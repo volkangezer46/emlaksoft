@@ -12,17 +12,30 @@ const DEMO_TENANT_NAME = "Demo Emlak Ofisi";
 
 export type DemoLoginResult = { error?: string };
 
+function errMsg(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  return "Bilinmeyen hata";
+}
+
 async function findAuthUserIdByEmail(
   admin: ReturnType<typeof createAdminClient>,
   email: string,
 ): Promise<string | null> {
-  const { data, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
-  if (error) {
-    console.error("findAuthUserIdByEmail", error);
-    return null;
+  // Önce createUser başarısız olunca kullanılır; sayfalama ile ara
+  let page = 1;
+  for (;;) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) {
+      console.error("findAuthUserIdByEmail", error);
+      return null;
+    }
+    const hit = data.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    if (hit) return hit.id;
+    if (data.users.length < 200) return null;
+    page += 1;
+    if (page > 20) return null;
   }
-  const hit = data.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-  return hit?.id ?? null;
 }
 
 async function ensureAuthUser(
@@ -51,22 +64,25 @@ async function ensureAuthUser(
   const existingId = await findAuthUserIdByEmail(admin, persona.email);
   if (!existingId) throw new Error("Demo kullanıcı bulundu ama kimlik alınamadı.");
 
-  await admin.auth.admin.updateUserById(existingId, {
+  const { error: updErr } = await admin.auth.admin.updateUserById(existingId, {
     password: DEMO_PASSWORD,
     email_confirm: true,
     user_metadata: { full_name: persona.label },
     app_metadata: meta,
   });
+  if (updErr) throw new Error(updErr.message);
+
   return existingId;
 }
 
 async function ensureDemoTenant(): Promise<string> {
   const admin = createAdminClient();
-  const { data: existingTenant } = await admin
+  const { data: existingTenant, error: findErr } = await admin
     .from("tenants")
     .select("id")
     .eq("slug", DEMO_TENANT_SLUG)
     .maybeSingle();
+  if (findErr) throw new Error(`Ofis sorgusu: ${findErr.message}`);
 
   if (existingTenant?.id) return existingTenant.id;
 
@@ -85,7 +101,7 @@ async function ensureDemoTenant(): Promise<string> {
     .single();
   if (error || !created) throw new Error(error?.message ?? "Demo ofis oluşturulamadı.");
 
-  await admin.from("subscriptions").insert({
+  const { error: subErr } = await admin.from("subscriptions").insert({
     tenant_id: created.id,
     plan: "professional",
     status: "active",
@@ -93,18 +109,24 @@ async function ensureDemoTenant(): Promise<string> {
     amount_try: 5990,
     current_period_start: new Date().toISOString(),
   });
+  // Abonelik opsiyonel — çakışırsa yoksay
+  if (subErr) console.warn("demo subscription", subErr.message);
 
   return created.id;
 }
 
 /** Yalnızca tıklanan kişiliği hazırlar (hızlı ilk giriş). */
 async function ensurePersona(persona: DemoPersona): Promise<void> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("Sunucu yapılandırması eksik (Supabase servis anahtarı).");
+  }
+
   const admin = createAdminClient();
   const tenantId = persona.kind === "office" ? await ensureDemoTenant() : null;
   const userId = await ensureAuthUser(admin, persona, tenantId);
 
   if (persona.kind === "platform") {
-    await admin.from("platform_staff").upsert(
+    const { error } = await admin.from("platform_staff").upsert(
       {
         id: userId,
         email: persona.email.toLowerCase(),
@@ -115,8 +137,9 @@ async function ensurePersona(persona: DemoPersona): Promise<void> {
       },
       { onConflict: "id" },
     );
+    if (error) throw new Error(`Personel kaydı: ${error.message}`);
   } else {
-    await admin.from("profiles").upsert(
+    const { error } = await admin.from("profiles").upsert(
       {
         id: userId,
         tenant_id: tenantId,
@@ -125,6 +148,7 @@ async function ensurePersona(persona: DemoPersona): Promise<void> {
       },
       { onConflict: "id" },
     );
+    if (error) throw new Error(`Profil kaydı: ${error.message}`);
   }
 }
 
@@ -143,7 +167,7 @@ export async function quickDemoLogin(personaId: string): Promise<DemoLoginResult
     await ensurePersona(persona);
   } catch (e) {
     console.error("quickDemoLogin:ensure", e);
-    return { error: "Demo hesap hazırlanamadı. Ortam değişkenlerini kontrol edin." };
+    return { error: `Demo hesap hazırlanamadı: ${errMsg(e)}` };
   }
 
   const supabase = await createClient();
@@ -154,7 +178,7 @@ export async function quickDemoLogin(personaId: string): Promise<DemoLoginResult
 
   if (error) {
     console.error("quickDemoLogin:signIn", error);
-    return { error: "Demo giriş başarısız. Lütfen tekrar deneyin." };
+    return { error: `Demo giriş başarısız: ${error.message}` };
   }
 
   redirect(persona.kind === "platform" ? "/admin" : "/app");
