@@ -1,0 +1,178 @@
+"use client";
+
+import { useActionState, useEffect, useRef, useState, startTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Building2, RefreshCw, UserPlus, X } from "lucide-react";
+import { createBranch, createTeamMember, type TeamResult } from "@/app/actions/team";
+import { PhoneInput } from "@/components/ui/phone-input";
+
+type Branch = { id: string; name: string };
+type Province = { id: string; name: string };
+
+const initial: TeamResult = {};
+
+const roleOptions: { value: string; label: string }[] = [
+  { value: "advisor", label: "Danışman" },
+  { value: "team_lead", label: "Takım lideri" },
+  { value: "branch_manager", label: "Şube müdürü" },
+  { value: "gm", label: "Genel müdür" },
+  { value: "call_center", label: "Çağrı merkezi" },
+  { value: "accounting", label: "Muhasebe" },
+  { value: "readonly", label: "Salt okunur" },
+];
+
+function randomPassword() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  let out = "";
+  for (let i = 0; i < 12; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+}
+
+export function AddMemberDialog({ branches }: { branches: Branch[] }) {
+  const [open, setOpen] = useState(false);
+  const [pw, setPw] = useState("");
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const [state, action, pending] = useActionState(async (prev: TeamResult, formData: FormData) => {
+    const result = await createTeamMember(prev, formData);
+    if (result.ok) {
+      startTransition(() => {
+        setOpen(false);
+        formRef.current?.reset();
+        setPw("");
+        router.refresh();
+      });
+    }
+    return result;
+  }, initial);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    if (open) window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  return (
+    <>
+      <button
+        onClick={() => {
+          setPw(randomPassword());
+          setOpen(true);
+        }}
+        className="btn-shine inline-flex items-center gap-2 rounded-[10px] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
+      >
+        <UserPlus className="h-4 w-4" /> Ekip üyesi ekle
+      </button>
+
+      {open ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/40 p-4 backdrop-blur-sm sm:items-center">
+          <div className="w-full max-w-lg rounded-[20px] border border-line bg-surface shadow-[var(--shadow-lg)]">
+            <div className="flex items-center justify-between border-b border-line px-6 py-4">
+              <h2 className="font-display text-lg font-bold text-ink-950">Ekip üyesi ekle</h2>
+              <button onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-[8px] text-text-muted hover:bg-canvas" aria-label="Kapat"><X className="h-5 w-5" /></button>
+            </div>
+
+            <form ref={formRef} action={action} className="grid gap-4 p-6 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className="mb-1.5 block text-sm text-text-muted" htmlFor="full_name">Ad soyad *</label>
+                <input id="full_name" name="full_name" required className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" placeholder="Örn. Merve Akın" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm text-text-muted" htmlFor="email">E-posta *</label>
+                <input id="email" name="email" type="email" required className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" placeholder="danisman@ofis.com" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm text-text-muted" htmlFor="phone">Telefon</label>
+                <PhoneInput id="phone" name="phone" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm text-text-muted" htmlFor="role">Rol</label>
+                <select id="role" name="role" defaultValue="advisor" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
+                  {roleOptions.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm text-text-muted" htmlFor="branch_id">Şube</label>
+                <select id="branch_id" name="branch_id" defaultValue="" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
+                  <option value="">Şube atanmadı</option>
+                  {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="mb-1.5 block text-sm text-text-muted" htmlFor="password">Geçici şifre *</label>
+                <div className="flex gap-2">
+                  <input id="password" name="password" value={pw} onChange={(e) => setPw(e.target.value)} className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm tabular-nums outline-none focus:border-brand-400" />
+                  <button type="button" onClick={() => setPw(randomPassword())} className="inline-flex shrink-0 items-center gap-1.5 rounded-[10px] border border-line px-3 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600" aria-label="Yeni şifre üret"><RefreshCw className="h-3.5 w-3.5" /> Üret</button>
+                </div>
+                <p className="mt-1.5 text-[11px] text-text-faint">Bu şifreyi üyeye iletin; ilk girişte değiştirmesini önerin.</p>
+              </div>
+
+              {state.error ? <p className="text-sm text-danger-500 sm:col-span-2" role="alert">{state.error}</p> : null}
+
+              <div className="flex justify-end gap-2 sm:col-span-2">
+                <button type="button" onClick={() => setOpen(false)} className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-medium text-ink-950 hover:bg-canvas">Vazgeç</button>
+                <button type="submit" disabled={pending} className="rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60">{pending ? "Ekleniyor…" : "Üyeyi ekle"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+export function AddBranchDialog({ provinces }: { provinces: Province[] }) {
+  const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const [state, action, pending] = useActionState(async (prev: TeamResult, formData: FormData) => {
+    const result = await createBranch(prev, formData);
+    if (result.ok) {
+      startTransition(() => {
+        setOpen(false);
+        formRef.current?.reset();
+        router.refresh();
+      });
+    }
+    return result;
+  }, initial);
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-[10px] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+        <Building2 className="h-3.5 w-3.5" /> Şube ekle
+      </button>
+
+      {open ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/40 p-4 backdrop-blur-sm sm:items-center">
+          <div className="w-full max-w-md rounded-[20px] border border-line bg-surface shadow-[var(--shadow-lg)]">
+            <div className="flex items-center justify-between border-b border-line px-6 py-4">
+              <h2 className="font-display text-lg font-bold text-ink-950">Şube ekle</h2>
+              <button onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-[8px] text-text-muted hover:bg-canvas" aria-label="Kapat"><X className="h-5 w-5" /></button>
+            </div>
+            <form ref={formRef} action={action} className="grid gap-4 p-6">
+              <div>
+                <label className="mb-1.5 block text-sm text-text-muted" htmlFor="branch_name">Şube adı *</label>
+                <input id="branch_name" name="name" required className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" placeholder="Örn. Merkez Şube" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm text-text-muted" htmlFor="province_id">İl</label>
+                <select id="province_id" name="province_id" defaultValue="" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
+                  <option value="">Seçiniz</option>
+                  {provinces.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              {state.error ? <p className="text-sm text-danger-500" role="alert">{state.error}</p> : null}
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setOpen(false)} className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-medium text-ink-950 hover:bg-canvas">Vazgeç</button>
+                <button type="submit" disabled={pending} className="rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60">{pending ? "Ekleniyor…" : "Şubeyi ekle"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}

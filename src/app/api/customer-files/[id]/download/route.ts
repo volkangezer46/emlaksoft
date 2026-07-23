@@ -1,0 +1,36 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const supabase = await createClient();
+
+  const { data: file } = await supabase
+    .from("customer_files")
+    .select("file_name, file_type, storage_path")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!file) {
+    return NextResponse.json({ error: "Dosya bulunamadı" }, { status: 404 });
+  }
+
+  const { data: blob, error } = await supabase.storage
+    .from("customer-files")
+    .download(file.storage_path);
+
+  if (error || !blob) {
+    console.error("download error", error);
+    return NextResponse.json({ error: "İndirme başarısız" }, { status: 500 });
+  }
+
+  return new NextResponse(blob, {
+    headers: {
+      "Content-Type": file.file_type,
+      "Content-Disposition": `attachment; filename="${encodeURIComponent(file.file_name)}"`,
+    },
+  });
+}

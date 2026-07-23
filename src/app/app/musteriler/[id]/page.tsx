@@ -1,0 +1,407 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import {
+  ArrowLeft,
+  CalendarDays,
+  Mail,
+  MapPin,
+  MessageCircle,
+  PhoneCall,
+  Target,
+} from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { requireModulePage } from "@/lib/require-module-page";
+import { EditCustomerDialog } from "./edit-customer-dialog";
+import { DeleteCustomerButton } from "./delete-customer-button";
+import { Customer360Tabs } from "./customer-360-tabs";
+import { CustomerTasks, type CustomerTaskRow } from "./customer-tasks";
+import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
+import { CommunicationTimeline } from "@/components/app/communication-timeline";
+import { MatchedPropertiesWidget } from "./matched-properties-widget";
+import type { MatchProperty } from "@/lib/matching";
+
+const RING_C = 2 * Math.PI * 42;
+
+type Rel = { name?: string } | { name?: string }[] | null;
+
+type Demand = {
+  id: string;
+  transaction_type: string;
+  property_type: string | null;
+  budget_min: number | null;
+  budget_max: number | null;
+  rooms: string | null;
+  min_sqm: number | null;
+  urgency: string | null;
+  status: string;
+  province_id: string | null;
+  created_at: string;
+};
+
+type Call = {
+  id: string;
+  direction: string;
+  phone: string;
+  duration_sec: number | null;
+  disposition: string | null;
+  started_at: string;
+};
+
+type Appt = {
+  id: string;
+  appointment_type: string;
+  scheduled_at: string;
+  location: string | null;
+  status: string;
+};
+
+function relName(value: Rel) {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0]?.name ?? null) : value.name;
+}
+
+function initials(name: string) {
+  return name.split(/\s+/).map((p) => p[0] ?? "").join("").slice(0, 2).toUpperCase();
+}
+
+const apptTypeLabel: Record<string, string> = {
+  showing: "Yer gösterme",
+  office: "Ofis görüşmesi",
+  valuation: "Değerleme",
+  contract: "Sözleşme",
+};
+
+export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { perms } = await requireModulePage("customers");
+  const canEdit = (perms.customers ?? []).includes("edit");
+  const canDelete = (perms.customers ?? []).includes("delete");
+  const canTaskCreate = (perms.tasks ?? []).includes("create");
+  const canTaskEdit = (perms.tasks ?? []).includes("edit");
+  const canTaskDelete = (perms.tasks ?? []).includes("delete");
+  const canTaskView = (perms.tasks ?? []).includes("view");
+  const { id } = await params;
+  const supabase = await createClient();
+
+  const { data: customer } = await supabase
+    .from("customers")
+    .select("id, full_name, phone, email, customer_types, tags, source, notes, blacklist, created_at, province_id, province:geo_provinces(name), district:geo_districts(name)")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!customer) notFound();
+
+  const [
+    { data: demandsData },
+    { data: callsData },
+    { data: apptsData },
+    { data: provinces },
+    { data: auditData },
+    { data: dealsData },
+    { data: consentsData },
+    { data: filesData },
+    { data: tasksData },
+    { data: commsData },
+    { data: propertiesForMatch },
+  ] = await Promise.all([
+    supabase
+      .from("customer_demands")
+      .select("id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, province_id, created_at")
+      .eq("customer_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("calls")
+      .select("id, direction, phone, duration_sec, disposition, started_at")
+      .eq("customer_id", id)
+      .order("started_at", { ascending: false })
+      .limit(50),
+    supabase
+      .from("appointments")
+      .select("id, appointment_type, scheduled_at, location, status")
+      .eq("customer_id", id)
+      .order("scheduled_at", { ascending: false })
+      .limit(50),
+    supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
+    supabase
+      .from("audit_logs")
+      .select("id, action, created_at")
+      .eq("entity_id", id)
+      .order("created_at", { ascending: false })
+      .limit(40),
+    supabase
+      .from("deals")
+      .select("id, stage, deal_type, deal_value, updated_at")
+      .eq("customer_id", id)
+      .order("updated_at", { ascending: false })
+      .limit(40),
+    supabase
+      .from("iys_consents")
+      .select("id, channel, status, granted_at")
+      .eq("customer_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("customer_files")
+      .select("id, file_name, file_size, file_type, storage_path, label, created_at, uploader:profiles(full_name)")
+      .eq("customer_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("tasks")
+      .select("id, title, kind, priority, status, due_at")
+      .eq("customer_id", id)
+      .order("status", { ascending: true })
+      .order("due_at", { ascending: true, nullsFirst: false })
+      .limit(50),
+    supabase
+      .from("communications")
+      .select("id, channel, direction, subject, body, outcome, duration_sec, scheduled_at, created_at, created_by:profiles(full_name)")
+      .eq("customer_id", id)
+      .order("created_at", { ascending: false })
+      .limit(100),
+    // Portföy öneri widget'ı için — sadece aktif portföyler
+    supabase
+      .from("properties")
+      .select("id, property_code, title, transaction_type, property_type, status, list_price, province_id, district_id, features")
+      .is("deleted_at", null)
+      .in("status", ["live", "draft", "Yayında"])
+      .order("created_at", { ascending: false })
+      .limit(100),
+  ]);
+
+  const demands = (demandsData ?? []) as Demand[];
+  const calls = (callsData ?? []) as Call[];
+  const appts = (apptsData ?? []) as Appt[];
+  const audit = (auditData ?? []) as { id: string; action: string; created_at: string }[];
+
+  // Portföy öneri widget'ı için
+  const activeDemands = demands
+    .filter((d) => ["new", "active"].includes(d.status))
+    .map((d) => ({
+      id: d.id,
+      transaction_type: d.transaction_type,
+      property_type: d.property_type,
+      province_id: d.province_id,
+      district_id: null,
+      budget_min: d.budget_min != null ? Number(d.budget_min) : null,
+      budget_max: d.budget_max != null ? Number(d.budget_max) : null,
+      rooms: d.rooms,
+      min_sqm: d.min_sqm != null ? Number(d.min_sqm) : null,
+      urgency: d.urgency,
+      status: d.status,
+    }));
+  const matchProperties = (propertiesForMatch ?? []).map((p) => ({
+    ...p,
+    list_price: p.list_price != null ? Number(p.list_price) : null,
+    features: (p.features ?? {}) as MatchProperty["features"],
+  })) as MatchProperty[];
+
+  const province = relName(customer.province as Rel);
+  const district = relName(customer.district as Rel);
+  const types: string[] = customer.customer_types ?? [];
+  const tags: string[] = customer.tags ?? [];
+
+  const score = Math.min(96, 42 + calls.length * 6 + demands.length * 10 + appts.length * 8);
+
+  type Activity = {
+    key: string;
+    title: string;
+    sub: string;
+    time: string;
+    tone: string;
+  };
+
+  const activity: Activity[] = [
+    ...calls.map((c): Activity => ({
+      key: `c-${c.id}`,
+      title: c.disposition ?? (c.direction === "missed" ? "Cevapsız çağrı" : "Çağrı"),
+      sub: `${formatTurkishPhone(c.phone)}${c.duration_sec ? ` · ${Math.floor(c.duration_sec / 60)}:${String(c.duration_sec % 60).padStart(2, "0")}` : ""}`,
+      time: c.started_at,
+      tone: c.direction === "missed" ? "bg-danger-500/10 text-danger-500" : "bg-brand-600/10 text-brand-600",
+    })),
+    ...appts.map((a): Activity => ({
+      key: `a-${a.id}`,
+      title: apptTypeLabel[a.appointment_type] ?? "Randevu",
+      sub: a.location ?? "Konum belirtilmedi",
+      time: a.scheduled_at,
+      tone: "bg-mint-500/12 text-mint-600",
+    })),
+  ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+
+  const stats = [
+    { label: "Talep", value: demands.length, icon: Target },
+    { label: "Çağrı", value: calls.length, icon: PhoneCall },
+    { label: "Randevu", value: appts.length, icon: CalendarDays },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <Link href="/app/musteriler" className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600">
+        <ArrowLeft className="h-4 w-4" /> Müşteri merkezine dön
+      </Link>
+
+      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
+        <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-brand-600/30 blur-[90px]" />
+        <div className="relative grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-center">
+          <div className="flex items-start gap-4">
+            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-[20px] bg-[image:var(--grad-brand)] font-display text-xl font-extrabold text-white shadow-[var(--shadow-glow-brand)]">
+              {initials(customer.full_name)}
+            </span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="font-display text-2xl font-extrabold text-white md:text-3xl">{customer.full_name}</h1>
+                {customer.blacklist ? (
+                  <span className="rounded-full bg-danger-500/20 px-2 py-0.5 text-[10px] font-bold text-danger-400">Kara liste</span>
+                ) : null}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {types.length > 0 ? (
+                  types.map((t) => (
+                    <span key={t} className="rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold text-white/80">{t}</span>
+                  ))
+                ) : (
+                  <span className="text-xs text-white/40">Tür belirtilmedi</span>
+                )}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-white/70">
+                {customer.phone ? (
+                  <span className="flex items-center gap-1.5 tabular-nums">
+                    <PhoneCall className="h-3.5 w-3.5 text-mint-400" />
+                    {formatTurkishPhone(customer.phone)}
+                  </span>
+                ) : null}
+                {customer.email ? (
+                  <span className="flex items-center gap-1.5">
+                    <Mail className="h-3.5 w-3.5 text-cyan-400" />
+                    {customer.email}
+                  </span>
+                ) : null}
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-white/50" />
+                  {[district, province].filter(Boolean).join(", ") || "Konum yok"}
+                </span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {customer.phone ? (
+                  <a href={toTelHref(customer.phone) ?? "#"} className="btn-shine inline-flex items-center gap-1.5 rounded-[10px] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 transition hover:bg-white/90">
+                    <PhoneCall className="h-4 w-4" /> Ara
+                  </a>
+                ) : null}
+                {customer.phone ? (
+                  <a
+                    href={toWhatsAppLink(customer.phone) ?? "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                  >
+                    <MessageCircle className="h-4 w-4" /> WhatsApp
+                  </a>
+                ) : null}
+                <Link href="/app/arama" className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                  <PhoneCall className="h-4 w-4" /> Görüşme kaydet
+                </Link>
+                <Link href="/app/randevular" className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                  <CalendarDays className="h-4 w-4" /> Randevu ver
+                </Link>
+                <Link href={`/app/eslestirme?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                  <Target className="h-4 w-4" /> Eşleştir
+                </Link>
+                {canEdit ? (
+                  <EditCustomerDialog
+                    customer={{
+                      id: customer.id,
+                      full_name: customer.full_name,
+                      phone: customer.phone,
+                      email: customer.email,
+                      customer_types: customer.customer_types,
+                      province_id: customer.province_id,
+                      notes: customer.notes,
+                    }}
+                    provinces={provinces ?? []}
+                  />
+                ) : null}
+                {canDelete ? <DeleteCustomerButton customerId={customer.id} /> : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-5 lg:justify-end">
+            <div className="relative grid h-28 w-28 shrink-0 place-items-center">
+              <div className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-30 blur-md" style={{ background: "conic-gradient(from 0deg, var(--mint-500), var(--brand-500), var(--mint-500))" }} />
+              <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
+                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="8" />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="42"
+                  fill="none"
+                  stroke="var(--mint-400)"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  className="ring-sweep"
+                  style={{ "--circ": RING_C, "--dash": RING_C * (1 - score / 100) } as React.CSSProperties}
+                />
+              </svg>
+              <div className="absolute text-center">
+                <p className="font-display text-2xl font-extrabold text-white">{score}</p>
+                <p className="text-[9px] text-white/55">Müşteri skoru</p>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              {stats.map((s) => (
+                <div key={s.label} className="flex items-center gap-2.5 rounded-[12px] border border-white/10 bg-white/5 px-3 py-2 backdrop-blur">
+                  <s.icon className="h-4 w-4 text-mint-400" />
+                  <span className="font-display text-lg font-extrabold text-white">{s.value}</span>
+                  <span className="text-[11px] text-white/50">{s.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <Customer360Tabs
+        customerId={customer.id}
+        customerName={customer.full_name}
+        defaultProvinceId={customer.province_id}
+        provinces={provinces ?? []}
+        demands={demands}
+        activity={activity}
+        tags={tags}
+        notes={customer.notes}
+        source={customer.source}
+        createdAt={customer.created_at}
+        audit={audit}
+        deals={(dealsData ?? []).map((d) => ({
+          id: d.id,
+          stage: d.stage,
+          deal_type: d.deal_type,
+          deal_value: d.deal_value != null ? Number(d.deal_value) : null,
+          updated_at: d.updated_at,
+        }))}
+        consents={consentsData ?? []}
+        files={filesData ?? []}
+      />
+
+      <CommunicationTimeline
+        customerId={customer.id}
+        initialItems={(commsData ?? []) as Parameters<typeof CommunicationTimeline>[0]["initialItems"]}
+        canCreate={(perms.customers ?? []).includes("create")}
+      />
+
+      {canTaskView ? (
+        <CustomerTasks
+          customerId={customer.id}
+          tasks={(tasksData ?? []) as CustomerTaskRow[]}
+          canCreate={canTaskCreate}
+          canEdit={canTaskEdit}
+          canDelete={canTaskDelete}
+        />
+      ) : null}
+
+      <MatchedPropertiesWidget
+        demands={activeDemands}
+        properties={matchProperties}
+      />
+    </div>
+  );
+}

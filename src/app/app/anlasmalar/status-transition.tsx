@@ -1,0 +1,78 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2, Workflow } from "lucide-react";
+import { updateDealStage, type DealStage } from "@/app/actions/deals";
+import { useToast } from "@/components/app/toast-provider";
+
+const FLOW: { from: DealStage; to: DealStage; label: string; tone: string }[] = [
+  { from: "new", to: "qualified", label: "Nitelikli yap", tone: "bg-brand-600" },
+  { from: "qualified", to: "negotiation", label: "Müzakereye al", tone: "bg-amber-500" },
+  { from: "negotiation", to: "won", label: "Kazanıldı + komisyon", tone: "bg-mint-600" },
+  { from: "negotiation", to: "lost", label: "Kaybedildi", tone: "bg-danger-500" },
+  { from: "qualified", to: "lost", label: "Kaybedildi", tone: "bg-danger-500" },
+  { from: "new", to: "lost", label: "Kaybedildi", tone: "bg-danger-500" },
+];
+
+export function StatusTransitionBar({ dealId, stage }: { dealId: string; stage: string }) {
+  const router = useRouter();
+  const { push } = useToast();
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  const options = FLOW.filter((f) => f.from === stage);
+
+  if (options.length === 0) return null;
+
+  function run(to: DealStage) {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("deal_id", dealId);
+      fd.set("stage", to);
+      if (to === "lost") fd.set("loss_reason", "Durum geçişi");
+      const res = await updateDealStage(fd);
+      if (res.error) push(res.error, "err");
+      else {
+        push(to === "won" ? "Kazanıldı · komisyon üretildi" : "Aşama güncellendi", "ok");
+        setOpen(false);
+        router.refresh();
+      }
+    });
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1 rounded-[8px] border border-line bg-surface px-2.5 py-1.5 text-[11px] font-bold text-ink-950 hover:border-brand-300"
+      >
+        {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Workflow className="h-3.5 w-3.5 text-brand-600" />}
+        Geçiş
+      </button>
+      {open ? (
+        <>
+          <button type="button" className="fixed inset-0 z-40" aria-label="Kapat" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-9 z-50 min-w-[200px] overflow-hidden rounded-[12px] border border-line bg-surface shadow-[var(--shadow-lg)]">
+            <p className="border-b border-line px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-text-faint">
+              Aşama geçişi
+            </p>
+            {options.map((o) => (
+              <button
+                key={o.to}
+                type="button"
+                disabled={pending}
+                onClick={() => run(o.to)}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-ink-950 hover:bg-canvas disabled:opacity-50"
+              >
+                <span className={`h-2 w-2 rounded-full ${o.tone}`} />
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}

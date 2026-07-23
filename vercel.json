@@ -1,0 +1,28 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/gunluk-ozet",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/randevu-hatirlat",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/gorev-hatirlat",
+      "schedule": "0 */2 * * *"
+    },
+    {
+      "path": "/api/cron/portal-teyit",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/abonelik-kontrol",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/leak-sla",
+      "schedule": "0 */12 * * *"
+    }
+  ]
+}

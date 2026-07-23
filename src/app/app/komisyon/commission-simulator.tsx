@@ -1,0 +1,139 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import {
+  Building2,
+  Calculator,
+  Percent,
+  ReceiptText,
+  UserRound,
+  Wallet,
+} from "lucide-react";
+
+const DONUT_C = 2 * Math.PI * 42;
+
+function parseNumber(value: string) {
+  const normalized = value.replace(/[^\d.,]/g, "").replace(/\./g, "").replace(",", ".");
+  return Number(normalized) || 0;
+}
+
+function money(value: number) {
+  return new Intl.NumberFormat("tr-TR", {
+    style: "currency",
+    currency: "TRY",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+export function CommissionSimulator() {
+  const [dealValue, setDealValue] = useState("6.750.000");
+  const [rate, setRate] = useState("3");
+  const [advisorShare, setAdvisorShare] = useState("60");
+  const [includeVat, setIncludeVat] = useState(true);
+
+  const result = useMemo(() => {
+    const deal = parseNumber(dealValue);
+    const commissionRate = Math.min(Math.max(Number(rate) || 0, 0), 100);
+    const advisorRate = Math.min(Math.max(Number(advisorShare) || 0, 0), 100);
+    const gross = deal * (commissionRate / 100);
+    const vat = includeVat ? gross * 0.2 : 0;
+    const advisor = gross * (advisorRate / 100);
+    const office = gross - advisor;
+    return { deal, gross, vat, advisor, office, advisorRate };
+  }, [advisorShare, dealValue, includeVat, rate]);
+
+  return (
+    <section className="dashboard-panel overflow-hidden rounded-[20px] border border-line bg-surface">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
+        <div>
+          <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Calculator className="h-4 w-4" /> Canlı hesaplama</p>
+          <h2 className="mt-1 font-display text-lg font-bold text-ink-950">Komisyon simülatörü</h2>
+        </div>
+        <label className="flex items-center gap-2 rounded-full border border-line bg-canvas px-3 py-2 text-xs font-semibold text-text-muted">
+          <input type="checkbox" checked={includeVat} onChange={(event) => setIncludeVat(event.target.checked)} className="accent-brand-600" /> %20 KDV hesapla
+        </label>
+      </div>
+
+      <div className="grid lg:grid-cols-[1fr_1.2fr]">
+        <div className="grid content-start gap-4 border-b border-line p-5 lg:border-b-0 lg:border-r">
+          <label className="text-sm font-medium text-ink-950">
+            İşlem bedeli
+            <div className="relative mt-1.5">
+              <Wallet className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-600" />
+              <input value={dealValue} onChange={(event) => setDealValue(event.target.value)} inputMode="decimal" className="w-full rounded-[11px] border border-line bg-canvas py-3 pl-10 pr-12 text-lg font-bold tabular-nums text-ink-950 outline-none transition focus:border-brand-400 focus:bg-surface" />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-text-faint">₺</span>
+            </div>
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-sm font-medium text-ink-950">
+              Komisyon oranı
+              <div className="relative mt-1.5">
+                <input value={rate} onChange={(event) => setRate(event.target.value)} inputMode="decimal" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 pr-9 text-sm font-semibold outline-none focus:border-brand-400" />
+                <Percent className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+              </div>
+            </label>
+            <label className="text-sm font-medium text-ink-950">
+              Danışman payı
+              <div className="relative mt-1.5">
+                <input value={advisorShare} onChange={(event) => setAdvisorShare(event.target.value)} inputMode="decimal" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 pr-9 text-sm font-semibold outline-none focus:border-brand-400" />
+                <Percent className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+              </div>
+            </label>
+          </div>
+          <div className="rounded-[13px] border border-brand-300/35 bg-brand-600/5 p-4">
+            <p className="text-[10px] font-bold uppercase tracking-[.12em] text-brand-600">Brüt komisyon</p>
+            <p className="mt-1 font-display text-3xl font-extrabold tabular-nums text-ink-950">{money(result.gross)}</p>
+            <p className="mt-1 text-xs text-text-muted">{money(result.deal)} işlem bedeli üzerinden %{rate}</p>
+          </div>
+        </div>
+
+        <div className="p-5">
+          <div className="grid gap-5 sm:grid-cols-[180px_1fr] sm:items-center">
+            <div className="relative mx-auto grid h-40 w-40 place-items-center">
+              {/* rotating conic glow behind the donut */}
+              <div className="conic-spin pointer-events-none absolute inset-1 rounded-full opacity-40 blur-md" style={{ background: "conic-gradient(from 0deg, var(--brand-500), var(--mint-500), var(--brand-500))" }} />
+              <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90">
+                <circle cx="50" cy="50" r="42" fill="none" stroke="var(--mint-500)" strokeWidth="9" opacity="0.9" />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="42"
+                  fill="none"
+                  stroke="var(--brand-600)"
+                  strokeWidth="9"
+                  strokeLinecap="round"
+                  strokeDasharray={`${DONUT_C * (result.advisorRate / 100)} ${DONUT_C}`}
+                  style={{ transition: "stroke-dasharray .7s cubic-bezier(0.16, 1, 0.3, 1)" }}
+                />
+                {/* boundary marker at end of advisor arc */}
+                <circle
+                  cx={50 + 42 * Math.cos((result.advisorRate / 100) * 2 * Math.PI)}
+                  cy={50 + 42 * Math.sin((result.advisorRate / 100) * 2 * Math.PI)}
+                  r="3.2"
+                  className="glow-dot"
+                  fill="#fff"
+                  style={{ transition: "cx .7s cubic-bezier(0.16, 1, 0.3, 1), cy .7s cubic-bezier(0.16, 1, 0.3, 1)" }}
+                />
+              </svg>
+              <div className="relative grid h-24 w-24 place-items-center rounded-full bg-surface text-center shadow-[0_8px_24px_-10px_rgba(15,23,42,0.4)]">
+                <div><p className="text-[10px] text-text-faint">Dağıtılacak</p><p className="font-display text-base font-extrabold tabular-nums text-ink-950">{money(result.gross)}</p></div>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {[
+                { icon: UserRound, label: `Danışman payı · %${result.advisorRate}`, value: result.advisor, color: "text-brand-600", bg: "bg-brand-600/10" },
+                { icon: Building2, label: `Ofis payı · %${100 - result.advisorRate}`, value: result.office, color: "text-mint-600", bg: "bg-mint-500/10" },
+                { icon: ReceiptText, label: "Hesaplanan KDV", value: result.vat, color: "text-amber-500", bg: "bg-amber-400/12" },
+              ].map((item) => (
+                <div key={item.label} className="flex items-center gap-3 rounded-[12px] border border-line bg-canvas/60 p-3">
+                  <span className={`grid h-9 w-9 place-items-center rounded-[10px] ${item.bg} ${item.color}`}><item.icon className="h-4 w-4" /></span>
+                  <div className="min-w-0 flex-1"><p className="text-[10px] text-text-muted">{item.label}</p><p className="font-display text-base font-bold tabular-nums text-ink-950">{money(item.value)}</p></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}

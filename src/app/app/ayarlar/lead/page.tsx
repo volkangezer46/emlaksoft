@@ -1,0 +1,62 @@
+import Link from "next/link";
+import { ArrowLeft, Radio, Zap } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { requireModulePage } from "@/lib/require-module-page";
+import { LeadCapturePanel } from "./lead-capture-panel";
+
+export const dynamic = "force-dynamic";
+
+export default async function LeadCaptureSettingsPage() {
+  const ctx = await requireModulePage("settings");
+  const supabase = await createClient();
+
+  const { data: tenant } = await supabase
+    .from("tenants")
+    .select("lead_capture_token, lead_capture_enabled, slug")
+    .eq("id", ctx.tenantId)
+    .maybeSingle();
+
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const token = tenant?.lead_capture_token ?? "";
+  const enabled = tenant?.lead_capture_enabled !== false;
+  const vitrinUrl = tenant?.slug ? `${baseUrl}/vitrin/${tenant.slug}` : "";
+
+  const { count: leadCount } = await supabase
+    .from("customers")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", ctx.tenantId)
+    .eq("auto_assigned", true);
+
+  return (
+    <div className="space-y-6">
+      <Link href="/app/ayarlar" className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600">
+        <ArrowLeft className="h-4 w-4" /> Ayarlara dön
+      </Link>
+
+      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
+        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-mint-500/30 blur-[80px]" />
+        <div className="relative flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
+              <Radio className="h-4 w-4" /> Aday yakalama
+            </span>
+            <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">Gelen aday & hızlı yanıt</h1>
+            <p className="mt-1 max-w-xl text-sm text-white/60">
+              Web sitesi formu, reklam veya portal adaylarını CRM&apos;e otomatik düşürün. Her aday sırayla
+              en uygun danışmana atanır ve anında bildirim gönderilir.
+            </p>
+          </div>
+          <div className="rounded-[14px] border border-white/12 bg-white/[0.05] px-5 py-3 text-center">
+            <p className="flex items-center justify-center gap-1.5 font-display text-2xl font-extrabold text-mint-300">
+              <Zap className="h-5 w-5" /> {leadCount ?? 0}
+            </p>
+            <p className="text-[10px] text-white/50">otomatik atanan aday</p>
+          </div>
+        </div>
+      </section>
+
+      <LeadCapturePanel token={token} enabled={enabled} baseUrl={baseUrl} vitrinUrl={vitrinUrl} />
+    </div>
+  );
+}
