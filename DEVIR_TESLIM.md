@@ -98,6 +98,26 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 
 ## Bu sohbette tamamlanan işler
 
+### 23) Profesyonel katman — SEO, hata sayfaları, a11y (24 Temmuz 2026)
+
+**Build: ✓ 0 hata.** Production deploy (`44f2f10`, `1934299`).
+
+#### SEO / sosyal paylaşım
+- Zengin `metadata`: Open Graph, Twitter card, keywords, robots (googleBot max-preview), formatDetection, canonical, category
+- **Dinamik markalı Open Graph görseli** — `src/app/opengraph-image.tsx` (`next/og` ImageResponse, 1200×630, gradient + rozetler)
+- **Landing JSON-LD** yapılandırılmış veri (Organization + SoftwareApplication schema)
+- demo/kayıt/giriş sayfalarına SEO başlık + description + canonical (giriş noindex)
+
+#### Hata sayfaları (markalı)
+- **`not-found.tsx`** — premium 404 (gradient hero, hızlı bağlantılar)
+- **`global-error.tsx`** — root layout hatalarını yakalayan kendi html/body'li fallback
+
+#### Erişilebilirlik (a11y)
+- Site geneli `:focus-visible` görünür odak halkası (koyu bölümlerde cyan kontrast)
+- **"İçeriğe atla"** skip-link (Tab ile görünür) → landing/app/admin `#main-content`
+
+---
+
 ### 22) Lead skoru (liste) + komisyon split editörü (24 Temmuz 2026)
 
 **Build: ✓ 0 hata.** Production deploy (`514f197`, `ba4859c`).
