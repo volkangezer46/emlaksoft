@@ -77,8 +77,9 @@ export function AdminTopbar({
   const quickItems = QUICK.filter((q) => modules.includes(q.module));
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center justify-between gap-3 border-b border-line/80 bg-surface/85 px-4 backdrop-blur-xl md:px-5">
-      <div className="flex min-w-0 items-center gap-3">
+    <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-line/80 bg-surface/85 px-4 backdrop-blur-xl md:px-6">
+      {/* Sol: logo + başlık — sabit genişlik */}
+      <div className="flex w-52 shrink-0 items-center gap-3">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-amber-400/15 text-amber-600">
           <Radio className="h-4 w-4" />
         </span>
@@ -86,14 +87,14 @@ export function AdminTopbar({
           <p className="text-[10px] font-bold uppercase tracking-[.14em] text-amber-600">
             EmlakSoft · {roleLabel}
           </p>
-          <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-ink-950">
+          <p className="truncate text-sm font-semibold text-ink-950">
             {title}
-            <span className="hidden text-xs font-normal text-text-faint lg:inline">· {tagline}</span>
           </p>
         </div>
       </div>
 
-      <div className="hidden flex-1 justify-center px-6 md:flex">
+      {/* Orta: arama — flex-1 ile tüm boş alanı kapla */}
+      <div className="hidden flex-1 md:block">
         <CommandPalette modules={modules} />
       </div>
 

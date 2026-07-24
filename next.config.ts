@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,
+  // Turbopack dev cache — yerel geliştirmede yeniden derlemeyi hızlandırır
+  cacheMaxMemorySize: 0, // disk cache'e devret, RAM'i serbest bırak
 
   images: {
     formats: ["image/avif", "image/webp"],
