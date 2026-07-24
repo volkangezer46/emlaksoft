@@ -53,18 +53,20 @@ export default async function AppLayout({
   const { data: profile } = user
     ? await supabase
         .from("profiles")
-        .select("full_name, role, tenant_id, tenants(name, plan, status)")
+        .select("full_name, role, tenant_id, tenants(name, plan, status, brand_color)")
         .eq("id", user.id)
         .maybeSingle()
     : { data: null };
 
   const tenant = profile?.tenants as
-    | { name?: string; plan?: string; status?: string }
-    | { name?: string; plan?: string; status?: string }[]
+    | { name?: string; plan?: string; status?: string; brand_color?: string | null }
+    | { name?: string; plan?: string; status?: string; brand_color?: string | null }[]
     | null
     | undefined;
   const office =
     (Array.isArray(tenant) ? tenant[0] : tenant) ?? undefined;
+  // Beyaz etiket: ofisin marka rengi geçerliyse panel tema değişkenlerini override et
+  const brandColor = office?.brand_color && /^#[0-9a-fA-F]{6}$/.test(office.brand_color) ? office.brand_color : null;
   const fullName = String(profile?.full_name ?? "ES");
   const initials = fullName
     .split(/\s+/)
@@ -130,7 +132,10 @@ export default async function AppLayout({
   return (
     <ToastProvider>
       <ErrorBoundary>
-        <div className="flex min-h-screen bg-canvas">
+        {brandColor ? (
+          <style>{`.brand-scope{--brand-600:${brandColor};--brand-700:color-mix(in srgb,${brandColor} 80%,#000);--brand-500:color-mix(in srgb,${brandColor} 86%,#fff);--brand-400:color-mix(in srgb,${brandColor} 68%,#fff);--brand-300:color-mix(in srgb,${brandColor} 42%,#fff);--grad-brand:linear-gradient(120deg,${brandColor},var(--cyan-400) 55%,var(--mint-500));--shadow-glow-brand:0 20px 50px -18px color-mix(in srgb,${brandColor} 55%,transparent);}`}</style>
+        ) : null}
+        <div className={`flex min-h-screen bg-canvas${brandColor ? " brand-scope" : ""}`}>
           <AppPrefetcher tenantId={tenantId} />
           <RealtimeRefresh tenantId={tenantId} />
         <AppSidebar
