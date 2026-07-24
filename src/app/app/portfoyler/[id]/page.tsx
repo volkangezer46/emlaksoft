@@ -28,6 +28,7 @@ import { PropertyMediaManager, type MediaItem } from "./property-media-manager";
 import { AiContentPanel } from "./ai-content-panel";
 import { PropertyStatusHistory, PropertyAuthorizationPanel, PublishToPortalsPanel } from "./property-extras";
 import { PropertyHealthCard, ListingQualityCard } from "@/components/app/property-health-card";
+import { RelatedPropertiesWidget } from "./related-properties-widget";
 import { computePropertyHealth, computeListingQuality } from "@/lib/property-health";
 import { computePriceHealth } from "@/lib/price-health";
 import { isEndeksaConfigured } from "@/lib/integrations/endeksa";
@@ -540,6 +541,14 @@ export default async function PropertyDetailPage({
       <PropertyStatusHistory
         propertyId={id}
         initialHistory={statusHistory as Parameters<typeof PropertyStatusHistory>[0]["initialHistory"]}
+      />
+
+      {/* Benzer portföyler */}
+      <RelatedPropertiesWidget
+        currentId={id}
+        transactionType={property.transaction_type}
+        propertyType={property.property_type}
+        provinceId={property.province_id}
       />
     </div>
   );

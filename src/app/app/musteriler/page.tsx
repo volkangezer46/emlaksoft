@@ -24,11 +24,27 @@ type CustomerRow = {
   phone: string | null;
   email: string | null;
   customer_types: string[] | null;
+  source: string | null;
   notes: string | null;
   blacklist: boolean | null;
+  assigned_to: string | null;
   created_at: string;
   province: { name: string } | { name: string }[] | null;
 };
+
+const SOURCE_LABELS: Record<string, string> = {
+  referral:    "Referans",
+  web:         "Web sitesi",
+  social:      "Sosyal medya",
+  walk_in:     "Elden geldi",
+  phone:       "Telefon",
+  portal:      "Portal",
+  other:       "Diğer",
+};
+
+const CUSTOMER_TYPES = [
+  "Alıcı", "Satıcı", "Kiracı", "Mülk sahibi", "Yatırımcı",
+];
 
 function relativeAdded(iso: string) {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
@@ -55,31 +71,43 @@ function formatDate(iso: string) {
 export default async function CustomersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; type?: string; source?: string; from?: string; to?: string; assigned?: string }>;
 }) {
   const { perms } = await requireModulePage("customers");
   const canCreate = (perms.customers ?? []).includes("create");
   const canDelete = (perms.customers ?? []).includes("delete");
   const supabase = await createClient();
-  const { q = "" } = await searchParams;
+  const sp = await searchParams;
+  const q        = sp.q        ?? "";
+  const typeF    = sp.type     ?? "";
+  const sourceF  = sp.source   ?? "";
+  const fromF    = sp.from     ?? "";
+  const toF      = sp.to       ?? "";
+  const assignedF = sp.assigned ?? "";
 
-  const [{ data: customers }, { data: provinces }, { data: branches }] = await Promise.all([
+  const [{ data: customers }, { data: provinces }, { data: branches }, { data: advisors }] = await Promise.all([
     supabase
       .from("customers")
       .select(
-        "id, full_name, phone, email, customer_types, notes, blacklist, created_at, province:geo_provinces(name)",
+        "id, full_name, phone, email, customer_types, source, notes, blacklist, assigned_to, created_at, province:geo_provinces(name)",
       )
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(200),
-    supabase
-      .from("geo_provinces")
-      .select("id, name")
-      .order("name", { ascending: true }),
+      .limit(500),
+    supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
+    supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
   ]);
 
-  const allRows = (customers ?? []) as CustomerRow[];
+  let allRows = (customers ?? []) as CustomerRow[];
+
+  // Sunucu tarafı filtreler
+  if (typeF)    allRows = allRows.filter((c) => c.customer_types?.includes(typeF));
+  if (sourceF)  allRows = allRows.filter((c) => c.source === sourceF);
+  if (assignedF) allRows = allRows.filter((c) => c.assigned_to === assignedF);
+  if (fromF)    allRows = allRows.filter((c) => c.created_at >= fromF);
+  if (toF)      allRows = allRows.filter((c) => c.created_at <= toF + "T23:59:59");
+
   const needle = q.trim().toLocaleLowerCase("tr-TR");
   const rows = needle
     ? allRows.filter((customer) =>
@@ -90,6 +118,9 @@ export default async function CustomersPage({
     : allRows;
   const provinceList = provinces ?? [];
   const branchList = branches ?? [];
+  const advisorList = advisors ?? [];
+
+  const activeFilters = [typeF, sourceF, fromF, toF, assignedF].filter(Boolean).length;
   const ownerCount = allRows.filter((row) => row.customer_types?.includes("Mülk sahibi")).length;
   const buyerCount = allRows.filter((row) => row.customer_types?.includes("Alıcı")).length;
 
@@ -165,18 +196,86 @@ export default async function CustomersPage({
         </div>
       </section>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[16px] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]">
-        <form className="relative min-w-[240px] flex-1" action="/app/musteriler">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-          <input
-            name="q"
-            defaultValue={q}
-            placeholder="Ad, telefon, e-posta veya il ara…"
-            className="w-full rounded-[11px] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
-          />
-        </form>
+      {/* Filtre toolbar */}
+      <form className="rounded-[16px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] space-y-3" action="/app/musteriler">
+        <div className="flex flex-wrap gap-3">
+          {/* Arama */}
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+            <input
+              name="q"
+              defaultValue={q}
+              placeholder="Ad, telefon, e-posta ara…"
+              className="w-full rounded-[11px] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+            />
+          </div>
+          {/* Müşteri tipi */}
+          <select
+            name="type"
+            defaultValue={typeF}
+            className="rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+          >
+            <option value="">Tüm tipler</option>
+            {CUSTOMER_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          {/* Kaynak */}
+          <select
+            name="source"
+            defaultValue={sourceF}
+            className="rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+          >
+            <option value="">Tüm kaynaklar</option>
+            {Object.entries(SOURCE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+          {/* Danışman */}
+          {advisorList.length > 0 && (
+            <select
+              name="assigned"
+              defaultValue={assignedF}
+              className="rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+            >
+              <option value="">Tüm danışmanlar</option>
+              {advisorList.map((a) => <option key={a.id} value={a.id}>{a.full_name as string}</option>)}
+            </select>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Tarih aralığı */}
+          <div className="flex items-center gap-2 text-sm text-text-muted">
+            <span className="text-xs font-medium">Eklenme:</span>
+            <input
+              name="from"
+              type="date"
+              defaultValue={fromF}
+              className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+            />
+            <span>—</span>
+            <input
+              name="to"
+              type="date"
+              defaultValue={toF}
+              className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+            />
+          </div>
+          <button type="submit" className="rounded-[10px] bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700">
+            Filtrele
+          </button>
+          {(activeFilters > 0 || q) && (
+            <Link href="/app/musteriler" className="text-xs font-semibold text-text-muted hover:text-danger-500">
+              Temizle
+            </Link>
+          )}
+          <span className="ml-auto rounded-full bg-brand-600/10 px-3 py-1.5 text-xs font-semibold text-brand-600">
+            {rows.length} sonuç
+          </span>
+        </div>
+      </form>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-brand-600/10 px-3 py-1.5 text-xs font-semibold text-brand-600">{rows.length} sonuç</span>
+          <span />
+        </div>
+        <div className="flex items-center gap-2">
           <ExportCsvButton action={exportCustomersCsv} iconOnly label="Müşterileri CSV indir" />
         </div>
       </div>
