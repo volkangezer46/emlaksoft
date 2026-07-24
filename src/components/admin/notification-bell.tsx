@@ -1,9 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, Check, CheckCheck } from "lucide-react";
+import {
+  AlertOctagon,
+  AlertTriangle,
+  Bell,
+  BellOff,
+  CheckCheck,
+  CheckCircle2,
+  Info,
+  Settings,
+  type LucideIcon,
+} from "lucide-react";
 import { markAllPlatformNotificationsRead, markPlatformNotificationRead } from "@/app/actions/platform-notifications";
 
 type Notif = {
@@ -16,13 +26,16 @@ type Notif = {
   created_at: string;
 };
 
-const dotColor: Record<string, string> = {
-  success: "bg-mint-500",
-  info: "bg-brand-500",
-  warning: "bg-amber-400",
-  danger: "bg-danger-500",
-  system: "bg-cyan-400",
+const KIND_META: Record<string, { icon: LucideIcon; cls: string }> = {
+  success: { icon: CheckCircle2, cls: "bg-mint-500/12 text-mint-600" },
+  warning: { icon: AlertTriangle, cls: "bg-amber-400/15 text-amber-600" },
+  danger: { icon: AlertOctagon, cls: "bg-danger-500/10 text-danger-500" },
+  system: { icon: Settings, cls: "bg-cyan-400/15 text-cyan-600" },
+  info: { icon: Info, cls: "bg-brand-600/10 text-brand-600" },
 };
+function kindMeta(kind: string) {
+  return KIND_META[kind] ?? KIND_META.info;
+}
 
 function relTime(iso: string) {
   const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -34,11 +47,31 @@ function relTime(iso: string) {
   return `${day} gün`;
 }
 
+function groupByTime(items: Notif[]) {
+  const now = Date.now();
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  const weekMs = 7 * 86_400_000;
+  const groups: { label: string; items: Notif[] }[] = [
+    { label: "Bugün", items: [] },
+    { label: "Bu hafta", items: [] },
+    { label: "Daha eski", items: [] },
+  ];
+  for (const n of items) {
+    const t = new Date(n.created_at).getTime();
+    if (t >= dayStart.getTime()) groups[0].items.push(n);
+    else if (now - t < weekMs) groups[1].items.push(n);
+    else groups[2].items.push(n);
+  }
+  return groups.filter((g) => g.items.length > 0);
+}
+
 export function NotificationBell() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Notif[]>([]);
   const [unread, setUnread] = useState(0);
+  const [tab, setTab] = useState<"all" | "unread">("all");
   const ref = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -67,6 +100,9 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
+  const shown = tab === "unread" ? items.filter((n) => !n.read_at) : items;
+  const groups = useMemo(() => groupByTime(shown), [shown]);
+
   const openItem = async (n: Notif) => {
     setOpen(false);
     if (!n.read_at) {
@@ -84,13 +120,40 @@ export function NotificationBell() {
     router.refresh();
   };
 
+  function renderItem(n: Notif) {
+    const meta = kindMeta(n.kind);
+    const Icon = meta.icon;
+    return (
+      <button
+        key={n.id}
+        type="button"
+        onClick={() => openItem(n)}
+        className={`flex w-full items-start gap-3 border-b border-line/70 px-4 py-3 text-left transition hover:bg-canvas ${n.read_at ? "opacity-70" : "bg-brand-600/[0.04]"}`}
+      >
+        <span className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-[9px] ${meta.cls}`}>
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center justify-between gap-2">
+            <span className="flex min-w-0 items-center gap-1.5">
+              {!n.read_at ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-600" /> : null}
+              <span className="truncate text-sm font-semibold text-ink-950">{n.title}</span>
+            </span>
+            <span className="shrink-0 text-[10px] text-text-faint">{relTime(n.created_at)}</span>
+          </span>
+          {n.body ? <span className="mt-0.5 block truncate text-[11px] text-text-muted">{n.body}</span> : null}
+        </span>
+      </button>
+    );
+  }
+
   return (
     <div ref={ref} className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="relative grid h-9 w-9 place-items-center rounded-[10px] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
-        aria-label="Bildirimler"
+        aria-label={`Bildirimler${unread > 0 ? ` (${unread} okunmamış)` : ""}`}
       >
         <Bell className="h-4 w-4" />
         {unread > 0 ? (
@@ -101,42 +164,47 @@ export function NotificationBell() {
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-11 z-50 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-[16px] border border-line bg-surface shadow-[0_24px_50px_-20px_rgba(10,34,71,0.5)]">
+        <div className="absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-[16px] border border-line bg-surface shadow-[0_24px_50px_-20px_rgba(10,34,71,0.5)]">
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
-            <p className="text-sm font-semibold text-ink-950">Bildirimler</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-ink-950">Bildirimler</p>
+              {unread > 0 ? <span className="rounded-full bg-danger-500/10 px-1.5 py-0.5 text-[10px] font-bold text-danger-600">{unread} yeni</span> : null}
+            </div>
             {unread > 0 ? (
               <button type="button" onClick={markAll} className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:underline">
-                <CheckCheck className="h-3.5 w-3.5" /> Tümünü okundu işaretle
+                <CheckCheck className="h-3.5 w-3.5" /> Tümünü oku
               </button>
             ) : null}
           </div>
 
+          <div className="flex gap-1 border-b border-line px-2 py-1.5">
+            {([
+              { key: "all", label: "Tümü" },
+              { key: "unread", label: `Okunmamış${unread > 0 ? ` (${unread})` : ""}` },
+            ] as const).map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                className={`rounded-[9px] px-3 py-1.5 text-xs font-semibold transition ${tab === t.key ? "bg-brand-600/10 text-brand-600" : "text-text-muted hover:bg-canvas"}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
           <div className="max-h-[60vh] overflow-y-auto">
-            {items.length === 0 ? (
-              <div className="px-4 py-10 text-center">
-                <Bell className="mx-auto h-7 w-7 text-text-faint" />
-                <p className="mt-2 text-sm text-text-muted">Henüz bildirim yok.</p>
+            {shown.length === 0 ? (
+              <div className="grid place-items-center px-4 py-12 text-center">
+                <span className="grid h-12 w-12 place-items-center rounded-[14px] bg-canvas text-text-faint"><BellOff className="h-6 w-6" /></span>
+                <p className="mt-3 text-sm font-medium text-ink-950">{tab === "unread" ? "Okunmamış bildirim yok" : "Henüz bildirim yok"}</p>
               </div>
             ) : (
-              items.map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => openItem(n)}
-                  className={`flex w-full items-start gap-3 border-b border-line/70 px-4 py-3 text-left transition hover:bg-canvas ${
-                    n.read_at ? "" : "bg-brand-600/[0.04]"
-                  }`}
-                >
-                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.read_at ? "bg-line-strong" : dotColor[n.kind] ?? "bg-brand-500"}`} />
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center justify-between gap-2">
-                      <span className={`truncate text-sm ${n.read_at ? "font-medium text-ink-950" : "font-semibold text-ink-950"}`}>{n.title}</span>
-                      <span className="shrink-0 text-[10px] text-text-faint">{relTime(n.created_at)}</span>
-                    </span>
-                    {n.body ? <span className="mt-0.5 block truncate text-[11px] text-text-muted">{n.body}</span> : null}
-                  </span>
-                  {n.read_at ? <Check className="mt-1 h-3 w-3 shrink-0 text-text-faint" /> : null}
-                </button>
+              groups.map((g) => (
+                <div key={g.label}>
+                  <p className="sticky top-0 z-10 bg-canvas/90 px-4 py-1.5 text-[10px] font-bold uppercase tracking-wide text-text-faint backdrop-blur">{g.label}</p>
+                  {g.items.map(renderItem)}
+                </div>
               ))
             )}
           </div>
