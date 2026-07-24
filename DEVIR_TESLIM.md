@@ -98,6 +98,16 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 
 ## Bu sohbette tamamlanan işler
 
+### 24) Premium boş-durum (EmptyState) sistemi (24 Temmuz 2026)
+
+**Build: ✓ 0 hata.** Production deploy (`af61914`).
+
+- **`src/components/app/empty-state.tsx`** — yeniden kullanılabilir premium boş durum: gradient orb + ikon tile + ton varyantları (brand/mint/amber/danger) + opsiyonel CTA (href veya node)
+- **9 sayfaya tutarlı uygulama**: aidat, teklifler, kampanyalar, giderler, sözleşmeler, randevular, görevler, açık ev, portallar
+- Çift-border yok deseni: boşken bordersız `EmptyState`, doluyken bordered liste/tablo (ternary section'ın dışına taşındı)
+
+---
+
 ### 23) Profesyonel katman — SEO, hata sayfaları, a11y (24 Temmuz 2026)
 
 **Build: ✓ 0 hata.** Production deploy (`44f2f10`, `1934299`).
