@@ -16,8 +16,9 @@ import { setAppointmentStatus } from "@/app/actions/appointments";
 import { NewAppointmentDialog } from "./new-appointment-dialog";
 import { AddToCalendarButton } from "@/components/app/add-to-calendar-button";
 import { AppointmentCalendar } from "./appointment-calendar";
+import Link from "next/link";
 
-type Rel = { full_name?: string; title?: string; property_code?: string } | { full_name?: string; title?: string; property_code?: string }[] | null;
+type Rel = { id?: string; full_name?: string; title?: string; property_code?: string } | { id?: string; full_name?: string; title?: string; property_code?: string }[] | null;
 
 type AppointmentRow = {
   id: string;
@@ -68,7 +69,7 @@ export default async function AppointmentsPage() {
   const [{ data: appts }, { data: customers }, { data: properties }] = await Promise.all([
     supabase
       .from("appointments")
-      .select("id, appointment_type, scheduled_at, duration_min, location, status, notes, customer:customers(full_name), property:properties(title, property_code)")
+      .select("id, appointment_type, scheduled_at, duration_min, location, status, notes, customer:customers(id, full_name), property:properties(id, title, property_code)")
       .neq("status", "cancelled")
       .order("scheduled_at", { ascending: true })
       .limit(100),
@@ -189,8 +190,16 @@ export default async function AppointmentsPage() {
                 const date = new Date(appt.scheduled_at);
                 const customerName = customer?.full_name ?? "Belirtilmemiş";
                 const propertyName = property?.title || property?.property_code || "Portföy bağlanmadı";
+                const cardHref = customer?.id
+                  ? `/app/musteriler/${customer.id}`
+                  : property?.id
+                    ? `/app/portfoyler/${property.id}`
+                    : null;
                 return (
-                  <article key={appt.id} className="grid gap-3 px-5 py-4 transition hover:bg-brand-600/[0.02] md:grid-cols-[64px_1fr_auto] md:items-center">
+                  <article key={appt.id} className="group relative grid gap-3 px-5 py-4 transition hover:bg-brand-600/[0.02] md:grid-cols-[64px_1fr_auto] md:items-center">
+                    {cardHref ? (
+                      <Link href={cardHref} className="absolute inset-0" aria-label={`${customerName} randevusu detayı`} />
+                    ) : null}
                     <div className="flex flex-col items-center justify-center rounded-[12px] border border-line bg-canvas py-2">
                       <span className="font-display text-base font-extrabold tabular-nums text-ink-950">{new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit" }).format(date)}</span>
                       <span className="text-[9px] uppercase tracking-wide text-text-faint">{new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short" }).format(date)}</span>
@@ -207,7 +216,7 @@ export default async function AppointmentsPage() {
                         {appt.duration_min ? <span className="flex items-center gap-1"><Clock3 className="h-3 w-3" /> {appt.duration_min} dk</span> : null}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 md:flex-col md:items-end">
+                    <div className="relative z-10 flex items-center gap-2 md:flex-col md:items-end">
                       <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${status.cls}`}>{status.label}</span>
                       <div className="flex flex-wrap gap-1.5">
                         {appt.status === "pending" ? (

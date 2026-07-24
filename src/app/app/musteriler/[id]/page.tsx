@@ -16,6 +16,7 @@ import { DeleteCustomerButton } from "./delete-customer-button";
 import { Customer360Tabs } from "./customer-360-tabs";
 import { CustomerTasks, type CustomerTaskRow } from "./customer-tasks";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
+import { computeLeadScore, leadTierCls } from "@/lib/lead-score";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
 import { MatchedPropertiesWidget } from "./matched-properties-widget";
 import type { MatchProperty } from "@/lib/matching";
@@ -200,7 +201,27 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const types: string[] = customer.customer_types ?? [];
   const tags: string[] = customer.tags ?? [];
 
-  const score = Math.min(96, 42 + calls.length * 6 + demands.length * 10 + appts.length * 8);
+  // Lead skoru — mevcut sinyallerden anlık (bkz. lib/lead-score)
+  const activeDemandCount = demands.filter((d) => ["new", "active", "matched"].includes(d.status)).length;
+  const commsList = (commsData ?? []) as { created_at: string }[];
+  const lastActivityAt = [
+    ...calls.map((c) => c.started_at),
+    ...appts.map((a) => a.scheduled_at),
+    ...commsList.map((c) => c.created_at),
+  ].filter(Boolean).sort().at(-1) ?? null;
+  const lead = computeLeadScore({
+    hasPhone: Boolean(customer.phone),
+    hasEmail: Boolean(customer.email),
+    source: customer.source,
+    activeDemands: activeDemandCount,
+    communications: commsList.length,
+    appointments: appts.length,
+    calls: calls.length,
+    lastActivityAt,
+    createdAt: customer.created_at,
+    blacklist: Boolean(customer.blacklist),
+  });
+  const score = lead.score;
 
   type Activity = {
     key: string;
@@ -252,7 +273,14 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                 <h1 className="font-display text-2xl font-extrabold text-white md:text-3xl">{customer.full_name}</h1>
                 {customer.blacklist ? (
                   <span className="rounded-full bg-danger-500/20 px-2 py-0.5 text-[10px] font-bold text-danger-400">Kara liste</span>
-                ) : null}
+                ) : (
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 ring-inset ${leadTierCls(lead.tier)}`}
+                    title={lead.factors.map((f) => `${f.label}: ${f.points > 0 ? "+" : ""}${f.points}`).join(" · ")}
+                  >
+                    {lead.tier === "hot" ? "🔥" : lead.tier === "warm" ? "🌤️" : "❄️"} {lead.label} · {lead.score}
+                  </span>
+                )}
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {types.length > 0 ? (

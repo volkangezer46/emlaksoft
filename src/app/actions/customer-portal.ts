@@ -4,6 +4,13 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+import { scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
+
+function relName(v: unknown): string | null {
+  if (!v) return null;
+  const o = Array.isArray(v) ? v[0] : v;
+  return (o as { name?: string } | null)?.name ?? null;
+}
 
 export type PortalTokenResult = { ok?: boolean; error?: string; token?: string; url?: string };
 
@@ -136,13 +143,13 @@ export async function getCustomerPortalData(
     tenantId:   portalToken.tenant_id,
   };
 
-  // Müşteri + tenant + talepler + randevular + eşleşmeler paralel çek
+  // Müşteri + tenant + talepler + randevular + aktif portföyler paralel çek
   const [
     { data: customer },
     { data: tenant },
     { data: demands },
     { data: appointments },
-    { data: matches },
+    { data: propRows },
   ] = await Promise.all([
     admin.from("customers")
       .select("id, full_name, email, phone")
@@ -152,8 +159,8 @@ export async function getCustomerPortalData(
       .select("name")
       .eq("id", tenantId)
       .single(),
-    admin.from("demands")
-      .select("id, demand_type, province:provinces(name), min_price, max_price, status, created_at")
+    admin.from("customer_demands")
+      .select("id, transaction_type, property_type, province_id, district_id, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, province:geo_provinces(name)")
       .eq("customer_id", customerId)
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false })
@@ -165,16 +172,42 @@ export async function getCustomerPortalData(
       .gte("scheduled_at", new Date().toISOString())
       .order("scheduled_at", { ascending: true })
       .limit(5),
-    admin.from("matches")
-      .select("id, score, property:properties(title, property_code, list_price, province:provinces(name))")
-      .eq("customer_id", customerId)
+    // Eşleşme için tenant'ın aktif portföyleri (matches tablosu yok → anlık skorlanır)
+    admin.from("properties")
+      .select("id, property_code, title, transaction_type, property_type, status, list_price, province_id, district_id, features, province:geo_provinces(name)")
       .eq("tenant_id", tenantId)
-      .gte("score", 60)
-      .order("score", { ascending: false })
-      .limit(6),
+      .is("deleted_at", null)
+      .in("status", ["live", "reserved", "Yayında"])
+      .order("created_at", { ascending: false })
+      .limit(200),
   ]);
 
   if (!customer || !tenant) return null;
+
+  const demandRows = demands ?? [];
+
+  // Aktif taleplere göre portföyleri anlık skorla — en iyi 6 eşleşme
+  const activeDemands = demandRows.filter((d) => ["new", "active", "matched"].includes(d.status));
+  const scored: { id: string; score: number; title: string | null; code: string; price: number | null; province: string | null }[] = [];
+  const seen = new Set<string>();
+  for (const d of activeDemands) {
+    for (const p of propRows ?? []) {
+      const result = scoreDemandProperty(d as MatchDemand, p as unknown as MatchProperty);
+      if (result.score >= 50 && !seen.has(p.id)) {
+        seen.add(p.id);
+        scored.push({
+          id: p.id,
+          score: result.score,
+          title: p.title,
+          code: p.property_code,
+          price: p.list_price,
+          province: relName(p.province),
+        });
+      }
+    }
+  }
+  scored.sort((a, b) => b.score - a.score);
+  const topMatches = scored.slice(0, 6);
 
   return {
     customer: {
@@ -184,12 +217,12 @@ export async function getCustomerPortalData(
       phone:    customer.phone ?? null,
     },
     tenant: { name: tenant.name },
-    demands: (demands ?? []).map((d) => ({
+    demands: demandRows.map((d) => ({
       id:        d.id,
-      type:      d.demand_type ?? "",
-      province:  Array.isArray(d.province) ? d.province[0]?.name ?? null : (d.province as {name?: string} | null)?.name ?? null,
-      minPrice:  d.min_price ?? null,
-      maxPrice:  d.max_price ?? null,
+      type:      [d.transaction_type, d.property_type].filter(Boolean).join(" · "),
+      province:  relName(d.province),
+      minPrice:  d.budget_min ?? null,
+      maxPrice:  d.budget_max ?? null,
       status:    d.status ?? "",
       createdAt: d.created_at,
     })),
@@ -200,21 +233,15 @@ export async function getCustomerPortalData(
       status:      a.status,
       location:    a.location ?? null,
     })),
-    matches: (matches ?? []).map((m) => {
-      const prop = Array.isArray(m.property) ? m.property[0] : m.property;
-      const province = prop && (Array.isArray((prop as {province?: unknown}).province)
-        ? ((prop as {province?: {name?:string}[]}).province?.[0]?.name ?? null)
-        : ((prop as {province?: {name?:string}}).province?.name ?? null));
-      return {
-        id:    m.id,
-        score: m.score ?? null,
-        property: {
-          title:    prop?.title ?? null,
-          code:     prop?.property_code ?? "",
-          price:    (prop as {list_price?: number} | null)?.list_price ?? null,
-          province: province ?? null,
-        },
-      };
-    }),
+    matches: topMatches.map((m) => ({
+      id:    m.id,
+      score: m.score,
+      property: {
+        title:    m.title,
+        code:     m.code,
+        price:    m.price,
+        province: m.province,
+      },
+    })),
   };
 }

@@ -126,8 +126,15 @@ export function DealBoard({
                   return (
                     <article
                       key={d.id}
-                      className="lift group rounded-[14px] border border-line bg-surface p-3 shadow-[var(--shadow-xs)] transition hover:border-brand-300"
+                      className="lift group relative rounded-[14px] border border-line bg-surface p-3 shadow-[var(--shadow-xs)] transition hover:border-brand-300"
                     >
+                      {d.customer_id ? (
+                        <Link
+                          href={`/app/musteriler/${d.customer_id}`}
+                          className="absolute inset-0 rounded-[14px]"
+                          aria-label={`${d.customer_name ?? "Müşteri"} anlaşması`}
+                        />
+                      ) : null}
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-ink-950">
@@ -146,7 +153,7 @@ export function DealBoard({
                           style={{ width: `${Math.min(100, Number(d.probability) || 20)}%` }}
                         />
                       </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                      <div className="relative z-10 mt-3 flex flex-wrap items-center gap-1.5">
                         <StatusTransitionBar dealId={d.id} stage={d.stage} />
                         {canEdit ? (
                           <button

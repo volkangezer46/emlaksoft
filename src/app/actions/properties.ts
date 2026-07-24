@@ -6,8 +6,9 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { computePriceHealth } from "@/lib/price-health";
+import { notifyMatchingDemandsForProperty } from "@/lib/match-notify";
 
-export type PropertyResult = { error?: string; ok?: boolean };
+export type PropertyResult = { error?: string; ok?: boolean; matchedDemands?: number };
 
 const STATUSES = ["draft", "live", "reserved", "sold", "rented", "archived"];
 
@@ -89,10 +90,24 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
     newValue: { property_code: propertyCode, title },
   });
 
+  // Otomatik eşleştirme bildirimi — yeni portföyü aktif taleplerle skorla, güçlü eşleşme varsa danışmanı uyar
+  const matchedDemands = await notifyMatchingDemandsForProperty(gate.tenantId, gate.userId, {
+    id: data.id,
+    property_code: propertyCode,
+    title,
+    transaction_type: transactionType,
+    property_type: propertyType,
+    status: "draft",
+    list_price: priceValue,
+    province_id: provinceId || null,
+    district_id: null,
+    features: { rooms: rooms || null, sqm: Number.isFinite(sqmValue) ? sqmValue : null },
+  });
+
   revalidatePath("/app/portfoyler");
   revalidatePath(`/app/portfoyler/${data.id}`);
   revalidatePath("/app");
-  return { ok: true };
+  return { ok: true, matchedDemands };
 }
 
 export async function updateProperty(formData: FormData): Promise<PropertyResult> {
