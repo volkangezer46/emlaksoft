@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LogOut, Shield } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaff } from "@/lib/platform";
 import { AppSidebar } from "@/components/app/app-sidebar";
 import { CommandSearch } from "@/components/app/command-search";
@@ -14,7 +15,7 @@ import { LiveOfficeStrip } from "@/components/app/live-office-strip";
 import { RealtimeRefresh } from "@/components/app/realtime-refresh";
 import { listMyNotifications } from "@/app/actions/notifications";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { computeOfficeScore, loadOfficeScoreInputs } from "@/lib/office-score";
+import { getCachedOfficeScore } from "@/lib/office-score";
 import { IMPERSONATE_COOKIE } from "@/lib/impersonation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { effectiveCanAccessModule, getEffectivePermissions } from "@/lib/permissions-effective";
@@ -47,9 +48,7 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
 
   const { data: profile } = user
     ? await supabase
@@ -88,19 +87,16 @@ export default async function AppLayout({
   let notifications: Awaited<ReturnType<typeof listMyNotifications>> = [];
 
   if (user && profile?.tenant_id) {
-    try {
-      const inputs = await loadOfficeScoreInputs(supabase);
-      const computed = computeOfficeScore(inputs);
-      officeScore = computed.score;
-      officeScoreLabel = computed.label;
-    } catch {
-      officeScore = null;
+    // Skor (istek başına cache'li — dashboard ile paylaşılır) + bildirimler paralel
+    const [scoreComputed, notifResult] = await Promise.all([
+      getCachedOfficeScore().catch(() => null),
+      listMyNotifications().catch(() => []),
+    ]);
+    if (scoreComputed) {
+      officeScore = scoreComputed.score;
+      officeScoreLabel = scoreComputed.label;
     }
-    try {
-      notifications = await listMyNotifications();
-    } catch {
-      notifications = [];
-    }
+    notifications = notifResult;
   }
 
   const tenantId = (profile?.tenant_id as string | undefined) ?? null;

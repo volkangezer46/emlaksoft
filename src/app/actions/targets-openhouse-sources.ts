@@ -186,7 +186,8 @@ export async function getLeadSourceStats() {
     .from("customers")
     .select("lead_source")
     .eq("tenant_id", gate.tenantId)
-    .not("lead_source", "is", null);
+    .not("lead_source", "is", null)
+    .limit(10000);
 
   const counts = new Map<string, number>();
   for (const row of data ?? []) {

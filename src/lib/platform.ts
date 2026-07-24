@@ -1,6 +1,8 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { platformCanAccess, type PlatformModule, type PlatformRole } from "@/lib/platform-access";
 
 export type { PlatformRole };
@@ -49,13 +51,11 @@ async function bootstrapIfAllowed(userId: string, email: string, fullName: strin
   return data as PlatformStaff;
 }
 
-export async function getPlatformStaff(): Promise<PlatformStaff | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export const getPlatformStaff = cache(async (): Promise<PlatformStaff | null> => {
+  const user = await getRequestUser();
   if (!user?.email) return null;
 
+  const supabase = await createClient();
   const { data } = await supabase
     .from("platform_staff")
     .select("id, email, full_name, role, is_active")
@@ -70,15 +70,12 @@ export async function getPlatformStaff(): Promise<PlatformStaff | null> {
     user.email.split("@")[0] ??
     "Staff";
   return bootstrapIfAllowed(user.id, user.email, name);
-}
+});
 
 export async function requirePlatformStaff(): Promise<PlatformStaff> {
   const staff = await getPlatformStaff();
   if (!staff) {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getRequestUser();
     if (!user) redirect("/giris?next=/admin");
     redirect("/app");
   }

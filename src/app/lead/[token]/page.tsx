@@ -8,19 +8,17 @@ export default async function PublicLeadPage({ params }: { params: Promise<{ tok
   const { token } = await params;
   const admin = createAdminClient();
 
-  const { data: tenant } = await admin
-    .from("tenants")
-    .select("name, logo_url, brand_color, lead_capture_enabled")
-    .eq("lead_capture_token", token)
-    .maybeSingle();
+  // tenant ve provinces bağımsız → paralel
+  const [{ data: tenant }, { data: provinces }] = await Promise.all([
+    admin
+      .from("tenants")
+      .select("name, logo_url, brand_color, lead_capture_enabled")
+      .eq("lead_capture_token", token)
+      .maybeSingle(),
+    admin.from("geo_provinces").select("id, name").eq("is_active", true).order("name"),
+  ]);
 
   if (!tenant) notFound();
-
-  const { data: provinces } = await admin
-    .from("geo_provinces")
-    .select("id, name")
-    .eq("is_active", true)
-    .order("name");
 
   const closed = tenant.lead_capture_enabled === false;
 

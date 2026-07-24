@@ -23,11 +23,21 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
   const { slug, id } = await params;
   const admin = createAdminClient();
 
-  const { data: tenant } = await admin
-    .from("tenants")
-    .select("id, name, lead_capture_token, lead_capture_enabled")
-    .eq("slug", slug)
-    .maybeSingle();
+  // tenant (slug), media (params id) ve provinces (bağımsız) yalnızca params'a bağlı → paralel
+  const [{ data: tenant }, { data: mediaRows }, { data: provinces }] = await Promise.all([
+    admin
+      .from("tenants")
+      .select("id, name, lead_capture_token, lead_capture_enabled")
+      .eq("slug", slug)
+      .maybeSingle(),
+    admin
+      .from("property_media")
+      .select("id, kind, external_url, is_cover, sort_order")
+      .eq("property_id", id)
+      .order("is_cover", { ascending: false })
+      .order("sort_order", { ascending: true }),
+    admin.from("geo_provinces").select("id, name").eq("is_active", true).order("name"),
+  ]);
   if (!tenant) notFound();
 
   const { data: property } = await admin
@@ -42,21 +52,9 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
     .maybeSingle();
   if (!property) notFound();
 
-  const { data: mediaRows } = await admin
-    .from("property_media")
-    .select("id, kind, external_url, is_cover, sort_order")
-    .eq("property_id", id)
-    .order("is_cover", { ascending: false })
-    .order("sort_order", { ascending: true });
   const media = mediaRows ?? [];
   const images = media.filter((m) => m.kind === "image");
   const tours = media.filter((m) => m.kind !== "image");
-
-  const { data: provinces } = await admin
-    .from("geo_provinces")
-    .select("id, name")
-    .eq("is_active", true)
-    .order("name");
 
   const feat = (property.features ?? {}) as { rooms?: string; sqm?: number; baths?: number };
   const loc = [property.address_line, relName(property.district as Rel), relName(property.province as Rel)]

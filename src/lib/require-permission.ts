@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaff } from "@/lib/platform";
 import { type AppAction, type AppModule } from "@/lib/permissions";
 import { effectiveHasPermission, getEffectivePermissions } from "@/lib/permissions-effective";
@@ -22,9 +23,7 @@ export async function requirePermission(mod: AppModule, action: AppAction): Prom
   const role = String(profile?.role ?? "advisor");
 
   if (staff) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getRequestUser();
     const impersonating = Boolean(user?.app_metadata?.impersonating);
     if (!impersonating) {
       return { ok: true, userId: gate.userId, tenantId: gate.tenantId, role };

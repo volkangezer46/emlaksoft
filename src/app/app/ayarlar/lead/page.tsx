@@ -10,22 +10,24 @@ export default async function LeadCaptureSettingsPage() {
   const ctx = await requireModulePage("settings");
   const supabase = await createClient();
 
-  const { data: tenant } = await supabase
-    .from("tenants")
-    .select("lead_capture_token, lead_capture_enabled, slug")
-    .eq("id", ctx.tenantId)
-    .maybeSingle();
+  // tenant fetch + lead count bağımsız (ikisi de yalnızca tenantId'ye bağlı) → paralel
+  const [{ data: tenant }, { count: leadCount }] = await Promise.all([
+    supabase
+      .from("tenants")
+      .select("lead_capture_token, lead_capture_enabled, slug")
+      .eq("id", ctx.tenantId)
+      .maybeSingle(),
+    supabase
+      .from("customers")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", ctx.tenantId)
+      .eq("auto_assigned", true),
+  ]);
 
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
   const token = tenant?.lead_capture_token ?? "";
   const enabled = tenant?.lead_capture_enabled !== false;
   const vitrinUrl = tenant?.slug ? `${baseUrl}/vitrin/${tenant.slug}` : "";
-
-  const { count: leadCount } = await supabase
-    .from("customers")
-    .select("id", { count: "exact", head: true })
-    .eq("tenant_id", ctx.tenantId)
-    .eq("auto_assigned", true);
 
   return (
     <div className="space-y-6">

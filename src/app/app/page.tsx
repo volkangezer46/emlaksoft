@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { moneyTry } from "@/lib/leak-shield";
-import { computeOfficeScore, loadOfficeScoreInputs } from "@/lib/office-score";
+import { getCachedOfficeScore } from "@/lib/office-score";
 import { requireModulePage } from "@/lib/require-module-page";
 
 type Kpi = {
@@ -343,8 +343,7 @@ export default async function AppHomePage() {
       ? 100
       : Math.round((((liveListings ?? []).length - overdueListings.length) / (liveListings ?? []).length) * 100);
 
-  const officeScoreInputs = await loadOfficeScoreInputs(supabase);
-  const officeScore = computeOfficeScore(officeScoreInputs);
+  const officeScore = await getCachedOfficeScore();
 
   const tasks: { t: string; meta: string; tone: "brand" | "warn" | "amber" | "mint" }[] = [
     ...overdueListings.slice(0, 3).map((r) => ({

@@ -125,25 +125,24 @@ export async function getOwnerPortalData(token: string): Promise<OwnerPortalData
   if (!portalToken) return null;
   if (new Date(portalToken.expires_at) < new Date()) return null;
 
-  // Son görülme zamanını güncelle
-  await admin
-    .from("owner_portal_tokens")
-    .update({ last_seen_at: new Date().toISOString() })
-    .eq("token", token);
-
   const { propertyId, tenantId, ownerName } = {
     propertyId: portalToken.property_id,
     tenantId:   portalToken.tenant_id,
     ownerName:  portalToken.owner_name,
   };
 
+  // last_seen güncelleme yalnızca token'a bağlı → sonraki fetch'lerle paralel
   const [
+    ,
     { data: property },
     { data: tenant },
     { data: listings },
     { data: offers },
     { data: appointments },
   ] = await Promise.all([
+    admin.from("owner_portal_tokens")
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq("token", token),
     admin.from("properties")
       .select("id, property_code, title, list_price, status, description, province:geo_provinces(name), district:geo_districts(name)")
       .eq("id", propertyId)

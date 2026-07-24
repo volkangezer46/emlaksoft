@@ -30,11 +30,15 @@ export default async function VitrinPage({
   const sp = (await searchParams) ?? {};
   const admin = createAdminClient();
 
-  const { data: tenant } = await admin
-    .from("tenants")
-    .select("id, name, brand_color, lead_capture_token, lead_capture_enabled")
-    .eq("slug", slug)
-    .maybeSingle();
+  // provinces hiçbir şeye bağlı değil → tenant ile paralel çek
+  const [{ data: tenant }, { data: provinces }] = await Promise.all([
+    admin
+      .from("tenants")
+      .select("id, name, brand_color, lead_capture_token, lead_capture_enabled")
+      .eq("slug", slug)
+      .maybeSingle(),
+    admin.from("geo_provinces").select("id, name").eq("is_active", true).order("name"),
+  ]);
 
   if (!tenant) notFound();
 
@@ -74,12 +78,6 @@ export default async function VitrinPage({
       if (!coverMap.has(m.property_id)) coverMap.set(m.property_id, m.id);
     }
   }
-
-  const { data: provinces } = await admin
-    .from("geo_provinces")
-    .select("id, name")
-    .eq("is_active", true)
-    .order("name");
 
   return (
     <div className="min-h-screen bg-canvas">

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaff } from "@/lib/platform";
 import { type AppModule, DEFAULT_MATRIX } from "@/lib/permissions";
 import { effectiveCanAccessModule, getEffectivePermissions, type EffectivePermissions } from "@/lib/permissions-effective";
@@ -10,10 +11,7 @@ import { effectiveCanAccessModule, getEffectivePermissions, type EffectivePermis
  * (bkz. `getEffectivePermissions`) — sadece varsayılan matris değil, tenant override'ları da uygulanır.
  */
 export async function requireModulePage(mod: AppModule) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
   if (!user) redirect("/giris");
 
   const staff = await getPlatformStaff();
@@ -23,6 +21,7 @@ export async function requireModulePage(mod: AppModule) {
     return { userId: user.id, role: "owner" as string, tenantId: null as string | null, perms: ownerPerms };
   }
 
+  const supabase = await createClient();
   const { data: profile } = await supabase
     .from("profiles")
     .select("role, tenant_id")

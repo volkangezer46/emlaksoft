@@ -40,27 +40,29 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
     );
   }
 
-  await admin
-    .from("share_links")
-    .update({ view_count: (share.view_count ?? 0) + 1 })
-    .eq("id", share.id);
-
-  const { data: property } = await admin
-    .from("properties")
-    .select(
-      "title, property_code, transaction_type, property_type, list_price, address_line, features, assigned_to:profiles(full_name, phone), province:geo_provinces(name), district:geo_districts(name)",
-    )
-    .eq("id", share.entity_id)
-    .maybeSingle();
+  // view_count update + property + media hepsi yalnızca share'e bağlı → paralel
+  const [, { data: property }, { data: mediaRows }] = await Promise.all([
+    admin
+      .from("share_links")
+      .update({ view_count: (share.view_count ?? 0) + 1 })
+      .eq("id", share.id),
+    admin
+      .from("properties")
+      .select(
+        "title, property_code, transaction_type, property_type, list_price, address_line, features, assigned_to:profiles(full_name, phone), province:geo_provinces(name), district:geo_districts(name)",
+      )
+      .eq("id", share.entity_id)
+      .maybeSingle(),
+    admin
+      .from("property_media")
+      .select("id, kind, external_url, is_cover")
+      .eq("property_id", share.entity_id)
+      .order("is_cover", { ascending: false })
+      .order("sort_order", { ascending: true }),
+  ]);
 
   if (!property) notFound();
 
-  const { data: mediaRows } = await admin
-    .from("property_media")
-    .select("id, kind, external_url, is_cover")
-    .eq("property_id", share.entity_id)
-    .order("is_cover", { ascending: false })
-    .order("sort_order", { ascending: true });
   const media = mediaRows ?? [];
   const images = media.filter((m) => m.kind === "image");
   const tours = media.filter((m) => m.kind !== "image");

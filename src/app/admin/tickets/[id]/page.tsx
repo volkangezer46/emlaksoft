@@ -56,19 +56,21 @@ export default async function AdminTicketDetailPage({
   const { id } = await params;
   const admin = createAdminClient();
 
-  const { data: ticket } = await admin
-    .from("support_tickets")
-    .select("id, subject, body, category, priority, status, created_at, updated_at, tenant:tenants(name)")
-    .eq("id", id)
-    .maybeSingle();
+  // ticket ve messages ikisi de yalnızca params id'ye bağlı → paralel
+  const [{ data: ticket }, { data: messages }] = await Promise.all([
+    admin
+      .from("support_tickets")
+      .select("id, subject, body, category, priority, status, created_at, updated_at, tenant:tenants(name)")
+      .eq("id", id)
+      .maybeSingle(),
+    admin
+      .from("support_ticket_messages")
+      .select("id, body, author_kind, author_user_id, created_at")
+      .eq("ticket_id", id)
+      .order("created_at", { ascending: true }),
+  ]);
 
   if (!ticket) notFound();
-
-  const { data: messages } = await admin
-    .from("support_ticket_messages")
-    .select("id, body, author_kind, author_user_id, created_at")
-    .eq("ticket_id", id)
-    .order("created_at", { ascending: true });
 
   const rows = messages ?? [];
   const authorIds = [...new Set(rows.map((m) => m.author_user_id).filter(Boolean))] as string[];

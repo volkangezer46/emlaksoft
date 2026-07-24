@@ -132,25 +132,24 @@ export async function getCustomerPortalData(
   if (!portalToken) return null;
   if (new Date(portalToken.expires_at) < new Date()) return null;
 
-  // Son görülme zamanını güncelle
-  await admin
-    .from("customer_portal_tokens")
-    .update({ last_seen_at: new Date().toISOString() })
-    .eq("token", token);
-
   const { customerId, tenantId } = {
     customerId: portalToken.customer_id,
     tenantId:   portalToken.tenant_id,
   };
 
-  // Müşteri + tenant + talepler + randevular + aktif portföyler paralel çek
+  // last_seen güncelleme + müşteri + tenant + talepler + randevular + aktif portföyler paralel
   const [
+    ,
     { data: customer },
     { data: tenant },
     { data: demands },
     { data: appointments },
     { data: propRows },
   ] = await Promise.all([
+    // Son görülme zamanını güncelle (yalnızca token'a bağlı)
+    admin.from("customer_portal_tokens")
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq("token", token),
     admin.from("customers")
       .select("id, full_name, email, phone")
       .eq("id", customerId)

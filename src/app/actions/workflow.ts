@@ -96,27 +96,28 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
       return { error: "Komisyon kaydı oluşturulamadı." };
     }
 
-    await supabase
-      .from("properties")
-      .update({ status: "sold", updated_at: new Date().toISOString() })
-      .eq("id", propertyId);
-
-    await logActivity({
-      tenantId: gate.tenantId,
-      actorId: gate.userId,
-      action: "workflow.deal_won",
-      entityType: "deal",
-      entityId: deal.id,
-      newValue: { property_id: propertyId, gross, splits },
-    });
-
-    await notifyTenant({
-      tenantId: gate.tenantId,
-      title: "Satış kapandı · komisyon hesaplandı",
-      body: `${property.property_code}: ${gross.toLocaleString("tr-TR")} ₺ brüt`,
-      href: "/app/komisyon",
-      kind: "success",
-    });
+    // property update + logActivity + notifyTenant birbirinden bağımsız → paralel
+    await Promise.all([
+      supabase
+        .from("properties")
+        .update({ status: "sold", updated_at: new Date().toISOString() })
+        .eq("id", propertyId),
+      logActivity({
+        tenantId: gate.tenantId,
+        actorId: gate.userId,
+        action: "workflow.deal_won",
+        entityType: "deal",
+        entityId: deal.id,
+        newValue: { property_id: propertyId, gross, splits },
+      }),
+      notifyTenant({
+        tenantId: gate.tenantId,
+        title: "Satış kapandı · komisyon hesaplandı",
+        body: `${property.property_code}: ${gross.toLocaleString("tr-TR")} ₺ brüt`,
+        href: "/app/komisyon",
+        kind: "success",
+      }),
+    ]);
 
     revalidatePath("/app/komisyon");
     revalidatePath("/app/anlasmalar");

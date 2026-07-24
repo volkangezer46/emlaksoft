@@ -2,6 +2,9 @@
  * Ofis sağlık skoru v1 — 0–100.
  * Ağırlıklar: portal teyit sağlığı, açık talep, eşleşme potansiyeli, randevu, kapanış disiplini.
  */
+import { cache } from "react";
+import { createClient } from "@/lib/supabase/server";
+
 export type OfficeScoreInputs = {
   openDemands: number;
   livePortals: number;
@@ -33,6 +36,16 @@ export function computeOfficeScore(input: OfficeScoreInputs): {
 
   return { score, label };
 }
+
+/**
+ * İstek başına tek kez hesaplanan ofis skoru. Layout (her navigasyonda) ve
+ * dashboard aynı istekte çağırınca 5 sorgu tekrar etmez (React `cache()`).
+ */
+export const getCachedOfficeScore = cache(async () => {
+  const supabase = await createClient();
+  const inputs = await loadOfficeScoreInputs(supabase);
+  return computeOfficeScore(inputs);
+});
 
 export async function loadOfficeScoreInputs(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

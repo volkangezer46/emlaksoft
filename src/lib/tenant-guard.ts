@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaff } from "@/lib/platform";
 
 export type ActiveTenantResult =
@@ -12,10 +13,7 @@ const BLOCKED = new Set(["suspended", "cancelled"]);
  * Platform staff kendi ofisi askıdaysa bile ops amaçlı geçebilir.
  */
 export async function requireActiveTenant(): Promise<ActiveTenantResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
   if (!user) return { ok: false, error: "Oturum bulunamadı." };
 
   const tenantId = (user.app_metadata?.tenant_id as string | undefined) ?? null;
@@ -24,6 +22,7 @@ export async function requireActiveTenant(): Promise<ActiveTenantResult> {
   const staff = await getPlatformStaff();
   if (staff) return { ok: true, userId: user.id, tenantId };
 
+  const supabase = await createClient();
   const { data: tenant } = await supabase
     .from("tenants")
     .select("status")
