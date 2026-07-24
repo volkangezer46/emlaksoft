@@ -98,6 +98,19 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 
 ## Bu sohbette tamamlanan işler
 
+### 21) 3 yeni detay sayfası — paneldeki tüm kayıtlar artık açılabilir (24 Temmuz 2026)
+
+**Build: ✓ 0 hata.** Production deploy (`90fe5ac`).
+
+Doğal hedefi olmadığı için önceki turda atlanan kayıtlara **kendi detay sayfaları** eklendi:
+- **Ekip üyesi (danışman) detay** `/app/ekip/[id]` — profil, atanmış müşteri + portföy listesi, bu ay komisyon, randevu/çağrı istatistikleri. Bağlandı: ekip listesi adı + **danışman-kpi liderlik satırı** + **hedef kartları** (per-advisor)
+- **Admin satış/lead detay** `/admin/satis/[id]` — iletişim bilgileri, talep mesajı, mevcut `DemoCard` aksiyonları (durum/atama/not/dönüştür), dönüştürülen ofis linki. Bağlandı: demo kartı adı
+- **Otomasyon kuralı detay** `/app/otomasyonlar/[id]` — tetikleyici + config, koşullar, aksiyonlar, çalışma geçmişi. Bağlandı: otomasyon satırları
+
+Böylece paneldeki **pratikte tüm kayıtlar** tıklanınca ilgili detaya açılıyor (müşteri, portföy, sözleşme, teklif, talep, randevu, komisyon, anlaşma, destek, görev, açık ev, çağrı, İYS izni, kayıp-kaçak, abonelik/fatura, ekip üyesi, lead, otomasyon).
+
+---
+
 ### 20) Tüm panel kayıtları tıklanabilir + ekip sorgu optimizasyonu (24 Temmuz 2026)
 
 **Build: ✓ 0 hata.** Production deploy (`1205226`).
