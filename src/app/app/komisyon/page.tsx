@@ -13,6 +13,7 @@ import { exportCommissionsCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { CommissionSimulator } from "./commission-simulator";
 import { CommissionActions } from "./commission-actions";
+import { CommissionSplitEditor } from "./commission-split-editor";
 
 type CommissionRow = {
   id: string;
@@ -111,9 +112,24 @@ export default async function CommissionPage() {
                     <Link href={`/app/portfoyler/${property.id}`} className="absolute inset-0" aria-label={`${property.title ?? property.property_code ?? "Komisyon"} portföyü`} />
                   ) : null}
                   <div><p className="text-sm font-semibold text-ink-950">{property?.title ?? "Komisyon kaydı"}</p><p className="mt-0.5 text-xs text-text-muted">{property?.property_code ?? "Genel işlem"} · {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(row.created_at))}</p></div>
-                  <div><p className="text-[10px] text-text-faint">Brüt komisyon</p><p className="font-display text-sm font-bold text-ink-950">{money(Number(row.gross_amount))}</p></div>
+                  <div>
+                    <p className="text-[10px] text-text-faint">Brüt komisyon</p>
+                    <p className="font-display text-sm font-bold text-ink-950">{money(Number(row.gross_amount))}</p>
+                    {Array.isArray(row.splits) && row.splits.length > 0 ? (
+                      <p className="mt-0.5 flex flex-wrap gap-x-2 text-[10px] text-text-muted">
+                        {row.splits.map((s, i) => (
+                          <span key={i}>{s.label} %{s.rate}{i < row.splits!.length - 1 ? " ·" : ""}</span>
+                        ))}
+                      </p>
+                    ) : null}
+                  </div>
                   <div><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${row.status === "paid" || row.status === "collected" ? "bg-mint-500/10 text-mint-600" : "bg-amber-400/15 text-amber-500"}`}>{row.status === "paid" || row.status === "collected" ? "Tahsil edildi" : "Hesaplandı"}</span></div>
-                  {canEdit ? <div className="relative z-10"><CommissionActions commissionId={row.id} amount={Number(row.gross_amount)} status={row.status} /></div> : null}
+                  {canEdit ? (
+                    <div className="relative z-10 flex flex-col items-end gap-1.5">
+                      <CommissionSplitEditor commissionId={row.id} gross={Number(row.gross_amount)} initial={row.splits} />
+                      <CommissionActions commissionId={row.id} amount={Number(row.gross_amount)} status={row.status} />
+                    </div>
+                  ) : null}
                 </article>
               );
             })}
