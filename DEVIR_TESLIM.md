@@ -124,6 +124,8 @@ Sabit-kodlu dropdown dizileri yerine **yönetilebilir DB tanımları**:
 
 > Genişletme: yeni bir dropdown eklerken kategoriyi `definitions`'a seed'le + sayfada `getDefinitions("...")` çağır + dialog'a prop geç (desen kurulu).
 
+**Sprint-29 (25 Temmuz):** Definitions'a **gider kategorisi** + **randevu tipi** eklendi (migration 043). Giderler formu/özeti/etiketleri ve randevu dialog türleri artık DB'den (DEFAULT yedekli). Toplam 7 kategori yönetilebilir: müşteri tipi/kaynağı, portföy tipi, işlem tipi, sözleşme tipi, gider kategorisi, randevu tipi.
+
 ---
 
 ### 26) İnteraktif harita (rakip özelliği) + ana sayfa ultra-premium (24 Temmuz 2026)
