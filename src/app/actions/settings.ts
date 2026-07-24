@@ -24,6 +24,7 @@ export async function updateTenantInfo(formData: FormData): Promise<SettingsResu
   const phone       = String(formData.get("phone")        ?? "").trim();
   const addressLine = String(formData.get("address_line") ?? "").trim();
   const city        = String(formData.get("city")         ?? "").trim();
+  const website     = String(formData.get("website")      ?? "").trim();
 
   if (!name) return { error: "Ofis adı zorunlu." };
 
@@ -44,6 +45,7 @@ export async function updateTenantInfo(formData: FormData): Promise<SettingsResu
       phone:        phone       || null,
       address_line: addressLine || null,
       city:         city        || null,
+      website:      website     || null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", tenantId);

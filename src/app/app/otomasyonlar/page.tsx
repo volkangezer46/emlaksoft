@@ -1,7 +1,7 @@
-import Link from "next/link";
-import { Zap, Plus, Play, Pause, BarChart3 } from "lucide-react";
+import { Zap, Play, Pause, BarChart3 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { ApplyTemplateButton, AutomationRowActions } from "./automation-actions";
 
 const TRIGGER_LABELS: Record<string, string> = {
   new_customer:       "Yeni müşteri",
@@ -91,14 +91,14 @@ export default async function OtomasyonlarPage() {
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[
-            { trigger: "no_contact_days",  name: "14 gün dokunulmamış müşteri uyarısı", action: "notify_manager" },
-            { trigger: "auth_expiring",    name: "Yetki belgesi bitişi — görev oluştur",  action: "create_task" },
-            { trigger: "new_customer",     name: "Yeni müşteriyle 5 dk içinde iletişim",  action: "create_task" },
-            { trigger: "deal_won",         name: "Satış sonrası teşekkür WhatsApp'ı",     action: "send_whatsapp" },
-            { trigger: "property_matched", name: "Eşleşen portföyü müşteriye gönder",     action: "send_whatsapp" },
-            { trigger: "demand_stale",     name: "30 gün hareketsiz talep uyarısı",       action: "notify_manager" },
+            { key: "no_contact_days",  name: "14 gün dokunulmamış müşteri uyarısı", trigger: "no_contact_days",  action: "notify_manager" },
+            { key: "auth_expiring",    name: "Yetki belgesi bitişi — görev oluştur",  trigger: "auth_expiring",    action: "create_task" },
+            { key: "new_customer",     name: "Yeni müşteriyle 5 dk içinde iletişim",  trigger: "new_customer",     action: "create_task" },
+            { key: "deal_won",         name: "Satış sonrası teşekkür WhatsApp'ı",     trigger: "deal_won",         action: "send_whatsapp" },
+            { key: "property_matched", name: "Eşleşen portföyü müşteriye gönder",     trigger: "property_matched", action: "send_whatsapp" },
+            { key: "demand_stale",     name: "30 gün hareketsiz talep uyarısı",       trigger: "demand_stale",     action: "notify_manager" },
           ].map((t) => (
-            <div key={t.trigger} className="flex items-center gap-3 rounded-[12px] border border-line bg-surface px-3 py-3">
+            <div key={t.key} className="flex items-center gap-3 rounded-[12px] border border-line bg-surface px-3 py-3">
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-brand-600/10 text-brand-600">
                 <Zap className="h-4 w-4" />
               </span>
@@ -108,9 +108,7 @@ export default async function OtomasyonlarPage() {
                   {TRIGGER_LABELS[t.trigger]} → {ACTION_LABELS[t.action]}
                 </p>
               </div>
-              <button type="button" className="shrink-0 rounded-[7px] border border-brand-300/40 px-2 py-1 text-[10px] font-semibold text-brand-600 hover:bg-brand-600/5">
-                Uygula
-              </button>
+              <ApplyTemplateButton templateKey={t.key} />
             </div>
           ))}
         </div>
@@ -164,6 +162,7 @@ export default async function OtomasyonlarPage() {
                   }`}>
                     {r.status === "active" ? "Aktif" : r.status === "draft" ? "Taslak" : "Pasif"}
                   </span>
+                  <AutomationRowActions row={r} />
                 </div>
               );
             })}

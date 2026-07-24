@@ -15,6 +15,8 @@ type Tenant = {
   phone: string | null;
   address_line: string | null;
   city: string | null;
+  logo_url?: string | null;
+  website?: string | null;
 };
 
 const fieldClass =
@@ -92,6 +94,10 @@ export function CompanyForm({ tenant }: { tenant: Tenant }) {
             placeholder="TR330006100519786457841326"
             maxLength={32}
           />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-website">Web sitesi</label>
+          <input id="tenant-website" name="website" type="url" defaultValue={tenant.website ?? ""} className={fieldClass} placeholder="https://ofisim.com" />
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-color">Marka rengi</label>

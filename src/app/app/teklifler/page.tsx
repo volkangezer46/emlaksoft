@@ -1,6 +1,8 @@
-import { Tag, CheckCircle2, XCircle, Clock, ArrowUpDown } from "lucide-react";
+import { Tag, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listOffers } from "@/app/actions/offers";
+import { createClient } from "@/lib/supabase/server";
+import { NewOfferDialog } from "./new-offer-dialog";
 
 const STATUS_LABELS: Record<string, string> = {
   draft:     "Taslak",
@@ -28,8 +30,37 @@ function customerLabel(c: { full_name: string } | { full_name: string }[] | null
 }
 
 export default async function TekliflerPage() {
-  await requireModulePage("offers");
-  const offers = await listOffers();
+  const { perms } = await requireModulePage("offers");
+  const canCreate = perms.offers?.includes("create") ?? perms.commissions?.includes("create") ?? false;
+
+  const supabase = await createClient();
+  const [offers, { data: propData }, { data: custData }] = await Promise.all([
+    listOffers(),
+    supabase
+      .from("properties")
+      .select("id, property_code, title, list_price")
+      .is("deleted_at", null)
+      .in("status", ["live", "draft", "reserved"])
+      .order("created_at", { ascending: false })
+      .limit(200),
+    supabase
+      .from("customers")
+      .select("id, full_name")
+      .is("deleted_at", null)
+      .order("full_name", { ascending: true })
+      .limit(300),
+  ]);
+
+  const properties = (propData ?? []).map((p) => ({
+    id: p.id,
+    property_code: p.property_code as string,
+    title: p.title as string | null,
+    list_price: p.list_price as number | null,
+  }));
+  const customers = (custData ?? []).map((c) => ({
+    id: c.id,
+    full_name: c.full_name as string,
+  }));
 
   const accepted = offers.filter((o) => o.status === "accepted").length;
   const pending  = offers.filter((o) => o.status === "submitted").length;

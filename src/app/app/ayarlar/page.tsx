@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getNotificationPrefs } from "@/app/actions/notification-prefs";
 import { CompanyForm } from "./company-form";
+import { LogoUploadForm } from "./logo-upload-form";
 import { NotificationPrefsPanel } from "@/components/app/notification-prefs";
 
 type SettingCard = {
@@ -53,7 +54,7 @@ export default async function SettingsPage() {
   const [{ data: tenantRow }, notifPrefs, { count: consentCount }, { count: activeConsentCount }, { count: auditCount }] = await Promise.all([
     supabase
       .from("tenants")
-      .select("name, plan, tax_office, tax_number, license_no, brand_color, iban, phone, address_line, city")
+      .select("name, plan, tax_office, tax_number, license_no, brand_color, iban, phone, address_line, city, logo_url, website")
       .limit(1)
       .maybeSingle(),
     getNotificationPrefs(),
@@ -62,7 +63,7 @@ export default async function SettingsPage() {
     supabase.from("audit_logs").select("id", { count: "exact", head: true }),
   ]);
 
-  const tenant = tenantRow ?? { name: "", plan: "office", tax_office: null, tax_number: null, license_no: null, brand_color: null, iban: null, phone: null, address_line: null, city: null };
+  const tenant = tenantRow ?? { name: "", plan: "office", tax_office: null, tax_number: null, license_no: null, brand_color: null, iban: null, phone: null, address_line: null, city: null, logo_url: null, website: null };
 
   const complianceStrip = [
     {
@@ -119,8 +120,19 @@ export default async function SettingsPage() {
         </div>
       </section>
 
-      {/* company form (live) */}
-      <CompanyForm tenant={tenant} />
+      {/* Logo + company form */}
+      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-6">
+        <div className="flex items-center gap-3 border-b border-line pb-4">
+          <div>
+            <h2 className="font-display font-bold text-ink-950">Marka & kimlik</h2>
+            <p className="text-xs text-text-muted">Logo, ofis adı ve iletişim bilgileri</p>
+          </div>
+        </div>
+        <div className="mt-5 border-b border-line pb-5">
+          <LogoUploadForm currentUrl={tenant.logo_url ?? null} officeName={tenant.name || "Ofis"} />
+        </div>
+        <CompanyForm tenant={tenant} />
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
         <NotificationPrefsPanel initial={notifPrefs} />
