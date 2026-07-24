@@ -98,6 +98,21 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 
 ## Bu sohbette tamamlanan işler
 
+### 27) DB-driven tanımlar — tüm seçim alanları veritabanından (25 Temmuz 2026)
+
+**Build: ✓ 0 hata.** Production deploy (`fdf74b9`, `4dbcb14`). Migration 042 uygulandı.
+
+Sabit-kodlu dropdown dizileri yerine **yönetilebilir DB tanımları**:
+- **`definitions` tablosu** (migration 042) — `tenant_id` null = global varsayılan, dolu = ofise özel; RLS (ofis kendi + global okur, yalnız kendi yazar). Global seed: müşteri tipi/kaynağı, portföy tipi, işlem tipi, sözleşme tipi
+- **`getDefinitions(category)`** helper (`src/lib/definitions.ts`, React cache) — tenant override + global merge
+- **Yönetim ekranı** `/app/ayarlar/tanimlar` — kategori sekmeleri; ofise özel seçenek ekle/gizle/sil; sistem varsayılanları (Globe ikonu) korunur, kilitli
+- `addDefinition`/`toggleDefinition`/`deleteDefinition` action'ları (settings.edit yetkisi)
+- **Bağlanan dropdown'lar**: müşteri tip+kaynak (liste + new/edit), portföy tip+işlem (new/edit), sözleşme tipi. Hepsi DEFAULT yedekli (DB boşsa sabit değere düşer)
+
+> Genişletme: yeni bir dropdown eklerken kategoriyi `definitions`'a seed'le + sayfada `getDefinitions("...")` çağır + dialog'a prop geç (desen kurulu).
+
+---
+
 ### 26) İnteraktif harita (rakip özelliği) + ana sayfa ultra-premium (24 Temmuz 2026)
 
 **Build: ✓ 0 hata.** Production deploy (`1ee6cd2`, `760e781`).
