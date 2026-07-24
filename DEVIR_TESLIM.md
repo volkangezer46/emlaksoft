@@ -98,6 +98,21 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 
 ## Bu sohbette tamamlanan işler
 
+### 25) Bildirim merkezi zenginleştirme (24 Temmuz 2026)
+
+**Build: ✓ 0 hata.** Production deploy (`e590768`).
+
+`src/components/app/notification-bell.tsx`:
+- Sayılı okunmamış rozeti (9+) + "X yeni" etiketi
+- **Tümü / Okunmamış** sekmeleri
+- Tür-renkli ikonlar (success/warning/danger/system/info)
+- **Zaman gruplama** (Bugün / Bu hafta / Daha eski) + göreli zaman ("5 dk önce")
+- İkonlu premium boş durum, okunmamış nokta göstergesi
+
+> Not: Admin tarafı `src/components/admin/notification-bell.tsx` aynı zenginleştirmeyle güncellenebilir (henüz yapılmadı).
+
+---
+
 ### 24) Premium boş-durum (EmptyState) sistemi (24 Temmuz 2026)
 
 **Build: ✓ 0 hata.** Production deploy (`af61914`).
