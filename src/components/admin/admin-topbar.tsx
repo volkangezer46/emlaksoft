@@ -93,7 +93,7 @@ export function AdminTopbar({
         </div>
       </div>
 
-      <div className="hidden flex-1 justify-center px-4 md:flex">
+      <div className="hidden flex-1 justify-center px-6 md:flex">
         <CommandPalette modules={modules} />
       </div>
 

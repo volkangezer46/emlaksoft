@@ -139,12 +139,12 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="group flex h-9 w-full max-w-xs items-center gap-2 rounded-[11px] border border-line bg-canvas/70 px-3 text-sm text-text-faint transition hover:border-brand-300 hover:text-text-muted sm:w-72"
+        className="group flex h-10 w-full max-w-lg items-center gap-3 rounded-[12px] border border-line bg-canvas/80 px-4 text-sm text-text-faint shadow-[var(--shadow-xs)] transition hover:border-brand-300/70 hover:bg-surface hover:text-text-muted hover:shadow-[var(--shadow-sm)]"
       >
-        <Search className="h-4 w-4" />
-        <span className="flex-1 text-left">Ara… ofis, üye, destek talebi</span>
-        <kbd className="hidden rounded-md border border-line bg-surface px-1.5 py-0.5 text-[10px] font-semibold text-text-faint sm:inline">
-          Ctrl K
+        <Search className="h-4 w-4 shrink-0 transition group-hover:text-brand-500" />
+        <span className="flex-1 text-left text-[13px]">Ara… ofis, üye, destek talebi</span>
+        <kbd className="hidden items-center gap-1 rounded-[7px] border border-line bg-surface px-2 py-1 text-[10px] font-semibold text-text-faint sm:inline-flex">
+          Ctrl <span className="font-bold">K</span>
         </kbd>
       </button>
 
