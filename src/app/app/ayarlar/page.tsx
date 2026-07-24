@@ -33,6 +33,7 @@ const SETUP_RING_C = 2 * Math.PI * 42;
 const cards: SettingCard[] = [
   { title: "Şube / ekip", desc: "Şubeler, ekipler ve bölge yetkilendirmeleri.", icon: Users2, tone: "bg-cyan-400/12 text-cyan-500", href: "/app/ekip" },
   { title: "Kullanıcı & roller", desc: "Danışman, yönetici ve broker rol izinleri.", icon: Fingerprint, tone: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/roller" },
+  { title: "Tanımlar & seçim listeleri", desc: "Müşteri tipi, kaynak, portföy tipi gibi tüm dropdown seçeneklerini yönetin.", icon: Sliders, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/tanimlar" },
   { title: "Komisyon defteri", desc: "Hakediş kayıtları, danışman payı ve ödeme bağlantıları.", icon: Wallet, tone: "bg-amber-400/15 text-amber-500", href: "/app/komisyon" },
   { title: "İYS / EİDS", desc: "İzin yönetimi ve elektronik ileti uyumu.", icon: ShieldCheck, tone: "bg-mint-500/12 text-mint-600", badge: "Manuel", badgeCls: "bg-ink-950/8 text-text-muted", href: "/app/uyum" },
   { title: "Abonelik & iyzico", desc: "Paket, fatura ve ödeme yöntemi yönetimi.", icon: CreditCard, tone: "bg-brand-600/10 text-brand-600", badge: "Pro", badgeCls: "bg-brand-600/10 text-brand-600", href: "/app/abonelik" },

@@ -17,6 +17,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { exportCustomersCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { NewCustomerDialog } from "./new-customer-dialog";
+import { getDefinitions } from "@/lib/definitions";
 import { CustomerRowDelete } from "./customer-row-delete";
 import { formatTurkishPhone } from "@/lib/phone";
 import { computeLeadScore, leadTierCls } from "@/lib/lead-score";
@@ -119,7 +120,7 @@ export default async function CustomersPage({
   const assignedF = sp.assigned ?? "";
   const sortF    = sp.sort     ?? "";
 
-  const [{ data: customers }, { data: provinces }, { data: branches }, { data: advisors }, { data: signals }] = await Promise.all([
+  const [{ data: customers }, { data: provinces }, { data: branches }, { data: advisors }, { data: signals }, typeDefs, sourceDefs] = await Promise.all([
     supabase
       .from("customers")
       .select(
@@ -134,7 +135,14 @@ export default async function CustomersPage({
     tenantId
       ? supabase.rpc("customer_lead_signals", { p_tenant_id: tenantId })
       : Promise.resolve({ data: [] as LeadSignalRow[] }),
+    getDefinitions("customer_type"),
+    getDefinitions("customer_source"),
   ]);
+
+  // DB-driven tanımlar (boşsa sabit yedeğe düş)
+  const customerTypes = typeDefs.length > 0 ? typeDefs : CUSTOMER_TYPES.map((t) => ({ value: t, label: t, color: null }));
+  const customerTypeValues = customerTypes.map((t) => t.value);
+  const sourceEntries = sourceDefs.length > 0 ? sourceDefs.map((s) => [s.value, s.label] as const) : Object.entries(SOURCE_LABELS);
 
   // Lead skoru — her müşteri için sinyallerden (bkz. lib/lead-score)
   const signalMap = new Map<string, LeadSignalRow>();
@@ -225,7 +233,7 @@ export default async function CustomersPage({
             <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Müşteri merkezi</h1>
             <p className="mt-1 text-sm text-white/60">Talep, iletişim ve müşteri yolculuğu tek operasyon ekranında.</p>
           </div>
-          {canCreate ? <NewCustomerDialog provinces={provinceList} branches={branchList} /> : null}
+          {canCreate ? <NewCustomerDialog provinces={provinceList} branches={branchList} types={customerTypeValues} /> : null}
         </div>
         <div className="relative mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
           <div className="grid grid-cols-3 gap-3">
@@ -330,7 +338,7 @@ export default async function CustomersPage({
             className="rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
           >
             <option value="">Tüm tipler</option>
-            {CUSTOMER_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            {customerTypes.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
           {/* Kaynak */}
           <select
@@ -339,7 +347,7 @@ export default async function CustomersPage({
             className="rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
           >
             <option value="">Tüm kaynaklar</option>
-            {Object.entries(SOURCE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            {sourceEntries.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
           {/* Danışman */}
           {advisorList.length > 0 && (
@@ -417,7 +425,7 @@ export default async function CustomersPage({
           </p>
           {canCreate ? (
             <div className="mt-5">
-              <NewCustomerDialog provinces={provinceList} branches={branchList} />
+              <NewCustomerDialog provinces={provinceList} branches={branchList} types={customerTypeValues} />
             </div>
           ) : null}
         </div>

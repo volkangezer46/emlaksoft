@@ -12,9 +12,17 @@ type Branch = { id: string; name: string };
 
 const initial: CustomerResult = {};
 
-const types = ["Alıcı", "Mülk sahibi", "Kiracı", "Yatırımcı"];
+const DEFAULT_TYPES = ["Alıcı", "Mülk sahibi", "Kiracı", "Yatırımcı"];
 
-export function NewCustomerDialog({ provinces, branches = [] }: { provinces: Province[]; branches?: Branch[] }) {
+export function NewCustomerDialog({
+  provinces,
+  branches = [],
+  types = DEFAULT_TYPES,
+}: {
+  provinces: Province[];
+  branches?: Branch[];
+  types?: string[];
+}) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(createCustomer, initial);
   const router = useRouter();
