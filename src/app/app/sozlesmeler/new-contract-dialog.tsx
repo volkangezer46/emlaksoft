@@ -53,9 +53,51 @@ Kiracı ___ aylık kira bedeli tutarında depozito ödeyecektir.
 MADDE 3 — Tarafların Yükümlülükleri
 ___________________________
 
+MADDE 4 — Kira Artışı
+Kira bedeli her yıl, bir önceki kira yılının on iki aylık ortalama TÜFE oranını geçmeyecek şekilde artırılır (TBK m.344).
+
 İmzalar:
 Kiraya Veren: ___________________________  Tarih: _______
 Kiracı:       ___________________________  Tarih: _______`,
+
+  teklif: `TEKLİF MEKTUBU
+
+Tarih: ___________________________
+Sayın: ___________________________
+
+İlgilendiğiniz taşınmaz için teklifimiz aşağıdaki gibidir:
+
+Taşınmaz: ___________________________
+Teklif Bedeli: ___________________________ TL
+Geçerlilik: ___________________________ tarihine kadar
+Ödeme Şekli: ___________________________
+
+Bu teklif yukarıda belirtilen tarihe kadar geçerlidir. Olumlu değerlendirmeniz durumunda süreç birlikte yürütülecektir.
+
+Saygılarımızla,
+___________________________ (Danışman / Ofis)`,
+
+  sozlesme: `HİZMET / ARACILIK SÖZLEŞMESİ
+
+Hizmet Veren (Emlak Ofisi): ___________________________
+Hizmet Alan (Müşteri):      ___________________________
+Konu:                       ___________________________
+
+MADDE 1 — Kapsam
+Emlak ofisi, müşteriye taşınmaz alım/satım/kiralama sürecinde aracılık ve danışmanlık hizmeti verir.
+
+MADDE 2 — Hizmet Bedeli (Komisyon)
+İşlem gerçekleştiğinde, taraflarca kabul edilen oran üzerinden hizmet bedeli ödenir.
+
+MADDE 3 — Süre ve Yetki
+Bu sözleşme _____ tarihinden itibaren _____ süreyle geçerlidir.
+
+MADDE 4 — Gizlilik ve KVKK
+Taraflar, kişisel verilerin 6698 sayılı KVKK kapsamında korunacağını kabul eder.
+
+İmzalar:
+Emlak Ofisi: ___________________________  Tarih: _______
+Müşteri:     ___________________________  Tarih: _______`,
 };
 
 const init: ContractResult = {};

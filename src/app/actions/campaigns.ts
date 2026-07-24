@@ -20,7 +20,7 @@ export async function createCampaign(
   if (!gate.ok) return { error: gate.error };
 
   const title    = String(fd.get("title")   ?? "").trim();
-  const channel  = String(fd.get("channel") ?? "sms").trim() as "sms" | "whatsapp";
+  const channel  = String(fd.get("channel") ?? "sms").trim() as "sms" | "whatsapp" | "email";
   const message  = String(fd.get("message") ?? "").trim();
   const filter   = String(fd.get("filter")  ?? "all").trim(); // all | type:alici | type:satici
 
@@ -143,6 +143,13 @@ export async function sendCampaign(campaignId: string): Promise<CampaignResult> 
         .eq("status", "pending");
       failCount = pending.length;
     }
+  } else if (campaign.channel === "email") {
+    // E-posta kanalı — gönderim sağlayıcısı (SMTP/Resend) yapılandırıldığında aktifleşir
+    await admin.from("campaign_recipients")
+      .update({ status: "failed", error_msg: "E-posta sağlayıcısı yapılandırılmamış. Yönetici ayarlardan ekleyince aktifleşir." })
+      .eq("campaign_id", campaignId)
+      .eq("status", "pending");
+    failCount = pending.length;
   } else {
     // WhatsApp — tek tek gönder (rate limit nedeniyle)
     for (const r of pending) {

@@ -1,8 +1,9 @@
 "use client";
 
 import { useActionState, useTransition, useState } from "react";
-import { Plus, MessageSquare, X } from "lucide-react";
+import { Plus, MessageSquare, Sparkles, X } from "lucide-react";
 import { createCampaign, type CampaignResult } from "@/app/actions/campaigns";
+import { CAMPAIGN_TEMPLATES } from "@/lib/campaign-templates";
 
 const FILTERS = [
   { value: "all",         label: "Tüm müşteriler" },
@@ -17,7 +18,8 @@ export function NewCampaignDialog({ trigger }: { trigger?: "button" | "icon" } =
   const [open, setOpen] = useState(false);
   const [state, action] = useActionState(createCampaign, init);
   const [, startTransition] = useTransition();
-  const [charCount, setCharCount] = useState(0);
+  const [message, setMessage] = useState("");
+  const charCount = message.length;
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -106,6 +108,7 @@ export function NewCampaignDialog({ trigger }: { trigger?: "button" | "icon" } =
                 >
                   <option value="sms">SMS (Netgsm)</option>
                   <option value="whatsapp">WhatsApp</option>
+                  <option value="email">E-posta</option>
                 </select>
               </div>
 
@@ -126,6 +129,25 @@ export function NewCampaignDialog({ trigger }: { trigger?: "button" | "icon" } =
                 </select>
               </div>
 
+              {/* Hazır şablonlar */}
+              <div>
+                <p className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-ink-950">
+                  <Sparkles className="h-3.5 w-3.5 text-brand-600" /> Hazır şablon
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {CAMPAIGN_TEMPLATES.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setMessage(t.message)}
+                      className="rounded-full border border-line bg-canvas px-2.5 py-1 text-[11px] font-medium text-text-muted transition hover:border-brand-400 hover:text-brand-600"
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Mesaj */}
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
@@ -142,8 +164,9 @@ export function NewCampaignDialog({ trigger }: { trigger?: "button" | "icon" } =
                   required
                   rows={4}
                   maxLength={612}
-                  onChange={(e) => setCharCount(e.target.value.length)}
-                  placeholder="Mesajınızı buraya yazın…"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Mesajınızı buraya yazın… ({ad} ve {ofis} otomatik değişir)"
                   className="w-full resize-none rounded-[10px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300"
                 />
                 {charCount > 0 && charCount <= 160 && (

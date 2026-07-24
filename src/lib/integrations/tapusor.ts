@@ -61,7 +61,7 @@ export async function getTapusorParcelInsight(input: {
   ada?: string | null;
   parsel?: string | null;
 }): Promise<TapusorParcelInsight> {
-  const config = getTapusorConfig();
+  const config = (await getTapusorConfigFull()) ?? getTapusorConfig();
   if (!config) throw new Error("Tapusor yapılandırılmamış.");
 
   const res = await fetch(`${config.baseUrl}/v1/parcel-inquiry`, {
