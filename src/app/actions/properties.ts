@@ -10,6 +10,15 @@ import { notifyMatchingDemandsForProperty } from "@/lib/match-notify";
 
 export type PropertyResult = { error?: string; ok?: boolean; matchedDemands?: number };
 
+/** Boş ise null; geçerli bir enlem/boylam sayısıysa döndürür. */
+function parseCoord(raw: FormDataEntryValue | null): number | null {
+  const s = String(raw ?? "").trim().replace(",", ".");
+  if (!s) return null;
+  const n = Number(s);
+  if (!Number.isFinite(n) || n < -180 || n > 180) return null;
+  return n;
+}
+
 const STATUSES = ["draft", "live", "reserved", "sold", "rented", "archived"];
 
 export async function createProperty(formData: FormData): Promise<PropertyResult> {
@@ -23,6 +32,8 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   const provinceId = String(formData.get("province_id") ?? "").trim();
   const branchId = String(formData.get("branch_id") ?? "").trim();
   const addressLine = String(formData.get("address_line") ?? "").trim();
+  const latVal = parseCoord(formData.get("lat"));
+  const lngVal = parseCoord(formData.get("lng"));
   const rooms = String(formData.get("rooms") ?? "").trim();
   const sqmValue = Number(String(formData.get("sqm") ?? "").replace(",", "."));
   const rawPrice = String(formData.get("list_price") ?? "").replace(/[^\d.,]/g, "");
@@ -65,6 +76,8 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
       province_id: provinceId || null,
       branch_id: branchId || null,
       address_line: addressLine || null,
+      lat: latVal,
+      lng: lngVal,
       features: {
         rooms: rooms || null,
         sqm: Number.isFinite(sqmValue) ? sqmValue : null,
@@ -124,6 +137,8 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
   const branchId = String(formData.get("branch_id") ?? "").trim();
   const hasBranch = formData.has("branch_id");
   const addressLine = String(formData.get("address_line") ?? "").trim();
+  const latVal = parseCoord(formData.get("lat"));
+  const lngVal = parseCoord(formData.get("lng"));
   const rooms = String(formData.get("rooms") ?? "").trim();
   const sqmValue = Number(String(formData.get("sqm") ?? "").replace(",", "."));
   const rawPrice = String(formData.get("list_price") ?? "").replace(/[^\d.,]/g, "");
@@ -160,6 +175,8 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
     commission_rate: Number.isFinite(commissionValue) ? commissionValue : null,
     province_id: provinceId || null,
     address_line: addressLine || null,
+    lat: latVal,
+    lng: lngVal,
     features: {
       rooms: rooms || null,
       sqm: Number.isFinite(sqmValue) ? sqmValue : null,

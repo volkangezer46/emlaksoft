@@ -30,6 +30,7 @@ import { PropertyStatusHistory, PropertyAuthorizationPanel, PublishToPortalsPane
 import { PropertyHealthCard, ListingQualityCard } from "@/components/app/property-health-card";
 import { RelatedPropertiesWidget } from "./related-properties-widget";
 import { TapuInquiryPanel } from "./tapu-inquiry-panel";
+import { PropertyMap } from "@/components/app/property-map";
 import { computePropertyHealth, computeListingQuality } from "@/lib/property-health";
 import { computePriceHealth } from "@/lib/price-health";
 import { isEndeksaConfigured } from "@/lib/integrations/endeksa";
@@ -104,7 +105,7 @@ export default async function PropertyDetailPage({
     supabase
       .from("properties")
       .select(
-        "id, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, parcel_block, parcel_lot, features, price_health, created_at, updated_at, assigned_to, province:geo_provinces(name), district:geo_districts(name)",
+        "id, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, parcel_block, parcel_lot, lat, lng, features, price_health, created_at, updated_at, assigned_to, province:geo_provinces(name), district:geo_districts(name)",
       )
       .eq("id", id)
       .is("deleted_at", null)
@@ -274,6 +275,8 @@ export default async function PropertyDetailPage({
                     commission_rate: property.commission_rate != null ? Number(property.commission_rate) : null,
                     address_line: property.address_line,
                     province_id: property.province_id,
+                    lat: property.lat as number | null,
+                    lng: property.lng as number | null,
                     features: (property.features ?? {}) as { rooms?: string | null; sqm?: number | null },
                   }}
                   provinces={provinces ?? []}
@@ -563,6 +566,17 @@ export default async function PropertyDetailPage({
         propertyId={id}
         initialHistory={statusHistory as Parameters<typeof PropertyStatusHistory>[0]["initialHistory"]}
       />
+
+      {/* Konum haritası (OpenStreetMap) */}
+      <section>
+        <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-ink-950"><MapPin className="h-4 w-4 text-brand-600" /> Konum</h2>
+        <PropertyMap
+          lat={property.lat as number | null}
+          lng={property.lng as number | null}
+          label={[property.address_line, district, province].filter(Boolean).join(" · ") || property.title || undefined}
+          addressQuery={[property.address_line, district, province].filter(Boolean).join(", ") || null}
+        />
+      </section>
 
       {/* Tapu & parsel sorgusu (TAKBİS/Tapusor) */}
       <TapuInquiryPanel

@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { createProperty } from "@/app/actions/properties";
+import { LatLngPicker } from "@/components/app/lat-lng-picker";
 
 type Province = { id: string; name: string };
 type Branch = { id: string; name: string };
@@ -123,6 +124,7 @@ export function NewPropertyDialog({ provinces, branches = [] }: { provinces: Pro
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="address-line">Adres özeti</label>
                 <input id="address-line" name="address_line" className={fieldClass} placeholder="Mahalle, cadde…" />
               </div>
+              <LatLngPicker fieldClass={fieldClass} />
               {branches.length > 0 ? (
                 <div className="sm:col-span-2">
                   <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="property-branch">Şube</label>

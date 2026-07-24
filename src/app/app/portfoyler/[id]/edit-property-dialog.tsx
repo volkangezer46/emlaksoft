@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Pencil, X } from "lucide-react";
 import { updateProperty } from "@/app/actions/properties";
 import { useToast } from "@/components/app/toast-provider";
+import { LatLngPicker } from "@/components/app/lat-lng-picker";
 
 type Province = { id: string; name: string };
 
@@ -19,6 +20,8 @@ type Props = {
     commission_rate: number | null;
     address_line: string | null;
     province_id: string | null;
+    lat: number | null;
+    lng: number | null;
     features: { rooms?: string | null; sqm?: number | null };
   };
   provinces: Province[];
@@ -129,6 +132,7 @@ export function EditPropertyDialog({ property, provinces }: Props) {
                 Adres
                 <input name="address_line" defaultValue={property.address_line ?? ""} className={field} />
               </label>
+              <LatLngPicker defaultLat={property.lat} defaultLng={property.lng} fieldClass={field} />
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button type="button" onClick={() => setOpen(false)} className="rounded-[10px] border border-line px-4 py-2 text-sm font-semibold text-text-muted">
