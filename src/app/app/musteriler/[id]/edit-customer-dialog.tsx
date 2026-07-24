@@ -9,11 +9,12 @@ import { PhoneInput } from "@/components/ui/phone-input";
 type Province = { id: string; name: string };
 
 const initial: CustomerResult = {};
-const types = ["Alıcı", "Mülk sahibi", "Kiracı", "Yatırımcı"];
+const DEFAULT_TYPES = ["Alıcı", "Mülk sahibi", "Kiracı", "Yatırımcı"];
 
 export function EditCustomerDialog({
   customer,
   provinces,
+  types = DEFAULT_TYPES,
 }: {
   customer: {
     id: string;
@@ -28,6 +29,7 @@ export function EditCustomerDialog({
     anniversary_note: string | null;
   };
   provinces: Province[];
+  types?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();

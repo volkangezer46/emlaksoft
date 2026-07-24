@@ -102,7 +102,10 @@ Müşteri:     ___________________________  Tarih: _______`,
 
 const init: ContractResult = {};
 
-export function NewContractDialog({ trigger }: { trigger?: "button" | "icon" } = {}) {
+export function NewContractDialog({
+  trigger,
+  contractTypes = CONTRACT_TYPES,
+}: { trigger?: "button" | "icon"; contractTypes?: { value: string; label: string }[] } = {}) {
   const [open, setOpen] = useState(false);
   const [state, action, isPending] = useActionState(createContract, init);
   const [, startTransition] = useTransition();
@@ -187,7 +190,7 @@ export function NewContractDialog({ trigger }: { trigger?: "button" | "icon" } =
                     onChange={(e) => applyTemplate(e.target.value)}
                     className="w-full appearance-none rounded-[10px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300"
                   >
-                    {CONTRACT_TYPES.map((t) => (
+                    {contractTypes.map((t) => (
                       <option key={t.value} value={t.value}>{t.label}</option>
                     ))}
                   </select>

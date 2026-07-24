@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { getDefinitions } from "@/lib/definitions";
 import { EditCustomerDialog } from "./edit-customer-dialog";
 import { DeleteCustomerButton } from "./delete-customer-button";
 import { Customer360Tabs } from "./customer-360-tabs";
@@ -97,6 +98,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     { data: tasksData },
     { data: commsData },
     { data: propertiesForMatch },
+    customerTypeDefs,
   ] = await Promise.all([
     supabase
       .from("customers")
@@ -165,9 +167,12 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .in("status", ["live", "draft", "Yayında"])
       .order("created_at", { ascending: false })
       .limit(100),
+    getDefinitions("customer_type"),
   ]);
 
   if (!customer) notFound();
+
+  const customerTypeOptions = customerTypeDefs.length ? customerTypeDefs.map((d) => d.value) : undefined;
 
   const demands = (demandsData ?? []) as Demand[];
   const calls = (callsData ?? []) as Call[];
@@ -349,6 +354,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                       anniversary_note: customer.anniversary_note,
                     }}
                     provinces={provinces ?? []}
+                    types={customerTypeOptions}
                   />
                 ) : null}
                 {canDelete ? <DeleteCustomerButton customerId={customer.id} /> : null}

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { getDefinitions } from "@/lib/definitions";
 import { moneyTry } from "@/lib/leak-shield";
 import { setPropertyStatus } from "@/app/actions/properties";
 import { ClosePortalDialog } from "@/app/app/portallar/portal-dialogs";
@@ -101,7 +102,7 @@ export default async function PropertyDetailPage({
   const supabase = await createClient();
 
   // 1. tur — hepsi yalnızca `id`'ye bağlı, tam paralel
-  const [{ data: property }, { data: portalsData }, statusHistory, configuredPortals] = await Promise.all([
+  const [{ data: property }, { data: portalsData }, statusHistory, configuredPortals, propertyTypeDefs, transactionTypeDefs] = await Promise.all([
     supabase
       .from("properties")
       .select(
@@ -117,9 +118,14 @@ export default async function PropertyDetailPage({
       .order("created_at", { ascending: false }),
     getPropertyStatusHistory(id),
     getConfiguredPortals(),
+    getDefinitions("property_type"),
+    getDefinitions("transaction_type"),
   ]);
 
   if (!property) notFound();
+
+  const propertyTypeOptions = propertyTypeDefs.length ? propertyTypeDefs.map((d) => d.value) : undefined;
+  const transactionTypeOptions = transactionTypeDefs.length ? transactionTypeDefs.map((d) => d.value) : undefined;
 
   const portals = (portalsData ?? []) as Portal[];
   const portalIds = portals.map((p) => p.id);
@@ -280,6 +286,8 @@ export default async function PropertyDetailPage({
                     features: (property.features ?? {}) as { rooms?: string | null; sqm?: number | null },
                   }}
                   provinces={provinces ?? []}
+                  propertyTypes={propertyTypeOptions}
+                  transactionTypes={transactionTypeOptions}
                 />
               ) : null}
               <Link href="/app/kayip-kacak" className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">

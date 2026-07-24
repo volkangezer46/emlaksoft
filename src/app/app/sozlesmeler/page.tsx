@@ -8,6 +8,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
+import { getDefinitions } from "@/lib/definitions";
 import { listContracts } from "@/app/actions/contracts";
 import { NewContractDialog } from "./new-contract-dialog";
 import { EmptyState } from "@/components/app/empty-state";
@@ -72,9 +73,15 @@ function customerName(c: { full_name: string } | { full_name: string }[] | null)
 
 export default async function SozlesmelerPage() {
   const { perms } = await requireModulePage("contracts");
-  const contracts = await listContracts();
+  const [contracts, contractTypeDefs] = await Promise.all([
+    listContracts(),
+    getDefinitions("contract_type"),
+  ]);
 
   const canCreate = perms.contracts?.includes("create") ?? false;
+  const contractTypeOptions = contractTypeDefs.length
+    ? contractTypeDefs.map((d) => ({ value: d.value, label: d.label }))
+    : undefined;
 
   const total   = contracts.length;
   const signed  = contracts.filter((c) => c.status === "signed").length;
@@ -116,7 +123,7 @@ export default async function SozlesmelerPage() {
       {/* Üst toolbar */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-text-muted">{total} sözleşme</p>
-        {canCreate && <NewContractDialog />}
+        {canCreate && <NewContractDialog contractTypes={contractTypeOptions} />}
       </div>
 
       {/* Liste */}
@@ -126,7 +133,7 @@ export default async function SozlesmelerPage() {
           title="Henüz sözleşme yok"
           description="İlk sözleşme taslağınızı oluşturun, imzalayanları ekleyin ve dijital onay alın."
           tone="brand"
-          action={canCreate ? { label: "Yeni sözleşme", node: <NewContractDialog trigger="button" /> } : undefined}
+          action={canCreate ? { label: "Yeni sözleşme", node: <NewContractDialog trigger="button" contractTypes={contractTypeOptions} /> } : undefined}
         />
       ) : (
         <section className="overflow-hidden rounded-[20px] border border-line bg-surface">

@@ -25,12 +25,22 @@ type Props = {
     features: { rooms?: string | null; sqm?: number | null };
   };
   provinces: Province[];
+  transactionTypes?: string[];
+  propertyTypes?: string[];
 };
 
 const field =
   "mt-1.5 w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400";
 
-export function EditPropertyDialog({ property, provinces }: Props) {
+const DEFAULT_TRANSACTION_TYPES = ["Satılık", "Kiralık", "sale", "rent"];
+const DEFAULT_PROPERTY_TYPES = ["Daire", "Villa", "Arsa", "İşyeri", "Diğer"];
+
+export function EditPropertyDialog({
+  property,
+  provinces,
+  transactionTypes = DEFAULT_TRANSACTION_TYPES,
+  propertyTypes = DEFAULT_PROPERTY_TYPES,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const { push } = useToast();
@@ -81,20 +91,13 @@ export function EditPropertyDialog({ property, provinces }: Props) {
               <label className="text-xs font-medium text-text-muted">
                 İşlem
                 <select name="transaction_type" defaultValue={property.transaction_type} className={field}>
-                  <option>Satılık</option>
-                  <option>Kiralık</option>
-                  <option value="sale">sale</option>
-                  <option value="rent">rent</option>
+                  {transactionTypes.map((t) => <option key={t}>{t}</option>)}
                 </select>
               </label>
               <label className="text-xs font-medium text-text-muted">
                 Tür
                 <select name="property_type" defaultValue={property.property_type} className={field}>
-                  <option>Daire</option>
-                  <option>Villa</option>
-                  <option>Arsa</option>
-                  <option>İşyeri</option>
-                  <option>Diğer</option>
+                  {propertyTypes.map((t) => <option key={t}>{t}</option>)}
                 </select>
               </label>
               <label className="text-xs font-medium text-text-muted">

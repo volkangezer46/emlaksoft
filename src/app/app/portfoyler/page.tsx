@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { getDefinitions } from "@/lib/definitions";
 import { NewPropertyDialog } from "./new-property-dialog";
 import { PropertyBulkActions } from "./property-bulk-actions";
 
@@ -84,15 +85,19 @@ export default async function PropertiesPage({
     );
   }
 
-  const [{ data }, { data: provinces }, { data: branches }] = await Promise.all([
+  const [{ data }, { data: provinces }, { data: branches }, propertyTypeDefs, transactionTypeDefs] = await Promise.all([
     query,
     supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
+    getDefinitions("property_type"),
+    getDefinitions("transaction_type"),
   ]);
 
   const allProperties = (data ?? []) as PropertyRow[];
   const provinceList = provinces ?? [];
   const branchList = branches ?? [];
+  const propertyTypeOptions = propertyTypeDefs.length ? propertyTypeDefs.map((d) => d.value) : undefined;
+  const transactionTypeOptions = transactionTypeDefs.length ? transactionTypeDefs.map((d) => d.value) : undefined;
 
   let properties = allProperties;
 
@@ -139,7 +144,7 @@ export default async function PropertiesPage({
             <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Portföy operasyonu</h1>
             <p className="mt-1 text-sm text-white/60">Fiyat sağlığı, portal teyidi ve yetki durumu tek merkezde.</p>
           </div>
-          {canCreate ? <NewPropertyDialog provinces={provinceList} branches={branchList} /> : null}
+          {canCreate ? <NewPropertyDialog provinces={provinceList} branches={branchList} propertyTypes={propertyTypeOptions} transactionTypes={transactionTypeOptions} /> : null}
         </div>
         <div className="relative mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
           <div className="grid grid-cols-3 gap-3">
@@ -220,7 +225,7 @@ export default async function PropertiesPage({
           <p className="mt-2 max-w-md text-sm leading-relaxed text-text-muted">İlk portföyünüzü ekleyin; fiyat sağlığı, portal teyidi ve yetki süresi otomatik izlenmeye başlasın.</p>
           {canCreate ? (
             <div className="mt-5 [&>button]:bg-brand-600 [&>button]:text-white">
-              <NewPropertyDialog provinces={provinceList} branches={branchList} />
+              <NewPropertyDialog provinces={provinceList} branches={branchList} propertyTypes={propertyTypeOptions} transactionTypes={transactionTypeOptions} />
             </div>
           ) : null}
         </div>

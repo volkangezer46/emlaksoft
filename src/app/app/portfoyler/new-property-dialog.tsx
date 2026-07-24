@@ -20,7 +20,20 @@ type Branch = { id: string; name: string };
 const fieldClass =
   "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
-export function NewPropertyDialog({ provinces, branches = [] }: { provinces: Province[]; branches?: Branch[] }) {
+const DEFAULT_PROPERTY_TYPES = ["Daire", "Villa", "Arsa", "İşyeri", "Müstakil ev", "Bina"];
+const DEFAULT_TRANSACTION_TYPES = ["Satılık", "Kiralık"];
+
+export function NewPropertyDialog({
+  provinces,
+  branches = [],
+  propertyTypes = DEFAULT_PROPERTY_TYPES,
+  transactionTypes = DEFAULT_TRANSACTION_TYPES,
+}: {
+  provinces: Province[];
+  branches?: Branch[];
+  propertyTypes?: string[];
+  transactionTypes?: string[];
+}) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,8 +92,7 @@ export function NewPropertyDialog({ provinces, branches = [] }: { provinces: Pro
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="transaction-type">İşlem türü *</label>
                 <div className="relative">
                   <select id="transaction-type" name="transaction_type" required defaultValue="Satılık" className={`${fieldClass} appearance-none`}>
-                    <option>Satılık</option>
-                    <option>Kiralık</option>
+                    {transactionTypes.map((type) => <option key={type}>{type}</option>)}
                   </select>
                   <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
                 </div>
@@ -89,7 +101,7 @@ export function NewPropertyDialog({ provinces, branches = [] }: { provinces: Pro
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="property-type">Portföy türü *</label>
                 <div className="relative">
                   <select id="property-type" name="property_type" required defaultValue="Daire" className={`${fieldClass} appearance-none`}>
-                    {["Daire", "Villa", "Arsa", "İşyeri", "Müstakil ev", "Bina"].map((type) => <option key={type}>{type}</option>)}
+                    {propertyTypes.map((type) => <option key={type}>{type}</option>)}
                   </select>
                   <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
                 </div>
