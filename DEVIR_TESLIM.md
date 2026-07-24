@@ -98,6 +98,17 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 
 ## Bu sohbette tamamlanan işler
 
+### 31) Beyaz-etiket — ofis marka rengi tüm panele (25 Temmuz 2026)
+
+**Build: ✓ 0 hata.** Production deploy (`62260ef`).
+
+- App layout `tenants.brand_color` okur; geçerli hex ise `.brand-scope` üzerinden panel CSS marka değişkenleri override edilir: `--brand-600/700/500/400/300` + `--grad-brand` + `--shadow-glow-brand`
+- Tek renkten tam ramp `color-mix(in srgb, …)` ile türetilir (koyu/açık tonlar)
+- Ofis `/app/ayarlar`'daki `<input type="color">` ile rengini seçer → tüm ofis paneli o markaya döner; renk yoksa varsayılan mavi
+- Not: Tailwind `--color-brand-*` → `var(--brand-*)` referansı sayesinde override use-site'ta cascade eder
+
+---
+
 ### 28) Jet hız + ana sayfa premium çerçeve (25 Temmuz 2026)
 
 **Build: ✓ 0 hata.** Production deploy (`c011d42`, `171acae`).
