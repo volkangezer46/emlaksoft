@@ -39,11 +39,11 @@ export function NewDealDialog({ properties, customers }: { properties: Prop[]; c
         <Plus className="h-4 w-4" /> Yeni anlaşma
       </button>
       {open ? (
-        <div className="fixed inset-0 z-50 grid place-items-center p-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center">
           <button type="button" aria-label="Kapat" className="absolute inset-0 bg-ink-950/50 backdrop-blur-sm" onClick={() => setOpen(false)} />
           <form
             onSubmit={onSubmit}
-            className="relative w-full max-w-md space-y-3 rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-lg)]"
+            className="relative my-auto w-full max-w-md space-y-3 rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-lg)]"
           >
             <h2 className="font-display text-lg font-bold text-ink-950">Pipeline’a anlaşma ekle</h2>
             <label className="block text-xs font-medium text-text-muted">

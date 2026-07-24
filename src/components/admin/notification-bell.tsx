@@ -101,7 +101,7 @@ export function NotificationBell() {
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-[16px] border border-line bg-surface shadow-[0_24px_50px_-20px_rgba(10,34,71,0.5)]">
+        <div className="absolute right-0 top-11 z-50 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-[16px] border border-line bg-surface shadow-[0_24px_50px_-20px_rgba(10,34,71,0.5)]">
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
             <p className="text-sm font-semibold text-ink-950">Bildirimler</p>
             {unread > 0 ? (

@@ -9,6 +9,16 @@ import { isValidOptionalTurkishMobile, normalizeTurkishPhone, TR_MOBILE_ERROR_ME
 
 export type CustomerResult = { error?: string; ok?: boolean; id?: string };
 
+/** Boş ise geçerli; dolu ise ISO tarih (YYYY-MM-DD) formatını ve gerçek takvim gününü doğrular. */
+function isValidOptionalDate(value: string): boolean {
+  if (!value) return true;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [y, m, d] = value.split("-").map(Number);
+  if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
 export async function createCustomer(
   _prev: CustomerResult,
   formData: FormData,
@@ -27,9 +37,14 @@ export async function createCustomer(
   const provinceId = String(formData.get("province_id") ?? "").trim();
   const branchId = String(formData.get("branch_id") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
+  const birthDate = String(formData.get("birth_date") ?? "").trim();
+  const anniversaryDate = String(formData.get("anniversary_date") ?? "").trim();
+  const anniversaryNote = String(formData.get("anniversary_note") ?? "").trim();
 
   if (!fullName) return { error: "Ad soyad zorunlu." };
   if (!isValidOptionalTurkishMobile(phone)) return { error: TR_MOBILE_ERROR_MESSAGE };
+  if (!isValidOptionalDate(birthDate)) return { error: "Doğum tarihi geçersiz." };
+  if (!isValidOptionalDate(anniversaryDate)) return { error: "Yıldönümü tarihi geçersiz." };
   const normalizedPhone = phone ? normalizeTurkishPhone(phone) : "";
 
   const { data, error } = await supabase
@@ -43,6 +58,9 @@ export async function createCustomer(
       province_id: provinceId || null,
       branch_id: branchId || null,
       notes: notes || null,
+      birth_date: birthDate || null,
+      anniversary_date: anniversaryDate || null,
+      anniversary_note: anniversaryNote || null,
       assigned_to: user.id,
       created_by: user.id,
     })
@@ -82,10 +100,15 @@ export async function updateCustomer(
   const provinceId = String(formData.get("province_id") ?? "").trim();
   const branchId = String(formData.get("branch_id") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
+  const birthDate = String(formData.get("birth_date") ?? "").trim();
+  const anniversaryDate = String(formData.get("anniversary_date") ?? "").trim();
+  const anniversaryNote = String(formData.get("anniversary_note") ?? "").trim();
 
   if (!id) return { error: "Müşteri bulunamadı." };
   if (!fullName) return { error: "Ad soyad zorunlu." };
   if (!isValidOptionalTurkishMobile(phone)) return { error: TR_MOBILE_ERROR_MESSAGE };
+  if (!isValidOptionalDate(birthDate)) return { error: "Doğum tarihi geçersiz." };
+  if (!isValidOptionalDate(anniversaryDate)) return { error: "Yıldönümü tarihi geçersiz." };
   const normalizedPhone = phone ? normalizeTurkishPhone(phone) : "";
 
   const supabase = await createClient();
@@ -96,6 +119,9 @@ export async function updateCustomer(
     customer_types: type ? [type] : [],
     province_id: provinceId || null,
     notes: notes || null,
+    birth_date: birthDate || null,
+    anniversary_date: anniversaryDate || null,
+    anniversary_note: anniversaryNote || null,
   };
   if (formData.has("branch_id")) updatePatch.branch_id = branchId || null;
 

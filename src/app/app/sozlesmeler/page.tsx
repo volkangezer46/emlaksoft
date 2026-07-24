@@ -150,9 +150,10 @@ export default async function SozlesmelerPage() {
               </thead>
               <tbody>
                 {contracts.map((c) => (
-                  <tr key={c.id} className="border-b border-line last:border-0 hover:bg-canvas/40 transition">
+                  <tr key={c.id} className="group relative cursor-pointer border-b border-line last:border-0 hover:bg-brand-600/[0.03] transition">
                     <td className="px-5 py-3.5">
-                      <p className="font-semibold text-ink-950">{c.title}</p>
+                      <Link href={`/app/sozlesmeler/${c.id}`} className="absolute inset-0" aria-label={`${c.title} sözleşmesini aç`} />
+                      <p className="font-semibold text-ink-950 group-hover:text-brand-600">{c.title}</p>
                       {propertyTitle(c.property) && (
                         <p className="text-xs text-text-faint">{propertyTitle(c.property)}</p>
                       )}

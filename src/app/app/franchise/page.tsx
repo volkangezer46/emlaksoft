@@ -12,11 +12,10 @@ import { moneyTry } from "@/lib/leak-shield";
 export default async function FranchiseBiPage() {
   await requireModulePage("reports");
   const supabase = await createClient();
-  const inputs = await loadOfficeScoreInputs(supabase);
-  const office = computeOfficeScore(inputs);
 
-  const [{ data: tenant }, { data: branches }, { data: properties }, { data: customers }, { data: profiles }, { data: deals }, { data: closures }] =
+  const [inputs, { data: tenant }, { data: branches }, { data: properties }, { data: customers }, { data: profiles }, { data: deals }, { data: closures }] =
     await Promise.all([
+      loadOfficeScoreInputs(supabase),
       supabase.from("tenants").select("name, plan").limit(1).maybeSingle(),
       supabase.from("branches").select("id, name, is_active").eq("is_active", true).order("name").limit(50),
       supabase.from("properties").select("id, branch_id").is("deleted_at", null).limit(2000),
@@ -29,6 +28,7 @@ export default async function FranchiseBiPage() {
         .limit(500),
     ]);
 
+  const office = computeOfficeScore(inputs);
   const branchList = branches ?? [];
   const advisorBranch = new Map((profiles ?? []).map((p) => [p.id, p.branch_id as string | null]));
 

@@ -162,7 +162,8 @@ export function SiteHeader() {
             <button
               type="button"
               onClick={() => setOpen((v) => !v)}
-              aria-label="Menü"
+              aria-label={open ? "Menüyü kapat" : "Menüyü aç"}
+              aria-expanded={open}
               className="grid h-10 w-10 place-items-center rounded-[10px] border border-line bg-surface text-ink-950 md:hidden"
             >
               {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}

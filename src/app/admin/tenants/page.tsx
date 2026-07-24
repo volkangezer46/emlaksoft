@@ -1,4 +1,5 @@
-import { Activity, Building2, ShieldAlert } from "lucide-react";
+import Link from "next/link";
+import { Activity, ArrowUpRight, Building2, ShieldAlert } from "lucide-react";
 import { setTenantPlanStatus, startImpersonation } from "@/app/actions/platform";
 import { exportTenantsCsv } from "@/app/actions/platform-export";
 import { ExportButton } from "@/components/admin/export-button";
@@ -163,7 +164,10 @@ export default async function AdminTenantsPage() {
                   {t.status === "active" ? <span className="status-pulse absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-mint-500" /> : null}
                 </span>
                 <div>
-                  <p className="font-display text-base font-bold text-ink-950">{t.name}</p>
+                  <Link href={`/admin/tenants/${t.id}`} className="group inline-flex items-center gap-1 font-display text-base font-bold text-ink-950 transition hover:text-brand-600">
+                    {t.name}
+                    <ArrowUpRight className="h-3.5 w-3.5 opacity-0 transition group-hover:opacity-100" />
+                  </Link>
                   <p className="mt-0.5 text-xs text-text-muted">
                     /{t.slug} · {memberCount.get(t.id) ?? 0} üye ·{" "}
                     {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(t.created_at))}

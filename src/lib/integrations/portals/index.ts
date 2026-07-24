@@ -83,119 +83,160 @@ export async function isPortalConfigured(portal: PortalName): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
-// Sahibinden.com adaptörü (kurumsal API — iskelet)
+// Adaptör spesifikasyonu — her portal aynı REST arayüzünü parametreler
+// (create=POST, update=PUT, unpublish=DELETE). Böylece 4 portal tek, test
+// edilebilir kod yolundan geçer; gerçek uçlar kurumsal API'ye göre değişebilir.
 // ---------------------------------------------------------------------------
 
-const SAHIBINDEN_BASE = "https://api.sahibinden.com/v1";
+type PortalSpec = {
+  label:    string;
+  base:     string;
+  collectionPath: string;
+  headers:  (cfg: PortalPublishConfig) => Record<string, string>;
+  map:      (p: PropertyPayload) => Record<string, unknown>;
+  parseId:  (data: Record<string, unknown>) => string;
+  parseUrl: (data: Record<string, unknown>) => string | undefined;
+};
 
-export async function sahibindenPublish(
-  property: PropertyPayload,
-  cfg: PortalPublishConfig,
-): Promise<PortalPublishResult> {
-  const base = cfg.baseUrl ?? SAHIBINDEN_BASE;
+const PORTAL_SPECS: Record<PortalName, PortalSpec> = {
+  sahibinden: {
+    label: "Sahibinden",
+    base: "https://api.sahibinden.com/v1",
+    collectionPath: "/listings",
+    headers: (cfg) => ({
+      "Content-Type": "application/json",
+      "X-API-Key": cfg.apiKey,
+      ...(cfg.apiSecret ? { "X-API-Secret": cfg.apiSecret } : {}),
+      ...(cfg.agencyId ? { "X-Agency-ID": cfg.agencyId } : {}),
+    }),
+    map: mapToSahibinden,
+    parseId: (d) => String(d.id ?? ""),
+    parseUrl: (d) => (typeof d.url === "string" ? d.url : undefined),
+  },
+  hepsiemlak: {
+    label: "Hepsiemlak",
+    base: "https://api.hepsiemlak.com/v2",
+    collectionPath: "/adverts",
+    headers: (cfg) => ({
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${cfg.apiKey}`,
+    }),
+    map: mapToHepsiemlak,
+    parseId: (d) => String(d.advertId ?? ""),
+    parseUrl: (d) => (typeof d.advertUrl === "string" ? d.advertUrl : undefined),
+  },
+  zingat: {
+    label: "Zingat",
+    base: "https://api.zingat.com/v1",
+    collectionPath: "/listings",
+    headers: (cfg) => ({
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${cfg.apiKey}`,
+      ...(cfg.agencyId ? { "X-Agency-Id": cfg.agencyId } : {}),
+    }),
+    map: mapToZingat,
+    parseId: (d) => String(d.listingId ?? d.id ?? ""),
+    parseUrl: (d) => (typeof d.listingUrl === "string" ? d.listingUrl : undefined),
+  },
+  emlakjet: {
+    label: "Emlakjet",
+    base: "https://api.emlakjet.com/v1",
+    collectionPath: "/ilan",
+    headers: (cfg) => ({
+      "Content-Type": "application/json",
+      "X-Api-Key": cfg.apiKey,
+      ...(cfg.apiSecret ? { "X-Api-Secret": cfg.apiSecret } : {}),
+    }),
+    map: mapToEmlakjet,
+    parseId: (d) => String(d.ilanId ?? d.id ?? ""),
+    parseUrl: (d) => (typeof d.ilanUrl === "string" ? d.ilanUrl : undefined),
+  },
+};
+
+/** Publish/update için gerçek yayın adaptörü tanımlı portallar. */
+export const SUPPORTED_PORTALS = Object.keys(PORTAL_SPECS) as PortalName[];
+export function isPortalSupported(portal: PortalName): boolean {
+  return portal in PORTAL_SPECS;
+}
+
+async function restCreate(spec: PortalSpec, property: PropertyPayload, cfg: PortalPublishConfig): Promise<PortalPublishResult> {
+  const base = cfg.baseUrl ?? spec.base;
   try {
-    const res = await fetch(`${base}/listings`, {
+    const res = await fetch(`${base}${spec.collectionPath}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-API-Key":    cfg.apiKey,
-        ...(cfg.apiSecret ? { "X-API-Secret": cfg.apiSecret } : {}),
-        ...(cfg.agencyId  ? { "X-Agency-ID":  cfg.agencyId  } : {}),
-      },
-      body: JSON.stringify(mapToSahibinden(property)),
+      headers: spec.headers(cfg),
+      body: JSON.stringify(spec.map(property)),
     });
-
     if (!res.ok) {
       const body = await res.text();
-      return { ok: false, error: `Sahibinden API hatası: ${res.status}`, errorCode: body.slice(0, 80) };
+      return { ok: false, error: `${spec.label} API hatası: ${res.status}`, errorCode: body.slice(0, 80) };
     }
-
-    const data = await res.json() as { id?: string; url?: string };
-    return { ok: true, externalId: String(data.id ?? ""), externalUrl: data.url };
+    const data = (await res.json()) as Record<string, unknown>;
+    return { ok: true, externalId: spec.parseId(data), externalUrl: spec.parseUrl(data) };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Bağlantı hatası." };
   }
 }
 
-export async function sahibindenUnpublish(
-  externalId: string,
-  cfg: PortalPublishConfig,
-): Promise<PortalPublishResult> {
-  const base = cfg.baseUrl ?? SAHIBINDEN_BASE;
+async function restUpdate(spec: PortalSpec, externalId: string, property: PropertyPayload, cfg: PortalPublishConfig): Promise<PortalPublishResult> {
+  const base = cfg.baseUrl ?? spec.base;
   try {
-    const res = await fetch(`${base}/listings/${externalId}`, {
-      method: "DELETE",
-      headers: { "X-API-Key": cfg.apiKey },
+    const res = await fetch(`${base}${spec.collectionPath}/${externalId}`, {
+      method: "PUT",
+      headers: spec.headers(cfg),
+      body: JSON.stringify(spec.map(property)),
     });
-    return { ok: res.ok, error: res.ok ? undefined : `HTTP ${res.status}` };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Bağlantı hatası." };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Hepsiemlak adaptörü (iskelet)
-// ---------------------------------------------------------------------------
-
-const HEPSIEMLAK_BASE = "https://api.hepsiemlak.com/v2";
-
-export async function hepsiemlakPublish(
-  property: PropertyPayload,
-  cfg: PortalPublishConfig,
-): Promise<PortalPublishResult> {
-  const base = cfg.baseUrl ?? HEPSIEMLAK_BASE;
-  try {
-    const res = await fetch(`${base}/adverts`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${cfg.apiKey}`,
-      },
-      body: JSON.stringify(mapToHepsiemlak(property)),
-    });
-
     if (!res.ok) {
-      return { ok: false, error: `Hepsiemlak API hatası: ${res.status}` };
+      const body = await res.text();
+      return { ok: false, error: `${spec.label} API hatası: ${res.status}`, errorCode: body.slice(0, 80) };
     }
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    return { ok: true, externalId: spec.parseId(data) || externalId, externalUrl: spec.parseUrl(data) };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Bağlantı hatası." };
+  }
+}
 
-    const data = await res.json() as { advertId?: string; advertUrl?: string };
-    return { ok: true, externalId: String(data.advertId ?? ""), externalUrl: data.advertUrl };
+async function restDelete(spec: PortalSpec, externalId: string, cfg: PortalPublishConfig): Promise<PortalPublishResult> {
+  const base = cfg.baseUrl ?? spec.base;
+  try {
+    const res = await fetch(`${base}${spec.collectionPath}/${externalId}`, {
+      method: "DELETE",
+      headers: spec.headers(cfg),
+    });
+    return { ok: res.ok, error: res.ok ? undefined : `${spec.label} API hatası: HTTP ${res.status}` };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Bağlantı hatası." };
   }
 }
 
 // ---------------------------------------------------------------------------
-// Yönlendirici: portala göre doğru adaptörü çağır
+// Yönlendiriciler: portala göre doğru adaptörü çağır
 // ---------------------------------------------------------------------------
 
-export async function publishToPortal(
-  portal: PortalName,
-  property: PropertyPayload,
-): Promise<PortalPublishResult> {
+export async function publishToPortal(portal: PortalName, property: PropertyPayload): Promise<PortalPublishResult> {
+  const spec = PORTAL_SPECS[portal];
+  if (!spec) return { ok: false, error: `${portal} entegrasyonu desteklenmiyor.` };
   const cfg = await getPortalConfig(portal);
-  if (!cfg) return { ok: false, error: `${portal} API anahtarı tanımlanmamış.` };
-
-  switch (portal) {
-    case "sahibinden": return sahibindenPublish(property, cfg);
-    case "hepsiemlak": return hepsiemlakPublish(property, cfg);
-    default:
-      return { ok: false, error: `${portal} entegrasyonu henüz aktif değil.` };
-  }
+  if (!cfg) return { ok: false, error: `${spec.label} API anahtarı tanımlanmamış.` };
+  return restCreate(spec, property, cfg);
 }
 
-export async function unpublishFromPortal(
-  portal: PortalName,
-  externalId: string,
-): Promise<PortalPublishResult> {
+export async function updateOnPortal(portal: PortalName, externalId: string, property: PropertyPayload): Promise<PortalPublishResult> {
+  const spec = PORTAL_SPECS[portal];
+  if (!spec) return { ok: false, error: `${portal} entegrasyonu desteklenmiyor.` };
+  if (!externalId) return { ok: false, error: "Güncellenecek ilan kimliği yok." };
   const cfg = await getPortalConfig(portal);
-  if (!cfg) return { ok: false, error: `${portal} API anahtarı tanımlanmamış.` };
+  if (!cfg) return { ok: false, error: `${spec.label} API anahtarı tanımlanmamış.` };
+  return restUpdate(spec, externalId, property, cfg);
+}
 
-  switch (portal) {
-    case "sahibinden": return sahibindenUnpublish(externalId, cfg);
-    default:
-      return { ok: false, error: `${portal} entegrasyonu henüz aktif değil.` };
-  }
+export async function unpublishFromPortal(portal: PortalName, externalId: string): Promise<PortalPublishResult> {
+  const spec = PORTAL_SPECS[portal];
+  if (!spec) return { ok: false, error: `${portal} entegrasyonu desteklenmiyor.` };
+  const cfg = await getPortalConfig(portal);
+  if (!cfg) return { ok: false, error: `${spec.label} API anahtarı tanımlanmamış.` };
+  return restDelete(spec, externalId, cfg);
 }
 
 // ---------------------------------------------------------------------------
@@ -216,6 +257,8 @@ function mapToSahibinden(p: PropertyPayload): Record<string, unknown> {
     neighborhood:     p.neighborhood,
     net_sqm:          p.squareMeters,
     room_count:       p.roomCount,
+    floor_count:      p.floorCount,
+    building_age:     p.buildingAge,
     images:           p.imageUrls ?? [],
     contact_phone:    p.contactPhone,
   };
@@ -233,6 +276,50 @@ function mapToHepsiemlak(p: PropertyPayload): Record<string, unknown> {
     district:         p.district,
     netArea:          p.squareMeters,
     roomInfo:         p.roomCount,
+    floorCount:       p.floorCount,
+    buildingAge:      p.buildingAge,
     photos:           (p.imageUrls ?? []).map((url) => ({ url })),
+  };
+}
+
+function mapToZingat(p: PropertyPayload): Record<string, unknown> {
+  return {
+    referenceNo:      p.propertyCode,
+    title:            p.title,
+    description:      p.description ?? "",
+    price:            p.listPrice,
+    currency:         p.currency ?? "TRY",
+    category:         p.propertyType,
+    listingType:      p.transactionType === "satilik" ? "sale" : "rent",
+    city:             p.province,
+    district:         p.district,
+    neighborhood:     p.neighborhood,
+    grossArea:        p.squareMeters,
+    roomCount:        p.roomCount,
+    floor:            p.floorCount,
+    buildingAge:      p.buildingAge,
+    images:           p.imageUrls ?? [],
+    phone:            p.contactPhone,
+  };
+}
+
+function mapToEmlakjet(p: PropertyPayload): Record<string, unknown> {
+  return {
+    referansNo:       p.propertyCode,
+    baslik:           p.title,
+    aciklama:         p.description ?? "",
+    fiyat:            p.listPrice,
+    paraBirimi:       p.currency ?? "TRY",
+    kategori:         p.propertyType,
+    ilanTipi:         p.transactionType === "satilik" ? "satilik" : "kiralik",
+    il:               p.province,
+    ilce:             p.district,
+    mahalle:          p.neighborhood,
+    metrekare:        p.squareMeters,
+    odaSayisi:        p.roomCount,
+    katSayisi:        p.floorCount,
+    binaYasi:         p.buildingAge,
+    fotograflar:      p.imageUrls ?? [],
+    telefon:          p.contactPhone,
   };
 }

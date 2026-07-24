@@ -2,18 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requirePermission } from "@/lib/require-permission";
+import { logActivity } from "@/lib/activity";
 
 export type SettingsResult = { error?: string; ok?: boolean };
 
 export async function updateTenantInfo(formData: FormData): Promise<SettingsResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const gate = await requirePermission("settings", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const tenantId = gate.tenantId;
 
-  if (!user) return { error: "Oturum bulunamadı." };
-  const tenantId = (user.app_metadata?.tenant_id as string | undefined) ?? null;
-  if (!tenantId) return { error: "Ofis bilgisi bulunamadı." };
+  const supabase = await createClient();
 
   const name        = String(formData.get("name")         ?? "").trim();
   const taxOffice   = String(formData.get("tax_office")   ?? "").trim();
@@ -54,6 +53,15 @@ export async function updateTenantInfo(formData: FormData): Promise<SettingsResu
     console.error("updateTenantInfo", error);
     return { error: "Ofis bilgileri güncellenemedi." };
   }
+
+  await logActivity({
+    tenantId,
+    actorId: gate.userId,
+    action: "settings.update",
+    entityType: "tenant",
+    entityId: tenantId,
+    newValue: { name },
+  });
 
   revalidatePath("/app/ayarlar");
   revalidatePath("/app");

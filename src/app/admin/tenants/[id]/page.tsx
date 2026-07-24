@@ -4,25 +4,24 @@ import { ArrowLeft, Building2, Download, ShieldAlert, Users, Wallet } from "luci
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { stopImpersonation } from "@/app/actions/platform";
+import { PLANS } from "@/lib/billing/plans";
+import { SubscriptionPanel } from "./subscription-panel";
 
 export default async function AdminTenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   await requirePlatformModule("tenants");
   const { id } = await params;
   const admin = createAdminClient();
 
-  const { data: tenant } = await admin
-    .from("tenants")
-    .select("id, name, plan, status, created_at")
-    .eq("id", id)
-    .maybeSingle();
-  if (!tenant) notFound();
-
-  const [{ count: customers }, { count: properties }, { data: sub }, { count: tickets }] = await Promise.all([
+  // Hepsi yalnızca `id`'ye bağlı — tek turda paralel (notFound ödünü küçük)
+  const [{ data: tenant }, { count: customers }, { count: properties }, { data: sub }, { count: tickets }] = await Promise.all([
+    admin.from("tenants").select("id, name, plan, status, created_at").eq("id", id).maybeSingle(),
     admin.from("customers").select("id", { count: "exact", head: true }).eq("tenant_id", id).is("deleted_at", null),
     admin.from("properties").select("id", { count: "exact", head: true }).eq("tenant_id", id),
     admin.from("subscriptions").select("status, amount_try, plan").eq("tenant_id", id).maybeSingle(),
     admin.from("support_tickets").select("id", { count: "exact", head: true }).eq("tenant_id", id).in("status", ["open", "in_progress", "waiting"]),
   ]);
+
+  if (!tenant) notFound();
 
   return (
     <div className="space-y-6">
@@ -40,11 +39,19 @@ export default async function AdminTenantDetailPage({ params }: { params: Promis
               {tenant.plan} · {tenant.status} · yönetici erişimiyle güvenli okuma
             </p>
           </div>
-          <form action={stopImpersonation}>
-            <button type="submit" className="rounded-[10px] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950">
-              Önizlemeyi bitir
-            </button>
-          </form>
+          <div className="flex flex-wrap items-center gap-2">
+            <SubscriptionPanel
+              tenantId={tenant.id}
+              currentPlan={tenant.plan ?? "office"}
+              currentStatus={tenant.status ?? "trial"}
+              plans={PLANS.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry }))}
+            />
+            <form action={stopImpersonation}>
+              <button type="submit" className="rounded-[10px] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950">
+                Önizlemeyi bitir
+              </button>
+            </form>
+          </div>
         </div>
         <div className="relative mt-6 grid gap-3 sm:grid-cols-4">
           {[

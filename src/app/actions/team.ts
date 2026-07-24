@@ -105,8 +105,12 @@ export async function updateTeamMember(formData: FormData): Promise<TeamResult> 
   const activeRaw = String(formData.get("is_active") ?? "").trim();
 
   if (!id) return { error: "Üye bulunamadı." };
-  if (id === user.id && role && role !== "owner") {
-    // avoid locking yourself out of management by downgrading own role here
+  // Kendini yönetimden kilitleme koruması: kendi rolünü bu ekrandan değiştiremez / kendini pasife alamaz
+  if (id === user.id && role && role !== "owner" && role !== "gm") {
+    return { error: "Kendi yönetici rolünüzü bu ekrandan düşüremezsiniz." };
+  }
+  if (id === user.id && activeRaw === "false") {
+    return { error: "Kendinizi pasife alamazsınız." };
   }
 
   const admin = createAdminClient();

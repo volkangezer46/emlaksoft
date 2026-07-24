@@ -103,7 +103,7 @@ export function BranchCard({
               <button type="button" disabled={pending} onClick={remove} className="rounded-[8px] bg-danger-500 px-2 py-1 text-[11px] font-bold text-white hover:bg-danger-600 disabled:opacity-60">
                 Sil
               </button>
-              <button type="button" onClick={() => setConfirming(false)} className="rounded-[8px] px-1.5 py-1 text-[11px] font-semibold text-text-muted hover:text-ink-950">
+              <button type="button" aria-label="Vazgeç" onClick={() => setConfirming(false)} className="rounded-[8px] px-1.5 py-1 text-[11px] font-semibold text-text-muted hover:text-ink-950">
                 <X className="h-3 w-3" />
               </button>
             </span>

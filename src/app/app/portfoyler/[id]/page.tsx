@@ -98,30 +98,29 @@ export default async function PropertyDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: property } = await supabase
-    .from("properties")
-    .select(
-      "id, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, parcel_block, parcel_lot, features, price_health, created_at, updated_at, assigned_to, province:geo_provinces(name), district:geo_districts(name)",
-    )
-    .eq("id", id)
-    .is("deleted_at", null)
-    .maybeSingle();
-
-  if (!property) notFound();
-
-  const { data: portalsData } = await supabase
-    .from("portal_listings")
-    .select("id, portal_name, portal_listing_id, portal_url, status, last_confirmed_at, removed_at, removal_reason")
-    .eq("property_id", id)
-    .order("created_at", { ascending: false });
-
-  const portals = (portalsData ?? []) as Portal[];
-  const portalIds = portals.map((p) => p.id);
-
-  const [statusHistory, configuredPortals] = await Promise.all([
+  // 1. tur — hepsi yalnızca `id`'ye bağlı, tam paralel
+  const [{ data: property }, { data: portalsData }, statusHistory, configuredPortals] = await Promise.all([
+    supabase
+      .from("properties")
+      .select(
+        "id, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, parcel_block, parcel_lot, features, price_health, created_at, updated_at, assigned_to, province:geo_provinces(name), district:geo_districts(name)",
+      )
+      .eq("id", id)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    supabase
+      .from("portal_listings")
+      .select("id, portal_name, portal_listing_id, portal_url, status, last_confirmed_at, removed_at, removal_reason")
+      .eq("property_id", id)
+      .order("created_at", { ascending: false }),
     getPropertyStatusHistory(id),
     getConfiguredPortals(),
   ]);
+
+  if (!property) notFound();
+
+  const portals = (portalsData ?? []) as Portal[];
+  const portalIds = portals.map((p) => p.id);
 
   const [{ data: closuresData }, { data: assigneeProfile }, { data: provinces }, { data: teamMembers }, { data: mediaData }] = await Promise.all([
     portalIds.length

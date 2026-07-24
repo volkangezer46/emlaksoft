@@ -1,4 +1,5 @@
-import { Tag, CheckCircle2, XCircle, Clock } from "lucide-react";
+import Link from "next/link";
+import { Tag } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listOffers } from "@/app/actions/offers";
 import { createClient } from "@/lib/supabase/server";
@@ -119,8 +120,11 @@ export default async function TekliflerPage() {
                     withdrawn: "bg-zinc-50 text-zinc-500 ring-zinc-400/10",
                   };
                   return (
-                    <tr key={o.id} className="border-b border-line last:border-0 hover:bg-canvas/40">
-                      <td className="px-5 py-3 font-semibold text-ink-950">{propertyLabel(o.property)}</td>
+                    <tr key={o.id} className="group relative cursor-pointer border-b border-line last:border-0 transition hover:bg-brand-600/[0.03]">
+                      <td className="px-5 py-3 font-semibold text-ink-950">
+                        <Link href={`/app/teklifler/${o.id}`} className="absolute inset-0" aria-label={`${propertyLabel(o.property)} teklif detayı`} />
+                        <span className="group-hover:text-brand-600">{propertyLabel(o.property)}</span>
+                      </td>
                       <td className="px-4 py-3 text-text-muted">{customerLabel(o.customer)}</td>
                       <td className="px-4 py-3 font-bold text-ink-950">{money(Number(o.amount))}</td>
                       <td className="px-4 py-3 text-text-muted">{o.counter_amount ? money(Number(o.counter_amount)) : "—"}</td>

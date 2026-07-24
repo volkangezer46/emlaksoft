@@ -1,7 +1,9 @@
 import Link from "next/link";
 import {
   ArrowUpRight,
+  Cake,
   Clock3,
+  Gift,
   Mail,
   MapPin,
   Phone,
@@ -29,6 +31,9 @@ type CustomerRow = {
   blacklist: boolean | null;
   assigned_to: string | null;
   created_at: string;
+  birth_date: string | null;
+  anniversary_date: string | null;
+  anniversary_note: string | null;
   province: { name: string } | { name: string }[] | null;
 };
 
@@ -53,6 +58,24 @@ function relativeAdded(iso: string) {
   if (days < 30) return `${days} gün önce eklendi`;
   if (days < 365) return `${Math.floor(days / 30)} ay önce eklendi`;
   return `${Math.floor(days / 365)} yıl önce eklendi`;
+}
+
+/** Yıllık tekrar eden bir tarihin (doğum günü/yıldönümü) bugüne kaç gün kaldığını döndürür (0 = bugün). Geçersiz/boş ise null. */
+function daysUntilAnnual(iso: string | null): number | null {
+  if (!iso) return null;
+  const src = new Date(iso);
+  if (Number.isNaN(src.getTime())) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let next = new Date(today.getFullYear(), src.getMonth(), src.getDate());
+  if (next < today) next = new Date(today.getFullYear() + 1, src.getMonth(), src.getDate());
+  return Math.round((next.getTime() - today.getTime()) / 86_400_000);
+}
+
+function occasionLabel(days: number): string {
+  if (days === 0) return "bugün";
+  if (days === 1) return "yarın";
+  return `${days} gün sonra`;
 }
 
 function provinceName(p: CustomerRow["province"]) {
@@ -89,7 +112,7 @@ export default async function CustomersPage({
     supabase
       .from("customers")
       .select(
-        "id, full_name, phone, email, customer_types, source, notes, blacklist, assigned_to, created_at, province:geo_provinces(name)",
+        "id, full_name, phone, email, customer_types, source, notes, blacklist, assigned_to, created_at, birth_date, anniversary_date, anniversary_note, province:geo_provinces(name)",
       )
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
@@ -119,6 +142,18 @@ export default async function CustomersPage({
   const provinceList = provinces ?? [];
   const branchList = branches ?? [];
   const advisorList = advisors ?? [];
+
+  // Yaklaşan doğum günü / yıldönümü (önümüzdeki 7 gün) — ekstra sorgu yok, mevcut listeden hesaplanır
+  const WINDOW_DAYS = 7;
+  type Occasion = { id: string; name: string; kind: "birthday" | "anniversary"; days: number; note: string | null };
+  const occasions: Occasion[] = [];
+  for (const row of allRows) {
+    const bd = daysUntilAnnual(row.birth_date);
+    if (bd !== null && bd <= WINDOW_DAYS) occasions.push({ id: row.id, name: row.full_name, kind: "birthday", days: bd, note: null });
+    const ad = daysUntilAnnual(row.anniversary_date);
+    if (ad !== null && ad <= WINDOW_DAYS) occasions.push({ id: row.id, name: row.full_name, kind: "anniversary", days: ad, note: row.anniversary_note });
+  }
+  occasions.sort((a, b) => a.days - b.days);
 
   const activeFilters = [typeF, sourceF, fromF, toF, assignedF].filter(Boolean).length;
   const ownerCount = allRows.filter((row) => row.customer_types?.includes("Mülk sahibi")).length;
@@ -195,6 +230,45 @@ export default async function CustomersPage({
           </div>
         </div>
       </section>
+
+      {/* Yaklaşan doğum günü / yıldönümü hatırlatma */}
+      {occasions.length > 0 ? (
+        <section className="overflow-hidden rounded-[16px] border border-amber-300/60 bg-gradient-to-r from-amber-50 to-rose-50/60 p-4 shadow-[var(--shadow-xs)] dark:border-amber-400/25 dark:from-amber-500/[0.08] dark:to-rose-500/[0.06]">
+          <div className="flex items-center gap-2">
+            <span className="grid h-8 w-8 place-items-center rounded-full bg-amber-400/20 text-amber-600 dark:text-amber-400">
+              <Gift className="h-4 w-4" />
+            </span>
+            <p className="text-sm font-bold text-ink-950">
+              Yaklaşan özel günler
+              <span className="ml-1.5 font-medium text-text-muted">· önümüzdeki {WINDOW_DAYS} gün</span>
+            </p>
+          </div>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {occasions.slice(0, 12).map((o) => (
+              <li key={`${o.id}-${o.kind}`}>
+                <Link
+                  href={`/app/musteriler/${o.id}`}
+                  className="group inline-flex items-center gap-2 rounded-full border border-line bg-surface/80 px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-500/10"
+                  title={o.note ?? undefined}
+                >
+                  {o.kind === "birthday" ? (
+                    <Cake className="h-3.5 w-3.5 text-rose-500" />
+                  ) : (
+                    <Gift className="h-3.5 w-3.5 text-amber-500" />
+                  )}
+                  <span>{o.name}</span>
+                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${o.days === 0 ? "bg-rose-500 text-white" : "bg-amber-400/20 text-amber-700 dark:text-amber-300"}`}>
+                    {o.kind === "birthday" ? "🎂" : "🎉"} {occasionLabel(o.days)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+            {occasions.length > 12 ? (
+              <li className="self-center text-xs font-medium text-text-muted">+{occasions.length - 12} daha</li>
+            ) : null}
+          </ul>
+        </section>
+      ) : null}
 
       {/* Filtre toolbar */}
       <form className="rounded-[16px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] space-y-3" action="/app/musteriler">
@@ -322,9 +396,10 @@ export default async function CustomersPage({
               {rows.map((c) => (
                 <tr
                   key={c.id}
-                  className="group border-b border-line transition last:border-0 hover:bg-brand-600/[0.025]"
+                  className="group relative cursor-pointer border-b border-line transition last:border-0 hover:bg-brand-600/[0.025]"
                 >
                   <td className="px-5 py-4">
+                    <Link href={`/app/musteriler/${c.id}`} className="absolute inset-0" aria-label={`${c.full_name} detayları`} />
                     <div className="flex items-center gap-3">
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[image:var(--grad-brand)] text-xs font-bold text-white shadow-[var(--shadow-xs)]">
                         {c.full_name.split(/\s+/).map((part) => part[0] ?? "").join("").slice(0, 2).toUpperCase()}
@@ -359,11 +434,11 @@ export default async function CustomersPage({
                     <span className="flex items-center gap-2"><Clock3 className="h-3.5 w-3.5 text-text-faint" />{formatDate(c.created_at)}</span>
                   </td>
                   <td className="px-4 py-4">
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="relative z-10 flex items-center justify-end gap-1">
                       {canDelete ? <CustomerRowDelete customerId={c.id} name={c.full_name} /> : null}
-                      <Link href={`/app/musteriler/${c.id}`} className="grid h-8 w-8 place-items-center rounded-[9px] text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600" aria-label={`${c.full_name} detayları`}>
+                      <span className="grid h-8 w-8 place-items-center rounded-[9px] text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
                         <ArrowUpRight className="h-4 w-4" />
-                      </Link>
+                      </span>
                     </div>
                   </td>
                 </tr>

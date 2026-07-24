@@ -50,15 +50,17 @@ export default async function RolePermissionsPage({
   const isOwnerRole = selectedRole === "owner";
 
   const supabase = await createClient();
-  const { data: overrideRows } = ctx.tenantId
-    ? await supabase
-        .from("tenant_role_permissions")
-        .select("module, action")
-        .eq("tenant_id", ctx.tenantId)
-        .eq("role", selectedRole)
-    : { data: [] };
-
-  const effective = await getEffectivePermissions(ctx.tenantId, selectedRole);
+  // İki sorgu bağımsız — tek turda paralel
+  const [{ data: overrideRows }, effective] = await Promise.all([
+    ctx.tenantId
+      ? supabase
+          .from("tenant_role_permissions")
+          .select("module, action")
+          .eq("tenant_id", ctx.tenantId)
+          .eq("role", selectedRole)
+      : Promise.resolve({ data: [] as { module: string; action: string }[] }),
+    getEffectivePermissions(ctx.tenantId, selectedRole),
+  ]);
   const overriddenCells = (overrideRows ?? []).map((r) => `${r.module}:${r.action}`);
 
   return (

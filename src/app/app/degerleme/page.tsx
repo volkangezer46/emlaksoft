@@ -22,7 +22,7 @@ export default async function ValuationPage({
   await requireModulePage("valuation");
   const { property: preselectedPropertyId } = await searchParams;
   const supabase = await createClient();
-  const [{ data: valuations }, { data: properties }, { data: provinces }] = await Promise.all([
+  const [{ data: valuations }, { data: properties }, { data: provinces }, endeksaOn, tapusorOn] = await Promise.all([
     supabase
       .from("valuations")
       .select("id, title, estimated_low, estimated_mid, estimated_high, confidence, sources, created_at, property_id")
@@ -35,13 +35,11 @@ export default async function ValuationPage({
       .order("created_at", { ascending: false })
       .limit(100),
     supabase.from("geo_provinces").select("id, name").order("name"),
-  ]);
-
-  const rows = valuations ?? [];
-  const [endeksaOn, tapusorOn] = await Promise.all([
     isEndeksaConfiguredFull(),
     isTapusorConfiguredFull(),
   ]);
+
+  const rows = valuations ?? [];
 
   return (
     <div className="space-y-6">

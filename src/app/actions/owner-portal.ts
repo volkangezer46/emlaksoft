@@ -145,7 +145,7 @@ export async function getOwnerPortalData(token: string): Promise<OwnerPortalData
     { data: appointments },
   ] = await Promise.all([
     admin.from("properties")
-      .select("id, property_code, title, list_price, status, description, province:provinces(name), district:districts(name)")
+      .select("id, property_code, title, list_price, status, description, province:geo_provinces(name), district:geo_districts(name)")
       .eq("id", propertyId)
       .single(),
     admin.from("tenants")

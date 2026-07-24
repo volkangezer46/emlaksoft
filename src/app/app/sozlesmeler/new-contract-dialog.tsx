@@ -91,14 +91,14 @@ export function NewContractDialog({ trigger }: { trigger?: "button" | "icon" } =
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center">
           <button
             type="button"
             aria-label="Kapat"
             onClick={() => setOpen(false)}
             className="absolute inset-0 bg-ink-950/50 backdrop-blur-sm"
           />
-          <div className="relative w-full max-w-2xl rounded-[20px] border border-line bg-surface p-6 shadow-[var(--shadow-xl)]">
+          <div className="relative my-auto w-full max-w-2xl rounded-[20px] border border-line bg-surface p-6 shadow-[var(--shadow-xl)]">
             <div className="mb-5 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-brand-600/10 text-brand-600">

@@ -145,6 +145,41 @@ export function NewCustomerDialog({ provinces, branches = [] }: { provinces: Pro
                   </select>
                 </div>
               ) : null}
+              <div>
+                <label className="mb-1.5 block text-sm text-text-muted" htmlFor="birth_date">
+                  Doğum tarihi
+                </label>
+                <input
+                  id="birth_date"
+                  name="birth_date"
+                  type="date"
+                  max="2100-12-31"
+                  className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm text-text-muted" htmlFor="anniversary_date">
+                  Yıldönümü
+                </label>
+                <input
+                  id="anniversary_date"
+                  name="anniversary_date"
+                  type="date"
+                  max="2100-12-31"
+                  className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="mb-1.5 block text-sm text-text-muted" htmlFor="anniversary_note">
+                  Yıldönümü notu
+                </label>
+                <input
+                  id="anniversary_note"
+                  name="anniversary_note"
+                  className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                  placeholder="Örn. İlk ev alımı, 3 yıllık kiracı"
+                />
+              </div>
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="notes">
                   Not

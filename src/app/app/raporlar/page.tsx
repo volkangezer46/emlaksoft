@@ -7,6 +7,8 @@ import {
   PieChart,
   Siren,
   Target,
+  TrendingDown,
+  TrendingUp,
   Users,
   Wallet,
 } from "lucide-react";
@@ -24,6 +26,11 @@ export default async function ReportsPage() {
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
+  // Gelir/gider trendi için son 6 ayın başı
+  const sixMonthsAgo = new Date(monthStart);
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+  const sixMonthsAgoIso = sixMonthsAgo.toISOString();
+  const sixMonthsAgoDate = sixMonthsAgoIso.slice(0, 10);
 
   const [
     scoreInputs,
@@ -34,6 +41,8 @@ export default async function ReportsPage() {
     { data: closures },
     { data: portals },
     { data: customerSources },
+    { data: commissionTrend },
+    { data: expenseTrend },
   ] = await Promise.all([
     loadOfficeScoreInputs(supabase),
     supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
@@ -44,6 +53,10 @@ export default async function ReportsPage() {
     supabase.from("portal_listings").select("status, last_confirmed_at").eq("status", "live").limit(200),
     // Müşteri kaynak dağılımı
     supabase.from("customers").select("source").is("deleted_at", null).not("source", "is", null).limit(1000),
+    // Gelir trendi (komisyon, son 6 ay)
+    supabase.from("commissions").select("gross_amount, created_at").gte("created_at", sixMonthsAgoIso).limit(2000),
+    // Gider trendi (son 6 ay)
+    supabase.from("expenses").select("amount, expense_date").gte("expense_date", sixMonthsAgoDate).limit(2000),
   ]);
 
   const office = computeOfficeScore(scoreInputs);
@@ -73,6 +86,30 @@ export default async function ReportsPage() {
     .map(([label, count]) => ({ label, count }));
   const sourceTotal = Math.max(1, sourceBars.reduce((s, b) => s + b.count, 0));
   const sourceMax = Math.max(1, ...sourceBars.map((b) => b.count));
+
+  // Gelir/gider karşılaştırma trendi (son 6 ay)
+  const MONTH_LABELS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+  const trendMonths = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(monthStart);
+    d.setMonth(d.getMonth() - (5 - i));
+    return { key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: MONTH_LABELS[d.getMonth()], income: 0, expense: 0 };
+  });
+  const trendIndex = new Map(trendMonths.map((m, i) => [m.key, i]));
+  for (const c of commissionTrend ?? []) {
+    const key = String(c.created_at).slice(0, 7);
+    const idx = trendIndex.get(key);
+    if (idx !== undefined) trendMonths[idx].income += Number(c.gross_amount || 0);
+  }
+  for (const e of expenseTrend ?? []) {
+    const key = String(e.expense_date).slice(0, 7);
+    const idx = trendIndex.get(key);
+    if (idx !== undefined) trendMonths[idx].expense += Number(e.amount || 0);
+  }
+  const trendMax = Math.max(1, ...trendMonths.flatMap((m) => [m.income, m.expense]));
+  const trendIncomeTotal = trendMonths.reduce((s, m) => s + m.income, 0);
+  const trendExpenseTotal = trendMonths.reduce((s, m) => s + m.expense, 0);
+  const trendNet = trendIncomeTotal - trendExpenseTotal;
+  const hasTrendData = trendIncomeTotal > 0 || trendExpenseTotal > 0;
 
   return (
     <div className="space-y-6">
@@ -123,6 +160,63 @@ export default async function ReportsPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <div className="flex flex-wrap items-center gap-2">
+          <Wallet className="h-4 w-4 text-brand-600" />
+          <h2 className="font-display font-bold text-ink-950">Gelir & gider · son 6 ay</h2>
+          <div className="ml-auto flex items-center gap-4 text-xs">
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px] bg-mint-500" /> Gelir</span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px] bg-danger-500" /> Gider</span>
+          </div>
+        </div>
+
+        {hasTrendData ? (
+          <>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-[12px] border border-line bg-canvas p-3">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold text-text-muted"><TrendingUp className="h-3.5 w-3.5 text-mint-600" /> Toplam gelir</p>
+                <p className="mt-1 font-display text-lg font-extrabold text-mint-600">{money(trendIncomeTotal)}</p>
+              </div>
+              <div className="rounded-[12px] border border-line bg-canvas p-3">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold text-text-muted"><TrendingDown className="h-3.5 w-3.5 text-danger-500" /> Toplam gider</p>
+                <p className="mt-1 font-display text-lg font-extrabold text-danger-500">{money(trendExpenseTotal)}</p>
+              </div>
+              <div className="rounded-[12px] border border-line bg-canvas p-3">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold text-text-muted"><Wallet className="h-3.5 w-3.5 text-brand-600" /> Net</p>
+                <p className={`mt-1 font-display text-lg font-extrabold ${trendNet >= 0 ? "text-mint-600" : "text-danger-500"}`}>{money(trendNet)}</p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-6 gap-2 sm:gap-4">
+              {trendMonths.map((m, i) => (
+                <div key={m.key} className="flex flex-col items-center">
+                  <div className="flex h-40 w-full items-end justify-center gap-1 rounded-[12px] bg-canvas px-1.5 pb-2 pt-4 sm:gap-1.5 sm:px-2">
+                    <div
+                      className="bar-live w-full max-w-[26px] rounded-t-[6px] bg-mint-500"
+                      style={{ height: `${Math.max(m.income > 0 ? 6 : 0, (m.income / trendMax) * 100)}%`, animationDelay: `${i * 70}ms` }}
+                      title={`Gelir: ${money(m.income)}`}
+                    />
+                    <div
+                      className="bar-live w-full max-w-[26px] rounded-t-[6px] bg-danger-500"
+                      style={{ height: `${Math.max(m.expense > 0 ? 6 : 0, (m.expense / trendMax) * 100)}%`, animationDelay: `${i * 70 + 35}ms` }}
+                      title={`Gider: ${money(m.expense)}`}
+                    />
+                  </div>
+                  <p className="mt-2 text-center text-xs font-semibold text-ink-950">{m.label}</p>
+                  <p className={`text-center text-[10px] font-bold tabular-nums ${m.income - m.expense >= 0 ? "text-mint-600" : "text-danger-500"}`}>
+                    {m.income - m.expense >= 0 ? "+" : ""}{new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 }).format(m.income - m.expense)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="py-10 text-center text-sm text-text-muted">
+            Henüz komisyon veya gider kaydı yok. Anlaşma kapatıp gider ekledikçe bu grafik dolacak.
+          </p>
+        )}
       </section>
 
       {sourceBars.length > 0 ? (

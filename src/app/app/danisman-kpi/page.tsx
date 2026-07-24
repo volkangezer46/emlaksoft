@@ -42,15 +42,16 @@ export default async function DanismanKpiPage() {
     { data: commissions },
   ] = await Promise.all([
     supabase.from("profiles").select("id, full_name, role").limit(50),
-    supabase.from("customers").select("id, assigned_to").is("deleted_at", null),
-    supabase.from("calls").select("id, handled_by").gte("started_at", monthStart.toISOString()),
-    supabase.from("appointments").select("id, assigned_to, status").gte("scheduled_at", monthStart.toISOString()),
-    supabase.from("offers").select("id, created_by, status, amount").gte("created_at", monthStart.toISOString()),
+    supabase.from("customers").select("id, assigned_to").is("deleted_at", null).limit(5000),
+    supabase.from("calls").select("id, handled_by").gte("started_at", monthStart.toISOString()).limit(5000),
+    supabase.from("appointments").select("id, assigned_to, status").gte("scheduled_at", monthStart.toISOString()).limit(5000),
+    supabase.from("offers").select("id, created_by, status, amount").gte("created_at", monthStart.toISOString()).limit(5000),
     supabase
       .from("commissions")
       .select("id, gross_amount, status, deal:deals(assigned_to)")
       .gte("created_at", monthStart.toISOString())
-      .in("status", ["paid", "collected"]),
+      .in("status", ["paid", "collected"])
+      .limit(5000),
   ]);
 
   // Danışman bazlı hesapla

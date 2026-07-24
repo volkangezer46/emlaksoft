@@ -26,6 +26,15 @@ export function DemoForm() {
 
   return (
     <form action={action} className="space-y-4 text-left">
+      {/* Honeypot — gerçek kullanıcılar görmez; botlar doldurursa talep sessizce reddedilir */}
+      <input
+        type="text"
+        name="website"
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        className="absolute left-[-9999px] h-0 w-0 opacity-0"
+      />
       <div>
         <label className="mb-1.5 block text-sm text-text-muted" htmlFor="full_name">Ad soyad *</label>
         <input id="full_name" name="full_name" required className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" placeholder="Örn. Volkan Gezer" />

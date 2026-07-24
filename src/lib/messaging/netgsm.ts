@@ -174,19 +174,30 @@ function normalizePhone(raw: string): string | null {
   return null;
 }
 
+/** XML özel karakterlerini kaçırır (usercode/password/msgheader güvenli gömme). */
+function xmlEscape(v: string): string {
+  return v
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 function buildSingleXml(cfg: NetgsmConfig, phones: string[], text: string): string {
-  const nos = phones.map((p) => `<no>${p}</no>`).join("\n      ");
+  // Her numara kendi <no> düğümünde; DIŞ sarmalayıcı <no> YOK (Netgsm 1:n şeması).
+  const nos = phones.map((p) => `<no>${p}</no>`).join("\n    ");
   return `<?xml version="1.0" encoding="UTF-8"?>
 <mainbody>
   <header>
-    <usercode>${cfg.usercode}</usercode>
-    <password>${cfg.password}</password>
-    <msgheader>${cfg.msgheader}</msgheader>
+    <usercode>${xmlEscape(cfg.usercode)}</usercode>
+    <password>${xmlEscape(cfg.password)}</password>
+    <msgheader>${xmlEscape(cfg.msgheader)}</msgheader>
     <type>1:n</type>
   </header>
   <body>
     <msg><![CDATA[${text}]]></msg>
-    <no>${nos}</no>
+    ${nos}
   </body>
 </mainbody>`;
 }

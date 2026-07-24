@@ -59,10 +59,10 @@ export default async function TeamPage() {
   const supabase = await createClient();
 
   const [{ data: membersData }, { data: branchesData }, { data: provincesData }, { data: customersData }] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, phone, role, is_active, created_at, branch_id, branch:branches(name)").order("created_at", { ascending: true }),
-    supabase.from("branches").select("id, name, is_active, province_id, province:geo_provinces(name)").order("created_at", { ascending: true }),
+    supabase.from("profiles").select("id, full_name, phone, role, is_active, created_at, branch_id, branch:branches(name)").order("created_at", { ascending: true }).limit(500),
+    supabase.from("branches").select("id, name, is_active, province_id, province:geo_provinces(name)").order("created_at", { ascending: true }).limit(200),
     supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
-    supabase.from("customers").select("assigned_to").is("deleted_at", null),
+    supabase.from("customers").select("assigned_to").is("deleted_at", null).limit(10000),
   ]);
 
   const members = (membersData ?? []) as Member[];

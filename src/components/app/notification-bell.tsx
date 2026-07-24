@@ -69,7 +69,7 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
       {open ? (
         <>
           <button type="button" aria-label="Kapat" className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-12 z-50 w-[340px] overflow-hidden rounded-[16px] border border-line bg-surface shadow-[var(--shadow-lg)]">
+          <div className="absolute right-0 top-12 z-50 w-[min(340px,calc(100vw-1.5rem))] overflow-hidden rounded-[16px] border border-line bg-surface shadow-[var(--shadow-lg)]">
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <p className="font-display text-sm font-bold text-ink-950">Bildirimler</p>
               {unread > 0 ? (

@@ -23,6 +23,9 @@ export function EditCustomerDialog({
     customer_types: string[] | null;
     province_id: string | null;
     notes: string | null;
+    birth_date: string | null;
+    anniversary_date: string | null;
+    anniversary_note: string | null;
   };
   provinces: Province[];
 }) {
@@ -87,6 +90,18 @@ export function EditCustomerDialog({
                   <option value="">Seçiniz</option>
                   {provinces.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm text-text-muted" htmlFor="edit-birth-date">Doğum tarihi</label>
+                <input id="edit-birth-date" name="birth_date" type="date" max="2100-12-31" defaultValue={customer.birth_date ?? ""} className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm text-text-muted" htmlFor="edit-anniversary-date">Yıldönümü</label>
+                <input id="edit-anniversary-date" name="anniversary_date" type="date" max="2100-12-31" defaultValue={customer.anniversary_date ?? ""} className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="mb-1.5 block text-sm text-text-muted" htmlFor="edit-anniversary-note">Yıldönümü notu</label>
+                <input id="edit-anniversary-note" name="anniversary_note" defaultValue={customer.anniversary_note ?? ""} placeholder="Örn. İlk ev alımı, 3 yıllık kiracı" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" />
               </div>
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="edit-notes">Not</label>

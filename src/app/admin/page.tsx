@@ -48,10 +48,10 @@ export default async function AdminHomePage() {
 
   const [{ data: tenants }, { count: memberCount }, { data: tickets }, { data: subs }, { data: audit }, { count: newDemos }] =
     await Promise.all([
-      admin.from("tenants").select("id, name, plan, status, created_at, trial_ends_at").order("created_at", { ascending: false }),
+      admin.from("tenants").select("id, name, plan, status, created_at, trial_ends_at").order("created_at", { ascending: false }).limit(2000),
       admin.from("profiles").select("id", { count: "exact", head: true }),
       admin.from("support_tickets").select("id, status, priority, created_at").order("created_at", { ascending: false }).limit(80),
-      admin.from("subscriptions").select("status, amount_try, plan, created_at"),
+      admin.from("subscriptions").select("status, amount_try, plan, created_at").limit(5000),
       admin.from("audit_logs").select("action, entity_type, actor_id, tenant_id, created_at, tenant:tenants(name)").order("created_at", { ascending: false }).limit(10),
       admin.from("demo_requests").select("id", { count: "exact", head: true }).eq("status", "new"),
     ]);

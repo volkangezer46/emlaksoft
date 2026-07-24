@@ -82,16 +82,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: customer } = await supabase
-    .from("customers")
-    .select("id, full_name, phone, email, customer_types, tags, source, notes, blacklist, created_at, province_id, province:geo_provinces(name), district:geo_districts(name)")
-    .eq("id", id)
-    .is("deleted_at", null)
-    .maybeSingle();
-
-  if (!customer) notFound();
-
+  // Tüm sorgular yalnızca `id`'ye bağlı — müşteri sorgusu da batch'e katıldı (notFound sonra)
   const [
+    { data: customer },
     { data: demandsData },
     { data: callsData },
     { data: apptsData },
@@ -104,6 +97,12 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     { data: commsData },
     { data: propertiesForMatch },
   ] = await Promise.all([
+    supabase
+      .from("customers")
+      .select("id, full_name, phone, email, customer_types, tags, source, notes, blacklist, created_at, province_id, birth_date, anniversary_date, anniversary_note, province:geo_provinces(name), district:geo_districts(name)")
+      .eq("id", id)
+      .is("deleted_at", null)
+      .maybeSingle(),
     supabase
       .from("customer_demands")
       .select("id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, province_id, created_at")
@@ -166,6 +165,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .order("created_at", { ascending: false })
       .limit(100),
   ]);
+
+  if (!customer) notFound();
 
   const demands = (demandsData ?? []) as Demand[];
   const calls = (callsData ?? []) as Call[];
@@ -315,6 +316,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                       customer_types: customer.customer_types,
                       province_id: customer.province_id,
                       notes: customer.notes,
+                      birth_date: customer.birth_date,
+                      anniversary_date: customer.anniversary_date,
+                      anniversary_note: customer.anniversary_note,
                     }}
                     provinces={provinces ?? []}
                   />

@@ -22,31 +22,27 @@ export default async function AdminActivityPage() {
       .limit(100),
   ]);
 
-  // Platform staff isimlerini çek
+  // İsim çözümleme — platform staff + tenant actor sorguları bağımsız, tek turda
   const platformActorIds = [
     ...new Set((platformRows ?? []).map((r) => r.actor_id).filter(Boolean)),
   ] as string[];
-  const platformNames = new Map<string, string>();
-  if (platformActorIds.length) {
-    const { data: staffList } = await admin
-      .from("platform_staff")
-      .select("id, full_name")
-      .in("id", platformActorIds);
-    for (const s of staffList ?? []) platformNames.set(s.id, s.full_name);
-  }
-
-  // Tenant actor isimlerini çek
   const tenantActorIds = [
     ...new Set((tenantRows ?? []).map((r) => r.actor_id).filter(Boolean)),
   ] as string[];
+
+  const [{ data: staffList }, { data: profiles }] = await Promise.all([
+    platformActorIds.length
+      ? admin.from("platform_staff").select("id, full_name").in("id", platformActorIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+    tenantActorIds.length
+      ? admin.from("profiles").select("id, full_name").in("id", tenantActorIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+  ]);
+
+  const platformNames = new Map<string, string>();
+  for (const s of staffList ?? []) platformNames.set(s.id, s.full_name);
   const tenantNames = new Map<string, string>();
-  if (tenantActorIds.length) {
-    const { data: profiles } = await admin
-      .from("profiles")
-      .select("id, full_name")
-      .in("id", tenantActorIds);
-    for (const p of profiles ?? []) tenantNames.set(p.id, p.full_name);
-  }
+  for (const p of profiles ?? []) tenantNames.set(p.id, p.full_name);
 
   // İki listeyi birleştir ve tarihe göre sırala
   type UnifiedRow = {

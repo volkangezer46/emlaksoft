@@ -1,6 +1,6 @@
 # EmlakSoft — Devir & Süreklilik Dosyası
 
-> **Son güncelleme:** 23 Temmuz 2026  
+> **Son güncelleme:** 24 Temmuz 2026  
 > **Proje yolu:** `C:\Users\volka\Projects\emlaksoft`  
 > **Amaç:** Cursor / VS Code’da yeni sohbette bu dosyayı okutup kaldığın yerden devam etmek.
 
@@ -86,6 +86,8 @@ Guard: `requirePlatformModule("...")`
 - `000033` — `tenants.iban`, `phone`, `address_line`, `city` ✅ production'a uygulandı
 - `000034` — `tenants.logo_url`, `website` ✅ production'a uygulandı
 - `000035` — `customers.birth_date`, `anniversary_date` (index'li) ✅ production'a uygulandı
+- `000036` — hot-path composite index'ler (assigned_to, status vb.) ⚠️ **production'a uygulanacak**
+- `000037` — `rate_limits` tablosu + `check_rate_limit` RPC (public endpoint koruması) ⚠️ **production'a uygulanacak**
 
 Rehber: `MIGRATION_GUIDE.md`  
 Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
@@ -93,6 +95,84 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 ---
 
 ## Bu sohbette tamamlanan işler
+
+### 16) Kalan maddelerin kapatılması + derin performans turu (24 Temmuz 2026)
+
+**Build: ✓ 0 hata.** Sprint-15'te "bilinçli ertelendi" denen tüm maddeler kapatıldı + sistem geneli performans.
+
+#### 🐛 Kritik gizli bug'lar bulundu & düzeltildi
+- **Portal yayınlama tamamen bozuktu** — `portal-publish.ts` `province:provinces(name)` / `district:districts(name)` kullanıyordu ama gerçek FK tabloları `geo_provinces`/`geo_districts`. PostgREST embedded join başarısız → `property` hep null → her yayın "Portföy bulunamadı" veriyordu. Düzeltildi (owner-portal.ts'te de aynı bug vardı, düzeltildi)
+- **`sendBulkSms` XML iç içe `<no>`** — `<no>${nos}</no>` sarmalaması `<no><no>..</no></no>` üretiyordu (Netgsm şemasına aykırı). Dış sarmalayıcı kaldırıldı + usercode/password/msgheader XML-escape edildi
+- **`updateTeamMember` ölü kod** — kendini kilitleme koruması boş `if` bloğundaydı; artık kendi yönetici rolünü düşürme + kendini pasife alma engelleniyor
+
+#### Portal entegrasyonu tamamlandı (4/4 portal)
+- Spec-tabanlı tek adaptör motoru (`PORTAL_SPECS`) — sahibinden/hepsiemlak/**zingat**/**emlakjet** artık publish/update/unpublish destekliyor
+- `updateOnPortal` (PUT) + `updatePropertyOnPortal` action — fiyat/başlık değişince canlı ilanı senkron
+- `mapToZingat` + `mapToEmlakjet` alan eşlemeleri, `SUPPORTED_PORTALS` + `isPortalSupported`
+- `getConfiguredPortals` artık yalnız adaptörü OLAN portalları döner (UI tutarlılığı — kullanıcı desteklenmeyen portala anahtar girip hata almaz)
+
+#### Güvenlik sertleştirme (public/auth'suz yüzey)
+- **DB-tabanlı hız sınırlayıcı** — migration 037 `rate_limits` tablosu + atomik `check_rate_limit` RPC + `src/lib/rate-limit.ts` (fail-open)
+- Demo formu: IP başına 10 dk'da 5 talep + **honeypot** alanı (bot koruması)
+- Public imza gönderimi: IP başına dakikada 10 deneme (token enumeration koruması)
+- `next.config`: **HSTS** (2 yıl, preload) + **Permissions-Policy** başlıkları
+
+#### Derin performans (dünya-standardı hedefi)
+- **Proxy middleware matcher daraltıldı** ⭐ — eskiden TÜM isteklerde (marketing, vitrin, token, public) `getUser()` ağ çağrısı yapıyordu; artık yalnız `/app`, `/admin`, `/giris`, `/kayit`. Public trafikte her sayfa yükünden bir Supabase Auth round-trip kalktı (en büyük kazanç)
+- **Kalan Tier-2 waterfall'lar** paralelleştirildi: `ayarlar/roller` (2→1), `musteriler/[id]` (customer batch'e katıldı, 12 sorgu tek turda), `admin/tenants/[id]` (tenant batch'e katıldı)
+
+#### ⚠️ Bilinen kalan iş (dokümante edildi, riskli olduğu için ertelendi)
+- **`customer-portal.ts` şema uyumsuzluğu** — `admin.from("demands")` (tablo `customer_demands`), `demand_type` kolonu (gerçekte `transaction_type`/`property_type`), `matches` tablosu, `provinces` — bu fonksiyon eski/farklı şemaya göre yazılmış ve uçtan uca test edilmemiş görünüyor. Kör yeniden adlandırma yeni bug riski taşıdığından, ayrı bir düzeltme turunda şema eşlemesi doğrulanarak ele alınmalı
+- WhatsApp gönderimi: yapılandırılabilir (API url/token set edilirse çalışır) — bilinçli iskelet
+
+#### Deploy'da uygulanacak migration'lar
+```
+npx tsx scripts/apply-one.ts supabase/migrations/20260724000036_hotpath_indexes.sql
+npx tsx scripts/apply-one.ts supabase/migrations/20260724000037_rate_limits.sql
+```
+
+---
+
+### 15) 360° kalite + dünya-standardı performans turu (24 Temmuz 2026)
+
+**Build: ✓ 0 hata, 43 dinamik route** — 2 paralel keşif ajanı (waterfall + kalite denetimi) çalıştırıldı, bulgular uygulandı.
+
+#### 🔴 KRİTİK güvenlik açığı kapatıldı
+- **`updateTenantInfo` yetki kontrolü yoktu** (`src/app/actions/settings.ts`) — herhangi bir tenant kullanıcısı (readonly/advisor dahil) ofis adı, **vergi no, IBAN**, marka rengini doğrudan çağırarak değiştirebiliyordu (RLS'e güveniliyordu). Artık `requirePermission("settings","edit")` (owner/gm) + `logActivity` kaydı. Sözlük: settings.edit advisor'da yalnız VIEW.
+
+#### Yeni premium özellikler
+- **Müşteri doğum tarihi + yıldönümü alanları** — new/edit dialog + `createCustomer`/`updateCustomer` action (`isValidOptionalDate` takvim doğrulaması), müşteri 360 select'e eklendi (migration 035 kolonları kullanıldı)
+- **Yaklaşan özel günler banner'ı** — `/app/musteriler` üstünde önümüzdeki 7 gün içindeki doğum günü 🎂 / yıldönümü 🎉; ekstra sorgu yok (mevcut listeden hesaplanır), müşteri detayına link
+- **Raporlar gelir/gider karşılaştırma grafiği** — son 6 ay komisyon (gelir) vs `expenses` (gider) gruplanmış bar chart + toplam gelir/gider/net kartları; veri yoksa empty state
+- **Admin tenant abonelik değiştirme paneli** — `subscription-panel.tsx` (paket + durum dialog), mevcut `updateTenantPlanStatus` action'ına bağlandı, tenant + subscriptions senkron güncelleme
+- **Sözleşme e-imza akışı TAMAMLANDI** — eksik olan public `/imza/[token]` imza sayfası oluşturuldu (sözleşme metni + imzalayanlar durumu + onay + IP kaydı); `sendContractForSigning` artık token'ları geri okuyup **Netgsm SMS ile imza linki gönderiyor** (yapılandırılmışsa); `submitSignatureByToken` form action
+
+#### Performans (dünya-standardı hedefi)
+- **Waterfall paralelleştirme** (ardışık bağımsız DB round-trip → tek `Promise.all`):
+  - `admin/sistem` — 3 batch → 1 (10 sorgu tek turda)
+  - `app/franchise` — `loadOfficeScoreInputs` + 7 sorgu tek batch
+  - `app/portfoyler/[id]` — 4 tur → 2 (property+portals+history+configured tek turda, sonra notFound)
+  - `app/degerleme` — 2 batch → 1 (endeksa/tapusor config sorguya katıldı)
+  - `admin/aktivite` — 2 isim çözümleme sorgusu → 1
+- **Unbounded query koruması** — `danisman-kpi` (5×5000), `ekip` (customers 10000), `admin/page` (tenants 2000, subs 5000)
+- **Hot-path index migration** `20260724000036_hotpath_indexes.sql` — customers/properties `(tenant_id, assigned_to)`, subscriptions `(tenant_id, status)`, demo_requests, valuations, offers `(created_by, status)`
+
+#### Tutarlılık & a11y (kalite denetimi bulguları)
+- **6 eksik admin `loading.tsx`** eklendi: bildirimler, danisman, duyuru, geo, members, sistem
+- **a11y** — `branch-card.tsx` X butonu `aria-label="Vazgeç"`; `site-header.tsx` mobil menü toggle `aria-label` (state'e göre) + `aria-expanded`
+- **Portal veri kaybı** — `mapToSahibinden`/`mapToHepsiemlak` artık `floorCount` + `buildingAge` maplıyor (sessiz veri kaybı giderildi)
+
+#### ⚠️ Deploy'da uygulanacak
+- **Migration 036** production'a uygulanmalı: `npx tsx scripts/apply-one.ts supabase/migrations/20260724000036_hotpath_indexes.sql`
+- SMS imza bildirimi için Netgsm anahtarı gerekli (yoksa link üretilir ama SMS atılmaz — akış yine çalışır)
+
+#### Kalite denetiminden kalan düşük öncelikli notlar (bilinçli/ertelendi)
+- Portal `zingat`/`emlakjet` adaptörleri hâlâ iskelet (UI anahtar girmeye izin veriyor); `updateListing()` implement edilmedi
+- WhatsApp gönderimi iskelet (API url/token set edilirse çalışır)
+- `demo.ts` / token portal endpoint'lerinde rate-limit yok (spam yüzeyi)
+- `sendBulkSms` XML `<no>` iç içe sarma riski — Netgsm şemasıyla doğrulanmalı
+
+---
 
 ### 14) Rakip analizi + büyük özellik turu (24 Temmuz 2026)
 

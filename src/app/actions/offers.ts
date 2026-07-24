@@ -67,7 +67,26 @@ export async function updateOfferStatus(
     .eq("tenant_id", gate.tenantId);
 
   revalidatePath("/app/teklifler");
+  revalidatePath(`/app/teklifler/${offerId}`);
   return { ok: true };
+}
+
+/** Tek teklifi ilişkili portföy + müşteri ID'leriyle getirir (detay sayfası için). */
+export async function getOffer(id: string) {
+  const gate = await requirePermission("commissions", "view");
+  if (!gate.ok) return null;
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("offers")
+    .select(
+      "id, amount, currency, status, counter_amount, valid_until, notes, submitted_at, responded_at, created_at, updated_at, property_id, customer_id, property:properties(id, property_code, title, list_price, transaction_type, property_type), customer:customers(id, full_name, phone, email)",
+    )
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+
+  return data;
 }
 
 export async function listOffers(propertyId?: string) {

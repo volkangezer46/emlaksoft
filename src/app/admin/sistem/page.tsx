@@ -32,26 +32,32 @@ export default async function AdminSystemPage() {
   const staff = await requirePlatformModule("sistem");
   const admin = createAdminClient();
 
-  // OpenAI
-  const dbKey = await getPlatformSetting("openai_api_key");
-  const envKey = process.env.OPENAI_API_KEY?.trim() || null;
-  const activeKey = (dbKey?.trim() || envKey) ?? null;
-  const keySource: "db" | "env" | "none" = dbKey?.trim() ? "db" : envKey ? "env" : "none";
-  const maskedKey = activeKey ? mask(activeKey) : null;
-
-  // Endeksa — DB öncelikli
+  // Tüm platform ayarları + geo sayımları tek turda (bağımsız → tam paralel)
   const [
+    dbKey,
     dbEndeksaId, dbEndeksaSecret, dbTapusorKey,
     dbSahibindenKey, dbHepsiemlakKey, dbZingatKey,
+    { count: provinces }, { count: districts }, { count: neighborhoods },
   ] = await Promise.all([
+    getPlatformSetting("openai_api_key"),
     getPlatformSetting("endeksa_client_id"),
     getPlatformSetting("endeksa_client_secret"),
     getPlatformSetting("tapusor_api_key"),
     getPlatformSetting("sahibinden_api_key"),
     getPlatformSetting("hepsiemlak_api_key"),
     getPlatformSetting("zingat_api_key"),
+    admin.from("geo_provinces").select("id", { count: "exact", head: true }),
+    admin.from("geo_districts").select("id", { count: "exact", head: true }),
+    admin.from("geo_neighborhoods").select("id", { count: "exact", head: true }),
   ]);
 
+  // OpenAI
+  const envKey = process.env.OPENAI_API_KEY?.trim() || null;
+  const activeKey = (dbKey?.trim() || envKey) ?? null;
+  const keySource: "db" | "env" | "none" = dbKey?.trim() ? "db" : envKey ? "env" : "none";
+  const maskedKey = activeKey ? mask(activeKey) : null;
+
+  // Endeksa — DB öncelikli
   const endeksaClientId = dbEndeksaId?.trim() || process.env.ENDEKSA_CLIENT_ID?.trim() || null;
   const endeksaSecret = dbEndeksaSecret?.trim() || process.env.ENDEKSA_CLIENT_SECRET?.trim() || null;
   const tapusorApiKey = dbTapusorKey?.trim() || process.env.TAPUSOR_API_KEY?.trim() || null;
@@ -71,13 +77,6 @@ export default async function AdminSystemPage() {
   // Endeksa/Tapusor masked değerler (güvenli gösterim)
   const maskedEndeksaId = endeksaClientId ? mask(endeksaClientId, 4, 3) : null;
   const maskedTapusorKey = tapusorApiKey ? mask(tapusorApiKey) : null;
-
-  // Geo
-  const [{ count: provinces }, { count: districts }, { count: neighborhoods }] = await Promise.all([
-    admin.from("geo_provinces").select("id", { count: "exact", head: true }),
-    admin.from("geo_districts").select("id", { count: "exact", head: true }),
-    admin.from("geo_neighborhoods").select("id", { count: "exact", head: true }),
-  ]);
 
   const provinceCoverage = Math.round(((provinces ?? 0) / TOTAL_PROVINCES) * 100);
   const cronConfigured = Boolean(process.env.CRON_SECRET?.trim());

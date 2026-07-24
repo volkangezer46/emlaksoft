@@ -6,7 +6,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
+  // Yalnızca kimlik-doğrulama mantığının gerektiği yollarda çalış.
+  // Public/marketing/vitrin/token/api sayfaları her istekte gereksiz
+  // getUser() ağ çağrısı yapmasın — public trafikte büyük gecikme kazancı.
+  matcher: ["/app/:path*", "/admin/:path*", "/giris", "/kayit"],
 };

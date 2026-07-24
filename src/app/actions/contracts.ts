@@ -1,11 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+import { sendSms, isNetgsmConfigured } from "@/lib/messaging/netgsm";
+import { checkRateLimit } from "@/lib/rate-limit";
 
-export type ContractResult = { ok?: boolean; error?: string; id?: string };
+function appBaseUrl() {
+  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+}
+
+export type ContractResult = { ok?: boolean; error?: string; id?: string; notified?: number };
 
 const CONTRACT_TYPES = ["satis", "kira", "sozlesme", "teklif", "diger"] as const;
 
@@ -112,16 +119,19 @@ export async function sendContractForSigning(
   if (!contract) return { error: "Sözleşme bulunamadı." };
   if (contract.status !== "draft") return { error: "Sadece taslak sözleşmeler gönderilebilir." };
 
-  // İmzalayanları ekle
-  await admin.from("contract_signers").insert(
-    signers.map((s) => ({
-      contract_id: contractId,
-      full_name:   s.full_name,
-      email:       s.email ?? null,
-      phone:       s.phone ?? null,
-      status:      "pending",
-    })),
-  );
+  // İmzalayanları ekle — token DB tarafında üretilir, geri okuyup link kuruyoruz
+  const { data: insertedSigners } = await admin
+    .from("contract_signers")
+    .insert(
+      signers.map((s) => ({
+        contract_id: contractId,
+        full_name:   s.full_name,
+        email:       s.email ?? null,
+        phone:       s.phone ?? null,
+        status:      "pending",
+      })),
+    )
+    .select("token, phone, full_name");
 
   // Sözleşme durumunu güncelle
   await admin
@@ -129,12 +139,23 @@ export async function sendContractForSigning(
     .update({ status: "sent", updated_at: new Date().toISOString() })
     .eq("id", contractId);
 
-  // TODO: SMS / e-posta bildirimi (Netgsm veya e-posta)
-  // Her imzalayan için token üretildi, /imza/[token] linki gönderilebilir
+  // İmza linklerini SMS ile gönder (Netgsm yapılandırılmışsa; hata gönderimi bloklamaz)
+  let smsSent = 0;
+  if (await isNetgsmConfigured()) {
+    const base = appBaseUrl();
+    for (const s of insertedSigners ?? []) {
+      if (!s.phone) continue;
+      const link = `${base}/imza/${s.token}`;
+      const text = `Sayin ${s.full_name}, "${contract.title}" sozlesmesini imzalamak icin: ${link}`;
+      const res = await sendSms(s.phone, text);
+      if (res.ok) smsSent += 1;
+      else console.error("sendContract sms", s.phone, res.error);
+    }
+  }
 
   revalidatePath("/app/sozlesmeler");
   revalidatePath(`/app/sozlesmeler/${contractId}`);
-  return { ok: true };
+  return { ok: true, notified: smsSent };
 }
 
 // ---------------------------------------------------------------------------
@@ -178,6 +199,32 @@ export async function signContractByToken(
   }
 
   return { ok: true };
+}
+
+/**
+ * Public imza sayfası form action'ı — token'ı formdan alır, IP'yi header'dan
+ * çözer, imzayı kaydeder ve sayfayı yeniler. Auth gerekmez (token yeterli).
+ */
+export async function submitSignatureByToken(
+  _prev: ContractResult,
+  fd: FormData,
+): Promise<ContractResult> {
+  const token = String(fd.get("token") ?? "").trim();
+  if (!token) return { error: "Geçersiz imza linki." };
+
+  const hdrs = await headers();
+  const ip =
+    hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    hdrs.get("x-real-ip") ||
+    undefined;
+
+  // Token tahmini/kaba kuvvet koruması — IP başına dakikada 10 deneme
+  const { allowed } = await checkRateLimit(`sign:${ip ?? "unknown"}`, { limit: 10, windowSec: 60 });
+  if (!allowed) return { error: "Çok fazla deneme. Lütfen biraz sonra tekrar deneyin." };
+
+  const result = await signContractByToken(token, ip);
+  if (result.ok) revalidatePath(`/imza/${token}`);
+  return result;
 }
 
 // ---------------------------------------------------------------------------

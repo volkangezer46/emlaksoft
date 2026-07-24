@@ -68,7 +68,7 @@ export default async function CommissionPage() {
           <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Komisyon & hakediş</h1>
           <p className="mt-1 text-sm text-white/60">Çok taraflı paylaşım, KDV ve tahsilat görünümü tek defterde.</p>
         </div>
-        <div className="relative mt-6 grid grid-cols-3 gap-3">
+        <div className="relative mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           {[
             { label: "Toplam komisyon", value: money(total), icon: Wallet, tone: "text-cyan-400" },
             { label: "Tahsil edilen", value: money(paid), icon: CheckCircle2, tone: "text-mint-400" },

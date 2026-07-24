@@ -3,9 +3,62 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
-import { publishToPortal, unpublishFromPortal, isPortalConfigured, type PortalName } from "@/lib/integrations/portals";
+import {
+  publishToPortal,
+  updateOnPortal,
+  unpublishFromPortal,
+  isPortalConfigured,
+  isPortalSupported,
+  SUPPORTED_PORTALS,
+  type PortalName,
+  type PropertyPayload,
+} from "@/lib/integrations/portals";
 
 export type PortalPublishResult = { ok?: boolean; error?: string; externalId?: string; externalUrl?: string };
+
+const PROPERTY_SELECT = `
+  id, property_code, title, description, list_price,
+  property_type, transaction_type,
+  province:geo_provinces(name),
+  district:geo_districts(name),
+  net_sqm, room_count, floor, building_age
+` as const;
+
+type PropertyRow = {
+  property_code: string;
+  title: string | null;
+  description: string | null;
+  list_price: number | null;
+  property_type: string | null;
+  transaction_type: string | null;
+  province: { name?: string } | { name?: string }[] | null;
+  district: { name?: string } | { name?: string }[] | null;
+  net_sqm: number | null;
+  room_count: string | null;
+  floor: number | null;
+  building_age: number | null;
+};
+
+function relName(v: { name?: string } | { name?: string }[] | null): string | undefined {
+  return Array.isArray(v) ? v[0]?.name : v?.name ?? undefined;
+}
+
+function toPayload(property: PropertyRow): PropertyPayload {
+  return {
+    propertyCode:    property.property_code,
+    title:           property.title ?? property.property_code,
+    description:     property.description ?? undefined,
+    listPrice:       property.list_price ?? 0,
+    propertyType:    property.property_type ?? "daire",
+    transactionType: property.transaction_type === "kiralik" ? "kiralik" : "satilik",
+    province:        relName(property.province),
+    district:        relName(property.district),
+    squareMeters:    property.net_sqm ?? undefined,
+    roomCount:       property.room_count ?? undefined,
+    floorCount:      property.floor ?? undefined,
+    buildingAge:     property.building_age ?? undefined,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // İlanı portale gönder
@@ -18,18 +71,16 @@ export async function publishPropertyToPortal(
   const gate = await requirePermission("portals", "create");
   if (!gate.ok) return { error: gate.error };
 
+  if (!isPortalSupported(portalName)) {
+    return { error: `${portalName} için yayın entegrasyonu henüz mevcut değil.` };
+  }
+
   const supabase = await createClient();
 
   // Portföy bilgilerini çek
   const { data: property } = await supabase
     .from("properties")
-    .select(`
-      id, property_code, title, description, list_price,
-      property_type, transaction_type,
-      province:provinces(name),
-      district:districts(name),
-      net_sqm, room_count, floor, building_age
-    `)
+    .select(PROPERTY_SELECT)
     .eq("id", propertyId)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
@@ -42,29 +93,8 @@ export async function publishPropertyToPortal(
     return { error: `${portalName} API anahtarı tanımlanmamış. /admin/sistem'den ekleyin.` };
   }
 
-  const provinceName = Array.isArray(property.province)
-    ? property.province[0]?.name
-    : (property.province as { name?: string } | null)?.name;
-
-  const districtName = Array.isArray(property.district)
-    ? property.district[0]?.name
-    : (property.district as { name?: string } | null)?.name;
-
   // Portale gönder
-  const result = await publishToPortal(portalName, {
-    propertyCode:    property.property_code,
-    title:           property.title ?? property.property_code,
-    description:     property.description ?? undefined,
-    listPrice:       property.list_price ?? 0,
-    propertyType:    property.property_type ?? "daire",
-    transactionType: (property.transaction_type === "kiralik" ? "kiralik" : "satilik"),
-    province:        provinceName,
-    district:        districtName,
-    squareMeters:    property.net_sqm ?? undefined,
-    roomCount:       property.room_count ?? undefined,
-    floorCount:      property.floor ?? undefined,
-    buildingAge:     property.building_age ?? undefined,
-  });
+  const result = await publishToPortal(portalName, toPayload(property as PropertyRow));
 
   if (!result.ok) return { error: result.error };
 
@@ -84,6 +114,54 @@ export async function publishPropertyToPortal(
     },
     { onConflict: "tenant_id,property_id,portal_name" },
   );
+
+  revalidatePath("/app/portallar");
+  revalidatePath(`/app/portfoyler/${propertyId}`);
+  return { ok: true, externalId: result.externalId, externalUrl: result.externalUrl };
+}
+
+// ---------------------------------------------------------------------------
+// Canlı ilanı portalde güncelle (fiyat/başlık/foto değişince yeniden senkron)
+// ---------------------------------------------------------------------------
+
+export async function updatePropertyOnPortal(
+  propertyId: string,
+  portalName: PortalName,
+  externalId: string,
+  listingId: string,
+): Promise<PortalPublishResult> {
+  const gate = await requirePermission("portals", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  if (!isPortalSupported(portalName)) {
+    return { error: `${portalName} için yayın entegrasyonu henüz mevcut değil.` };
+  }
+  if (!externalId) return { error: "Portal ilan kimliği yok; önce yayınlayın." };
+
+  const configured = await isPortalConfigured(portalName);
+  if (!configured) return { error: `${portalName} API anahtarı tanımlanmamış.` };
+
+  const supabase = await createClient();
+  const { data: property } = await supabase
+    .from("properties")
+    .select(PROPERTY_SELECT)
+    .eq("id", propertyId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+
+  if (!property) return { error: "Portföy bulunamadı." };
+
+  const result = await updateOnPortal(portalName, externalId, toPayload(property as PropertyRow));
+  if (!result.ok) return { error: result.error };
+
+  await supabase
+    .from("portal_listings")
+    .update({
+      last_confirmed_at: new Date().toISOString(),
+      portal_url: result.externalUrl ?? undefined,
+    })
+    .eq("id", listingId)
+    .eq("tenant_id", gate.tenantId);
 
   revalidatePath("/app/portallar");
   revalidatePath(`/app/portfoyler/${propertyId}`);
@@ -130,7 +208,7 @@ export async function unpublishPropertyFromPortal(
 // ---------------------------------------------------------------------------
 
 export async function getConfiguredPortals(): Promise<PortalName[]> {
-  const portals: PortalName[] = ["sahibinden", "hepsiemlak", "zingat", "emlakjet"];
-  const results = await Promise.all(portals.map((p) => isPortalConfigured(p)));
-  return portals.filter((_, i) => results[i]);
+  // Yalnızca yayın adaptörü OLAN portalları değerlendir (UI tutarlılığı)
+  const results = await Promise.all(SUPPORTED_PORTALS.map((p) => isPortalConfigured(p)));
+  return SUPPORTED_PORTALS.filter((_, i) => results[i]);
 }
