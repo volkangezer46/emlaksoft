@@ -53,7 +53,7 @@ export default async function SettingsPage() {
   const [{ data: tenantRow }, notifPrefs, { count: consentCount }, { count: activeConsentCount }, { count: auditCount }] = await Promise.all([
     supabase
       .from("tenants")
-      .select("name, plan, tax_office, tax_number, license_no, brand_color")
+      .select("name, plan, tax_office, tax_number, license_no, brand_color, iban, phone, address_line, city")
       .limit(1)
       .maybeSingle(),
     getNotificationPrefs(),
@@ -62,7 +62,7 @@ export default async function SettingsPage() {
     supabase.from("audit_logs").select("id", { count: "exact", head: true }),
   ]);
 
-  const tenant = tenantRow ?? { name: "", plan: "office", tax_office: null, tax_number: null, license_no: null, brand_color: null };
+  const tenant = tenantRow ?? { name: "", plan: "office", tax_office: null, tax_number: null, license_no: null, brand_color: null, iban: null, phone: null, address_line: null, city: null };
 
   const complianceStrip = [
     {
@@ -78,7 +78,7 @@ export default async function SettingsPage() {
     },
   ];
 
-  const checks = [tenant.name, tenant.tax_office, tenant.tax_number, tenant.license_no, tenant.brand_color, user?.email];
+  const checks = [tenant.name, tenant.tax_office, tenant.tax_number, tenant.license_no, tenant.brand_color, tenant.iban, tenant.phone, tenant.address_line, user?.email];
   const filled = checks.filter(Boolean).length;
   const completion = Math.round((filled / checks.length) * 100);
   const planLabel: Record<string, string> = { advisor: "Danışman", office: "Ofis", professional: "Profesyonel", enterprise: "Kurumsal" };

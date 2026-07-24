@@ -11,6 +11,10 @@ type Tenant = {
   tax_number: string | null;
   license_no: string | null;
   brand_color: string | null;
+  iban: string | null;
+  phone: string | null;
+  address_line: string | null;
+  city: string | null;
 };
 
 const fieldClass =
@@ -53,6 +57,18 @@ export function CompanyForm({ tenant }: { tenant: Tenant }) {
           <input id="tenant-name" name="name" required defaultValue={tenant.name} className={fieldClass} placeholder="EmlakSoft Gayrimenkul" />
         </div>
         <div>
+          <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-phone">Telefon</label>
+          <input id="tenant-phone" name="phone" type="tel" defaultValue={tenant.phone ?? ""} className={fieldClass} placeholder="+90 555 123 4567" />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-city">Şehir</label>
+          <input id="tenant-city" name="city" defaultValue={tenant.city ?? ""} className={fieldClass} placeholder="İstanbul" />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-address">Adres</label>
+          <input id="tenant-address" name="address_line" defaultValue={tenant.address_line ?? ""} className={fieldClass} placeholder="Bağdat Cad. No:42 Kadıköy" />
+        </div>
+        <div>
           <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-tax-office">Vergi dairesi</label>
           <input id="tenant-tax-office" name="tax_office" defaultValue={tenant.tax_office ?? ""} className={fieldClass} placeholder="Onikişubat VD" />
         </div>
@@ -63,6 +79,19 @@ export function CompanyForm({ tenant }: { tenant: Tenant }) {
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-license">Yetki belgesi no</label>
           <input id="tenant-license" name="license_no" defaultValue={tenant.license_no ?? ""} className={fieldClass} placeholder="TR-46-00123" />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-iban">
+            IBAN <span className="text-text-faint text-xs font-normal">(fatura / ödeme)</span>
+          </label>
+          <input
+            id="tenant-iban"
+            name="iban"
+            defaultValue={tenant.iban ?? ""}
+            className={fieldClass}
+            placeholder="TR330006100519786457841326"
+            maxLength={32}
+          />
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-color">Marka rengi</label>
