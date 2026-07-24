@@ -83,6 +83,9 @@ Guard: `requirePlatformModule("...")`
 - `000025` — `platform_settings` (OpenAI anahtarı vb.)
 - `000026` — `advisor_sessions` + `advisor_messages` (danışman sohbet geçmişi)
 - `000027` — `platform_audit_logs` (platform personel işlem kaydı)
+- `000033` — `tenants.iban`, `phone`, `address_line`, `city` ✅ production'a uygulandı
+- `000034` — `tenants.logo_url`, `website` ✅ production'a uygulandı
+- `000035` — `customers.birth_date`, `anniversary_date` (index'li) ✅ production'a uygulandı
 
 Rehber: `MIGRATION_GUIDE.md`  
 Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
