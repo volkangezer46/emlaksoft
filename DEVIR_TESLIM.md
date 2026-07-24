@@ -98,6 +98,25 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 
 ## Bu sohbette tamamlanan işler
 
+### 26) İnteraktif harita (rakip özelliği) + ana sayfa ultra-premium (24 Temmuz 2026)
+
+**Build: ✓ 0 hata.** Production deploy (`1ee6cd2`, `760e781`).
+
+#### İnteraktif harita üzerinde portföy (sahibinden/Zingat standardı)
+- **`PropertyMap`** (`src/components/app/property-map.tsx`) — OpenStreetMap embed: ücretsiz, **API anahtarı/npm dependency gerektirmez**; işaretli interaktif harita, yoksa adres araması
+- Portföy detayına "Konum" bölümü (lat/lng varsa harita)
+- **`LatLngPicker`** — new/edit form'da enlem/boylam + "Konumumu kullan" (tarayıcı geolocation) + haritadan doğrula linki
+- `properties.lat/lng` zaten şemadaydı → create/update action'lara + dialog'lara bağlandı
+
+#### Ana sayfa ultra-premium
+- Canlı animasyonlu **aurora mesh** arka planı (`.hero-aurora`, 22s yumuşak drift, reduced-motion desteği)
+- Birincil CTA gradient (`grad-brand`) + güçlü glow + ok mikro-animasyonu
+
+#### Rakip özellik durumu (rakip analizinden)
+Uygulanmış: lead skorlama, TÜFE kira artış, aidat, TAKBİS, e-posta/sözleşme şablonları, komisyon split, otomatik eşleştirme bildirimi, takvim sync, **interaktif harita**. Harici API/kredi gerektirenler (iskelet mevcut): **WhatsApp Business inbox**, **ilan performans analitiği** (portal metrik API'si), sanal tur/360°.
+
+---
+
 ### 25) Bildirim merkezi zenginleştirme (24 Temmuz 2026)
 
 **Build: ✓ 0 hata.** Production deploy (`e590768`).
