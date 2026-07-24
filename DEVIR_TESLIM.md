@@ -91,6 +91,41 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 
 ## Bu sohbette tamamlanan işler
 
+### 14) Rakip analizi + büyük özellik turu (24 Temmuz 2026)
+
+**Build: ✓ 0 hata, 70 sayfa**
+
+#### Tamamlanan özellikler
+- **Otomasyonlar** — `applyAutomationTemplate`, `toggleAutomation`, `deleteAutomation` server action'ları. "Uygula" butonu artık şablonu DB'ye kaydeder, toggle/sil çalışır
+- **Logo upload** — `tenants.logo_url + website` migration (034), `uploadTenantLogo` action, `LogoUploadForm` client component, ayarlar sayfasına entegre
+- **Teklifler** — `NewOfferDialog` — portföy auto-fill, müşteri seçimi, geçerlilik tarihi. Teklifler sayfasına "Yeni teklif" butonu eklendi
+- **Sözleşme detay** — `/app/sozlesmeler/[id]` yeni sayfası + `ContractSignPanel` (imzalayan ekle → imzaya gönder)
+- **Benzer portföy widget** — portföy detay sayfasına `RelatedPropertiesWidget` eklendi (skor tabanlı: aynı tip+il)
+- **Müşteri gelişmiş filtre** — kaynak, tip, danışman, tarih aralığı filtreleri; server-side uygulama
+- **Toplu portal yayınlama** — `PublishToPortalsPanel`'e "Tümüne yayınla" butonu eklendi
+- **Doğum günü/yıldönümü cron** — migration 035 (`birth_date`, `anniversary_date`), `/api/cron/dogum-gunu` endpoint, vercel.json'a eklendi (08:00 TR saati)
+- **IBAN + adres + telefon + website** — migrations 033-034, settings action + form güncellendi
+- **Admin topbar arama** — `max-w-lg w-full`, flex-1 ile tam genişlik
+- **Font optimizasyonu** — latin-ext kaldırıldı, Geist Mono preload: false, build süresi ~11s
+
+#### Yeni migrations
+- `20260724000033_tenant_iban.sql` — iban, phone, address_line, city
+- `20260724000034_tenant_logo.sql` — logo_url, website
+- `20260724000035_customer_dates.sql` — birth_date, anniversary_date (index'li)
+
+#### Yeni cron endpoint
+- `/api/cron/dogum-gunu` — her gün 08:00, bugün doğum günü/yıldönümü olan müşteriler için ofise bildirim
+
+#### Sıradaki vizyon adımları
+- Dashboard son 24s aktivite feed (D)
+- Randevular takvim görünümü (F)
+- Müşteri edit dialog'una doğum tarihi alanı ekle
+- Müşteri sayfasında yaklaşan doğum günü banner'ı
+- Raporlar → gelir/gider karşılaştırma grafiği
+- Admin tenant detay — abonelik değiştirme butonu
+
+---
+
 ### 13) Kapsamlı kalite turu (24 Temmuz 2026)
 
 **Build: ✓ 0 hata, 69 sayfa**
