@@ -380,12 +380,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         }))}
         consents={consentsData ?? []}
         files={filesData ?? []}
-      />
-
-      <CommunicationTimeline
-        customerId={customer.id}
-        initialItems={(commsData ?? []) as Parameters<typeof CommunicationTimeline>[0]["initialItems"]}
-        canCreate={(perms.customers ?? []).includes("create")}
+        communications={(commsData ?? []) as Parameters<typeof CommunicationTimeline>[0]["initialItems"]}
+        canCreateComm={(perms.customers ?? []).includes("create")}
       />
 
       {canTaskView ? (

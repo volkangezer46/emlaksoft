@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  AlertTriangle,
   ArrowUpRight,
   BarChart3,
   Bell,
@@ -127,6 +128,9 @@ export default async function AppHomePage() {
   sixMonthsAgo.setDate(1);
   sixMonthsAgo.setHours(0, 0, 0, 0);
 
+  const fifteenDaysFromNow = new Date();
+  fifteenDaysFromNow.setDate(fifteenDaysFromNow.getDate() + 15);
+
   const [
     { count },
     { data: latest },
@@ -142,6 +146,7 @@ export default async function AppHomePage() {
     { data: profiles },
     { data: auditLive },
     { data: customerDates },
+    { data: expiringAuthority },
   ] = await Promise.all([
     supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
     supabase
@@ -206,6 +211,16 @@ export default async function AppHomePage() {
       .gte("created_at", new Date(Date.now() - 49 * 86_400_000).toISOString())
       .order("created_at", { ascending: false })
       .limit(100),
+    // Yetki belgesi 15 gün içinde dolacak portföyler
+    supabase
+      .from("properties")
+      .select("id, property_code, title, authority_expires_at")
+      .is("deleted_at", null)
+      .not("authority_expires_at", "is", null)
+      .lte("authority_expires_at", fifteenDaysFromNow.toISOString())
+      .gte("authority_expires_at", new Date().toISOString())
+      .order("authority_expires_at", { ascending: true })
+      .limit(10),
   ]);
 
   const customerCount = count ?? 0;
@@ -401,8 +416,53 @@ export default async function AppHomePage() {
     "appointment.create": "Randevu",
   };
 
+  const expiringList = expiringAuthority ?? [];
+
   return (
     <div className="space-y-6">
+      {/* Yetki belgesi uyarı kartı — sadece yaklaşan kayıt varsa görünür */}
+      {expiringList.length > 0 && (
+        <div className="flex flex-wrap items-start gap-3 rounded-[16px] border border-amber-400/40 bg-amber-400/[0.06] p-4">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-amber-400/20 text-amber-600">
+            <AlertTriangle className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-amber-700">
+              {expiringList.length} portföyün yetki belgesi 15 gün içinde bitiyor
+            </p>
+            <ul className="mt-2 space-y-1">
+              {expiringList.map((p) => {
+                const expires = new Date(p.authority_expires_at as string);
+                const daysLeft = Math.ceil((expires.getTime() - Date.now()) / 86_400_000);
+                return (
+                  <li key={p.id} className="flex flex-wrap items-center gap-2 text-xs text-amber-700/80">
+                    <Link
+                      href={`/app/portfoyler/${p.id}`}
+                      className="font-semibold hover:underline"
+                    >
+                      {p.title ?? p.property_code}
+                    </Link>
+                    <span className="text-amber-600/60">·</span>
+                    <span className={daysLeft <= 5 ? "font-bold text-red-600" : ""}>
+                      {daysLeft} gün kaldı
+                    </span>
+                    <span className="text-amber-600/60">
+                      ({expires.toLocaleDateString("tr-TR")})
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+          <Link
+            href="/app/portfoyler"
+            className="shrink-0 rounded-[9px] border border-amber-400/50 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-400/20"
+          >
+            Portföylere git
+          </Link>
+        </div>
+      )}
+
       <div className="theme-dark relative overflow-hidden rounded-[20px] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-40" />
         <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-brand-600/40 blur-3xl" />

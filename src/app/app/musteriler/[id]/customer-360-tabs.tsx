@@ -8,6 +8,7 @@ import {
   FileText,
   Folder,
   Handshake,
+  MessageSquare,
   PhoneCall,
   ShieldCheck,
   Sparkles,
@@ -18,6 +19,7 @@ import { NewDemandDialog } from "./new-demand-dialog";
 import { DemandStatusButtons } from "./demand-status-buttons";
 import { EditDemandDialog } from "./edit-demand-dialog";
 import { CustomerFilesTab } from "./customer-files-tab";
+import { CommunicationTimeline } from "@/components/app/communication-timeline";
 
 type Province = { id: string; name: string };
 
@@ -67,13 +69,14 @@ function dateTime(iso: string) {
 }
 
 const tabs = [
-  { id: "talepler", label: "Talepler", icon: Target },
+  { id: "talepler",  label: "Talepler",   icon: Target },
   { id: "anlasmalar", label: "Anlaşmalar", icon: Handshake },
-  { id: "dosyalar", label: "Dosyalar", icon: Folder },
-  { id: "izinler", label: "İYS", icon: ShieldCheck },
-  { id: "aktivite", label: "Aktivite", icon: Activity },
-  { id: "notlar", label: "Notlar", icon: Sparkles },
-  { id: "gecmis", label: "Geçmiş", icon: FileText },
+  { id: "iletisim", label: "İletişim",   icon: MessageSquare },
+  { id: "dosyalar", label: "Dosyalar",   icon: Folder },
+  { id: "izinler",  label: "İYS",        icon: ShieldCheck },
+  { id: "aktivite", label: "Aktivite",   icon: Activity },
+  { id: "notlar",   label: "Notlar",     icon: Sparkles },
+  { id: "gecmis",   label: "Geçmiş",     icon: FileText },
 ] as const;
 
 type DealRow = {
@@ -89,6 +92,19 @@ type ConsentRow = {
   channel: string;
   status: string;
   granted_at: string | null;
+};
+
+type CommRow = {
+  id: string;
+  channel: string;
+  direction: string;
+  subject: string | null;
+  body: string | null;
+  outcome: string | null;
+  duration_sec: number | null;
+  scheduled_at: string | null;
+  created_at: string;
+  created_by: { full_name?: string } | { full_name?: string }[] | null;
 };
 
 type FileRow = {
@@ -119,6 +135,8 @@ export function Customer360Tabs({
   deals = [],
   consents = [],
   files = [],
+  communications = [],
+  canCreateComm = false,
 }: {
   customerId: string;
   customerName: string;
@@ -134,6 +152,8 @@ export function Customer360Tabs({
   deals?: DealRow[];
   consents?: ConsentRow[];
   files?: FileRow[];
+  communications?: CommRow[];
+  canCreateComm?: boolean;
 }) {
   const [tab, setTab] = useState<TabId>("talepler");
 
@@ -157,13 +177,14 @@ export function Customer360Tabs({
         {tabs.map((t) => {
           const active = tab === t.id;
           const count =
-            t.id === "talepler" ? demands.length
-              : t.id === "anlasmalar" ? deals.length
-                : t.id === "dosyalar" ? (files ?? []).length
-                  : t.id === "izinler" ? consents.length
-                    : t.id === "aktivite" ? activity.length
-                      : t.id === "gecmis" ? audit.length
-                        : null;
+            t.id === "talepler"   ? demands.length
+            : t.id === "anlasmalar" ? deals.length
+            : t.id === "iletisim" ? communications.length
+            : t.id === "dosyalar" ? (files ?? []).length
+            : t.id === "izinler"  ? consents.length
+            : t.id === "aktivite" ? activity.length
+            : t.id === "gecmis"   ? audit.length
+            : null;
           return (
             <button
               key={t.id}
@@ -262,6 +283,14 @@ export function Customer360Tabs({
             </div>
           )}
         </section>
+      ) : null}
+
+      {tab === "iletisim" ? (
+        <CommunicationTimeline
+          customerId={customerId}
+          initialItems={communications}
+          canCreate={canCreateComm}
+        />
       ) : null}
 
       {tab === "dosyalar" ? <CustomerFilesTab customerId={customerId} files={files ?? []} /> : null}

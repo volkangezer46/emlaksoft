@@ -1,7 +1,7 @@
 # Production Deployment Checklist
 
-**Tarih:** 2026-07-22  
-**Sprint:** Premium Plus  
+**Tarih:** 2026-07-24 (güncellendi)
+**Sprint:** Premium Plus + Görev tamamlama
 **Target:** Beta Launch
 
 ---
@@ -85,10 +85,17 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 - Yukarıdaki tüm ENV'leri ekle
 - Production + Preview separate values (opsiyonel)
 
-### 3. Cron Jobs
-- Settings → Cron Jobs
-- `vercel.json` dosyasındaki cron'ları import et
-- Her endpoint için Authorization header test et
+### 3. Cron Jobs (vercel.json hazır — 6 job)
+- `vercel.json` tüm cron'ları içeriyor:
+  - `0 7 * * *` → `/api/cron/gunluk-ozet`
+  - `*/30 * * * *` → `/api/cron/randevu-hatirlat`
+  - `0 */2 * * *` → `/api/cron/gorev-hatirlat`
+  - `0 */6 * * *` → `/api/cron/portal-teyit`
+  - `0 0 * * *` → `/api/cron/abonelik-kontrol`
+  - `0 */12 * * *` → `/api/cron/leak-sla`
+- Vercel Dashboard → Settings → Cron Jobs → otomatik algılanır
+- **CRON_SECRET** env değişkenini ekle (aşağıdaki generate komutuyla)
+- Smoke test: `npm run cron:smoke` (APP_URL + CRON_SECRET ile)
 
 ### 4. Domain
 - Custom domain ekle: `app.emlaksoft.com`
@@ -113,13 +120,37 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 - [ ] Eşleştirme skor hesaplama
 - [ ] Dosya upload/download
 
-### Payments
+### Payments — iyzico Prod Test
 - [ ] Ödeme linki oluştur
 - [ ] iyzico checkout form açılıyor
-- [ ] Test kart ile ödeme
-- [ ] Callback success
-- [ ] Webhook test (Postman)
-- [ ] Komisyon tahsilat
+- [ ] Test kart ile ödeme (sandbox: `5528790000000008`, CVV: `123`, Ay/Yıl: `12/30`)
+- [ ] Callback success → `/api/iyzico/callback`
+- [ ] Webhook imza doğrulaması — Postman ile test:
+  ```bash
+  # iyzico webhook imzası kontrolü (IYZICO_SECRET_KEY ile HMAC-SHA256)
+  curl -X POST https://app.emlaksoft.com/api/iyzico/webhook \
+    -H "Content-Type: application/json" \
+    -H "x-iyzi-signature: <hesaplanan-imza>" \
+    -d '{"status":"SUCCESS","paymentId":"test123"}'
+  ```
+- [ ] Komisyon tahsilat kaydı oluştu mu?
+- [ ] `ALLOW_PAYMENT_LINK_DEMO=0` prod'da set edildi mi?
+
+### Supabase Storage Bucket Kurulumu
+- [ ] Supabase Dashboard → Storage → New bucket
+  - Name: `customer-files`
+  - Public: **HAYIR** (private)
+  - File size limit: 10MB
+- [ ] RLS policy SQL çalıştır:
+  ```sql
+  create policy "Tenant isolated access"
+  on storage.objects for all
+  using (
+    bucket_id = 'customer-files'
+    and (storage.foldername(name))[1] = (auth.jwt()->>'tenant_id')::text
+  );
+  ```
+- [ ] Test: Müşteri sayfasından dosya upload → download çalışıyor mu?
 
 ### Realtime
 - [ ] Bildirim geldi mi (browser tab)
@@ -190,10 +221,21 @@ curl -X GET https://app.emlaksoft.com/api/cron/gunluk-ozet \
 - [ ] Cron job success rates
 
 ### Immediate Fixes
-- iyzico webhook test (prod merchant ID)
-- CRON_SECRET rotation policy
-- Storage bucket size monitoring
-- Database backup strategy
+- iyzico webhook test (prod merchant ID — IYZICO_MERCHANT_ID env'e ekle)
+- CRON_SECRET rotation: 90 günde bir yeni generate et
+- Storage bucket size monitoring: Supabase dashboard'dan izle
+- Database backup: Supabase otomatik daily backup (pro plan)
+- Endeksa/Tapusor prod anahtarları: `/admin/sistem` → DB'ye kaydet
+- VAPID keys generate: `npx web-push generate-vapid-keys` → Vercel env'e ekle
+
+### Değerleme API Prod Test
+```bash
+# Endeksa/Tapusor anahtarları /admin/sistem'den DB'ye kaydedildikten sonra:
+# 1. /app/degerleme sayfasına git
+# 2. Adres gir ve "Değerle" butonuna bas
+# 3. Endeksa/Tapusor badge'lerinin yeşil olduğunu doğrula
+# 4. Sonuç fiyat bandı görünüyor mu kontrol et
+```
 
 ### Next Sprint
 - A2: iyzico webhook sertleştirme

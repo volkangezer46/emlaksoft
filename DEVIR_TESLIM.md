@@ -91,6 +91,24 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 
 ## Bu sohbette tamamlanan işler
 
+### 12) Eksik görevler 3D + 3E tamamlandı (24 Temmuz 2026)
+
+**Build: ✓ 0 hata, 69 sayfa**
+
+#### 3D — Dashboard yetki belgesi uyarısı
+- `src/app/app/page.tsx` — `properties.authority_expires_at` kolonu paralel sorguya eklendi
+- 15 gün içinde dolacak portföyler varsa hero card üstünde amber uyarı kartı gösterilir
+- 5 gün veya daha az kalanlar kırmızı bold ile vurgulanır
+- Portföy adı tıklanınca ilgili portföy detay sayfasına gider
+
+#### 3E — Portföy toplu durum güncelleme
+- `src/app/actions/bulk-property.ts` — `bulkUpdatePropertyStatus` server action
+- `src/app/app/portfoyler/property-bulk-actions.tsx` — checkbox listesi + durum dropdown client component
+- `src/app/app/portfoyler/page.tsx` — `PropertyBulkActions` import edildi; portföy listesinin üstüne `<details>` accordion içinde entegre edildi
+- Tek seferde max 50 portföy, durum geçmişi + audit log yazılır, `revalidatePath` ile sayfa yenilenir
+
+---
+
 ### 11) Performans optimizasyonu + eksik özellikler (23 Temmuz 2026)
 
 **Build: ✓ 0 hata, 69 sayfa**
@@ -127,10 +145,6 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 - **3A — Müşteri 360 portföy öneri widget'ı**: `src/app/app/musteriler/[id]/matched-properties-widget.tsx` — müşterinin aktif taleplerini portföylerle skor ≥ 45 ile eşleştirir, üst 6'yı gösterir ✅
 - **3B — Portföy tam metin arama**: `portfoyler/page.tsx` sunucu tarafında `ilike` filtresi eklendi (`property_code`, `title` kolonları) ✅
 - **3C — Müşteri kaynak raporu**: `raporlar/page.tsx` — `customers.source` sorgusunu paralel çeker, bar grafikle kaynak dağılımını gösterir ✅
-
-#### Kalan görevler (eve geçince devam)
-- **3D** — `src/app/app/page.tsx` dashboard'a yetki belgesi 15 gün içinde dolacak portföyler için uyarı kartı ekle (`properties.authority_expires_at` kolonu)
-- **3E** — `src/app/app/portfoyler/page.tsx` checkbox + toplu durum güncelleme (client component gerektirir)
 
 ### 10) Admin aktivite kaydı + danışman sohbet export (23 Temmuz 2026)
 - `supabase/migrations/20260723000027_platform_audit_logs.sql` — `platform_audit_logs` tablosu, RLS (platform_staff okur, service_role yazar) → production'a uygulandı ✅

@@ -13,6 +13,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { NewPropertyDialog } from "./new-property-dialog";
+import { PropertyBulkActions } from "./property-bulk-actions";
 
 type PropertyRow = {
   id: string;
@@ -231,6 +232,26 @@ export default async function PropertiesPage({
           <Link href="/app/portfoyler" className="mt-5 rounded-[10px] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white">Filtreyi temizle</Link>
         </div>
       ) : (
+        <>
+        {/* Toplu düzenleme bölümü */}
+        <details className="group rounded-[16px] border border-line bg-surface">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-text-muted transition hover:text-ink-950 [&::-webkit-details-marker]:hidden">
+            <span>Toplu durum güncelle</span>
+            <span className="rounded-full bg-canvas px-2 py-0.5 text-xs text-text-faint group-open:hidden">{properties.length} portföy</span>
+            <span className="hidden rounded-full bg-brand-600/10 px-2 py-0.5 text-xs text-brand-600 group-open:block">Kapat</span>
+          </summary>
+          <div className="border-t border-line px-4 pb-4 pt-3">
+            <PropertyBulkActions
+              properties={properties.map((p) => ({
+                id: p.id,
+                property_code: p.property_code,
+                title: p.title,
+                status: p.status,
+              }))}
+            />
+          </div>
+        </details>
+
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {properties.map((property) => {
             const portals = property.portal_listings ?? [];
@@ -268,6 +289,7 @@ export default async function PropertiesPage({
             );
           })}
         </div>
+        </>
       )}
     </div>
   );
