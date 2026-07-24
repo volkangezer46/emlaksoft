@@ -15,7 +15,7 @@ import { LiveOfficeStrip } from "@/components/app/live-office-strip";
 import { RealtimeRefresh } from "@/components/app/realtime-refresh";
 import { listMyNotifications } from "@/app/actions/notifications";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { getCachedOfficeScore } from "@/lib/office-score";
+import { getOfficeScoreCached } from "@/lib/office-score";
 import { IMPERSONATE_COOKIE } from "@/lib/impersonation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { effectiveCanAccessModule, getEffectivePermissions } from "@/lib/permissions-effective";
@@ -87,9 +87,9 @@ export default async function AppLayout({
   let notifications: Awaited<ReturnType<typeof listMyNotifications>> = [];
 
   if (user && profile?.tenant_id) {
-    // Skor (istek başına cache'li — dashboard ile paylaşılır) + bildirimler paralel
+    // Skor (navigasyonlar arası cache'li, 3 dk) + bildirimler paralel
     const [scoreComputed, notifResult] = await Promise.all([
-      getCachedOfficeScore().catch(() => null),
+      getOfficeScoreCached(profile.tenant_id as string).catch(() => null),
       listMyNotifications().catch(() => []),
     ]);
     if (scoreComputed) {

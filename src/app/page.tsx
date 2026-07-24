@@ -296,7 +296,7 @@ export default function HomePage() {
             <div className="pointer-events-none absolute inset-x-10 top-6 -z-10 h-72 glow-conic opacity-70" />
             <Reveal variant="scale">
               <div className="perspective">
-                <div className="relative">
+                <div className="premium-ring relative">
                   <DashboardMock />
                   {/* floating chips */}
                   <div className="animate-float absolute -left-4 top-10 hidden w-52 rounded-[16px] border border-line bg-surface/90 p-3.5 shadow-[var(--shadow-card)] backdrop-blur md:block">

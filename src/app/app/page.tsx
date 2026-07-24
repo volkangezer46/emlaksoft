@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { moneyTry } from "@/lib/leak-shield";
-import { getCachedOfficeScore } from "@/lib/office-score";
+import { getCachedOfficeScore, getOfficeScoreCached } from "@/lib/office-score";
 import { requireModulePage } from "@/lib/require-module-page";
 
 type Kpi = {
@@ -109,7 +109,7 @@ function weekBuckets(dates: string[], weeks = 7) {
 }
 
 export default async function AppHomePage() {
-  await requireModulePage("dashboard");
+  const { tenantId } = await requireModulePage("dashboard");
   const supabase = await createClient();
   const {
     data: { user },
@@ -343,7 +343,7 @@ export default async function AppHomePage() {
       ? 100
       : Math.round((((liveListings ?? []).length - overdueListings.length) / (liveListings ?? []).length) * 100);
 
-  const officeScore = await getCachedOfficeScore();
+  const officeScore = tenantId ? await getOfficeScoreCached(tenantId) : await getCachedOfficeScore();
 
   const tasks: { t: string; meta: string; tone: "brand" | "warn" | "amber" | "mint" }[] = [
     ...overdueListings.slice(0, 3).map((r) => ({
