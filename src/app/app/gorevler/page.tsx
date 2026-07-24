@@ -44,7 +44,7 @@ export default async function TasksPage({
   let query = supabase
     .from("tasks")
     .select(
-      "id, title, notes, kind, priority, status, due_at, assigned_to, customer_id, created_at, assignee:profiles!tasks_assigned_to_fkey(full_name), customer:customers(full_name)",
+      "id, title, notes, kind, priority, status, due_at, assigned_to, customer_id, property_id, created_at, assignee:profiles!tasks_assigned_to_fkey(full_name), customer:customers(full_name)",
     )
     .eq("tenant_id", ctx.tenantId);
 

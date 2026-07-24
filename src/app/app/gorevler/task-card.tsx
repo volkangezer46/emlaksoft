@@ -13,6 +13,7 @@ export type TaskRow = {
   status: string;
   due_at: string | null;
   customer_id: string | null;
+  property_id: string | null;
   assignee: Rel;
   customer: Rel;
 };
@@ -48,13 +49,21 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
   const assignee = relName(task.assignee);
   const customer = relName(task.customer);
   const highPr = task.priority === "high";
+  const href = task.customer_id
+    ? `/app/musteriler/${task.customer_id}`
+    : task.property_id
+      ? `/app/portfoyler/${task.property_id}`
+      : null;
 
   return (
     <article
-      className={`flex items-start gap-3 rounded-[16px] border bg-surface px-4 py-3.5 transition ${
+      className={`group relative flex items-start gap-3 rounded-[16px] border bg-surface px-4 py-3.5 transition ${
         done ? "border-line opacity-70" : highPr ? "border-danger-500/25" : "border-line"
       }`}
     >
+      {href ? (
+        <Link href={href} className="absolute inset-0 rounded-[16px]" aria-label={`${task.title} kaydını aç`} />
+      ) : null}
       <span
         className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-[11px] ${
           done ? "bg-mint-500/10 text-mint-600" : "bg-brand-600/10 text-brand-600"
@@ -84,7 +93,7 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
           {customer ? (
             <Link
               href={`/app/musteriler/${task.customer_id}`}
-              className="flex items-center gap-1 font-semibold text-brand-600 hover:underline"
+              className="relative z-10 flex items-center gap-1 font-semibold text-brand-600 hover:underline"
             >
               {customer}
             </Link>
@@ -92,7 +101,7 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="relative z-10 flex shrink-0 items-center gap-1.5">
         {canEdit ? (
           done ? (
             <form action={reopenTask}>

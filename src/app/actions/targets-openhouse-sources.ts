@@ -140,7 +140,7 @@ export async function listOpenHouses() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("open_houses")
-    .select("id, scheduled_at, duration_min, location, status, visitor_count, max_visitors, notes, property:properties(property_code, title)")
+    .select("id, scheduled_at, duration_min, location, status, visitor_count, max_visitors, notes, property:properties(id, property_code, title)")
     .eq("tenant_id", gate.tenantId)
     .order("scheduled_at", { ascending: false })
     .limit(50);

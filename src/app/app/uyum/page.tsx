@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -62,10 +63,15 @@ export default async function CompliancePage() {
           ) : (
             <div className="mt-4 space-y-2">
               {(consents ?? []).map((c) => {
-                const cust = c.customer as { full_name?: string } | { full_name?: string }[] | null;
-                const name = Array.isArray(cust) ? cust[0]?.full_name : cust?.full_name;
+                const cust = c.customer as { id?: string; full_name?: string } | { id?: string; full_name?: string }[] | null;
+                const custRow = Array.isArray(cust) ? cust[0] : cust;
+                const name = custRow?.full_name;
+                const custId = custRow?.id;
                 return (
-                  <div key={c.id} className="flex items-center justify-between rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5 text-sm">
+                  <div key={c.id} className="group relative flex items-center justify-between rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5 text-sm">
+                    {custId ? (
+                      <Link href={`/app/musteriler/${custId}`} className="absolute inset-0 rounded-[12px]" aria-label={`${name ?? "Müşteri"} kaydını aç`} />
+                    ) : null}
                     <div>
                       <p className="font-semibold text-ink-950">{name ?? "Müşteri"}</p>
                       <p className="text-xs text-text-muted">{channelLabel[c.channel] ?? c.channel}</p>

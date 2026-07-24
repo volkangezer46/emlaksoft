@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Activity, CreditCard, FileText, TrendingUp } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
@@ -38,10 +39,14 @@ const statusColor: Record<string, string> = {
   paused: "var(--cyan-400)",
 };
 
-type Rel = { name?: string } | { name?: string }[] | null;
+type Rel = { id?: string; name?: string } | { id?: string; name?: string }[] | null;
 function nameOf(v: Rel) {
   if (!v) return "—";
   return Array.isArray(v) ? (v[0]?.name ?? "—") : (v.name ?? "—");
+}
+function idOf(v: Rel) {
+  if (!v) return null;
+  return Array.isArray(v) ? (v[0]?.id ?? null) : (v.id ?? null);
 }
 
 function money(n: number) {
@@ -55,12 +60,12 @@ export default async function AdminBillingPage() {
   const [{ data: subs }, { data: invoices }] = await Promise.all([
     admin
       .from("subscriptions")
-      .select("id, plan, status, billing_cycle, amount_try, trial_ends_at, current_period_end, created_at, tenant:tenants(name)")
+      .select("id, plan, status, billing_cycle, amount_try, trial_ends_at, current_period_end, created_at, tenant:tenants(id, name)")
       .order("created_at", { ascending: false })
       .limit(500),
     admin
       .from("invoices")
-      .select("id, invoice_no, status, total_try, due_at, paid_at, created_at, tenant:tenants(name)")
+      .select("id, invoice_no, status, total_try, due_at, paid_at, created_at, tenant:tenants(id, name)")
       .order("created_at", { ascending: false })
       .limit(100),
   ]);
@@ -245,8 +250,13 @@ export default async function AdminBillingPage() {
             </h2>
           </div>
           <div className="divide-y divide-line">
-            {subRows.map((s) => (
-              <div key={s.id} className="grid gap-2 px-5 py-3 transition hover:bg-brand-600/[0.02] sm:grid-cols-[1.2fr_.8fr_.7fr_.7fr] sm:items-center">
+            {subRows.map((s) => {
+              const tenantId = idOf(s.tenant as Rel);
+              return (
+              <div key={s.id} className="group relative grid gap-2 px-5 py-3 transition hover:bg-brand-600/[0.02] sm:grid-cols-[1.2fr_.8fr_.7fr_.7fr] sm:items-center">
+                {tenantId ? (
+                  <Link href={`/admin/tenants/${tenantId}`} className="absolute inset-0" aria-label={`${nameOf(s.tenant as Rel)} kaydını aç`} />
+                ) : null}
                 <p className="text-sm font-semibold text-ink-950">{nameOf(s.tenant as Rel)}</p>
                 <p className="text-xs text-text-muted">{planLabel[s.plan] ?? s.plan} · {s.billing_cycle}</p>
                 <p className="text-xs font-semibold text-ink-950">{money(Number(s.amount_try))}</p>
@@ -254,7 +264,8 @@ export default async function AdminBillingPage() {
                   {subStatus[s.status] ?? s.status}
                 </span>
               </div>
-            ))}
+              );
+            })}
             {subRows.length === 0 ? <p className="px-5 py-10 text-center text-sm text-text-muted">Abonelik kaydı yok.</p> : null}
           </div>
         </section>
@@ -272,8 +283,13 @@ export default async function AdminBillingPage() {
           </p>
         ) : (
           <div className="divide-y divide-line">
-            {invRows.map((inv) => (
-              <div key={inv.id} className="grid gap-2 px-5 py-3 sm:grid-cols-[1fr_.7fr_.7fr_.7fr] sm:items-center">
+            {invRows.map((inv) => {
+              const tenantId = idOf(inv.tenant as Rel);
+              return (
+              <div key={inv.id} className="group relative grid gap-2 px-5 py-3 transition hover:bg-brand-600/[0.02] sm:grid-cols-[1fr_.7fr_.7fr_.7fr] sm:items-center">
+                {tenantId ? (
+                  <Link href={`/admin/tenants/${tenantId}`} className="absolute inset-0" aria-label={`${inv.invoice_no} faturasının müşterisini aç`} />
+                ) : null}
                 <div>
                   <p className="text-sm font-semibold text-ink-950">{inv.invoice_no}</p>
                   <p className="text-xs text-text-muted">{nameOf(inv.tenant as Rel)}</p>
@@ -286,7 +302,8 @@ export default async function AdminBillingPage() {
                   {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(inv.created_at))}
                 </p>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

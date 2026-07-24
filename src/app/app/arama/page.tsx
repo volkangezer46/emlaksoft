@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   Activity,
   Clock3,
@@ -20,12 +21,17 @@ type CallRow = {
   disposition: string | null;
   notes: string | null;
   started_at: string;
-  customer: { full_name: string } | { full_name: string }[] | null;
+  customer: { id: string; full_name: string } | { id: string; full_name: string }[] | null;
 };
 
 function customerName(value: CallRow["customer"]) {
   if (!value) return "Bilinmeyen arayan";
   return Array.isArray(value) ? (value[0]?.full_name ?? "Bilinmeyen arayan") : value.full_name;
+}
+
+function customerId(value: CallRow["customer"]) {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0]?.id ?? null) : value.id;
 }
 
 function duration(value: number | null) {
@@ -41,7 +47,7 @@ export default async function PhoneOsPage() {
   const [{ data: calls }, { data: customers }, { data: demands }] = await Promise.all([
     supabase
       .from("calls")
-      .select("id, direction, phone, duration_sec, disposition, notes, started_at, customer:customers(full_name)")
+      .select("id, direction, phone, duration_sec, disposition, notes, started_at, customer:customers(id, full_name)")
       .order("started_at", { ascending: false })
       .limit(100),
     supabase
@@ -147,8 +153,12 @@ export default async function PhoneOsPage() {
           <div className="divide-y divide-line">
             {rows.map((call) => {
               const DirectionIcon = call.direction === "inbound" ? PhoneIncoming : call.direction === "outbound" ? PhoneOutgoing : PhoneMissed;
+              const custId = customerId(call.customer);
               return (
-                <article key={call.id} className="grid gap-3 px-5 py-4 transition hover:bg-brand-600/[0.02] md:grid-cols-[1.2fr_.8fr_.8fr_.7fr] md:items-center">
+                <article key={call.id} className="group relative grid gap-3 px-5 py-4 transition hover:bg-brand-600/[0.02] md:grid-cols-[1.2fr_.8fr_.8fr_.7fr] md:items-center">
+                  {custId ? (
+                    <Link href={`/app/musteriler/${custId}`} className="absolute inset-0" aria-label={`${customerName(call.customer)} müşterisini aç`} />
+                  ) : null}
                   <div className="flex items-center gap-3"><span className={`grid h-10 w-10 place-items-center rounded-[11px] ${call.direction === "missed" ? "bg-danger-500/10 text-danger-500" : "bg-brand-600/10 text-brand-600"}`}><DirectionIcon className="h-4 w-4" /></span><div><p className="text-sm font-semibold text-ink-950">{customerName(call.customer)}</p><p className="text-xs tabular-nums text-text-muted">{formatTurkishPhone(call.phone)}</p></div></div>
                   <div><p className="text-[10px] text-text-faint">Sonuç</p><p className="text-xs font-semibold text-ink-950">{call.disposition ?? "Cevapsız"}</p></div>
                   <div><p className="text-[10px] text-text-faint">Süre</p><p className="text-xs font-semibold tabular-nums text-ink-950">{duration(call.duration_sec)}</p></div>

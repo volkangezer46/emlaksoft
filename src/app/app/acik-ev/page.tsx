@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { DoorOpen, Users, CalendarDays, MapPin } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listOpenHouses } from "@/app/actions/targets-openhouse-sources";
@@ -9,10 +10,18 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "İptal",
 };
 
-function propertyLabel(p: { property_code: string; title: string | null } | { property_code: string; title: string | null }[] | null) {
+type PropertyRel = { id: string; property_code: string; title: string | null } | { id: string; property_code: string; title: string | null }[] | null;
+
+function propertyLabel(p: PropertyRel) {
   if (!p) return "—";
   const item = Array.isArray(p) ? p[0] : p;
   return item?.title ?? item?.property_code ?? "—";
+}
+
+function propertyId(p: PropertyRel) {
+  if (!p) return null;
+  const item = Array.isArray(p) ? p[0] : p;
+  return item?.id ?? null;
 }
 
 export default async function AcikEvPage() {
@@ -67,8 +76,12 @@ export default async function AcikEvPage() {
               completed: "bg-zinc-100 text-zinc-600",
               cancelled: "bg-red-50 text-red-600",
             };
+            const propId = propertyId(e.property);
             return (
-              <div key={e.id} className="rounded-[20px] border border-line bg-surface p-5">
+              <div key={e.id} className="group relative rounded-[20px] border border-line bg-surface p-5">
+                {propId ? (
+                  <Link href={`/app/portfoyler/${propId}`} className="absolute inset-0 rounded-[20px]" aria-label={`${propertyLabel(e.property)} portföyünü aç`} />
+                ) : null}
                 <div className="flex items-start justify-between gap-2">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-brand-600/10 text-brand-600">
                     <DoorOpen className="h-5 w-5" />

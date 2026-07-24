@@ -54,15 +54,18 @@ function initials(name: string) {
 }
 
 export default async function TeamPage() {
-  const { perms } = await requireModulePage("team");
+  const { perms, tenantId } = await requireModulePage("team");
   const canManage = (perms.team ?? []).includes("create");
   const supabase = await createClient();
 
-  const [{ data: membersData }, { data: branchesData }, { data: provincesData }, { data: customersData }] = await Promise.all([
+  const [{ data: membersData }, { data: branchesData }, { data: provincesData }, { data: advisorCounts }] = await Promise.all([
     supabase.from("profiles").select("id, full_name, phone, role, is_active, created_at, branch_id, branch:branches(name)").order("created_at", { ascending: true }).limit(500),
     supabase.from("branches").select("id, name, is_active, province_id, province:geo_provinces(name)").order("created_at", { ascending: true }).limit(200),
     supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
-    supabase.from("customers").select("assigned_to").is("deleted_at", null).limit(10000),
+    // Danışman başına müşteri sayısı — aggregate (10.000 satır yerine ~N satır)
+    tenantId
+      ? supabase.rpc("customer_counts_by_advisor", { p_tenant_id: tenantId })
+      : Promise.resolve({ data: [] as { assigned_to: string; cnt: number }[] }),
   ]);
 
   const members = (membersData ?? []) as Member[];
@@ -70,8 +73,8 @@ export default async function TeamPage() {
   const provinces = provincesData ?? [];
 
   const assignedCount = new Map<string, number>();
-  (customersData ?? []).forEach((c: { assigned_to: string | null }) => {
-    if (c.assigned_to) assignedCount.set(c.assigned_to, (assignedCount.get(c.assigned_to) ?? 0) + 1);
+  ((advisorCounts ?? []) as { assigned_to: string; cnt: number }[]).forEach((r) => {
+    if (r.assigned_to) assignedCount.set(r.assigned_to, Number(r.cnt));
   });
 
   const activeCount = members.filter((m) => m.is_active).length;

@@ -26,11 +26,11 @@ type Closure = {
   portal_listing: {
     portal_name: string;
     portal_listing_id: string | null;
-    property: { property_code: string; title: string | null } | { property_code: string; title: string | null }[] | null;
+    property: { id: string; property_code: string; title: string | null } | { id: string; property_code: string; title: string | null }[] | null;
   } | {
     portal_name: string;
     portal_listing_id: string | null;
-    property: { property_code: string; title: string | null } | { property_code: string; title: string | null }[] | null;
+    property: { id: string; property_code: string; title: string | null } | { id: string; property_code: string; title: string | null }[] | null;
   }[] | null;
 };
 
@@ -59,7 +59,7 @@ export default async function LeakShieldPage() {
     supabase
       .from("listing_closures")
       .select(
-        "id, reason, deal_happened, deal_amount, closed_by_us, competitor_closed, estimated_lost_commission, created_at, portal_listing:portal_listings(portal_name, portal_listing_id, property:properties(property_code, title))",
+        "id, reason, deal_happened, deal_amount, closed_by_us, competitor_closed, estimated_lost_commission, created_at, portal_listing:portal_listings(portal_name, portal_listing_id, property:properties(id, property_code, title))",
       )
       .order("created_at", { ascending: false })
       .limit(100),
@@ -285,7 +285,10 @@ export default async function LeakShieldPage() {
               const prop = propertyOf(r);
               const lost = Number(r.estimated_lost_commission || 0);
               return (
-                <article key={r.id} className="grid gap-3 px-5 py-4 sm:grid-cols-[1.4fr_.8fr_.7fr] sm:items-center">
+                <article key={r.id} className="group relative grid gap-3 px-5 py-4 transition hover:bg-brand-600/[0.02] sm:grid-cols-[1.4fr_.8fr_.7fr] sm:items-center">
+                  {prop?.id ? (
+                    <Link href={`/app/portfoyler/${prop.id}`} className="absolute inset-0" aria-label={`${prop.property_code ?? "Portföy"} kaydını aç`} />
+                  ) : null}
                   <div>
                     <p className="text-sm font-semibold text-ink-950">
                       {listing?.portal_name ?? "Portal"}{" "}
