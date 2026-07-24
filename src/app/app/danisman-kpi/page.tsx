@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { TrendingUp, Users, Phone, Target, Trophy, BarChart3 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -171,14 +172,15 @@ export default async function DanismanKpiPage() {
               </thead>
               <tbody>
                 {advisors.map((a, i) => (
-                  <tr key={a.id} className="border-b border-line last:border-0 hover:bg-canvas/40 transition">
+                  <tr key={a.id} className="group relative cursor-pointer border-b border-line last:border-0 hover:bg-brand-600/[0.03] transition">
                     <td className="px-5 py-3.5">
                       <span className={`font-display font-bold ${i === 0 ? "text-amber-500" : i === 1 ? "text-zinc-400" : i === 2 ? "text-amber-700" : "text-text-faint"}`}>
                         {i + 1}
                       </span>
                     </td>
                     <td className="px-4 py-3.5">
-                      <p className="font-semibold text-ink-950">{a.full_name}</p>
+                      <Link href={`/app/ekip/${a.id}`} className="absolute inset-0" aria-label={`${a.full_name} danışman detayı`} />
+                      <p className="font-semibold text-ink-950 group-hover:text-brand-600">{a.full_name}</p>
                       <p className="text-[10px] text-text-faint capitalize">{a.role}</p>
                     </td>
                     <td className="px-4 py-3.5 text-text-muted">{a.customerCount}</td>

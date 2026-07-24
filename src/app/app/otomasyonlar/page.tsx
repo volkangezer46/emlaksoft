@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Zap, Play, Pause, BarChart3 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -134,14 +135,15 @@ export default async function OtomasyonlarPage() {
             {rows.map((r) => {
               const acts = Array.isArray(r.actions) ? r.actions : [];
               return (
-                <div key={r.id} className="flex items-center gap-3 px-5 py-3.5 transition hover:bg-canvas/40">
+                <div key={r.id} className="group relative flex items-center gap-3 px-5 py-3.5 transition hover:bg-brand-600/[0.03]">
+                  <Link href={`/app/otomasyonlar/${r.id}`} className="absolute inset-0" aria-label={`${r.name} otomasyon detayı`} />
                   <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[9px] ${
                     r.status === "active" ? "bg-mint-500/12 text-mint-600" : "bg-zinc-100 text-zinc-400"
                   }`}>
                     {r.status === "active" ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold text-ink-950">{r.name}</p>
+                    <p className="truncate font-semibold text-ink-950 group-hover:text-brand-600">{r.name}</p>
                     <p className="text-xs text-text-muted">
                       {TRIGGER_LABELS[r.trigger_type] ?? r.trigger_type}
                       {acts.length > 0 && ` → ${acts.map((a) => ACTION_LABELS[a.type] ?? a.type).join(", ")}`}
@@ -162,7 +164,9 @@ export default async function OtomasyonlarPage() {
                   }`}>
                     {r.status === "active" ? "Aktif" : r.status === "draft" ? "Taslak" : "Pasif"}
                   </span>
-                  <AutomationRowActions row={r} />
+                  <div className="relative z-10">
+                    <AutomationRowActions row={r} />
+                  </div>
                 </div>
               );
             })}

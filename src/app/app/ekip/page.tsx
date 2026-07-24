@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  ArrowUpRight,
   Building2,
   Crown,
   Fingerprint,
@@ -248,7 +249,10 @@ export default async function TeamPage() {
                     {isOwner ? <span className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full border-2 border-white bg-amber-400 text-ink-950"><Crown className="h-2.5 w-2.5" /></span> : null}
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink-950">{m.full_name}</p>
+                    <Link href={`/app/ekip/${m.id}`} className="group inline-flex items-center gap-1 truncate text-sm font-semibold text-ink-950 transition hover:text-brand-600">
+                      <span className="truncate">{m.full_name}</span>
+                      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 opacity-0 transition group-hover:opacity-100" />
+                    </Link>
                     <p className="mt-0.5 truncate text-xs text-text-muted">{m.phone ? formatTurkishPhone(m.phone) : "Telefon yok"}{relName(m.branch) ? ` · ${relName(m.branch)}` : ""}</p>
                   </div>
                 </div>

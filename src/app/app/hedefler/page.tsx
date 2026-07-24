@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { TrendingUp } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listTargets } from "@/app/actions/targets-openhouse-sources";
@@ -45,12 +46,17 @@ export default async function HedeflerPage() {
             const dealPct    = pct(t.actual_deals, t.target_deals);
             const revPct     = pct(Number(t.actual_revenue), Number(t.target_revenue));
             const period     = new Date(t.period_start).toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
+            const prof       = Array.isArray(t.profile) ? t.profile[0] : t.profile;
+            const profId     = (prof as { id?: string } | null)?.id ?? null;
             return (
-              <div key={t.id} className="rounded-[20px] border border-line bg-surface p-5">
+              <div key={t.id} className="group relative rounded-[20px] border border-line bg-surface p-5 transition hover:border-brand-400/40">
+                {profId ? (
+                  <Link href={`/app/ekip/${profId}`} className="absolute inset-0 rounded-[20px]" aria-label={`${profileLabel(t.profile)} danışman detayı`} />
+                ) : null}
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs font-semibold text-text-muted">{period}</p>
-                    <p className="mt-0.5 font-display font-bold text-ink-950">{profileLabel(t.profile)}</p>
+                    <p className="mt-0.5 font-display font-bold text-ink-950 group-hover:text-brand-600">{profileLabel(t.profile)}</p>
                   </div>
                   <span className="rounded-full bg-brand-600/10 px-2 py-1 text-[10px] font-bold text-brand-600">
                     {t.period === "monthly" ? "Aylık" : t.period === "quarterly" ? "Çeyrek" : "Yıllık"}

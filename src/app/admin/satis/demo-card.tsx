@@ -115,7 +115,10 @@ export function DemoCard({ row, staff }: { row: DemoRow; staff: { id: string; fu
     <div className={`dashboard-panel rounded-[16px] border border-line bg-surface p-4 transition ${pending ? "opacity-60" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate font-display font-bold text-ink-950">{row.full_name}</p>
+          <Link href={`/admin/satis/${row.id}`} className="group inline-flex max-w-full items-center gap-1 truncate font-display font-bold text-ink-950 transition hover:text-brand-600">
+            <span className="truncate">{row.full_name}</span>
+            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 opacity-0 transition group-hover:opacity-100" />
+          </Link>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-text-faint">
             {row.company ? <span className="flex items-center gap-1"><Building2 className="h-3 w-3" /> {row.company}</span> : null}
             {row.city ? <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {row.city}</span> : null}
