@@ -96,6 +96,34 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 
 ## Bu sohbette tamamlanan işler
 
+### 17) Tıklanabilirlik + full responsive + yeni modüller + CANLIYA ALINDI (24 Temmuz 2026)
+
+**Build: ✓ 0 hata.** 3 paralel keşif ajanı (tıklanabilirlik / responsive / rakip analizi) → bulgular uygulandı → **production'a deploy edildi.**
+
+#### 🚀 Canlıya alma
+- `git push origin main` → Vercel otomatik production deploy tetiklendi (commit `073b3c2`)
+- Migration **036** (hotpath indexes) + **037** (rate_limits + check_rate_limit RPC) production DB'ye **uygulandı** ✅
+
+#### Tıklanabilir kayıtlar (stretched-link deseni, ekstra JS yok)
+- Müşteriler / Sözleşmeler / Teklifler tablo satırları artık **tamamen tıklanabilir** → detay
+- Admin ofis listesinden ofis adı → `/admin/tenants/[id]` detayına link (önceden hiç link yoktu)
+
+#### Yeni modüller
+- **Teklifler detay sayfası** `/app/teklifler/[id]` — durum aksiyonları (kabul/ret/karşı teklif/geri çek), ilişkili portföy+müşteri linkleri, zaman çizelgesi, liste fiyatına göre % fark. `getOffer` action + `OfferStatusActions`
+- **TÜFE Kira Artış Hesaplama** `/app/kira-artis` — 12 aylık ortalama TÜFE yasal tavanı (TBK m.344) otomatik uygular; yeni kira + aylık/yıllık fark; manuel oran + tavan kontrolü. `src/lib/tufe.ts` (TÜİK referans serisi 2024-2025, yeni ay verisi eklenebilir). Sidebar'a eklendi (valuation modülü)
+
+#### Full responsive
+- **4 modal** (teklif/sözleşme/kampanya/anlaşma) → mobil dikey scroll deseni (`items-start + overflow-y-auto + sm:items-center + my-auto`)
+- Komisyon hero grid `grid-cols-3` → `grid-cols-1 sm:grid-cols-3` (mobilde veri kesilmesi giderildi)
+- Bildirim menüleri (app+admin) → `w-[min(340px,calc(100vw-1.5rem))]` (dar ekranda taşma yok)
+- `globals.css` body'ye güvenlik amaçlı `overflow-x: hidden`
+- Denetim sonucu: 10 tablonun tamamı zaten `overflow-x-auto` ile responsive ✅
+
+#### Rakip analizi notları (gelecek turlar için, DEVIR'de saklı)
+Yüksek değerli sıradaki adaylar: gerçek WhatsApp Business API + inbox, harita üzerinde portföy (lat/lng), otomatik eşleştirme bildirimi (altyapı hazır — hızlı kazanım), lead skorlama, e-posta kanalı + kampanya şablonları, sözleşme merge-field şablon kütüphanesi, TAKBİS tapu sorgu UI, ilan performans analitiği, takvim senkronizasyonu (.ics).
+
+---
+
 ### 16) Kalan maddelerin kapatılması + derin performans turu (24 Temmuz 2026)
 
 **Build: ✓ 0 hata.** Sprint-15'te "bilinçli ertelendi" denen tüm maddeler kapatıldı + sistem geneli performans.
