@@ -87,7 +87,9 @@ Guard: `requirePlatformModule("...")`
 - `000034` — `tenants.logo_url`, `website` ✅ production'a uygulandı
 - `000035` — `customers.birth_date`, `anniversary_date` (index'li) ✅ production'a uygulandı
 - `000036` — hot-path composite index'ler (assigned_to, status vb.) ⚠️ **production'a uygulanacak**
-- `000037` — `rate_limits` tablosu + `check_rate_limit` RPC (public endpoint koruması) ⚠️ **production'a uygulanacak**
+- `000037` — `rate_limits` tablosu + `check_rate_limit` RPC (public endpoint koruması) ✅ production'a uygulandı
+- `000038` — `campaign_channel` enum'a `email` eklendi ✅ production'a uygulandı
+- `000039` — `property_dues` (aidat takibi) ✅ production'a uygulandı
 
 Rehber: `MIGRATION_GUIDE.md`  
 Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
@@ -95,6 +97,39 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 ---
 
 ## Bu sohbette tamamlanan işler
+
+### 18) "Hepsini sırayla yap" — 4 dalga özellik + bug fix turu (24 Temmuz 2026)
+
+**Build: ✓ 0 hata.** Rakip analizi + denetim bulgularının tamamı dalgalar halinde uygulandı, her dalga sonu commit + production deploy.
+
+#### DALGA 1 — Tıklanabilirlik + kritik bug
+- **Talepler / Randevular / Komisyon / Anlaşmalar** kartları stretched-link ile ilgili kayda (müşteri/portföy) tıklanabilir (Kampanyalar doğal hedefi olmadığı için atlandı)
+- **🐛 BUG: `customer-portal.ts` tamamen bozuktu** — `demands`/`matches`/`demand_type`/`provinces` gerçek şemayla eşleşmiyordu (müşteri portalı çalışmıyordu). `customer_demands` + `budget_min/max` + `geo_provinces`'e çevrildi; **matches tablosu yok** → aktif taleplere göre portföyler `scoreDemandProperty` ile anlık skorlanıyor
+
+#### DALGA 2 — Zeka katmanı
+- **Otomatik eşleştirme bildirimi** (`lib/match-notify`) — yeni portföy eklenince aktif taleplerle skorlanır, güçlü eşleşme (≥60) varsa danışmana ofis-içi bildirim + web push (`createProperty`'ye bağlandı)
+- **Lead skorlama** (`lib/lead-score`) — müşteri 360 sinyallerinden (telefon/e-posta/kaynak/talep/iletişim/randevu/güncellik) 0-100 skor + 🔥 Sıcak / 🌤️ Ilık / ❄️ Soğuk rozet, müşteri detay hero'da
+
+#### DALGA 3 — Entegrasyon & şablonlar
+- **TAKBİS/Tapusor ada-parsel sorgu paneli** — portföy detayında; `queryTapuInsight` action (DB-aware config); anahtar yoksa zarif kurulum yönlendirmesi. `getTapusorParcelInsight` DB anahtarını da destekler hale geldi
+- **Kampanya şablon kütüphanesi** (`lib/campaign-templates`, 7 hazır şablon) + **e-posta kanalı** (enum migration 038; sağlayıcı yapılandırılınca aktif)
+- **Sözleşme şablon kütüphanesi genişletildi** — teklif mektubu + hizmet/aracılık sözleşmesi (KVKK + TÜFE maddeli)
+
+#### DALGA 4 — Modüller & harita
+- **Yeni modül: Aidat & ortak gider takibi** `/app/aidat` — `property_dues` tablosu (migration 039), portföy bazlı aidat, ödendi/bekliyor/gecikti durumu, özet kartları, sidebar'a eklendi
+- **Harita**: portföy adresi → Google Maps "Haritada göster" linki (hafif)
+- **Takvim .ics + Google/Outlook senkronizasyonu** zaten tam implement edilmiş (`lib/calendar`, `addToGoogleCalendar` two-way dahil) — doğrulandı
+
+#### Deploy'da uygulanan migration'lar (production ✅)
+- `038` campaign_email_channel · `039` property_dues
+
+#### ⚠️ Kalan (harici bağımlılık / daha büyük — bilinçli ertelendi, dokümante)
+- **Portal görüntülenme/lead metrikleri** — gerçek portal (sahibinden/hepsiemlak) kurumsal API'si gerektirir. Mevcut portallar sayfası teyit sağlığı + portal başına kırılımı zaten gösteriyor
+- **Tam interaktif harita (pin/ısı haritası)** — `properties`'e `latitude/longitude` kolonu + adres geocoding servisi gerekir (harici). Şu an Google Maps linki mevcut
+- **Komisyon split editörü** — `commissions.splits` jsonb altyapısı var; görsel editör niş olduğu için ertelendi
+- **Gerçek WhatsApp Business API + inbox** — iskelet mevcut, kurumsal API gerekir
+
+---
 
 ### 17) Tıklanabilirlik + full responsive + yeni modüller + CANLIYA ALINDI (24 Temmuz 2026)
 
