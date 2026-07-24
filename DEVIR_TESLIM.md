@@ -124,7 +124,11 @@ Sabit-kodlu dropdown dizileri yerine **yönetilebilir DB tanımları**:
 
 > Genişletme: yeni bir dropdown eklerken kategoriyi `definitions`'a seed'le + sayfada `getDefinitions("...")` çağır + dialog'a prop geç (desen kurulu).
 
-**Sprint-29 (25 Temmuz):** Definitions'a **gider kategorisi** + **randevu tipi** eklendi (migration 043). Giderler formu/özeti/etiketleri ve randevu dialog türleri artık DB'den (DEFAULT yedekli). Toplam 7 kategori yönetilebilir: müşteri tipi/kaynağı, portföy tipi, işlem tipi, sözleşme tipi, gider kategorisi, randevu tipi.
+**Sprint-29 (25 Temmuz):** Definitions'a **gider kategorisi** + **randevu tipi** eklendi (migration 043). Giderler formu/özeti/etiketleri ve randevu dialog türleri artık DB'den (DEFAULT yedekli).
+
+**Sprint-30 (25 Temmuz):** Definitions'a **talep aciliyeti** + **destek kategorisi** eklendi (migration 044). Talep formu (işlem/portföy tipi mevcut kategoriler + aciliyet yeni) ve destek formu (kategori) DB'den. `Customer360Tabs` prop zinciriyle bağlandı. **Toplam 9 kategori yönetilebilir**: müşteri tipi/kaynağı, portföy tipi, işlem tipi, sözleşme tipi, gider kategorisi, randevu tipi, talep aciliyeti, destek kategorisi.
+
+> **İlke:** Değeri yalnızca gösterim/gruplama için kullanılan dropdown'lar DB-driven; iş akışı durumları (draft/signed/paid, ticket priority, deal stage vb. — kod bunlara göre dallanır) bilinçli sabit tutuldu (değiştirilmeleri mantığı bozar).
 
 ---
 
