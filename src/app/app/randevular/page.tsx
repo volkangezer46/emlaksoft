@@ -15,6 +15,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { setAppointmentStatus } from "@/app/actions/appointments";
 import { NewAppointmentDialog } from "./new-appointment-dialog";
 import { AddToCalendarButton } from "@/components/app/add-to-calendar-button";
+import { AppointmentCalendar } from "./appointment-calendar";
 
 type Rel = { full_name?: string; title?: string; property_code?: string } | { full_name?: string; title?: string; property_code?: string }[] | null;
 
@@ -151,6 +152,16 @@ export default async function AppointmentsPage() {
           </div>
         </div>
       </section>
+
+      {/* Takvim görünümü */}
+      <AppointmentCalendar
+        appointments={rows.map((r) => ({
+          id: r.id,
+          scheduled_at: r.scheduled_at,
+          appointment_type: r.appointment_type,
+          status: r.status,
+        }))}
+      />
 
       <div className="grid gap-4 xl:grid-cols-[1.55fr_1fr]">
         {/* timeline */}

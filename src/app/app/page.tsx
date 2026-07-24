@@ -131,6 +131,8 @@ export default async function AppHomePage() {
   const fifteenDaysFromNow = new Date();
   fifteenDaysFromNow.setDate(fifteenDaysFromNow.getDate() + 15);
 
+  const last24h = new Date(Date.now() - 86_400_000).toISOString();
+
   const [
     { count },
     { data: latest },
@@ -147,6 +149,10 @@ export default async function AppHomePage() {
     { data: auditLive },
     { data: customerDates },
     { data: expiringAuthority },
+    { data: recentCustomers24h },
+    { data: recentCalls24h },
+    { data: recentAppts24h },
+    { data: recentProperties24h },
   ] = await Promise.all([
     supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
     supabase
@@ -221,6 +227,18 @@ export default async function AppHomePage() {
       .gte("authority_expires_at", new Date().toISOString())
       .order("authority_expires_at", { ascending: true })
       .limit(10),
+    // Son 24s — müşteri eklemeler
+    supabase.from("customers").select("id, full_name, created_at").is("deleted_at", null)
+      .gte("created_at", last24h).order("created_at", { ascending: false }).limit(5),
+    // Son 24s — aramalar
+    supabase.from("calls").select("id, phone, direction, started_at").gte("started_at", last24h)
+      .order("started_at", { ascending: false }).limit(5),
+    // Son 24s — randevular
+    supabase.from("appointments").select("id, appointment_type, scheduled_at, status")
+      .gte("created_at", last24h).order("created_at", { ascending: false }).limit(5),
+    // Son 24s — yeni portföyler
+    supabase.from("properties").select("id, property_code, title, created_at").is("deleted_at", null)
+      .gte("created_at", last24h).order("created_at", { ascending: false }).limit(5),
   ]);
 
   const customerCount = count ?? 0;
@@ -404,6 +422,40 @@ export default async function AppHomePage() {
       spark: [0, 0, 0, 0, 0, 0, Math.max(0, Math.round(lostMonth / 1000))],
     },
   ];
+
+  // Son 24s unified aktivite feed
+  type FeedItem = { key: string; icon: string; text: string; time: string; tone: string };
+  const feed24h: FeedItem[] = [
+    ...(recentCustomers24h ?? []).map((c) => ({
+      key: `cust-${c.id}`,
+      icon: "👤",
+      text: `Yeni müşteri: ${c.full_name}`,
+      time: c.created_at,
+      tone: "text-brand-600",
+    })),
+    ...(recentProperties24h ?? []).map((p) => ({
+      key: `prop-${p.id}`,
+      icon: "🏠",
+      text: `Portföy eklendi: ${p.title ?? p.property_code}`,
+      time: p.created_at,
+      tone: "text-mint-600",
+    })),
+    ...(recentCalls24h ?? []).map((c) => ({
+      key: `call-${c.id}`,
+      icon: c.direction === "inbound" ? "📲" : "📞",
+      text: `${c.direction === "inbound" ? "Gelen" : "Giden"} arama: ${c.phone}`,
+      time: c.started_at,
+      tone: "text-cyan-600",
+    })),
+    ...(recentAppts24h ?? []).map((a) => ({
+      key: `appt-${a.id}`,
+      icon: "📅",
+      text: `Randevu: ${a.appointment_type === "showing" ? "Yer gösterme" : a.appointment_type}`,
+      time: a.scheduled_at,
+      tone: "text-amber-600",
+    })),
+  ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+   .slice(0, 8);
 
   const actionLabel: Record<string, string> = {
     "workflow.deal_won": "Satış kapandı",
@@ -867,29 +919,28 @@ export default async function AppHomePage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
-                <Zap className="h-4 w-4" /> Audit akışı
+                <Zap className="h-4 w-4" /> Canlı akış
               </p>
-              <h2 className="mt-1 font-display font-bold text-ink-950">Son işlemler</h2>
+              <h2 className="mt-1 font-display font-bold text-ink-950">Son 24 saat</h2>
             </div>
             <Link href="/app/denetim" className="text-[10px] font-semibold text-brand-600">
               Denetim
             </Link>
           </div>
-          <div className="relative mt-5 space-y-4 before:absolute before:bottom-2 before:left-[15px] before:top-2 before:w-px before:bg-line">
-            {(auditLive ?? []).length === 0 ? (
-              <p className="text-sm text-text-muted">Henüz audit kaydı yok.</p>
+          <div className="relative mt-5 space-y-3 before:absolute before:bottom-2 before:left-[15px] before:top-2 before:w-px before:bg-line">
+            {feed24h.length === 0 ? (
+              <p className="text-sm text-text-muted">Son 24 saatte aktivite yok.</p>
             ) : (
-              (auditLive ?? []).map((a) => (
-                <div key={a.id} className="relative flex gap-3">
-                  <span className="z-10 grid h-8 w-8 shrink-0 place-items-center rounded-[9px] border border-line bg-surface text-brand-600">
-                    <Zap className="h-3.5 w-3.5" />
+              feed24h.map((item) => (
+                <div key={item.key} className="relative flex gap-3">
+                  <span className="z-10 grid h-8 w-8 shrink-0 place-items-center rounded-[9px] border border-line bg-surface text-base">
+                    {item.icon}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold text-ink-950">{actionLabel[a.action] ?? a.action}</p>
-                    <p className="truncate text-[10px] text-text-muted">{a.entity_type ?? "—"}</p>
+                    <p className={`truncate text-xs font-semibold ${item.tone}`}>{item.text}</p>
                   </div>
-                  <span className="text-[9px] text-text-faint">
-                    {new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit" }).format(new Date(a.created_at))}
+                  <span className="shrink-0 text-[9px] text-text-faint">
+                    {new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit" }).format(new Date(item.time))}
                   </span>
                 </div>
               ))
