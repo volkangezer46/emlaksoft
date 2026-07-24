@@ -12,8 +12,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   property_type: "Portföy tipi",
   transaction_type: "İşlem tipi",
   contract_type: "Sözleşme tipi",
+  expense_category: "Gider kategorisi",
+  appointment_type: "Randevu tipi",
 };
-const ORDER = ["customer_type", "customer_source", "property_type", "transaction_type", "contract_type"];
+const ORDER = ["customer_type", "customer_source", "property_type", "transaction_type", "contract_type", "expense_category", "appointment_type"];
 
 export default async function DefinitionsPage() {
   const { tenantId } = await requireModulePage("settings");

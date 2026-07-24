@@ -18,7 +18,7 @@ type Option = { id: string; label: string };
 const fieldClass =
   "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
-const typeOptions = [
+const DEFAULT_TYPE_OPTIONS = [
   { value: "showing", label: "Yer gösterme" },
   { value: "office", label: "Ofis görüşmesi" },
   { value: "valuation", label: "Değerleme" },
@@ -28,9 +28,11 @@ const typeOptions = [
 export function NewAppointmentDialog({
   customers,
   properties,
+  typeOptions = DEFAULT_TYPE_OPTIONS,
 }: {
   customers: Option[];
   properties: Option[];
+  typeOptions?: { value: string; label: string }[];
 }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);

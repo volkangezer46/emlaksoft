@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { setAppointmentStatus } from "@/app/actions/appointments";
 import { NewAppointmentDialog } from "./new-appointment-dialog";
+import { getDefinitions } from "@/lib/definitions";
 import { AddToCalendarButton } from "@/components/app/add-to-calendar-button";
 import { AppointmentCalendar } from "./appointment-calendar";
 import Link from "next/link";
@@ -67,7 +68,7 @@ function initials(name: string) {
 export default async function AppointmentsPage() {
   await requireModulePage("appointments");
   const supabase = await createClient();
-  const [{ data: appts }, { data: customers }, { data: properties }] = await Promise.all([
+  const [{ data: appts }, { data: customers }, { data: properties }, apptTypeDefs] = await Promise.all([
     supabase
       .from("appointments")
       .select("id, appointment_type, scheduled_at, duration_min, location, status, notes, customer:customers(id, full_name), property:properties(id, title, property_code)")
@@ -76,7 +77,9 @@ export default async function AppointmentsPage() {
       .limit(100),
     supabase.from("customers").select("id, full_name").is("deleted_at", null).order("full_name"),
     supabase.from("properties").select("id, title, property_code").is("deleted_at", null).order("created_at", { ascending: false }),
+    getDefinitions("appointment_type"),
   ]);
+  const appointmentTypeOptions = apptTypeDefs.length > 0 ? apptTypeDefs.map((t) => ({ value: t.value, label: t.label })) : undefined;
 
   const rows = (appts ?? []) as AppointmentRow[];
   const customerOptions = (customers ?? []).map((c) => ({ id: c.id, label: c.full_name }));
@@ -116,7 +119,7 @@ export default async function AppointmentsPage() {
             <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Randevular & yer gösterme</h1>
             <p className="mt-1 text-sm text-white/60">Yer gösterme, görüşme ve tur planını tek akışta yönetin.</p>
           </div>
-          <NewAppointmentDialog customers={customerOptions} properties={propertyOptions} />
+          <NewAppointmentDialog customers={customerOptions} properties={propertyOptions} typeOptions={appointmentTypeOptions} />
         </div>
         <div className="relative mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
           <div className="grid grid-cols-3 gap-3">

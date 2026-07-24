@@ -6,7 +6,9 @@ export type DefinitionCategory =
   | "customer_source"
   | "property_type"
   | "transaction_type"
-  | "contract_type";
+  | "contract_type"
+  | "expense_category"
+  | "appointment_type";
 
 export type DefinitionItem = { value: string; label: string; color: string | null };
 

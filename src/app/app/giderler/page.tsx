@@ -2,6 +2,7 @@ import { Receipt, Plus, Trash2 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listExpenses, deleteExpense } from "@/app/actions/expenses";
 import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
+import { getDefinitions } from "@/lib/definitions";
 import { EmptyState } from "@/components/app/empty-state";
 
 // Inline server action wrappers — void return için form action uyumlu
@@ -23,11 +24,15 @@ function money(n: number) {
 
 export default async function GiderlerPage() {
   const { perms } = await requireModulePage("expenses");
-  const expenses = await listExpenses();
+  const [expenses, catDefs] = await Promise.all([listExpenses(), getDefinitions("expense_category")]);
   const canCreate = perms.expenses?.includes("create") ?? false;
 
+  // DB-driven gider kategorileri (boşsa sabit yedeğe düş)
+  const categories = catDefs.length > 0 ? catDefs.map((c) => ({ value: c.value, label: c.label })) : EXPENSE_CATEGORIES;
+  const catLabel = (v: string) => categories.find((c) => c.value === v)?.label ?? v;
+
   const total = expenses.reduce((s, e) => s + Number(e.amount), 0);
-  const byCategory = EXPENSE_CATEGORIES.map((c) => ({
+  const byCategory = categories.map((c) => ({
     ...c,
     total: expenses.filter((e) => e.category === c.value).reduce((s, e) => s + Number(e.amount), 0),
   }));
@@ -75,7 +80,7 @@ export default async function GiderlerPage() {
             <input name="title" required placeholder="Başlık" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
             <input name="amount" type="number" min="0" step="0.01" required placeholder="Tutar (TRY)" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
             <select name="category" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300">
-              {EXPENSE_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+              {categories.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
             <input name="expense_date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
             <input name="notes" placeholder="Not (opsiyonel)" className="sm:col-span-2 rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
@@ -111,7 +116,7 @@ export default async function GiderlerPage() {
                 {expenses.map((e) => (
                   <tr key={e.id} className="border-b border-line last:border-0 hover:bg-canvas/40">
                     <td className="px-5 py-3 font-semibold text-ink-950">{e.title}</td>
-                    <td className="px-4 py-3 text-text-muted">{EXPENSE_CATEGORIES.find((c) => c.value === e.category)?.label ?? e.category}</td>
+                    <td className="px-4 py-3 text-text-muted">{catLabel(e.category)}</td>
                     <td className="px-4 py-3 font-bold text-ink-950">{money(Number(e.amount))}</td>
                     <td className="px-4 py-3 text-text-muted">{new Date(e.expense_date).toLocaleDateString("tr-TR")}</td>
                     <td className="px-4 py-3">
