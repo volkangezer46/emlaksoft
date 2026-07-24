@@ -109,7 +109,7 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 - **Zaman gruplama** (Bugün / Bu hafta / Daha eski) + göreli zaman ("5 dk önce")
 - İkonlu premium boş durum, okunmamış nokta göstergesi
 
-> Not: Admin tarafı `src/components/admin/notification-bell.tsx` aynı zenginleştirmeyle güncellenebilir (henüz yapılmadı).
+- **Admin bildirim merkezi** de aynı zenginleştirmeyle güncellendi (`b8032b3`) — app ile tutarlı; "Tüm bildirimleri gör" footer linki korundu
 
 ---
 
