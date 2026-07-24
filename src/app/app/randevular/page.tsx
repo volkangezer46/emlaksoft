@@ -2,6 +2,7 @@ import {
   CalendarClock,
   CalendarDays,
   CheckCircle2,
+  XCircle,
   Clock3,
   FileSignature,
   MapPin,
@@ -235,6 +236,13 @@ export default async function AppointmentsPage() {
                             <input type="hidden" name="id" value={appt.id} />
                             <input type="hidden" name="status" value="completed" />
                             <button type="submit" className="inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-brand-600 transition hover:border-brand-300"><CheckCircle2 className="h-3 w-3" /> Tamamlandı</button>
+                          </form>
+                        ) : null}
+                        {appt.status !== "completed" ? (
+                          <form action={setAppointmentStatus}>
+                            <input type="hidden" name="id" value={appt.id} />
+                            <input type="hidden" name="status" value="cancelled" />
+                            <button type="submit" className="inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-danger-500 transition hover:border-danger-500/40"><XCircle className="h-3 w-3" /> İptal</button>
                           </form>
                         ) : null}
                         <AddToCalendarButton

@@ -72,7 +72,8 @@ export async function setTenantPlanStatus(formData: FormData): Promise<void> {
  * Rol readonly — yanlışlıkla yıkıcı yazmayı azaltır. Cookie banner için.
  */
 export async function startImpersonation(formData: FormData): Promise<void> {
-  const staff = await requirePlatformStaff();
+  // Impersonation tenant yönetimi yetkisi gerektirir (destek/muhasebe rolü giremez)
+  const staff = await requirePlatformModule("tenants");
   const tenantId = String(formData.get("tenant_id") ?? "").trim();
   if (!tenantId) return;
 

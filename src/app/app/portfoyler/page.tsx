@@ -189,6 +189,7 @@ export default async function PropertiesPage({
           <input
             name="q"
             defaultValue={q}
+            aria-label="Portföy ara"
             placeholder="Kod, başlık, portal veya konum ara…"
             className="w-full rounded-[11px] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
           />

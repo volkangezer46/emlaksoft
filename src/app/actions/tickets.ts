@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requirePlatformStaff } from "@/lib/platform";
+import { requirePlatformStaff, requirePlatformModule } from "@/lib/platform";
 import { requireActiveTenant } from "@/lib/tenant-guard";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
 
@@ -82,7 +82,7 @@ export async function createSupportTicket(
 }
 
 export async function updateTicketStatus(formData: FormData): Promise<TicketResult> {
-  await requirePlatformStaff();
+  await requirePlatformModule("tickets");
 
   const id = String(formData.get("id") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
@@ -112,7 +112,7 @@ export async function replyTicketAsStaff(
   _prev: TicketResult,
   formData: FormData,
 ): Promise<TicketResult> {
-  const staff = await requirePlatformStaff();
+  const staff = await requirePlatformModule("tickets");
   const id = String(formData.get("id") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
   if (!id || !body) return { error: "Yanıt boş olamaz." };

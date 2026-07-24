@@ -292,7 +292,7 @@ export default async function AppHomePage() {
     { label: "Yeni talep", value: demandCounts.new, color: "bg-brand-600" },
     { label: "Aktif talep", value: demandCounts.active, color: "bg-cyan-400" },
     { label: "Eşleşen", value: demandCounts.matched, color: "bg-mint-500" },
-    { label: "Kazanılan deal", value: dealWon, color: "bg-amber-400" },
+    { label: "Kazanılan anlaşma", value: dealWon, color: "bg-amber-400" },
   ];
   const pipeMax = Math.max(1, ...pipeline.map((p) => p.value));
   const openDeals = (dealRows ?? []).filter((d) => !["won", "lost"].includes(d.stage)).length;
@@ -361,7 +361,7 @@ export default async function AppHomePage() {
       })),
   ];
   if (openDeals > 0) {
-    tasks.push({ t: `${openDeals} açık anlaşma`, meta: "Pipeline’ı ilerletin", tone: "mint" });
+    tasks.push({ t: `${openDeals} açık anlaşma`, meta: "Satış hattını ilerletin", tone: "mint" });
   }
   if (tasks.length === 0) {
     tasks.push({ t: "Portal Kontrol’ü gözden geçir", meta: "Teyit ve kapanışları güncelle", tone: "brand" });
@@ -614,7 +614,7 @@ export default async function AppHomePage() {
           <div className="relative mt-5">
             {monthTotals.every((v) => v === 0) ? (
               <div className="grid h-56 place-items-center rounded-[14px] border border-dashed border-line-strong text-sm text-text-muted">
-                Henüz komisyon serisi yok — ilk deal kapanınca grafik dolacak.
+                Henüz komisyon serisi yok — ilk anlaşma kapanınca grafik dolacak.
               </div>
             ) : (
               <>
@@ -645,9 +645,9 @@ export default async function AppHomePage() {
           <div className="flex items-start justify-between">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
-                <PieChart className="h-4 w-4" /> Canlı pipeline
+                <PieChart className="h-4 w-4" /> Canlı satış hattı
               </p>
-              <h2 className="mt-1 font-display text-lg font-bold text-ink-950">Talep → deal hunisi</h2>
+              <h2 className="mt-1 font-display text-lg font-bold text-ink-950">Talep → anlaşma hunisi</h2>
             </div>
             <Link href="/app/anlasmalar" className="text-xs font-semibold text-brand-600">
               Board
@@ -675,7 +675,7 @@ export default async function AppHomePage() {
               <p className="font-display text-xl font-extrabold text-ink-950">%{conversion}</p>
             </div>
             <div>
-              <p className="text-[10px] text-text-faint">Açık deal</p>
+              <p className="text-[10px] text-text-faint">Açık anlaşma</p>
               <p className="font-display text-xl font-extrabold text-ink-950">{openDeals}</p>
             </div>
           </div>
@@ -876,7 +876,7 @@ export default async function AppHomePage() {
               <p className="flex items-center gap-2 text-xs font-semibold text-amber-500">
                 <Trophy className="h-4 w-4" /> Ekip performansı
               </p>
-              <h2 className="mt-1 font-display font-bold text-ink-950">Deal değeri liderliği</h2>
+              <h2 className="mt-1 font-display font-bold text-ink-950">Anlaşma değeri liderliği</h2>
             </div>
             <Link href="/app/ekip" className="text-[10px] font-semibold text-brand-600">
               Ekip
@@ -885,7 +885,7 @@ export default async function AppHomePage() {
           <div className="mt-5 space-y-3">
             {team.length === 0 ? (
               <p className="rounded-[12px] border border-dashed border-line-strong px-3 py-8 text-center text-sm text-text-muted">
-                Atanmış deal yok — pipeline’dan anlaşma ekleyin.
+                Atanmış anlaşma yok — satış hattından anlaşma ekleyin.
               </p>
             ) : (
               team.map((member, index) => (

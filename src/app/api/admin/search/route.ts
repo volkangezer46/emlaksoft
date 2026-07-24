@@ -16,8 +16,12 @@ export async function GET(req: NextRequest) {
   const staff = await getPlatformStaff();
   if (!staff) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const q = (req.nextUrl.searchParams.get("q") ?? "").trim();
-  if (q.length < 2) return NextResponse.json({ hits: [] });
+  const rawQ = (req.nextUrl.searchParams.get("q") ?? "").trim();
+  if (rawQ.length < 2) return NextResponse.json({ hits: [] });
+
+  // PostgREST .or() filter injection koruması: gramer karakterlerini (, ) . * : soyutla
+  const q = rawQ.slice(0, 80).replace(/[(),.*:\\]/g, " ");
+  if (q.trim().length < 2) return NextResponse.json({ hits: [] });
 
   const admin = createAdminClient();
   const like = `%${q}%`;

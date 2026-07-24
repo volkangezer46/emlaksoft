@@ -327,6 +327,7 @@ export default async function CustomersPage({
             <input
               name="q"
               defaultValue={q}
+              aria-label="Müşteri ara"
               placeholder="Ad, telefon, e-posta ara…"
               className="w-full rounded-[11px] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
             />
@@ -335,6 +336,7 @@ export default async function CustomersPage({
           <select
             name="type"
             defaultValue={typeF}
+            aria-label="Müşteri tipi filtresi"
             className="rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
           >
             <option value="">Tüm tipler</option>
@@ -344,6 +346,7 @@ export default async function CustomersPage({
           <select
             name="source"
             defaultValue={sourceF}
+            aria-label="Kaynak filtresi"
             className="rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
           >
             <option value="">Tüm kaynaklar</option>
@@ -354,6 +357,7 @@ export default async function CustomersPage({
             <select
               name="assigned"
               defaultValue={assignedF}
+              aria-label="Danışman filtresi"
               className="rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
             >
               <option value="">Tüm danışmanlar</option>

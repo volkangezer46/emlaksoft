@@ -12,7 +12,7 @@ import { ExportCsvButton } from "@/components/app/export-csv-button";
 const actionLabel: Record<string, string> = {
   "workflow.deal_won": "Satış kapandı",
   "commission.paid": "Komisyon tahsil",
-  "commission.from_pipeline": "Pipeline komisyon",
+  "commission.from_pipeline": "Satış hattı komisyonu",
   "deal.create": "Anlaşma oluşturuldu",
   "deal.stage": "Anlaşma aşaması",
   "payment_link.create": "Ödeme linki",
@@ -113,7 +113,7 @@ export default async function AuditPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
           <div>
             <h2 className="font-display font-bold text-ink-950">Olay akışı</h2>
-            <p className="text-xs text-text-muted">Aktör + diff · tenant izole</p>
+            <p className="text-xs text-text-muted">Aktör + değişiklik · ofis izole</p>
           </div>
           <ExportCsvButton label="CSV dışa aktar" action={exportAuditCsv} />
         </div>

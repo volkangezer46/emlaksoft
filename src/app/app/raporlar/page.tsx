@@ -121,7 +121,7 @@ export default async function ReportsPage() {
               <BarChart3 className="h-3.5 w-3.5" /> Rapor merkezi
             </p>
             <h1 className="mt-2 font-display text-3xl font-extrabold">Ofis sağlık & performans</h1>
-            <p className="mt-2 text-sm text-white/60">Gerçek aggregate · sahte pipeline yok.</p>
+            <p className="mt-2 text-sm text-white/60">Gerçek toplulaştırma · sahte satış hattı yok.</p>
           </div>
           <div className="rounded-[16px] border border-white/10 bg-white/5 px-5 py-4 text-center">
             <p className="font-display text-3xl font-extrabold text-mint-400">{office.score}</p>

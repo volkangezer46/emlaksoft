@@ -76,7 +76,7 @@ export default async function DealsPage() {
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-mint-400">
-              <Handshake className="h-3.5 w-3.5" /> Anlaşma pipeline
+              <Handshake className="h-3.5 w-3.5" /> Anlaşma hattı
             </p>
             <h1 className="mt-2 font-display text-3xl font-extrabold md:text-4xl">Anlaşma tahtası</h1>
             <p className="mt-2 max-w-lg text-sm text-white/60">
@@ -87,7 +87,7 @@ export default async function DealsPage() {
         </div>
         <div className="relative mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
-            { label: "Açık pipeline", value: money(pipelineValue), icon: TrendingUp, tone: "text-cyan-300" },
+            { label: "Açık hat", value: money(pipelineValue), icon: TrendingUp, tone: "text-cyan-300" },
             { label: "Kazanılan", value: money(wonValue), icon: Trophy, tone: "text-mint-300" },
             { label: "Açık kart", value: String(open.length), icon: Handshake, tone: "text-amber-300" },
             { label: "Kazanma oranı", value: `%${winRate}`, icon: Wallet, tone: "text-white" },
@@ -106,7 +106,7 @@ export default async function DealsPage() {
           <span className="grid h-14 w-14 place-items-center rounded-[16px] bg-mint-500/12 text-mint-600">
             <Handshake className="h-7 w-7" />
           </span>
-          <h2 className="mt-4 font-display text-lg font-bold text-ink-950">Pipeline boş</h2>
+          <h2 className="mt-4 font-display text-lg font-bold text-ink-950">Satış hattı boş</h2>
           <p className="mt-1 max-w-md text-sm text-text-muted">
             İlk anlaşmayı ekleyin veya portföyden "Anlaşma + komisyon" ile kazanan işlem açın.
           </p>

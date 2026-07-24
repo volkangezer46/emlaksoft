@@ -40,7 +40,7 @@ const cards: SettingCard[] = [
   { title: "Değerleme", desc: "Çok kaynaklı fiyat bandı ve ofis emsalleri.", icon: Sliders, tone: "bg-cyan-400/12 text-cyan-500", href: "/app/degerleme" },
   { title: "Raporlar", desc: "Ofis skoru, komisyon ve kayıp-kaçak özeti.", icon: ScrollText, tone: "bg-danger-500/10 text-danger-500", href: "/app/raporlar" },
   { title: "Denetim kayıtları", desc: "Yazma işlemleri ve KVKK erişim günlüğü.", icon: ScrollText, tone: "bg-danger-500/10 text-danger-500", href: "/app/denetim" },
-  { title: "Anlaşma pipeline", desc: "Deal board · müzakere → kazanılan.", icon: Wallet, tone: "bg-amber-400/15 text-amber-500", href: "/app/anlasmalar" },
+  { title: "Anlaşma hattı", desc: "Anlaşma tahtası · müzakere → kazanılan.", icon: Wallet, tone: "bg-amber-400/15 text-amber-500", href: "/app/anlasmalar" },
   { title: "Portallar & ilanlar", desc: "Portal ilan bağlama, teyit ve kayıp-kaçak akışı.", icon: Plug, tone: "bg-cyan-400/12 text-cyan-500", href: "/app/portallar" },
   { title: "Aday yakalama", desc: "Web formu/bağlantı, sırayla atama ve hızlı yanıt.", icon: Radio, tone: "bg-mint-500/12 text-mint-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/lead" },
 ];
