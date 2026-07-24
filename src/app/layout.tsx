@@ -29,17 +29,51 @@ const geistMono = Geist_Mono({
   fallback: ["monospace"],
 });
 
+const SITE_NAME = "EmlakSoft";
+const SITE_TITLE = "EmlakSoft — Türkiye’nin emlak işletim sistemi";
+const SITE_DESC =
+  "Müşteriden tapuya, ilandan komisyona kadar emlak ofisinizi tek platformda yönetin. İYS/EİDS uyumlu, yapay zeka destekli emlak CRM.";
+
 export const metadata: Metadata = {
   title: {
-    default: "EmlakSoft — Türkiye’nin emlak işletim sistemi",
+    default: SITE_TITLE,
     template: "%s | EmlakSoft",
   },
-  description:
-    "Müşteriden tapuya, ilandan komisyona kadar emlak ofisinizi tek platformda yönetin. İYS/EİDS uyumlu, AI destekli CRM.",
+  description: SITE_DESC,
+  applicationName: SITE_NAME,
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   ),
   manifest: "/manifest.webmanifest",
+  keywords: [
+    "emlak CRM", "emlak yazılımı", "emlak ofis yönetimi", "portföy yönetimi",
+    "İYS uyum", "EİDS", "emlak komisyon", "gayrimenkul CRM", "emlak danışmanı yazılımı",
+    "sahibinden entegrasyon", "hepsiemlak", "kira artış hesaplama",
+  ],
+  authors: [{ name: "EmlakSoft" }],
+  creator: "EmlakSoft",
+  publisher: "EmlakSoft",
+  category: "business",
+  formatDetection: { telephone: true, email: true, address: true },
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    locale: "tr_TR",
+    siteName: SITE_NAME,
+    title: SITE_TITLE,
+    description: SITE_DESC,
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESC,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
+  },
   appleWebApp: {
     capable: true,
     title: "EmlakSoft",

@@ -198,8 +198,32 @@ function Cell({ v }: { v: boolean | "partial" }) {
 }
 
 export default function HomePage() {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://emlaksoft.com";
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        name: "EmlakSoft",
+        url: baseUrl,
+        description: "Türkiye emlak ofisleri için premium abonelikli CRM ve ofis yönetim platformu.",
+        areaServed: "TR",
+      },
+      {
+        "@type": "SoftwareApplication",
+        name: "EmlakSoft",
+        applicationCategory: "BusinessApplication",
+        operatingSystem: "Web",
+        description: "Müşteriden tapuya, ilandan komisyona kadar emlak ofisinizi tek platformda yönetin. İYS/EİDS uyumlu, yapay zeka destekli emlak CRM.",
+        offers: { "@type": "Offer", price: "990", priceCurrency: "TRY" },
+        inLanguage: "tr-TR",
+      },
+    ],
+  };
+
   return (
     <div className="bg-canvas text-text">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <SiteHeader />
 
       <main>

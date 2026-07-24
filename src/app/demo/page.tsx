@@ -1,4 +1,16 @@
 import Link from "next/link";
+
+export const metadata = {
+  title: "Ücretsiz Demo Talep Edin",
+  description:
+    "EmlakSoft'u ofisinize özel canlı demo ile keşfedin. Portföy, müşteri, komisyon ve portal yönetimini 15 dakikada görün.",
+  alternates: { canonical: "/demo" },
+  openGraph: {
+    title: "EmlakSoft — Ücretsiz Demo",
+    description: "Emlak ofisinizi tek platformda yönetin. Canlı demo talep edin.",
+    url: "/demo",
+  },
+};
 import { CalendarDays } from "lucide-react";
 import { DemoForm } from "./demo-form";
 
