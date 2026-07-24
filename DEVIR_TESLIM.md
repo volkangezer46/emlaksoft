@@ -98,6 +98,26 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 
 ## Bu sohbette tamamlanan işler
 
+### 20) Tüm panel kayıtları tıklanabilir + ekip sorgu optimizasyonu (24 Temmuz 2026)
+
+**Build: ✓ 0 hata.** Production deploy (`1205226`).
+
+#### Tıklanabilirlik tamamlandı (stretched-link → ilgili kayıt)
+Bu turdan önce zaten tıklanabilir: müşteri/portföy/sözleşme/teklif/talep/randevu/komisyon/anlaşma/destek. Eklenen:
+- **Görevler** → müşteri/portföy, **Açık Ev** → portföy, **Arama (çağrı)** → müşteri
+- **Uyum (İYS consent)** → müşteri, **Kayıp-kaçak** → portföy
+- **Admin Billing** (abonelik + fatura satırları) → tenant detay
+- Doğal hedefi/detayı olmayanlar bilinçli atlandı: otomasyonlar, hedefler, danışman-kpi, admin members/personel, satış demo kartı (detay sayfası yok)
+
+#### Performans
+- **Ekip**: her yüklemede 10.000 müşteri satırı çekip danışman başına sayıyordu → **`customer_counts_by_advisor` aggregate RPC** (migration 040) ile ~N danışman satırı
+- Lead source stats unbounded → limit'li
+
+#### Migration (production ✅)
+- `040` customer_counts_by_advisor RPC
+
+---
+
 ### 19) Sistem geneli max hız optimizasyonu (24 Temmuz 2026)
 
 **Build: ✓ 0 hata.** 2 keşif ajanı (waterfall tarama) + auth hot-path analizi → uygulandı → production deploy (`3252b44`).
