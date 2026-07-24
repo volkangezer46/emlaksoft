@@ -230,10 +230,31 @@ export default async function PropertyDetailPage({
             <p className="mt-1 text-sm text-white/60">
               {property.transaction_type} · {property.property_type}
             </p>
-            <p className="mt-2 flex items-center gap-1.5 text-sm text-white/70">
-              <MapPin className="h-3.5 w-3.5 text-mint-400" />
-              {[property.address_line, district, province].filter(Boolean).join(" · ") || "Konum belirtilmedi"}
-            </p>
+            {(() => {
+              const parts = [property.address_line, district, province].filter(Boolean);
+              const label = parts.join(" · ") || "Konum belirtilmedi";
+              if (parts.length === 0) {
+                return (
+                  <p className="mt-2 flex items-center gap-1.5 text-sm text-white/70">
+                    <MapPin className="h-3.5 w-3.5 text-mint-400" /> {label}
+                  </p>
+                );
+              }
+              const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts.join(", "))}`;
+              return (
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group mt-2 inline-flex items-center gap-1.5 text-sm text-white/70 transition hover:text-mint-300"
+                  title="Haritada göster"
+                >
+                  <MapPin className="h-3.5 w-3.5 text-mint-400" />
+                  <span className="underline-offset-2 group-hover:underline">{label}</span>
+                  <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold text-mint-300">Haritada göster</span>
+                </a>
+              );
+            })()}
             <p className="mt-4 font-display text-3xl font-extrabold text-white">
               {formatPrice(property.list_price != null ? Number(property.list_price) : null, property.transaction_type)}
             </p>
