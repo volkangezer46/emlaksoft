@@ -226,7 +226,7 @@ export default function HomePage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <SiteHeader />
 
-      <main>
+      <main id="main-content">
         {/* ================= HERO ================= */}
         <section className="hero-lux relative overflow-hidden">
           <div className="pointer-events-none absolute inset-0 -z-10">

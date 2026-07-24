@@ -99,6 +99,7 @@ export default function RootLayout({
       className={`${manrope.variable} ${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-[family-name:var(--font-inter)]">
+        <a href="#main-content" className="skip-link">İçeriğe atla</a>
         <ServiceWorkerRegister />
         {children}
       </body>

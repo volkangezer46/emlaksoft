@@ -166,6 +166,37 @@ body {
   overflow-x: hidden;
 }
 
+/* Erişilebilirlik: klavye ile gezinirken görünür odak halkası (fare tıklamasında değil) */
+:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* Koyu bölümlerde (theme-dark) odak halkası kontrastı */
+.theme-dark :focus-visible {
+  outline-color: var(--cyan-400);
+}
+
+/* "İçeriğe atla" linki — klavye ile Tab'landığında görünür olur */
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 100;
+  transform: translateY(-150%);
+  padding: 0.625rem 1rem;
+  border-radius: 10px;
+  background: var(--brand-600);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-lg);
+  transition: transform 0.15s ease;
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 h1, h2, h3, h4 {
   font-family: var(--font-manrope), system-ui, sans-serif;
   letter-spacing: -0.022em;
