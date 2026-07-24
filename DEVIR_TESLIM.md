@@ -91,6 +91,53 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 
 ## Bu sohbette tamamlanan işler
 
+### 13) Kapsamlı kalite turu (24 Temmuz 2026)
+
+**Build: ✓ 0 hata, 69 sayfa**
+
+#### Kontrol edilip tamamlanmış bulunanlar
+- `/app/*` tüm loading.tsx'ler — mevcut ✅
+- Error boundary — app layout'ta `<ErrorBoundary>` sarılı, admin'de `error.tsx` var ✅
+- `/app/portallar` teyit butonu — `confirmPortalListing` form action mevcut ✅
+- Bildirim tercihleri UI — `<NotificationPrefsPanel>` ayarlar sayfasında mevcut ✅
+- `/admin/personel` — tam dolu, personel ekleme/rol/pasif yönetimi çalışıyor ✅
+
+#### Deploy doküman güncellemeleri (DEPLOY_CHECKLIST.md)
+- iyzico webhook prod test talimatı (sandbox kart, imza curl komutu)
+- Cron job listesi (6 job, vercel.json hazır)
+- Supabase Storage bucket kurulum SQL + RLS policy
+- Değerleme API prod test adımları
+
+#### Müşteri 360 iletişim sekmesi
+- `customer-360-tabs.tsx`'e `iletisim` sekmesi eklendi
+- `CommunicationTimeline` component sekme içinde render ediliyor
+- `page.tsx`'ten bağımsız render kaldırıldı, `communications` + `canCreateComm` prop üzerinden geçiyor
+
+#### Price Health motoru genişletme
+- `src/lib/price-health.ts` — 50+ il/ilçe m² referans tablosu (İstanbul ilçeleri dahil)
+- Kira/satış için farklı m² fiyat hesabı (`transactionType` parametresi)
+- Eşikler %8/%15 → %10/%20 (yüksek enflasyon ortamına uygun)
+- `overrideSqmPrice` parametresi — Endeksa/Tapusor canlı verisiyle override
+
+#### Admin topbar arama genişletme
+- `command-palette.tsx` — `w-full` (max-w sınırı yok), `Ctrl K` badge shrink-0
+- `admin-topbar.tsx` — sol logo bölümü `w-52 shrink-0`, arama `flex-1`
+
+#### Font + build optimizasyonu
+- `layout.tsx` — Manrope weight azaltıldı, latin-ext kaldırıldı, Geist Mono preload: false
+- `next.config.ts` — `cacheMaxMemorySize: 0` disk cache'e devret
+- Build süresi: ~21s → ~11s
+
+#### Sıradaki vizyon adımları (kod gerektiren, ertelendi)
+- **PWA Push** — VAPID keys: `npx web-push generate-vapid-keys` → Vercel'e NEXT_PUBLIC_VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY + VAPID_SUBJECT ekle. `push_subscriptions` tablosu + SW handler hazır, sadece prod anahtarları eksik.
+- **CTI entegrasyonu** — Gelen çağrıyı müşteriye otomatik eşleştirme. Provider: Netgsm/Bulutfon. `src/lib/messaging/netgsm.ts` iskelet var. Eklenecek: webhook endpoint + müşteri telefon normalize eşleştirme.
+- **Mobile app** — React Native + Expo. Mevcut API route'ları hazır. Supabase Auth + RLS aynı. Öncelik: müşteri ekleme, çağrı kaydı, portföy listeleme.
+- **Unit test** — Kritik action'lar için Jest iskelet: `bulkUpdatePropertyStatus`, `requirePermission`, `computePriceHealth`. `package.json`'a `jest` + `@testing-library/react` eklenecek.
+- **useApi migration** — `src/app/admin/personel/page.tsx` hâlâ `fetch("/api/admin/personel")` direkt kullanıyor. `useAppApi` hook'una taşınabilir ama işlevsel, öncelik düşük.
+- **IBAN alanı** — `tenants` tablosuna `iban` kolonu + `updateTenantInfo` action + `company-form.tsx` alan eklenmesi gerekiyor (migration gerektirir).
+
+---
+
 ### 12) Eksik görevler 3D + 3E tamamlandı (24 Temmuz 2026)
 
 **Build: ✓ 0 hata, 69 sayfa**
