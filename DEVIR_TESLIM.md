@@ -98,6 +98,35 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 
 ## Bu sohbette tamamlanan işler
 
+### 32) 360° uçtan uca denetim — 4 paralel ajan + web araştırması (25 Temmuz 2026)
+
+**Build: ✓ 0 hata.** Production deploy (`9e1597f`, `08b54a8`→`c29c30e`). Migration 045/046/047 uygulandı.
+
+4 paralel denetim ajanı (doğruluk/veri, güvenlik, UX, performans/a11y) + KVKK/EİDS web araştırması → bulgular önceliklendirildi ve uygulandı.
+
+#### 🔴 DALGA 1 — Kritik bug + güvenlik (canlıya alındı)
+- **ACİL BUG**: `properties.lat/lng` kolonları yoktu → eklediğim harita özelliği portföy create/update'i **production'da kırıyordu** (`PGRST204`). Migration 046 ile kolonlar eklendi ✅
+- Portal yayın + malik portalı: olmayan kolonlar (`description/net_sqm/room_count/floor/building_age`) → `features` jsonb / `address_line`
+- Gider modülü yanlış yetki (`reports`→`expenses`, sessiz form hatası), `listExpenses` geçersiz `-31` tarihi (Şubat vb. boş), giderler `canDelete`
+- `increment_visitor_count` RPC yoktu (açık ev sayacı çalışmıyordu) → migration 047
+- **Güvenlik**: iyzico webhook **FAIL-CLOSED** (imzasız tahsil engeli), iyzico'suz production'da bedava abonelik engeli, property-media API IDOR (yalnız herkese açık portföy görselleri), demo super_admin production bloğu, dogum-gunu cron `Bearer undefined` bypass, netgsm CDATA `]]>` kaçışı
+
+#### 🟡 DALGA 2 — Dil + a11y + orta güvenlik (canlıya alındı)
+- TR dil sözlüğü: kullanıcıya görünen deal→anlaşma, pipeline→satış hattı, tenant→ofis, diff→değişiklik, aggregate→toplulaştırma (dashboard/raporlar/denetim/anlaşmalar/ayarlar)
+- a11y: müşteri/portföy filtre-arama `aria-label`
+- Güvenlik: impersonation→`requirePlatformModule("tenants")`, admin arama filter-injection sanitizasyonu, ticket işlemleri modül kontrolü
+- CRUD: randevu **iptal** butonu (dead cancelled durumu)
+
+#### ⏳ Denetimden kalan (öncelikli follow-up — düşük/orta önem)
+- **CRUD edit eksikleri**: updateExpense, updateTask, randevu erteleme (updateAppointment), teklif tutarı edit, talep/kampanya/aidat/deal kalıcı silme
+- **Orta güvenlik**: offboarding export'a `support` rolü erişimi (ops/super_admin'e kısıtla), müşteri-dosyası indirmede tenant-içi rol kontrolü, sözleşme imza token expiry, rate-limit fail-open + signup captcha, health endpoint ham hata sızıntısı
+- **Performans**: danisman-kpi/franchise/raporlar SQL agregasyonu (RPC ile), vitrin/paylaş `next/image` (LCP/CLS), gunluk-ozet cron N+1, property-media-manager seri upload
+- **Diğer**: appointment/task/contract timezone tutarlılığı, convertWorkflow idempotency (çift komisyon), modal focus-trap/role=dialog
+
+> Web araştırması: sistem TR emlak CRM standartlarını (portföy/müşteri/eşleştirme/randevu/sözleşme/EİDS yetki takibi/KVKK-İYS/mobil-bulut) ve yasal gereklilikleri zaten karşılıyor.
+
+---
+
 ### 31) Beyaz-etiket — ofis marka rengi tüm panele (25 Temmuz 2026)
 
 **Build: ✓ 0 hata.** Production deploy (`62260ef`).
