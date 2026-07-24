@@ -19,6 +19,16 @@ import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { NewCustomerDialog } from "./new-customer-dialog";
 import { CustomerRowDelete } from "./customer-row-delete";
 import { formatTurkishPhone } from "@/lib/phone";
+import { computeLeadScore, leadTierCls } from "@/lib/lead-score";
+
+type LeadSignalRow = {
+  customer_id: string;
+  active_demands: number;
+  comms: number;
+  appts: number;
+  calls: number;
+  last_activity: string | null;
+};
 
 type CustomerRow = {
   id: string;
@@ -94,9 +104,9 @@ function formatDate(iso: string) {
 export default async function CustomersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; type?: string; source?: string; from?: string; to?: string; assigned?: string }>;
+  searchParams: Promise<{ q?: string; type?: string; source?: string; from?: string; to?: string; assigned?: string; sort?: string }>;
 }) {
-  const { perms } = await requireModulePage("customers");
+  const { perms, tenantId } = await requireModulePage("customers");
   const canCreate = (perms.customers ?? []).includes("create");
   const canDelete = (perms.customers ?? []).includes("delete");
   const supabase = await createClient();
@@ -107,8 +117,9 @@ export default async function CustomersPage({
   const fromF    = sp.from     ?? "";
   const toF      = sp.to       ?? "";
   const assignedF = sp.assigned ?? "";
+  const sortF    = sp.sort     ?? "";
 
-  const [{ data: customers }, { data: provinces }, { data: branches }, { data: advisors }] = await Promise.all([
+  const [{ data: customers }, { data: provinces }, { data: branches }, { data: advisors }, { data: signals }] = await Promise.all([
     supabase
       .from("customers")
       .select(
@@ -120,7 +131,29 @@ export default async function CustomersPage({
     supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
+    tenantId
+      ? supabase.rpc("customer_lead_signals", { p_tenant_id: tenantId })
+      : Promise.resolve({ data: [] as LeadSignalRow[] }),
   ]);
+
+  // Lead skoru — her müşteri için sinyallerden (bkz. lib/lead-score)
+  const signalMap = new Map<string, LeadSignalRow>();
+  for (const s of (signals ?? []) as LeadSignalRow[]) signalMap.set(s.customer_id, s);
+  const leadOf = (c: CustomerRow) => {
+    const s = signalMap.get(c.id);
+    return computeLeadScore({
+      hasPhone: Boolean(c.phone),
+      hasEmail: Boolean(c.email),
+      source: c.source,
+      activeDemands: s?.active_demands ?? 0,
+      communications: s?.comms ?? 0,
+      appointments: s?.appts ?? 0,
+      calls: s?.calls ?? 0,
+      lastActivityAt: s?.last_activity ?? null,
+      createdAt: c.created_at,
+      blacklist: Boolean(c.blacklist),
+    });
+  };
 
   let allRows = (customers ?? []) as CustomerRow[];
 
@@ -142,6 +175,13 @@ export default async function CustomersPage({
   const provinceList = provinces ?? [];
   const branchList = branches ?? [];
   const advisorList = advisors ?? [];
+
+  // Lead skorları — rozet + "sıcak önce" sıralama için önceden hesapla
+  const leadMap = new Map(rows.map((c) => [c.id, leadOf(c)]));
+  const displayRows = sortF === "hot"
+    ? [...rows].sort((a, b) => (leadMap.get(b.id)?.score ?? 0) - (leadMap.get(a.id)?.score ?? 0))
+    : rows;
+  const hotCount = rows.filter((c) => leadMap.get(c.id)?.tier === "hot").length;
 
   // Yaklaşan doğum günü / yıldönümü (önümüzdeki 7 gün) — ekstra sorgu yok, mevcut listeden hesaplanır
   const WINDOW_DAYS = 7;
@@ -334,11 +374,20 @@ export default async function CustomersPage({
           <button type="submit" className="rounded-[10px] bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700">
             Filtrele
           </button>
-          {(activeFilters > 0 || q) && (
+          {(activeFilters > 0 || q || sortF) && (
             <Link href="/app/musteriler" className="text-xs font-semibold text-text-muted hover:text-danger-500">
               Temizle
             </Link>
           )}
+          <button
+            type="submit"
+            name="sort"
+            value={sortF === "hot" ? "" : "hot"}
+            className={`inline-flex items-center gap-1 rounded-[10px] px-3 py-2 text-xs font-semibold transition ${sortF === "hot" ? "bg-rose-500/15 text-rose-600 ring-1 ring-rose-500/25" : "border border-line text-text-muted hover:border-rose-400 hover:text-rose-600"}`}
+            title="Lead skoruna göre sırala"
+          >
+            🔥 Sıcak önce{hotCount > 0 ? ` · ${hotCount}` : ""}
+          </button>
           <span className="ml-auto rounded-full bg-brand-600/10 px-3 py-1.5 text-xs font-semibold text-brand-600">
             {rows.length} sonuç
           </span>
@@ -393,7 +442,9 @@ export default async function CustomersPage({
               </tr>
             </thead>
             <tbody>
-              {rows.map((c) => (
+              {displayRows.map((c) => {
+                const lead = leadMap.get(c.id);
+                return (
                 <tr
                   key={c.id}
                   className="group relative cursor-pointer border-b border-line transition last:border-0 hover:bg-brand-600/[0.025]"
@@ -405,7 +456,17 @@ export default async function CustomersPage({
                         {c.full_name.split(/\s+/).map((part) => part[0] ?? "").join("").slice(0, 2).toUpperCase()}
                       </span>
                       <div>
-                        <p className="font-semibold text-ink-950">{c.full_name}</p>
+                        <p className="flex items-center gap-1.5 font-semibold text-ink-950">
+                          {c.full_name}
+                          {lead && !c.blacklist ? (
+                            <span
+                              className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold ring-1 ring-inset ${leadTierCls(lead.tier)}`}
+                              title={`Lead skoru: ${lead.score}`}
+                            >
+                              {lead.tier === "hot" ? "🔥" : lead.tier === "warm" ? "🌤️" : "❄️"} {lead.score}
+                            </span>
+                          ) : null}
+                        </p>
                         {c.blacklist ? (
                           <p className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-danger-500"><span className="h-1.5 w-1.5 rounded-full bg-danger-500" /> Kara liste</p>
                         ) : (
@@ -442,7 +503,8 @@ export default async function CustomersPage({
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           </div>
