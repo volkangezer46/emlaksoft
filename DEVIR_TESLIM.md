@@ -98,6 +98,19 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 
 ## Bu sohbette tamamlanan işler
 
+### 28) Jet hız + ana sayfa premium çerçeve (25 Temmuz 2026)
+
+**Build: ✓ 0 hata.** Production deploy (`c011d42`, `171acae`).
+
+#### Jet hız (her sayfa hızlı açılsın)
+- **Ofis skoru navigasyonlar arası cache** — app layout her sayfa açılışında 5 sorgu çalıştırıyordu (React cache sadece istek içinde dedupe ediyordu). Artık `unstable_cache` (tenant-key'li, 3 dk revalidate) + `loadOfficeScoreInputsForTenant` (admin client + açık tenant filtresi — RLS'siz cache ortamı için güvenli). Dashboard + layout aynı cache'i paylaşır; **çapraz-ofis sızıntısı yok** (key tenantId içerir)
+- **15 detay/alt sayfaya `loading.tsx`** — müşteri/portföy/sözleşme/teklif/ekip/otomasyon/destek [id], admin satış/tenant/ticket [id], ayarlar lead/roller/tanımlar, admin geo il/ilçe. Navigasyonda anında iskelet → algılanan yükleme jet hızı
+
+#### Ana sayfa ultra-premium
+- Dashboard showcase'e dönen animasyonlu gradient çerçeve (`.premium-ring`, CSS `@property --ring-angle` — içeriği döndürmez, `prefers-reduced-motion` destekli)
+
+---
+
 ### 27) DB-driven tanımlar — tüm seçim alanları veritabanından (25 Temmuz 2026)
 
 **Build: ✓ 0 hata.** Production deploy (`fdf74b9`, `4dbcb14`). Migration 042 uygulandı.
