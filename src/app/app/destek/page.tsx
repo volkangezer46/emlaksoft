@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CheckCircle2, Clock3, LifeBuoy } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { getDefinitions } from "@/lib/definitions";
 import { NewTicketDialog } from "./new-ticket-dialog";
 import type { CSSProperties } from "react";
 
@@ -43,11 +44,18 @@ const catLabel: Record<string, string> = {
 export default async function SupportPage() {
   await requireModulePage("support");
   const supabase = await createClient();
-  const { data: tickets } = await supabase
-    .from("support_tickets")
-    .select("id, subject, category, priority, status, created_at, updated_at")
-    .order("created_at", { ascending: false })
-    .limit(100);
+  const [{ data: tickets }, categoryDefs] = await Promise.all([
+    supabase
+      .from("support_tickets")
+      .select("id, subject, category, priority, status, created_at, updated_at")
+      .order("created_at", { ascending: false })
+      .limit(100),
+    getDefinitions("ticket_category"),
+  ]);
+
+  const categoryOptions = categoryDefs.length
+    ? categoryDefs.map((d) => ({ value: d.value, label: d.label }))
+    : undefined;
 
   const rows = tickets ?? [];
   const openCount = rows.filter((t) => t.status === "open" || t.status === "in_progress" || t.status === "waiting").length;
@@ -85,7 +93,7 @@ export default async function SupportPage() {
                 <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Talepleriniz</h1>
                 <p className="mt-1 text-sm text-white/60">EmlakSoft ekibine fatura, kurulum ve teknik taleplerinizi iletin.</p>
               </div>
-              <NewTicketDialog />
+              <NewTicketDialog categoryOptions={categoryOptions} />
             </div>
             <div className="mt-6 grid grid-cols-3 gap-3">
               <div className="rounded-[14px] border border-white/10 bg-white/5 p-3">

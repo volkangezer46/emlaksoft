@@ -6,7 +6,7 @@ import { requirePermission } from "@/lib/require-permission";
 
 export type DefinitionResult = { ok?: boolean; error?: string; id?: string };
 
-const CATEGORIES = ["customer_type", "customer_source", "property_type", "transaction_type", "contract_type", "expense_category", "appointment_type"] as const;
+const CATEGORIES = ["customer_type", "customer_source", "property_type", "transaction_type", "contract_type", "expense_category", "appointment_type", "demand_urgency", "ticket_category"] as const;
 
 /** Ofise özel yeni tanım ekler (dropdown seçeneği). */
 export async function addDefinition(_prev: DefinitionResult, fd: FormData): Promise<DefinitionResult> {

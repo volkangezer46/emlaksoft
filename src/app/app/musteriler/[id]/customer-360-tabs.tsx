@@ -125,6 +125,9 @@ export function Customer360Tabs({
   customerName,
   defaultProvinceId,
   provinces,
+  transactionTypes,
+  propertyTypes,
+  urgencyOptions,
   demands,
   activity,
   tags,
@@ -142,6 +145,9 @@ export function Customer360Tabs({
   customerName: string;
   defaultProvinceId: string | null;
   provinces: Province[];
+  transactionTypes?: string[];
+  propertyTypes?: string[];
+  urgencyOptions?: { value: string; label: string }[];
   demands: Demand[];
   activity: ActivityItem[];
   tags: string[];
@@ -213,6 +219,9 @@ export function Customer360Tabs({
               customerName={customerName}
               provinces={provinces}
               defaultProvinceId={defaultProvinceId}
+              transactionTypes={transactionTypes}
+              propertyTypes={propertyTypes}
+              urgencyOptions={urgencyOptions}
             />
           </div>
           {demands.length === 0 ? (

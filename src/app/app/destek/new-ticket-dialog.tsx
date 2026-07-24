@@ -7,7 +7,20 @@ import { createSupportTicket, type TicketResult } from "@/app/actions/tickets";
 
 const initial: TicketResult = {};
 
-export function NewTicketDialog() {
+const DEFAULT_CATEGORY_OPTIONS: { value: string; label: string }[] = [
+  { value: "general", label: "Genel" },
+  { value: "billing", label: "Abonelik / fatura" },
+  { value: "bug", label: "Hata bildirimi" },
+  { value: "feature", label: "Özellik isteği" },
+  { value: "compliance", label: "İYS / KVKK" },
+  { value: "onboarding", label: "Kurulum" },
+];
+
+export function NewTicketDialog({
+  categoryOptions = DEFAULT_CATEGORY_OPTIONS,
+}: {
+  categoryOptions?: { value: string; label: string }[];
+} = {}) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -52,12 +65,9 @@ export function NewTicketDialog() {
                 <div>
                   <label className="mb-1.5 block text-sm text-text-muted" htmlFor="category">Kategori</label>
                   <select id="category" name="category" defaultValue="general" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
-                    <option value="general">Genel</option>
-                    <option value="billing">Abonelik / fatura</option>
-                    <option value="bug">Hata bildirimi</option>
-                    <option value="feature">Özellik isteği</option>
-                    <option value="compliance">İYS / KVKK</option>
-                    <option value="onboarding">Kurulum</option>
+                    {categoryOptions.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
                   </select>
                 </div>
                 <div>

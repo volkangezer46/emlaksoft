@@ -12,16 +12,31 @@ const initial: DemandResult = {};
 const fieldClass =
   "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
+const DEFAULT_TRANSACTION_TYPES = ["Satılık", "Kiralık"];
+const DEFAULT_PROPERTY_TYPES = ["Daire", "Villa", "Arsa", "İşyeri", "Müstakil ev", "Bina"];
+const DEFAULT_URGENCY_OPTIONS: { value: string; label: string }[] = [
+  { value: "low", label: "Düşük" },
+  { value: "normal", label: "Normal" },
+  { value: "high", label: "Yüksek" },
+  { value: "urgent", label: "Acil" },
+];
+
 export function NewDemandDialog({
   customerId,
   customerName,
   provinces,
   defaultProvinceId,
+  transactionTypes = DEFAULT_TRANSACTION_TYPES,
+  propertyTypes = DEFAULT_PROPERTY_TYPES,
+  urgencyOptions = DEFAULT_URGENCY_OPTIONS,
 }: {
   customerId: string;
   customerName: string;
   provinces: Province[];
   defaultProvinceId?: string | null;
+  transactionTypes?: string[];
+  propertyTypes?: string[];
+  urgencyOptions?: { value: string; label: string }[];
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -80,14 +95,15 @@ export function NewDemandDialog({
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="demand-tx">İşlem türü *</label>
                 <select id="demand-tx" name="transaction_type" required defaultValue="Satılık" className={fieldClass}>
-                  <option>Satılık</option>
-                  <option>Kiralık</option>
+                  {transactionTypes.map((t) => (
+                    <option key={t}>{t}</option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="demand-type">Portföy türü</label>
                 <select id="demand-type" name="property_type" defaultValue="Daire" className={fieldClass}>
-                  {["Daire", "Villa", "Arsa", "İşyeri", "Müstakil ev", "Bina"].map((t) => (
+                  {propertyTypes.map((t) => (
                     <option key={t}>{t}</option>
                   ))}
                 </select>
@@ -125,10 +141,9 @@ export function NewDemandDialog({
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="demand-urgency">Aciliyet</label>
                 <select id="demand-urgency" name="urgency" defaultValue="normal" className={fieldClass}>
-                  <option value="low">Düşük</option>
-                  <option value="normal">Normal</option>
-                  <option value="high">Yüksek</option>
-                  <option value="urgent">Acil</option>
+                  {urgencyOptions.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
                 </select>
               </div>
 

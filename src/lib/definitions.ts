@@ -8,7 +8,9 @@ export type DefinitionCategory =
   | "transaction_type"
   | "contract_type"
   | "expense_category"
-  | "appointment_type";
+  | "appointment_type"
+  | "demand_urgency"
+  | "ticket_category";
 
 export type DefinitionItem = { value: string; label: string; color: string | null };
 

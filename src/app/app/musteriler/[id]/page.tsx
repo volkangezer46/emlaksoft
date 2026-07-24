@@ -99,6 +99,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     { data: commsData },
     { data: propertiesForMatch },
     customerTypeDefs,
+    transactionTypeDefs,
+    propertyTypeDefs,
+    demandUrgencyDefs,
   ] = await Promise.all([
     supabase
       .from("customers")
@@ -168,11 +171,19 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .order("created_at", { ascending: false })
       .limit(100),
     getDefinitions("customer_type"),
+    getDefinitions("transaction_type"),
+    getDefinitions("property_type"),
+    getDefinitions("demand_urgency"),
   ]);
 
   if (!customer) notFound();
 
   const customerTypeOptions = customerTypeDefs.length ? customerTypeDefs.map((d) => d.value) : undefined;
+  const transactionTypeOptions = transactionTypeDefs.length ? transactionTypeDefs.map((d) => d.value) : undefined;
+  const propertyTypeOptions = propertyTypeDefs.length ? propertyTypeDefs.map((d) => d.value) : undefined;
+  const demandUrgencyOptions = demandUrgencyDefs.length
+    ? demandUrgencyDefs.map((d) => ({ value: d.value, label: d.label }))
+    : undefined;
 
   const demands = (demandsData ?? []) as Demand[];
   const calls = (callsData ?? []) as Call[];
@@ -402,6 +413,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         customerName={customer.full_name}
         defaultProvinceId={customer.province_id}
         provinces={provinces ?? []}
+        transactionTypes={transactionTypeOptions}
+        propertyTypes={propertyTypeOptions}
+        urgencyOptions={demandUrgencyOptions}
         demands={demands}
         activity={activity}
         tags={tags}
