@@ -98,6 +98,28 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 
 ## Bu sohbette tamamlanan işler
 
+### 19) Sistem geneli max hız optimizasyonu (24 Temmuz 2026)
+
+**Build: ✓ 0 hata.** 2 keşif ajanı (waterfall tarama) + auth hot-path analizi → uygulandı → production deploy (`3252b44`).
+
+#### Auth hot-path dedup (en yüksek etki — her sayfa + her action)
+- **`getRequestUser`** (`lib/supabase/auth-cache.ts`, React `cache()`) — `supabase.auth.getUser()` her çağrıda Supabase Auth sunucusuna gidip JWT doğruluyordu; request başına 2-3× çağrılıyordu → **1×**. `require-module-page`, `require-permission`, `tenant-guard`, app layout hepsi bunu kullanıyor
+- **`getPlatformStaff`** `cache()`'lendi — request içinde platform_staff sorgusu dedupe
+
+#### Ofis skoru dedup
+- **`getCachedOfficeScore`** (`lib/office-score.ts`, React `cache()`) — dashboard hem layout hem page'de skoru hesaplıyordu (10 sorgu) → **5** (paylaşımlı). Layout'ta skor + bildirimler paralel; dashboard'da `loadOfficeScoreInputs` ana batch'e katıldı
+
+#### Waterfall paralelleştirme (~13 round-trip tasarrufu)
+- paylas/[token] (3→1), vitrin/[slug] (4→3), vitrin/[slug]/[id] (4→2)
+- customer-portal + owner-portal: `last_seen` update batch'e fold
+- destek/[id] + admin/tickets/[id]: ticket + messages paralel
+- ayarlar/lead, lead/[token]: bağımsız sorgular paralel; workflow deal-won: update+log+notify paralel
+- Lead kaynak istatistiği unbounded → limit'li
+
+> Not: `core.autocrlf=true` nedeniyle çalışma ağacında ~166 dosya satır-sonu farkı gösterebilir (içerik diff'i yok); commit'lere yalnızca gerçek değişen dosyalar dahil edildi.
+
+---
+
 ### 18) "Hepsini sırayla yap" — 4 dalga özellik + bug fix turu (24 Temmuz 2026)
 
 **Build: ✓ 0 hata.** Rakip analizi + denetim bulgularının tamamı dalgalar halinde uygulandı, her dalga sonu commit + production deploy.
