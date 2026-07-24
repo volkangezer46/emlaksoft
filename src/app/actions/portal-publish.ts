@@ -17,26 +17,22 @@ import {
 export type PortalPublishResult = { ok?: boolean; error?: string; externalId?: string; externalUrl?: string };
 
 const PROPERTY_SELECT = `
-  id, property_code, title, description, list_price,
-  property_type, transaction_type,
+  id, property_code, title, address_line, list_price,
+  property_type, transaction_type, features,
   province:geo_provinces(name),
-  district:geo_districts(name),
-  net_sqm, room_count, floor, building_age
+  district:geo_districts(name)
 ` as const;
 
 type PropertyRow = {
   property_code: string;
   title: string | null;
-  description: string | null;
+  address_line: string | null;
   list_price: number | null;
   property_type: string | null;
   transaction_type: string | null;
+  features: { rooms?: string | null; sqm?: number | null; floor?: number | null; building_age?: number | null } | null;
   province: { name?: string } | { name?: string }[] | null;
   district: { name?: string } | { name?: string }[] | null;
-  net_sqm: number | null;
-  room_count: string | null;
-  floor: number | null;
-  building_age: number | null;
 };
 
 function relName(v: { name?: string } | { name?: string }[] | null): string | undefined {
@@ -44,19 +40,23 @@ function relName(v: { name?: string } | { name?: string }[] | null): string | un
 }
 
 function toPayload(property: PropertyRow): PropertyPayload {
+  const f = property.features ?? {};
+  const sqm = f.sqm != null ? Number(f.sqm) : undefined;
+  const floor = f.floor != null ? Number(f.floor) : undefined;
+  const buildingAge = f.building_age != null ? Number(f.building_age) : undefined;
   return {
     propertyCode:    property.property_code,
     title:           property.title ?? property.property_code,
-    description:     property.description ?? undefined,
+    description:     property.address_line ?? undefined,
     listPrice:       property.list_price ?? 0,
     propertyType:    property.property_type ?? "daire",
     transactionType: property.transaction_type === "kiralik" ? "kiralik" : "satilik",
     province:        relName(property.province),
     district:        relName(property.district),
-    squareMeters:    property.net_sqm ?? undefined,
-    roomCount:       property.room_count ?? undefined,
-    floorCount:      property.floor ?? undefined,
-    buildingAge:     property.building_age ?? undefined,
+    squareMeters:    Number.isFinite(sqm) ? sqm : undefined,
+    roomCount:       f.rooms ?? undefined,
+    floorCount:      Number.isFinite(floor) ? floor : undefined,
+    buildingAge:     Number.isFinite(buildingAge) ? buildingAge : undefined,
   };
 }
 

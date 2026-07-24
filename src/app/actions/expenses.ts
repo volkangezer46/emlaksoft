@@ -10,7 +10,7 @@ export async function createExpense(
   _prev: ExpenseResult,
   fd: FormData,
 ): Promise<ExpenseResult> {
-  const gate = await requirePermission("reports", "create");
+  const gate = await requirePermission("expenses", "create");
   if (!gate.ok) return { error: gate.error };
 
   const title       = String(fd.get("title")       ?? "").trim();
@@ -46,7 +46,7 @@ export async function createExpense(
 }
 
 export async function deleteExpense(id: string): Promise<ExpenseResult> {
-  const gate = await requirePermission("reports", "delete");
+  const gate = await requirePermission("expenses", "delete");
   if (!gate.ok) return { error: gate.error };
 
   const supabase = await createClient();
@@ -61,7 +61,7 @@ export async function deleteExpense(id: string): Promise<ExpenseResult> {
 }
 
 export async function listExpenses(month?: string) {
-  const gate = await requirePermission("reports", "view");
+  const gate = await requirePermission("expenses", "view");
   if (!gate.ok) return [];
 
   const supabase = await createClient();
@@ -73,9 +73,10 @@ export async function listExpenses(month?: string) {
     .limit(200);
 
   if (month) {
-    query = query
-      .gte("expense_date", `${month}-01`)
-      .lte("expense_date", `${month}-31`);
+    // Ayın ilk günü (dahil) → sonraki ayın ilk günü (hariç) — geçersiz -31 tarihi yok
+    const [y, m] = month.split("-").map(Number);
+    const next = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+    query = query.gte("expense_date", `${month}-01`).lt("expense_date", next);
   }
 
   const { data } = await query;

@@ -62,8 +62,13 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
     amountTry,
   });
 
-  // Sandbox anahtarı yoksa: demo ödeme akışı (yerel geliştirme)
+  // Sandbox anahtarı yoksa: demo ödeme akışı — YALNIZCA geliştirmede/açıkça izin verildiğinde.
+  // Production'da iyzico yoksa demo tahsilatla ücretsiz abonelik verilmesi engellenir.
   if (!isIyzicoConfigured()) {
+    const demoAllowed = process.env.NODE_ENV !== "production" || process.env.ALLOW_BILLING_DEMO === "true";
+    if (!demoAllowed) {
+      return { error: "Ödeme altyapısı yapılandırılmamış. Lütfen yönetici ile iletişime geçin." };
+    }
     await fulfillSuccessfulPayment({
       tenantId: gate.tenantId,
       plan,

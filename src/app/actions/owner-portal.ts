@@ -144,7 +144,7 @@ export async function getOwnerPortalData(token: string): Promise<OwnerPortalData
       .update({ last_seen_at: new Date().toISOString() })
       .eq("token", token),
     admin.from("properties")
-      .select("id, property_code, title, list_price, status, description, province:geo_provinces(name), district:geo_districts(name)")
+      .select("id, property_code, title, list_price, status, address_line, province:geo_provinces(name), district:geo_districts(name)")
       .eq("id", propertyId)
       .single(),
     admin.from("tenants")
@@ -189,7 +189,7 @@ export async function getOwnerPortalData(token: string): Promise<OwnerPortalData
       status:      property.status ?? null,
       province:    provinceName,
       district:    districtName,
-      description: property.description ?? null,
+      description: property.address_line ?? null,
     },
     tenant: { name: tenant.name },
     ownerName,

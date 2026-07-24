@@ -196,7 +196,7 @@ function buildSingleXml(cfg: NetgsmConfig, phones: string[], text: string): stri
     <type>1:n</type>
   </header>
   <body>
-    <msg><![CDATA[${text}]]></msg>
+    <msg><![CDATA[${text.replace(/]]>/g, "]] >")}]]></msg>
     ${nos}
   </body>
 </mainbody>`;

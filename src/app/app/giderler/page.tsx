@@ -26,6 +26,7 @@ export default async function GiderlerPage() {
   const { perms } = await requireModulePage("expenses");
   const [expenses, catDefs] = await Promise.all([listExpenses(), getDefinitions("expense_category")]);
   const canCreate = perms.expenses?.includes("create") ?? false;
+  const canDelete = perms.expenses?.includes("delete") ?? false;
 
   // DB-driven gider kategorileri (boşsa sabit yedeğe düş)
   const categories = catDefs.length > 0 ? catDefs.map((c) => ({ value: c.value, label: c.label })) : EXPENSE_CATEGORIES;
@@ -120,7 +121,7 @@ export default async function GiderlerPage() {
                     <td className="px-4 py-3 font-bold text-ink-950">{money(Number(e.amount))}</td>
                     <td className="px-4 py-3 text-text-muted">{new Date(e.expense_date).toLocaleDateString("tr-TR")}</td>
                     <td className="px-4 py-3">
-                      {canCreate && (
+                      {canDelete && (
                         <form action={handleDelete.bind(null, e.id) as (fd: FormData) => Promise<void>}>
                           <button type="submit" className="grid h-7 w-7 place-items-center rounded-[7px] text-text-faint transition hover:bg-red-50 hover:text-red-600" aria-label="Sil">
                             <Trash2 className="h-3.5 w-3.5" />

@@ -31,8 +31,7 @@ export async function POST(req: NextRequest) {
     req.headers.get("x-iyz-signature-v3") ??
     req.headers.get("X-IYZ-SIGNATURE-V3");
 
-  // İmza doğrulama: merchant portalda IYZICO_MERCHANT_ID set ise sıkı; yoksa soft-pass + log
-  const strict = Boolean(process.env.IYZICO_MERCHANT_ID?.trim());
+  // İmza doğrulama — FAIL-CLOSED: geçersiz imzada her zaman reddet (kimliksiz tahsil engeli)
   const valid = verifyWebhookSignatureV3({
     headerSignature: signature,
     merchantId: body.merchantId != null ? String(body.merchantId) : undefined,
@@ -42,12 +41,9 @@ export async function POST(req: NextRequest) {
     status: body.status,
   });
 
-  if (strict && !valid) {
-    console.warn("iyzico webhook signature mismatch");
+  if (!valid) {
+    console.warn("iyzico webhook signature reddedildi");
     return NextResponse.json({ ok: false, error: "bad_signature" }, { status: 401 });
-  }
-  if (!strict && !valid) {
-    console.warn("iyzico webhook signature soft-fail (IYZICO_MERCHANT_ID yok)");
   }
 
   const status = String(body.status ?? "").toUpperCase();

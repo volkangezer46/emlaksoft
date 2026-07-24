@@ -9,12 +9,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const { data: media } = await admin
     .from("property_media")
-    .select("storage_path, file_type")
+    .select("storage_path, file_type, property:properties(status, deleted_at)")
     .eq("id", id)
     .eq("kind", "image")
     .maybeSingle();
 
-  if (!media?.storage_path) {
+  // Yalnızca herkese açık listelenen (taslak/silinmiş olmayan) portföylerin görselleri servis edilir
+  const prop = media && (Array.isArray(media.property) ? media.property[0] : media.property);
+  const isPublic = prop && !prop.deleted_at && prop.status !== "draft";
+  if (!media?.storage_path || !isPublic) {
     return NextResponse.json({ error: "Görsel bulunamadı" }, { status: 404 });
   }
 

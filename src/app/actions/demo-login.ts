@@ -163,6 +163,12 @@ export async function quickDemoLogin(personaId: string): Promise<DemoLoginResult
   const persona = getDemoPersona(personaId);
   if (!persona) return { error: "Geçersiz test kişiliği." };
 
+  // Güvenlik: platform (super_admin/ops...) kişilikleri production'da ASLA açılamaz —
+  // demo modu ofis demoları için açılsa bile platform admin ele geçirmeyi engelle.
+  if (persona.kind === "platform" && process.env.NODE_ENV === "production") {
+    return { error: "Bu test kişiliği bu ortamda kullanılamaz." };
+  }
+
   try {
     await ensurePersona(persona);
   } catch (e) {

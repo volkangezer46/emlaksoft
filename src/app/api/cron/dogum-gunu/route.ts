@@ -9,8 +9,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * Yetki: CRON_SECRET header kontrolü
  */
 export async function GET(req: Request) {
+  const secret = process.env.CRON_SECRET?.trim();
+  // CRON_SECRET tanımlı değilse production'da reddet ("Bearer undefined" bypass'ını engelle)
+  if (!secret) {
+    return NextResponse.json({ error: "Cron not configured" }, { status: process.env.NODE_ENV === "production" ? 401 : 200 });
+  }
   const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (auth !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
