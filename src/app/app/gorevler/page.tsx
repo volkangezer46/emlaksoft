@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { AlarmClock, CalendarClock, CheckCircle2, ListChecks, Sparkles } from "lucide-react";
+import { AlarmClock, CalendarClock, CheckCircle2, ListChecks } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { NewTaskDialog } from "./new-task-dialog";
 import { TaskCard, type TaskRow } from "./task-card";
+import { EmptyState } from "@/components/app/empty-state";
 
 export const dynamic = "force-dynamic";
 
@@ -154,11 +155,12 @@ export default async function TasksPage({
       </div>
 
       {tasks.length === 0 ? (
-        <div className="rounded-[20px] border border-dashed border-line bg-surface px-5 py-16 text-center">
-          <Sparkles className="mx-auto h-8 w-8 text-text-faint" />
-          <p className="mt-3 text-sm font-semibold text-ink-950">Bu filtrede görev yok</p>
-          <p className="mt-1 text-xs text-text-muted">Yeni görev ekleyerek takip akışınızı başlatın.</p>
-        </div>
+        <EmptyState
+          icon={ListChecks}
+          title="Bu filtrede görev yok"
+          description="Yeni görev ekleyerek takip akışınızı başlatın."
+          tone="brand"
+        />
       ) : (
         <div className="space-y-2">
           {tasks.map((t) => (

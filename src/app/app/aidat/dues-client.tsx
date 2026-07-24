@@ -3,8 +3,9 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, Loader2, Plus, Trash2, Undo2 } from "lucide-react";
+import { Check, Coins, Loader2, Plus, Trash2, Undo2 } from "lucide-react";
 import { createDue, toggleDuePaid, deleteDue, type DueResult } from "@/app/actions/dues";
+import { EmptyState } from "@/components/app/empty-state";
 
 type Property = { id: string; property_code: string; title: string | null };
 type Due = {
@@ -85,10 +86,15 @@ export function DuesClient({ dues, properties, canCreate }: { dues: Due[]; prope
         </section>
       ) : null}
 
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
-        {dues.length === 0 ? (
-          <p className="py-16 text-center text-sm text-text-muted">Henüz aidat kaydı yok.</p>
-        ) : (
+      {dues.length === 0 ? (
+        <EmptyState
+          icon={Coins}
+          title="Henüz aidat kaydı yok"
+          description="Portföy bazlı aidat ve ortak gider kayıtlarınız burada listelenecek. Yukarıdan ilk kaydı ekleyin."
+          tone="amber"
+        />
+      ) : (
+        <section className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="border-b border-line bg-canvas/80 text-text-muted">
@@ -138,8 +144,8 @@ export function DuesClient({ dues, properties, canCreate }: { dues: Due[]; prope
               </tbody>
             </table>
           </div>
-        )}
-      </section>
+        </section>
+      )}
     </div>
   );
 }

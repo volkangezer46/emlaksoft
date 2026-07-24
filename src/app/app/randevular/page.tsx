@@ -17,6 +17,7 @@ import { NewAppointmentDialog } from "./new-appointment-dialog";
 import { AddToCalendarButton } from "@/components/app/add-to-calendar-button";
 import { AppointmentCalendar } from "./appointment-calendar";
 import Link from "next/link";
+import { EmptyState } from "@/components/app/empty-state";
 
 type Rel = { id?: string; full_name?: string; title?: string; property_code?: string } | { id?: string; full_name?: string; title?: string; property_code?: string }[] | null;
 
@@ -166,22 +167,22 @@ export default async function AppointmentsPage() {
 
       <div className="grid gap-4 xl:grid-cols-[1.55fr_1fr]">
         {/* timeline */}
-        <section className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
-          <div className="flex items-center justify-between border-b border-line px-5 py-4">
-            <div>
-              <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><CalendarClock className="h-4 w-4" /> Tur planı</p>
-              <h2 className="mt-1 font-display font-bold text-ink-950">Yaklaşan randevular</h2>
+        {rows.length === 0 ? (
+          <EmptyState
+            icon={CalendarDays}
+            title="Henüz randevu yok"
+            description="İlk yer gösterme veya görüşmenizi planladığınızda tur planı burada oluşacak."
+            tone="mint"
+          />
+        ) : (
+          <section className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+            <div className="flex items-center justify-between border-b border-line px-5 py-4">
+              <div>
+                <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><CalendarClock className="h-4 w-4" /> Tur planı</p>
+                <h2 className="mt-1 font-display font-bold text-ink-950">Yaklaşan randevular</h2>
+              </div>
+              <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[10px] font-bold text-brand-600">{rows.length} kayıt</span>
             </div>
-            <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[10px] font-bold text-brand-600">{rows.length} kayıt</span>
-          </div>
-
-          {rows.length === 0 ? (
-            <div className="grid place-items-center px-6 py-16 text-center">
-              <span className="grid h-14 w-14 place-items-center rounded-[16px] bg-brand-600/10 text-brand-600"><CalendarDays className="h-7 w-7" /></span>
-              <h3 className="mt-4 font-display text-lg font-bold text-ink-950">Henüz randevu yok</h3>
-              <p className="mt-1 max-w-sm text-sm text-text-muted">İlk yer gösterme veya görüşmenizi planladığınızda tur planı burada oluşacak.</p>
-            </div>
-          ) : (
             <div className="divide-y divide-line">
               {rows.map((appt) => {
                 const status = statusMeta[appt.status] ?? statusMeta.pending;
@@ -251,8 +252,8 @@ export default async function AppointmentsPage() {
                 );
               })}
             </div>
-          )}
-        </section>
+          </section>
+        )}
 
         {/* side: signature + gps */}
         <div className="space-y-4">

@@ -4,6 +4,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { listCampaigns } from "@/app/actions/campaigns";
 import { NewCampaignDialog } from "./new-campaign-dialog";
 import { CampaignActions } from "./campaign-actions";
+import { EmptyState } from "@/components/app/empty-state";
 
 const STATUS_LABELS: Record<string, string> = {
   draft:     "Taslak",
@@ -102,23 +103,16 @@ export default async function KampanyalarPage() {
       </div>
 
       {/* Liste */}
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
-        {campaigns.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="mb-4 rounded-full bg-muted p-4">
-              <MessageSquare className="h-8 w-8 text-text-muted" />
-            </div>
-            <h3 className="text-lg font-semibold text-ink-950">Henüz kampanya yok</h3>
-            <p className="mt-1 max-w-sm text-sm text-text-muted">
-              İlk kampanyanızı oluşturun. Müşteri listenizdeki herkese SMS veya WhatsApp gönderin.
-            </p>
-            {canCreate && (
-              <div className="mt-4">
-                <NewCampaignDialog trigger="button" />
-              </div>
-            )}
-          </div>
-        ) : (
+      {campaigns.length === 0 ? (
+        <EmptyState
+          icon={MessageSquare}
+          title="Henüz kampanya yok"
+          description="İlk kampanyanızı oluşturun. Müşteri listenizdeki herkese SMS veya WhatsApp gönderin."
+          tone="brand"
+          action={canCreate ? { label: "Yeni kampanya", node: <NewCampaignDialog trigger="button" /> } : undefined}
+        />
+      ) : (
+        <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="border-b border-line bg-canvas/80 text-text-muted">
@@ -172,8 +166,8 @@ export default async function KampanyalarPage() {
               </tbody>
             </table>
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* Bilgi kutusu */}
       <section className="rounded-[16px] border border-dashed border-line-strong bg-surface px-5 py-4 text-sm text-text-muted">

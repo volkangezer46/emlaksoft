@@ -4,6 +4,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { listOffers } from "@/app/actions/offers";
 import { createClient } from "@/lib/supabase/server";
 import { NewOfferDialog } from "./new-offer-dialog";
+import { EmptyState } from "@/components/app/empty-state";
 
 const STATUS_LABELS: Record<string, string> = {
   draft:     "Taslak",
@@ -93,10 +94,14 @@ export default async function TekliflerPage() {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
-        {offers.length === 0 ? (
-          <p className="py-16 text-center text-sm text-text-muted">Henüz teklif yok.</p>
-        ) : (
+      {offers.length === 0 ? (
+        <EmptyState
+          icon={Tag}
+          title="Henüz teklif yok"
+          description="Portföylere gelen teklifler burada listelenir. Portföy detayından veya “Yeni teklif” ile ilk teklifi ekleyin."
+        />
+      ) : (
+        <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[700px] text-left text-sm">
               <thead className="border-b border-line bg-canvas/80 text-text-muted">
@@ -142,8 +147,8 @@ export default async function TekliflerPage() {
               </tbody>
             </table>
           </div>
-        )}
-      </section>
+        </section>
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { DoorOpen, Users, CalendarDays, MapPin } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listOpenHouses } from "@/app/actions/targets-openhouse-sources";
+import { EmptyState } from "@/components/app/empty-state";
 
 const STATUS_LABELS: Record<string, string> = {
   planned:   "Planlandı",
@@ -60,11 +61,12 @@ export default async function AcikEvPage() {
       </section>
 
       {events.length === 0 ? (
-        <div className="rounded-[20px] border border-dashed border-line-strong bg-surface py-16 text-center">
-          <DoorOpen className="mx-auto h-10 w-10 text-text-faint" />
-          <p className="mt-3 font-semibold text-ink-950">Henüz açık ev etkinliği yok</p>
-          <p className="mt-1 text-sm text-text-muted">Portföy randevu sayfasından açık ev günü ekleyebilirsiniz.</p>
-        </div>
+        <EmptyState
+          icon={DoorOpen}
+          title="Henüz açık ev etkinliği yok"
+          description="Portföy randevu sayfasından açık ev günü ekleyebilirsiniz."
+          tone="mint"
+        />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {events.map((e) => {

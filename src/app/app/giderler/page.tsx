@@ -2,6 +2,7 @@ import { Receipt, Plus, Trash2 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listExpenses, deleteExpense } from "@/app/actions/expenses";
 import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
+import { EmptyState } from "@/components/app/empty-state";
 
 // Inline server action wrappers — void return için form action uyumlu
 async function handleCreate(fd: FormData): Promise<void> {
@@ -86,10 +87,15 @@ export default async function GiderlerPage() {
       )}
 
       {/* Liste */}
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
-        {expenses.length === 0 ? (
-          <p className="py-16 text-center text-sm text-text-muted">Henüz gider kaydı yok.</p>
-        ) : (
+      {expenses.length === 0 ? (
+        <EmptyState
+          icon={Receipt}
+          title="Henüz gider kaydı yok"
+          description="Ofis giderlerinizi kategorilere göre ekleyin. Kayıtlar burada listelenir."
+          tone="amber"
+        />
+      ) : (
+        <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[600px] text-left text-sm">
               <thead className="border-b border-line bg-canvas/80 text-text-muted">
@@ -122,8 +128,8 @@ export default async function GiderlerPage() {
               </tbody>
             </table>
           </div>
-        )}
-      </section>
+        </section>
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
 import { requireModulePage } from "@/lib/require-module-page";
 import { listContracts } from "@/app/actions/contracts";
 import { NewContractDialog } from "./new-contract-dialog";
+import { EmptyState } from "@/components/app/empty-state";
 
 const TYPE_LABELS: Record<string, string> = {
   satis:     "Satış",
@@ -119,23 +120,16 @@ export default async function SozlesmelerPage() {
       </div>
 
       {/* Liste */}
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
-        {contracts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="mb-4 rounded-full bg-muted p-4">
-              <FileText className="h-8 w-8 text-text-muted" />
-            </div>
-            <h3 className="text-lg font-semibold text-ink-950">Henüz sözleşme yok</h3>
-            <p className="mt-1 max-w-sm text-sm text-text-muted">
-              İlk sözleşme taslağınızı oluşturun, imzalayanları ekleyin ve dijital onay alın.
-            </p>
-            {canCreate && (
-              <div className="mt-4">
-                <NewContractDialog trigger="button" />
-              </div>
-            )}
-          </div>
-        ) : (
+      {contracts.length === 0 ? (
+        <EmptyState
+          icon={FileSignature}
+          title="Henüz sözleşme yok"
+          description="İlk sözleşme taslağınızı oluşturun, imzalayanları ekleyin ve dijital onay alın."
+          tone="brand"
+          action={canCreate ? { label: "Yeni sözleşme", node: <NewContractDialog trigger="button" /> } : undefined}
+        />
+      ) : (
+        <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[700px] text-left text-sm">
               <thead className="border-b border-line bg-canvas/80 text-text-muted">
@@ -185,8 +179,8 @@ export default async function SozlesmelerPage() {
               </tbody>
             </table>
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* Bilgi kutusu */}
       <section className="rounded-[16px] border border-dashed border-line-strong bg-surface px-5 py-4 text-sm text-text-muted">

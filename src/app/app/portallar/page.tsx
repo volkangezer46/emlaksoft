@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { confirmPortalListing } from "@/app/actions/portal-listings";
 import { ClosePortalDialog, NewPortalDialog } from "./portal-dialogs";
+import { EmptyState } from "@/components/app/empty-state";
 
 type PortalRow = {
   id: string;
@@ -176,12 +177,17 @@ export default async function PortalsPage() {
       ) : null}
 
       {rows.length === 0 ? (
-        <div className="grid place-items-center rounded-[20px] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
-          <span className="relative grid h-16 w-16 place-items-center rounded-[18px] bg-brand-600/10 text-brand-600"><RadioTower className="h-8 w-8" /><span className="status-pulse absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-mint-500" /></span>
-          <h2 className="mt-5 font-display text-xl font-bold text-ink-950">Yayın ağınızı bağlayın</h2>
-          <p className="mt-2 max-w-md text-sm leading-relaxed text-text-muted">Portal ilanlarını portföylerle eşleştirin; teyit süresi ve kapanış nedenleri otomatik izlenmeye başlasın.</p>
-          {propertyOptions.length > 0 ? <div className="mt-5 [&>button]:bg-brand-600 [&>button]:text-white"><NewPortalDialog properties={propertyOptions} /></div> : null}
-        </div>
+        <EmptyState
+          icon={RadioTower}
+          title="Yayın ağınızı bağlayın"
+          description="Portal ilanlarını portföylerle eşleştirin; teyit süresi ve kapanış nedenleri otomatik izlenmeye başlasın."
+          tone="brand"
+          action={
+            propertyOptions.length > 0
+              ? { label: "Yeni portal ilanı", node: <div className="[&>button]:bg-brand-600 [&>button]:text-white"><NewPortalDialog properties={propertyOptions} /></div> }
+              : undefined
+          }
+        />
       ) : (
         <div className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
