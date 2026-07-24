@@ -230,6 +230,7 @@ export default function HomePage() {
         {/* ================= HERO ================= */}
         <section className="hero-lux relative overflow-hidden">
           <div className="pointer-events-none absolute inset-0 -z-10">
+            <div className="hero-aurora" />
             <div className="blob animate-aurora left-[-6%] top-[-8%] h-[420px] w-[420px]" style={{ background: "radial-gradient(circle, rgba(20,99,255,0.5), transparent 70%)" }} />
             <div className="blob animate-float-slow right-[-4%] top-[4%] h-[360px] w-[360px]" style={{ background: "radial-gradient(circle, rgba(34,211,238,0.45), transparent 70%)" }} />
           </div>
@@ -275,8 +276,8 @@ export default function HomePage() {
             </p>
 
             <div className="animate-rise mt-8 flex flex-wrap items-center justify-center gap-3" style={{ animationDelay: "240ms" }}>
-              <Link href="/kayit" className="btn-shine inline-flex items-center gap-2 rounded-[12px] bg-brand-600 px-6 py-3.5 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:bg-brand-700">
-                14 gün ücretsiz dene <ArrowRight className="h-4 w-4" />
+              <Link href="/kayit" className="btn-shine group inline-flex items-center gap-2 rounded-[12px] bg-[image:var(--grad-brand)] px-6 py-3.5 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:brightness-[1.06] hover:shadow-[0_24px_60px_-16px_rgba(20,99,255,0.7)]">
+                14 gün ücretsiz dene <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </Link>
               <Link href="/demo" className="inline-flex items-center gap-2 rounded-[12px] border border-line-strong bg-surface px-6 py-3.5 text-sm font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600">
                 Canlı demo izle

@@ -503,6 +503,30 @@ h1, h2, h3, h4 {
     linear-gradient(180deg, #f9fbff 0%, #f3f7fd 58%, #eef4fb 100%);
 }
 
+/* Ultra-premium canlı aurora mesh — hero'nun arkasında yumuşak, hareketli renk bulutu */
+.hero-aurora {
+  position: absolute;
+  inset: -28% -12% auto -12%;
+  height: 760px;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 40% at 18% 28%, rgba(20, 99, 255, 0.26), transparent 70%),
+    radial-gradient(34% 36% at 82% 18%, rgba(34, 211, 238, 0.22), transparent 70%),
+    radial-gradient(42% 42% at 52% 66%, rgba(16, 185, 163, 0.20), transparent 70%),
+    radial-gradient(30% 32% at 90% 58%, rgba(122, 169, 255, 0.18), transparent 70%);
+  filter: blur(46px) saturate(1.15);
+  opacity: 0.85;
+  animation: hero-aurora 22s ease-in-out infinite alternate;
+}
+@keyframes hero-aurora {
+  0%   { transform: translate3d(-2%, -1%, 0) scale(1); }
+  50%  { transform: translate3d(3%, 2%, 0) scale(1.07); }
+  100% { transform: translate3d(-1%, 1.5%, 0) scale(1.03); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-aurora { animation: none; }
+}
+
 .hero-lux::after {
   content: "";
   position: absolute;
