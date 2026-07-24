@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { requirePlatformStaff } from "@/lib/platform";
+import { requirePlatformStaff, requirePlatformModule } from "@/lib/platform";
 import { IMPERSONATE_COOKIE } from "@/lib/impersonation";
 import { logActivity } from "@/lib/activity";
 import { getPlan, type PlanId } from "@/lib/billing/plans";
