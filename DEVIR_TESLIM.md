@@ -98,6 +98,18 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 
 ## Bu sohbette tamamlanan işler
 
+### 22) Lead skoru (liste) + komisyon split editörü (24 Temmuz 2026)
+
+**Build: ✓ 0 hata.** Production deploy (`514f197`, `ba4859c`).
+
+- **Müşteri listesinde lead skoru** — `customer_lead_signals` aggregate RPC (migration 041): müşteri başına aktif talep/iletişim/randevu/çağrı + son etkileşim tek sorguda. Her satırda 🔥Sıcak/🌤️Ilık/❄️Soğuk rozet + **"Sıcak önce"** sıralama toggle'ı (sıcak aday sayısıyla). Danışman en sıcak adaylara öncelik verir
+- **Komisyon çok-taraflı paylaşım editörü** — `updateCommissionSplits` action (oran→tutar otomatik, %100 doğrulaması) + `CommissionSplitEditor` (taraf ekle/çıkar, canlı tutar/kalan%). Komisyon satırında mevcut paylaşım gösterimi. "Çok taraflı paylaşım" vaadi artık uçtan uca
+
+#### Migration (production ✅)
+- `041` customer_lead_signals RPC
+
+---
+
 ### 21) 3 yeni detay sayfası — paneldeki tüm kayıtlar artık açılabilir (24 Temmuz 2026)
 
 **Build: ✓ 0 hata.** Production deploy (`90fe5ac`).
