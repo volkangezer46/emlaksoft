@@ -332,7 +332,26 @@ Su anki sonuç: **39 tablo, bulgu yok.**
 > politikalarında `WITH CHECK` verilmemişse `USING`'i yazma denetimi olarak da
 > kullanıyor. Rapor etmeden önce doğrulandı.
 
-### 10.7 CI 3 push kırmızı — araç zinciri sürüklenmesi
+### 10.7 Sessiz liste kırpması — 25 sayfada
+Panelde 25 liste sayfasında `.limit()` vardı ve **hiçbiri kullanıcıya bunu
+söylemiyordu**: müşteriler 500, portföyler 200, talepler 200, teklifler 200,
+anlaşmalar 200, görevler 100/200, komisyon 100, randevular 100, denetim 120…
+
+600 müşterisi olan bir ofis 500 kayıt görüyor, kalan 100'den haberi olmuyordu.
+Üstelik sayfa üstündeki "N sonuç" rozeti **çekilen kümeyi** sayıyordu, gerçek
+toplamı değil — sayı doğru görünüyor ama yanlış şeyi sayıyor.
+
+Sessiz kırpma en sinsi hata türü: ekranda hiçbir şey bozuk görünmez, kullanıcı
+aradığı kaydı bulamaz ve "sistemde yok" sanır. Komisyon defterinde özellikle
+kötü — para tutan bir listede eksik satır farkedilmez. Denetim kaydında ise
+"kayıt yok" ile "kayıt var ama listede değil" farkı denetimin anlamını
+belirliyor.
+
+→ **[x]** `<ListLimitNotice shown total />` — 8 sayfaya bağlandı. Toplam,
+sorguya `{ count: "exact" }` eklenerek **aynı yanıtta** geliyor; ek gidiş-dönüş
+yok. Her şey ekrandaysa uyarı hiç render edilmiyor.
+
+### 10.8 CI 3 push kırmızı — araç zinciri sürüklenmesi
 `npm install` (yerel npm 11.6.2) lockfile'dan `@emnapi/*` girdilerini düşürdü.
 npm 11.6.2 tolere ediyor, **npm 11.18.0 etmiyor**. CI `.nvmrc: 24`'ten en
 güncel 24.x'i kuruyor, o da 11.18 getiriyor. Actions log API'si public repoda
