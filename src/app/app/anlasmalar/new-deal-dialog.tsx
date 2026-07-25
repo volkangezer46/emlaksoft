@@ -2,7 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus } from "lucide-react";
+import { Handshake, Loader2, Plus } from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { createPipelineDeal } from "@/app/actions/deals";
 import { useToast } from "@/components/app/toast-provider";
 
@@ -30,22 +37,24 @@ export function NewDealDialog({ properties, customers }: { properties: Prop[]; c
   }
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="btn-shine inline-flex items-center gap-1.5 rounded-[10px] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950"
-      >
-        <Plus className="h-4 w-4" /> Yeni anlaşma
-      </button>
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center">
-          <button type="button" aria-label="Kapat" className="absolute inset-0 bg-ink-950/50 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <form
-            onSubmit={onSubmit}
-            className="relative my-auto w-full max-w-md space-y-3 rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-lg)]"
-          >
-            <h2 className="font-display text-lg font-bold text-ink-950">Pipeline’a anlaşma ekle</h2>
+    /* Radix Dialog: focus trap + Esc (öncesinde yoktu) + scroll lock + ARIA. */
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[10px] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950"
+        >
+          <Plus className="h-4 w-4" /> Yeni anlaşma
+        </button>
+      </DialogTrigger>
+
+      <DialogContent size="sm">
+        <DialogHeader
+          icon={<Handshake />}
+          title="Pipeline’a anlaşma ekle"
+          description="Portföy ve müşteriyi eşleştirip aşamayı belirleyin."
+        />
+        <form onSubmit={onSubmit} className="space-y-3 p-6">
             <label className="block text-xs font-medium text-text-muted">
               Portföy
               <select name="property_id" className="mt-1.5 w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
@@ -96,18 +105,19 @@ export function NewDealDialog({ properties, customers }: { properties: Prop[]; c
                 <span className="mt-0.5 block text-text-muted">Müzakere veya kazanılan aşaması için gerekli.</span>
               </span>
             </label>
-            <div className="flex justify-end gap-2 pt-1">
-              <button type="button" onClick={() => setOpen(false)} className="rounded-[10px] border border-line px-4 py-2 text-sm font-semibold text-text-muted">
-                Vazgeç
-              </button>
-              <button type="submit" disabled={pending} className="inline-flex items-center gap-1.5 rounded-[10px] bg-ink-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+            <div className="hairline-t flex justify-end gap-2 pt-4">
+              <DialogClose asChild>
+                <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas">
+                  Vazgeç
+                </button>
+              </DialogClose>
+              <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[10px] bg-ink-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                 {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Kaydet
               </button>
             </div>
-          </form>
-        </div>
-      ) : null}
-    </>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

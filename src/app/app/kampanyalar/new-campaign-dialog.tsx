@@ -1,7 +1,14 @@
 "use client";
 
 import { useActionState, useTransition, useState } from "react";
-import { Plus, MessageSquare, Sparkles, X } from "lucide-react";
+import { Plus, MessageSquare, Sparkles } from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { createCampaign, type CampaignResult } from "@/app/actions/campaigns";
 import { CAMPAIGN_TEMPLATES } from "@/lib/campaign-templates";
 
@@ -14,7 +21,7 @@ const FILTERS = [
 
 const init: CampaignResult = {};
 
-export function NewCampaignDialog({ trigger }: { trigger?: "button" | "icon" } = {}) {
+export function NewCampaignDialog() {
   const [open, setOpen] = useState(false);
   // action kullanılmıyor: form handleSubmit içinde createCampaign'i doğrudan
   // çağırıyor; useActionState burada yalnızca `state` için duruyor.
@@ -32,56 +39,32 @@ export function NewCampaignDialog({ trigger }: { trigger?: "button" | "icon" } =
     });
   }
 
-  const triggerBtn =
-    trigger === "button" ? (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-[12px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
-      >
-        <Plus className="h-4 w-4" /> Yeni kampanya
-      </button>
-    ) : (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-[12px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
-      >
-        <Plus className="h-4 w-4" /> Yeni kampanya
-      </button>
-    );
+  // Not: burada `trigger === "button" ? A : B` şeklinde bir üçlü vardı ama
+  // A ve B BİREBİR AYNIYDI — yani `trigger` prop'u hiçbir şey yapmıyordu.
+  // Yanıltıcı API kaldırıldı. Açma işini artık DialogTrigger üstleniyor,
+  // ayrıca onClick de gerekmiyor.
+  const triggerBtn = (
+    <button
+      type="button"
+      className="focus-ring press inline-flex items-center gap-2 rounded-[12px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+    >
+      <Plus className="h-4 w-4" /> Yeni kampanya
+    </button>
+  );
 
   return (
-    <>
-      {triggerBtn}
+    /* Radix Dialog: focus trap + Esc (öncesinde yoktu) + scroll lock + ARIA.
+       Düz başlık DialogHeader'a geçince gradient başlık + açıklama kazandı. */
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{triggerBtn}</DialogTrigger>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center">
-          <button
-            type="button"
-            aria-label="Kapat"
-            onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-ink-950/50 backdrop-blur-sm"
-          />
-          <div className="relative my-auto w-full max-w-lg rounded-[20px] border border-line bg-surface p-6 shadow-[var(--shadow-xl)]">
-            <div className="mb-5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-brand-600/10 text-brand-600">
-                  <MessageSquare className="h-4 w-4" />
-                </span>
-                <h2 className="font-display text-lg font-bold text-ink-950">Yeni Kampanya</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="grid h-8 w-8 place-items-center rounded-[8px] text-text-muted transition hover:bg-canvas hover:text-ink-950"
-                aria-label="Kapat"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
+      <DialogContent size="md">
+        <DialogHeader
+          icon={<MessageSquare />}
+          title="Yeni kampanya"
+          description="SMS veya WhatsApp ile müşteri listenize toplu mesaj gönderin."
+        />
+        <form onSubmit={handleSubmit} className="space-y-4 p-6">
               {/* Başlık */}
               <div>
                 <label htmlFor="kamp-title" className="mb-1.5 block text-sm font-semibold text-ink-950">
@@ -181,29 +164,31 @@ export function NewCampaignDialog({ trigger }: { trigger?: "button" | "icon" } =
                 )}
               </div>
 
+              {/* Palet dışı red-50/red-600 yerine danger tonları */}
               {state?.error && (
-                <p className="rounded-[8px] bg-red-50 px-3 py-2 text-sm text-red-600">{state.error}</p>
+                <p className="rounded-[8px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
+                  {state.error}
+                </p>
               )}
 
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="rounded-[10px] border border-line px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
-                >
-                  Vazgeç
-                </button>
+              <div className="hairline-t flex justify-end gap-2 pt-4">
+                <DialogClose asChild>
+                  <button
+                    type="button"
+                    className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+                  >
+                    Vazgeç
+                  </button>
+                </DialogClose>
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+                  className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
                 >
                   <Plus className="h-4 w-4" /> Kampanya oluştur
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

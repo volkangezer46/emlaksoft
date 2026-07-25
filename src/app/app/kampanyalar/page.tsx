@@ -120,7 +120,7 @@ export default async function KampanyalarPage() {
           title="Henüz kampanya yok"
           description="İlk kampanyanızı oluşturun. Müşteri listenizdeki herkese SMS veya WhatsApp gönderin."
           tone="brand"
-          action={canCreate ? { label: "Yeni kampanya", node: <NewCampaignDialog trigger="button" /> } : undefined}
+          action={canCreate ? { label: "Yeni kampanya", node: <NewCampaignDialog /> } : undefined}
         />
       ) : (
         <DataTable
