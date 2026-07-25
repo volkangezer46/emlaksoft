@@ -3,6 +3,7 @@ import { Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { BarCompare, ChartFrame } from "@/components/ui/chart";
+import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -152,60 +153,70 @@ export default async function DanismanKpiPage() {
       {advisors.length === 0 ? (
         <p className="py-12 text-center text-sm text-text-muted">Danışman kaydı bulunamadı.</p>
       ) : (
-        <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="border-b border-line bg-canvas/80 text-xs text-text-muted">
-                <tr>
-                  <th className="px-5 py-3 font-semibold">#</th>
-                  <th className="px-4 py-3 font-semibold">Danışman</th>
-                  <th className="px-4 py-3 font-semibold">Müşteri</th>
-                  <th className="px-4 py-3 font-semibold">Çağrı</th>
-                  <th className="px-4 py-3 font-semibold">Randevu</th>
-                  <th className="px-4 py-3 font-semibold">Teklif</th>
-                  <th className="px-4 py-3 font-semibold">Satış</th>
-                  <th className="px-4 py-3 font-semibold">Dönüşüm</th>
-                  <th className="px-4 py-3 font-semibold">Gelir</th>
-                  <th className="px-4 py-3 font-semibold">Skor</th>
-                </tr>
-              </thead>
-              <tbody>
-                {advisors.map((a, i) => (
-                  <tr key={a.id} className="group relative cursor-pointer border-b border-line last:border-0 hover:bg-brand-600/[0.03] transition">
-                    <td className="px-5 py-3.5">
-                      <span className={`font-display font-bold ${i === 0 ? "text-amber-500" : i === 1 ? "text-zinc-400" : i === 2 ? "text-amber-700" : "text-text-faint"}`}>
-                        {i + 1}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <Link href={`/app/ekip/${a.id}`} className="absolute inset-0" aria-label={`${a.full_name} danışman detayı`} />
-                      <p className="font-semibold text-ink-950 group-hover:text-brand-600">{a.full_name}</p>
-                      <p className="text-[10px] text-text-faint capitalize">{a.role}</p>
-                    </td>
-                    <td className="px-4 py-3.5 text-text-muted">{a.customerCount}</td>
-                    <td className="px-4 py-3.5 text-text-muted">{a.callCount}</td>
-                    <td className="px-4 py-3.5 text-text-muted">{a.appointCount}</td>
-                    <td className="px-4 py-3.5 text-text-muted">{a.offerCount}</td>
-                    <td className="px-4 py-3.5 font-semibold text-ink-950">{a.dealCount}</td>
-                    <td className="px-4 py-3.5 text-text-muted">{a.conversionRate}</td>
-                    <td className="px-4 py-3.5 font-bold text-mint-700">{a.revenue > 0 ? money(a.revenue) : "—"}</td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-line">
-                          <div
-                            className="h-full rounded-full bg-brand-600"
-                            style={{ width: `${(a.score / topScore) * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-bold text-ink-950">{a.score}</span>
+        <TableFrame minWidth={760}>
+          <Table>
+            <THead>
+              <TR>
+                <TH>#</TH>
+                <TH>Danışman</TH>
+                <TH align="right">Müşteri</TH>
+                <TH align="right">Çağrı</TH>
+                <TH align="right">Randevu</TH>
+                <TH align="right">Teklif</TH>
+                <TH align="right">Satış</TH>
+                <TH align="right">Dönüşüm</TH>
+                <TH align="right">Gelir</TH>
+                <TH>Skor</TH>
+              </TR>
+            </THead>
+            <TBody>
+              {advisors.map((a, i) => (
+                <TR key={a.id} interactive>
+                  <TD>
+                    {/* İlk üç sıra madalya rengi; zinc palet dışıydı, ink'e çekildi */}
+                    <span
+                      className={`numeric font-display font-bold ${
+                        i === 0
+                          ? "text-amber-500"
+                          : i === 1
+                            ? "text-text-muted"
+                            : i === 2
+                              ? "text-amber-700"
+                              : "text-text-faint"
+                      }`}
+                    >
+                      {i + 1}
+                    </span>
+                  </TD>
+                  <TD>
+                    <Link href={`/app/ekip/${a.id}`} className="absolute inset-0" aria-label={`${a.full_name} danışman detayı`} />
+                    <p className="font-semibold text-ink-950 group-hover:text-brand-600">{a.full_name}</p>
+                    <p className="text-[10px] text-text-faint capitalize">{a.role}</p>
+                  </TD>
+                  <TD align="right" className="text-text-muted">{a.customerCount}</TD>
+                  <TD align="right" className="text-text-muted">{a.callCount}</TD>
+                  <TD align="right" className="text-text-muted">{a.appointCount}</TD>
+                  <TD align="right" className="text-text-muted">{a.offerCount}</TD>
+                  <TD align="right" className="font-semibold text-ink-950">{a.dealCount}</TD>
+                  <TD align="right" className="text-text-muted">{a.conversionRate}</TD>
+                  {/* mint-700 bu turda tanımlandı; öncesinde sınıf sessizce düşüyordu */}
+                  <TD align="right" className="font-bold text-mint-700">{a.revenue > 0 ? money(a.revenue) : "—"}</TD>
+                  <TD>
+                    <div className="flex items-center gap-2">
+                      <div className="surface-sunken h-1.5 w-16 overflow-hidden rounded-full">
+                        <div
+                          className="h-full rounded-full bg-[image:var(--grad-brand)]"
+                          style={{ width: `${(a.score / topScore) * 100}%` }}
+                        />
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                      <span className="numeric text-xs font-bold text-ink-950">{a.score}</span>
+                    </div>
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </TableFrame>
       )}
     </div>
   );

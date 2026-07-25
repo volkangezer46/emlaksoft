@@ -18,6 +18,8 @@ import {
   PLATFORM_ROLE_LABELS,
 } from "@/app/actions/platform-staff";
 import type { PlatformRole } from "@/lib/platform-access";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -164,19 +166,20 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => void }) 
   }
 
   return (
-    <tr className="border-b border-line last:border-0">
-      <td className="px-5 py-3.5">
+    <TR>
+      <TD>
         <p className="font-semibold text-ink-950">{member.full_name}</p>
         <p className="text-xs text-text-faint">{member.email}</p>
-        {err ? <p className="mt-0.5 text-xs text-danger-500">{err}</p> : null}
-      </td>
-      <td className="px-4 py-3.5">
+        {err ? <p className="mt-0.5 text-xs font-medium text-danger-600" role="alert">{err}</p> : null}
+      </TD>
+      <TD>
         <div className="relative">
           <select
             defaultValue={member.role}
             onChange={changeRole}
             disabled={pending || !member.is_active}
-            className={`appearance-none rounded-[9px] border border-line bg-canvas py-1.5 pl-2.5 pr-8 text-xs font-semibold outline-none focus:border-brand-400 disabled:opacity-50 ${roleCls[member.role]}`}
+            aria-label={`${member.full_name} rolü`}
+            className={`focus-ring appearance-none rounded-[9px] border border-hairline bg-canvas py-1.5 pl-2.5 pr-8 text-xs font-semibold outline-none disabled:opacity-50 ${roleCls[member.role]}`}
           >
             {(Object.entries(PLATFORM_ROLE_LABELS) as [PlatformRole, string][]).map(([v, l]) => (
               <option key={v} value={v}>{l}</option>
@@ -184,24 +187,24 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => void }) 
           </select>
           <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-current opacity-60" />
         </div>
-      </td>
-      <td className="px-4 py-3.5">
-        <span className={`text-xs font-semibold ${member.is_active ? "text-mint-600" : "text-text-faint"}`}>
+      </TD>
+      <TD>
+        <Badge variant={member.is_active ? "success" : "outline"} size="sm">
           {member.is_active ? "Aktif" : "Pasif"}
-        </span>
-      </td>
-      <td className="px-4 py-3.5 text-xs text-text-muted">
+        </Badge>
+      </TD>
+      <TD align="right" className="text-xs text-text-muted">
         {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(member.created_at))}
-      </td>
-      <td className="px-4 py-3.5">
+      </TD>
+      <TD align="right">
         <button
           type="button"
           onClick={toggle}
           disabled={pending}
-          className={`inline-flex items-center gap-1 rounded-[9px] border px-2.5 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
+          className={`focus-ring press inline-flex items-center gap-1 rounded-[9px] border px-2.5 py-1.5 text-xs font-semibold shadow-[var(--elev-1)] transition disabled:opacity-50 ${
             member.is_active
-              ? "border-danger-500/30 text-danger-500 hover:bg-danger-500/8"
-              : "border-mint-500/30 text-mint-600 hover:bg-mint-500/8"
+              ? "border-danger-500/30 bg-surface text-danger-600 hover:bg-danger-500/8"
+              : "border-mint-500/30 bg-surface text-mint-700 hover:bg-mint-500/8"
           }`}
         >
           {pending ? (
@@ -212,8 +215,30 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => void }) 
             <><UserPlus className="h-3 w-3" /> Aktif yap</>
           )}
         </button>
-      </td>
-    </tr>
+      </TD>
+    </TR>
+  );
+}
+
+/** İki tabloda (aktif/pasif) aynı başlıklar — tek yerde tutuluyor. */
+function StaffTable({ rows, onDone }: { rows: StaffRow[]; onDone: () => void }) {
+  return (
+    <TableFrame minWidth={680} className="rounded-none border-0 shadow-none">
+      <Table>
+        <THead>
+          <TR>
+            <TH>Personel</TH>
+            <TH>Rol</TH>
+            <TH>Durum</TH>
+            <TH align="right">Katılım</TH>
+            <TH align="right">İşlem</TH>
+          </TR>
+        </THead>
+        <TBody>
+          {rows.map((m) => <StaffRow key={m.id} member={m} onDone={onDone} />)}
+        </TBody>
+      </Table>
+    </TableFrame>
   );
 }
 
@@ -280,22 +305,7 @@ export default function PersonelPage() {
         ) : active.length === 0 ? (
           <div className="px-5 py-10 text-center text-sm text-text-muted">Aktif personel yok.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-left text-sm">
-              <thead className="border-b border-line bg-canvas/80 text-text-muted">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Personel</th>
-                  <th className="px-4 py-3 font-medium">Rol</th>
-                  <th className="px-4 py-3 font-medium">Durum</th>
-                  <th className="px-4 py-3 font-medium">Katılım</th>
-                  <th className="px-4 py-3 font-medium">İşlem</th>
-                </tr>
-              </thead>
-              <tbody>
-                {active.map((m) => <StaffRow key={m.id} member={m} onDone={load} />)}
-              </tbody>
-            </table>
-          </div>
+          <StaffTable rows={active} onDone={load} />
         )}
       </section>
 
@@ -307,22 +317,7 @@ export default function PersonelPage() {
             <h2 className="font-display font-bold text-ink-950">Pasif personel</h2>
             <span className="ml-auto rounded-full bg-canvas px-2.5 py-0.5 text-[10px] font-bold text-text-faint">{passive.length}</span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-left text-sm">
-              <thead className="border-b border-line bg-canvas/80 text-text-muted">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Personel</th>
-                  <th className="px-4 py-3 font-medium">Rol</th>
-                  <th className="px-4 py-3 font-medium">Durum</th>
-                  <th className="px-4 py-3 font-medium">Katılım</th>
-                  <th className="px-4 py-3 font-medium">İşlem</th>
-                </tr>
-              </thead>
-              <tbody>
-                {passive.map((m) => <StaffRow key={m.id} member={m} onDone={load} />)}
-              </tbody>
-            </table>
-          </div>
+          <StaffTable rows={passive} onDone={load} />
         </section>
       ) : null}
     </div>

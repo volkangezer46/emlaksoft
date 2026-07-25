@@ -21,6 +21,7 @@ import { getDefinitions } from "@/lib/definitions";
 import { CustomerRowDelete } from "./customer-row-delete";
 import { formatTurkishPhone } from "@/lib/phone";
 import { computeLeadScore, leadTierCls } from "@/lib/lead-score";
+import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 type LeadSignalRow = {
   customer_id: string;
@@ -440,28 +441,24 @@ export default async function CustomersPage({
           <p className="mt-1 text-sm text-text-muted">Arama ifadenizi değiştirip tekrar deneyin.</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-[18px] border border-line bg-surface shadow-[var(--shadow-xs)]">
-          <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-b border-line bg-canvas/80 text-text-muted">
-              <tr>
-                <th className="px-5 py-3.5 font-medium">Müşteri</th>
-                <th className="px-4 py-3 font-medium">Tür</th>
-                <th className="px-4 py-3 font-medium">İletişim</th>
-                <th className="px-4 py-3 font-medium">Konum</th>
-                <th className="px-4 py-3 font-medium">Son durum</th>
-                <th className="w-24 px-4 py-3"><span className="sr-only">İşlemler</span></th>
-              </tr>
-            </thead>
-            <tbody>
+        <TableFrame minWidth={760}>
+          <Table>
+            <THead>
+              <TR>
+                <TH>Müşteri</TH>
+                <TH>Tür</TH>
+                <TH>İletişim</TH>
+                <TH>Konum</TH>
+                <TH>Son durum</TH>
+                <TH align="right"><span className="sr-only">İşlemler</span></TH>
+              </TR>
+            </THead>
+            <TBody>
               {displayRows.map((c) => {
                 const lead = leadMap.get(c.id);
                 return (
-                <tr
-                  key={c.id}
-                  className="group relative cursor-pointer border-b border-line transition last:border-0 hover:bg-brand-600/[0.025]"
-                >
-                  <td className="px-5 py-4">
+                <TR key={c.id} interactive>
+                  <TD>
                     <Link href={`/app/musteriler/${c.id}`} className="absolute inset-0" aria-label={`${c.full_name} detayları`} />
                     <div className="flex items-center gap-3">
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[image:var(--grad-brand)] text-xs font-bold text-white shadow-[var(--shadow-xs)]">
@@ -486,8 +483,8 @@ export default async function CustomersPage({
                         )}
                       </div>
                     </div>
-                  </td>
-                  <td className="px-4 py-3">
+                  </TD>
+                  <TD>
                     {c.customer_types && c.customer_types.length > 0 ? (
                       <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-medium text-brand-600">
                         {c.customer_types[0]}
@@ -495,32 +492,31 @@ export default async function CustomersPage({
                     ) : (
                       <span className="text-text-faint">—</span>
                     )}
-                  </td>
-                  <td className="px-4 py-4">
+                  </TD>
+                  <TD>
                     <p className="flex items-center gap-2 tabular-nums text-text-muted"><Phone className="h-3.5 w-3.5 text-brand-600" />{c.phone ? formatTurkishPhone(c.phone) : "—"}</p>
                     {c.email ? <p className="mt-1 flex items-center gap-2 text-xs text-text-faint"><Mail className="h-3.5 w-3.5" />{c.email}</p> : null}
-                  </td>
-                  <td className="px-4 py-4 text-text-muted">
+                  </TD>
+                  <TD className="text-text-muted">
                     <span className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-text-faint" />{provinceName(c.province)}</span>
-                  </td>
-                  <td className="px-4 py-4 text-text-muted">
+                  </TD>
+                  <TD className="text-text-muted">
                     <span className="flex items-center gap-2"><Clock3 className="h-3.5 w-3.5 text-text-faint" />{formatDate(c.created_at)}</span>
-                  </td>
-                  <td className="px-4 py-4">
+                  </TD>
+                  <TD>
                     <div className="relative z-10 flex items-center justify-end gap-1">
                       {canDelete ? <CustomerRowDelete customerId={c.id} name={c.full_name} /> : null}
                       <span className="grid h-8 w-8 place-items-center rounded-[9px] text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
                         <ArrowUpRight className="h-4 w-4" />
                       </span>
                     </div>
-                  </td>
-                </tr>
+                  </TD>
+                </TR>
                 );
               })}
-            </tbody>
-          </table>
-          </div>
-        </div>
+            </TBody>
+          </Table>
+        </TableFrame>
       )}
     </div>
   );
