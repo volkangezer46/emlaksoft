@@ -14,6 +14,7 @@ import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { CommissionSimulator } from "./commission-simulator";
 import { CommissionActions } from "./commission-actions";
 import { CommissionSplitEditor } from "./commission-split-editor";
+import { ListLimitNotice } from "@/components/app/list-limit-notice";
 
 type CommissionRow = {
   id: string;
@@ -49,9 +50,12 @@ export default async function CommissionPage() {
   const { perms } = await requireModulePage("commissions");
   const canEdit = (perms.commissions ?? []).includes("edit");
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, count: commissionTotal } = await supabase
     .from("commissions")
-    .select("id, gross_amount, vat_amount, status, splits, created_at, deal:deals(deal_value,stage,property:properties(id,property_code,title))")
+    .select(
+      "id, gross_amount, vat_amount, status, splits, created_at, deal:deals(deal_value,stage,property:properties(id,property_code,title))",
+      { count: "exact" },
+    )
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -94,6 +98,16 @@ export default async function CommissionPage() {
             <ExportCsvButton action={exportCommissionsCsv} label="Dışa aktar" />
             <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[10px] font-bold text-brand-600">{rows.length} kayıt</span>
           </div>
+        </div>
+        {/* Defter 100 kayitla sinirli; "N kayit" rozeti CEKILEN kumeyi
+            sayiyordu, gercek toplami degil. Para tutan bir listede bunun
+            sessiz kalmasi ozellikle kotu. */}
+        <div className="px-5 pt-3">
+          <ListLimitNotice
+            shown={rows.length}
+            total={commissionTotal}
+            hint="Tam döküm için dışa aktarım kullanın."
+          />
         </div>
         {rows.length === 0 ? (
           <div className="grid place-items-center px-6 py-14 text-center">

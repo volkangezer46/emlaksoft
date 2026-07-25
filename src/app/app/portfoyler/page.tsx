@@ -17,6 +17,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { getDefinitions } from "@/lib/definitions";
 import { NewPropertyDialog } from "./new-property-dialog";
 import { PropertyBulkActions } from "./property-bulk-actions";
+import { ListLimitNotice } from "@/components/app/list-limit-notice";
 
 type PropertyRow = {
   id: string;
@@ -85,7 +86,12 @@ export default async function PropertiesPage({
   // Sunucu tarafı arama — q varsa ilike ile filtrele, yoksa tam listeyi çek
   let query = supabase
     .from("properties")
-    .select("id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, province_id, district_id, province:geo_provinces(name), district:geo_districts(name), portal_listings(portal_name,status,last_confirmed_at)")
+    // count: liste 200 ile sinirli; kullaniciya kacinin disarida kaldigini
+    // soyleyebilmek icin gercek toplam gerekiyor (ek sorgu yok, ayni yanitta).
+    .select(
+      "id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, province_id, district_id, province:geo_provinces(name), district:geo_districts(name), portal_listings(portal_name,status,last_confirmed_at)",
+      { count: "exact" },
+    )
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(200);
@@ -116,7 +122,7 @@ export default async function PropertiesPage({
     query = query.or(clauses.join(","));
   }
 
-  const [{ data }, { data: provinces }, { data: branches }, propertyTypeDefs, transactionTypeDefs] = await Promise.all([
+  const [{ data, count: propertyTotal }, { data: provinces }, { data: branches }, propertyTypeDefs, transactionTypeDefs] = await Promise.all([
     query,
     supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
@@ -287,6 +293,8 @@ export default async function PropertiesPage({
             />
           </div>
         </details>
+
+        <ListLimitNotice shown={allProperties.length} total={propertyTotal} />
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {properties.map((property) => {

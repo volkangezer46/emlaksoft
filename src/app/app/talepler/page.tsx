@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { ListLimitNotice } from "@/components/app/list-limit-notice";
 
 type Rel = { id?: string; full_name?: string; name?: string } | { id?: string; full_name?: string; name?: string }[] | null;
 
@@ -66,8 +67,11 @@ export default async function DemandsPage({
 
   let query = supabase
     .from("customer_demands")
+    // `count: "exact"`: liste 200 ile sınırlı, kullanıcıya kaç kaydın
+    // dışarıda kaldığını söyleyebilmek için gerçek toplam lazım.
     .select(
       "id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, customer:customers(id, full_name), province:geo_provinces(name)",
+      { count: "exact" },
     )
     .order("created_at", { ascending: false })
     .limit(200);
@@ -78,7 +82,7 @@ export default async function DemandsPage({
     query = query.in("status", ["new", "active", "matched"]);
   }
 
-  const { data } = await query;
+  const { data, count: demandTotal } = await query;
   const rows = (data ?? []) as DemandRow[];
 
   const openCount = rows.filter((r) => r.status !== "closed").length;
@@ -157,6 +161,7 @@ export default async function DemandsPage({
         </div>
       ) : (
         <div className="grid gap-3">
+          <ListLimitNotice shown={rows.length} total={demandTotal} />
           {rows.map((d) => {
             const customer = relOne<{ id: string; full_name: string }>(d.customer);
             const province = relOne<{ name: string }>(d.province);

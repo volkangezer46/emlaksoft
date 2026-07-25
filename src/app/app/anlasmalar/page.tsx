@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DealBoard, type BoardDeal } from "./deal-board";
 import { NewDealDialog } from "./new-deal-dialog";
+import { ListLimitNotice } from "@/components/app/list-limit-notice";
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
@@ -15,11 +16,14 @@ export default async function DealsPage() {
   const canEdit = (perms.commissions ?? []).includes("edit");
   const supabase = await createClient();
 
-  const [{ data: dealsRaw }, { data: properties }, { data: customers }, { data: members }] = await Promise.all([
+  const [{ data: dealsRaw, count: dealTotal }, { data: properties }, { data: customers }, { data: members }] = await Promise.all([
     supabase
       .from("deals")
+      // Pipeline 200 anlaşmayla sınırlı; gerçek toplam olmadan kullanıcı
+      // eksik bir kanban görüp bunu tam sanır.
       .select(
         "id, stage, deal_type, deal_value, probability, assigned_to, updated_at, property_id, customer_id, property:properties(id, title, property_code), customer:customers(id, full_name)",
+        { count: "exact" },
       )
       .order("updated_at", { ascending: false })
       .limit(200),
@@ -118,7 +122,16 @@ export default async function DealsPage() {
           </div>
         </div>
       ) : (
-        <DealBoard deals={deals} canEdit={canEdit} members={members ?? []} />
+        <>
+          <ListLimitNotice
+            shown={deals.length}
+            total={dealTotal}
+            hint="Kapanan anlaşmaları raporlardan inceleyin."
+            href="/app/raporlar"
+            hrefLabel="Raporlar"
+          />
+          <DealBoard deals={deals} canEdit={canEdit} members={members ?? []} />
+        </>
       )}
     </div>
   );

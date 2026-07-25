@@ -22,6 +22,7 @@ import { CustomerRowDelete } from "./customer-row-delete";
 import { formatTurkishPhone } from "@/lib/phone";
 import { computeLeadScore, leadTierCls } from "@/lib/lead-score";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { ListLimitNotice } from "@/components/app/list-limit-notice";
 
 type LeadSignalRow = {
   customer_id: string;
@@ -121,11 +122,15 @@ export default async function CustomersPage({
   const assignedF = sp.assigned ?? "";
   const sortF    = sp.sort     ?? "";
 
-  const [{ data: customers }, { data: provinces }, { data: branches }, { data: advisors }, { data: signals }, typeDefs, sourceDefs] = await Promise.all([
+  const [{ data: customers, count: customerTotal }, { data: provinces }, { data: branches }, { data: advisors }, { data: signals }, typeDefs, sourceDefs] = await Promise.all([
     supabase
       .from("customers")
+      // `count: "exact"` — liste 500 kayıtla sınırlı ve bunu kullanıcıya
+      // söyleyebilmek için GERÇEK toplamı bilmek gerekiyor. Sayım aynı
+      // yanıtta geliyor, ek gidiş-dönüş yok.
       .select(
         "id, full_name, phone, email, customer_types, source, notes, blacklist, assigned_to, created_at, birth_date, anniversary_date, anniversary_note, province:geo_provinces(name)",
+        { count: "exact" },
       )
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
@@ -406,6 +411,10 @@ export default async function CustomersPage({
           </span>
         </div>
       </form>
+
+      {/* "N sonuç" rozeti CEKILEN kumeyi sayiyordu, gercek toplami degil.
+          Sayfa 500 kayitla sinirli; asilan kismi kullaniciya soyluyoruz. */}
+      <ListLimitNotice shown={(customers ?? []).length} total={customerTotal} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
