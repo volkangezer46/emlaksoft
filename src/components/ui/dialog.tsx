@@ -72,11 +72,14 @@ export function DialogHeader({
   title,
   description,
   icon,
+  tone = "default",
   className,
 }: {
   title: string;
   description?: string;
   icon?: ReactNode;
+  /** `danger`: yıkıcı/uyarı nitelikli işlemlerde ikon kutusu kırmızıya döner. */
+  tone?: "default" | "danger";
   className?: string;
 }) {
   return (
@@ -90,7 +93,14 @@ export function DialogHeader({
       <div className="relative flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           {icon ? (
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px] bg-white/10 text-mint-400 [&_svg]:h-5 [&_svg]:w-5">
+            <span
+              className={cn(
+                "grid h-11 w-11 shrink-0 place-items-center rounded-[13px] [&_svg]:h-5 [&_svg]:w-5",
+                tone === "danger"
+                  ? "bg-danger-500/20 text-danger-300"
+                  : "bg-white/10 text-mint-400",
+              )}
+            >
               {icon}
             </span>
           ) : null}
