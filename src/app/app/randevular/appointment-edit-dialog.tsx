@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { createPortal } from "react-dom";
-import { CalendarClock, X } from "lucide-react";
+import { useState, useTransition } from "react";
+import { CalendarClock } from "lucide-react";
 import { updateAppointment } from "@/app/actions/appointments";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 type TypeOption = { value: string; label: string };
 type Appointment = {
@@ -41,19 +47,8 @@ export function AppointmentEditDialog({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const dialogRef = useRef<HTMLDivElement>(null);
   const types = typeOptions && typeOptions.length > 0 ? typeOptions : DEFAULT_TYPES;
   const { date, time } = localParts(appointment.scheduled_at);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    dialogRef.current?.focus();
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
 
   function onSubmit(fd: FormData) {
     setError(null);
@@ -64,44 +59,25 @@ export function AppointmentEditDialog({
     });
   }
 
+  /*
+   * Radix Dialog'a taşındı. Elle kurulum Esc'i hallediyordu ama FOCUS TRAP ve
+   * SCROLL LOCK yoktu. createPortal + useEffect + dialogRef üçlüsü de artık
+   * gereksiz — Radix hepsini kendisi yapıyor.
+   */
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-text-muted transition hover:border-brand-300"
-      >
-        <CalendarClock className="h-3 w-3" /> Ertele
-      </button>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-text-muted transition hover:border-brand-300"
+        >
+          <CalendarClock className="h-3 w-3" /> Ertele
+        </button>
+      </DialogTrigger>
 
-      {open &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-50 grid place-items-center bg-ink-950/40 p-4 backdrop-blur-sm"
-            onClick={(e) => e.target === e.currentTarget && setOpen(false)}
-          >
-            <div
-              ref={dialogRef}
-              role="dialog"
-              aria-modal="true"
-              aria-label="Randevu düzenle"
-              tabIndex={-1}
-              className="w-full max-w-md rounded-[20px] border border-line bg-surface p-5 shadow-xl outline-none"
-            >
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="font-display font-bold text-ink-950">Randevuyu Ertele / Düzenle</h2>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="grid h-8 w-8 place-items-center rounded-[9px] text-text-faint transition hover:bg-canvas"
-                  aria-label="Kapat"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              <form action={onSubmit} className="grid gap-3">
+      <DialogContent size="sm">
+        <DialogHeader icon={<CalendarClock />} title="Randevuyu ertele / düzenle" />
+        <form action={onSubmit} className="grid gap-3 p-6">
                 <input type="hidden" name="id" value={appointment.id} />
                 <select
                   name="appointment_type"
@@ -160,28 +136,29 @@ export function AppointmentEditDialog({
                   placeholder="Not (opsiyonel)"
                   className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                 />
-                {error && <p className="text-xs font-semibold text-red-600">{error}</p>}
-                <div className="mt-1 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setOpen(false)}
-                    className="rounded-[10px] border border-line px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
-                  >
-                    Vazgeç
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={pending}
-                    className="rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
-                  >
-                    {pending ? "Kaydediliyor…" : "Kaydet"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>,
-          document.body,
-        )}
-    </>
+          {/* Palet dışı red-600 → danger-600, role="alert" eklendi */}
+          {error && (
+            <p className="text-xs font-semibold text-danger-600" role="alert">{error}</p>
+          )}
+          <div className="hairline-t mt-1 flex justify-end gap-2 pt-4">
+            <DialogClose asChild>
+              <button
+                type="button"
+                className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+              >
+                Vazgeç
+              </button>
+            </DialogClose>
+            <button
+              type="submit"
+              disabled={pending}
+              className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+            >
+              {pending ? "Kaydediliyor…" : "Kaydet"}
+            </button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
