@@ -8,7 +8,6 @@ import {
   ShieldCheck,
   UserMinus,
   UserPlus,
-  X,
 } from "lucide-react";
 import {
   addPlatformStaff,
@@ -20,6 +19,13 @@ import {
 import type { PlatformRole } from "@/lib/platform-access";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -71,28 +77,25 @@ function AddStaffDialog({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="btn-shine inline-flex items-center gap-2 rounded-[11px] bg-amber-400 px-4 py-2.5 text-sm font-bold text-ink-950"
-      >
-        <Plus className="h-4 w-4" /> Personel ekle
-      </button>
+    /* Radix Dialog: focus trap + Esc (öncesinde yoktu) + scroll lock + ARIA.
+       Ayrıca eski kapat butonunun aria-label'ı yoktu — DialogHeader'ınki var. */
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[11px] bg-amber-400 px-4 py-2.5 text-sm font-bold text-ink-950"
+        >
+          <Plus className="h-4 w-4" /> Personel ekle
+        </button>
+      </DialogTrigger>
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-[20px] border border-line bg-surface p-6 shadow-[var(--shadow-modal)]">
-            <div className="flex items-center justify-between">
-              <h2 className="font-display font-bold text-ink-950">Yeni personel ekle</h2>
-              <button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-full text-text-muted hover:text-ink-950">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <p className="mt-1 text-xs text-text-muted">
-              Auth’da kayıtlı e-posta varsa doğrudan eklenir; yoksa davet e-postası gönderilir.
-            </p>
-            <form ref={formRef} onSubmit={submit} className="mt-5 grid gap-4">
+      <DialogContent size="sm">
+        <DialogHeader
+          icon={<UserPlus />}
+          title="Yeni personel ekle"
+          description="Auth’da kayıtlı e-posta varsa doğrudan eklenir; yoksa davet gönderilir."
+        />
+        <form ref={formRef} onSubmit={submit} className="grid gap-4 p-6">
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="ps-email">
                   E-posta <span className="text-danger-500">*</span>
@@ -117,21 +120,29 @@ function AddStaffDialog({ onDone }: { onDone: () => void }) {
                 </div>
               </div>
 
-              {error ? <p className="rounded-[10px] bg-danger-500/8 px-3 py-2 text-sm text-danger-500" role="alert">{error}</p> : null}
-              {success ? <p className="rounded-[10px] bg-mint-500/10 px-3 py-2 text-sm font-semibold text-mint-600">Personel eklendi ✓</p> : null}
+              {error ? (
+                <p className="rounded-[10px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">{error}</p>
+              ) : null}
+              {success ? (
+                <p className="rounded-[10px] bg-mint-500/10 px-3 py-2 text-sm font-semibold text-mint-700" role="status">
+                  Personel eklendi ✓
+                </p>
+              ) : null}
 
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setOpen(false)} className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted">İptal</button>
-                <button type="submit" disabled={pending} className="inline-flex items-center gap-2 rounded-[10px] bg-ink-950 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+              <div className="hairline-t flex justify-end gap-2 pt-4">
+                <DialogClose asChild>
+                  <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:bg-canvas">
+                    İptal
+                  </button>
+                </DialogClose>
+                <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-ink-950 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
                   {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
                   {pending ? "Ekleniyor…" : "Ekle"}
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
-    </>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

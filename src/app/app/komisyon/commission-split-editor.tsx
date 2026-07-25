@@ -2,7 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus, Split, Trash2, X } from "lucide-react";
+import { Loader2, Plus, Split, Trash2 } from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { updateCommissionSplits } from "@/app/actions/commissions";
 
 type Row = { label: string; rate: string };
@@ -59,26 +66,24 @@ export function CommissionSplitEditor({
   }
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1 rounded-[9px] border border-line px-2.5 py-1.5 text-[11px] font-bold text-ink-950 transition hover:border-brand-300"
-      >
-        <Split className="h-3.5 w-3.5 text-brand-600" /> Paylaşım
-      </button>
+    /* Radix Dialog: focus trap + Esc (öncesinde yoktu) + scroll lock + ARIA. */
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline px-2.5 py-1.5 text-[11px] font-bold text-ink-950 transition hover:border-brand-300"
+        >
+          <Split className="h-3.5 w-3.5 text-brand-600" /> Paylaşım
+        </button>
+      </DialogTrigger>
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/50 p-4 backdrop-blur-sm sm:items-center">
-          <div className="my-auto w-full max-w-md rounded-[20px] border border-line bg-surface shadow-[var(--shadow-lg)]">
-            <div className="flex items-center justify-between border-b border-line px-6 py-4">
-              <h2 className="flex items-center gap-2 font-display text-lg font-bold text-ink-950"><Split className="h-4 w-4 text-brand-600" /> Komisyon paylaşımı</h2>
-              <button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-[8px] text-text-muted hover:bg-canvas" aria-label="Kapat">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="p-6">
+      <DialogContent size="sm">
+        <DialogHeader
+          icon={<Split />}
+          title="Komisyon paylaşımı"
+          description="Brüt komisyonu taraflar arasında bölüştürün."
+        />
+        <div className="p-6">
               <p className="mb-3 text-sm text-text-muted">Brüt komisyon: <span className="font-bold text-ink-950">{money(gross)}</span></p>
 
               <div className="space-y-2">
@@ -120,18 +125,22 @@ export function CommissionSplitEditor({
                 <span>{remaining >= 0 ? `Kalan: %${remaining.toFixed(0)}` : `%${Math.abs(remaining).toFixed(0)} fazla`}</span>
               </div>
 
-              {error ? <p className="mt-2 text-sm text-danger-500">{error}</p> : null}
+              {error ? (
+                <p className="mt-2 text-sm font-medium text-danger-600" role="alert">{error}</p>
+              ) : null}
 
-              <div className="mt-4 flex justify-end gap-2">
-                <button type="button" onClick={() => setOpen(false)} className="rounded-[10px] border border-line px-4 py-2 text-sm font-medium text-ink-950 hover:bg-canvas">Vazgeç</button>
-                <button type="button" onClick={save} disabled={pending} className="inline-flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60">
+              <div className="hairline-t mt-4 flex justify-end gap-2 pt-4">
+                <DialogClose asChild>
+                  <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-medium text-ink-950 transition hover:bg-canvas">
+                    Vazgeç
+                  </button>
+                </DialogClose>
+                <button type="button" onClick={save} disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60">
                   {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Kaydet
                 </button>
               </div>
-            </div>
-          </div>
         </div>
-      ) : null}
-    </>
+      </DialogContent>
+    </Dialog>
   );
 }
