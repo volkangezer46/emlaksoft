@@ -18,7 +18,8 @@
     "db:migrate": "tsx scripts/apply-migrations.ts",
     "db:smoke": "tsx scripts/smoke-auth.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:rls-audit": "tsx scripts/rls-audit.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
