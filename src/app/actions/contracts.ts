@@ -119,6 +119,15 @@ export async function sendContractForSigning(
   if (!contract) return { error: "Sözleşme bulunamadı." };
   if (contract.status !== "draft") return { error: "Sadece taslak sözleşmeler gönderilebilir." };
 
+  // Süresiz imza token'larını önle — geçerlilik belirtilmemişse gönderimden 30 gün sonrasına kur
+  const { data: current } = await admin
+    .from("contracts")
+    .select("expires_at")
+    .eq("id", contractId)
+    .maybeSingle();
+  const defaultExpiry =
+    current?.expires_at ?? new Date(Date.now() + 30 * 86_400_000).toISOString();
+
   // İmzalayanları ekle — token DB tarafında üretilir, geri okuyup link kuruyoruz
   const { data: insertedSigners } = await admin
     .from("contract_signers")
@@ -133,10 +142,10 @@ export async function sendContractForSigning(
     )
     .select("token, phone, full_name");
 
-  // Sözleşme durumunu güncelle
+  // Sözleşme durumunu güncelle (+ varsayılan geçerlilik süresi)
   await admin
     .from("contracts")
-    .update({ status: "sent", updated_at: new Date().toISOString() })
+    .update({ status: "sent", expires_at: defaultExpiry, updated_at: new Date().toISOString() })
     .eq("id", contractId);
 
   // İmza linklerini SMS ile gönder (Netgsm yapılandırılmışsa; hata gönderimi bloklamaz)
@@ -176,6 +185,19 @@ export async function signContractByToken(
 
   if (!signer) return { error: "Geçersiz veya süresi dolmuş imza linki." };
   if (signer.status !== "pending") return { error: "Bu sözleşme zaten imzalandı veya reddedildi." };
+
+  // Sunucu tarafı zorunlu kontrol — görüntü kontrolü doğrudan action çağrısıyla atlanamasın
+  const { data: contract } = await admin
+    .from("contracts")
+    .select("status, expires_at")
+    .eq("id", signer.contract_id)
+    .maybeSingle();
+
+  if (!contract) return { error: "Sözleşme bulunamadı." };
+  if (contract.status === "cancelled") return { error: "Bu sözleşme iptal edilmiştir; imza alınamaz." };
+  if (contract.expires_at && new Date(contract.expires_at).getTime() < Date.now()) {
+    return { error: "Bu imza linkinin geçerlilik süresi dolmuştur." };
+  }
 
   const now = new Date().toISOString();
 
