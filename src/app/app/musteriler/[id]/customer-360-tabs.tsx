@@ -34,6 +34,8 @@ type Demand = {
   urgency: string | null;
   status: string;
   province_id: string | null;
+  district_id: string | null;
+  neighborhood_id: string | null;
   created_at: string;
 };
 

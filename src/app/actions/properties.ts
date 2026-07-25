@@ -21,6 +21,29 @@ function parseCoord(raw: FormDataEntryValue | null): number | null {
 
 const STATUSES = ["draft", "live", "reserved", "sold", "rented", "archived"];
 
+/**
+ * Fiyat sağlığı modelinin konum ipucu: önce ilçe adı, yoksa il adı.
+ *
+ * İlçe belirgin şekilde daha iyi bir sinyal — Kadıköy ile Sultanbeyli'nin m²
+ * fiyatı arasındaki fark, İstanbul ile Konya arasındakinden büyük. Bu yüzden
+ * ilçe varsa il adı hiç sorgulanmıyor: tek bir gidiş-dönüş yeter.
+ */
+async function resolveGeoHint(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  provinceId: string,
+  districtId: string,
+): Promise<string | null> {
+  if (districtId) {
+    const { data } = await supabase.from("geo_districts").select("name").eq("id", districtId).maybeSingle();
+    if (data?.name) return data.name;
+  }
+  if (provinceId) {
+    const { data } = await supabase.from("geo_provinces").select("name").eq("id", provinceId).maybeSingle();
+    return data?.name ?? null;
+  }
+  return null;
+}
+
 export async function createProperty(formData: FormData): Promise<PropertyResult> {
   const gate = await requirePermission("properties", "create");
   if (!gate.ok) return { error: gate.error };
@@ -30,6 +53,8 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   const transactionType = String(formData.get("transaction_type") ?? "").trim();
   const propertyType = String(formData.get("property_type") ?? "").trim();
   const provinceId = String(formData.get("province_id") ?? "").trim();
+  const districtId = String(formData.get("district_id") ?? "").trim();
+  const neighborhoodId = String(formData.get("neighborhood_id") ?? "").trim();
   const branchId = String(formData.get("branch_id") ?? "").trim();
   const addressLine = String(formData.get("address_line") ?? "").trim();
   const latVal = parseCoord(formData.get("lat"));
@@ -51,11 +76,10 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   const suffix = crypto.randomUUID().slice(0, 6).toUpperCase();
   const propertyCode = `ES-${stamp}-${suffix}`;
 
-  let districtHint: string | null = null;
-  if (provinceId) {
-    const { data: prov } = await supabase.from("geo_provinces").select("name").eq("id", provinceId).maybeSingle();
-    districtHint = prov?.name ?? null;
-  }
+  // `districtHint` adi ilce demek ama ONCEDEN IL adi geciriliyordu; formda
+  // ilce alani hic yoktu. Artik once ilce, yoksa il adi kullaniliyor —
+  // ilce bazli m2 referanslari (Kadikoy, Cankaya, Nilufer...) ancak boyle devreye giriyor.
+  const districtHint = await resolveGeoHint(supabase, provinceId, districtId);
   const health = computePriceHealth({
     listPrice: priceValue,
     sqm: Number.isFinite(sqmValue) ? sqmValue : null,
@@ -74,6 +98,8 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
       list_price: priceValue,
       commission_rate: Number.isFinite(commissionValue) ? commissionValue : null,
       province_id: provinceId || null,
+      district_id: districtId || null,
+      neighborhood_id: neighborhoodId || null,
       branch_id: branchId || null,
       address_line: addressLine || null,
       lat: latVal,
@@ -113,7 +139,9 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
     status: "draft",
     list_price: priceValue,
     province_id: provinceId || null,
-    district_id: null,
+    // Onceden burada `district_id: null` sabiti vardi: talep eslestirme ilceye
+    // gore puanladigi icin ilce esmesi HIC calismiyordu.
+    district_id: districtId || null,
     features: { rooms: rooms || null, sqm: Number.isFinite(sqmValue) ? sqmValue : null },
   });
 
@@ -134,6 +162,8 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
   const transactionType = String(formData.get("transaction_type") ?? "").trim();
   const propertyType = String(formData.get("property_type") ?? "").trim();
   const provinceId = String(formData.get("province_id") ?? "").trim();
+  const districtId = String(formData.get("district_id") ?? "").trim();
+  const neighborhoodId = String(formData.get("neighborhood_id") ?? "").trim();
   const branchId = String(formData.get("branch_id") ?? "").trim();
   const hasBranch = formData.has("branch_id");
   const addressLine = String(formData.get("address_line") ?? "").trim();
@@ -155,11 +185,10 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
   }
 
   const supabase = await createClient();
-  let districtHint: string | null = null;
-  if (provinceId) {
-    const { data: prov } = await supabase.from("geo_provinces").select("name").eq("id", provinceId).maybeSingle();
-    districtHint = prov?.name ?? null;
-  }
+  // `districtHint` adi ilce demek ama ONCEDEN IL adi geciriliyordu; formda
+  // ilce alani hic yoktu. Artik once ilce, yoksa il adi kullaniliyor —
+  // ilce bazli m2 referanslari (Kadikoy, Cankaya, Nilufer...) ancak boyle devreye giriyor.
+  const districtHint = await resolveGeoHint(supabase, provinceId, districtId);
   const health = computePriceHealth({
     listPrice: priceValue,
     sqm: Number.isFinite(sqmValue) ? sqmValue : null,
@@ -174,6 +203,8 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
     min_price: minValue != null && Number.isFinite(minValue) ? minValue : null,
     commission_rate: Number.isFinite(commissionValue) ? commissionValue : null,
     province_id: provinceId || null,
+    district_id: districtId || null,
+    neighborhood_id: neighborhoodId || null,
     address_line: addressLine || null,
     lat: latVal,
     lng: lngVal,

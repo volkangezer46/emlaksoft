@@ -6,7 +6,6 @@ import {
   Building2,
   Check,
   ChevronDown,
-  MapPin,
   Plus,
   Sparkles,
 } from "lucide-react";
@@ -19,6 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { LatLngPicker } from "@/components/app/lat-lng-picker";
+import { GeoSelect } from "@/components/app/geo-select";
 
 type Province = { id: string; name: string };
 type Branch = { id: string; name: string };
@@ -118,19 +118,13 @@ export function NewPropertyDialog({
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="sqm">Brüt m²</label>
                 <input id="sqm" name="sqm" inputMode="decimal" className={fieldClass} placeholder="185" />
               </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="property-province">İl</label>
-                <div className="relative">
-                  <select id="property-province" name="province_id" defaultValue="" className={`${fieldClass} appearance-none`}>
-                    <option value="">Seçiniz</option>
-                    {provinces.map((province) => <option key={province.id} value={province.id}>{province.name}</option>)}
-                  </select>
-                  <MapPin className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-                </div>
-              </div>
-              <div>
+              {/* İl/İlçe/Mahalle: önceki hâlde yalnızca il sorulur, `district_id`
+                  ve `neighborhood_id` kolonları hep NULL kalırdı. Emsal motoru
+                  (find_comparables) ilçe üzerinden çalıştığı için veri bulamıyordu. */}
+              <GeoSelect provinces={provinces} className="sm:col-span-2" />
+              <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="address-line">Adres özeti</label>
-                <input id="address-line" name="address_line" className={fieldClass} placeholder="Mahalle, cadde…" />
+                <input id="address-line" name="address_line" className={fieldClass} placeholder="Cadde, sokak, kapı no…" />
               </div>
               <LatLngPicker fieldClass={fieldClass} />
               {branches.length > 0 ? (

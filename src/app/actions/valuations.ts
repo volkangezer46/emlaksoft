@@ -18,8 +18,13 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
   const listPrice = listPriceRaw ? Number(listPriceRaw.replace(/\./g, "").replace(",", ".")) : null;
   const sqmRaw = String(formData.get("sqm") ?? "").trim();
   const sqm = sqmRaw ? Number(sqmRaw.replace(",", ".")) : null;
-  const districtHint = String(formData.get("district") ?? "").trim();
-  const provinceHint = String(formData.get("province") ?? "").trim();
+  // Onceden ilce SERBEST METIN ("Ilce ipucu") olarak aliniyordu; bu yuzden
+  // `geo_districts` ile eslesemiyor ve emsal motoru yalnizca bir portfoy
+  // secildiginde calisabiliyordu. Artik formdan gercek `district_id` geliyor.
+  const formProvinceId = String(formData.get("province_id") ?? "").trim();
+  const formDistrictId = String(formData.get("district_id") ?? "").trim();
+  const formPropertyType = String(formData.get("property_type") ?? "").trim();
+  const formTransactionType = String(formData.get("transaction_type") ?? "").trim();
   const ada = String(formData.get("ada") ?? "").trim();
   const parsel = String(formData.get("parsel") ?? "").trim();
 
@@ -29,14 +34,33 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
   let resolvedTitle = title;
   let price = listPrice;
   let area = sqm;
-  let provinceName = provinceHint || null;
+  let provinceName: string | null = null;
+  let districtHint: string | null = null;
   let adaVal = ada || null;
   let parselVal = parsel || null;
 
-  // Emsal motoru için gereken alanlar — portföy seçildiyse oradan gelir
-  let districtId: string | null = null;
-  let propertyType: string | null = null;
-  let transactionType: string | null = null;
+  // Emsal motoru icin gereken alanlar. Once formdaki secim, portfoy secildiyse
+  // ondan gelen deger bosluklari tamamlar.
+  let districtId: string | null = formDistrictId || null;
+  let propertyType: string | null = formPropertyType || null;
+  let transactionType: string | null = formTransactionType || null;
+
+  // Form ilce/il secildiyse adlarini tek sorguda coz.
+  if (formDistrictId) {
+    const { data: d } = await supabase
+      .from("geo_districts")
+      .select("name, province:geo_provinces(name)")
+      .eq("id", formDistrictId)
+      .maybeSingle();
+    if (d) {
+      districtHint = d.name;
+      const rel = d.province as { name?: string } | { name?: string }[] | null;
+      provinceName = (Array.isArray(rel) ? rel[0]?.name : rel?.name) ?? null;
+    }
+  } else if (formProvinceId) {
+    const { data: pr } = await supabase.from("geo_provinces").select("name").eq("id", formProvinceId).maybeSingle();
+    provinceName = pr?.name ?? null;
+  }
 
   if (propertyId) {
     const { data: p } = await supabase
@@ -54,9 +78,10 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
       area = area ?? (feat?.sqm != null ? Number(feat.sqm) : null);
       adaVal = adaVal ?? p.parcel_block ?? null;
       parselVal = parselVal ?? p.parcel_lot ?? null;
-      districtId = p.district_id ?? null;
-      propertyType = p.property_type ?? null;
-      transactionType = p.transaction_type ?? null;
+      // Formda secim yoksa portfoyden devral (?? ile: bos string degil, null kontrolu).
+      districtId = districtId ?? p.district_id ?? null;
+      propertyType = propertyType ?? p.property_type ?? null;
+      transactionType = transactionType ?? p.transaction_type ?? null;
       const provinceRel = p.province as { name?: string } | { name?: string }[] | null;
       const pName = Array.isArray(provinceRel) ? provinceRel[0]?.name : provinceRel?.name;
       provinceName = provinceName ?? pName ?? null;
@@ -66,7 +91,7 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
   const est = await estimateMultiSourceValue({
     listPrice: price,
     sqm: area,
-    districtHint: districtHint || null,
+    districtHint,
     provinceName,
     ada: adaVal,
     parsel: parselVal,

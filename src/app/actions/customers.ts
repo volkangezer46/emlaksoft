@@ -35,6 +35,7 @@ export async function createCustomer(
   const email = String(formData.get("email") ?? "").trim();
   const type = String(formData.get("type") ?? "").trim();
   const provinceId = String(formData.get("province_id") ?? "").trim();
+  const districtId = String(formData.get("district_id") ?? "").trim();
   const branchId = String(formData.get("branch_id") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
   const birthDate = String(formData.get("birth_date") ?? "").trim();
@@ -56,6 +57,7 @@ export async function createCustomer(
       email: email || null,
       customer_types: type ? [type] : [],
       province_id: provinceId || null,
+      district_id: districtId || null,
       branch_id: branchId || null,
       notes: notes || null,
       birth_date: birthDate || null,
@@ -98,6 +100,7 @@ export async function updateCustomer(
   const email = String(formData.get("email") ?? "").trim();
   const type = String(formData.get("type") ?? "").trim();
   const provinceId = String(formData.get("province_id") ?? "").trim();
+  const districtId = String(formData.get("district_id") ?? "").trim();
   const branchId = String(formData.get("branch_id") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
   const birthDate = String(formData.get("birth_date") ?? "").trim();
@@ -118,6 +121,7 @@ export async function updateCustomer(
     email: email || null,
     customer_types: type ? [type] : [],
     province_id: provinceId || null,
+    district_id: districtId || null,
     notes: notes || null,
     birth_date: birthDate || null,
     anniversary_date: anniversaryDate || null,

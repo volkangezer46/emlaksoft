@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { GeoSelect } from "@/components/app/geo-select";
 import { createCustomer, type CustomerResult } from "@/app/actions/customers";
 import { PhoneInput } from "@/components/ui/phone-input";
 
@@ -120,23 +121,10 @@ export function NewCustomerDialog({
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="mb-1.5 block text-sm text-text-muted" htmlFor="province_id">
-                  İl
-                </label>
-                <select
-                  id="province_id"
-                  name="province_id"
-                  className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
-                  defaultValue=""
-                >
-                  <option value="">Seçiniz</option>
-                  {provinces.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+              {/* Musteride mahalle gereksiz; ilce yeterli ve bolge bazli
+                  raporlama/filtreleme icin kritik. */}
+              <div className="sm:col-span-2">
+                <GeoSelect provinces={provinces} withNeighborhood={false} />
               </div>
               {branches.length > 0 ? (
                 <div className="sm:col-span-2">

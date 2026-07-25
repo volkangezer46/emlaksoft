@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { GeoSelect } from "@/components/app/geo-select";
 
 type Province = { id: string; name: string };
 
@@ -109,19 +110,11 @@ export function NewDemandDialog({
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="demand-sqm">Min m²</label>
                 <input id="demand-sqm" name="min_sqm" inputMode="decimal" className={fieldClass} placeholder="120" />
               </div>
-              <div>
-                <label className="mb-1.5 block text-sm text-text-muted" htmlFor="demand-province">İl</label>
-                <select
-                  id="demand-province"
-                  name="province_id"
-                  defaultValue={defaultProvinceId ?? ""}
-                  className={fieldClass}
-                >
-                  <option value="">Seçiniz</option>
-                  {provinces.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
+              {/* Talebin de ilcesi olmali: eslestirme motoru portfoy ilcesi ile
+                  talep ilcesini karsilastiriyor. Yalnizca il varken tum il
+                  tek bir kova gibi davraniyordu. */}
+              <div className="sm:col-span-2">
+                <GeoSelect provinces={provinces} defaultProvinceId={defaultProvinceId} />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="demand-urgency">Aciliyet</label>

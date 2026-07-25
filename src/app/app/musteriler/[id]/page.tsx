@@ -37,6 +37,8 @@ type Demand = {
   urgency: string | null;
   status: string;
   province_id: string | null;
+  district_id: string | null;
+  neighborhood_id: string | null;
   created_at: string;
 };
 
@@ -105,13 +107,13 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   ] = await Promise.all([
     supabase
       .from("customers")
-      .select("id, full_name, phone, email, customer_types, tags, source, notes, blacklist, created_at, province_id, birth_date, anniversary_date, anniversary_note, province:geo_provinces(name), district:geo_districts(name)")
+      .select("id, full_name, phone, email, customer_types, tags, source, notes, blacklist, created_at, province_id, district_id, birth_date, anniversary_date, anniversary_note, province:geo_provinces(name), district:geo_districts(name)")
       .eq("id", id)
       .is("deleted_at", null)
       .maybeSingle(),
     supabase
       .from("customer_demands")
-      .select("id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, province_id, created_at")
+      .select("id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, province_id, district_id, neighborhood_id, created_at")
       .eq("customer_id", id)
       .order("created_at", { ascending: false }),
     supabase
@@ -359,6 +361,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                       email: customer.email,
                       customer_types: customer.customer_types,
                       province_id: customer.province_id,
+                      district_id: customer.district_id,
                       notes: customer.notes,
                       birth_date: customer.birth_date,
                       anniversary_date: customer.anniversary_date,

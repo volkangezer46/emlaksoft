@@ -33,6 +33,8 @@ export async function createDemand(
   const transactionType = String(formData.get("transaction_type") ?? "").trim();
   const propertyType = String(formData.get("property_type") ?? "").trim();
   const provinceId = String(formData.get("province_id") ?? "").trim();
+  const districtId = String(formData.get("district_id") ?? "").trim();
+  const neighborhoodId = String(formData.get("neighborhood_id") ?? "").trim();
   const rooms = String(formData.get("rooms") ?? "").trim();
   const urgency = String(formData.get("urgency") ?? "").trim();
   const budgetMin = parseMoney(formData.get("budget_min"));
@@ -66,6 +68,8 @@ export async function createDemand(
       transaction_type: transactionType,
       property_type: propertyType || null,
       province_id: provinceId || null,
+      district_id: districtId || null,
+      neighborhood_id: neighborhoodId || null,
       budget_min: budgetMin,
       budget_max: budgetMax,
       rooms: rooms || null,
@@ -106,6 +110,8 @@ export async function updateDemand(
   const transactionType = String(formData.get("transaction_type") ?? "").trim();
   const propertyType = String(formData.get("property_type") ?? "").trim();
   const provinceId = String(formData.get("province_id") ?? "").trim();
+  const districtId = String(formData.get("district_id") ?? "").trim();
+  const neighborhoodId = String(formData.get("neighborhood_id") ?? "").trim();
   const rooms = String(formData.get("rooms") ?? "").trim();
   const urgency = String(formData.get("urgency") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
@@ -127,6 +133,8 @@ export async function updateDemand(
       transaction_type: transactionType,
       property_type: propertyType || null,
       province_id: provinceId || null,
+      district_id: districtId || null,
+      neighborhood_id: neighborhoodId || null,
       budget_min: budgetMin,
       budget_max: budgetMax,
       rooms: rooms || null,

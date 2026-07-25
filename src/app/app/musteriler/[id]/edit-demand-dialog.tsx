@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { GeoSelect } from "@/components/app/geo-select";
 import { updateDemand, type DemandResult } from "@/app/actions/demands";
 
 type Province = { id: string; name: string };
@@ -34,6 +35,8 @@ export function EditDemandDialog({
     urgency: string | null;
     status: string;
     province_id: string | null;
+    district_id: string | null;
+    neighborhood_id: string | null;
   };
   provinces: Province[];
   customerId: string;
@@ -95,12 +98,13 @@ export function EditDemandDialog({
                 <label className="mb-1.5 block text-sm text-text-muted">Min m²</label>
                 <input name="min_sqm" defaultValue={demand.min_sqm ?? ""} className={fieldClass} />
               </div>
-              <div>
-                <label className="mb-1.5 block text-sm text-text-muted">İl</label>
-                <select name="province_id" defaultValue={demand.province_id ?? ""} className={fieldClass}>
-                  <option value="">Seçiniz</option>
-                  {provinces.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+              <div className="sm:col-span-2">
+                <GeoSelect
+                  provinces={provinces}
+                  defaultProvinceId={demand.province_id}
+                  defaultDistrictId={demand.district_id}
+                  defaultNeighborhoodId={demand.neighborhood_id}
+                />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted">Durum</label>

@@ -108,7 +108,7 @@ export default async function PropertyDetailPage({
     supabase
       .from("properties")
       .select(
-        "id, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, parcel_block, parcel_lot, lat, lng, features, price_health, created_at, updated_at, assigned_to, province:geo_provinces(name), district:geo_districts(name)",
+        "id, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, district_id, neighborhood_id, parcel_block, parcel_lot, lat, lng, features, price_health, created_at, updated_at, assigned_to, province:geo_provinces(name), district:geo_districts(name)",
       )
       .eq("id", id)
       .is("deleted_at", null)
@@ -284,6 +284,8 @@ export default async function PropertyDetailPage({
                     commission_rate: property.commission_rate != null ? Number(property.commission_rate) : null,
                     address_line: property.address_line,
                     province_id: property.province_id,
+                    district_id: property.district_id,
+                    neighborhood_id: property.neighborhood_id,
                     lat: property.lat as number | null,
                     lng: property.lng as number | null,
                     features: (property.features ?? {}) as { rooms?: string | null; sqm?: number | null },

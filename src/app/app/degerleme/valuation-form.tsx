@@ -4,9 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createValuation } from "@/app/actions/valuations";
 import { useToast } from "@/components/app/toast-provider";
+import { GeoSelect } from "@/components/app/geo-select";
 
 type Prop = { id: string; property_code: string; title: string | null; list_price: number | null };
 type Province = { id: string; name: string };
+
+const PROPERTY_TYPES = ["Daire", "Villa", "Arsa", "İşyeri", "Müstakil ev", "Bina"];
 
 export function ValuationForm({
   properties,
@@ -62,19 +65,25 @@ export function ValuationForm({
             <input name="sqm" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm" placeholder="135" />
           </div>
         </div>
+        {/* Onceden il ADI + serbest metin "Ilce ipucu" aliniyordu. Serbest metin
+            geo_districts ile eslesmedigi icin emsal motoru yalnizca bir portfoy
+            secildiginde devreye girebiliyordu. Artik gercek district_id gidiyor. */}
+        <GeoSelect provinces={provinces} withNeighborhood={false} />
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-sm text-text-muted">İl</label>
-            <select name="province" defaultValue="" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm">
-              <option value="">Seçiniz</option>
-              {provinces.map((p) => (
-                <option key={p.id} value={p.name}>{p.name}</option>
-              ))}
+            <label className="mb-1.5 block text-sm text-text-muted">Portföy türü</label>
+            <select name="property_type" defaultValue="" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm">
+              <option value="">Fark etmez</option>
+              {PROPERTY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           <div>
-            <label className="mb-1.5 block text-sm text-text-muted">İlçe ipucu</label>
-            <input name="district" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm" placeholder="Onikişubat" />
+            <label className="mb-1.5 block text-sm text-text-muted">İşlem türü</label>
+            <select name="transaction_type" defaultValue="" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm">
+              <option value="">Fark etmez</option>
+              <option value="Satılık">Satılık</option>
+              <option value="Kiralık">Kiralık</option>
+            </select>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -87,8 +96,9 @@ export function ValuationForm({
             <input name="parsel" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm" placeholder="7" />
           </div>
         </div>
-        <p className="text-[11px] text-text-faint">
-          İl seçilirse Endeksa &amp; Tapusor entegrasyonu (yapılandırılmışsa) otomatik devreye girer.
+        <p className="text-[11px] leading-relaxed text-text-faint">
+          İlçe seçilirse kendi portföy ve satış verinizden gerçek emsal analizi çalışır.
+          Endeksa &amp; Tapusor anahtarları tanımlandıysa onlar da kaynak olarak eklenir.
         </p>
         <button
           type="submit"

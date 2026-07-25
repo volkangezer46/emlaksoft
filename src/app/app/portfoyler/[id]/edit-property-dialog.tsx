@@ -13,6 +13,7 @@ import {
 import { updateProperty } from "@/app/actions/properties";
 import { useToast } from "@/components/app/toast-provider";
 import { LatLngPicker } from "@/components/app/lat-lng-picker";
+import { GeoSelect } from "@/components/app/geo-select";
 
 type Province = { id: string; name: string };
 
@@ -27,6 +28,8 @@ type Props = {
     commission_rate: number | null;
     address_line: string | null;
     province_id: string | null;
+    district_id: string | null;
+    neighborhood_id: string | null;
     lat: number | null;
     lng: number | null;
     features: { rooms?: string | null; sqm?: number | null };
@@ -124,17 +127,16 @@ export function EditPropertyDialog({
                 m²
                 <input name="sqm" defaultValue={property.features.sqm ?? ""} className={field} />
               </label>
-              <label className="sm:col-span-2 text-xs font-medium text-text-muted">
-                İl
-                <select name="province_id" defaultValue={property.province_id ?? ""} className={field}>
-                  <option value="">Seçilmedi</option>
-                  {provinces.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {/* Duzenleme formunda da ilce/mahalle: kayit acilirken mevcut
+                  il/ilcenin alt listeleri kendiliginden yuklenir. */}
+              <div className="sm:col-span-2">
+                <GeoSelect
+                  provinces={provinces}
+                  defaultProvinceId={property.province_id}
+                  defaultDistrictId={property.district_id}
+                  defaultNeighborhoodId={property.neighborhood_id}
+                />
+              </div>
               <label className="sm:col-span-2 text-xs font-medium text-text-muted">
                 Adres
                 <input name="address_line" defaultValue={property.address_line ?? ""} className={field} />

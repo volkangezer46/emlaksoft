@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { GeoSelect } from "@/components/app/geo-select";
 import { updateCustomer, type CustomerResult } from "@/app/actions/customers";
 import { PhoneInput } from "@/components/ui/phone-input";
 
@@ -30,6 +31,7 @@ export function EditCustomerDialog({
     email: string | null;
     customer_types: string[] | null;
     province_id: string | null;
+    district_id: string | null;
     notes: string | null;
     birth_date: string | null;
     anniversary_date: string | null;
@@ -92,12 +94,13 @@ export function EditCustomerDialog({
                   {types.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="mb-1.5 block text-sm text-text-muted" htmlFor="edit-province">İl</label>
-                <select id="edit-province" name="province_id" defaultValue={customer.province_id ?? ""} className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
-                  <option value="">Seçiniz</option>
-                  {provinces.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+              <div className="sm:col-span-2">
+                <GeoSelect
+                  provinces={provinces}
+                  withNeighborhood={false}
+                  defaultProvinceId={customer.province_id}
+                  defaultDistrictId={customer.district_id}
+                />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="edit-birth-date">Doğum tarihi</label>
