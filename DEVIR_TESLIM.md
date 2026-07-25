@@ -1,6 +1,6 @@
 # EmlakSoft — Devir & Süreklilik Dosyası
 
-> **Son güncelleme:** 24 Temmuz 2026  
+> **Son güncelleme:** 25 Temmuz 2026  
 > **Proje yolu:** `C:\Users\volka\Projects\emlaksoft`  
 > **Amaç:** Cursor / VS Code’da yeni sohbette bu dosyayı okutup kaldığın yerden devam etmek.
 
@@ -122,11 +122,20 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 - Offboarding tam-veri export → yalnız ops/super_admin; müşteri belgesi indirme → `requirePermission("customers","view")`
 - signUp IP başına saatte 5 rate-limit; health endpoint ham hata sızıntısı kaldırıldı
 
+#### 🟢 DALGA 4 — CRUD düzenleme boşlukları (canlıya alındı, `fbd7cae`)
+- Sunucu action'ları: `updateExpense`, `updateTask`, `updateAppointment` (erteleme), `updateOffer`
+- Premium edit dialogları (portal, ESC/backdrop, `role=dialog`, aria): giderler, görevler, randevular ("Ertele"), teklif detayı
+- Kalan CRUD: talep/kampanya/aidat/deal kalıcı silme (opsiyonel — soft-delete/arşiv tercih edilebilir)
+
+#### 🟢 DALGA 5 — Jet hızı performans (canlıya alındı, `7973aeb`)
+- **Danışman KPI**: 5 tablo × 5000 satır JS agregasyonu → tek `advisor_kpis` RPC (migration 048, Postgres tarafında toplama)
+- **Vitrin & paylaş**: `<img>` → `next/image` (fill + sizes + priority) → WebP/resize LCP kazancı, CLS sıfır
+- **Günlük özet cron**: alıcı başına SELECT+INSERT (N+1) → tenant başına tek existing sorgu + toplu insert
+
 #### ⏳ Denetimden kalan (daha düşük öncelik)
-- **CRUD edit eksikleri**: updateExpense, updateTask, randevu erteleme, teklif tutarı edit, talep/kampanya/aidat/deal kalıcı silme
 - **Güvenlik**: sözleşme imza token expiry (migration gerektirir), rate-limit fail-open (RPC uygulanmadıysa)
-- **Performans**: danisman-kpi/franchise/raporlar SQL agregasyonu (RPC), vitrin/paylaş `next/image` (LCP/CLS), gunluk-ozet cron N+1, property-media seri upload
-- **Diğer**: appointment/task/contract timezone tutarlılığı, modal focus-trap/role=dialog
+- **Performans**: franchise/raporlar SQL agregasyonu (limitler makul, düşük öncelik), property-media seri upload
+- **Diğer**: appointment/task/contract timezone tutarlılığı
 
 > Web araştırması: sistem TR emlak CRM standartlarını (portföy/müşteri/eşleştirme/randevu/sözleşme/EİDS yetki takibi/KVKK-İYS/mobil-bulut) ve yasal gereklilikleri zaten karşılıyor.
 
