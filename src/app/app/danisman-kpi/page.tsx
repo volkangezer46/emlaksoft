@@ -27,81 +27,53 @@ type AdvisorKpi = {
 };
 
 export default async function DanismanKpiPage() {
-  await requireModulePage("reports");
+  const { tenantId } = await requireModulePage("reports");
   const supabase = await createClient();
 
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
-  const [
-    { data: profiles },
-    { data: customers },
-    { data: calls },
-    { data: appointments },
-    { data: offers },
-    { data: commissions },
-  ] = await Promise.all([
+  // Profiller + tek round-trip aggregate RPC (5 tablo, Postgres tarafında toplanır)
+  const [{ data: profiles }, { data: kpiRows }] = await Promise.all([
     supabase.from("profiles").select("id, full_name, role").limit(50),
-    supabase.from("customers").select("id, assigned_to").is("deleted_at", null).limit(5000),
-    supabase.from("calls").select("id, handled_by").gte("started_at", monthStart.toISOString()).limit(5000),
-    supabase.from("appointments").select("id, assigned_to, status").gte("scheduled_at", monthStart.toISOString()).limit(5000),
-    supabase.from("offers").select("id, created_by, status, amount").gte("created_at", monthStart.toISOString()).limit(5000),
-    supabase
-      .from("commissions")
-      .select("id, gross_amount, status, deal:deals(assigned_to)")
-      .gte("created_at", monthStart.toISOString())
-      .in("status", ["paid", "collected"])
-      .limit(5000),
+    supabase.rpc("advisor_kpis", { p_tenant_id: tenantId, p_month_start: monthStart.toISOString() }),
   ]);
+
+  const kpiByUid = new Map<string, {
+    customer_count: number; call_count: number; appoint_count: number;
+    offer_count: number; deal_count: number; revenue: number;
+  }>();
+  for (const r of (kpiRows ?? []) as Array<Record<string, unknown>>) {
+    kpiByUid.set(String(r.assigned_to), {
+      customer_count: Number(r.customer_count ?? 0),
+      call_count:     Number(r.call_count ?? 0),
+      appoint_count:  Number(r.appoint_count ?? 0),
+      offer_count:    Number(r.offer_count ?? 0),
+      deal_count:     Number(r.deal_count ?? 0),
+      revenue:        Number(r.revenue ?? 0),
+    });
+  }
 
   // Danışman bazlı hesapla
   const advisorMap = new Map<string, AdvisorKpi>();
 
   for (const p of profiles ?? []) {
     if (!["advisor", "team_lead", "branch_manager", "gm", "owner"].includes(p.role)) continue;
+    const k = kpiByUid.get(p.id);
     advisorMap.set(p.id, {
       id:             p.id,
       full_name:      p.full_name,
       role:           p.role,
-      customerCount:  0,
-      callCount:      0,
-      appointCount:   0,
-      offerCount:     0,
-      dealCount:      0,
-      revenue:        0,
+      customerCount:  k?.customer_count ?? 0,
+      callCount:      k?.call_count ?? 0,
+      appointCount:   k?.appoint_count ?? 0,
+      offerCount:     k?.offer_count ?? 0,
+      dealCount:      k?.deal_count ?? 0,
+      revenue:        k?.revenue ?? 0,
       conversionRate: "—",
       score:          0,
     });
-  }
-
-  for (const c of customers ?? []) {
-    if (c.assigned_to && advisorMap.has(c.assigned_to)) {
-      advisorMap.get(c.assigned_to)!.customerCount++;
-    }
-  }
-  for (const c of calls ?? []) {
-    if (c.handled_by && advisorMap.has(c.handled_by)) {
-      advisorMap.get(c.handled_by)!.callCount++;
-    }
-  }
-  for (const a of appointments ?? []) {
-    if (a.assigned_to && advisorMap.has(a.assigned_to)) {
-      advisorMap.get(a.assigned_to)!.appointCount++;
-    }
-  }
-  for (const o of offers ?? []) {
-    if (o.created_by && advisorMap.has(o.created_by)) {
-      const adv = advisorMap.get(o.created_by)!;
-      adv.offerCount++;
-      if (o.status === "accepted") adv.dealCount++;
-    }
-  }
-  for (const c of commissions ?? []) {
-    const assignedTo = Array.isArray(c.deal) ? c.deal[0]?.assigned_to : (c.deal as {assigned_to?: string} | null)?.assigned_to;
-    if (assignedTo && advisorMap.has(assignedTo)) {
-      advisorMap.get(assignedTo)!.revenue += Number(c.gross_amount ?? 0);
-    }
   }
 
   // Dönüşüm oranı + skor

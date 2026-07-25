@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft, BedDouble, Bath, Building2, MapPin, Ruler, ShieldCheck } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -78,13 +79,28 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
           <div>
             {images.length > 0 ? (
               <div className="overflow-hidden rounded-[18px] border border-line bg-surface">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/api/property-media/${images[0].id}`} alt={property.title || "Portföy"} className="aspect-[16/10] w-full object-cover" />
+                <div className="relative aspect-[16/10] w-full">
+                  <Image
+                    src={`/api/property-media/${images[0].id}`}
+                    alt={property.title || "Portföy"}
+                    fill
+                    priority
+                    sizes="(max-width: 1024px) 100vw, 60vw"
+                    className="object-cover"
+                  />
+                </div>
                 {images.length > 1 ? (
                   <div className="grid grid-cols-5 gap-2 p-2">
                     {images.slice(1, 11).map((m) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img key={m.id} src={`/api/property-media/${m.id}`} alt="Görsel" className="aspect-square w-full rounded-[8px] object-cover" />
+                      <div key={m.id} className="relative aspect-square w-full overflow-hidden rounded-[8px]">
+                        <Image
+                          src={`/api/property-media/${m.id}`}
+                          alt="Görsel"
+                          fill
+                          sizes="(max-width: 1024px) 20vw, 120px"
+                          className="object-cover"
+                        />
+                      </div>
                     ))}
                   </div>
                 ) : null}

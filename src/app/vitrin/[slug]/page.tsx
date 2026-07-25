@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Building2, MapPin, Ruler, BedDouble, ShieldCheck } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -149,11 +150,12 @@ export default async function VitrinPage({
                 >
                   <div className="relative aspect-[4/3] overflow-hidden bg-ink-950/5">
                     {coverId ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <Image
                         src={`/api/property-media/${coverId}`}
                         alt={p.title || "Portföy"}
-                        className="h-full w-full object-cover transition group-hover:scale-105"
+                        fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        className="object-cover transition group-hover:scale-105"
                       />
                     ) : (
                       <div className="grid h-full w-full place-items-center text-text-faint">

@@ -63,28 +63,31 @@ export async function GET(req: NextRequest) {
     const body = `Bugün: ${newCustomers ?? 0} müşteri · ${newDeals ?? 0} anlaşma hareketi · ${overduePortals ?? 0} gecikmiş teyit`;
     const recipients = (profiles ?? []).filter((p) => wantsDigest(p.notification_prefs));
     skippedPrefs += (profiles?.length ?? 0) - recipients.length;
+    if (recipients.length === 0) continue;
 
-    for (const p of recipients) {
-      const { data: existing } = await admin
-        .from("notifications")
-        .select("id")
-        .eq("tenant_id", t.id)
-        .eq("user_id", p.id)
-        .eq("title", "Günlük ofis özeti")
-        .gte("created_at", since)
-        .limit(1);
+    // N+1 yerine: bugün özet almış kullanıcıları tek sorguda topla, kalanları tek insert ile ekle
+    const { data: alreadySent } = await admin
+      .from("notifications")
+      .select("user_id")
+      .eq("tenant_id", t.id)
+      .eq("title", "Günlük ofis özeti")
+      .gte("created_at", since);
+    const sentSet = new Set((alreadySent ?? []).map((n) => n.user_id));
 
-      if (existing?.length) continue;
-
-      await admin.from("notifications").insert({
+    const rows = recipients
+      .filter((p) => !sentSet.has(p.id))
+      .map((p) => ({
         tenant_id: t.id,
         user_id: p.id,
         title: "Günlük ofis özeti",
         body,
         href: "/app/raporlar",
         kind: "info",
-      });
-      sent += 1;
+      }));
+
+    if (rows.length > 0) {
+      const { error } = await admin.from("notifications").insert(rows);
+      if (!error) sent += rows.length;
     }
   }
 

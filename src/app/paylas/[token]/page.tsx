@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Bath, BedDouble, Building2, Check, MapPin, MessageCircle, Phone, Ruler, ShieldCheck } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -121,22 +122,28 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
 
           {images.length > 0 ? (
             <div className="border-b border-white/10 p-4">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/api/property-media/${images[0].id}`}
-                alt={property.title || "Portföy"}
-                className="aspect-[16/10] w-full rounded-[16px] object-cover"
-              />
+              <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[16px]">
+                <Image
+                  src={`/api/property-media/${images[0].id}`}
+                  alt={property.title || "Portföy"}
+                  fill
+                  priority
+                  sizes="(max-width: 640px) 100vw, 600px"
+                  className="object-cover"
+                />
+              </div>
               {images.length > 1 ? (
                 <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
                   {images.slice(1, 7).map((m) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={m.id}
-                      src={`/api/property-media/${m.id}`}
-                      alt="Portföy görseli"
-                      className="aspect-square w-full rounded-[10px] object-cover"
-                    />
+                    <div key={m.id} className="relative aspect-square w-full overflow-hidden rounded-[10px]">
+                      <Image
+                        src={`/api/property-media/${m.id}`}
+                        alt="Portföy görseli"
+                        fill
+                        sizes="(max-width: 640px) 25vw, 100px"
+                        className="object-cover"
+                      />
+                    </div>
                   ))}
                 </div>
               ) : null}
