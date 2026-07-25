@@ -48,6 +48,17 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
 
     if (!property) return { error: "Portföy bulunamadı." };
 
+    // Idempotency: bu portföy için zaten kazanılan anlaşma varsa çift komisyonu engelle
+    const { data: existingDeal } = await supabase
+      .from("deals")
+      .select("id")
+      .eq("property_id", propertyId)
+      .eq("tenant_id", gate.tenantId)
+      .eq("stage", "won")
+      .limit(1)
+      .maybeSingle();
+    if (existingDeal) return { error: "Bu portföy zaten anlaşmaya dönüştürülmüş." };
+
     const value = dealValue && Number.isFinite(dealValue) ? dealValue : Number(property.list_price) || 0;
     const rate = Number(property.commission_rate) || 3;
     const gross = Math.round(value * (rate / 100) * 100) / 100;

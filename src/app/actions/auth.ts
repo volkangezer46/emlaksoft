@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isValidOptionalTurkishMobile, normalizeTurkishPhone, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
 function slugify(input: string) {
   return input
@@ -83,6 +84,13 @@ export async function signUp(
   }
   if (password.length < 8) {
     return { error: "Şifre en az 8 karakter olmalı." };
+  }
+
+  // Hız sınırı — IP başına saatte 5 kayıt (sınırsız ofis/hesap oluşturmayı engelle)
+  const ip = await clientIp();
+  const { allowed } = await checkRateLimit(`signup:${ip}`, { limit: 5, windowSec: 3600 });
+  if (!allowed) {
+    return { error: "Çok fazla kayıt denemesi. Lütfen bir süre sonra tekrar deneyin." };
   }
   if (!isValidOptionalTurkishMobile(rawPhone)) {
     return { error: TR_MOBILE_ERROR_MESSAGE };

@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requirePermission } from "@/lib/require-permission";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  // Müşteri belgesi görüntüleme yetkisi gerektirir (tenant-içi gizlilik)
+  const gate = await requirePermission("customers", "view");
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: 403 });
+
   const { id } = await params;
   const supabase = await createClient();
 

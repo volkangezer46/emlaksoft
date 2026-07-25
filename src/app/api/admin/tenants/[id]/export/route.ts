@@ -8,7 +8,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * Sadece platform staff erişebilir.
  */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  await requirePlatformModule("tenants");
+  const staff = await requirePlatformModule("tenants");
+  // Tam veri paketi hassas → yalnızca ops/super_admin (destek/muhasebe indiremez)
+  if (staff.role !== "ops" && staff.role !== "super_admin") {
+    return NextResponse.json({ error: "Bu işlem için yetkiniz yok." }, { status: 403 });
+  }
   const { id: tenantId } = await params;
   const admin = createAdminClient();
 

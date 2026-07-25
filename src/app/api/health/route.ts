@@ -14,8 +14,10 @@ export async function GET() {
       at: new Date().toISOString(),
     });
   } catch (e) {
+    // Ham DB hata mesajını dışarı sızdırma — yalnızca sunucu log'una
+    console.error("health check", e);
     return NextResponse.json(
-      { ok: false, db: "down", error: e instanceof Error ? e.message : "unknown", ms: Date.now() - started },
+      { ok: false, db: "down", ms: Date.now() - started },
       { status: 503 },
     );
   }
