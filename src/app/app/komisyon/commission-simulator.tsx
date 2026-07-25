@@ -9,6 +9,7 @@ import {
   UserRound,
   Wallet,
 } from "lucide-react";
+import { calculateCommission } from "@/lib/commission";
 
 const DONUT_C = 2 * Math.PI * 42;
 
@@ -25,22 +26,53 @@ function money(value: number) {
   }).format(value);
 }
 
+/*
+ * BU BILESENDE DUZELTILEN UC SEY:
+ *
+ * 1. "KDV dahil" modu YOKTU. Onceki onay kutusu ("%20 KDV hesapla") yalnizca
+ *    KDV'nin GOSTERILIP gosterilmeyecegini belirliyordu. Musteri "180.000 KDV
+ *    dahil" dediginde danisman yanlis rakam goruyordu: dogru matrah
+ *    180.000 / 1,20 = 150.000, ama arayuz dogrudan 180.000 uzerinden gidiyordu.
+ *
+ * 2. KDV orani (0.2) burada da SABIT yaziliydi — deals.ts ve workflow.ts ile
+ *    birlikte ucuncu kopya. Hepsi lib/commission.ts'e tasindi.
+ *
+ * 3. "Elime ne gececek" sorusuna CEVAP VERMIYORDU: danismanin brut payini
+ *    gosteriyor, stopaj ve diger kesintileri hic hesaba katmiyordu. X7'nin
+ *    amaci tam olarak bu soruydu.
+ *
+ * Stopaj varsayilani SIFIR ve kullanici girdisi — danismanin vergi statusune
+ * gore degistigi icin uygulamanin karar vermesi dogru olmaz.
+ */
 export function CommissionSimulator() {
   const [dealValue, setDealValue] = useState("6.750.000");
   const [rate, setRate] = useState("3");
   const [advisorShare, setAdvisorShare] = useState("60");
-  const [includeVat, setIncludeVat] = useState(true);
+  const [vatIncluded, setVatIncluded] = useState(false);
+  const [withholdingRate, setWithholdingRate] = useState("0");
+  const [otherDeductions, setOtherDeductions] = useState("");
 
-  const result = useMemo(() => {
-    const deal = parseNumber(dealValue);
-    const commissionRate = Math.min(Math.max(Number(rate) || 0, 0), 100);
-    const advisorRate = Math.min(Math.max(Number(advisorShare) || 0, 0), 100);
-    const gross = deal * (commissionRate / 100);
-    const vat = includeVat ? gross * 0.2 : 0;
-    const advisor = gross * (advisorRate / 100);
-    const office = gross - advisor;
-    return { deal, gross, vat, advisor, office, advisorRate };
-  }, [advisorShare, dealValue, includeVat, rate]);
+  const calc = useMemo(
+    () =>
+      calculateCommission({
+        amount: parseNumber(dealValue),
+        rate: parseNumber(rate),
+        vatIncluded,
+        advisorShare: parseNumber(advisorShare),
+        withholdingRate: parseNumber(withholdingRate),
+        otherDeductions: parseNumber(otherDeductions),
+      }),
+    [dealValue, rate, vatIncluded, advisorShare, withholdingRate, otherDeductions],
+  );
+
+  const result = {
+    deal: parseNumber(dealValue),
+    gross: calc.net,
+    vat: calc.vat,
+    advisor: calc.advisorGross,
+    office: calc.officeGross,
+    advisorRate: calc.used.advisorShare,
+  };
 
   return (
     <section className="dashboard-panel overflow-hidden rounded-[20px] border border-line bg-surface">
@@ -49,9 +81,27 @@ export function CommissionSimulator() {
           <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Calculator className="h-4 w-4" /> Canlı hesaplama</p>
           <h2 className="mt-1 font-display text-lg font-bold text-ink-950">Komisyon simülatörü</h2>
         </div>
-        <label className="flex items-center gap-2 rounded-full border border-line bg-canvas px-3 py-2 text-xs font-semibold text-text-muted">
-          <input type="checkbox" checked={includeVat} onChange={(event) => setIncludeVat(event.target.checked)} className="accent-brand-600" /> %20 KDV hesapla
-        </label>
+        {/* Onceki onay kutusu KDV'yi yalnizca GOSTERIYORDU; burada anlasmanin
+            KDV dahil mi haric mi oldugu soruluyor. Ikisi arasinda %20 fark var
+            ve sahada en sik karisan nokta bu. */}
+        <div className="flex gap-1.5 rounded-full border border-line bg-canvas p-1">
+          {[
+            { v: false, l: "KDV hariç" },
+            { v: true, l: "KDV dahil" },
+          ].map((o) => (
+            <button
+              key={o.l}
+              type="button"
+              onClick={() => setVatIncluded(o.v)}
+              aria-pressed={vatIncluded === o.v}
+              className={`focus-ring press rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                vatIncluded === o.v ? "bg-ink-950 text-white" : "text-text-muted hover:text-ink-950"
+              }`}
+            >
+              {o.l}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-[1fr_1.2fr]">
@@ -80,10 +130,30 @@ export function CommissionSimulator() {
               </div>
             </label>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-sm font-medium text-ink-950">
+              Stopaj
+              <div className="relative mt-1.5">
+                <input value={withholdingRate} onChange={(event) => setWithholdingRate(event.target.value)} inputMode="decimal" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 pr-9 text-sm font-semibold outline-none focus:border-brand-400" />
+                <Percent className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+              </div>
+            </label>
+            <label className="text-sm font-medium text-ink-950">
+              Diğer kesinti
+              <input value={otherDeductions} onChange={(event) => setOtherDeductions(event.target.value)} inputMode="decimal" placeholder="₺" className="mt-1.5 w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm font-semibold tabular-nums outline-none focus:border-brand-400" />
+            </label>
+          </div>
           <div className="rounded-[13px] border border-brand-300/35 bg-brand-600/5 p-4">
-            <p className="text-[10px] font-bold uppercase tracking-[.12em] text-brand-600">Brüt komisyon</p>
+            <p className="text-[10px] font-bold uppercase tracking-[.12em] text-brand-600">Komisyon (KDV hariç)</p>
             <p className="mt-1 font-display text-3xl font-extrabold tabular-nums text-ink-950">{money(result.gross)}</p>
-            <p className="mt-1 text-xs text-text-muted">{money(result.deal)} işlem bedeli üzerinden %{rate}</p>
+            <p className="mt-1 text-xs text-text-muted">
+              {money(result.deal)} bedel üzerinden %{rate}
+              {vatIncluded ? " · girilen tutar KDV dahil kabul edildi" : ""}
+            </p>
+            <p className="hairline-t mt-2.5 flex items-center justify-between pt-2.5 text-xs">
+              <span className="text-text-muted">Müşteriden tahsil edilecek</span>
+              <span className="font-display text-sm font-extrabold tabular-nums text-ink-950">{money(calc.gross)}</span>
+            </p>
           </div>
         </div>
 
@@ -132,6 +202,33 @@ export function CommissionSimulator() {
               ))}
             </div>
           </div>
+
+          {/* X7'nin asil sorusu: "elime ne gececek". Onceki hali yalnizca brut
+              payi gosteriyordu. */}
+          <div className="mt-4 rounded-[13px] border border-mint-500/30 bg-mint-500/[0.07] p-4">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[.12em] text-mint-600">
+                  Danışmanın eline geçen
+                </p>
+                <p className="mt-0.5 font-display text-2xl font-extrabold tabular-nums text-mint-600">
+                  {money(calc.advisorNet)}
+                </p>
+              </div>
+              {calc.withholding > 0 ? (
+                <p className="text-xs text-text-muted">
+                  Stopaj <span className="font-semibold tabular-nums text-danger-600">−{money(calc.withholding)}</span>
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <p className="mt-3 text-[11px] leading-relaxed text-text-muted">
+            Paylaşım <strong>KDV hariç</strong> tutar üzerinden yapılır — KDV devlete gider, ofis ya da
+            danışmanın geliri değildir. Stopaj ve diğer kesintiler sizin girdiğiniz oranlardır;
+            danışmanın vergi statüsüne göre değiştiği için varsayılanları sıfırdır. Bu araç aritmetik
+            yapar, <strong>mali müşavir yerine geçmez</strong>.
+          </p>
         </div>
       </div>
     </section>

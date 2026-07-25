@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { checkAuthorityShield } from "@/lib/authority-shield";
 import { notifyTenant } from "@/app/actions/notifications";
+import { buildSplits, calculateCommission } from "@/lib/commission";
 
 export type DealResult = { error?: string; ok?: boolean; dealId?: string };
 
@@ -200,19 +201,19 @@ async function ensureCommissionForDeal(
   if (!property) return;
 
   const value = dealValue != null && Number.isFinite(Number(dealValue)) ? Number(dealValue) : Number(property.list_price) || 0;
-  const rate = Number(property.commission_rate) || 3;
-  const gross = Math.round(value * (rate / 100) * 100) / 100;
-  const vat = Math.round(gross * 0.2 * 100) / 100;
-  const splits = [
-    { label: "Danışman", rate: 50, amount: Math.round(gross * 0.5 * 100) / 100 },
-    { label: "Ofis", rate: 50, amount: Math.round(gross * 0.5 * 100) / 100 },
-  ];
+  // KDV orani ve paylasim burada SABIT yazilmisti (0.2 ve 50/50); ayni sabitler
+  // workflow.ts'te de vardi. Tek kaynaga tasindi (lib/commission.ts).
+  const calc = calculateCommission({
+    amount: value,
+    rate: Number(property.commission_rate) || undefined,
+  });
+  const splits = buildSplits(calc.net);
 
   await supabase.from("commissions").insert({
     tenant_id: tenantId,
     deal_id: dealId,
-    gross_amount: gross,
-    vat_amount: vat,
+    gross_amount: calc.net,
+    vat_amount: calc.vat,
     status: "calculated",
     splits,
   });
@@ -228,6 +229,6 @@ async function ensureCommissionForDeal(
     action: "commission.from_pipeline",
     entityType: "deal",
     entityId: dealId,
-    newValue: { gross, property_code: property.property_code },
+    newValue: { gross: calc.net, vat: calc.vat, property_code: property.property_code },
   });
 }

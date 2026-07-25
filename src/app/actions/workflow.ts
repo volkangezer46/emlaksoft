@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { checkAuthorityShield } from "@/lib/authority-shield";
 import { notifyTenant } from "@/app/actions/notifications";
+import { buildSplits, calculateCommission } from "@/lib/commission";
 
 export type WorkflowResult = { error?: string; ok?: boolean; dealId?: string; commissionId?: string };
 
@@ -31,7 +32,6 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
     const amountRaw = String(formData.get("deal_value") ?? "").replace(/[^\d.,]/g, "");
     const dealValue = amountRaw ? Number(amountRaw.replace(/\./g, "").replace(",", ".")) : null;
     const advisorShare = Number(String(formData.get("advisor_share") ?? "50")) || 50;
-    const officeShare = Math.max(0, 100 - advisorShare);
     const hasAuthority = String(formData.get("has_authority") ?? "") === "1";
 
     if (!propertyId) return { error: "Portföy zorunlu." };
@@ -60,9 +60,14 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
     if (existingDeal) return { error: "Bu portföy zaten anlaşmaya dönüştürülmüş." };
 
     const value = dealValue && Number.isFinite(dealValue) ? dealValue : Number(property.list_price) || 0;
-    const rate = Number(property.commission_rate) || 3;
-    const gross = Math.round(value * (rate / 100) * 100) / 100;
-    const vat = Math.round(gross * 0.2 * 100) / 100;
+    // Sabit %20 KDV ve %3 oran buradan kaldirildi — bkz. lib/commission.ts
+    const calc = calculateCommission({
+      amount: value,
+      rate: Number(property.commission_rate) || undefined,
+      advisorShare,
+    });
+    const gross = calc.net;
+    const vat = calc.vat;
 
     const { data: deal, error: dealErr } = await supabase
       .from("deals")
@@ -84,10 +89,9 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
       return { error: "Deal oluşturulamadı." };
     }
 
-    const splits = [
-      { label: "Danışman", rate: advisorShare, amount: Math.round(gross * (advisorShare / 100) * 100) / 100 },
-      { label: "Ofis", rate: officeShare, amount: Math.round(gross * (officeShare / 100) * 100) / 100 },
-    ];
+    // Ofis payi cikarma ile hesaplaniyor: iki ayri carpimin toplami
+    // yuvarlama yuzunden matrahi tutturmayabiliyordu (or. %33/%67).
+    const splits = buildSplits(gross, advisorShare);
 
     const { data: commission, error: cErr } = await supabase
       .from("commissions")
