@@ -132,10 +132,13 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 - **Vitrin & paylaş**: `<img>` → `next/image` (fill + sizes + priority) → WebP/resize LCP kazancı, CLS sıfır
 - **Günlük özet cron**: alıcı başına SELECT+INSERT (N+1) → tenant başına tek existing sorgu + toplu insert
 
+#### 🟢 DALGA 6 — İmza token güvenliği (canlıya alındı, `7137683`)
+- `signContractByToken` sunucu tarafında iptal + geçerlilik süresi kontrol ediyor (görüntü kontrolü atlanamaz)
+- Sözleşme gönderiminde geçerlilik yoksa token 30 gün sonra otomatik dolar (süresiz link riski kapatıldı)
+
 #### ⏳ Denetimden kalan (daha düşük öncelik)
-- **Güvenlik**: sözleşme imza token expiry (migration gerektirir), rate-limit fail-open (RPC uygulanmadıysa)
 - **Performans**: franchise/raporlar SQL agregasyonu (limitler makul, düşük öncelik), property-media seri upload
-- **Diğer**: appointment/task/contract timezone tutarlılığı
+- **Diğer**: appointment/task timezone tutarlılığı, talep/kampanya/aidat/deal kalıcı silme (soft-delete tercih edilebilir)
 
 > Web araştırması: sistem TR emlak CRM standartlarını (portföy/müşteri/eşleştirme/randevu/sözleşme/EİDS yetki takibi/KVKK-İYS/mobil-bulut) ve yasal gereklilikleri zaten karşılıyor.
 
