@@ -163,9 +163,13 @@ export async function quickDemoLogin(personaId: string): Promise<DemoLoginResult
   const persona = getDemoPersona(personaId);
   if (!persona) return { error: "Geçersiz test kişiliği." };
 
-  // Güvenlik: platform (super_admin/ops...) kişilikleri production'da ASLA açılamaz —
-  // demo modu ofis demoları için açılsa bile platform admin ele geçirmeyi engelle.
-  if (persona.kind === "platform" && process.env.NODE_ENV === "production") {
+  // Güvenlik: platform (super_admin/ops...) kişilikleri production'da varsayılan olarak
+  // KAPALI — demo modu ofis demoları için açık olsa bile platform admin ele geçirmeyi engelle.
+  // Sahip, kontrollü test için Vercel'de ALLOW_PLATFORM_DEMO=true ile geçici açabilir.
+  // UYARI: açıkken /admin siteye giren herkese tek tıkla erişilebilir; test sonrası kaldırılmalı.
+  const platformDemoAllowed =
+    process.env.NODE_ENV !== "production" || process.env.ALLOW_PLATFORM_DEMO === "true";
+  if (persona.kind === "platform" && !platformDemoAllowed) {
     return { error: "Bu test kişiliği bu ortamda kullanılamaz." };
   }
 
