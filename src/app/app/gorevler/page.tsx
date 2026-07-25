@@ -5,6 +5,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { NewTaskDialog } from "./new-task-dialog";
 import { TaskCard, type TaskRow } from "./task-card";
 import { EmptyState } from "@/components/app/empty-state";
+import { ListLimitNotice } from "@/components/app/list-limit-notice";
 
 export const dynamic = "force-dynamic";
 
@@ -44,8 +45,11 @@ export default async function TasksPage({
 
   let query = supabase
     .from("tasks")
+    // count: filtreye göre 100/200 sınırı var; hangi filtrede olursa olsun
+    // kullanıcı kaç görevin listede olmadığını görebilmeli.
     .select(
       "id, title, notes, kind, priority, status, due_at, assigned_to, customer_id, property_id, created_at, assignee:profiles!tasks_assigned_to_fkey(full_name), customer:customers(full_name)",
+      { count: "exact" },
     )
     .eq("tenant_id", ctx.tenantId);
 
@@ -67,7 +71,7 @@ export default async function TasksPage({
     query = query.eq("status", "open").order("due_at", { ascending: true, nullsFirst: false }).limit(200);
   }
 
-  const [{ data: tasksData }, { data: members }, { data: customers }, counts] = await Promise.all([
+  const [{ data: tasksData, count: taskTotal }, { data: members }, { data: customers }, counts] = await Promise.all([
     query,
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
     supabase
@@ -163,6 +167,7 @@ export default async function TasksPage({
         />
       ) : (
         <div className="space-y-2">
+          <ListLimitNotice shown={tasks.length} total={taskTotal} hint="Filtre uygulayarak daraltın." />
           {tasks.map((t) => (
             <TaskCard key={t.id} task={t} canEdit={canEdit} canDelete={canDelete} />
           ))}

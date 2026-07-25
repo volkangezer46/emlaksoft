@@ -21,6 +21,7 @@ import { AppointmentCalendar } from "./appointment-calendar";
 import { AppointmentEditDialog } from "./appointment-edit-dialog";
 import Link from "next/link";
 import { EmptyState } from "@/components/app/empty-state";
+import { ListLimitNotice } from "@/components/app/list-limit-notice";
 
 type Rel = { id?: string; full_name?: string; title?: string; property_code?: string } | { id?: string; full_name?: string; title?: string; property_code?: string }[] | null;
 
@@ -70,10 +71,15 @@ function initials(name: string) {
 export default async function AppointmentsPage() {
   await requireModulePage("appointments");
   const supabase = await createClient();
-  const [{ data: appts }, { data: customers }, { data: properties }, apptTypeDefs] = await Promise.all([
+  const [{ data: appts, count: apptTotal }, { data: customers }, { data: properties }, apptTypeDefs] = await Promise.all([
     supabase
       .from("appointments")
-      .select("id, appointment_type, scheduled_at, duration_min, location, status, notes, customer:customers(id, full_name), property:properties(id, title, property_code)")
+      // count: liste 100 randevuyla sınırlı; yoğun bir ofiste bu kolayca
+      // aşılır ve kullanıcı eksik takvim görüp bunu tam sanar.
+      .select(
+        "id, appointment_type, scheduled_at, duration_min, location, status, notes, customer:customers(id, full_name), property:properties(id, title, property_code)",
+        { count: "exact" },
+      )
       .neq("status", "cancelled")
       .order("scheduled_at", { ascending: true })
       .limit(100),
@@ -191,6 +197,9 @@ export default async function AppointmentsPage() {
                 <h2 className="mt-1 font-display font-bold text-ink-950">Yaklaşan randevular</h2>
               </div>
               <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[10px] font-bold text-brand-600">{rows.length} kayıt</span>
+            </div>
+            <div className="px-5 pt-3">
+              <ListLimitNotice shown={rows.length} total={apptTotal} hint="Geçmiş randevular için takvimi kullanın." />
             </div>
             <div className="divide-y divide-line">
               {rows.map((appt) => {

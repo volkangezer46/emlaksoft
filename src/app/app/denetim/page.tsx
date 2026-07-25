@@ -9,6 +9,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { exportAuditCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { DAY_MS, msSince, now } from "@/lib/clock";
+import { ListLimitNotice } from "@/components/app/list-limit-notice";
 
 const actionLabel: Record<string, string> = {
   "workflow.deal_won": "Satış kapandı",
@@ -43,9 +44,15 @@ function diffPreview(oldValue: unknown, newValue: unknown) {
 export default async function AuditPage() {
   await requireModulePage("settings");
   const supabase = await createClient();
-  const { data: logs } = await supabase
+  const { data: logs, count: logTotal } = await supabase
     .from("audit_logs")
-    .select("id, action, entity_type, entity_id, actor_id, new_value, old_value, created_at")
+    // Denetim kaydında sessiz kırpma özellikle sakıncalı: "kayıt yok"
+    // ile "kayıt var ama listede değil" arasındaki fark, denetimin
+    // anlamını belirliyor.
+    .select(
+      "id, action, entity_type, entity_id, actor_id, new_value, old_value, created_at",
+      { count: "exact" },
+    )
     .order("created_at", { ascending: false })
     .limit(120);
 
@@ -125,6 +132,13 @@ export default async function AuditPage() {
           </div>
         ) : (
           <div className="divide-y divide-line">
+            <div className="px-5 py-3">
+              <ListLimitNotice
+                shown={rows.length}
+                total={logTotal}
+                hint="Daha eski kayıtlar için dışa aktarım kullanın."
+              />
+            </div>
             {rows.map((r) => (
               <article key={r.id} className="grid gap-2 px-5 py-3.5 transition hover:bg-brand-600/[0.02] md:grid-cols-[1.1fr_1.2fr_.7fr_auto] md:items-center">
                 <div>
