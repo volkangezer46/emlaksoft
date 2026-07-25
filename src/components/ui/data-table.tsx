@@ -137,6 +137,8 @@ export function DataTable({
   empty,
   className,
   toolbar,
+  rowActions,
+  actionsHeader,
 }: {
   columns: DataTableColumn[];
   rows: DataTableRow[];
@@ -150,6 +152,20 @@ export function DataTable({
   className?: string;
   /** Arama kutusunun yanına konacak ek kontroller (filtre menüsü, CSV vb.). */
   toolbar?: React.ReactNode;
+  /**
+   * Satır başına etkileşimli aksiyonlar (düzenle/sil/gönder düğmeleri).
+   *
+   * Neden `Record<id, ReactNode>` ve dizi değil: tablo sıralanıp filtrelendiği
+   * için indeks hizası bozulur; id ile eşleme sırayla birlikte kayar.
+   *
+   * Neden serileştirme sorunu YOK: Server Component'ten Client Component'e
+   * FONKSİYON geçirilemez ama React ELEMENTİ geçirilebilir (RSC payload'ında
+   * taşınır). Sunucu sayfası aksiyon bileşenlerini kendisi render edip buraya
+   * verir; DataTable yalnızca yerleştirir.
+   */
+  rowActions?: Record<string, React.ReactNode>;
+  /** Aksiyon kolonunun başlığı (varsayılan: gizli). */
+  actionsHeader?: string;
 }) {
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -222,7 +238,8 @@ export function DataTable({
     setSortDir("asc");
   }
 
-  const colCount = columns.length;
+  const hasActions = Boolean(rowActions);
+  const colCount = columns.length + (hasActions ? 1 : 0);
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -286,6 +303,11 @@ export function DataTable({
                   </TH>
                 );
               })}
+              {hasActions ? (
+                <TH align="right" className="w-px">
+                  {actionsHeader ? actionsHeader : <span className="sr-only">İşlemler</span>}
+                </TH>
+              ) : null}
             </TR>
           </THead>
 
@@ -366,6 +388,15 @@ export function DataTable({
                         </TD>
                       );
                     })}
+                    {hasActions ? (
+                      <TD align="right" className="whitespace-nowrap">
+                        {/* relative + z-10: satırı kaplayan görünmez bağlantının
+                            üstünde kalsın, tıklama aksiyona gelsin */}
+                        <span className="relative z-10 inline-flex items-center gap-1">
+                          {rowActions?.[String(row.id ?? "")] ?? null}
+                        </span>
+                      </TD>
+                    ) : null}
                   </TR>
                 );
               })
@@ -388,6 +419,7 @@ export function DataTable({
                         : null}
                   </TD>
                 ))}
+                {hasActions ? <TD /> : null}
               </TR>
             </TFoot>
           ) : null}

@@ -5,6 +5,7 @@ import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 import { getDefinitions } from "@/lib/definitions";
 import { EmptyState } from "@/components/app/empty-state";
 import { ChartFrame, DonutSplit } from "@/components/ui/chart";
+import { DataTable, type DataTableColumn, type DataTableRow } from "@/components/ui/data-table";
 import { ExpenseEditDialog } from "./expense-edit-dialog";
 
 // Inline server action wrappers — void return için form action uyumlu
@@ -44,6 +45,49 @@ export default async function GiderlerPage() {
   const categoryChart = activeCategories
     .sort((a, b) => b.total - a.total)
     .map((c) => ({ name: c.label, value: c.total }));
+
+  const EXPENSE_COLUMNS: DataTableColumn[] = [
+    { key: "title", header: "Başlık", sortable: true, subtitleKey: "notes" },
+    { key: "category", header: "Kategori", sortable: true },
+    { key: "amount", header: "Tutar", format: "money", align: "right", sortable: true, total: true },
+    { key: "expense_date", header: "Tarih", format: "date", align: "right", sortable: true },
+  ];
+
+  const expenseRows: DataTableRow[] = expenses.map((e) => ({
+    id:           e.id,
+    title:        e.title,
+    notes:        e.notes,
+    category:     catLabel(e.category),
+    amount:       Number(e.amount),
+    expense_date: e.expense_date,
+  }));
+
+  // Satır aksiyonları sunucuda render edilip DataTable'a ELEMENT olarak
+  // geçiyor. Fonksiyon geçirilemez ama React elementi RSC payload'ında taşınır.
+  const expenseActions: Record<string, React.ReactNode> = Object.fromEntries(
+    expenses.map((e) => [
+      e.id,
+      <>
+        {canEdit && (
+          <ExpenseEditDialog
+            expense={{ id: e.id, title: e.title, amount: Number(e.amount), category: e.category, expense_date: e.expense_date, notes: e.notes }}
+            categories={categories}
+          />
+        )}
+        {canDelete && (
+          <form action={handleDelete.bind(null, e.id) as (fd: FormData) => Promise<void>}>
+            <button
+              type="submit"
+              className="focus-ring press grid h-7 w-7 place-items-center rounded-[7px] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600"
+              aria-label={`${e.title} giderini sil`}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </form>
+        )}
+      </>,
+    ]),
+  );
 
   return (
     <div className="space-y-6">
@@ -115,48 +159,15 @@ export default async function GiderlerPage() {
           tone="amber"
         />
       ) : (
-        <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px] text-left text-sm">
-              <thead className="border-b border-line bg-canvas/80 text-text-muted">
-                <tr>
-                  <th className="px-5 py-3 font-semibold">Başlık</th>
-                  <th className="px-4 py-3 font-semibold">Kategori</th>
-                  <th className="px-4 py-3 font-semibold">Tutar</th>
-                  <th className="px-4 py-3 font-semibold">Tarih</th>
-                  <th className="px-4 py-3 font-semibold" />
-                </tr>
-              </thead>
-              <tbody>
-                {expenses.map((e) => (
-                  <tr key={e.id} className="border-b border-line last:border-0 hover:bg-canvas/40">
-                    <td className="px-5 py-3 font-semibold text-ink-950">{e.title}</td>
-                    <td className="px-4 py-3 text-text-muted">{catLabel(e.category)}</td>
-                    <td className="px-4 py-3 font-bold text-ink-950">{money(Number(e.amount))}</td>
-                    <td className="px-4 py-3 text-text-muted">{new Date(e.expense_date).toLocaleDateString("tr-TR")}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        {canEdit && (
-                          <ExpenseEditDialog
-                            expense={{ id: e.id, title: e.title, amount: Number(e.amount), category: e.category, expense_date: e.expense_date, notes: e.notes }}
-                            categories={categories}
-                          />
-                        )}
-                        {canDelete && (
-                          <form action={handleDelete.bind(null, e.id) as (fd: FormData) => Promise<void>}>
-                            <button type="submit" className="grid h-7 w-7 place-items-center rounded-[7px] text-text-faint transition hover:bg-red-50 hover:text-red-600" aria-label="Sil">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </form>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <DataTable
+          columns={EXPENSE_COLUMNS}
+          rows={expenseRows}
+          rowActions={expenseActions}
+          showTotals
+          minWidth={600}
+          searchPlaceholder="Gider başlığı veya kategori ara…"
+          empty={{ description: "Arama terimini değiştirip tekrar deneyin." }}
+        />
       )}
     </div>
   );
