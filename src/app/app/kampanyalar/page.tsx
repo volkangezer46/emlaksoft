@@ -47,6 +47,10 @@ export default async function KampanyalarPage() {
     { key: "status", header: "Durum", format: "badge", badges: STATUS_BADGES, sortable: true },
     { key: "recipients", header: "Alıcı", align: "right", searchable: false },
     { key: "dateLabel", header: "Tarih", align: "right", searchable: false },
+    // Detay bagi: alici bazinda teslimat sonucu ve HATA MESAJI hicbir yerde
+    // gorunmuyordu; kullanici "12 hata" sayisini gorup neden oldugunu
+    // ogrenemiyordu.
+    { key: "_href", header: "", format: "link", linkLabel: "Detay" },
   ];
 
   const campaignRows: DataTableRow[] = campaigns.map((c) => ({
@@ -61,6 +65,7 @@ export default async function KampanyalarPage() {
         ? `${c.sent_count ?? 0}/${c.total_count ?? 0}${(c.failed_count ?? 0) > 0 ? ` · ${c.failed_count} hata` : ""}`
         : `${c.total_count ?? 0} alıcı`,
     dateLabel: relativeDate(c.created_at),
+    _href: `/app/kampanyalar/${c.id}`,
   }));
 
   const campaignActions: Record<string, React.ReactNode> = Object.fromEntries(

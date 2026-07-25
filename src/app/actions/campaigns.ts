@@ -198,6 +198,49 @@ export async function listCampaigns() {
   return data ?? [];
 }
 
+/**
+ * Tek kampanya + alici dokumu (detay sayfasi icin).
+ *
+ * NEDEN SONRADAN EKLENDI: `campaign_recipients` tablosu her alici icin durum
+ * ve HATA MESAJI tutuyordu ama hicbir ekran bu satirlari okumuyordu. Liste
+ * sayfasi yalnizca "12 hata" gibi bir sayi gosteriyordu; kullanici HANGI
+ * numaraya ulasilamadigini ve NEDEN ulasilamadigini ogrenemiyordu. Basarisiz
+ * gonderimi duzeltmenin yolu yoktu.
+ */
+export async function getCampaign(id: string) {
+  const gate = await requirePermission("customers", "view");
+  if (!gate.ok) return null;
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("campaigns")
+    .select("id, title, channel, message, status, total_count, sent_count, failed_count, scheduled_at, sent_at, created_at")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+
+  return data;
+}
+
+export async function listCampaignRecipients(campaignId: string) {
+  const gate = await requirePermission("customers", "view");
+  if (!gate.ok) return [];
+
+  const supabase = await createClient();
+  // Once basarisizlar: kullanicinin bu sayfaya gelme sebebi genellikle
+  // "neden ulasmadi" sorusu. `status` metinsel siralamada failed < pending <
+  // sent oldugu icin artan sirada basarisizlar zaten ust sirada.
+  const { data } = await supabase
+    .from("campaign_recipients")
+    .select("id, customer_id, full_name, phone, status, error_msg, sent_at, created_at")
+    .eq("campaign_id", campaignId)
+    .order("status", { ascending: true })
+    .order("full_name", { ascending: true })
+    .limit(500);
+
+  return data ?? [];
+}
+
 // ---------------------------------------------------------------------------
 // Kampanya sil
 // ---------------------------------------------------------------------------
