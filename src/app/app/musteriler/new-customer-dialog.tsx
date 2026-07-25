@@ -1,9 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useActionState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus } from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { createCustomer, type CustomerResult } from "@/app/actions/customers";
 import { PhoneInput } from "@/components/ui/phone-input";
 
@@ -43,39 +50,30 @@ export function NewCustomerDialog({
     initial,
   );
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    if (open) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
-
+  /*
+   * Radix Dialog'a taşındı. Elle kurulum Esc'i hallediyordu ama FOCUS TRAP ve
+   * SCROLL LOCK yoktu. Ayrıca tetikleyici ve kapat butonlarında `type="button"`
+   * eksikti — form içinde kullanılsalar submit tetikleyeceklerdi.
+   */
   return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        className="btn-shine inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-      >
-        <Plus className="h-4 w-4" />
-        Yeni müşteri
-      </button>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+        >
+          <Plus className="h-4 w-4" />
+          Yeni müşteri
+        </button>
+      </DialogTrigger>
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/40 p-4 backdrop-blur-sm sm:items-center">
-          <div className="w-full max-w-lg rounded-[20px] border border-line bg-surface shadow-[var(--shadow-lg)]">
-            <div className="flex items-center justify-between border-b border-line px-6 py-4">
-              <h2 className="font-display text-lg font-bold text-ink-950">
-                Yeni müşteri
-              </h2>
-              <button
-                onClick={() => setOpen(false)}
-                className="grid h-8 w-8 place-items-center rounded-[8px] text-text-muted hover:bg-canvas"
-                aria-label="Kapat"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form ref={formRef} action={action} className="grid gap-4 p-6 sm:grid-cols-2">
+      <DialogContent size="md">
+        <DialogHeader
+          icon={<Plus />}
+          title="Yeni müşteri"
+          description="Temel bilgilerle müşteri kaydı açın."
+        />
+        <form ref={formRef} action={action} className="grid gap-4 p-6 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="full_name">
                   Ad soyad *
@@ -209,31 +207,30 @@ export function NewCustomerDialog({
               </div>
 
               {state.error ? (
-                <p className="sm:col-span-2 text-sm text-danger-500" role="alert">
+                <p className="sm:col-span-2 text-sm font-medium text-danger-600" role="alert">
                   {state.error}
                 </p>
               ) : null}
 
-              <div className="sm:col-span-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-medium text-ink-950 hover:bg-canvas"
-                >
-                  Vazgeç
-                </button>
-                <button
-                  type="submit"
-                  disabled={pending}
-                  className="rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
-                >
-                  {pending ? "Kaydediliyor…" : "Kaydet"}
-                </button>
-              </div>
-            </form>
+          <div className="hairline-t sm:col-span-2 flex justify-end gap-2 pt-4">
+            <DialogClose asChild>
+              <button
+                type="button"
+                className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas"
+              >
+                Vazgeç
+              </button>
+            </DialogClose>
+            <button
+              type="submit"
+              disabled={pending}
+              className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+            >
+              {pending ? "Kaydediliyor…" : "Kaydet"}
+            </button>
           </div>
-        </div>
-      ) : null}
-    </>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
