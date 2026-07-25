@@ -1091,13 +1091,17 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-line pt-6 text-sm text-text-muted md:flex-row">
-            <p>© {new Date().getFullYear()} EmlakSoft. Tüm hakları saklıdır.</p>
-            <div className="flex flex-wrap gap-4">
-              <Link href="/gizlilik" className="hover:text-brand-600">Gizlilik</Link>
-              <Link href="/kullanim-sartlari" className="hover:text-brand-600">Kullanım şartları</Link>
-              <Link href="/gizlilik" className="hover:text-brand-600">KVKK</Link>
+          <div className="mt-12 border-t border-line pt-6 text-sm text-text-muted">
+            <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 md:justify-start">
+              <Link href="/kullanim-sartlari" className="hover:text-brand-600">Kullanım Şartları</Link>
+              <Link href="/gizlilik" className="hover:text-brand-600">Gizlilik Politikası</Link>
+              <Link href="/kvkk-aydinlatma" className="hover:text-brand-600">KVKK Aydınlatma</Link>
+              <Link href="/cerez-politikasi" className="hover:text-brand-600">Çerez Politikası</Link>
+              <Link href="/mesafeli-satis" className="hover:text-brand-600">Mesafeli Satış Sözleşmesi</Link>
+              <Link href="/on-bilgilendirme" className="hover:text-brand-600">Ön Bilgilendirme</Link>
+              <Link href="/iptal-iade" className="hover:text-brand-600">İptal &amp; İade</Link>
             </div>
+            <p className="mt-4 text-center md:text-left">© {new Date().getFullYear()} EmlakSoft. Tüm hakları saklıdır.</p>
           </div>
         </div>
       </footer>
