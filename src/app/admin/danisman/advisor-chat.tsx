@@ -91,8 +91,8 @@ function SessionSidebar({
         <button
           type="button"
           onClick={onNew}
-          title="Yeni sohbet"
-          className="grid h-7 w-7 place-items-center rounded-[8px] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-600"
+          aria-label="Yeni sohbet başlat"
+          className="focus-ring press grid h-7 w-7 place-items-center rounded-[8px] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-600"
         >
           <MessageSquarePlus className="h-4 w-4" />
         </button>
@@ -126,8 +126,8 @@ function SessionSidebar({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onDelete(s.id); }}
-                className="mt-0.5 hidden h-5 w-5 shrink-0 place-items-center rounded text-text-faint transition hover:text-danger-500 group-hover:grid"
-                title="Sil"
+                className="focus-ring mt-0.5 hidden h-5 w-5 shrink-0 place-items-center rounded text-text-faint transition hover:text-danger-500 group-hover:grid"
+                aria-label="Sohbeti sil"
               >
                 <Trash2 className="h-3 w-3" />
               </button>

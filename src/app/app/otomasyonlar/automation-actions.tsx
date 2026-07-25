@@ -104,8 +104,8 @@ export function AutomationRowActions({ row }: { row: AutomationRow }) {
         type="button"
         onClick={remove}
         disabled={pending}
-        title="Sil"
-        className="grid h-7 w-7 place-items-center rounded-[7px] border border-line text-text-faint transition hover:border-danger-500/30 hover:text-danger-500 disabled:opacity-50"
+        aria-label="Otomasyonu sil"
+        className="focus-ring press grid h-7 w-7 place-items-center rounded-[7px] border border-line text-text-faint transition hover:border-danger-500/30 hover:text-danger-500 disabled:opacity-50"
       >
         <Trash2 className="h-3.5 w-3.5" />
       </button>

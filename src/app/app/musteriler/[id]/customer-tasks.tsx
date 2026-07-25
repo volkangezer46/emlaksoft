@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Clock, ListChecks, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Tip } from "@/components/ui/tooltip";
 import { completeTask, createTask, deleteTask, reopenTask } from "@/app/actions/tasks";
 
 export type CustomerTaskRow = {
@@ -120,19 +121,25 @@ export function CustomerTasks({
               </span>
               {canEdit ? (
                 isDone ? (
-                  <button type="button" disabled={pending} onClick={() => act(reopenTask, t.id)} title="Yeniden aç" className="grid h-7 w-7 place-items-center rounded-[8px] border border-line text-text-muted hover:border-brand-300">
-                    <RotateCcw className="h-3.5 w-3.5" />
-                  </button>
+                  <Tip label="Yeniden aç">
+                    <button type="button" disabled={pending} onClick={() => act(reopenTask, t.id)} aria-label="Görevi yeniden aç" className="focus-ring press grid h-7 w-7 place-items-center rounded-[8px] border border-line text-text-muted transition hover:border-brand-300">
+                      <RotateCcw className="h-3.5 w-3.5" />
+                    </button>
+                  </Tip>
                 ) : (
-                  <button type="button" disabled={pending} onClick={() => act(completeTask, t.id)} title="Tamamla" className="grid h-7 w-7 place-items-center rounded-[8px] bg-mint-500/10 text-mint-600 hover:bg-mint-500/20">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  </button>
+                  <Tip label="Tamamla">
+                    <button type="button" disabled={pending} onClick={() => act(completeTask, t.id)} aria-label="Görevi tamamla" className="focus-ring press grid h-7 w-7 place-items-center rounded-[8px] bg-mint-500/10 text-mint-600 transition hover:bg-mint-500/20">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    </button>
+                  </Tip>
                 )
               ) : null}
               {canDelete ? (
-                <button type="button" disabled={pending} onClick={() => act(deleteTask, t.id)} title="Sil" className="grid h-7 w-7 place-items-center rounded-[8px] border border-line text-danger-500 hover:border-danger-500/40">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                <Tip label="Sil">
+                  <button type="button" disabled={pending} onClick={() => act(deleteTask, t.id)} aria-label="Görevi sil" className="focus-ring press grid h-7 w-7 place-items-center rounded-[8px] border border-line text-danger-500 transition hover:border-danger-500/40">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </Tip>
               ) : null}
             </div>
           );

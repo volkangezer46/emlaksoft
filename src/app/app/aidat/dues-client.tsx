@@ -72,8 +72,18 @@ export function DuesClient({ dues, properties, canCreate }: { dues: Due[]; prope
           <form ref={formRef} action={action} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <input name="title" required placeholder="Başlık (ör. Nisan aidatı)" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400 sm:col-span-2 lg:col-span-1" />
             <input name="amount" type="number" min="0" step="0.01" required placeholder="Tutar (₺)" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400" />
-            <input name="period" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400" title="İlgili ay" />
-            <input name="due_date" type="date" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400" title="Son ödeme tarihi" />
+            {/* Bu iki tarih alanının TEK etiketi `title` idi. Native `title`
+                ekran okuyucularda güvenilir okunmaz ve görsel olarak da hiçbir
+                şey göstermez: kullanıcı iki boş tarih kutusu görüyordu.
+                Gerçek <label> ile değiştirildi. */}
+            <label className="block text-[11px] font-semibold text-text-muted">
+              İlgili ay
+              <input name="period" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className="mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400" />
+            </label>
+            <label className="block text-[11px] font-semibold text-text-muted">
+              Son ödeme tarihi
+              <input name="due_date" type="date" className="mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400" />
+            </label>
             <select name="property_id" defaultValue="" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400 sm:col-span-2 lg:col-span-3">
               <option value="">Portföy (opsiyonel)</option>
               {properties.map((p) => (

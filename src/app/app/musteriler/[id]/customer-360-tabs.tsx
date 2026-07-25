@@ -18,6 +18,7 @@ import {
 import { NewDemandDialog } from "./new-demand-dialog";
 import { DemandStatusButtons } from "./demand-status-buttons";
 import { EditDemandDialog } from "./edit-demand-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CustomerFilesTab } from "./customer-files-tab";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
 
@@ -180,10 +181,21 @@ export function Customer360Tabs({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
+    <Tabs
+      value={tab}
+      onValueChange={(v) => setTab(v as TabId)}
+      className="space-y-4"
+    >
+      {/*
+        Elle yazilmis butonlardan Radix Tabs'e gecildi. Onceki halde EKSIK OLANLAR:
+          - role="tablist" / role="tab" / role="tabpanel" ve aria-selected
+          - ok tuslariyla sekmeler arasi gezinme (WAI-ARIA sekme deseninin
+            temel gereksinimi; Tab tusu sekme cubugundan CIKAR, icerige gecer)
+          - aria-controls / aria-labelledby baglantisi
+        Gorunum korundu: hap seklindeki sekmeler, sayaclar ve ikonlar ayni.
+      */}
+      <TabsList className="flex-wrap border-0 bg-transparent p-0">
         {tabs.map((t) => {
-          const active = tab === t.id;
           const count =
             t.id === "talepler"   ? demands.length
             : t.id === "anlasmalar" ? deals.length
@@ -194,23 +206,22 @@ export function Customer360Tabs({
             : t.id === "gecmis"   ? audit.length
             : null;
           return (
-            <button
+            <TabsTrigger
               key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-                active ? "bg-brand-600 text-white" : "border border-line bg-surface text-text-muted hover:border-brand-400"
-              }`}
+              value={t.id}
+              className="group focus-ring rounded-full border border-line bg-surface px-3.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-400 data-[state=active]:border-brand-600 data-[state=active]:bg-brand-600 data-[state=active]:text-white data-[state=active]:shadow-none [&_svg]:h-3.5 [&_svg]:w-3.5"
             >
-              <t.icon className="h-3.5 w-3.5" />
+              <t.icon />
               {t.label}
-              {count != null ? <span className={active ? "text-white/70" : "text-text-faint"}>{count}</span> : null}
-            </button>
+              {count != null ? (
+                <span className="text-text-faint transition-colors group-data-[state=active]:text-white/70">{count}</span>
+              ) : null}
+            </TabsTrigger>
           );
         })}
-      </div>
+      </TabsList>
 
-      {tab === "talepler" ? (
+      <TabsContent value="talepler">
         <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -260,9 +271,9 @@ export function Customer360Tabs({
             </div>
           )}
         </section>
-      ) : null}
+      </TabsContent>
 
-      {tab === "anlasmalar" ? (
+      <TabsContent value="anlasmalar">
         <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -294,19 +305,19 @@ export function Customer360Tabs({
             </div>
           )}
         </section>
-      ) : null}
+      </TabsContent>
 
-      {tab === "iletisim" ? (
+      <TabsContent value="iletisim">
         <CommunicationTimeline
           customerId={customerId}
           initialItems={communications}
           canCreate={canCreateComm}
         />
-      ) : null}
+      </TabsContent>
 
-      {tab === "dosyalar" ? <CustomerFilesTab customerId={customerId} files={files ?? []} /> : null}
+      <TabsContent value="dosyalar"><CustomerFilesTab customerId={customerId} files={files ?? []} /></TabsContent>
 
-      {tab === "izinler" ? (
+      <TabsContent value="izinler">
         <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -337,9 +348,9 @@ export function Customer360Tabs({
             </div>
           )}
         </section>
-      ) : null}
+      </TabsContent>
 
-      {tab === "aktivite" ? (
+      <TabsContent value="aktivite">
         <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <PhoneCall className="h-4 w-4 text-mint-600" /> Aktivite akışı
@@ -365,9 +376,9 @@ export function Customer360Tabs({
             </div>
           )}
         </section>
-      ) : null}
+      </TabsContent>
 
-      {tab === "notlar" ? (
+      <TabsContent value="notlar">
         <div className="space-y-4">
           {tags.length > 0 ? (
             <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
@@ -393,9 +404,9 @@ export function Customer360Tabs({
             </div>
           </section>
         </div>
-      ) : null}
+      </TabsContent>
 
-      {tab === "gecmis" ? (
+      <TabsContent value="gecmis">
         <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <FileText className="h-4 w-4 text-brand-600" /> İşlem geçmişi
@@ -415,7 +426,7 @@ export function Customer360Tabs({
             </div>
           )}
         </section>
-      ) : null}
-    </div>
+      </TabsContent>
+    </Tabs>
   );
 }

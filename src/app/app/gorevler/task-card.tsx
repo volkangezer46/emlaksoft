@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CheckCircle2, Clock, FileText, MapPin, Phone, RotateCcw, Trash2, User } from "lucide-react";
+import { Tip } from "@/components/ui/tooltip";
 import { completeTask, deleteTask, reopenTask } from "@/app/actions/tasks";
 import { TaskEditDialog } from "./task-edit-dialog";
 
@@ -110,14 +111,20 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
           done ? (
             <form action={reopenTask}>
               <input type="hidden" name="id" value={task.id} />
-              <button type="submit" title="Yeniden aç" className="grid h-8 w-8 place-items-center rounded-[9px] border border-line text-text-muted hover:border-brand-300">
-                <RotateCcw className="h-4 w-4" />
-              </button>
+              {/* `title=""` yerine Tip: klavye odagında da açılır, dokunmatikte
+                  kilitlenmez ve ekran dışına taşmaz. `aria-label` ayrıca şart —
+                  ikon-only butonda `title` ekran okuyucularda tutarlı okunmuyor. */}
+              <Tip label="Yeniden aç">
+                <button type="submit" aria-label="Görevi yeniden aç" className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line text-text-muted transition hover:border-brand-300">
+                  <RotateCcw className="h-4 w-4" />
+                </button>
+              </Tip>
             </form>
           ) : (
             <form action={completeTask}>
               <input type="hidden" name="id" value={task.id} />
-              <button type="submit" title="Tamamla" className="inline-flex items-center gap-1.5 rounded-[9px] bg-mint-500/10 px-3 py-2 text-xs font-semibold text-mint-600 hover:bg-mint-500/20">
+              {/* Bu butonda metin var; `title` gereksiz tekrardı, kaldırıldı. */}
+              <button type="submit" className="focus-ring press inline-flex items-center gap-1.5 rounded-[9px] bg-mint-500/10 px-3 py-2 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/20">
                 <CheckCircle2 className="h-4 w-4" /> Tamamla
               </button>
             </form>
@@ -126,9 +133,11 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
         {canDelete ? (
           <form action={deleteTask}>
             <input type="hidden" name="id" value={task.id} />
-            <button type="submit" title="Sil" className="grid h-8 w-8 place-items-center rounded-[9px] border border-line text-danger-500 hover:border-danger-500/40">
-              <Trash2 className="h-4 w-4" />
-            </button>
+            <Tip label="Sil">
+              <button type="submit" aria-label="Görevi sil" className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line text-danger-500 transition hover:border-danger-500/40">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </Tip>
           </form>
         ) : null}
       </div>
