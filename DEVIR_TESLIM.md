@@ -136,9 +136,18 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 - `signContractByToken` sunucu tarafında iptal + geçerlilik süresi kontrol ediyor (görüntü kontrolü atlanamaz)
 - Sözleşme gönderiminde geçerlilik yoksa token 30 gün sonra otomatik dolar (süresiz link riski kapatıldı)
 
+#### 🟢 DALGA 7 — Kurumsal auth + TR mevzuat + ultra hız (canlıya alındı, `f7aaa90` + `b4fc1c6`)
+- **Giriş** `/giris`: split-screen marka paneli (aurora, değer önerileri, alıntı), ikonlu inputlar, şifre göster/gizle, TLS rozeti
+- **Kayıt** `/kayit`: 3 adımlı wizard (Hesap → Ofisiniz → Güvenlik), ilerleme göstergesi, danışman sayısı kart seçimi, şifre güç ölçer, KVKK+şartlar onay kutusu; ortak `AuthShell` bileşeni
+- **TR mevzuat (online satış zorunlulukları)**: `/mesafeli-satis`, `/on-bilgilendirme`, `/iptal-iade`, `/cerez-politikasi`, `/kvkk-aydinlatma` YENİ; `/gizlilik` + `/kullanim-sartlari` taslaktan gerçek içeriğe; ortak `LegalPage` şablonu; footer 7 yasal link. NOT: ticari ünvan/MERSİS tescil sonrası doldurulacak.
+- **Ultra hız**: vitrin sayfaları ISR (revalidate 120, CDN); `/app` + `/admin` template.tsx ile 0.3s premium sayfa geçiş animasyonu; medya yükleme 3'lü paralel. Ana sayfa + tüm yasal + kayıt sayfaları tam statik (○).
+- Ana sayfa: dönen premium-ring kaldırıldı → statik gradient hairline; hero'ya kurumsal güvence şeridi (`732855f`)
+- Demo not: platform demo girişi tek anahtara bağlı (`ENABLE_DEMO_LOGIN`) — canlıya geçmeden `false` yapılacak (`ea03ee9`)
+
 #### ⏳ Denetimden kalan (daha düşük öncelik)
-- **Performans**: franchise/raporlar SQL agregasyonu (limitler makul, düşük öncelik), property-media seri upload
+- **Performans**: franchise/raporlar SQL agregasyonu (limitler makul, düşük öncelik)
 - **Diğer**: appointment/task timezone tutarlılığı, talep/kampanya/aidat/deal kalıcı silme (soft-delete tercih edilebilir)
+- **Yasal**: ticari ünvan/adres/MERSİS bilgileri şirket tescili sonrası mevzuat sayfalarına işlenecek
 
 > Web araştırması: sistem TR emlak CRM standartlarını (portföy/müşteri/eşleştirme/randevu/sözleşme/EİDS yetki takibi/KVKK-İYS/mobil-bulut) ve yasal gereklilikleri zaten karşılıyor.
 
