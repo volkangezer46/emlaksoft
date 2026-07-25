@@ -128,13 +128,16 @@ export function DealBoard({
                       key={d.id}
                       className="lift group relative rounded-[14px] border border-line bg-surface p-3 shadow-[var(--shadow-xs)] transition hover:border-brand-300"
                     >
-                      {d.customer_id ? (
-                        <Link
-                          href={`/app/musteriler/${d.customer_id}`}
-                          className="absolute inset-0 rounded-[14px]"
-                          aria-label={`${d.customer_name ?? "Müşteri"} anlaşması`}
-                        />
-                      ) : null}
+                      {/* Kart ustundeki ortu-link ONCEDEN MUSTERI sayfasina
+                          gidiyordu; kullanici anlasma kartina tikladiginda
+                          anlasmayi degil musteriyi aciyordu. Ustelik musterisi
+                          olmayan anlasma HIC tiklanamiyordu. Artik anlasma
+                          detayina gidiyor ve her kartta var. */}
+                      <Link
+                        href={`/app/anlasmalar/${d.id}`}
+                        className="focus-ring absolute inset-0 rounded-[14px]"
+                        aria-label={`${d.property_title ?? d.property_code ?? "Anlaşma"} detayını aç`}
+                      />
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-ink-950">

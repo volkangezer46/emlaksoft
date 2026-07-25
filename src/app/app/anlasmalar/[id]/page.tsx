@@ -1,0 +1,481 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Banknote,
+  Building2,
+  CalendarClock,
+  Handshake,
+  ListChecks,
+  Tag,
+  TrendingUp,
+  User,
+} from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { requireModulePage } from "@/lib/require-module-page";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+
+export const metadata = { title: "Anlaşma detayı" };
+
+/** Pipeline aşamaları — deal-board ile aynı sıra ve etiketler. */
+const STAGES = [
+  { key: "new", label: "Yeni" },
+  { key: "qualified", label: "Nitelikli" },
+  { key: "negotiation", label: "Müzakere" },
+  { key: "won", label: "Kazanıldı" },
+  { key: "lost", label: "Kaybedildi" },
+] as const;
+
+function money(n: number | null | undefined) {
+  if (n == null) return "—";
+  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(Number(n)) + " ₺";
+}
+
+function tarih(iso: string | null) {
+  if (!iso) return "—";
+  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+}
+
+/** supabase-js gömülü ilişkiyi dizi olarak tipleyebilir; iki biçimi de karşıla. */
+function rel<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return (Array.isArray(value) ? value[0] : value) ?? null;
+}
+
+/**
+ * Anlaşma detayı — pipeline'daki paranın 360° görünümü.
+ *
+ * NEDEN VAR: Anlaşma bu sistemdeki en değerli kayıt (para burada dönüyor) ama
+ * DETAY SAYFASI YOKTU. Kanban kartındaki üç satır dışında hiçbir yerde
+ * görülemiyordu: bağlı komisyon, teklif, sözleşme ve görevler ayrı ayrı
+ * sayfalarda duruyor ve hangisinin bu anlaşmaya ait olduğu görülemiyordu.
+ *
+ * İLİŞKİ HARİTASI: `commissions.deal_id` ve `tasks.deal_id` doğrudan FK;
+ * teklif ve sözleşmede `deal_id` YOK — onlar portföy+müşteri ikilisi üzerinden
+ * eşleştiriliyor. Bu bir yaklaşım, kesin bağ değil; sayfada da öyle
+ * etiketleniyor ("aynı portföy + müşteri").
+ */
+export default async function DealDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { perms } = await requireModulePage("commissions");
+  const { id } = await params;
+  const supabase = await createClient();
+
+  const { data: deal } = await supabase
+    .from("deals")
+    .select(
+      "id, deal_type, stage, deal_value, probability, loss_reason, created_at, updated_at, property_id, customer_id, assigned_to",
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  // RLS kiracı dışını zaten göstermiyor; burada yalnızca "yok" durumu.
+  if (!deal) notFound();
+
+  const [{ data: property }, { data: customer }, { data: assignee }, { data: commissions }, { data: tasks }] =
+    await Promise.all([
+      deal.property_id
+        ? supabase
+            .from("properties")
+            .select(
+              "id, property_code, title, list_price, transaction_type, property_type, status, province:geo_provinces(name), district:geo_districts(name)",
+            )
+            .eq("id", deal.property_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      deal.customer_id
+        ? supabase
+            .from("customers")
+            .select("id, full_name, phone, email")
+            .eq("id", deal.customer_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      deal.assigned_to
+        ? supabase.from("profiles").select("full_name, role").eq("id", deal.assigned_to).maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase
+        .from("commissions")
+        .select("id, gross_amount, vat_amount, status, created_at")
+        .eq("deal_id", id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("tasks")
+        .select("id, title, status, due_at, priority")
+        .eq("deal_id", id)
+        .order("due_at", { ascending: true })
+        .limit(20),
+    ]);
+
+  /*
+   * Teklif ve sözleşmede `deal_id` kolonu YOK. Aynı portföy + müşteri ikilisine
+   * bakarak yaklaşık eşleştirme yapıyoruz. Her ikisi de dolu değilse hiç
+   * sorgu atmıyoruz — tek başına portföy eşleşmesi başka müşterinin teklifini
+   * bu anlaşmaya bağlar, bu yanlış olur.
+   */
+  const capraz = Boolean(deal.property_id && deal.customer_id);
+  const [{ data: offers }, { data: contracts }] = await Promise.all([
+    capraz
+      ? supabase
+          .from("offers")
+          .select("id, amount, status, valid_until, created_at")
+          .eq("property_id", deal.property_id!)
+          .eq("customer_id", deal.customer_id!)
+          .order("created_at", { ascending: false })
+          .limit(10)
+      : Promise.resolve({ data: null }),
+    capraz
+      ? supabase
+          .from("contracts")
+          .select("id, title, contract_type, status, signed_at, created_at")
+          .eq("property_id", deal.property_id!)
+          .eq("customer_id", deal.customer_id!)
+          .order("created_at", { ascending: false })
+          .limit(10)
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const stageIdx = STAGES.findIndex((s) => s.key === deal.stage);
+  const kayip = deal.stage === "lost";
+  const kazanildi = deal.stage === "won";
+  const province = property ? rel(property.province as { name: string } | { name: string }[] | null) : null;
+  const district = property ? rel(property.district as { name: string } | { name: string }[] | null) : null;
+
+  const komisyonlar = commissions ?? [];
+  const brutToplam = komisyonlar.reduce((s, c) => s + Number(c.gross_amount ?? 0), 0);
+  const kdvToplam = komisyonlar.reduce((s, c) => s + Number(c.vat_amount ?? 0), 0);
+  const tahsilEdilen = komisyonlar
+    .filter((c) => c.status === "paid" || c.status === "Tahsil edildi")
+    .reduce((s, c) => s + Number(c.gross_amount ?? 0), 0);
+
+  const acikGorev = (tasks ?? []).filter((t) => t.status !== "done" && t.status !== "Tamamlandı").length;
+  const olasilik = deal.probability != null ? Number(deal.probability) : null;
+  const dealValue = deal.deal_value != null ? Number(deal.deal_value) : null;
+  // Beklenen değer = tutar × olasılık. Kazanılan/kaybedilende olasılık anlamsız.
+  const beklenen =
+    dealValue != null && olasilik != null && !kazanildi && !kayip
+      ? Math.round(dealValue * (olasilik > 1 ? olasilik / 100 : olasilik))
+      : null;
+
+  const canSeeCommission = (perms.commissions ?? []).includes("view");
+
+  return (
+    <div className="space-y-6">
+      <Link
+        href="/app/anlasmalar"
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600"
+      >
+        <ArrowLeft className="h-4 w-4" /> Pipeline&apos;a dön
+      </Link>
+
+      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
+        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-mint-500/25 blur-[80px]" />
+        <div className="relative">
+          <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
+            <Handshake className="h-3.5 w-3.5" /> {deal.deal_type === "rent" ? "Kiralama" : "Satış"} anlaşması
+          </span>
+          <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">
+            {property?.title ?? property?.property_code ?? "Portföysüz anlaşma"}
+          </h1>
+          <p className="mt-1 text-sm text-white/60">
+            {customer?.full_name ?? "Müşteri atanmadı"} · {tarih(deal.created_at)} tarihinde açıldı
+          </p>
+
+          {/* Pipeline şeridi: anlaşmanın hangi aşamada olduğunu tek bakışta göster. */}
+          <ol className="relative mt-6 flex flex-wrap gap-2" aria-label="Anlaşma aşaması">
+            {STAGES.map((s, i) => {
+              const gecildi = !kayip && stageIdx >= 0 && i <= stageIdx && s.key !== "lost";
+              const aktif = s.key === deal.stage;
+              if (s.key === "lost" && !kayip) return null;
+              return (
+                <li
+                  key={s.key}
+                  aria-current={aktif ? "step" : undefined}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-bold ${
+                    aktif
+                      ? "border-white/40 bg-white text-ink-950"
+                      : gecildi
+                        ? "border-mint-400/40 bg-mint-500/15 text-mint-300"
+                        : "border-white/12 bg-white/[0.04] text-white/45"
+                  }`}
+                >
+                  {s.label}
+                </li>
+              );
+            })}
+          </ol>
+
+          <div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              { label: "Anlaşma tutarı", value: money(dealValue), icon: Banknote },
+              {
+                label: kazanildi || kayip ? "Olasılık (kapandı)" : "Beklenen değer",
+                value: beklenen != null ? money(beklenen) : olasilik != null ? `%${Math.round(olasilik > 1 ? olasilik : olasilik * 100)}` : "—",
+                icon: TrendingUp,
+              },
+              { label: "Komisyon (brüt)", value: canSeeCommission ? money(brutToplam) : "—", icon: Tag },
+              { label: "Açık görev", value: String(acikGorev), icon: ListChecks },
+            ].map((k) => (
+              <div key={k.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur">
+                <k.icon className="h-4 w-4 text-mint-400" />
+                <p className="numeric mt-2 truncate font-display text-lg font-extrabold text-white">{k.value}</p>
+                <p className="text-[10px] text-white/45 sm:text-xs">{k.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {kayip && deal.loss_reason ? (
+        <p
+          className="flex items-start gap-2 rounded-[14px] border border-danger-500/30 bg-danger-500/5 px-4 py-3 text-sm text-danger-600"
+          role="status"
+        >
+          <span className="font-bold">Kayıp nedeni:</span> {deal.loss_reason}
+        </p>
+      ) : null}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Bağlı portföy — tıklanabilir */}
+        <section className="surface-card rounded-[var(--radius-panel)] p-5">
+          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+            <Building2 className="h-4 w-4 text-brand-600" /> Portföy
+          </h2>
+          {property ? (
+            <Link
+              href={`/app/portfoyler/${property.id}`}
+              className="lift-hover focus-ring group mt-3 block rounded-[14px] border border-line bg-canvas p-4 transition hover:border-brand-300"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-brand-600">
+                    {property.property_code}
+                  </p>
+                  <p className="mt-0.5 truncate font-semibold text-ink-950">{property.title ?? "Başlıksız"}</p>
+                  <p className="mt-1 text-xs text-text-muted">
+                    {[property.transaction_type, property.property_type, province?.name, district?.name]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                  <p className="numeric mt-2 font-display text-lg font-extrabold text-ink-950">
+                    {money(property.list_price != null ? Number(property.list_price) : null)}
+                  </p>
+                </div>
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-surface text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
+                  <ArrowUpRight className="h-4 w-4" />
+                </span>
+              </div>
+            </Link>
+          ) : (
+            <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+              Bu anlaşmaya portföy bağlanmamış.
+            </p>
+          )}
+        </section>
+
+        {/* Bağlı müşteri — tıklanabilir */}
+        <section className="surface-card rounded-[var(--radius-panel)] p-5">
+          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+            <User className="h-4 w-4 text-brand-600" /> Müşteri
+          </h2>
+          {customer ? (
+            <Link
+              href={`/app/musteriler/${customer.id}`}
+              className="lift-hover focus-ring group mt-3 block rounded-[14px] border border-line bg-canvas p-4 transition hover:border-brand-300"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-ink-950">{customer.full_name}</p>
+                  <p className="numeric mt-1 text-xs text-text-muted">{customer.phone ?? "Telefon yok"}</p>
+                  <p className="mt-0.5 truncate text-xs text-text-muted">{customer.email ?? "E-posta yok"}</p>
+                </div>
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-surface text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
+                  <ArrowUpRight className="h-4 w-4" />
+                </span>
+              </div>
+            </Link>
+          ) : (
+            <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+              Bu anlaşmaya müşteri bağlanmamış.
+            </p>
+          )}
+          <dl className="mt-3 space-y-1.5">
+            <div className="hairline-t flex justify-between gap-3 pt-2 text-sm">
+              <dt className="text-text-muted">Sorumlu danışman</dt>
+              <dd className="font-semibold text-ink-950">{assignee?.full_name ?? "Atanmadı"}</dd>
+            </div>
+            <div className="flex justify-between gap-3 text-sm">
+              <dt className="text-text-muted">Son güncelleme</dt>
+              <dd className="font-semibold text-ink-950">{tarih(deal.updated_at)}</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+
+      {/* Komisyon — yetki gerektiriyor */}
+      {canSeeCommission ? (
+        <section className="surface-card rounded-[var(--radius-panel)] p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+              <Banknote className="h-4 w-4 text-brand-600" /> Komisyon
+            </h2>
+            <Link href="/app/komisyon" className="text-xs font-semibold text-brand-600 hover:underline">
+              Komisyon merkezine git →
+            </Link>
+          </div>
+          {komisyonlar.length === 0 ? (
+            <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+              {kazanildi
+                ? "Anlaşma kazanıldı ama komisyon kaydı açılmamış."
+                : "Bu anlaşmaya bağlı komisyon kaydı yok."}
+            </p>
+          ) : (
+            <>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                {[
+                  ["Brüt", money(brutToplam)],
+                  ["KDV", money(kdvToplam)],
+                  ["Tahsil edilen", money(tahsilEdilen)],
+                ].map(([k, v]) => (
+                  <div key={k} className="rounded-[12px] border border-line bg-canvas px-4 py-2.5">
+                    <p className="text-[11px] text-text-faint">{k}</p>
+                    <p className="numeric text-sm font-bold text-ink-950">{v}</p>
+                  </div>
+                ))}
+              </div>
+              <TableFrame className="mt-3" minWidth={480}>
+                <Table>
+                  <THead>
+                    <TR>
+                      <TH>Tarih</TH>
+                      <TH align="right">Brüt</TH>
+                      <TH align="right">KDV</TH>
+                      <TH>Durum</TH>
+                    </TR>
+                  </THead>
+                  <TBody>
+                    {komisyonlar.map((c) => (
+                      <TR key={c.id}>
+                        <TD>{tarih(c.created_at)}</TD>
+                        <TD align="right">{money(Number(c.gross_amount))}</TD>
+                        <TD align="right">{money(Number(c.vat_amount))}</TD>
+                        <TD>
+                          <Badge variant={c.status === "paid" ? "success" : "warning"}>{c.status ?? "—"}</Badge>
+                        </TD>
+                      </TR>
+                    ))}
+                  </TBody>
+                </Table>
+              </TableFrame>
+            </>
+          )}
+        </section>
+      ) : null}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Teklifler ve sözleşmeler: yaklaşık eşleşme, bu açıkça yazılıyor */}
+        <section className="surface-card rounded-[var(--radius-panel)] p-5">
+          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+            <Tag className="h-4 w-4 text-brand-600" /> Teklifler
+          </h2>
+          <p className="mt-1 text-[11px] text-text-faint">
+            Teklif kaydında anlaşma bağı yok; aynı portföy + müşteri ikilisine göre listeleniyor.
+          </p>
+          {(offers ?? []).length === 0 ? (
+            <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
+              Eşleşen teklif yok.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {(offers ?? []).map((o) => (
+                <li key={o.id}>
+                  <Link
+                    href={`/app/teklifler/${o.id}`}
+                    className="focus-ring flex items-center justify-between gap-3 rounded-[12px] border border-line bg-canvas px-4 py-2.5 transition hover:border-brand-300"
+                  >
+                    <span className="numeric font-semibold text-ink-950">{money(Number(o.amount))}</span>
+                    <span className="flex items-center gap-2 text-xs text-text-muted">
+                      {o.status ?? "—"}
+                      <ArrowUpRight className="h-3.5 w-3.5" />
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="surface-card rounded-[var(--radius-panel)] p-5">
+          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+            <CalendarClock className="h-4 w-4 text-brand-600" /> Sözleşmeler
+          </h2>
+          <p className="mt-1 text-[11px] text-text-faint">
+            Aynı portföy + müşteri ikilisine göre listeleniyor.
+          </p>
+          {(contracts ?? []).length === 0 ? (
+            <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
+              Eşleşen sözleşme yok.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {(contracts ?? []).map((c) => (
+                <li key={c.id}>
+                  <Link
+                    href={`/app/sozlesmeler/${c.id}`}
+                    className="focus-ring flex items-center justify-between gap-3 rounded-[12px] border border-line bg-canvas px-4 py-2.5 transition hover:border-brand-300"
+                  >
+                    <span className="min-w-0 truncate font-semibold text-ink-950">{c.title ?? c.contract_type}</span>
+                    <span className="flex shrink-0 items-center gap-2 text-xs text-text-muted">
+                      {c.status ?? "—"}
+                      <ArrowUpRight className="h-3.5 w-3.5" />
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+
+      {/* Görevler — deal_id ile GERÇEK bağ */}
+      <section className="surface-card rounded-[var(--radius-panel)] p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+            <ListChecks className="h-4 w-4 text-brand-600" /> Bağlı görevler
+          </h2>
+          <Link href="/app/gorevler" className="text-xs font-semibold text-brand-600 hover:underline">
+            Görev merkezine git →
+          </Link>
+        </div>
+        {(tasks ?? []).length === 0 ? (
+          <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+            Bu anlaşmaya bağlı görev yok.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {(tasks ?? []).map((t) => {
+              const bitti = t.status === "done" || t.status === "Tamamlandı";
+              return (
+                <li
+                  key={t.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-line bg-canvas px-4 py-2.5"
+                >
+                  <span className={`font-medium ${bitti ? "text-text-faint line-through" : "text-ink-950"}`}>
+                    {t.title}
+                  </span>
+                  <span className="flex items-center gap-2 text-xs text-text-muted">
+                    {t.due_at ? tarih(t.due_at) : "Tarihsiz"}
+                    <Badge variant={bitti ? "success" : t.priority === "high" ? "danger" : "default"}>
+                      {bitti ? "Tamam" : (t.status ?? "Açık")}
+                    </Badge>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
