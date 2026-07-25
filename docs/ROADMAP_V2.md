@@ -60,11 +60,37 @@ edilir; yarım iş push edilmez.
   - [ ] Uygulanan migration'ları izleyen `schema_migrations` tablosu ekle
         (şu an hiçbir izleme yok — neyin uygulandığı bilinmiyor)
   - [ ] `--dry-run` ve tek dosya modu
-- [ ] **F3** 12 yüksek önemli güvenlik açığı, hepsinde fix var:
-  - [ ] `sharp`/libvips — CVE-2026-33327/33328/35590/35591 (Next Image kullanıyor, **çalışma zamanı riski**)
-  - [ ] `postcss` — CSS stringify XSS
-  - [ ] `brace-expansion` — DoS (OOM)
-  - [ ] Kalan 9 ESLint zinciri (devDependency, çalışma zamanı riski yok)
+- [~] **F3** Güvenlik açıkları — **KISMEN AÇIK, ENGELLİ. Sıradaki ilk iş.**
+
+  **Durum:** `sharp` 0.34.5 (libvips CVE-2026-33327/33328/35590/35591) ve
+  `postcss` 8.4.31 (XSS + path traversal) prod bağımlılığı olarak açık.
+  Kalan 9 açık ESLint zincirinde (devDependency, çalışma zamanı riski yok).
+
+  **Neden kapatılamadı — üç yaklaşım denendi, üçü de ölçüldü:**
+
+  | Yaklaşım | Sonuç |
+  |---|---|
+  | `overrides: { sharp, postcss }` | Yerelde her şey yeşil, **CI'da `npm ci` patlıyor** (780fbf5→f713d38, 5 push kırmızı) |
+  | `overrides: { sharp }` tek başına | Aynı — **suçlu sharp override'ı** (c1ff535 kırmızı) |
+  | `sharp`i doğrudan dependency yapmak | `npm ci` ve build geçiyor **ama açık kapanmıyor**: Next kendi `next/node_modules/sharp`'ında 0.34.5 taşıyor ve onu kullanıyor. Sadece `overrides` tekilleştiriyor |
+
+  **Elenen sebepler (hepsi ölçümle):** lockfile senkronu (yerel `npm ci` exit 0),
+  Linux platform kapsamı (`--os=linux --cpu=x64` dry-run exit 0, tüm musl/gnu/arm
+  varyantları lockfile'da), registry'de paket eksikliği (üçü de mevcut), install
+  script hatası (sharp'ın yok), `engine-strict` (kaldırıldı, CI hâlâ kırmızıydı).
+
+  **GERÇEK ENGEL:** CI'ın `npm ci` hata mesajını okuyamıyorum. GitHub Actions
+  log API'si public repo için de **403** veriyor, `gh` CLI kurulu değil. Bu yüzden
+  bisection'la çalıştım; kök sebep kesinleşti (sharp override) ama *neden*
+  kırdığı bilinmiyor.
+
+  - [ ] **Yapılacak (5 dakikalık iş, kullanıcı tarafında):** GitHub → Actions →
+        kırmızı run (`c1ff535`) → "Install dependencies" adımının log'unu aç,
+        `npm error` satırlarını paylaş. Hata mesajıyla bu madde tek hamlede kapanır.
+  - [ ] Alternatif: `gh auth login` yapılırsa logu kendim okuyabilirim.
+  - [ ] Alternatif: Next'in sharp pinini yükseltmesini beklemek (pasif).
+  - [ ] CI audit adımı şu an `continue-on-error: true` — sinyal görünür, ama
+        bloklamıyor. Açık kapanınca bu satır kaldırılacak.
 - [ ] **F4** `.env.local.example`'a eksik değişkenleri ekle (`CRON_SECRET` zorunlu
       — **7 cron route** ona bağlı, yoksa hepsi sessizce çalışmaz)
 - [ ] **F5** Sır rotasyonu notu: `service_role` + DB şifresi sohbette paylaşıldı
