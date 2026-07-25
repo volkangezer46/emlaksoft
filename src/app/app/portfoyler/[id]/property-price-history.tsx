@@ -1,0 +1,226 @@
+"use client";
+
+import { useMemo, useState, useTransition } from "react";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, LineChart, Table2, TrendingDown } from "lucide-react";
+import { AreaTrend } from "@/components/ui/chart";
+import { moneyTry } from "@/lib/leak-shield";
+import { getPropertyPriceHistory } from "@/app/actions/property-price-history";
+import {
+  PRICE_FIELD_LABEL,
+  historyAuthorName,
+  summarizePriceHistory,
+  toChartSeries,
+  type PriceField,
+  type PriceHistoryRow,
+} from "@/lib/price-history";
+
+const FIELD_TABS: PriceField[] = ["list_price", "min_price", "hidden_price"];
+
+const dateFmt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" });
+
+function relDays(days: number) {
+  if (days <= 0) return "bugün";
+  if (days === 1) return "dün";
+  return `${days} gün önce`;
+}
+
+export function PropertyPriceHistory({
+  propertyId,
+  initialHistory,
+  isRent,
+}: {
+  propertyId: string;
+  initialHistory: PriceHistoryRow[];
+  isRent?: boolean;
+}) {
+  const [field, setField] = useState<PriceField>("list_price");
+  const [rows, setRows] = useState<PriceHistoryRow[]>(initialHistory);
+  const [view, setView] = useState<"table" | "chart">("table");
+  const [pending, start] = useTransition();
+
+  const summary = useMemo(() => summarizePriceHistory(rows), [rows]);
+  const chartData = useMemo(() => toChartSeries(rows), [rows]);
+  const suffix = isRent ? "/ay" : "";
+
+  function switchField(next: PriceField) {
+    if (next === field) return;
+    setField(next);
+    start(async () => {
+      setRows(await getPropertyPriceHistory(propertyId, next));
+    });
+  }
+
+  const trendClass =
+    !summary || summary.totalChange === 0
+      ? "text-text-muted"
+      : summary.totalChange < 0
+        ? "text-danger-500"
+        : "text-mint-600";
+
+  return (
+    <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
+        <div>
+          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+            <TrendingDown className="h-4 w-4 text-brand-600" /> Fiyat geçmişi
+            {summary && summary.changeCount > 0 ? (
+              <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-[10px] font-bold text-brand-600">
+                {summary.changeCount} değişim
+              </span>
+            ) : null}
+          </h2>
+          <p className="mt-0.5 text-xs text-text-muted">
+            {summary
+              ? `${relDays(summary.daysOnMarket)} kayıtta · son güncelleme ${relDays(summary.daysSinceLastChange)}`
+              : "Fiyat değişimi kaydedildikçe burada birikir"}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-[10px] border border-line p-0.5">
+            {FIELD_TABS.map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => switchField(f)}
+                className={`rounded-[8px] px-2.5 py-1.5 text-[11px] font-semibold transition ${
+                  field === f ? "bg-ink-950 text-white" : "text-text-muted hover:text-ink-950"
+                }`}
+              >
+                {PRICE_FIELD_LABEL[f]}
+              </button>
+            ))}
+          </div>
+          {rows.length >= 2 ? (
+            <div className="flex rounded-[10px] border border-line p-0.5">
+              <button
+                type="button"
+                onClick={() => setView("table")}
+                aria-label="Tablo görünümü"
+                className={`rounded-[8px] px-2.5 py-1.5 transition ${view === "table" ? "bg-ink-950 text-white" : "text-text-muted hover:text-ink-950"}`}
+              >
+                <Table2 className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("chart")}
+                aria-label="Grafik görünümü"
+                className={`rounded-[8px] px-2.5 py-1.5 transition ${view === "chart" ? "bg-ink-950 text-white" : "text-text-muted hover:text-ink-950"}`}
+              >
+                <LineChart className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {pending ? (
+        <p className="px-5 py-10 text-center text-sm text-text-muted">Yükleniyor…</p>
+      ) : rows.length === 0 ? (
+        <p className="px-5 py-10 text-center text-sm text-text-muted">
+          Bu portföy için {PRICE_FIELD_LABEL[field].toLowerCase()} kaydı yok. Fiyat güncellendiğinde
+          otomatik olarak buraya düşer.
+        </p>
+      ) : (
+        <>
+          {summary ? (
+            <div className="border-b border-line px-5 py-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-text-faint">İlk fiyat</p>
+                  <p className="font-display text-lg font-extrabold text-ink-950">
+                    {moneyTry(summary.firstPrice)}{suffix}
+                  </p>
+                  <p className="text-[10px] text-text-faint">{dateFmt.format(new Date(summary.firstDate))}</p>
+                </div>
+                <ArrowRight className="h-4 w-4 shrink-0 text-text-faint" />
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-text-faint">Güncel</p>
+                  <p className="font-display text-lg font-extrabold text-ink-950">
+                    {moneyTry(summary.lastPrice)}{suffix}
+                  </p>
+                  <p className="text-[10px] text-text-faint">{dateFmt.format(new Date(summary.lastDate))}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-4">
+                <div className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-text-faint">Toplam değişim</p>
+                  <p className={`mt-0.5 font-display text-sm font-extrabold ${trendClass}`}>
+                    {summary.totalChange > 0 ? "+" : summary.totalChange < 0 ? "−" : ""}
+                    {moneyTry(Math.abs(summary.totalChange))}
+                  </p>
+                </div>
+                <div className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-text-faint">Yüzde</p>
+                  <p className={`mt-0.5 font-display text-sm font-extrabold ${trendClass}`}>
+                    {summary.totalChangePct > 0 ? "+" : ""}
+                    %{summary.totalChangePct}
+                  </p>
+                </div>
+                <div className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-text-faint">İndirim / zam</p>
+                  <p className="mt-0.5 font-display text-sm font-extrabold text-ink-950">
+                    {summary.cutCount} / {summary.raiseCount}
+                  </p>
+                </div>
+                <div className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-text-faint">Ort. aralık</p>
+                  <p className="mt-0.5 font-display text-sm font-extrabold text-ink-950">
+                    {summary.avgDaysBetween > 0 ? `${summary.avgDaysBetween} gün` : "—"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {view === "chart" && chartData.length >= 2 ? (
+            <div className="px-5 py-4" style={{ height: 260 }}>
+              <AreaTrend
+                data={chartData}
+                xKey="tarih"
+                series={[{ key: "fiyat", label: PRICE_FIELD_LABEL[field] }]}
+                format="money"
+              />
+            </div>
+          ) : (
+            <div className="divide-y divide-line">
+              {[...rows].reverse().map((row) => {
+                const down = row.old_price != null && row.new_price < row.old_price;
+                const up = row.old_price != null && row.new_price > row.old_price;
+                return (
+                  <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-ink-950">
+                        {moneyTry(row.new_price)}{suffix}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-text-muted">
+                        {dateFmt.format(new Date(row.created_at))} · {historyAuthorName(row.changed_by)}
+                        {row.reason ? ` · ${row.reason}` : ""}
+                      </p>
+                    </div>
+                    {row.old_price != null ? (
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                          down ? "bg-danger-500/10 text-danger-500" : up ? "bg-mint-500/12 text-mint-600" : "bg-ink-950/6 text-text-muted"
+                        }`}
+                      >
+                        {down ? <ArrowDownRight className="h-3 w-3" /> : up ? <ArrowUpRight className="h-3 w-3" /> : null}
+                        {moneyTry(Math.abs(row.new_price - row.old_price))}
+                        {row.change_pct != null ? ` (%${Math.abs(row.change_pct)})` : ""}
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-ink-950/6 px-2.5 py-1 text-[11px] font-semibold text-text-muted">
+                        Başlangıç
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}

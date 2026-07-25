@@ -28,6 +28,7 @@ import { DeletePropertyButton, ReassignProperty } from "./property-admin-actions
 import { PropertyMediaManager, type MediaItem } from "./property-media-manager";
 import { AiContentPanel } from "./ai-content-panel";
 import { PropertyStatusHistory, PropertyAuthorizationPanel, PublishToPortalsPanel } from "./property-extras";
+import { PropertyPriceHistory } from "./property-price-history";
 import { PropertyHealthCard, ListingQualityCard } from "@/components/app/property-health-card";
 import { RelatedPropertiesWidget } from "./related-properties-widget";
 import { TapuInquiryPanel } from "./tapu-inquiry-panel";
@@ -38,6 +39,7 @@ import { isEndeksaConfigured } from "@/lib/integrations/endeksa";
 import { isTapusorConfigured } from "@/lib/integrations/tapusor";
 import { getConfiguredPortals } from "@/app/actions/portal-publish";
 import { getPropertyStatusHistory } from "@/app/actions/property-management";
+import { getPropertyPriceHistory } from "@/app/actions/property-price-history";
 import type { CSSProperties } from "react";
 
 const RING_C = 2 * Math.PI * 42;
@@ -102,7 +104,7 @@ export default async function PropertyDetailPage({
   const supabase = await createClient();
 
   // 1. tur — hepsi yalnızca `id`'ye bağlı, tam paralel
-  const [{ data: property }, { data: portalsData }, statusHistory, configuredPortals, propertyTypeDefs, transactionTypeDefs] = await Promise.all([
+  const [{ data: property }, { data: portalsData }, statusHistory, priceHistory, configuredPortals, propertyTypeDefs, transactionTypeDefs] = await Promise.all([
     supabase
       .from("properties")
       .select(
@@ -117,6 +119,7 @@ export default async function PropertyDetailPage({
       .eq("property_id", id)
       .order("created_at", { ascending: false }),
     getPropertyStatusHistory(id),
+    getPropertyPriceHistory(id),
     getConfiguredPortals(),
     getDefinitions("property_type"),
     getDefinitions("transaction_type"),
@@ -350,6 +353,13 @@ export default async function PropertyDetailPage({
         propertyId={property.id}
         listPrice={property.list_price != null ? Number(property.list_price) : null}
         transactionType={property.transaction_type}
+      />
+
+      {/* Fiyat geçmişi — trigger ile otomatik biriken tarihçe */}
+      <PropertyPriceHistory
+        propertyId={property.id}
+        initialHistory={priceHistory}
+        isRent={property.transaction_type === "rent" || property.transaction_type === "Kiralık" || property.transaction_type === "kiralik"}
       />
 
       <section className="rounded-[20px] border border-line bg-surface p-5">
