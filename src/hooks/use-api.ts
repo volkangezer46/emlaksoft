@@ -58,7 +58,14 @@ export function useApi<T>(
   }, [url, cacheKey, enabled]);
 
   // Initial fetch
+  //
+  // Bilinçli istisna: `fetchData` bellek içi cache'te taze kayıt varsa
+  // beklemeden `setData` + `setLoading(false)` yapar — cache'ten anında boyama
+  // bu hook'un varlık sebebi. Bunu ertelemek (ör. `.then()` içine almak) her
+  // sayfada bir boş kare (flash) doğurur. Kural bu iki satır dışında her yerde
+  // hata seviyesinde açık; yeni ihlaller CI'da yakalanır.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- cache'ten senkron ilk boyama
     fetchData();
   }, [fetchData]);
 

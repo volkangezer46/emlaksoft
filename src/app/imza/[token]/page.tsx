@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { CheckCircle2, Clock3, FileText, ShieldCheck } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SignPanel } from "./sign-panel";
+import { isPast } from "@/lib/clock";
 
 export const metadata = {
   title: "Sözleşme imzası",
@@ -38,7 +39,7 @@ export default async function PublicContractSignPage({ params }: { params: Promi
   const tenant = contract.tenant as { name?: string } | { name?: string }[] | null;
   const office = (Array.isArray(tenant) ? tenant[0]?.name : tenant?.name) || "EmlakSoft";
   const signers = ((contract.signers ?? []) as SignerRow[]).slice().sort((a, b) => a.full_name.localeCompare(b.full_name, "tr"));
-  const expired = contract.expires_at ? new Date(contract.expires_at).getTime() < Date.now() : false;
+  const expired = isPast(contract.expires_at);
   const cancelled = contract.status === "cancelled";
   const alreadySigned = signer.status === "signed";
 

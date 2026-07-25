@@ -74,17 +74,23 @@ export function NotificationBell() {
   const [tab, setTab] = useState<"all" | "unread">("all");
   const ref = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/admin/notifications");
-      if (!res.ok) return;
-      const json = await res.json();
-      setItems(json.items ?? []);
-      setUnread(json.unread ?? 0);
-    } catch {
-      /* sessiz */
-    }
-  }, []);
+  // Durum güncellemeleri bilinçli olarak `.then()` içinde: `async/await`
+  // gövdesinde yazıldığında React Compiler bunu efektten senkron setState
+  // sayıyor (react-hooks/set-state-in-effect).
+  const load = useCallback(
+    () =>
+      fetch("/api/admin/notifications")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((json) => {
+          if (!json) return;
+          setItems(json.items ?? []);
+          setUnread(json.unread ?? 0);
+        })
+        .catch(() => {
+          /* sessiz */
+        }),
+    [],
+  );
 
   useEffect(() => {
     load();

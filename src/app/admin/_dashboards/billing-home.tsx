@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AlertTriangle, ArrowUpRight, CreditCard, FileText, TrendingUp, Wallet } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CountUp } from "@/components/admin/count-up";
+import { now } from "@/lib/clock";
 
 const planLabel: Record<string, string> = {
   advisor: "Danışman",
@@ -59,7 +60,7 @@ export async function BillingHome({ staffName }: { staffName: string }) {
   const trialing = subRows.filter((s) => s.status === "trialing").length;
   const pastDue = subRows.filter((s) => s.status === "past_due").length;
 
-  const nowMs = Date.now();
+  const nowMs = now();
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
   const collectedThisMonth = invRows
     .filter((i) => i.status === "paid" && i.paid_at && new Date(i.paid_at).getTime() >= monthStart)

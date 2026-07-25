@@ -17,12 +17,17 @@ type Expense = {
 
 export function ExpenseEditDialog({ expense, categories }: { expense: Expense; categories: readonly Category[] }) {
   const [open, setOpen] = useState(false);
-  const [state, action, pending] = useActionState<ExpenseResult, FormData>(updateExpense, {});
+  // Başarıda kapatma efekt içinde değil, action akışında yapılıyor: efekt
+  // gövdesinde senkron setState fazladan bir render turu doğuruyordu.
+  const [state, action, pending] = useActionState<ExpenseResult, FormData>(
+    async (prev, formData) => {
+      const result = await updateExpense(prev, formData);
+      if (result.ok) setOpen(false);
+      return result;
+    },
+    {},
+  );
   const dialogRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (state.ok) setOpen(false);
-  }, [state.ok]);
 
   useEffect(() => {
     if (!open) return;

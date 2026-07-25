@@ -60,40 +60,52 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
     ? navCmds.filter((n) => n.label.toLocaleLowerCase("tr-TR").includes(q.toLocaleLowerCase("tr-TR")))
     : navCmds;
 
+  // Sorgu 2 karakterin altındayken sunucu sonuçları gösterilmez. Bunu efektle
+  // `hits`'i boşaltarak değil, türeterek yapıyoruz — state tek kaynak kalıyor.
+  const shownHits = q.trim().length < 2 ? [] : hits;
+
   const flat = [
     ...filteredNav.map((n) => ({ kind: "nav" as const, ...n })),
-    ...hits.map((h) => ({ kind: "hit" as const, ...h })),
+    ...shownHits.map((h) => ({ kind: "hit" as const, ...h })),
   ];
+
+  // `active` sonuç listesi küçüldüğünde taşabilir; efektle sıfırlamak yerine
+  // okuma anında sınırlıyoruz.
+  const activeIndex = Math.min(active, Math.max(0, flat.length - 1));
+
+  // Kapanışta arama durumunu sıfırla. Tüm kapanış yolları buradan geçer,
+  // böylece "open değişince efektte setState" desenine gerek kalmıyor.
+  const close = useCallback(() => {
+    setOpen(false);
+    setQ("");
+    setHits([]);
+    setActive(0);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setOpen((v) => !v);
+        setOpen((v) => {
+          if (v) close();
+          return !v;
+        });
       }
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") close();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [close]);
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 30);
-    else {
-      setQ("");
-      setHits([]);
-      setActive(0);
-    }
   }, [open]);
 
   useEffect(() => {
-    if (q.trim().length < 2) {
-      setHits([]);
-      return;
-    }
+    if (q.trim().length < 2) return;
     let cancelled = false;
-    setLoading(true);
     const t = setTimeout(async () => {
+      setLoading(true);
       try {
         const res = await fetch(`/api/admin/search?q=${encodeURIComponent(q)}`);
         const json = await res.json();
@@ -110,26 +122,24 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
     };
   }, [q]);
 
-  useEffect(() => setActive(0), [q, hits.length]);
-
   const go = useCallback(
     (href: string) => {
-      setOpen(false);
+      close();
       router.push(href);
     },
-    [router],
+    [close, router],
   );
 
   const onInputKey = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActive((a) => Math.min(a + 1, flat.length - 1));
+      setActive(Math.min(activeIndex + 1, flat.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActive((a) => Math.max(a - 1, 0));
+      setActive(Math.max(activeIndex - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const item = flat[active];
+      const item = flat[activeIndex];
       if (item) go(item.href);
     }
   };
@@ -151,7 +161,7 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
       {open ? (
         <div
           className="fixed inset-0 z-[60] flex items-start justify-center bg-ink-950/40 px-4 pt-[12vh] backdrop-blur-sm"
-          onClick={() => setOpen(false)}
+          onClick={close}
         >
           <div
             className="w-full max-w-xl overflow-hidden rounded-[18px] border border-line bg-surface shadow-[0_40px_90px_-30px_rgba(10,34,71,0.6)]"
@@ -162,7 +172,10 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
               <input
                 ref={inputRef}
                 value={q}
-                onChange={(e) => setQ(e.target.value)}
+                onChange={(e) => {
+                  setQ(e.target.value);
+                  setActive(0);
+                }}
                 onKeyDown={onInputKey}
                 placeholder="Ofis, kullanıcı, destek talebi veya sayfa ara…"
                 className="h-14 flex-1 bg-transparent text-[15px] text-ink-950 outline-none placeholder:text-text-faint"
@@ -176,7 +189,7 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
               ) : null}
               {flat.map((item, i) => {
                 const Icon = item.kind === "nav" ? item.icon : typeIcon[item.type];
-                const isActive = i === active;
+                const isActive = i === activeIndex;
                 const isFirstHit = item.kind === "hit" && (flat[i - 1]?.kind ?? "nav") === "nav";
                 return (
                   <div key={`${item.kind}-${item.href}-${i}`}>

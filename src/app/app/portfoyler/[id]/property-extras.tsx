@@ -10,6 +10,7 @@ import {
 } from "@/app/actions/property-management";
 import { publishPropertyToPortal } from "@/app/actions/portal-publish";
 import type { PortalName } from "@/lib/integrations/portals";
+import { DAY_MS, msUntil } from "@/lib/clock";
 
 // ---------------------------------------------------------------------------
 // Durum geçmişi paneli
@@ -115,7 +116,7 @@ export function PropertyAuthorizationPanel({
   const [saving, start] = useTransition();
 
   const daysLeft = initial.authEnd
-    ? Math.floor((new Date(initial.authEnd).getTime() - Date.now()) / 86_400_000)
+    ? Math.floor(msUntil(initial.authEnd) / DAY_MS)
     : null;
 
   const urgency = daysLeft !== null

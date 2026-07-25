@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { PayButtons } from "./pay-buttons";
+import { isPast } from "@/lib/clock";
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -27,7 +28,7 @@ export default async function PublicPaymentLinkPage({
 
   const tenant = link.tenant as { name?: string } | { name?: string }[] | null;
   const office = Array.isArray(tenant) ? tenant[0]?.name : tenant?.name;
-  const expired = link.expires_at && new Date(link.expires_at).getTime() < Date.now();
+  const expired = isPast(link.expires_at);
   const iyzicoReady = isIyzicoConfigured();
   const justPaid = sp.paid === "1" || link.status === "paid";
 

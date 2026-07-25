@@ -24,17 +24,24 @@ export function NewCustomerDialog({
   types?: string[];
 }) {
   const [open, setOpen] = useState(false);
-  const [state, action, pending] = useActionState(createCustomer, initial);
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
-
-  useEffect(() => {
-    if (state.ok) {
-      setOpen(false);
-      formRef.current?.reset();
-      router.refresh();
-    }
-  }, [state, router]);
+  // Başarı sonrası kapat + formu sıfırla + listeyi yenile: efekt gövdesinde
+  // senkron setState yerine action akışında. Ayrıca eski efektin bağımlılığı
+  // `[state, router]` olduğu için aynı sonuç nesnesi tekrar gelse de
+  // tetiklenebiliyordu; burada yalnızca gerçek bir başarıda çalışır.
+  const [state, action, pending] = useActionState(
+    async (prev: typeof initial, formData: FormData) => {
+      const result = await createCustomer(prev, formData);
+      if (result.ok) {
+        setOpen(false);
+        formRef.current?.reset();
+        router.refresh();
+      }
+      return result;
+    },
+    initial,
+  );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);

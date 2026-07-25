@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { moneyTry } from "@/lib/leak-shield";
 import type { CSSProperties } from "react";
+import { now } from "@/lib/clock";
 
 const RING_C = 2 * Math.PI * 42;
 
@@ -83,7 +84,7 @@ export default async function LeakShieldPage() {
 
   // 8-week lost commission buckets
   const weekMs = 7 * 86_400_000;
-  const nowMs = Date.now();
+  const nowMs = now();
   const buckets = Array.from({ length: 8 }, () => 0);
   rows.forEach((r) => {
     const idx = 7 - Math.floor((nowMs - new Date(r.created_at).getTime()) / weekMs);

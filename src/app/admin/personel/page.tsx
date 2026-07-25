@@ -224,17 +224,22 @@ export default function PersonelPage() {
   const [staff, setStaff] = useState<StaffRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch("/api/admin/personel");
-    if (res.ok) {
-      const data = await res.json();
-      setStaff(data);
-    }
-    setLoading(false);
+  const load = useCallback(() => {
+    // Durum güncellemeleri bilinçli olarak `.then()` içinde: `async/await`
+    // gövdesinde yazıldığında React Compiler bunu efektten senkron setState
+    // sayıyor. Baştaki `setLoading(true)` de kaldırıldı — `loading` zaten
+    // `true` başlıyor; manuel yenilemelerde liste yerinde güncellenir.
+    return fetch("/api/admin/personel")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: StaffRow[] | null) => {
+        if (data) setStaff(data);
+        setLoading(false);
+      });
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const active = staff.filter((s) => s.is_active);
   const passive = staff.filter((s) => !s.is_active);

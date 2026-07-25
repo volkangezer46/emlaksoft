@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { exportAuditCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
+import { DAY_MS, msSince, now } from "@/lib/clock";
 
 const actionLabel: Record<string, string> = {
   "workflow.deal_won": "Satış kapandı",
@@ -56,12 +57,12 @@ export default async function AuditPage() {
     for (const p of profiles ?? []) actorNames.set(p.id, p.full_name);
   }
 
-  const today = rows.filter((r) => Date.now() - new Date(r.created_at).getTime() < 86_400_000).length;
+  const today = rows.filter((r) => msSince(r.created_at) < DAY_MS).length;
 
   const buckets = Array.from({ length: 12 }, () => 0);
-  const now = Date.now();
+  const nowMs = now();
   rows.forEach((r) => {
-    const hours = Math.floor((now - new Date(r.created_at).getTime()) / (2 * 3600_000));
+    const hours = Math.floor((nowMs - new Date(r.created_at).getTime()) / (2 * 3600_000));
     if (hours >= 0 && hours < 12) buckets[11 - hours] += 1;
   });
   const maxB = Math.max(1, ...buckets);

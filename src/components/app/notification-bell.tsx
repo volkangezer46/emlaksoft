@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, startTransition } from "react";
+import { useMemo, useState, startTransition } from "react";
 import Link from "next/link";
 import {
   AlertOctagon,
@@ -69,13 +69,14 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
   const [prefs, setPrefs] = useState<NotifPrefs | null>(null);
   const [tab, setTab] = useState<"all" | "unread">("all");
 
-  useEffect(() => {
+  // Sunucudan yeni `initial` geldiğinde yerel listeyi tazele. Efekt yerine
+  // React'in belgelediği "prop değişiminde render sırasında state ayarla"
+  // deseni: fazladan commit + efekt turu yok, sonuç aynı.
+  const [seenInitial, setSeenInitial] = useState(initial);
+  if (initial !== seenInitial) {
+    setSeenInitial(initial);
     setItems(initial);
-  }, [initial]);
-
-  useEffect(() => {
-    setPrefs(readNotifPrefs());
-  }, [open]);
+  }
 
   const visible = useMemo(() => {
     if (!prefs) return items;
@@ -93,7 +94,12 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
 
   async function onOpen() {
     setOpen((v) => !v);
-    if (!open) await refresh();
+    if (!open) {
+      // Tercihler localStorage'dan okunuyor; efekt yerine burada — panel
+      // açılmadan değerine ihtiyaç yok ve olay içinde okumak daha doğrudan.
+      setPrefs(readNotifPrefs());
+      await refresh();
+    }
   }
 
   async function onRead(id: string) {

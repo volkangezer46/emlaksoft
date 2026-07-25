@@ -30,6 +30,7 @@ import {
   weekBuckets,
 } from "@/lib/admin-format";
 import type { CSSProperties } from "react";
+import { msUntil } from "@/lib/clock";
 
 const RING_C = 2 * Math.PI * 42;
 
@@ -77,7 +78,7 @@ export default async function AdminHomePage() {
   // Trial'ı 7 gün içinde biten tenant'lar
   const soon = list.filter((t) => {
     if (t.status !== "trial" || !t.trial_ends_at) return false;
-    const diff = new Date(t.trial_ends_at).getTime() - Date.now();
+    const diff = msUntil(t.trial_ends_at);
     return diff > 0 && diff < 7 * 86_400_000;
   }).length;
 

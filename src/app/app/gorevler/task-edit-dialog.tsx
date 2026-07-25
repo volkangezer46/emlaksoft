@@ -38,12 +38,17 @@ function toLocalInput(iso: string | null) {
 
 export function TaskEditDialog({ task }: { task: Task }) {
   const [open, setOpen] = useState(false);
-  const [state, action, pending] = useActionState<TaskResult, FormData>(updateTask, {});
+  // Başarıda kapatma efekt içinde değil, action akışında yapılıyor: efekt
+  // gövdesinde senkron setState fazladan bir render turu doğuruyordu.
+  const [state, action, pending] = useActionState<TaskResult, FormData>(
+    async (prev, formData) => {
+      const result = await updateTask(prev, formData);
+      if (result.ok) setOpen(false);
+      return result;
+    },
+    {},
+  );
   const dialogRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (state.ok) setOpen(false);
-  }, [state.ok]);
 
   useEffect(() => {
     if (!open) return;

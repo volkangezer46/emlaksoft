@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Bath, BedDouble, Building2, Check, MapPin, MessageCircle, Phone, Ruler, ShieldCheck } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
+import { isPast } from "@/lib/clock";
 
 function money(n: number | null) {
   if (n == null) return "Fiyat için sorun";
@@ -28,7 +29,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
     .maybeSingle();
 
   if (!share || share.entity_type !== "property") notFound();
-  if (share.expires_at && new Date(share.expires_at).getTime() < Date.now()) {
+  if (isPast(share.expires_at)) {
     return (
       <div className="grid min-h-screen place-items-center bg-canvas px-4">
         <div className="text-center">

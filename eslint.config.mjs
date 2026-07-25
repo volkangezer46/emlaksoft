@@ -7,12 +7,16 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     rules: {
-      // React Compiler ön-uyarıları: Server Component'lerde Date.now() gibi
-      // saf olmayan çağrılar ve ilk senkronizasyon amaçlı setState-in-effect
-      // desenleri bu kod tabanında bilinçli ve doğru kullanılıyor.
-      // CI'ı kırmasın diye uyarıya düşürüldü — derleyici hatası değil, öneri.
-      "react-hooks/purity": "warn",
-      "react-hooks/set-state-in-effect": "warn",
+      // NOT: `react-hooks/purity` ve `react-hooks/set-state-in-effect`
+      // eskiden burada "warn"a düşürülmüştü ("CI'ı kırmasın" gerekçesiyle).
+      // Artık ikisi de eslint-config-next'in varsayılanı olan HATA seviyesinde:
+      //  * purity → zaman okumaları `src/lib/clock.ts` yardımcılarına taşındı.
+      //  * set-state-in-effect → efektle state kopyalama/sıfırlama desenleri
+      //    action akışına, olay yöneticilerine veya türetmeye çevrildi.
+      // Kalan iki bilinçli istisna (`use-api.ts`, `use-app-api.ts` — cache'ten
+      // anında boyama) satır bazlı, gerekçeli disable ile işaretli. Böylece
+      // yeni ihlaller sessizce birikmek yerine CI'da yakalanır.
+      //
       // `_fd`, `_m` gibi alt çizgi önekli isimler "bilinçli kullanılmıyor"
       // demektir (imza gereği duran parametreler). Konvansiyonu kurala tanıt.
       "@typescript-eslint/no-unused-vars": [

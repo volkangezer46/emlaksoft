@@ -15,6 +15,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { computeOfficeScore, loadOfficeScoreInputs } from "@/lib/office-score";
+import { DAY_MS, msSince } from "@/lib/clock";
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
@@ -64,7 +65,7 @@ export default async function ReportsPage() {
   const lost = (closures ?? []).reduce((s, c) => s + Number(c.estimated_lost_commission || 0), 0);
   const overdue = (portals ?? []).filter((p) => {
     if (!p.last_confirmed_at) return true;
-    return Date.now() - new Date(p.last_confirmed_at).getTime() > 7 * 86_400_000;
+    return msSince(p.last_confirmed_at) > 7 * DAY_MS;
   }).length;
 
   const bars = [

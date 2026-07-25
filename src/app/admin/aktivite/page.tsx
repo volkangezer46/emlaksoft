@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { auditActionLabel, relativeTimeTR } from "@/lib/admin-format";
+import { DAY_MS, msSince } from "@/lib/clock";
 
 export default async function AdminActivityPage() {
   await requirePlatformModule("activity");
@@ -85,7 +86,7 @@ export default async function AdminActivityPage() {
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
    .slice(0, 150);
 
-  const today = unified.filter((r) => Date.now() - new Date(r.createdAt).getTime() < 86_400_000).length;
+  const today = unified.filter((r) => msSince(r.createdAt) < DAY_MS).length;
   const platformCount = unified.filter((r) => r.isPlatform).length;
 
   return (

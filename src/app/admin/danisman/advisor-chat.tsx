@@ -180,14 +180,23 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Oturum listesini yükle
-  const refreshSessions = useCallback(async () => {
-    setSessionsLoading(true);
-    const list = await listAdvisorSessions();
-    setSessions(list);
-    setSessionsLoading(false);
-  }, []);
+  // Durum güncellemeleri bilinçli olarak `.then()` içinde: `async/await`
+  // gövdesinde yazıldığında React Compiler bunu efektten senkron setState
+  // sayıyor (react-hooks/set-state-in-effect). Promise döndürüldüğü için
+  // `await refreshSessions()` çağrı yerleri aynen çalışmaya devam eder.
+  // Baştaki `setSessionsLoading(true)` de kaldırıldı — durum `true` başlıyor.
+  const refreshSessions = useCallback(
+    () =>
+      listAdvisorSessions().then((list) => {
+        setSessions(list);
+        setSessionsLoading(false);
+      }),
+    [],
+  );
 
-  useEffect(() => { refreshSessions(); }, [refreshSessions]);
+  useEffect(() => {
+    void refreshSessions();
+  }, [refreshSessions]);
 
   // Mesaj gelince aşağı kaydır
   useEffect(() => {

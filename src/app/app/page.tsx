@@ -22,6 +22,7 @@ import { createClient } from "@/lib/supabase/server";
 import { moneyTry } from "@/lib/leak-shield";
 import { getCachedOfficeScore, getOfficeScoreCached } from "@/lib/office-score";
 import { requireModulePage } from "@/lib/require-module-page";
+import { DAY_MS, daysAgoIso, msUntil } from "@/lib/clock";
 
 type Kpi = {
   label: string;
@@ -131,7 +132,7 @@ export default async function AppHomePage() {
   const fifteenDaysFromNow = new Date();
   fifteenDaysFromNow.setDate(fifteenDaysFromNow.getDate() + 15);
 
-  const last24h = new Date(Date.now() - 86_400_000).toISOString();
+  const last24h = daysAgoIso(1);
 
   const [
     { count },
@@ -192,7 +193,7 @@ export default async function AppHomePage() {
     supabase
       .from("calls")
       .select("started_at")
-      .gte("started_at", new Date(Date.now() - 49 * 86_400_000).toISOString())
+      .gte("started_at", daysAgoIso(49))
       .order("started_at", { ascending: false })
       .limit(100),
     supabase.from("customer_demands").select("status").neq("status", "closed").limit(200),
@@ -200,7 +201,7 @@ export default async function AppHomePage() {
     supabase
       .from("deals")
       .select("stage, deal_value, assigned_to, updated_at")
-      .gte("updated_at", new Date(Date.now() - 90 * 86_400_000).toISOString())
+      .gte("updated_at", daysAgoIso(90))
       .limit(100),
     supabase.from("profiles").select("id, full_name, role").limit(50),
     // 500 → 100, sadece 7 haftalık pencere
@@ -208,7 +209,7 @@ export default async function AppHomePage() {
       .from("customers")
       .select("created_at")
       .is("deleted_at", null)
-      .gte("created_at", new Date(Date.now() - 49 * 86_400_000).toISOString())
+      .gte("created_at", daysAgoIso(49))
       .order("created_at", { ascending: false })
       .limit(100),
     // Yetki belgesi 15 gün içinde dolacak portföyler
@@ -467,7 +468,7 @@ export default async function AppHomePage() {
             <ul className="mt-2 space-y-1">
               {expiringList.map((p) => {
                 const expires = new Date(p.authority_expires_at as string);
-                const daysLeft = Math.ceil((expires.getTime() - Date.now()) / 86_400_000);
+                const daysLeft = Math.ceil(msUntil(expires) / DAY_MS);
                 return (
                   <li key={p.id} className="flex flex-wrap items-center gap-2 text-xs text-amber-700/80">
                     <Link

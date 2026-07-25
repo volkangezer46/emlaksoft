@@ -133,6 +133,11 @@ export function useAppApi<T>(
     const mem = memory.get(key) as CacheEntry<T> | undefined;
     const ls = mem ?? readLS<T>(key);
     if (ls && ls.tenantId === tenantId) {
+      // Bilinçli istisna: bellek/localStorage cache'inden anında boyama.
+      // Ertelemek panel geçişlerinde boş kare (flash) doğurur — bu hook
+      // tam olarak onu engellemek için var. Kural başka her yerde hata
+      // seviyesinde açık.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- cache'ten senkron ilk boyama
       setData(ls.data);
       setLoading(false);
       if (Date.now() - ls.ts < ttl) return;

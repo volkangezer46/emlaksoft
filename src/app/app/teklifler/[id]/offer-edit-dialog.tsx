@@ -14,12 +14,17 @@ type Offer = {
 
 export function OfferEditDialog({ offer }: { offer: Offer }) {
   const [open, setOpen] = useState(false);
-  const [state, action, pending] = useActionState<OfferResult, FormData>(updateOffer, {});
+  // Başarıda kapatma efekt içinde değil, action akışında yapılıyor: efekt
+  // gövdesinde senkron setState fazladan bir render turu doğuruyordu.
+  const [state, action, pending] = useActionState<OfferResult, FormData>(
+    async (prev, formData) => {
+      const result = await updateOffer(prev, formData);
+      if (result.ok) setOpen(false);
+      return result;
+    },
+    {},
+  );
   const dialogRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (state.ok) setOpen(false);
-  }, [state.ok]);
 
   useEffect(() => {
     if (!open) return;

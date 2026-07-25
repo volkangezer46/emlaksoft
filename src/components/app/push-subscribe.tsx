@@ -22,9 +22,12 @@ export function PushSubscribeToggle() {
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!key || typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
-    setSupported(true);
+    // İkisi de service worker hazır olduktan sonra set ediliyor: hem efekt
+    // gövdesinde senkron setState kalmıyor, hem de SW hazır olmadan zaten
+    // abone olunamayacağı için düğmeyi erken göstermek yanıltıcıydı.
     navigator.serviceWorker.ready.then(async (reg) => {
       const sub = await reg.pushManager.getSubscription();
+      setSupported(true);
       setSubscribed(Boolean(sub));
     });
   }, []);
