@@ -117,11 +117,16 @@ Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
 - Güvenlik: impersonation→`requirePlatformModule("tenants")`, admin arama filter-injection sanitizasyonu, ticket işlemleri modül kontrolü
 - CRUD: randevu **iptal** butonu (dead cancelled durumu)
 
-#### ⏳ Denetimden kalan (öncelikli follow-up — düşük/orta önem)
-- **CRUD edit eksikleri**: updateExpense, updateTask, randevu erteleme (updateAppointment), teklif tutarı edit, talep/kampanya/aidat/deal kalıcı silme
-- **Orta güvenlik**: offboarding export'a `support` rolü erişimi (ops/super_admin'e kısıtla), müşteri-dosyası indirmede tenant-içi rol kontrolü, sözleşme imza token expiry, rate-limit fail-open + signup captcha, health endpoint ham hata sızıntısı
-- **Performans**: danisman-kpi/franchise/raporlar SQL agregasyonu (RPC ile), vitrin/paylaş `next/image` (LCP/CLS), gunluk-ozet cron N+1, property-media-manager seri upload
-- **Diğer**: appointment/task/contract timezone tutarlılığı, convertWorkflow idempotency (çift komisyon), modal focus-trap/role=dialog
+#### 🟢 DALGA 3 — Veri bütünlüğü + orta güvenlik (canlıya alındı, `fdddb7f`)
+- **convertWorkflow idempotency**: portföy zaten 'won' anlaşmaya dönüştürülmüşse çift komisyon engellendi (finansal doğruluk)
+- Offboarding tam-veri export → yalnız ops/super_admin; müşteri belgesi indirme → `requirePermission("customers","view")`
+- signUp IP başına saatte 5 rate-limit; health endpoint ham hata sızıntısı kaldırıldı
+
+#### ⏳ Denetimden kalan (daha düşük öncelik)
+- **CRUD edit eksikleri**: updateExpense, updateTask, randevu erteleme, teklif tutarı edit, talep/kampanya/aidat/deal kalıcı silme
+- **Güvenlik**: sözleşme imza token expiry (migration gerektirir), rate-limit fail-open (RPC uygulanmadıysa)
+- **Performans**: danisman-kpi/franchise/raporlar SQL agregasyonu (RPC), vitrin/paylaş `next/image` (LCP/CLS), gunluk-ozet cron N+1, property-media seri upload
+- **Diğer**: appointment/task/contract timezone tutarlılığı, modal focus-trap/role=dialog
 
 > Web araştırması: sistem TR emlak CRM standartlarını (portföy/müşteri/eşleştirme/randevu/sözleşme/EİDS yetki takibi/KVKK-İYS/mobil-bulut) ve yasal gereklilikleri zaten karşılıyor.
 
