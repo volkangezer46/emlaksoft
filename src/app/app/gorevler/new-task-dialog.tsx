@@ -2,8 +2,15 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown, ListPlus, Plus, X } from "lucide-react";
+import { Check, ChevronDown, ListPlus, Plus } from "lucide-react";
 import { createTask } from "@/app/actions/tasks";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 type Option = { id: string; full_name: string };
 
@@ -40,35 +47,25 @@ export function NewTaskDialog({ members, customers }: { members: Option[]; custo
   }
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="btn-shine inline-flex items-center gap-2 rounded-[11px] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 shadow-[var(--shadow-sm)]"
-      >
-        <Plus className="h-4 w-4" /> Yeni görev
-      </button>
+    /* Radix Dialog: focus trap + Esc (öncesinde YOKTU) + scroll lock + ARIA.
+       Görünüm birebir korundu — DialogHeader zaten bu tasarımın kendisi. */
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[11px] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 shadow-[var(--elev-2)]"
+        >
+          <Plus className="h-4 w-4" /> Yeni görev
+        </button>
+      </DialogTrigger>
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/55 p-4 backdrop-blur-md sm:items-center">
-          <div className="w-full max-w-2xl overflow-hidden rounded-[22px] border border-white/20 bg-surface shadow-[var(--shadow-lg)]">
-            <div className="theme-dark relative overflow-hidden bg-[image:var(--grad-ink)] px-6 py-5 text-white">
-              <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-              <div className="relative flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-white/10 text-mint-400"><ListPlus className="h-5 w-5" /></span>
-                  <div>
-                    <h2 className="font-display text-lg font-bold text-white">Yeni görev ekle</h2>
-                    <p className="text-xs text-white/55">Takip, arama, ziyaret veya evrak görevi planlayın.</p>
-                  </div>
-                </div>
-                <button type="button" onClick={() => setOpen(false)} className="grid h-9 w-9 place-items-center rounded-[10px] bg-white/8 text-white/70 transition hover:bg-white/15 hover:text-white" aria-label="Kapat">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-
-            <form ref={formRef} action={submit} className="grid gap-4 p-6 sm:grid-cols-2">
+      <DialogContent size="lg">
+        <DialogHeader
+          icon={<ListPlus />}
+          title="Yeni görev ekle"
+          description="Takip, arama, ziyaret veya evrak görevi planlayın."
+        />
+        <form ref={formRef} action={submit} className="grid gap-4 p-6 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="task-title">Başlık *</label>
                 <input id="task-title" name="title" required className={fieldClass} placeholder="Örn. Ahmet Bey'i geri ara" />
@@ -124,16 +121,18 @@ export function NewTaskDialog({ members, customers }: { members: Option[]; custo
 
               {error ? <p className="sm:col-span-2 text-sm text-danger-500" role="alert">{error}</p> : null}
 
-              <div className="sm:col-span-2 flex items-center justify-end gap-2 border-t border-line pt-4">
-                <button type="button" onClick={() => setOpen(false)} className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">Vazgeç</button>
-                <button type="submit" disabled={pending} className="btn-shine inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+              <div className="hairline-t sm:col-span-2 flex items-center justify-end gap-2 pt-4">
+                <DialogClose asChild>
+                  <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
+                    Vazgeç
+                  </button>
+                </DialogClose>
+                <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
                   <Check className="h-4 w-4" /> {pending ? "Ekleniyor…" : "Görevi ekle"}
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
-    </>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

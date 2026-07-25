@@ -70,27 +70,40 @@ export function CommandSearch() {
   }
 
   return (
-    <>
+    /* Panel arama kutusuna bağlı açılıyor (admin paletiyle aynı desen).
+       Öncesinde ekran ortasında modal olarak açılıp kutudan kopuk duruyordu. */
+    <div className="relative w-full max-w-lg">
       <button
         type="button"
         onClick={() => {
           setOpen(true);
           queueMicrotask(() => inputRef.current?.focus());
         }}
-        className="relative flex w-full max-w-lg items-center rounded-[11px] border border-line bg-canvas py-2.5 pl-10 pr-20 text-left text-sm text-text-faint transition hover:border-brand-300 hover:bg-surface"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        className="focus-ring relative flex w-full items-center rounded-[11px] border border-hairline bg-canvas py-2.5 pl-10 pr-20 text-left text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300 hover:bg-surface hover:shadow-[var(--elev-2)]"
       >
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-        <span>Müşteri, portföy, ilan no, ada-parsel ara…</span>
-        <span className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded-[7px] border border-line bg-surface px-2 py-1 text-[10px] text-text-faint sm:flex">
+        <span className="truncate">Müşteri, portföy, ilan no, ada-parsel ara…</span>
+        <span className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded-[7px] border border-hairline bg-surface px-2 py-1 text-[10px] text-text-faint sm:flex">
           <Command className="h-3 w-3" /> K
         </span>
       </button>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-ink-950/45 p-4 pt-[12vh] backdrop-blur-sm">
-          <button type="button" aria-label="Kapat" className="absolute inset-0" onClick={() => setOpen(false)} />
-          <div className="relative w-full max-w-xl overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-lg)]">
-            <div className="flex items-center gap-2 border-b border-line px-4">
+        <>
+          <button
+            type="button"
+            aria-label="Aramayı kapat"
+            className="fixed inset-0 z-40 cursor-default"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            role="dialog"
+            aria-label="Hızlı arama"
+            className="popover-in absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-[16px] border border-hairline bg-surface shadow-[var(--inner-top),var(--elev-5)]"
+          >
+            <div className="hairline-b flex items-center gap-2 px-4">
               <Search className="h-4 w-4 text-text-faint" />
               <input
                 ref={inputRef}
@@ -121,7 +134,7 @@ export function CommandSearch() {
               </button>
             </div>
 
-            <div className="max-h-[50vh] overflow-y-auto p-2">
+            <div className="max-h-[min(60vh,28rem)] overflow-y-auto p-2">
               {q.trim().length < 2 ? (
                 <p className="px-3 py-8 text-center text-sm text-text-muted">Müşteri, portföy kodu, oda tipi veya destek konusu yazın.</p>
               ) : hits.length === 0 && !pending ? (
@@ -156,8 +169,8 @@ export function CommandSearch() {
               )}
             </div>
           </div>
-        </div>
+        </>
       ) : null}
-    </>
+    </div>
   );
 }

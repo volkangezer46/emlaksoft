@@ -145,30 +145,47 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
   };
 
   return (
-    <>
+    /*
+     * Panel arama kutusunun ALTINA SABİTLENİYOR (anchored dropdown).
+     *
+     * Öncesinde ekranın ortasına konumlanan bir modal'dı (`fixed inset-0` +
+     * `pt-[12vh]`). Kullanıcı arama kutusuna tıklayınca panel kutudan kopuk,
+     * sayfanın ortasına "düşmüş" gibi görünüyordu — bildirilen hata buydu.
+     * Üst çubuktaki bir arama alanının beklenen davranışı, sonuçların kutuya
+     * bağlı ve aynı genişlikte açılmasıdır.
+     */
+    <div className="relative w-full">
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="group flex h-10 w-full items-center gap-3 rounded-[12px] border border-line bg-canvas/80 px-4 text-sm text-text-faint shadow-[var(--shadow-xs)] transition hover:border-brand-300/70 hover:bg-surface hover:text-text-muted hover:shadow-[var(--shadow-sm)]"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        className="focus-ring group flex h-10 w-full items-center gap-3 rounded-[12px] border border-hairline bg-canvas/80 px-4 text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300/70 hover:bg-surface hover:text-text-muted hover:shadow-[var(--elev-2)]"
       >
         <Search className="h-4 w-4 shrink-0 transition group-hover:text-brand-500" />
         <span className="flex-1 truncate text-left text-[13px]">Ara… ofis, üye, destek talebi</span>
-        <kbd className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-[7px] border border-line bg-surface px-2 py-1 text-[10px] font-semibold text-text-faint">
+        <kbd className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-[7px] border border-hairline bg-surface px-2 py-1 text-[10px] font-semibold text-text-faint">
           Ctrl <span className="font-bold">K</span>
         </kbd>
       </button>
 
       {open ? (
-        <div
-          className="fixed inset-0 z-[60] flex items-start justify-center bg-ink-950/40 px-4 pt-[12vh] backdrop-blur-sm"
-          onClick={close}
-        >
+        <>
+          {/* Dışarı tıklayınca kapat. Şeffaf — panel kutuya bağlı göründüğü
+              için karartma artık gereksiz, sayfa bağlamı görünür kalıyor. */}
+          <button
+            type="button"
+            aria-label="Aramayı kapat"
+            onClick={close}
+            className="fixed inset-0 z-40 cursor-default"
+          />
           <div
-            className="w-full max-w-xl overflow-hidden rounded-[18px] border border-line bg-surface shadow-[0_40px_90px_-30px_rgba(10,34,71,0.6)]"
-            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label="Hızlı arama"
+            className="popover-in absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-[16px] border border-hairline bg-surface shadow-[var(--inner-top),var(--elev-5)]"
           >
-            <div className="flex items-center gap-3 border-b border-line px-4">
-              <Search className="h-4.5 w-4.5 text-text-faint" />
+            <div className="hairline-b flex items-center gap-3 px-4">
+              <Search className="h-4 w-4 shrink-0 text-text-faint" />
               <input
                 ref={inputRef}
                 value={q}
@@ -178,12 +195,12 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
                 }}
                 onKeyDown={onInputKey}
                 placeholder="Ofis, kullanıcı, destek talebi veya sayfa ara…"
-                className="h-14 flex-1 bg-transparent text-[15px] text-ink-950 outline-none placeholder:text-text-faint"
+                className="h-12 flex-1 bg-transparent text-sm text-ink-950 outline-none placeholder:text-text-faint"
               />
               {loading ? <Loader2 className="h-4 w-4 animate-spin text-brand-500" /> : null}
             </div>
 
-            <div className="max-h-[52vh] overflow-y-auto p-2">
+            <div className="max-h-[min(60vh,28rem)] overflow-y-auto p-2">
               {filteredNav.length > 0 ? (
                 <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-text-faint">Sayfalar</p>
               ) : null}
@@ -232,18 +249,18 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
               ) : null}
             </div>
 
-            <div className="flex items-center justify-between border-t border-line bg-canvas/50 px-4 py-2 text-[10px] text-text-faint">
+            <div className="hairline-t surface-sunken flex items-center justify-between px-4 py-2 text-[10px] text-text-faint">
               <span className="flex items-center gap-2">
-                <kbd className="rounded border border-line bg-surface px-1.5 py-0.5">↑↓</kbd> gezin
-                <kbd className="rounded border border-line bg-surface px-1.5 py-0.5">↵</kbd> aç
+                <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5">↑↓</kbd> gezin
+                <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5">↵</kbd> aç
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="rounded border border-line bg-surface px-1.5 py-0.5">Esc</kbd> kapat
+                <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5">Esc</kbd> kapat
               </span>
             </div>
           </div>
-        </div>
+        </>
       ) : null}
-    </>
+    </div>
   );
 }

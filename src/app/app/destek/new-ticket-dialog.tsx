@@ -2,8 +2,15 @@
 
 import { useActionState, useRef, useState, startTransition } from "react";
 import { useRouter } from "next/navigation";
-import { LifeBuoy, X } from "lucide-react";
+import { LifeBuoy } from "lucide-react";
 import { createSupportTicket, type TicketResult } from "@/app/actions/tickets";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 const initial: TicketResult = {};
 
@@ -38,25 +45,28 @@ export function NewTicketDialog({
   }, initial);
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="btn-shine inline-flex items-center gap-2 rounded-[10px] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
-      >
-        <LifeBuoy className="h-4 w-4" /> Yeni talep
-      </button>
+    /*
+     * Radix Dialog'a taşındı. Bedava gelenler: focus trap, Esc ile kapatma
+     * (bu dialogda HİÇ YOKTU), scroll lock, aria-modal + başlık ilişkisi,
+     * kapanışta focus'un tetikleyici butona dönmesi.
+     */
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
+        >
+          <LifeBuoy className="h-4 w-4" /> Yeni talep
+        </button>
+      </DialogTrigger>
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/40 p-4 backdrop-blur-sm sm:items-center">
-          <div className="w-full max-w-lg rounded-[20px] border border-line bg-surface shadow-[var(--shadow-lg)]">
-            <div className="flex items-center justify-between border-b border-line px-6 py-4">
-              <h2 className="font-display text-lg font-bold text-ink-950">Destek talebi</h2>
-              <button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-[8px] text-text-muted hover:bg-canvas" aria-label="Kapat">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <form ref={formRef} action={action} className="grid gap-4 p-6">
+      <DialogContent size="md">
+        <DialogHeader
+          icon={<LifeBuoy />}
+          title="Destek talebi"
+          description="Sorununuzu iletin; ekip destek kuyruğundan takip eder."
+        />
+        <form ref={formRef} action={action} className="grid gap-4 p-6">
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="subject">Konu *</label>
                 <input id="subject" name="subject" required className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" placeholder="Örn. Fatura / portal teyit sorunu" />
@@ -84,17 +94,19 @@ export function NewTicketDialog({
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="body">Açıklama *</label>
                 <textarea id="body" name="body" required rows={5} className="w-full resize-none rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" placeholder="Sorunu adım adım yazın…" />
               </div>
-              {state.error ? <p className="text-sm text-danger-500" role="alert">{state.error}</p> : null}
+              {state.error ? <p className="text-sm font-medium text-danger-600" role="alert">{state.error}</p> : null}
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setOpen(false)} className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-medium">Vazgeç</button>
-                <button type="submit" disabled={pending} className="rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+                <DialogClose asChild>
+                  <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
+                    Vazgeç
+                  </button>
+                </DialogClose>
+                <button type="submit" disabled={pending} className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
                   {pending ? "Gönderiliyor…" : "Gönder"}
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
-    </>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
