@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { foldTr } from "@/lib/tr-text";
+import { inFilter, orIlike, safeLike } from "@/lib/pgrst";
 import {
   ArrowUpRight,
   Building2,
@@ -27,13 +29,23 @@ type PropertyRow = {
   price_health: string | null;
   features: Record<string, unknown> | null;
   created_at: string;
+  province_id: string | null;
+  district_id: string | null;
   province: { name: string } | { name: string }[] | null;
+  district: { name: string } | { name: string }[] | null;
   portal_listings: { portal_name: string; status: string; last_confirmed_at: string | null }[] | null;
 };
 
-function provinceName(value: PropertyRow["province"]) {
-  if (!value) return "Konum belirtilmedi";
-  return Array.isArray(value) ? (value[0]?.name ?? "Konum belirtilmedi") : value.name;
+/** supabase-js gomulu iliskiyi dizi olarak tipler; iki bicimi de karsila. */
+function relName(value: { name: string } | { name: string }[] | null): string | null {
+  if (!value) return null;
+  return (Array.isArray(value) ? value[0]?.name : value.name) ?? null;
+}
+
+/** "Istanbul / Kadikoy" — ilce yoksa yalniz il, ikisi de yoksa uyari metni. */
+function locationLabel(row: PropertyRow): string {
+  const parts = [relName(row.province), relName(row.district)].filter(Boolean);
+  return parts.length ? parts.join(" / ") : "Konum belirtilmedi";
 }
 
 function formatPrice(value: number | null, transaction: string) {
@@ -73,16 +85,35 @@ export default async function PropertiesPage({
   // Sunucu tarafı arama — q varsa ilike ile filtrele, yoksa tam listeyi çek
   let query = supabase
     .from("properties")
-    .select("id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, province:geo_provinces(name), portal_listings(portal_name,status,last_confirmed_at)")
+    .select("id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, province_id, district_id, province:geo_provinces(name), district:geo_districts(name), portal_listings(portal_name,status,last_confirmed_at)")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(200);
 
+  /*
+   * BULUNAN HATA: Arama kutusu "Kod, baslik, portal veya konum ara" diyordu
+   * ama sunucu filtresi YALNIZCA property_code ve title'a bakiyordu. Konum ya
+   * da portal adi yazan kullanici SIFIR sonuc aliyordu — asagidaki istemci
+   * tarafi filtre il adini da tariyordu ama sunucu o satirlari zaten
+   * elemisti, yani hicbir zaman devreye giremiyordu.
+   *
+   * Ikinci sorun: `q` dogrudan or() dizgesine gomuluyordu. Virgul, nokta ya
+   * da parantez iceren bir arama PostgREST gramerini bozuyordu.
+   *
+   * Cozum: konum adlarini once geo tablolarinda ara (name uzerinde trigram
+   * indeksi var, ucuz), bulunan id'leri or() kosuluna ekle.
+   */
   if (q) {
-    // Tam metin: property_code OR title OR address_line ile ilike
-    query = query.or(
-      `property_code.ilike.%${q}%,title.ilike.%${q}%`
-    );
+    const [{ data: provHits }, { data: distHits }] = await Promise.all([
+      supabase.from("geo_provinces").select("id").ilike("name", safeLike(q)).limit(20),
+      supabase.from("geo_districts").select("id").ilike("name", safeLike(q)).limit(50),
+    ]);
+    const clauses = [orIlike(["property_code", "title", "address_line"], q)];
+    const provClause = inFilter("province_id", (provHits ?? []).map((r) => r.id));
+    const distClause = inFilter("district_id", (distHits ?? []).map((r) => r.id));
+    if (provClause) clauses.push(provClause);
+    if (distClause) clauses.push(distClause);
+    query = query.or(clauses.join(","));
   }
 
   const [{ data }, { data: provinces }, { data: branches }, propertyTypeDefs, transactionTypeDefs] = await Promise.all([
@@ -101,19 +132,18 @@ export default async function PropertiesPage({
 
   let properties = allProperties;
 
+  // Istemci tarafi ikinci elemeyi KALDIRDIK. Sunucu artik kod/baslik/adres/il/ilce
+   // uzerinden dogru filtreliyor; ayni suzgeci burada tekrar uygulamak konum
+   // eslesmelerini geri eliyordu (haystack'te ilce adi yoktu). Portal adiyla
+   // arama ise ayri bir kosul olarak asagida ekleniyor.
   if (q) {
-    const needle = q.toLocaleLowerCase("tr-TR");
-    properties = properties.filter((property) => {
-      const haystack = [
-        property.property_code,
-        property.title ?? "",
-        provinceName(property.province),
-        ...(property.portal_listings?.map((p) => p.portal_name) ?? []),
-      ]
-        .join(" ")
-        .toLocaleLowerCase("tr-TR");
-      return haystack.includes(needle);
-    });
+    const needle = foldTr(q);
+    const portalOnly = allProperties.filter((property) =>
+      (property.portal_listings ?? []).some((p) => foldTr(p.portal_name).includes(needle)),
+    );
+    // Sunucu sonucuyla birlestir, id'ye gore tekille.
+    const seen = new Set(properties.map((p) => p.id));
+    for (const p of portalOnly) if (!seen.has(p.id)) { properties = [...properties, p]; seen.add(p.id); }
   }
 
   if (statusFilter !== "all") {
@@ -281,7 +311,7 @@ export default async function PropertiesPage({
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-brand-600">{property.transaction_type} · {property.property_type}</p>
                       <h2 className="mt-1 font-display text-lg font-bold text-ink-950">{property.title ?? property.property_code}</h2>
-                      <p className="mt-1 flex items-center gap-1.5 text-xs text-text-muted"><MapPin className="h-3.5 w-3.5" />{provinceName(property.province)}</p>
+                      <p className="mt-1 flex items-center gap-1.5 text-xs text-text-muted"><MapPin className="h-3.5 w-3.5" />{locationLabel(property)}</p>
                     </div>
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-canvas text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600" aria-hidden><ArrowUpRight className="h-4 w-4" /></span>
                   </div>

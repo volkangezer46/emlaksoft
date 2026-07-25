@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { orIlike, safeLike } from "@/lib/pgrst";
 import { requireActiveTenant } from "@/lib/tenant-guard";
 import { formatTurkishPhone } from "@/lib/phone";
 
@@ -20,8 +21,9 @@ export async function searchWorkspace(query: string): Promise<SearchHit[]> {
   if (q.length < 2) return [];
 
   const supabase = await createClient();
-  const safe = q.replace(/[%_,]/g, " ").trim();
-  const like = `%${safe}%`;
+  // Temizleme artik ortak yardimcida: onceden `%` ve `_` birakiliyordu,
+  // yani kullanici `%` yazip tum kayitlari cekebiliyordu.
+  const like = safeLike(q);
   const hits: SearchHit[] = [];
 
   const [{ data: customers }, { data: properties }, { data: demands }, { data: tickets }] =
@@ -30,19 +32,17 @@ export async function searchWorkspace(query: string): Promise<SearchHit[]> {
         .from("customers")
         .select("id, full_name, phone")
         .is("deleted_at", null)
-        .or(`full_name.ilike."${like}",phone.ilike."${like}",email.ilike."${like}"`)
+        .or(orIlike(["full_name", "phone", "email"], q))
         .limit(8),
       supabase
         .from("properties")
         .select("id, property_code, title, parcel_block, parcel_lot")
-        .or(
-          `property_code.ilike."${like}",title.ilike."${like}",parcel_block.ilike."${like}",parcel_lot.ilike."${like}"`,
-        )
+        .or(orIlike(["property_code", "title", "parcel_block", "parcel_lot"], q))
         .limit(8),
       supabase
         .from("customer_demands")
         .select("id, transaction_type, property_type, rooms, customer:customers(full_name)")
-        .or(`transaction_type.ilike."${like}",property_type.ilike."${like}",rooms.ilike."${like}"`)
+        .or(orIlike(["transaction_type", "property_type", "rooms"], q))
         .limit(6),
       supabase
         .from("support_tickets")

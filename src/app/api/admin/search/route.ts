@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { orIlike, safeLike } from "@/lib/pgrst";
 import { getPlatformStaff } from "@/lib/platform";
 import { platformCanAccess } from "@/lib/platform-access";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -20,11 +21,12 @@ export async function GET(req: NextRequest) {
   if (rawQ.length < 2) return NextResponse.json({ hits: [] });
 
   // PostgREST .or() filter injection koruması: gramer karakterlerini (, ) . * : soyutla
-  const q = rawQ.slice(0, 80).replace(/[(),.*:\\]/g, " ");
+  const q = rawQ.slice(0, 80);
   if (q.trim().length < 2) return NextResponse.json({ hits: [] });
 
   const admin = createAdminClient();
-  const like = `%${q}%`;
+  // Onceden `%` ve `_` temizlenmiyordu: `%` yazan kullanici tum kayitlari cekiyordu.
+  const like = safeLike(q);
   const hits: SearchHit[] = [];
 
   const tasks: PromiseLike<void>[] = [];
@@ -55,7 +57,7 @@ export async function GET(req: NextRequest) {
       admin
         .from("profiles")
         .select("id, full_name, email, role")
-        .or(`full_name.ilike.${like},email.ilike.${like}`)
+        .or(orIlike(["full_name", "email"], q))
         .limit(6)
         .then(({ data }) => {
           for (const m of data ?? []) {
