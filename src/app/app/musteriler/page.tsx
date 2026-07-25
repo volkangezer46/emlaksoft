@@ -3,6 +3,7 @@ import {
   ArrowUpRight,
   Cake,
   Clock3,
+  Copy,
   Gift,
   Mail,
   MapPin,
@@ -418,7 +419,15 @@ export default async function CustomersPage({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span />
+          {/* Cift kayit kontrolu: telefon/e-posta uzerinde benzersizlik kisiti
+              YOK, yani ayni kisi iki kez girilebiliyor ve bunu goren bir ekran
+              yoktu. */}
+          <Link
+            href="/app/musteriler/cift-kayit"
+            className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-amber-400 hover:text-amber-600"
+          >
+            <Copy className="h-3.5 w-3.5" /> Çift kayıt kontrolü
+          </Link>
         </div>
         <div className="flex items-center gap-2">
           <ExportCsvButton action={exportCustomersCsv} iconOnly label="Müşterileri CSV indir" />
