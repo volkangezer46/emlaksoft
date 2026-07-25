@@ -220,13 +220,16 @@ export function DataTable({
               }}
               placeholder={searchPlaceholder}
               aria-label={searchPlaceholder}
-              className="w-full max-w-xs rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+              className="focus-ring surface-sunken w-full max-w-xs rounded-[10px] border border-hairline px-3 py-2 text-sm outline-none transition focus:bg-surface"
             />
           ) : null}
           {toolbar}
-          <span className="ml-auto text-xs text-text-faint" aria-live="polite">
+          <span
+            className="numeric ml-auto text-[11px] font-medium tracking-wide text-text-faint"
+            aria-live="polite"
+          >
             {sorted.length} kayıt
-            {sorted.length !== rows.length ? ` (${rows.length} içinden)` : ""}
+            {sorted.length !== rows.length ? ` · ${rows.length} içinden` : ""}
           </span>
         </div>
       ) : null}
@@ -250,8 +253,8 @@ export function DataTable({
                         type="button"
                         onClick={() => toggleSort(col.key)}
                         className={cn(
-                          "inline-flex items-center gap-1.5 rounded-[6px] transition hover:text-ink-950",
-                          active && "text-ink-950",
+                          "focus-ring inline-flex items-center gap-1.5 rounded-[6px] px-0.5 uppercase tracking-[0.04em] transition hover:text-ink-950",
+                          active && "text-brand-700",
                         )}
                       >
                         {col.header}
@@ -353,7 +356,7 @@ export function DataTable({
 
       {pageSize > 0 && totalPages > 1 ? (
         <div className="flex items-center justify-between gap-3 text-sm">
-          <p className="text-text-muted">
+          <p className="numeric text-text-muted">
             {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, sorted.length)} /{" "}
             {sorted.length}
           </p>
@@ -362,7 +365,7 @@ export function DataTable({
               type="button"
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={safePage === 0}
-              className="inline-flex items-center gap-1 rounded-[9px] border border-line px-2.5 py-1.5 font-medium text-ink-950 transition hover:bg-canvas disabled:opacity-40"
+              className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas disabled:pointer-events-none disabled:opacity-40"
             >
               <ChevronLeft className="h-4 w-4" /> Önceki
             </button>
@@ -373,7 +376,7 @@ export function DataTable({
               type="button"
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={safePage >= totalPages - 1}
-              className="inline-flex items-center gap-1 rounded-[9px] border border-line px-2.5 py-1.5 font-medium text-ink-950 transition hover:bg-canvas disabled:opacity-40"
+              className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas disabled:pointer-events-none disabled:opacity-40"
             >
               Sonraki <ChevronRight className="h-4 w-4" />
             </button>

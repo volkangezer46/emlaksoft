@@ -77,6 +77,39 @@
   --shadow-modal: 0 28px 70px -18px rgba(10, 34, 71, 0.45);
   --shadow-glow-brand: 0 20px 50px -18px rgba(20, 99, 255, 0.55);
   --shadow-glow-mint: 0 20px 50px -18px rgba(16, 185, 163, 0.5);
+
+  /* ============================================================
+     PREMIUM KATMAN
+     Yükseklik (elevation) skalası. Tek katmanlı gri gölge yüzeyi "flat"
+     gösterir; premium his üç şeyin birleşiminden gelir:
+       1) sıkı kontak gölgesi  — nesneyi yüzeye oturtur
+       2) yumuşak ortam gölgesi — mesafe hissi verir, marka tonuna kaydırılmış
+          (nötr gri yerine ink mavisi → sistem "tek renk ailesi" gibi okunur)
+       3) üst iç parlaklık      — kenara ışık düşmüş izlenimi
+     ============================================================ */
+  --elev-1: 0 1px 2px rgba(10, 34, 71, 0.05), 0 2px 6px -1px rgba(10, 34, 71, 0.04);
+  --elev-2: 0 1px 2px rgba(10, 34, 71, 0.05), 0 6px 16px -4px rgba(10, 34, 71, 0.07);
+  --elev-3: 0 1px 3px rgba(10, 34, 71, 0.06), 0 12px 28px -8px rgba(10, 34, 71, 0.10);
+  --elev-4: 0 2px 4px rgba(10, 34, 71, 0.07), 0 24px 56px -16px rgba(10, 34, 71, 0.16);
+  --elev-5: 0 3px 6px rgba(10, 34, 71, 0.08), 0 40px 88px -24px rgba(10, 34, 71, 0.22);
+
+  /* Üst iç parlaklık — açık yüzeylerde kenar ışığı */
+  --inner-top: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  /* Koyu yüzeylerde aynı iş */
+  --inner-top-dark: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  /* Saç teli kenar — düz `border` yerine yarı saydam; arka planla kaynaşır */
+  --hairline: rgba(10, 34, 71, 0.08);
+  --hairline-strong: rgba(10, 34, 71, 0.14);
+
+  /* Yüzey katmanları */
+  --surface-raised: #ffffff;
+  --surface-sunken: #f1f4fa;
+
+  /* Odak halkası — çift katman: beyaz boşluk + marka halkası.
+     Tek renk halka koyu yüzeyde kayboluyordu. */
+  --focus-gap: 0 0 0 2px var(--surface);
+  --focus-ring: 0 0 0 4px rgba(20, 99, 255, 0.35);
 }
 
 @theme inline {
@@ -123,6 +156,17 @@
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+
+  /* Yükseklik skalası Tailwind sınıfı olarak: shadow-elev-1 … shadow-elev-5 */
+  --shadow-elev-1: var(--elev-1);
+  --shadow-elev-2: var(--elev-2);
+  --shadow-elev-3: var(--elev-3);
+  --shadow-elev-4: var(--elev-4);
+  --shadow-elev-5: var(--elev-5);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
   --color-text: var(--text);
@@ -259,6 +303,92 @@ h1, h2, h3, h4 {
    ============================================================ */
 
 .font-display { font-family: var(--font-manrope), system-ui, sans-serif; }
+
+/* ============================================================
+   PREMIUM UTILITY KATMANI
+   Amaç: kaliteyi tek tek sayfaya elle işlemek yerine paylaşılan
+   sınıflara koymak; bileşenler bunları kullanınca iyileşme panele yayılır.
+   ============================================================ */
+
+/* Kart yüzeyi — düz `border + bg` üçlemesinin premium karşılığı.
+   Kenar yarı saydam (arka planla kaynaşır), üstte ince ışık, çok katmanlı gölge. */
+.surface-card {
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--inner-top), var(--elev-2);
+}
+.surface-card-flat {
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--inner-top), var(--elev-1);
+}
+/* Gömülü alan — input, well, kod bloğu. Işık yukarıdan geldiği için iç gölge üstte. */
+.surface-sunken {
+  background: var(--surface-sunken);
+  box-shadow: inset 0 1px 2px rgba(10, 34, 71, 0.06);
+}
+
+/* Saç teli ayırıcılar — `border-line` yerine; tablo/liste satırlarında
+   çizgi ağırlığını düşürür, içerik öne çıkar. */
+.hairline-b { border-bottom: 1px solid var(--hairline); }
+.hairline-t { border-top: 1px solid var(--hairline); }
+
+/* Çift katmanlı odak halkası. Tek renk halka koyu yüzeylerde kayboluyordu;
+   beyaz boşluk halkayı her zeminde ayırır. Yalnızca klavye ile gezinirken. */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-gap), var(--focus-ring);
+}
+
+/* Basma geri bildirimi — tıklamanın fiziksel hissi. 1px'lik iniş yeterli;
+   fazlası oyuncak gibi durur. */
+.press { transition: transform 0.12s ease, box-shadow 0.18s ease; }
+.press:active { transform: translateY(1px) scale(0.995); }
+
+/* Hover'da yükselme — kart/satır için. Gölge ve konum birlikte değişir,
+   yalnızca renk değiştirmek "tıklanabilir" hissi vermiyor. */
+.lift-hover { transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease; }
+.lift-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--inner-top), var(--elev-3);
+}
+
+/* Gradient saç teli kenar — vurgulu kartlar için (fiyat, KPI, plan kartı).
+   `border-image` yerine maskeli pseudo-element: köşe yarıçapına uyar. */
+.grad-hairline { position: relative; }
+.grad-hairline::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(140deg, rgba(20, 99, 255, 0.35), rgba(16, 185, 163, 0.28) 50%, rgba(10, 34, 71, 0.06));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* SAYISAL HİZALAMA — finansal tablolarda kritik.
+   Orantılı rakamlarda "1" ile "8" farklı genişlikte olduğu için tutar kolonu
+   titrek görünür. tabular-nums tüm rakamları eşit genişliğe alır; tutarlar
+   sağdan hizalandığında kuruş kuruşa oturur. Profesyonellik farkı buradan
+   çıkıyor — CRM'de en çok bakılan şey sayılar. */
+.numeric {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Tipografi rafinesi */
+h1, h2, h3 {
+  /* Başlıkta son kelimenin tek başına alt satıra düşmesini engeller */
+  text-wrap: balance;
+}
+p {
+  /* Paragrafta yetim satır (orphan) önler */
+  text-wrap: pretty;
+}
 
 .text-gradient {
   background: linear-gradient(100deg, var(--brand-600), var(--cyan-400) 50%, var(--mint-500));

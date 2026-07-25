@@ -33,7 +33,7 @@ export function TableFrame({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-sm)]",
+        "surface-card overflow-hidden rounded-[var(--radius-panel)]",
         className,
       )}
     >
@@ -52,7 +52,12 @@ export function THead({ className, ...props }: ComponentProps<"thead">) {
   return (
     <thead
       {...props}
-      className={cn("border-b border-line bg-canvas/80 text-text-muted", className)}
+      className={cn(
+        // Başlık satırı: saç teli alt kenar + hafif gömülü zemin.
+        // Kalın `border-line` çizgisi tabloyu ağırlaştırıyordu.
+        "hairline-b bg-canvas/70 text-[11px] font-semibold uppercase tracking-[0.04em] text-text-faint",
+        className,
+      )}
     />
   );
 }
@@ -79,8 +84,11 @@ export function TR({
     <tr
       {...props}
       className={cn(
-        "border-b border-line transition last:border-0",
-        interactive && "group relative cursor-pointer hover:bg-brand-600/[0.025]",
+        "hairline-b transition-colors last:border-0",
+        // Hover'da yalnızca zemin değil, sol kenarda ince marka vurgusu:
+        // gözün "hangi satırdayım" sorusunu anında cevaplar.
+        interactive &&
+          "group relative cursor-pointer hover:bg-brand-600/[0.035] hover:shadow-[inset_2px_0_0_0_var(--brand-500)]",
         className,
       )}
     />
@@ -101,7 +109,13 @@ export function TH({
   return (
     <th
       {...props}
-      className={cn("px-4 py-3 font-medium whitespace-nowrap", alignClass[align], className)}
+      className={cn(
+        "px-4 py-2.5 whitespace-nowrap",
+        alignClass[align],
+        // Sağa hizalı başlık = sayısal kolon; rakam hizalamasını burada da aç
+        align === "right" && "numeric",
+        className,
+      )}
     />
   );
 }
@@ -111,7 +125,19 @@ export function TD({
   align = "left",
   ...props
 }: Omit<ComponentProps<"td">, "align"> & { align?: keyof typeof alignClass }) {
-  return <td {...props} className={cn("px-4 py-3", alignClass[align], className)} />;
+  return (
+    <td
+      {...props}
+      className={cn(
+        "px-4 py-3",
+        alignClass[align],
+        // Tablolarda sağa hizalama fiilen "sayı" demektir. tabular-nums'u
+        // otomatik açıyoruz; tutar kolonları böylece kuruş kuruşa hizalanır.
+        align === "right" && "numeric",
+        className,
+      )}
+    />
+  );
 }
 
 /** Tablo içinde satır kaplayan boş durum hücresi. */

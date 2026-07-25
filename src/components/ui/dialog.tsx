@@ -48,7 +48,9 @@ export function DialogContent({
           <DialogPrimitive.Content
             {...props}
             className={cn(
-              "dialog-content w-full overflow-hidden rounded-[22px] border border-white/20 bg-surface shadow-[var(--shadow-lg)]",
+              // Modal en yüksek katman: elev-5 + üst iç ışık. Tek katmanlı
+              // shadow-lg modalı arka plandan yeterince ayırmıyordu.
+              "dialog-content w-full overflow-hidden rounded-[22px] border border-white/20 bg-surface shadow-[var(--inner-top),var(--elev-5)]",
               sizeClass[size],
               className,
             )}
@@ -104,7 +106,7 @@ export function DialogHeader({
           </div>
         </div>
         <DialogPrimitive.Close
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-white/8 text-white/70 transition hover:bg-white/15 hover:text-white"
+          className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-white/8 text-white/70 transition hover:bg-white/15 hover:text-white"
           aria-label="Kapat"
         >
           <X className="h-5 w-5" />
