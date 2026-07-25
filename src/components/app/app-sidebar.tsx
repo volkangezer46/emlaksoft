@@ -15,7 +15,6 @@ import {
   FileSignature,
   Gauge,
   Handshake,
-  Home,
   LayoutDashboard,
   LifeBuoy,
   ListChecks,

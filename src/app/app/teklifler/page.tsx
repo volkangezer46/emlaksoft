@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { Tag } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listOffers } from "@/app/actions/offers";
 import { createClient } from "@/lib/supabase/server";
 import { NewOfferDialog } from "./new-offer-dialog";
 import { EmptyState } from "@/components/app/empty-state";
+import { DataTable, ROW_HREF, type DataTableColumn, type DataTableRow } from "@/components/ui/data-table";
 
 const STATUS_LABELS: Record<string, string> = {
   draft:     "Taslak",
@@ -15,10 +15,24 @@ const STATUS_LABELS: Record<string, string> = {
   withdrawn: "Geri çekildi",
 };
 
-function money(n: number | null) {
-  if (!n) return "—";
-  return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
-}
+/** Durum → tasarım sistemi rozet tonu (ham emerald/red/zinc yerine). */
+const STATUS_BADGES: DataTableColumn["badges"] = {
+  draft:     { label: STATUS_LABELS.draft,     variant: "default" },
+  submitted: { label: STATUS_LABELS.submitted, variant: "info" },
+  countered: { label: STATUS_LABELS.countered, variant: "warning" },
+  accepted:  { label: STATUS_LABELS.accepted,  variant: "success" },
+  rejected:  { label: STATUS_LABELS.rejected,  variant: "danger" },
+  withdrawn: { label: STATUS_LABELS.withdrawn, variant: "outline" },
+};
+
+const OFFER_COLUMNS: DataTableColumn[] = [
+  { key: "property", header: "Portföy", sortable: true },
+  { key: "customer", header: "Müşteri", sortable: true },
+  { key: "amount", header: "Teklif", format: "money", align: "right", sortable: true },
+  { key: "counter", header: "Karşı teklif", format: "money", align: "right", hideBelow: "md" },
+  { key: "status", header: "Durum", format: "badge", badges: STATUS_BADGES, sortable: true },
+  { key: "created_at", header: "Tarih", format: "date", align: "right", sortable: true },
+];
 
 function propertyLabel(p: { property_code: string; title: string | null } | { property_code: string; title: string | null }[] | null) {
   if (!p) return "—";
@@ -67,6 +81,18 @@ export default async function TekliflerPage() {
   const accepted = offers.filter((o) => o.status === "accepted").length;
   const pending  = offers.filter((o) => o.status === "submitted").length;
 
+  // DataTable client bileşenine geçen düz (serileştirilebilir) satırlar
+  const offerRows: DataTableRow[] = offers.map((o) => ({
+    id:         o.id,
+    [ROW_HREF]: `/app/teklifler/${o.id}`,
+    property:   propertyLabel(o.property),
+    customer:   customerLabel(o.customer),
+    amount:     o.amount != null ? Number(o.amount) : null,
+    counter:    o.counter_amount != null ? Number(o.counter_amount) : null,
+    status:     o.status,
+    created_at: o.created_at,
+  }));
+
   return (
     <div className="space-y-6">
       <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
@@ -79,7 +105,7 @@ export default async function TekliflerPage() {
             <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Teklifler</h1>
             <p className="mt-1 text-sm text-white/75">Portföylere gelen teklifleri ve durumlarını izleyin.</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {[
               { label: "Toplam", value: offers.length },
               { label: "Bekliyor", value: pending },
@@ -90,6 +116,7 @@ export default async function TekliflerPage() {
                 <p className="text-[10px] text-white/70">{k.label}</p>
               </div>
             ))}
+            {canCreate ? <NewOfferDialog properties={properties} customers={customers} /> : null}
           </div>
         </div>
       </section>
@@ -101,53 +128,13 @@ export default async function TekliflerPage() {
           description="Portföylere gelen teklifler burada listelenir. Portföy detayından veya “Yeni teklif” ile ilk teklifi ekleyin."
         />
       ) : (
-        <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[700px] text-left text-sm">
-              <thead className="border-b border-line bg-canvas/80 text-text-muted">
-                <tr>
-                  <th className="px-5 py-3 font-semibold">Portföy</th>
-                  <th className="px-4 py-3 font-semibold">Müşteri</th>
-                  <th className="px-4 py-3 font-semibold">Teklif</th>
-                  <th className="px-4 py-3 font-semibold">Karşı teklif</th>
-                  <th className="px-4 py-3 font-semibold">Durum</th>
-                  <th className="px-4 py-3 font-semibold">Tarih</th>
-                </tr>
-              </thead>
-              <tbody>
-                {offers.map((o) => {
-                  const statusStyle: Record<string, string> = {
-                    accepted: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
-                    rejected: "bg-red-50 text-red-700 ring-red-600/20",
-                    submitted: "bg-blue-50 text-blue-700 ring-blue-600/20",
-                    countered: "bg-amber-50 text-amber-700 ring-amber-600/20",
-                    draft: "bg-zinc-100 text-zinc-600 ring-zinc-500/10",
-                    withdrawn: "bg-zinc-50 text-zinc-500 ring-zinc-400/10",
-                  };
-                  return (
-                    <tr key={o.id} className="group relative cursor-pointer border-b border-line last:border-0 transition hover:bg-brand-600/[0.03]">
-                      <td className="px-5 py-3 font-semibold text-ink-950">
-                        <Link href={`/app/teklifler/${o.id}`} className="absolute inset-0" aria-label={`${propertyLabel(o.property)} teklif detayı`} />
-                        <span className="group-hover:text-brand-600">{propertyLabel(o.property)}</span>
-                      </td>
-                      <td className="px-4 py-3 text-text-muted">{customerLabel(o.customer)}</td>
-                      <td className="px-4 py-3 font-bold text-ink-950">{money(Number(o.amount))}</td>
-                      <td className="px-4 py-3 text-text-muted">{o.counter_amount ? money(Number(o.counter_amount)) : "—"}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${statusStyle[o.status] ?? statusStyle.draft}`}>
-                          {STATUS_LABELS[o.status] ?? o.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-text-muted">
-                        {new Date(o.created_at).toLocaleDateString("tr-TR")}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <DataTable
+          columns={OFFER_COLUMNS}
+          rows={offerRows}
+          minWidth={700}
+          searchPlaceholder="Portföy veya müşteri ara…"
+          empty={{ description: "Arama terimini değiştirip tekrar deneyin." }}
+        />
       )}
     </div>
   );

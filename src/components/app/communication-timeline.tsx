@@ -2,7 +2,7 @@
 
 import { useActionState, useTransition, useState } from "react";
 import {
-  MessageSquare, Phone, Mail, FileText, Users, Plus, Trash2, Clock,
+  MessageSquare, Mail, FileText, Users, Plus, Trash2, Clock,
   PhoneIncoming, PhoneOutgoing, PhoneMissed, ChevronDown,
 } from "lucide-react";
 import { createCommunication, type CommResult } from "@/app/actions/communications";

@@ -18,7 +18,6 @@ import {
   PLATFORM_ROLE_LABELS,
 } from "@/app/actions/platform-staff";
 import type { PlatformRole } from "@/lib/platform-access";
-import { useRouter } from "next/navigation";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -89,7 +88,7 @@ function AddStaffDialog({ onDone }: { onDone: () => void }) {
               </button>
             </div>
             <p className="mt-1 text-xs text-text-muted">
-              Auth'da kayıtlı e-posta varsa doğrudan eklenir; yoksa davet e-postası gönderilir.
+              Auth’da kayıtlı e-posta varsa doğrudan eklenir; yoksa davet e-postası gönderilir.
             </p>
             <form ref={formRef} onSubmit={submit} className="mt-5 grid gap-4">
               <div>
@@ -222,7 +221,6 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => void }) 
 // Page — client component, veriyi /api/admin/personel üzerinden çeker
 // ---------------------------------------------------------------------------
 export default function PersonelPage() {
-  const router = useRouter();
   const [staff, setStaff] = useState<StaffRow[]>([]);
   const [loading, setLoading] = useState(true);
 

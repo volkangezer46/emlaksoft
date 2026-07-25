@@ -2,10 +2,9 @@
 
 import { useState, useTransition } from "react";
 import {
-  Clock, FileCheck2, History, Loader2, Plus, RadioTower, Send, Shield, X,
+  Clock, FileCheck2, History, Loader2, RadioTower, Send, Shield,
 } from "lucide-react";
 import {
-  changePropertyStatus,
   getPropertyStatusHistory,
   updatePropertyAuthorization,
 } from "@/app/actions/property-management";

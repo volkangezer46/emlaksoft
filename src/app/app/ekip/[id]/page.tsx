@@ -7,7 +7,6 @@ import {
   CalendarDays,
   Phone,
   PhoneCall,
-  Target,
   Users,
   Wallet,
 } from "lucide-react";

@@ -22,7 +22,7 @@ export default async function KiraArtisPage() {
             </span>
             <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Kira artış hesaplama</h1>
             <p className="mt-1 max-w-xl text-sm text-white/70">
-              12 aylık ortalama TÜFE'ye göre yasal tavanı otomatik uygular; yeni kirayı, aylık ve yıllık farkı anında gösterir.
+              12 aylık ortalama TÜFE’ye göre yasal tavanı otomatik uygular; yeni kirayı, aylık ve yıllık farkı anında gösterir.
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-[14px] border border-white/12 bg-white/8 px-4 py-3">
@@ -41,7 +41,7 @@ export default async function KiraArtisPage() {
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-mint-600" />
         <p>
           Konut kiralarında artış, önceki kira yılındaki 12 aylık ortalama TÜFE oranını aşamaz. Bu araç TÜİK referans
-          verisiyle hesaplar; nihai oran için TÜİK'in ilgili ay verisini esas alın. İş yeri kiralarında sözleşme
+          verisiyle hesaplar; nihai oran için TÜİK’in ilgili ay verisini esas alın. İş yeri kiralarında sözleşme
           serbestisi geçerli olabilir.
         </p>
       </section>

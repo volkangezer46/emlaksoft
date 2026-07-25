@@ -15,7 +15,7 @@ async function smokeTest() {
   let envContent;
   try {
     envContent = readFileSync(envPath, 'utf-8');
-  } catch (e) {
+  } catch {
     console.error('❌ .env.local bulunamadı');
     process.exit(1);
   }

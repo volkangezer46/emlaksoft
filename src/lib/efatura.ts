@@ -104,11 +104,6 @@ async function parasutuCreateInvoice(
   cfg: EFaturaConfig,
 ): Promise<InvoiceResult> {
   try {
-    const totalAmount = input.lines.reduce(
-      (s, l) => s + l.quantity * l.unitPrice * (1 + l.vatRate / 100),
-      0,
-    );
-
     const body = {
       description:   input.notes ?? input.lines[0]?.description ?? "Komisyon",
       issue_date:    input.date,

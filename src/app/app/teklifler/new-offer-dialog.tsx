@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useState } from "react";
 import { Plus, X, Tag, Loader2 } from "lucide-react";
 import { createOffer, type OfferResult } from "@/app/actions/offers";
 

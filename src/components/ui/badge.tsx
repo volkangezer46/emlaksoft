@@ -2,7 +2,7 @@
  * Badge component variants
  */
 
-type BadgeVariant = "default" | "success" | "warning" | "danger" | "info" | "outline";
+export type BadgeVariant = "default" | "success" | "warning" | "danger" | "info" | "outline";
 type BadgeSize = "sm" | "md" | "lg";
 
 export function Badge({

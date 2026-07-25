@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MessageSquare, Plus, Send, Trash2, CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react";
+import { MessageSquare, CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listCampaigns } from "@/app/actions/campaigns";
 import { NewCampaignDialog } from "./new-campaign-dialog";

@@ -14,7 +14,7 @@ async function applyMigrations() {
   let envContent;
   try {
     envContent = readFileSync(envPath, 'utf-8');
-  } catch (e) {
+  } catch {
     console.error('❌ .env.local dosyası okunamadı');
     process.exit(1);
   }

@@ -1,13 +1,12 @@
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { requirePlatformStaff } from "@/lib/platform";
-import { PLATFORM_ROLE_LABELS, PLATFORM_ROLE_TAGLINES, platformModulesFor } from "@/lib/platform-access";
+import { PLATFORM_ROLE_LABELS, platformModulesFor } from "@/lib/platform-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const staff = await requirePlatformStaff();
   const roleLabel = PLATFORM_ROLE_LABELS[staff.role] ?? staff.role;
-  const tagline = PLATFORM_ROLE_TAGLINES[staff.role] ?? "Platform kontrol";
   const modules = platformModulesFor(staff.role);
 
   // Sidebar rozet sayıları — role göre ilgili olanlar
@@ -34,7 +33,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="flex min-h-screen bg-canvas">
       <AdminSidebar staffName={staff.full_name} role={staff.role} roleLabel={roleLabel} badges={badges} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <AdminTopbar roleLabel={roleLabel} tagline={tagline} modules={modules} />
+        <AdminTopbar roleLabel={roleLabel} modules={modules} />
         <main id="main-content" className="flex-1 p-4 md:p-6">{children}</main>
       </div>
     </div>

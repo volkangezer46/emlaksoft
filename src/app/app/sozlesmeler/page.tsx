@@ -4,7 +4,6 @@ import {
   Clock,
   FileSignature,
   FileText,
-  Plus,
   XCircle,
 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -133,7 +132,7 @@ export default async function SozlesmelerPage() {
           title="Henüz sözleşme yok"
           description="İlk sözleşme taslağınızı oluşturun, imzalayanları ekleyin ve dijital onay alın."
           tone="brand"
-          action={canCreate ? { label: "Yeni sözleşme", node: <NewContractDialog trigger="button" contractTypes={contractTypeOptions} /> } : undefined}
+          action={canCreate ? { label: "Yeni sözleşme", node: <NewContractDialog contractTypes={contractTypeOptions} /> } : undefined}
         />
       ) : (
         <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
@@ -194,7 +193,7 @@ export default async function SozlesmelerPage() {
         <p className="font-semibold text-ink-950">E-imza nasıl çalışır?</p>
         <p className="mt-1">
           Sözleşme taslağı oluşturun → imzalayan kişileri ekleyin → sistem benzersiz bir imza linki oluşturur →
-          kişi linke tıklayıp onayladığında sözleşme "İmzalandı" durumuna geçer.
+          kişi linke tıklayıp onayladığında sözleşme “İmzalandı” durumuna geçer.
           Tüm imzalayanlar onayladığında sözleşme tamamlanır.
         </p>
       </section>

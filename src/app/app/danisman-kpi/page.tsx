@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { TrendingUp, Users, Phone, Target, Trophy, BarChart3 } from "lucide-react";
+import { Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { BarCompare, ChartFrame } from "@/components/ui/chart";
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -94,6 +95,13 @@ export default async function DanismanKpiPage() {
 
   const topScore = Math.max(1, ...advisors.map((a) => a.score));
 
+  // Grafik verisi: geliri olan ilk 8 danışman (düz, serileştirilebilir dizi)
+  const revenueChart = advisors
+    .filter((a) => a.revenue > 0)
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 8)
+    .map((a) => ({ name: a.full_name, revenue: a.revenue }));
+
   return (
     <div className="space-y-6">
       {/* Hero */}
@@ -121,6 +129,25 @@ export default async function DanismanKpiPage() {
           </div>
         </div>
       </section>
+
+      {/* Gelir kırılımı — tabloyu okumadan önce tek bakışta sıralama.
+          Bilinçli olarak tek seri: gelir (₺) ile satış adedi aynı eksende
+          gösterilse ölçek farkı yüzünden yanıltıcı olurdu. */}
+      {revenueChart.length > 0 ? (
+        <ChartFrame
+          title="Danışman bazlı gelir"
+          subtitle="Bu ay · en yüksek 8 danışman"
+          height={Math.max(200, revenueChart.length * 38)}
+        >
+          <BarCompare
+            data={revenueChart}
+            xKey="name"
+            layout="horizontal"
+            format="money"
+            series={[{ key: "revenue", label: "Gelir" }]}
+          />
+        </ChartFrame>
+      ) : null}
 
       {advisors.length === 0 ? (
         <p className="py-12 text-center text-sm text-text-muted">Danışman kaydı bulunamadı.</p>

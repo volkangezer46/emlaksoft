@@ -8,18 +8,17 @@ import { isValidOptionalTurkishMobile, normalizeTurkishPhone, TR_MOBILE_ERROR_ME
 
 export type TeamResult = { error?: string; ok?: boolean };
 
-const ROLES = [
-  "owner",
-  "gm",
-  "branch_manager",
-  "team_lead",
-  "advisor",
-  "call_center",
-  "accounting",
-  "readonly",
-] as const;
-
-type Role = (typeof ROLES)[number];
+// Not: bu liste yalnızca tip kaynağı olarak kullanılıyordu (çalışma zamanında
+// hiç okunmuyor), bu yüzden dizi yerine doğrudan birleşim tipi.
+type Role =
+  | "owner"
+  | "gm"
+  | "branch_manager"
+  | "team_lead"
+  | "advisor"
+  | "call_center"
+  | "accounting"
+  | "readonly";
 
 // Roles allowed to manage the team
 const MANAGER_ROLES: Role[] = ["owner", "gm", "branch_manager"];

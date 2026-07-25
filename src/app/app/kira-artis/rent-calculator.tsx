@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ArrowRight, Calculator, Info, TrendingUp } from "lucide-react";
 import { computeRentIncrease, TUFE_12M_AVG, tufeRateForMonth } from "@/lib/tufe";
 
@@ -25,11 +25,14 @@ export function RentCalculator({ months, latestMonth }: { months: string[]; late
   const legalCap = tufe.rate;
   const appliedRate = useManual && manualRate ? Number(manualRate) : legalCap;
 
-  const result = useMemo(() => {
-    const rentNum = Number(rent);
-    if (!rentNum || rentNum <= 0) return null;
-    return computeRentIncrease(rentNum, appliedRate, useManual ? legalCap : undefined);
-  }, [rent, appliedRate, useManual, legalCap]);
+  // Not: burada useMemo yok — computeRentIncrease dört aritmetik işlem yapıyor,
+  // manuel memoization hem gereksiz hem de React Compiler'ın kendi
+  // memoization'ını uygulamasını engelliyordu (preserve-manual-memoization).
+  const rentNum = Number(rent);
+  const result =
+    rentNum > 0
+      ? computeRentIncrease(rentNum, appliedRate, useManual ? legalCap : undefined)
+      : null;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">

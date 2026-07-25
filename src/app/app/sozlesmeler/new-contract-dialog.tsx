@@ -102,12 +102,16 @@ Müşteri:     ___________________________  Tarih: _______`,
 
 const init: ContractResult = {};
 
+// Not: eskiden bir `trigger` prop'u vardı ama bileşen onu hiç okumuyordu —
+// her iki çağrı yerinde de aynı "Yeni sözleşme" butonu render ediliyor.
+// Yanıltıcı olduğu için kaldırıldı (çağrı yeri de güncellendi).
 export function NewContractDialog({
-  trigger,
   contractTypes = CONTRACT_TYPES,
-}: { trigger?: "button" | "icon"; contractTypes?: { value: string; label: string }[] } = {}) {
+}: { contractTypes?: { value: string; label: string }[] } = {}) {
   const [open, setOpen] = useState(false);
-  const [state, action, isPending] = useActionState(createContract, init);
+  // action kullanılmıyor (handleSubmit createContract'i doğrudan çağırıyor);
+  // dizi boşluğu ile atlanıyor — isPending gerekli.
+  const [state, , isPending] = useActionState(createContract, init);
   const [, startTransition] = useTransition();
   const [selectedType, setSelectedType] = useState("diger");
 

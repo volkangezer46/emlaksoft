@@ -146,7 +146,6 @@ export default async function AppHomePage() {
     { data: demandRows },
     { data: dealRows },
     { data: profiles },
-    { data: auditLive },
     { data: customerDates },
     { data: expiringAuthority },
     { data: recentCustomers24h },
@@ -204,11 +203,6 @@ export default async function AppHomePage() {
       .gte("updated_at", new Date(Date.now() - 90 * 86_400_000).toISOString())
       .limit(100),
     supabase.from("profiles").select("id, full_name, role").limit(50),
-    supabase
-      .from("audit_logs")
-      .select("id, action, entity_type, created_at")
-      .order("created_at", { ascending: false })
-      .limit(6),
     // 500 → 100, sadece 7 haftalık pencere
     supabase
       .from("customers")
@@ -455,17 +449,6 @@ export default async function AppHomePage() {
     })),
   ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
    .slice(0, 8);
-
-  const actionLabel: Record<string, string> = {
-    "workflow.deal_won": "Satış kapandı",
-    "deal.stage": "Anlaşma aşaması",
-    "deal.create": "Anlaşma oluşturuldu",
-    "commission.paid": "Komisyon tahsil",
-    "property.create": "Portföy eklendi",
-    "customer.create": "Müşteri eklendi",
-    "call.create": "Çağrı kaydı",
-    "appointment.create": "Randevu",
-  };
 
   const expiringList = expiringAuthority ?? [];
 

@@ -1,14 +1,10 @@
-import { notFound } from "next/navigation";
 import {
   Building2,
   CalendarDays,
-  CheckCircle2,
   ExternalLink,
   MapPin,
   RadioTower,
   Tag,
-  TrendingUp,
-  XCircle,
 } from "lucide-react";
 import { getOwnerPortalData } from "@/app/actions/owner-portal";
 
@@ -69,7 +65,6 @@ export default async function MalikPortaliPage({
 
   const { property, tenant, ownerName, portalListings, offers, appointments } = data;
   const liveListings = portalListings.filter((l) => l.status === "live");
-  const acceptedOffers = offers.filter((o) => o.status === "accepted");
 
   return (
     <div className="min-h-screen bg-zinc-50">

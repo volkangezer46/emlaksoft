@@ -16,7 +16,9 @@ const init: CampaignResult = {};
 
 export function NewCampaignDialog({ trigger }: { trigger?: "button" | "icon" } = {}) {
   const [open, setOpen] = useState(false);
-  const [state, action] = useActionState(createCampaign, init);
+  // action kullanılmıyor: form handleSubmit içinde createCampaign'i doğrudan
+  // çağırıyor; useActionState burada yalnızca `state` için duruyor.
+  const [state] = useActionState(createCampaign, init);
   const [, startTransition] = useTransition();
   const [message, setMessage] = useState("");
   const charCount = message.length;

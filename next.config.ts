@@ -23,9 +23,12 @@ const nextConfig: NextConfig = {
   },
 
   experimental: {
+    // Barrel-import maliyetini düşür: yalnızca kullanılan alt modüller derlenir.
+    // Buradaki her paket gerçekten kurulu olmalı — aksi halde satır ölü kalır.
     optimizePackageImports: [
       "lucide-react",
       "date-fns",
+      "recharts",
       "@radix-ui/react-dialog",
       "@radix-ui/react-dropdown-menu",
       "@radix-ui/react-select",

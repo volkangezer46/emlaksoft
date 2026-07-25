@@ -47,8 +47,6 @@ export default function BroadcastPage() {
     });
   }
 
-  const selectedKind = KIND_OPTIONS.find((k) => k.value === kind) ?? KIND_OPTIONS[0];
-
   return (
     <div className="space-y-6">
       {/* Başlık */}

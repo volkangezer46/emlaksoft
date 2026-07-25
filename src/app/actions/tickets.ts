@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requirePlatformStaff, requirePlatformModule } from "@/lib/platform";
+import { requirePlatformModule } from "@/lib/platform";
 import { requireActiveTenant } from "@/lib/tenant-guard";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
 

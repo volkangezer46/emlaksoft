@@ -1,9 +1,10 @@
 import { Receipt, Plus, Trash2 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
-import { listExpenses, deleteExpense } from "@/app/actions/expenses";
+import { listExpenses } from "@/app/actions/expenses";
 import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 import { getDefinitions } from "@/lib/definitions";
 import { EmptyState } from "@/components/app/empty-state";
+import { ChartFrame, DonutSplit } from "@/components/ui/chart";
 import { ExpenseEditDialog } from "./expense-edit-dialog";
 
 // Inline server action wrappers — void return için form action uyumlu
@@ -39,6 +40,10 @@ export default async function GiderlerPage() {
     ...c,
     total: expenses.filter((e) => e.category === c.value).reduce((s, e) => s + Number(e.amount), 0),
   }));
+  const activeCategories = byCategory.filter((c) => c.total > 0);
+  const categoryChart = activeCategories
+    .sort((a, b) => b.total - a.total)
+    .map((c) => ({ name: c.label, value: c.total }));
 
   return (
     <div className="space-y-6">
@@ -65,15 +70,22 @@ export default async function GiderlerPage() {
         </div>
       </section>
 
-      {/* Kategori özet */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {byCategory.filter((c) => c.total > 0).map((c) => (
-          <div key={c.value} className="rounded-[16px] border border-line bg-surface p-3 text-center">
-            <p className="text-xs font-semibold text-text-muted">{c.label}</p>
-            <p className="mt-1 font-display text-base font-bold text-ink-950">{money(c.total)}</p>
+      {/* Kategori özet — dağılım grafiği + kırılım kartları */}
+      {activeCategories.length > 0 ? (
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,340px)_1fr]">
+          <ChartFrame title="Kategori dağılımı" subtitle="Tüm gider kayıtları" height={250}>
+            <DonutSplit data={categoryChart} format="money" centerLabel="Toplam gider" />
+          </ChartFrame>
+          <div className="grid content-start grid-cols-2 gap-3 sm:grid-cols-3">
+            {activeCategories.map((c) => (
+              <div key={c.value} className="rounded-[16px] border border-line bg-surface p-3 text-center">
+                <p className="text-xs font-semibold text-text-muted">{c.label}</p>
+                <p className="mt-1 font-display text-base font-bold text-ink-950">{money(c.total)}</p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      ) : null}
 
       {/* Yeni gider formu */}
       {canCreate && (

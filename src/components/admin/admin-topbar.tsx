@@ -41,13 +41,13 @@ const QUICK: { label: string; href: string; icon: typeof Building2; module: Plat
   { label: "Coğrafya", href: "/admin/geo", icon: MapPin, module: "geo" },
 ];
 
+// Not: `tagline` prop'u alınıyor ama hiçbir yerde render edilmiyordu (h-14
+// başlık çubuğunda üçüncü satıra yer yok). Yanıltıcı API yerine kaldırıldı.
 export function AdminTopbar({
   roleLabel,
-  tagline,
   modules,
 }: {
   roleLabel: string;
-  tagline: string;
   modules: PlatformModule[];
 }) {
   const pathname = usePathname();

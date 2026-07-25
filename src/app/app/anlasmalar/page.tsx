@@ -108,7 +108,7 @@ export default async function DealsPage() {
           </span>
           <h2 className="mt-4 font-display text-lg font-bold text-ink-950">Satış hattı boş</h2>
           <p className="mt-1 max-w-md text-sm text-text-muted">
-            İlk anlaşmayı ekleyin veya portföyden "Anlaşma + komisyon" ile kazanan işlem açın.
+            İlk anlaşmayı ekleyin veya portföyden “Anlaşma + komisyon” ile kazanan işlem açın.
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             {canCreate ? <NewDealDialog properties={properties ?? []} customers={customers ?? []} /> : null}

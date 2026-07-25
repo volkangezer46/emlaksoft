@@ -58,7 +58,7 @@ export function PropertyMap({
         <MapPin className="mx-auto h-7 w-7 text-text-faint" />
         <p className="mt-2 text-sm text-text-muted">Bu portföy için harita koordinatı girilmemiş.</p>
         <a href={gmaps} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 rounded-[10px] border border-line px-4 py-2 text-sm font-semibold text-brand-600 transition hover:border-brand-300">
-          Adresi Google Maps'te ara <ExternalLink className="h-3.5 w-3.5" />
+          Adresi Google Maps’te ara <ExternalLink className="h-3.5 w-3.5" />
         </a>
       </div>
     );

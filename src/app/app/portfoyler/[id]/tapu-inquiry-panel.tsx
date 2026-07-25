@@ -78,7 +78,7 @@ export function TapuInquiryPanel({
           {result && result.ok && result.configured === false ? (
             <div className="mt-3 flex items-start gap-2 rounded-[10px] border border-amber-300/50 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
               <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>Tapusor API anahtarı tanımlı değil. Yönetici <strong>/admin/sistem</strong>'den anahtarı ekleyince sorgu aktifleşir.</span>
+              <span>Tapusor API anahtarı tanımlı değil. Yönetici <strong>/admin/sistem</strong>’den anahtarı ekleyince sorgu aktifleşir.</span>
             </div>
           ) : null}
 

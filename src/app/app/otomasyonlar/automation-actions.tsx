@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition, useState } from "react";
-import { CheckCircle2, Loader2, Pause, Play, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Pause, Play, Trash2 } from "lucide-react";
 import { applyAutomationTemplate, toggleAutomation, deleteAutomation } from "@/app/actions/automations";
 
 type AutomationRow = {

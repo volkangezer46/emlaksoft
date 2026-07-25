@@ -17,18 +17,36 @@
   --brand-500: #2f78ff;
   --brand-400: #3984ff;
   --brand-300: #7aa9ff;
+  --brand-50: #eef4ff;
 
   --cyan-400: #22d3ee;
+
+  /* mint / danger / warn Tailwind'in varsayılan paletinde YOK — bu yüzden
+     burada tanımlanmayan her ton (ör. text-mint-700) sessizce hiçbir şey
+     yapmaz. Kod tabanında kullanılan tüm tonlar aşağıda tam olarak tanımlı;
+     yeni bir ton kullanmadan önce buraya eklenmesi gerekir. */
+  --mint-700: #0b8172;
   --mint-600: #0e9f8c;
   --mint-500: #10b9a3;
   --mint-400: #34d3bd;
+  --mint-300: #6ee0cd;
+  --mint-50: #ecfbf7;
 
   --amber-500: #e0a53a;
   --amber-400: #f2b84b;
   --amber-300: #f7cd7a;
 
+  --danger-700: #a92a2e;
+  --danger-600: #cf3438;
   --danger-500: #e5484d;
+  --danger-400: #ec6b6f;
+  --danger-300: #f4a3a6;
+  --danger-100: #fee2e2;
+  --danger-50: #fef2f2;
+
+  --warn-600: #d98c12;
   --warn-500: #f5a524;
+  --warn-400: #f7b84e;
 
   --canvas: #f6f8fc;
   --surface: #ffffff;
@@ -52,6 +70,11 @@
   --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06);
   --shadow-card: 0 8px 30px rgba(15, 23, 42, 0.08);
   --shadow-lg: 0 24px 60px -20px rgba(10, 34, 71, 0.35);
+  /* Dialog/modal katmanı — lg'den bir kademe daha derin. Kod tabanında
+     shadow-[var(--shadow-xl)] ve --shadow-modal referansları vardı ama
+     tanımları yoktu; tanımsız değişken sessizce gölgesiz bırakır. */
+  --shadow-xl: 0 32px 80px -24px rgba(10, 34, 71, 0.42);
+  --shadow-modal: 0 28px 70px -18px rgba(10, 34, 71, 0.45);
   --shadow-glow-brand: 0 20px 50px -18px rgba(20, 99, 255, 0.55);
   --shadow-glow-mint: 0 20px 50px -18px rgba(16, 185, 163, 0.5);
 }
@@ -70,18 +93,32 @@
   --color-brand-500: var(--brand-500);
   --color-brand-400: var(--brand-400);
   --color-brand-300: var(--brand-300);
+  --color-brand-50: var(--brand-50);
 
   --color-cyan-400: var(--cyan-400);
+
+  --color-mint-700: var(--mint-700);
   --color-mint-600: var(--mint-600);
   --color-mint-500: var(--mint-500);
   --color-mint-400: var(--mint-400);
+  --color-mint-300: var(--mint-300);
+  --color-mint-50: var(--mint-50);
 
   --color-amber-500: var(--amber-500);
   --color-amber-400: var(--amber-400);
   --color-amber-300: var(--amber-300);
 
+  --color-danger-700: var(--danger-700);
+  --color-danger-600: var(--danger-600);
   --color-danger-500: var(--danger-500);
+  --color-danger-400: var(--danger-400);
+  --color-danger-300: var(--danger-300);
+  --color-danger-100: var(--danger-100);
+  --color-danger-50: var(--danger-50);
+
+  --color-warn-600: var(--warn-600);
   --color-warn-500: var(--warn-500);
+  --color-warn-400: var(--warn-400);
 
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
@@ -456,6 +493,26 @@ h1, h2, h3, h4 {
 
 .dropdown-in { animation: dropIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
 @keyframes dropIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+
+/* ------------------------------------------------------------
+   Radix durum animasyonları (dialog / select / menü / tooltip)
+   src/components/ui/* bileşenleri bu sınıfları kullanır.
+   Giriş animasyonu var, çıkış anlık — panelde hızlı his için bilinçli tercih.
+   prefers-reduced-motion bloğu dosya sonundaki global kural ile karşılanıyor.
+   ------------------------------------------------------------ */
+@keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes popover-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.dialog-overlay[data-state="open"] { animation: overlay-in 0.18s ease both; }
+.dialog-content[data-state="open"] { animation: dialog-in 0.26s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.popover-in[data-state="open"],
+.popover-in[data-state="delayed-open"] { animation: popover-in 0.16s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
 .mega-surface {
   background:

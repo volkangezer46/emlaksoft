@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { FileSignature, Loader2, Plus, Send, Trash2, UserPlus } from "lucide-react";
+import { FileSignature, Loader2, Send, Trash2, UserPlus } from "lucide-react";
 import { sendContractForSigning } from "@/app/actions/contracts";
 
 type Signer = { full_name: string; email: string; phone: string };

@@ -71,7 +71,6 @@ export default async function AcikEvPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {events.map((e) => {
             const date = new Date(e.scheduled_at);
-            const isPast = date < new Date();
             const statusColor: Record<string, string> = {
               planned:   "bg-blue-50 text-blue-700",
               active:    "bg-emerald-50 text-emerald-700",

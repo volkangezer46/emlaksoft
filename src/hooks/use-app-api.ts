@@ -50,7 +50,9 @@ export function invalidateAppApi(tenantId: string, ...urls: string[]) {
   }
 }
 
-export async function prefetchAppApi(tenantId: string, url: string, ttl = DEFAULT_TTL) {
+// `_ttl` bilinçli olarak okunmuyor: prefetch yalnızca cache'i doldurur, tazelik
+// kontrolünü çağıran useAppApi yapar. Parametre çağrı yerleriyle uyum için duruyor.
+export async function prefetchAppApi(tenantId: string, url: string, _ttl = DEFAULT_TTL) {
   const key = cacheKey(tenantId, url);
   if (memory.has(key)) return;
   if (inflight.has(key)) return inflight.get(key);
