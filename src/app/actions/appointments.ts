@@ -99,3 +99,61 @@ export async function updateAppointmentStatus(formData: FormData): Promise<Appoi
 export async function setAppointmentStatus(formData: FormData): Promise<void> {
   await updateAppointmentStatus(formData);
 }
+
+/** Randevu erteleme / düzenleme — tarih, saat, tür, süre, yer, not. */
+export async function updateAppointment(formData: FormData): Promise<AppointmentResult> {
+  const gate = await requirePermission("appointments", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return { error: "Randevu bulunamadı." };
+
+  const appointmentType = String(formData.get("appointment_type") ?? "").trim();
+  const date = String(formData.get("date") ?? "").trim();
+  const time = String(formData.get("time") ?? "").trim();
+  const location = String(formData.get("location") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+  const durationValue = Number(String(formData.get("duration_min") ?? "").trim());
+
+  if (!appointmentType || !TYPES.includes(appointmentType)) {
+    return { error: "Geçerli bir randevu türü seçin." };
+  }
+  if (!date || !time) return { error: "Tarih ve saat zorunlu." };
+
+  const scheduledAt = new Date(`${date}T${time}`);
+  if (Number.isNaN(scheduledAt.getTime())) {
+    return { error: "Geçerli bir tarih/saat girin." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("appointments")
+    .update({
+      appointment_type: appointmentType,
+      scheduled_at: scheduledAt.toISOString(),
+      duration_min: Number.isFinite(durationValue) && durationValue > 0 ? Math.round(durationValue) : null,
+      location: location || null,
+      notes: notes || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId);
+
+  if (error) {
+    console.error("updateAppointment", error);
+    return { error: "Randevu güncellenemedi." };
+  }
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "appointment.update",
+    entityType: "appointment",
+    entityId: id,
+    newValue: { appointment_type: appointmentType, scheduled_at: scheduledAt.toISOString() },
+  });
+
+  revalidatePath("/app/randevular");
+  revalidatePath("/app");
+  return { ok: true };
+}

@@ -45,6 +45,39 @@ export async function createExpense(
   return { ok: true, id: data.id };
 }
 
+export async function updateExpense(
+  _prev: ExpenseResult,
+  fd: FormData,
+): Promise<ExpenseResult> {
+  const gate = await requirePermission("expenses", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const id = String(fd.get("id") ?? "").trim();
+  if (!id) return { error: "Kayıt bulunamadı." };
+
+  const title       = String(fd.get("title")       ?? "").trim();
+  const amount      = parseFloat(String(fd.get("amount") ?? "0"));
+  const category    = String(fd.get("category")    ?? "diger").trim();
+  const expenseDate = String(fd.get("expense_date") ?? "").trim() || new Date().toISOString().slice(0, 10);
+  const notes       = String(fd.get("notes")       ?? "").trim() || null;
+  const propertyId  = String(fd.get("property_id") ?? "").trim() || null;
+
+  if (!title)          return { error: "Başlık zorunludur." };
+  if (isNaN(amount) || amount <= 0) return { error: "Geçerli bir tutar girin." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("expenses")
+    .update({ title, amount, category, expense_date: expenseDate, notes, property_id: propertyId })
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId);
+
+  if (error) return { error: "Gider güncellenemedi." };
+
+  revalidatePath("/app/giderler");
+  return { ok: true, id };
+}
+
 export async function deleteExpense(id: string): Promise<ExpenseResult> {
   const gate = await requirePermission("expenses", "delete");
   if (!gate.ok) return { error: gate.error };

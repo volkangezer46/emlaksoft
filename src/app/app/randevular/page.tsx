@@ -18,6 +18,7 @@ import { NewAppointmentDialog } from "./new-appointment-dialog";
 import { getDefinitions } from "@/lib/definitions";
 import { AddToCalendarButton } from "@/components/app/add-to-calendar-button";
 import { AppointmentCalendar } from "./appointment-calendar";
+import { AppointmentEditDialog } from "./appointment-edit-dialog";
 import Link from "next/link";
 import { EmptyState } from "@/components/app/empty-state";
 
@@ -237,6 +238,12 @@ export default async function AppointmentsPage() {
                             <input type="hidden" name="status" value="completed" />
                             <button type="submit" className="inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-brand-600 transition hover:border-brand-300"><CheckCircle2 className="h-3 w-3" /> Tamamlandı</button>
                           </form>
+                        ) : null}
+                        {appt.status !== "completed" ? (
+                          <AppointmentEditDialog
+                            appointment={{ id: appt.id, appointment_type: appt.appointment_type, scheduled_at: appt.scheduled_at, duration_min: appt.duration_min, location: appt.location, notes: appt.notes }}
+                            typeOptions={appointmentTypeOptions}
+                          />
                         ) : null}
                         {appt.status !== "completed" ? (
                           <form action={setAppointmentStatus}>

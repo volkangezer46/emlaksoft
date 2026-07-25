@@ -78,6 +78,56 @@ export async function createTask(_prev: TaskResult, formData: FormData): Promise
   return { ok: true, id: data.id };
 }
 
+export async function updateTask(_prev: TaskResult, formData: FormData): Promise<TaskResult> {
+  const gate = await requirePermission("tasks", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return { error: "Görev bulunamadı." };
+
+  const title = String(formData.get("title") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+  const kind = String(formData.get("kind") ?? "followup").trim();
+  const priority = String(formData.get("priority") ?? "normal").trim();
+  const dueRaw = String(formData.get("due_at") ?? "").trim();
+  const assignedTo = String(formData.get("assigned_to") ?? "").trim();
+
+  if (!title) return { error: "Görev başlığı zorunlu." };
+  if (!KINDS.includes(kind)) return { error: "Geçersiz görev türü." };
+  if (!PRIORITIES.includes(priority)) return { error: "Geçersiz öncelik." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tasks")
+    .update({
+      title,
+      notes: notes || null,
+      kind,
+      priority,
+      due_at: dueRaw ? new Date(dueRaw).toISOString() : null,
+      ...(assignedTo ? { assigned_to: assignedTo } : {}),
+    })
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId);
+
+  if (error) {
+    console.error("updateTask", error);
+    return { error: "Görev güncellenemedi." };
+  }
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "task.update",
+    entityType: "task",
+    entityId: id,
+    newValue: { title, kind, priority },
+  });
+
+  revalidatePath("/app/gorevler");
+  return { ok: true, id };
+}
+
 export async function completeTask(formData: FormData): Promise<void> {
   const gate = await requirePermission("tasks", "edit");
   if (!gate.ok) return;

@@ -4,6 +4,7 @@ import { listExpenses, deleteExpense } from "@/app/actions/expenses";
 import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 import { getDefinitions } from "@/lib/definitions";
 import { EmptyState } from "@/components/app/empty-state";
+import { ExpenseEditDialog } from "./expense-edit-dialog";
 
 // Inline server action wrappers — void return için form action uyumlu
 async function handleCreate(fd: FormData): Promise<void> {
@@ -26,6 +27,7 @@ export default async function GiderlerPage() {
   const { perms } = await requireModulePage("expenses");
   const [expenses, catDefs] = await Promise.all([listExpenses(), getDefinitions("expense_category")]);
   const canCreate = perms.expenses?.includes("create") ?? false;
+  const canEdit = perms.expenses?.includes("edit") ?? false;
   const canDelete = perms.expenses?.includes("delete") ?? false;
 
   // DB-driven gider kategorileri (boşsa sabit yedeğe düş)
@@ -121,13 +123,21 @@ export default async function GiderlerPage() {
                     <td className="px-4 py-3 font-bold text-ink-950">{money(Number(e.amount))}</td>
                     <td className="px-4 py-3 text-text-muted">{new Date(e.expense_date).toLocaleDateString("tr-TR")}</td>
                     <td className="px-4 py-3">
-                      {canDelete && (
-                        <form action={handleDelete.bind(null, e.id) as (fd: FormData) => Promise<void>}>
-                          <button type="submit" className="grid h-7 w-7 place-items-center rounded-[7px] text-text-faint transition hover:bg-red-50 hover:text-red-600" aria-label="Sil">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </form>
-                      )}
+                      <div className="flex items-center justify-end gap-1">
+                        {canEdit && (
+                          <ExpenseEditDialog
+                            expense={{ id: e.id, title: e.title, amount: Number(e.amount), category: e.category, expense_date: e.expense_date, notes: e.notes }}
+                            categories={categories}
+                          />
+                        )}
+                        {canDelete && (
+                          <form action={handleDelete.bind(null, e.id) as (fd: FormData) => Promise<void>}>
+                            <button type="submit" className="grid h-7 w-7 place-items-center rounded-[7px] text-text-faint transition hover:bg-red-50 hover:text-red-600" aria-label="Sil">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </form>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

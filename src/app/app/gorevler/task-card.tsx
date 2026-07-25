@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CheckCircle2, Clock, FileText, MapPin, Phone, RotateCcw, Trash2, User } from "lucide-react";
 import { completeTask, deleteTask, reopenTask } from "@/app/actions/tasks";
+import { TaskEditDialog } from "./task-edit-dialog";
 
 type Rel = { full_name?: string } | { full_name?: string }[] | null;
 
@@ -102,6 +103,9 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
       </div>
 
       <div className="relative z-10 flex shrink-0 items-center gap-1.5">
+        {canEdit && !done ? (
+          <TaskEditDialog task={{ id: task.id, title: task.title, notes: task.notes, kind: task.kind, priority: task.priority, due_at: task.due_at }} />
+        ) : null}
         {canEdit ? (
           done ? (
             <form action={reopenTask}>

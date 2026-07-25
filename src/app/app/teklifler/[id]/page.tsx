@@ -15,6 +15,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { getOffer } from "@/app/actions/offers";
 import { formatTurkishPhone } from "@/lib/phone";
 import { OfferStatusActions } from "./offer-status-actions";
+import { OfferEditDialog } from "./offer-edit-dialog";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Taslak",
@@ -184,6 +185,11 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
             <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <h2 className="mb-3 text-sm font-bold text-ink-950">İşlemler</h2>
               <OfferStatusActions offerId={offer.id} status={offer.status} />
+              {!["accepted", "rejected", "withdrawn"].includes(offer.status) ? (
+                <div className="mt-3 border-t border-line pt-3">
+                  <OfferEditDialog offer={{ id: offer.id, amount: offerAmount, valid_until: offer.valid_until, notes: offer.notes }} />
+                </div>
+              ) : null}
             </section>
           ) : null}
         </div>

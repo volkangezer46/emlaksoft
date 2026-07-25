@@ -71,6 +71,37 @@ export async function updateOfferStatus(
   return { ok: true };
 }
 
+/** Teklif tutarı / geçerlilik / not düzenleme. */
+export async function updateOffer(
+  _prev: OfferResult,
+  fd: FormData,
+): Promise<OfferResult> {
+  const gate = await requirePermission("commissions", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const id = String(fd.get("id") ?? "").trim();
+  if (!id) return { error: "Teklif bulunamadı." };
+
+  const amount     = parseFloat(String(fd.get("amount") ?? "0"));
+  const validUntil = String(fd.get("valid_until") ?? "").trim() || null;
+  const notes      = String(fd.get("notes") ?? "").trim() || null;
+
+  if (isNaN(amount) || amount <= 0) return { error: "Geçerli bir teklif tutarı girin." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("offers")
+    .update({ amount, valid_until: validUntil, notes, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId);
+
+  if (error) return { error: "Teklif güncellenemedi." };
+
+  revalidatePath("/app/teklifler");
+  revalidatePath(`/app/teklifler/${id}`);
+  return { ok: true, id };
+}
+
 /** Tek teklifi ilişkili portföy + müşteri ID'leriyle getirir (detay sayfası için). */
 export async function getOffer(id: string) {
   const gate = await requirePermission("commissions", "view");
