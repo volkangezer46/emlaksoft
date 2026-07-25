@@ -16,7 +16,9 @@
     "cron:smoke": "node scripts/cron-smoke.js",
     "geo:sync": "tsx scripts/geo-sync.ts",
     "db:migrate": "tsx scripts/apply-migrations.ts",
-    "db:smoke": "tsx scripts/smoke-auth.ts"
+    "db:smoke": "tsx scripts/smoke-auth.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
@@ -51,6 +53,7 @@
     "eslint-config-next": "16.2.11",
     "tailwindcss": "^4",
     "tsx": "^4.23.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }

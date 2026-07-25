@@ -31,6 +31,9 @@ jobs:
         # kod icinde gerekceli eslint-disable ile isaretli.
         run: npx eslint . --max-warnings=0
 
+      - name: Testler
+        run: npm test
+
       - name: Güvenlik denetimi (bilgilendirme — henüz bloklamıyor)
         # --omit=dev bilinçli: ESLint zincirindeki dev-only açıklar
         # (minimatch/brace-expansion DoS) production'a gitmiyor.
