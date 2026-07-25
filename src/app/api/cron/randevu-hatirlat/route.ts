@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/lib/notify-batch";
 
 function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -21,37 +22,39 @@ export async function GET(req: NextRequest) {
     .neq("status", "cancelled")
     .limit(200);
 
-  let notified = 0;
-  let skipped = 0;
   const windowStart = new Date(Date.now() - 20 * 3600_000).toISOString();
+  const list = appts ?? [];
 
-  for (const a of appts ?? []) {
-    const marker = `appt:${a.id}`;
-    const { data: existing } = await admin
-      .from("notifications")
-      .select("id")
-      .eq("tenant_id", a.tenant_id)
-      .eq("href", "/app/randevular")
-      .gte("created_at", windowStart)
-      .ilike("body", `%${marker}%`)
-      .limit(1);
+  // N+1 KALDIRILDI: randevu başına 1 SELECT + 1 INSERT yerine toplam 2 sorgu.
+  // Bu cron her 30 dakikada bir çalışıyor, yani kazanç en çok burada birikiyor.
+  const tenantIds = [...new Set(list.map((a) => String(a.tenant_id)))];
+  const alreadyNotified = await findNotifiedIds(admin, {
+    href: "/app/randevular",
+    tenantIds,
+    sinceIso: windowStart,
+    markerPrefix: "appt",
+  });
 
-    if (existing?.length) {
+  const toInsert: NotificationRow[] = [];
+  let skipped = 0;
+
+  for (const a of list) {
+    if (alreadyNotified.has(String(a.id).toLowerCase())) {
       skipped += 1;
       continue;
     }
-
     const cust = a.customer as { full_name?: string } | { full_name?: string }[] | null;
     const name = Array.isArray(cust) ? cust[0]?.full_name : cust?.full_name;
-    await admin.from("notifications").insert({
-      tenant_id: a.tenant_id,
+    toInsert.push({
+      tenant_id: String(a.tenant_id),
       title: "Yaklaşan randevu",
-      body: `${name ?? "Müşteri"} · ${new Date(a.scheduled_at).toLocaleString("tr-TR")} · ${marker}`,
+      body: `${name ?? "Müşteri"} · ${new Date(a.scheduled_at).toLocaleString("tr-TR")} · appt:${a.id}`,
       href: "/app/randevular",
       kind: "info",
     });
-    notified += 1;
   }
+
+  const notified = await insertNotifications(admin, toInsert);
 
   return NextResponse.json({ ok: true, notified, skipped });
 }

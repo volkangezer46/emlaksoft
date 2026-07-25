@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { insertNotifications, type NotificationRow } from "@/lib/notify-batch";
 
 function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -20,17 +21,17 @@ export async function GET(req: NextRequest) {
     .or(`last_confirmed_at.is.null,last_confirmed_at.lt.${due}`)
     .limit(200);
 
-  let notified = 0;
-  for (const row of listings ?? []) {
-    await admin.from("notifications").insert({
-      tenant_id: row.tenant_id,
-      title: "Portal teyit gecikti",
-      body: `${row.portal_name}${row.portal_listing_id ? ` #${row.portal_listing_id}` : ""} — 7+ gündür teyit yok`,
-      href: "/app/portallar",
-      kind: "warning",
-    });
-    notified += 1;
-  }
+  // Döngü içi insert yerine toplu yazma: 200 ilan için 200 gidiş-dönüş
+  // yerine tek istek (500'lük parçalar hâlinde).
+  const rows: NotificationRow[] = (listings ?? []).map((row) => ({
+    tenant_id: String(row.tenant_id),
+    title: "Portal teyit gecikti",
+    body: `${row.portal_name}${row.portal_listing_id ? ` #${row.portal_listing_id}` : ""} — 7+ gündür teyit yok`,
+    href: "/app/portallar",
+    kind: "warning",
+  }));
+
+  const notified = await insertNotifications(admin, rows);
 
   return NextResponse.json({ ok: true, notified });
 }
