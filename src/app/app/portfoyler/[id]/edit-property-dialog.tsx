@@ -2,7 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Pencil, X } from "lucide-react";
+import { Loader2, Pencil } from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { updateProperty } from "@/app/actions/properties";
 import { useToast } from "@/components/app/toast-provider";
 import { LatLngPicker } from "@/components/app/lat-lng-picker";
@@ -62,27 +69,24 @@ export function EditPropertyDialog({
   }
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white"
-      >
-        <Pencil className="h-4 w-4" /> Düzenle
-      </button>
-      {open ? (
-        <div className="fixed inset-0 z-50 grid place-items-center p-4">
-          <button type="button" aria-label="Kapat" className="absolute inset-0 bg-ink-950/55 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <form
-            onSubmit={onSubmit}
-            className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-lg)]"
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-display text-lg font-bold text-ink-950">Portföyü düzenle</h2>
-              <button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-[8px] text-text-faint hover:bg-canvas" aria-label="Kapat">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+    /* Radix Dialog: focus trap + Esc (öncesinde yoktu) + scroll lock + ARIA. */
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+        >
+          <Pencil className="h-4 w-4" /> Düzenle
+        </button>
+      </DialogTrigger>
+
+      <DialogContent size="md">
+        <DialogHeader
+          icon={<Pencil />}
+          title="Portföyü düzenle"
+          description={property.title ?? undefined}
+        />
+        <form onSubmit={onSubmit} className="p-6">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="sm:col-span-2 text-xs font-medium text-text-muted">
                 Başlık
@@ -137,18 +141,19 @@ export function EditPropertyDialog({
               </label>
               <LatLngPicker defaultLat={property.lat} defaultLng={property.lng} fieldClass={field} />
             </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setOpen(false)} className="rounded-[10px] border border-line px-4 py-2 text-sm font-semibold text-text-muted">
-                Vazgeç
-              </button>
-              <button type="submit" disabled={pending} className="inline-flex items-center gap-1.5 rounded-[10px] bg-ink-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+            <div className="hairline-t mt-4 flex justify-end gap-2 pt-4">
+              <DialogClose asChild>
+                <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas">
+                  Vazgeç
+                </button>
+              </DialogClose>
+              <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[10px] bg-ink-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                 {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Kaydet
               </button>
             </div>
-          </form>
-        </div>
-      ) : null}
-    </>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
