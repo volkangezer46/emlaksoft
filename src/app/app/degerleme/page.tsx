@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Gauge, Landmark, MapPinned, Sparkles } from "lucide-react";
+import { FileText, Gauge, Landmark, MapPinned, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { isEndeksaConfiguredFull } from "@/lib/integrations/endeksa";
@@ -117,11 +117,25 @@ export default async function ValuationPage({
                         Tapusor yatırım puanı: {investmentScoreSource.value}/100
                       </p>
                     ) : null}
-                    {v.property_id ? (
-                      <Link href={`/app/portfoyler/${v.property_id}`} className="mt-2 inline-block text-xs font-semibold text-brand-600 hover:underline">
-                        Portföye git →
+                    {/* Rapor bagi eklendi: degerleme uretiliyordu ama musteriye
+                        verilecek bir CIKTISI yoktu — sonuc yalnizca bu karttaki
+                        birkac satirdi. */}
+                    <div className="hairline-t mt-3 flex flex-wrap items-center gap-3 pt-2.5">
+                      <Link
+                        href={`/app/degerleme/${v.id}`}
+                        className="focus-ring inline-flex items-center gap-1 rounded-[8px] text-xs font-bold text-brand-600 hover:underline"
+                      >
+                        <FileText className="h-3.5 w-3.5" /> Raporu aç
                       </Link>
-                    ) : null}
+                      {v.property_id ? (
+                        <Link
+                          href={`/app/portfoyler/${v.property_id}`}
+                          className="focus-ring text-xs font-semibold text-text-muted hover:text-brand-600 hover:underline"
+                        >
+                          Portföye git →
+                        </Link>
+                      ) : null}
+                    </div>
                   </article>
                 );
               })}

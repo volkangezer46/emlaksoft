@@ -1147,3 +1147,90 @@ p {
 @media (prefers-reduced-motion: reduce) {
   .page-in { animation: none; }
 }
+
+/* ============================================================================
+   YAZDIRMA / PDF
+   ----------------------------------------------------------------------------
+   Emlakçının müşteriye elden verdiği belge bu. Tarayıcının "PDF olarak
+   kaydet" akışı kullanılıyor — ayrı bir PDF kütüphanesi eklenmedi: sunucuda
+   headless tarayıcı çalıştırmak (Puppeteer ~300 MB) ya da jsPDF ile Türkçe
+   font gömmek, kazanılan şeye göre çok pahalı. Tarayıcının kendi motoru
+   zaten doğru fontu, doğru kırılmayı ve seçilebilir metni veriyor.
+
+   Kullanım:
+     .no-print       → ekranda görünür, çıktıda yok (menü, butonlar, filtreler)
+     .print-only     → yalnızca çıktıda görünür (imza alanı, yasal not)
+     .print-sheet    → çıktıda tam genişlik, gölgesiz, kenarlıksız kağıt bloğu
+     .print-avoid-break → tablo satırı/kart ortadan bölünmesin
+   ========================================================================== */
+
+.print-only { display: none; }
+
+@media print {
+  /* Renkleri koru: varsayılan olarak tarayıcı arka planları basmaz ve
+     marka bandı bembeyaz çıkardı. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  @page {
+    size: A4;
+    margin: 14mm 12mm;
+  }
+
+  html, body {
+    background: #fff !important;
+    /* Ekran için 15px olan taban, A4'te fazla iri duruyor. */
+    font-size: 11pt;
+  }
+
+  .no-print,
+  nav,
+  aside,
+  header button,
+  [role="dialog"],
+  [data-radix-popper-content-wrapper] {
+    display: none !important;
+  }
+
+  .print-only { display: block !important; }
+
+  /* Panel kabuğu: kenar çubuğu ve üst bar gittiği için içerik tam genişlik. */
+  .print-sheet {
+    box-shadow: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+  }
+
+  /* Kart ve tablo satırları sayfa arasında ikiye bölünmesin. */
+  .print-avoid-break,
+  tr,
+  .surface-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Uzun tablolarda başlık her sayfada tekrarlansın. */
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+
+  /* Bağlantı hedefini metne yaz — kağıtta tıklanamaz.
+     Yalnızca dış bağlantılar; iç gezinme linkleri gürültü yapar. */
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 9pt;
+    color: #555;
+    word-break: break-all;
+  }
+
+  /* Animasyon ve geçişler çıktıda anlamsız; bazı motorlarda ara kareyi basar. */
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
