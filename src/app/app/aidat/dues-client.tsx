@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Check, Coins, Loader2, Plus, Trash2, Undo2 } from "lucide-react";
 import { createDue, toggleDuePaid, deleteDue, type DueResult } from "@/app/actions/dues";
 import { EmptyState } from "@/components/app/empty-state";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 type Property = { id: string; property_code: string; title: string | null };
 type Due = {
@@ -94,57 +96,68 @@ export function DuesClient({ dues, properties, canCreate }: { dues: Due[]; prope
           tone="amber"
         />
       ) : (
-        <section className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="border-b border-line bg-canvas/80 text-text-muted">
-                <tr>
-                  <th className="px-5 py-3 font-semibold">Başlık</th>
-                  <th className="px-4 py-3 font-semibold">Portföy</th>
-                  <th className="px-4 py-3 font-semibold">Dönem</th>
-                  <th className="px-4 py-3 font-semibold">Tutar</th>
-                  <th className="px-4 py-3 font-semibold">Durum</th>
-                  <th className="px-4 py-3"><span className="sr-only">İşlem</span></th>
-                </tr>
-              </thead>
-              <tbody>
+        <TableFrame minWidth={720}>
+          <Table>
+            <THead>
+              <TR>
+                <TH>Başlık</TH>
+                <TH>Portföy</TH>
+                <TH>Dönem</TH>
+                <TH align="right">Tutar</TH>
+                <TH>Durum</TH>
+                <TH align="right"><span className="sr-only">İşlem</span></TH>
+              </TR>
+            </THead>
+            <TBody>
                 {dues.map((d) => {
                   const prop = propOf(d.property);
                   const paid = d.status === "paid";
                   const overdue = !paid && d.due_date && new Date(d.due_date) < new Date();
                   return (
-                    <tr key={d.id} className="border-b border-line last:border-0 hover:bg-canvas/40">
-                      <td className="px-5 py-3 font-semibold text-ink-950">{d.title}</td>
-                      <td className="px-4 py-3 text-text-muted">
-                        {prop ? <Link href={`/app/portfoyler/${prop.id}`} className="hover:text-brand-600">{prop.title ?? prop.property_code}</Link> : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-text-muted">{monthLabel(d.period)}</td>
-                      <td className="px-4 py-3 font-bold text-ink-950">{money(Number(d.amount))}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${paid ? "bg-mint-500/12 text-mint-600" : overdue ? "bg-danger-500/12 text-danger-600" : "bg-amber-400/15 text-amber-600"}`}>
+                    /* Satırın tamamı ilgili portföye tıklanabilir — diğer liste
+                       sayfalarıyla tutarlı. Aidatın kendi detay sayfası yok,
+                       bağlamsal olarak doğru hedef portföy. */
+                    <TR key={d.id} interactive={Boolean(prop)}>
+                      <TD className="font-semibold text-ink-950">
+                        {prop ? (
+                          <Link
+                            href={`/app/portfoyler/${prop.id}`}
+                            className="absolute inset-0"
+                            aria-label={`${d.title} — ${prop.title ?? prop.property_code} portföyünü aç`}
+                          />
+                        ) : null}
+                        {d.title}
+                      </TD>
+                      <TD className="text-text-muted">
+                        {prop ? (prop.title ?? prop.property_code) : "—"}
+                      </TD>
+                      <TD className="text-text-muted">{monthLabel(d.period)}</TD>
+                      <TD align="right" className="font-bold text-ink-950">{money(Number(d.amount))}</TD>
+                      <TD>
+                        <Badge variant={paid ? "success" : overdue ? "danger" : "warning"} size="sm">
                           {paid ? "Ödendi" : overdue ? "Gecikti" : "Bekliyor"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1.5">
+                        </Badge>
+                      </TD>
+                      <TD align="right">
+                        {/* relative + z-10: satır linkinin üstünde kalsın */}
+                        <div className="relative z-10 flex items-center justify-end gap-1.5">
                           <button type="button" onClick={() => toggle(d.id, !paid)} disabled={busy === d.id}
-                            className="inline-flex items-center gap-1 rounded-[8px] border border-line px-2 py-1 text-[11px] font-semibold text-ink-950 transition hover:bg-canvas disabled:opacity-50">
+                            className="focus-ring press inline-flex items-center gap-1 rounded-[8px] border border-hairline bg-surface px-2 py-1 text-[11px] font-semibold text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas disabled:opacity-50">
                             {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : paid ? <Undo2 className="h-3 w-3" /> : <Check className="h-3 w-3 text-mint-600" />}
                             {paid ? "Geri al" : "Ödendi"}
                           </button>
-                          <button type="button" onClick={() => remove(d.id)} disabled={busy === d.id} aria-label="Sil"
-                            className="grid h-7 w-7 place-items-center rounded-[8px] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-500 disabled:opacity-50">
+                          <button type="button" onClick={() => remove(d.id)} disabled={busy === d.id} aria-label={`${d.title} aidatını sil`}
+                            className="focus-ring press grid h-7 w-7 place-items-center rounded-[8px] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600 disabled:opacity-50">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
-                      </td>
-                    </tr>
+                      </TD>
+                    </TR>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-        </section>
+            </TBody>
+          </Table>
+        </TableFrame>
       )}
     </div>
   );

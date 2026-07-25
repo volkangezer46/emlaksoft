@@ -1,46 +1,31 @@
 import Link from "next/link";
-import { MessageSquare, CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listCampaigns } from "@/app/actions/campaigns";
 import { NewCampaignDialog } from "./new-campaign-dialog";
 import { CampaignActions } from "./campaign-actions";
 import { EmptyState } from "@/components/app/empty-state";
+import { DataTable, type DataTableColumn, type DataTableRow } from "@/components/ui/data-table";
 
-const STATUS_LABELS: Record<string, string> = {
-  draft:     "Taslak",
-  scheduled: "Zamanlandı",
-  sending:   "Gönderiliyor",
-  done:      "Tamamlandı",
-  failed:    "Başarısız",
+/**
+ * Durum/kanal → paylaşılan Badge varyantları.
+ * Etiketler artık burada; ayrı STATUS_LABELS/CHANNEL_LABELS haritaları
+ * kaldırıldı (aynı bilgiyi iki yerde tutmak kayma üretiyordu).
+ * Eskiden yerel StatusBadge palet dışı zinc/blue/emerald/red sınıfları
+ * kullanıyordu; artık tasarım sistemi tonları.
+ */
+const STATUS_BADGES: DataTableColumn["badges"] = {
+  draft:     { label: "Taslak",        variant: "default" },
+  scheduled: { label: "Zamanlandı",    variant: "info" },
+  sending:   { label: "Gönderiliyor",  variant: "warning" },
+  done:      { label: "Tamamlandı",    variant: "success" },
+  failed:    { label: "Başarısız",     variant: "danger" },
 };
 
-const CHANNEL_LABELS: Record<string, string> = {
-  sms:       "SMS",
-  whatsapp:  "WhatsApp",
+const CHANNEL_BADGES: DataTableColumn["badges"] = {
+  sms:      { label: "SMS",      variant: "info" },
+  whatsapp: { label: "WhatsApp", variant: "success" },
 };
-
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    draft:     "bg-zinc-100 text-zinc-600 ring-zinc-500/10",
-    scheduled: "bg-blue-50 text-blue-700 ring-blue-600/20",
-    sending:   "bg-amber-50 text-amber-700 ring-amber-600/20",
-    done:      "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
-    failed:    "bg-red-50 text-red-700 ring-red-600/20",
-  };
-  const icons: Record<string, React.ReactNode> = {
-    draft:     <Clock className="h-3 w-3" />,
-    scheduled: <Clock className="h-3 w-3" />,
-    sending:   <Loader2 className="h-3 w-3 animate-spin" />,
-    done:      <CheckCircle2 className="h-3 w-3" />,
-    failed:    <XCircle className="h-3 w-3" />,
-  };
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${styles[status] ?? styles.draft}`}>
-      {icons[status]}
-      {STATUS_LABELS[status] ?? status}
-    </span>
-  );
-}
 
 function relativeDate(iso: string) {
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
@@ -55,6 +40,32 @@ export default async function KampanyalarPage() {
   const campaigns = await listCampaigns();
 
   const canCreate = perms.campaigns?.includes("create") ?? false;
+
+  const CAMPAIGN_COLUMNS: DataTableColumn[] = [
+    { key: "title", header: "Kampanya", sortable: true },
+    { key: "channel", header: "Kanal", format: "badge", badges: CHANNEL_BADGES, sortable: true },
+    { key: "status", header: "Durum", format: "badge", badges: STATUS_BADGES, sortable: true },
+    { key: "recipients", header: "Alıcı", align: "right", searchable: false },
+    { key: "dateLabel", header: "Tarih", align: "right", searchable: false },
+  ];
+
+  const campaignRows: DataTableRow[] = campaigns.map((c) => ({
+    id:      c.id,
+    title:   c.title,
+    channel: c.channel,
+    status:  c.status,
+    // Alıcı metni koşullu (gönderim bitmişse "gönderilen/toplam", değilse
+    // "N alıcı") — bildirimsel format bunu üretemez, sunucuda hesaplanıyor.
+    recipients:
+      c.status === "done" || c.status === "failed"
+        ? `${c.sent_count ?? 0}/${c.total_count ?? 0}${(c.failed_count ?? 0) > 0 ? ` · ${c.failed_count} hata` : ""}`
+        : `${c.total_count ?? 0} alıcı`,
+    dateLabel: relativeDate(c.created_at),
+  }));
+
+  const campaignActions: Record<string, React.ReactNode> = Object.fromEntries(
+    campaigns.map((c) => [c.id, <CampaignActions key={c.id} campaign={c} canSend={canCreate} />]),
+  );
 
   const total   = campaigns.length;
   const done    = campaigns.filter((c) => c.status === "done").length;
@@ -112,61 +123,14 @@ export default async function KampanyalarPage() {
           action={canCreate ? { label: "Yeni kampanya", node: <NewCampaignDialog trigger="button" /> } : undefined}
         />
       ) : (
-        <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="border-b border-line bg-canvas/80 text-text-muted">
-                <tr>
-                  <th className="px-5 py-3 font-semibold">Kampanya</th>
-                  <th className="px-4 py-3 font-semibold">Kanal</th>
-                  <th className="px-4 py-3 font-semibold">Durum</th>
-                  <th className="px-4 py-3 font-semibold">Alıcı</th>
-                  <th className="px-4 py-3 font-semibold">Tarih</th>
-                  <th className="px-4 py-3 font-semibold" />
-                </tr>
-              </thead>
-              <tbody>
-                {campaigns.map((c) => (
-                  <tr key={c.id} className="border-b border-line last:border-0 hover:bg-canvas/40 transition">
-                    <td className="px-5 py-3.5">
-                      <p className="font-semibold text-ink-950">{c.title}</p>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
-                        c.channel === "whatsapp"
-                          ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20"
-                          : "bg-blue-50 text-blue-700 ring-blue-600/20"
-                      }`}>
-                        {CHANNEL_LABELS[c.channel] ?? c.channel}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <StatusBadge status={c.status} />
-                    </td>
-                    <td className="px-4 py-3.5 text-text-muted">
-                      {c.status === "done" || c.status === "failed" ? (
-                        <span>
-                          {c.sent_count ?? 0}/{c.total_count ?? 0}
-                          {(c.failed_count ?? 0) > 0 && (
-                            <span className="ml-1 text-red-500">({c.failed_count} hata)</span>
-                          )}
-                        </span>
-                      ) : (
-                        <span>{c.total_count ?? 0} alıcı</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5 text-text-muted">
-                      {relativeDate(c.created_at)}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <CampaignActions campaign={c} canSend={canCreate} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <DataTable
+          columns={CAMPAIGN_COLUMNS}
+          rows={campaignRows}
+          rowActions={campaignActions}
+          minWidth={640}
+          searchPlaceholder="Kampanya adı, kanal veya durum ara…"
+          empty={{ description: "Arama terimini değiştirip tekrar deneyin." }}
+        />
       )}
 
       {/* Bilgi kutusu */}
