@@ -19,12 +19,6 @@ function propertyLabel(p: PropertyRel) {
   return item?.title ?? item?.property_code ?? "—";
 }
 
-function propertyId(p: PropertyRel) {
-  if (!p) return null;
-  const item = Array.isArray(p) ? p[0] : p;
-  return item?.id ?? null;
-}
-
 export default async function AcikEvPage() {
   await requireModulePage("open_house");
   const events = await listOpenHouses();
@@ -71,18 +65,25 @@ export default async function AcikEvPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {events.map((e) => {
             const date = new Date(e.scheduled_at);
+            // Palet disi Tailwind varsayilanlari (blue/emerald/zinc/red) proje
+            // token'lariyla degistirildi; ayni ekranda iki farkli mavi vardi.
             const statusColor: Record<string, string> = {
-              planned:   "bg-blue-50 text-blue-700",
-              active:    "bg-emerald-50 text-emerald-700",
-              completed: "bg-zinc-100 text-zinc-600",
-              cancelled: "bg-red-50 text-red-600",
+              planned:   "bg-brand-600/10 text-brand-600",
+              active:    "bg-mint-500/12 text-mint-600",
+              completed: "bg-ink-950/6 text-text-muted",
+              cancelled: "bg-danger-500/10 text-danger-600",
             };
-            const propId = propertyId(e.property);
             return (
               <div key={e.id} className="group relative rounded-[20px] border border-line bg-surface p-5">
-                {propId ? (
-                  <Link href={`/app/portfoyler/${propId}`} className="absolute inset-0 rounded-[20px]" aria-label={`${propertyLabel(e.property)} portföyünü aç`} />
-                ) : null}
+                {/* Ortu-link ONCEDEN PORTFOYE gidiyordu: acik ev kartina
+                    tiklayinca etkinlik degil portfoy aciliyordu ve ziyaretci
+                    listesine ulasilacak HICBIR yol yoktu. Artik acik ev
+                    detayina gidiyor; portfoy bagi detay sayfasinda ayri kart. */}
+                <Link
+                  href={`/app/acik-ev/${e.id}`}
+                  className="focus-ring absolute inset-0 rounded-[20px]"
+                  aria-label={`${propertyLabel(e.property)} açık ev detayını aç`}
+                />
                 <div className="flex items-start justify-between gap-2">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-brand-600/10 text-brand-600">
                     <DoorOpen className="h-5 w-5" />

@@ -130,7 +130,49 @@ export async function registerOpenHouseVisitor(
   await supabase.rpc("increment_visitor_count", { open_house_id: openHouseId }).maybeSingle();
 
   revalidatePath("/app/acik-ev");
+  revalidatePath(`/app/acik-ev/${openHouseId}`);
   return { ok: true };
+}
+
+/**
+ * Bir acik evin ziyaretci listesi.
+ *
+ * NEDEN SONRADAN EKLENDI: `open_house_visitors` tablosu YALNIZCA YAZILIYORDU.
+ * `registerOpenHouseVisitor` kayit aciyordu ama hicbir ekran bu satirlari
+ * okumuyordu — kartlarda sadece "N ziyaretci" sayaci gorunuyordu. Danisman
+ * acik evde topladigi ismi bir daha goremiyordu; acik evin butun amaci olan
+ * lead listesi sistemde olu veriydi.
+ */
+export async function listOpenHouseVisitors(openHouseId: string) {
+  const gate = await requirePermission("appointments", "view");
+  if (!gate.ok) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("open_house_visitors")
+    .select("id, full_name, phone, email, notes, created_customer_id, registered_at")
+    .eq("open_house_id", openHouseId)
+    .order("registered_at", { ascending: false });
+
+  return data ?? [];
+}
+
+/** Tek bir acik ev kaydi (detay sayfasi icin). */
+export async function getOpenHouse(openHouseId: string) {
+  const gate = await requirePermission("appointments", "view");
+  if (!gate.ok) return null;
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("open_houses")
+    .select(
+      "id, scheduled_at, duration_min, location, status, visitor_count, max_visitors, notes, created_at, property:properties(id, property_code, title, address_line, list_price)",
+    )
+    .eq("id", openHouseId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+
+  return data;
 }
 
 export async function listOpenHouses() {
