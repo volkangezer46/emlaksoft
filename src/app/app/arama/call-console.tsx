@@ -15,6 +15,8 @@ import {
 import { createCall } from "@/app/actions/calls";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { formatTurkishPhone } from "@/lib/phone";
+import { Combobox } from "@/components/ui/combobox";
+import { searchCustomers } from "@/app/actions/lookup";
 
 type Customer = {
   id: string;
@@ -124,13 +126,23 @@ export function CallConsole({
         </div>
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <label className="text-sm font-medium text-ink-950">
+          <div className="text-sm font-medium text-ink-950">
             Müşteri
-            <select name="customer_id" value={customerId} onChange={(event) => selectCustomer(event.target.value)} className="mt-1.5 w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
-              <option value="">Bilinmeyen arayan</option>
-              {customers.map((item) => <option key={item.id} value={item.id}>{item.full_name}</option>)}
-            </select>
-          </label>
+            {/* Kontrollü kullanım: seçim telefon alanını da dolduruyor,
+                bu yüzden `value` + `onValueChange` (defaultValue değil). */}
+            <Combobox
+              className="mt-1.5"
+              name="customer_id"
+              aria-label="Müşteri"
+              value={customerId}
+              onValueChange={selectCustomer}
+              placeholder="Bilinmeyen arayan"
+              searchPlaceholder="Ad ya da telefon ara…"
+              emptyText="Eşleşen müşteri yok"
+              onSearch={searchCustomers}
+              options={customers.map((item) => ({ value: item.id, label: item.full_name }))}
+            />
+          </div>
           <label className="text-sm font-medium text-ink-950">
             Telefon *
             <div className="mt-1.5">

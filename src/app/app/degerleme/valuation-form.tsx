@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { createValuation } from "@/app/actions/valuations";
 import { useToast } from "@/components/app/toast-provider";
 import { GeoSelect } from "@/components/app/geo-select";
+import { Combobox } from "@/components/ui/combobox";
+import { searchProperties } from "@/app/actions/lookup";
 
 type Prop = { id: string; property_code: string; title: string | null; list_price: number | null };
 type Province = { id: string; name: string };
@@ -41,15 +43,23 @@ export function ValuationForm({
       <h2 className="font-display font-bold text-ink-950">Yeni değerleme</h2>
       <div className="mt-4 space-y-3">
         <div>
-          <label className="mb-1.5 block text-sm text-text-muted">Portföy</label>
-          <select name="property_id" defaultValue={defaultPropertyId ?? ""} className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm">
-            <option value="">Seçiniz (opsiyonel)</option>
-            {properties.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.property_code} · {p.title || "Başlıksız"}
-              </option>
-            ))}
-          </select>
+          <span className="mb-1.5 block text-sm text-text-muted">Portföy</span>
+          {/* Liste sayfadan `.limit(100)` ile geliyor; arama sunucuya iniyor
+              ki 100. kayıttan eskisi de bulunabilsin. */}
+          <Combobox
+            name="property_id"
+            aria-label="Portföy"
+            defaultValue={defaultPropertyId ?? ""}
+            placeholder="Seçiniz (opsiyonel)"
+            searchPlaceholder="Kod ya da başlık ara…"
+            emptyText="Eşleşen portföy yok"
+            onSearch={searchProperties}
+            options={properties.map((p) => ({
+              value: p.id,
+              label: p.title || "Başlıksız",
+              hint: p.property_code,
+            }))}
+          />
         </div>
         <div>
           <label className="mb-1.5 block text-sm text-text-muted">Başlık</label>

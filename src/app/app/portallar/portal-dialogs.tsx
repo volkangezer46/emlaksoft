@@ -2,9 +2,10 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { Combobox } from "@/components/ui/combobox";
+import { searchProperties } from "@/app/actions/lookup";
 import {
   Check,
-  ChevronDown,
   Link2,
   Plus,
   RadioTower,
@@ -54,16 +55,26 @@ export function NewPortalDialog({ properties }: { properties: PropertyOption[] }
       </button>
       <DialogShell open={open} onOpenChange={setOpen} title="Portal ilanı bağla" description="Portföyü yayın ağına ekleyin." icon={RadioTower}>
           <form ref={formRef} action={submit} className="grid gap-4 p-6">
-            <label className="text-sm font-medium text-ink-950">
+            <div className="text-sm font-medium text-ink-950">
               Portföy *
-              <div className="relative mt-1.5">
-                <select name="property_id" required defaultValue="" className={`${inputClass} appearance-none`}>
-                  <option value="" disabled>Portföy seçin</option>
-                  {properties.map((property) => <option key={property.id} value={property.id}>{property.property_code} · {property.title ?? "İsimsiz portföy"}</option>)}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-              </div>
-            </label>
+              {/* Zorunlu alan: temizleme düğmesi kapalı (`required`),
+                  boş bırakılırsa gizli input `required` ile submit'i durdurur. */}
+              <Combobox
+                className="mt-1.5"
+                name="property_id"
+                required
+                aria-label="Portföy"
+                placeholder="Portföy seçin"
+                searchPlaceholder="Kod ya da başlık ara…"
+                emptyText="Eşleşen portföy yok"
+                onSearch={searchProperties}
+                options={properties.map((property) => ({
+                  value: property.id,
+                  label: property.title ?? "İsimsiz portföy",
+                  hint: property.property_code,
+                }))}
+              />
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="text-sm font-medium text-ink-950">
                 Portal *

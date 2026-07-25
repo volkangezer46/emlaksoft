@@ -8,6 +8,8 @@ import { createDue, toggleDuePaid, deleteDue, type DueResult } from "@/app/actio
 import { EmptyState } from "@/components/app/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { Combobox } from "@/components/ui/combobox";
+import { searchProperties } from "@/app/actions/lookup";
 
 type Property = { id: string; property_code: string; title: string | null };
 type Due = {
@@ -84,12 +86,21 @@ export function DuesClient({ dues, properties, canCreate }: { dues: Due[]; prope
               Son ödeme tarihi
               <input name="due_date" type="date" className="mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400" />
             </label>
-            <select name="property_id" defaultValue="" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400 sm:col-span-2 lg:col-span-3">
-              <option value="">Portföy (opsiyonel)</option>
-              {properties.map((p) => (
-                <option key={p.id} value={p.id}>{p.title ?? p.property_code}</option>
-              ))}
-            </select>
+            <div className="sm:col-span-2 lg:col-span-3">
+              <Combobox
+                name="property_id"
+                aria-label="Portföy"
+                placeholder="Portföy (opsiyonel)"
+                searchPlaceholder="Kod ya da başlık ara…"
+                emptyText="Eşleşen portföy yok"
+                onSearch={searchProperties}
+                options={properties.map((p) => ({
+                  value: p.id,
+                  label: p.title ?? p.property_code,
+                  hint: p.title ? p.property_code : undefined,
+                }))}
+              />
+            </div>
             <button type="submit" disabled={pending} className="inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60">
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Ekle
             </button>
