@@ -289,6 +289,24 @@ export default function HomePage() {
               <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-mint-600" /> 2 dakikada kurulum</span>
               <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-mint-600" /> Taahhütsüz</span>
             </div>
+
+            {/* Kurumsal güvence şeridi — gerçek ürün nitelikleri, rafine premium */}
+            <div className="animate-rise mx-auto mt-8 flex max-w-3xl flex-wrap items-center justify-center gap-2.5" style={{ animationDelay: "360ms" }}>
+              {[
+                { icon: Lock, label: "KVKK uyumlu" },
+                { icon: FileCheck, label: "İYS & EİDS entegre" },
+                { icon: Database, label: "Türkiye veri altyapısı" },
+                { icon: Headphones, label: "7/24 uzman destek" },
+              ].map((b) => (
+                <span
+                  key={b.label}
+                  className="group inline-flex items-center gap-2 rounded-full border border-line bg-surface/70 px-3.5 py-1.5 text-xs font-semibold text-ink-800 shadow-[var(--shadow-xs)] backdrop-blur transition hover:border-brand-400/60 hover:text-brand-600"
+                >
+                  <b.icon className="h-3.5 w-3.5 text-brand-600 transition group-hover:scale-110" />
+                  {b.label}
+                </span>
+              ))}
+            </div>
           </div>
 
           {/* big dashboard showcase */}

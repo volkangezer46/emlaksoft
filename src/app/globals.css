@@ -537,25 +537,25 @@ h1, h2, h3, h4 {
   position: relative;
   border-radius: 26px;
 }
+/* Statik, rafine gradient hairline çerçeve — dönme yok (kurumsal premium görünüm) */
 .premium-ring::before {
   content: "";
   position: absolute;
-  inset: -1.5px;
+  inset: -1px;
   border-radius: inherit;
-  padding: 1.5px;
-  background: conic-gradient(from var(--ring-angle), var(--brand-500), var(--cyan-400) 30%, var(--mint-500) 55%, var(--brand-400) 80%, var(--brand-500));
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--brand-500) 75%, transparent),
+    color-mix(in oklab, var(--cyan-400) 45%, transparent) 35%,
+    transparent 62%,
+    color-mix(in oklab, var(--mint-500) 30%, transparent) 100%
+  );
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  animation: ring-rotate 7s linear infinite;
-  opacity: 0.7;
+  opacity: 0.9;
   pointer-events: none;
-}
-@keyframes ring-rotate {
-  to { --ring-angle: 360deg; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .premium-ring::before { animation: none; }
 }
 
 .hero-lux::after {
