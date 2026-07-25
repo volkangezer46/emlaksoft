@@ -53,7 +53,14 @@
 ## 📦 Kurulum
 
 ### 1) Gereksinimler
-- Node.js 24 LTS önerilir · **minimum 22** (`@supabase/supabase-js` Node ≥22 şart koşuyor, Node 20'nin desteği Nisan 2026'da bitti). Sürüm `.nvmrc` dosyasında sabit: `nvm use`
+- **Node.js 24 LTS** · minimum 22 (`@supabase/supabase-js` `engines: node >=22` şart koşuyor; Node 20'nin desteği Nisan 2026'da bitti)
+  - Sürüm `.nvmrc` dosyasında sabit. macOS/Linux: `nvm use`
+  - **Windows:** nvm-windows `.nvmrc` okumaz, sürümü açıkça vermek gerekir:
+    ```powershell
+    nvm install 24.12.0
+    nvm use 24.12.0
+    ```
+    PowerShell 5.1'de `&&` çalışmaz — komutları ayrı satırda veya `;` ile verin.
 - npm/pnpm/bun
 - Supabase projesi (eu-central-1 önerilir)
 - iyzico merchant hesabı (opsiyonel)

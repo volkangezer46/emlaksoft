@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
   // Turbopack dev cache — yerel geliştirmede yeniden derlemeyi hızlandırır
   cacheMaxMemorySize: 0, // disk cache'e devret, RAM'i serbest bırak
 
+  turbopack: {
+    // Kökü açıkça sabitliyoruz. Otomatik tespit lockfile arayarak yukarı
+    // yürüyor; geliştirme makinesinde ~/.pnpm gibi işaretçiler varsa kökü
+    // proje dışına (hatta src/app'e) kaydırıp modül çözümlemesini bozuyor —
+    // recharts'ın @reduxjs/toolkit bağımlılığı bu yüzden "not found" oluyordu.
+    root: __dirname,
+  },
+
   images: {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 60 * 60 * 24 * 30,
