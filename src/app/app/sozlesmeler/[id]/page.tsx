@@ -7,12 +7,14 @@ import {
   Clock,
   FileSignature,
   FileText,
+  ShieldAlert,
   User,
   XCircle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { ContractSignPanel } from "./contract-sign-panel";
+import { riskSummary, scanContract } from "@/lib/contract-risk";
 
 const TYPE_LABELS: Record<string, string> = {
   satis:    "Satış",
@@ -48,7 +50,7 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
 
   const { data } = await supabase
     .from("contracts")
-    .select("id, title, contract_type, body, status, signed_at, expires_at, created_at, updated_at, property:properties(id,property_code,title), customer:customers(id,full_name), signers:contract_signers(id,full_name,email,phone,status,signed_at)")
+    .select("id, title, contract_type, body, status, signed_at, expires_at, created_at, updated_at, property:properties(id,property_code,title,commission_rate), customer:customers(id,full_name), signers:contract_signers(id,full_name,email,phone,status,signed_at)")
     .eq("id", id)
     .maybeSingle();
 
@@ -59,6 +61,31 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
   const signers = Array.isArray(contract.signers) ? contract.signers : [];
   const propertyName = entityName(contract.property as Parameters<typeof entityName>[0]);
   const customerName = entityName(contract.customer as Parameters<typeof entityName>[0]);
+
+  /*
+   * Risk taramasi (X4). Onceden HICBIR kontrol yoktu: `createContract`
+   * yalnizca baslik ve govdenin bos olmadigina bakiyordu. Sablonlar
+   * `___` yer tutucularla geliyor ve doldurulmamis bir sablonu imzaya
+   * gondermek sahada en sik yapilan hata.
+   */
+  const propertyRel = Array.isArray(contract.property) ? contract.property[0] : contract.property;
+  const riskler = scanContract({
+    contractType: contract.contract_type,
+    title: contract.title,
+    body: contract.body,
+    status: contract.status,
+    signedAt: contract.signed_at,
+    expiresAt: contract.expires_at,
+    createdAt: contract.created_at,
+    signerCount: signers.length,
+    hasProperty: Boolean(propertyRel?.id),
+    hasCustomer: Boolean(
+      (Array.isArray(contract.customer) ? contract.customer[0] : contract.customer)?.id,
+    ),
+    commissionRate:
+      propertyRel?.commission_rate != null ? Number(propertyRel.commission_rate) : null,
+  });
+  const ozet = riskSummary(riskler);
 
   return (
     <div className="space-y-6">
@@ -122,6 +149,70 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         {/* Sözleşme içeriği */}
         <section className="rounded-[20px] border border-line bg-surface p-6 shadow-[var(--shadow-xs)]">
+          {/* Risk taramasi — icerigin USTUNDE: kullanici metni okumadan
+              once neyin eksik oldugunu gormeli. */}
+          {riskler.length > 0 ? (
+            <section className="mb-4 rounded-[14px] border border-line bg-canvas p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 font-display text-sm font-bold text-ink-950">
+                  <ShieldAlert className="h-4 w-4 text-amber-500" /> Sözleşme kontrolü
+                </h2>
+                <div className="flex flex-wrap gap-1.5">
+                  {ozet.error > 0 ? (
+                    <span className="rounded-full bg-danger-500/10 px-2.5 py-0.5 text-[11px] font-bold text-danger-600">
+                      {ozet.error} hata
+                    </span>
+                  ) : null}
+                  {ozet.warning > 0 ? (
+                    <span className="rounded-full bg-amber-400/15 px-2.5 py-0.5 text-[11px] font-bold text-amber-600">
+                      {ozet.warning} uyarı
+                    </span>
+                  ) : null}
+                  {ozet.info > 0 ? (
+                    <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-[11px] font-bold text-brand-600">
+                      {ozet.info} bilgi
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              <ul className="mt-3 space-y-2">
+                {riskler.map((r) => (
+                  <li
+                    key={r.code}
+                    className={`rounded-[12px] border px-3.5 py-2.5 ${
+                      r.level === "error"
+                        ? "border-danger-500/30 bg-danger-500/[0.05]"
+                        : r.level === "warning"
+                          ? "border-amber-400/35 bg-amber-400/[0.06]"
+                          : "border-line bg-surface"
+                    }`}
+                  >
+                    <p
+                      className={`text-sm font-semibold ${
+                        r.level === "error"
+                          ? "text-danger-600"
+                          : r.level === "warning"
+                            ? "text-amber-600"
+                            : "text-ink-950"
+                      }`}
+                    >
+                      {r.title}
+                    </p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-text-muted">{r.detail}</p>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-[11px] leading-relaxed text-text-faint">
+                Bu tarama <strong>mekanik</strong>tir: bir maddenin varlığını arar, içeriğinin doğru ya
+                da yeterli olduğunu söyleyemez. <strong>Hukuki görüş yerine geçmez.</strong>
+              </p>
+            </section>
+          ) : (
+            <p className="mb-4 flex items-center gap-2 rounded-[12px] border border-mint-500/30 bg-mint-500/[0.06] px-4 py-2.5 text-sm text-mint-600">
+              <ShieldAlert className="h-4 w-4" /> Mekanik kontrollerde bulgu yok.
+            </p>
+          )}
+
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <FileText className="h-4 w-4 text-brand-600" /> İçerik
