@@ -47,8 +47,13 @@ edilir; yarım iş push edilmez.
 
 ## 1. Temizlik ve güvenlik (F)
 
-- [ ] **F1** `.npmrc` → `engine-strict=true`. Node sabitlemesinin son parçası;
-      olmadan `engines` sadece uyarı üretir.
+- [x] **F1** ~~`.npmrc` → `engine-strict=true`~~ **DENENDİ, GERİ ALINDI.**
+      CI'ı tamamen kırdı: `@img/sharp-win32-ia32@0.35.3` kendi package.json'unda
+      `engines: {"node":"^20.9.0"}` bildiriyor (caret → `<21`, Node 24'ü dışlar).
+      Paket optional + win32/ia32, yani hiç kurulmuyor; ama engine-strict
+      lockfile metadata'sını doğruladığı için `npm ci` Linux runner'da patlıyor.
+      Karar: kapı kaldırıldı. Node sürümü zaten `.nvmrc` (CI okuyor) +
+      `engines` uyarısıyla korunuyor. Gerekçe `.npmrc` içinde yazılı.
 - [ ] **F2** `scripts/apply-migrations.ts` bozuk: sabit listede **9** migration
       var, diskte **54**. `npm run db:migrate` 10–54'ü sessizce uygulamıyor.
   - [ ] Dizini tarayıp ada göre sıralayan sürüme çevir
