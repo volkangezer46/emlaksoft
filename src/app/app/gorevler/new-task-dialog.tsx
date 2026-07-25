@@ -4,6 +4,8 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, ListPlus, Plus } from "lucide-react";
 import { createTask } from "@/app/actions/tasks";
+import { Combobox } from "@/components/ui/combobox";
+import { searchCustomers } from "@/app/actions/lookup";
 import {
   Dialog,
   DialogClose,
@@ -104,15 +106,20 @@ export function NewTaskDialog({ members, customers }: { members: Option[]; custo
                   <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
                 </div>
               </div>
+              {/* Yalnızca müşteri listesi Combobox'a alındı. "Atanan" ekip
+                  listesi en fazla birkaç düzine kişi; orada native <select>
+                  hâlâ daha iyi (mobilde OS seçicisi, sıfır JS). */}
               <div className="sm:col-span-2">
-                <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="task-customer">İlgili müşteri</label>
-                <div className="relative">
-                  <select id="task-customer" name="customer_id" defaultValue="" className={`${fieldClass} appearance-none`}>
-                    <option value="">Seçiniz (opsiyonel)</option>
-                    {customers.map((c) => <option key={c.id} value={c.id}>{c.full_name}</option>)}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-                </div>
+                <span className="mb-1.5 block text-sm font-medium text-ink-950">İlgili müşteri</span>
+                <Combobox
+                  name="customer_id"
+                  aria-label="İlgili müşteri"
+                  placeholder="Seçiniz (opsiyonel)"
+                  searchPlaceholder="Müşteri ara…"
+                  emptyText="Eşleşen müşteri yok"
+                  onSearch={searchCustomers}
+                  options={customers.map((c) => ({ value: c.id, label: c.full_name }))}
+                />
               </div>
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="task-notes">Not</label>

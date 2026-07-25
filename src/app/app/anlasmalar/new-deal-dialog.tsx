@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { createPipelineDeal } from "@/app/actions/deals";
 import { useToast } from "@/components/app/toast-provider";
+import { Combobox } from "@/components/ui/combobox";
+import { searchCustomers, searchProperties } from "@/app/actions/lookup";
 
 type Prop = { id: string; property_code: string; title: string | null; list_price: number | null; transaction_type: string };
 type Cust = { id: string; full_name: string };
@@ -55,28 +57,39 @@ export function NewDealDialog({ properties, customers }: { properties: Prop[]; c
           description="Portföy ve müşteriyi eşleştirip aşamayı belirleyin."
         />
         <form onSubmit={onSubmit} className="space-y-3 p-6">
-            <label className="block text-xs font-medium text-text-muted">
+            {/* Uzun listeler Combobox'a alındı. Portföy satırında kod alt
+                satırda gösteriliyor (`hint`) — hem aranıyor hem de aynı
+                başlıklı iki portföy ayırt edilebiliyor. */}
+            <div className="block text-xs font-medium text-text-muted">
               Portföy
-              <select name="property_id" className="mt-1.5 w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
-                <option value="">Seçilmedi</option>
-                {properties.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.property_code} · {p.title ?? "Başlıksız"}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-xs font-medium text-text-muted">
+              <Combobox
+                className="mt-1.5"
+                name="property_id"
+                aria-label="Portföy"
+                placeholder="Seçilmedi"
+                searchPlaceholder="Kod ya da başlık ara…"
+                emptyText="Eşleşen portföy yok"
+                onSearch={searchProperties}
+                options={properties.map((p) => ({
+                  value: p.id,
+                  label: p.title ?? "Başlıksız",
+                  hint: p.property_code,
+                }))}
+              />
+            </div>
+            <div className="block text-xs font-medium text-text-muted">
               Müşteri
-              <select name="customer_id" className="mt-1.5 w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
-                <option value="">Seçilmedi</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.full_name}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <Combobox
+                className="mt-1.5"
+                name="customer_id"
+                aria-label="Müşteri"
+                placeholder="Seçilmedi"
+                searchPlaceholder="Müşteri ara…"
+                emptyText="Eşleşen müşteri yok"
+                onSearch={searchCustomers}
+                options={customers.map((c) => ({ value: c.id, label: c.full_name }))}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <label className="block text-xs font-medium text-text-muted">
                 Tür

@@ -77,8 +77,12 @@ export default async function AppointmentsPage() {
       .neq("status", "cancelled")
       .order("scheduled_at", { ascending: true })
       .limit(100),
-    supabase.from("customers").select("id, full_name").is("deleted_at", null).order("full_name"),
-    supabase.from("properties").select("id, title, property_code").is("deleted_at", null).order("created_at", { ascending: false }),
+    // Bu iki sorgu SINIRSIZDI: sayfa her acildiginda ofisin TUM musteri ve
+    // portfoy kayitlari cekiliyordu. Secici artik sunucu tarafinda arama
+    // yaptigi icin buradaki liste yalnizca "son eklenenler" kisayolu —
+    // 50 kayit yeterli, gerisi yazarak bulunuyor.
+    supabase.from("customers").select("id, full_name").is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
+    supabase.from("properties").select("id, title, property_code").is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
     getDefinitions("appointment_type"),
   ]);
   const appointmentTypeOptions = apptTypeDefs.length > 0 ? apptTypeDefs.map((t) => ({ value: t.value, label: t.label })) : undefined;

@@ -11,6 +11,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { createAppointment } from "@/app/actions/appointments";
+import { Combobox } from "@/components/ui/combobox";
+import { searchCustomers, searchProperties } from "@/app/actions/lookup";
 import {
   Dialog,
   DialogClose,
@@ -102,25 +104,33 @@ export function NewAppointmentDialog({
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="appointment-time">Saat *</label>
                 <input id="appointment-time" name="time" type="time" required defaultValue="10:00" className={fieldClass} />
               </div>
+              {/* Müşteri ve portföy listeleri kayıt sayısıyla büyüyor; native
+                  <select> içinde yüzlerce kayıt arasında yalnızca ilk harfe
+                  atlanabiliyordu. Combobox yazarak arıyor (Türkçe karakter
+                  duyarsız) ve `name` ile aynı FormData alanını gönderiyor. */}
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="appointment-customer">Müşteri</label>
-                <div className="relative">
-                  <select id="appointment-customer" name="customer_id" defaultValue="" className={`${fieldClass} appearance-none`}>
-                    <option value="">Seçiniz</option>
-                    {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.label}</option>)}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-                </div>
+                <span className="mb-1.5 block text-sm font-medium text-ink-950">Müşteri</span>
+                <Combobox
+                  name="customer_id"
+                  aria-label="Müşteri"
+                  placeholder="Seçiniz"
+                  searchPlaceholder="Müşteri ara…"
+                  emptyText="Eşleşen müşteri yok"
+                  onSearch={searchCustomers}
+                  options={customers.map((customer) => ({ value: customer.id, label: customer.label }))}
+                />
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="appointment-property">Portföy</label>
-                <div className="relative">
-                  <select id="appointment-property" name="property_id" defaultValue="" className={`${fieldClass} appearance-none`}>
-                    <option value="">Seçiniz</option>
-                    {properties.map((property) => <option key={property.id} value={property.id}>{property.label}</option>)}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-                </div>
+                <span className="mb-1.5 block text-sm font-medium text-ink-950">Portföy</span>
+                <Combobox
+                  name="property_id"
+                  aria-label="Portföy"
+                  placeholder="Seçiniz"
+                  searchPlaceholder="Portföy ara…"
+                  emptyText="Eşleşen portföy yok"
+                  onSearch={searchProperties}
+                  options={properties.map((property) => ({ value: property.id, label: property.label }))}
+                />
               </div>
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="appointment-location">Konum</label>

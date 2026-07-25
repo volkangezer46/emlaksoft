@@ -29,6 +29,17 @@ type Props = {
   required?: boolean;
   /** Seçimi temizleme düğmesi (zorunlu alanlarda kapatın). */
   clearable?: boolean;
+  /**
+   * Sunucu taraflı arama. Verilirse kullanıcı yazdıkça çağrılır ve dönen
+   * sonuçlar `options` ile BİRLEŞTİRİLİR (değiştirmez) — böylece sayfa
+   * açılışında gelen "son eklenenler" listesi kısayol olarak kalır.
+   *
+   * Server Action geçilebilir: fonksiyonun kendisi değil, serileştirilebilir
+   * bir referans taşınır.
+   */
+  onSearch?: (query: string) => Promise<ComboboxOption[]>;
+  /** `onSearch` için en az karakter sayısı. */
+  minSearchLength?: number;
   className?: string;
   id?: string;
   "aria-label"?: string;
@@ -68,6 +79,8 @@ export function Combobox({
   loading,
   required,
   clearable = true,
+  onSearch,
+  minSearchLength = 2,
   className,
   id,
   "aria-label": ariaLabel,
@@ -81,11 +94,67 @@ export function Combobox({
   const listId = `${autoId}-list`;
   const triggerId = id ?? `${autoId}-trigger`;
 
+  const [remote, setRemote] = useState<ComboboxOption[]>([]);
+  const [searching, setSearching] = useState(false);
+
   const value = controlledValue ?? uncontrolled;
-  const selected = useMemo(() => options.find((o) => o.value === value), [options, value]);
+
+  /*
+   * Aday havuzu: sayfadan gelen liste + sunucudan dönenler, değere göre
+   * tekilleştirilmiş. Sunucu sonucu önce yazılıyor ki daha güncel etiket
+   * (ör. yeniden adlandırılmış portföy) kazansın.
+   */
+  const pool = useMemo(() => {
+    if (!onSearch) return options;
+    const byValue = new Map<string, ComboboxOption>();
+    for (const o of remote) byValue.set(o.value, o);
+    for (const o of options) if (!byValue.has(o.value)) byValue.set(o.value, o);
+    return [...byValue.values()];
+  }, [options, remote, onSearch]);
+
+  const selected = useMemo(() => pool.find((o) => o.value === value), [pool, value]);
+
+  /*
+   * Sunucu araması. Geciktirme (debounce) 250 ms: her tuş vuruşunda sorgu
+   * atmak hem gereksiz hem de sonuçların sırasını bozar.
+   *
+   * `stale` bayrağı yarış koşulunu keser: "ka" sorgusu "kadıköy"den SONRA
+   * dönerse eski sonucu yazmaz. Sadece son isteğin sonucu ekrana gelir.
+   */
+  useEffect(() => {
+    if (!onSearch) return;
+    const q = query.trim();
+    if (q.length < minSearchLength) return;
+    let stale = false;
+    const timer = setTimeout(() => {
+      // setSearching efekt GOVDESINDE degil, zamanlayici geri cagrisinda:
+      // efekt icinde senkron setState zincirleme render doguruyor
+      // (react-hooks/set-state-in-effect).
+      setSearching(true);
+      onSearch(q)
+        .then((rows) => {
+          if (!stale) setRemote(rows);
+        })
+        .catch(() => {
+          // Ağ hatasında yerel listeyle devam; kutu kilitlenmesin.
+          if (!stale) setRemote([]);
+        })
+        .finally(() => {
+          if (!stale) setSearching(false);
+        });
+    }, 250);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [query, onSearch, minSearchLength]);
+
+  // Sorgu esigin altina dustugunde "Araniyor..." takili kalmasin diye
+  // gosterimde ek kosul: yalnizca yeterince uzun sorguda arama gostergesi.
+  const showSearching = searching && query.trim().length >= minSearchLength;
 
   // Türkçe alaka sıralaması: "kad" → Kadıköy önce, Beykadı sonra.
-  const filtered = useMemo(() => rankTr(options, query, (o) => `${o.label} ${o.hint ?? ""}`), [options, query]);
+  const filtered = useMemo(() => rankTr(pool, query, (o) => `${o.label} ${o.hint ?? ""}`), [pool, query]);
 
   // Etkin satırı görünür tut. `scrollIntoView({block:"nearest"})` sayfayı
   // kaydırmadan yalnızca listeyi kaydırır.
@@ -218,7 +287,13 @@ export function Combobox({
 
             <div ref={listRef} id={listId} role="listbox" className="max-h-64 overflow-y-auto p-1.5">
               {filtered.length === 0 ? (
-                <p className="px-3 py-6 text-center text-sm text-text-faint">{emptyText}</p>
+                <p className="px-3 py-6 text-center text-sm text-text-faint">
+                  {showSearching
+                    ? "Aranıyor…"
+                    : onSearch && query.trim().length > 0 && query.trim().length < minSearchLength
+                      ? `Aramak için en az ${minSearchLength} karakter yazın`
+                      : emptyText}
+                </p>
               ) : (
                 filtered.map((opt, i) => (
                   <div
@@ -248,9 +323,17 @@ export function Combobox({
               )}
             </div>
 
-            {options.length > 12 ? (
+            {/* Sunucu aramasi varken "x / y kayit" yaniltici olur: y sayfa
+                acilisinda gelen kisitli listedir, tum veri degil. */}
+            {onSearch ? (
               <p className="hairline-t px-3 py-1.5 text-[11px] text-text-faint">
-                {filtered.length} / {options.length} kayıt
+                {query.trim().length >= minSearchLength
+                  ? `${filtered.length} sonuç`
+                  : "Yazmaya başlayın — tüm kayıtlarda aranır"}
+              </p>
+            ) : pool.length > 12 ? (
+              <p className="hairline-t px-3 py-1.5 text-[11px] text-text-faint">
+                {filtered.length} / {pool.length} kayıt
               </p>
             ) : null}
           </PopoverPrimitive.Content>
