@@ -1,9 +1,15 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Pencil, X } from "lucide-react";
+import { useActionState, useState } from "react";
+import { Pencil } from "lucide-react";
 import { updateExpense, type ExpenseResult } from "@/app/actions/expenses";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 type Category = { value: string; label: string };
 type Expense = {
@@ -27,57 +33,27 @@ export function ExpenseEditDialog({ expense, categories }: { expense: Expense; c
     },
     {},
   );
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    dialogRef.current?.focus();
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
-
+  /*
+   * Radix Dialog'a taşındı. Buradaki elle kurulum Esc'i ve odak vermeyi
+   * halletmişti ama FOCUS TRAP ve SCROLL LOCK yoktu: Tab ile dialog dışına
+   * çıkılabiliyor, arka plan kayabiliyordu. Ayrıca createPortal + useEffect
+   * + dialogRef üçlüsü artık gereksiz — Radix hepsini kendisi yapıyor.
+   */
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="grid h-7 w-7 place-items-center rounded-[7px] text-text-faint transition hover:bg-brand-50 hover:text-brand-600"
-        aria-label="Düzenle"
-      >
-        <Pencil className="h-3.5 w-3.5" />
-      </button>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="focus-ring press grid h-7 w-7 place-items-center rounded-[7px] text-text-faint transition hover:bg-brand-50 hover:text-brand-600"
+          aria-label="Gideri düzenle"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+      </DialogTrigger>
 
-      {open &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-50 grid place-items-center bg-ink-950/40 p-4 backdrop-blur-sm"
-            onClick={(e) => e.target === e.currentTarget && setOpen(false)}
-          >
-            <div
-              ref={dialogRef}
-              role="dialog"
-              aria-modal="true"
-              aria-label="Gider düzenle"
-              tabIndex={-1}
-              className="w-full max-w-md rounded-[20px] border border-line bg-surface p-5 shadow-xl outline-none"
-            >
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="font-display font-bold text-ink-950">Gideri Düzenle</h2>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="grid h-8 w-8 place-items-center rounded-[9px] text-text-faint transition hover:bg-canvas"
-                  aria-label="Kapat"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              <form action={action} className="grid gap-3">
+      <DialogContent size="sm">
+        <DialogHeader icon={<Pencil />} title="Gideri düzenle" />
+        <form action={action} className="grid gap-3 p-6">
                 <input type="hidden" name="id" value={expense.id} />
                 <input
                   name="title"
@@ -121,28 +97,29 @@ export function ExpenseEditDialog({ expense, categories }: { expense: Expense; c
                   placeholder="Not (opsiyonel)"
                   className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                 />
-                {state.error && <p className="text-xs font-semibold text-red-600">{state.error}</p>}
-                <div className="mt-1 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setOpen(false)}
-                    className="rounded-[10px] border border-line px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
-                  >
-                    Vazgeç
-                  </button>
+                {/* Palet disi red-600 -> danger-600, role="alert" eklendi */}
+                {state.error && (
+                  <p className="text-xs font-semibold text-danger-600" role="alert">{state.error}</p>
+                )}
+                <div className="hairline-t mt-1 flex justify-end gap-2 pt-4">
+                  <DialogClose asChild>
+                    <button
+                      type="button"
+                      className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+                    >
+                      Vazgeç
+                    </button>
+                  </DialogClose>
                   <button
                     type="submit"
                     disabled={pending}
-                    className="rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+                    className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
                   >
                     {pending ? "Kaydediliyor…" : "Kaydet"}
                   </button>
                 </div>
-              </form>
-            </div>
-          </div>,
-          document.body,
-        )}
-    </>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
