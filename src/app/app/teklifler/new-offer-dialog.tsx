@@ -1,8 +1,15 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Plus, X, Tag, Loader2 } from "lucide-react";
+import { Plus, Tag, Loader2 } from "lucide-react";
 import { createOffer, type OfferResult } from "@/app/actions/offers";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 const init: OfferResult = {};
 
@@ -36,42 +43,25 @@ export function NewOfferDialog({
   }
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="btn-shine inline-flex items-center gap-2 rounded-[11px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-      >
-        <Plus className="h-4 w-4" /> Yeni teklif
-      </button>
-
-      {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/60 p-4 backdrop-blur-sm sm:items-center"
-          onClick={() => setOpen(false)}
+    /* Radix Dialog: focus trap + Esc (öncesinde yoktu) + scroll lock + ARIA.
+       Düz başlık DialogHeader'a geçince gradient başlık + ikon da kazandı. */
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[11px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
         >
-          <div
-            className="my-auto w-full max-w-lg rounded-[22px] border border-line bg-surface shadow-[0_40px_90px_-30px_rgba(10,34,71,0.6)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Başlık */}
-            <div className="flex items-center justify-between border-b border-line px-6 py-4">
-              <div className="flex items-center gap-2">
-                <Tag className="h-4 w-4 text-brand-600" />
-                <h2 className="font-display font-bold text-ink-950">Yeni teklif oluştur</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="grid h-8 w-8 place-items-center rounded-full text-text-muted hover:text-ink-950"
-                aria-label="Kapat"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+          <Plus className="h-4 w-4" /> Yeni teklif
+        </button>
+      </DialogTrigger>
 
-            {/* Form */}
-            <form action={action} className="p-6 space-y-4">
+      <DialogContent size="md">
+        <DialogHeader
+          icon={<Tag />}
+          title="Yeni teklif oluştur"
+          description="Portföye gelen teklifi kaydedin; durum akışı otomatik başlar."
+        />
+        <form action={action} className="space-y-4 p-6">
               {/* Portföy */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="offer-property">
@@ -162,32 +152,31 @@ export function NewOfferDialog({
               </div>
 
               {state?.error && (
-                <p className="rounded-[10px] bg-danger-500/8 px-3 py-2 text-sm text-danger-500" role="alert">
+                <p className="rounded-[10px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
                   {state.error}
                 </p>
               )}
 
-              <div className="flex justify-end gap-2 border-t border-line pt-4">
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:border-line-strong"
-                >
-                  İptal
-                </button>
+              <div className="hairline-t flex justify-end gap-2 pt-4">
+                <DialogClose asChild>
+                  <button
+                    type="button"
+                    className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:border-hairline-strong hover:bg-canvas"
+                  >
+                    İptal
+                  </button>
+                </DialogClose>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+                  className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
                 >
                   {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Tag className="h-4 w-4" />}
                   {isPending ? "Kaydediliyor…" : "Teklif oluştur"}
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
