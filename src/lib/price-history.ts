@@ -23,7 +23,46 @@ export type PriceHistoryRow = {
   reason: string | null;
   created_at: string;
   changed_by: { full_name?: string } | { full_name?: string }[] | null;
+  /** O günkü TCMB kuruyla döviz karşılıkları (kur yoksa null) */
+  new_price_usd?: number | null;
+  new_price_eur?: number | null;
+  old_price_usd?: number | null;
+  old_price_eur?: number | null;
+  /** Kurun alındığı tarih — hafta sonu/tatilde önceki iş gününe düşer */
+  fx_date?: string | null;
 };
+
+/** Fiyatların gösterileceği para birimi. */
+export type PriceCurrency = "TRY" | "USD" | "EUR";
+
+export const CURRENCY_LABEL: Record<PriceCurrency, string> = {
+  TRY: "₺ TL",
+  USD: "$ USD",
+  EUR: "€ EUR",
+};
+
+const fmt: Record<PriceCurrency, Intl.NumberFormat> = {
+  TRY: new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }),
+  USD: new Intl.NumberFormat("tr-TR", { style: "currency", currency: "USD", maximumFractionDigits: 0 }),
+  EUR: new Intl.NumberFormat("tr-TR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }),
+};
+
+export function formatPrice(amount: number | null | undefined, currency: PriceCurrency): string {
+  if (amount === null || amount === undefined) return "—";
+  return fmt[currency].format(amount);
+}
+
+/**
+ * Bir kaydın seçili para birimindeki tutarı.
+ *
+ * Kur kaydı yoksa `null` döner — TL değerini döviz gibi göstermek yerine
+ * bilinmiyor demek doğrusu. (Uydurulmuş kur, yanlış karara yol açar.)
+ */
+export function priceIn(row: PriceHistoryRow, currency: PriceCurrency, which: "new" | "old" = "new"): number | null {
+  if (currency === "TRY") return which === "new" ? row.new_price : row.old_price;
+  if (currency === "USD") return (which === "new" ? row.new_price_usd : row.old_price_usd) ?? null;
+  return (which === "new" ? row.new_price_eur : row.old_price_eur) ?? null;
+}
 
 export type PriceHistorySummary = {
   firstPrice: number;
@@ -92,19 +131,29 @@ export function summarizePriceHistory(rows: PriceHistoryRow[]): PriceHistorySumm
  * Grafik için veri noktaları. Recharts serileştirilebilir düz nesne istiyor.
  * Son noktadan sonra "bugün" kuyruğu eklenir ki fiyatın ne kadardır sabit
  * kaldığı çizgide görünsün.
+ *
+ * Döviz modunda kur verisi olmayan kayıtlar atlanır — TL değerini döviz
+ * eksenine karıştırmak grafiği yalancı yapar.
  */
-export function toChartSeries(rows: PriceHistoryRow[]): Array<Record<string, string | number>> {
+export function toChartSeries(
+  rows: PriceHistoryRow[],
+  currency: PriceCurrency = "TRY",
+): Array<Record<string, string | number>> {
   if (rows.length === 0) return [];
 
-  const fmt = new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short" });
-  const points = rows.map((row) => ({
-    tarih: fmt.format(new Date(row.created_at)),
-    fiyat: row.new_price,
-  }));
+  const fmt2 = new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short" });
+  const points: Array<Record<string, string | number>> = [];
+  for (const row of rows) {
+    const value = priceIn(row, currency);
+    if (value === null) continue;
+    points.push({ tarih: fmt2.format(new Date(row.created_at)), fiyat: value });
+  }
+
+  if (points.length === 0) return [];
 
   const lastMs = new Date(rows[rows.length - 1].created_at).getTime();
   if (Date.now() - lastMs > 86_400_000) {
-    points.push({ tarih: "Bugün", fiyat: rows[rows.length - 1].new_price });
+    points.push({ tarih: "Bugün", fiyat: points[points.length - 1].fiyat });
   }
 
   return points;

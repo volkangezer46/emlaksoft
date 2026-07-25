@@ -3,13 +3,16 @@
 import { useMemo, useState, useTransition } from "react";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, LineChart, Table2, TrendingDown } from "lucide-react";
 import { AreaTrend } from "@/components/ui/chart";
-import { moneyTry } from "@/lib/leak-shield";
 import { getPropertyPriceHistory } from "@/app/actions/property-price-history";
 import {
+  CURRENCY_LABEL,
   PRICE_FIELD_LABEL,
+  formatPrice,
   historyAuthorName,
+  priceIn,
   summarizePriceHistory,
   toChartSeries,
+  type PriceCurrency,
   type PriceField,
   type PriceHistoryRow,
 } from "@/lib/price-history";
@@ -36,11 +39,35 @@ export function PropertyPriceHistory({
   const [field, setField] = useState<PriceField>("list_price");
   const [rows, setRows] = useState<PriceHistoryRow[]>(initialHistory);
   const [view, setView] = useState<"table" | "chart">("table");
+  const [currency, setCurrency] = useState<PriceCurrency>("TRY");
   const [pending, start] = useTransition();
 
   const summary = useMemo(() => summarizePriceHistory(rows), [rows]);
-  const chartData = useMemo(() => toChartSeries(rows), [rows]);
+  const chartData = useMemo(() => toChartSeries(rows, currency), [rows, currency]);
   const suffix = isRent ? "/ay" : "";
+
+  // Döviz görünümünde kur verisi olmayan kayıt sayısı — dürüst uyarı için
+  const fxMissing = useMemo(
+    () => (currency === "TRY" ? 0 : rows.filter((r) => priceIn(r, currency) === null).length),
+    [rows, currency],
+  );
+
+  // Seçili para biriminde ilk/son/değişim. TL'de summary'nin değerleri;
+  // dövizde her kaydın O GÜNKÜ kuruyla çevrilmiş hali — bu sayede
+  // "₺'de +%12 ama $'da −%3" gerçeği görünür.
+  const display = useMemo(() => {
+    if (!summary || rows.length === 0) return null;
+    const first = priceIn(rows[0], currency);
+    const last = priceIn(rows[rows.length - 1], currency);
+    if (first === null || last === null) return null;
+    const change = last - first;
+    return {
+      first,
+      last,
+      change,
+      changePct: first > 0 ? Math.round((change / first) * 1000) / 10 : 0,
+    };
+  }, [summary, rows, currency]);
 
   function switchField(next: PriceField) {
     if (next === field) return;
@@ -51,14 +78,14 @@ export function PropertyPriceHistory({
   }
 
   const trendClass =
-    !summary || summary.totalChange === 0
+    !display || display.change === 0
       ? "text-text-muted"
-      : summary.totalChange < 0
-        ? "text-danger-500"
-        : "text-mint-600";
+      : display.change < 0
+        ? "text-danger-600"
+        : "text-mint-700";
 
   return (
-    <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+    <section className="surface-card overflow-hidden rounded-[20px]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
         <div>
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -76,7 +103,23 @@ export function PropertyPriceHistory({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Para birimi — o günkü TCMB resmî kuruyla. "₺'de arttı ama $'da
+              düştü" içgörüsü Türkiye piyasasında fiyat konuşmasının kalbi. */}
+          <div className="flex rounded-[10px] border border-line p-0.5">
+            {(Object.keys(CURRENCY_LABEL) as PriceCurrency[]).map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCurrency(c)}
+                className={`focus-ring rounded-[8px] px-2.5 py-1.5 text-[11px] font-semibold transition ${
+                  currency === c ? "bg-brand-600 text-white" : "text-text-muted hover:text-ink-950"
+                }`}
+              >
+                {CURRENCY_LABEL[c]}
+              </button>
+            ))}
+          </div>
           <div className="flex rounded-[10px] border border-line p-0.5">
             {FIELD_TABS.map((f) => (
               <button
@@ -123,50 +166,55 @@ export function PropertyPriceHistory({
         </p>
       ) : (
         <>
-          {summary ? (
-            <div className="border-b border-line px-5 py-4">
+          {summary && display ? (
+            <div className="hairline-b px-5 py-4">
+              {fxMissing > 0 ? (
+                <p className="mb-3 rounded-[10px] bg-amber-400/10 px-3 py-2 text-[11px] font-medium text-amber-700">
+                  {fxMissing} kayıt için o güne ait kur verisi yok; bu kayıtlar döviz görünümünde gizlendi.
+                </p>
+              ) : null}
               <div className="flex flex-wrap items-center gap-3">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wide text-text-faint">İlk fiyat</p>
-                  <p className="font-display text-lg font-extrabold text-ink-950">
-                    {moneyTry(summary.firstPrice)}{suffix}
+                  <p className="numeric font-display text-lg font-extrabold text-ink-950">
+                    {formatPrice(display.first, currency)}{suffix}
                   </p>
                   <p className="text-[10px] text-text-faint">{dateFmt.format(new Date(summary.firstDate))}</p>
                 </div>
                 <ArrowRight className="h-4 w-4 shrink-0 text-text-faint" />
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wide text-text-faint">Güncel</p>
-                  <p className="font-display text-lg font-extrabold text-ink-950">
-                    {moneyTry(summary.lastPrice)}{suffix}
+                  <p className="numeric font-display text-lg font-extrabold text-ink-950">
+                    {formatPrice(display.last, currency)}{suffix}
                   </p>
                   <p className="text-[10px] text-text-faint">{dateFmt.format(new Date(summary.lastDate))}</p>
                 </div>
               </div>
 
               <div className="mt-4 grid gap-2 sm:grid-cols-4">
-                <div className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5">
+                <div className="surface-sunken rounded-[12px] px-3 py-2.5">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-text-faint">Toplam değişim</p>
-                  <p className={`mt-0.5 font-display text-sm font-extrabold ${trendClass}`}>
-                    {summary.totalChange > 0 ? "+" : summary.totalChange < 0 ? "−" : ""}
-                    {moneyTry(Math.abs(summary.totalChange))}
+                  <p className={`numeric mt-0.5 font-display text-sm font-extrabold ${trendClass}`}>
+                    {display.change > 0 ? "+" : display.change < 0 ? "−" : ""}
+                    {formatPrice(Math.abs(display.change), currency)}
                   </p>
                 </div>
-                <div className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5">
+                <div className="surface-sunken rounded-[12px] px-3 py-2.5">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-text-faint">Yüzde</p>
-                  <p className={`mt-0.5 font-display text-sm font-extrabold ${trendClass}`}>
-                    {summary.totalChangePct > 0 ? "+" : ""}
-                    %{summary.totalChangePct}
+                  <p className={`numeric mt-0.5 font-display text-sm font-extrabold ${trendClass}`}>
+                    {display.changePct > 0 ? "+" : ""}
+                    %{display.changePct}
                   </p>
                 </div>
-                <div className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5">
+                <div className="surface-sunken rounded-[12px] px-3 py-2.5">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-text-faint">İndirim / zam</p>
-                  <p className="mt-0.5 font-display text-sm font-extrabold text-ink-950">
+                  <p className="numeric mt-0.5 font-display text-sm font-extrabold text-ink-950">
                     {summary.cutCount} / {summary.raiseCount}
                   </p>
                 </div>
-                <div className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5">
+                <div className="surface-sunken rounded-[12px] px-3 py-2.5">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-text-faint">Ort. aralık</p>
-                  <p className="mt-0.5 font-display text-sm font-extrabold text-ink-950">
+                  <p className="numeric mt-0.5 font-display text-sm font-extrabold text-ink-950">
                     {summary.avgDaysBetween > 0 ? `${summary.avgDaysBetween} gün` : "—"}
                   </p>
                 </div>
@@ -186,13 +234,19 @@ export function PropertyPriceHistory({
           ) : (
             <div className="divide-y divide-line">
               {[...rows].reverse().map((row) => {
+                // Yön TL üzerinden belirlenir (kaydın gerçeği), gösterim
+                // seçili para biriminde. Döviz karşılığı yoksa satır atlanmaz,
+                // tutar "—" görünür — veri kaybı yerine dürüst boşluk.
                 const down = row.old_price != null && row.new_price < row.old_price;
                 const up = row.old_price != null && row.new_price > row.old_price;
+                const shown = priceIn(row, currency);
+                const shownOld = priceIn(row, currency, "old");
+                const diff = shown !== null && shownOld !== null ? Math.abs(shown - shownOld) : null;
                 return (
                   <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-ink-950">
-                        {moneyTry(row.new_price)}{suffix}
+                      <p className="numeric text-sm font-semibold text-ink-950">
+                        {formatPrice(shown, currency)}{shown !== null ? suffix : ""}
                       </p>
                       <p className="mt-0.5 text-[11px] text-text-muted">
                         {dateFmt.format(new Date(row.created_at))} · {historyAuthorName(row.changed_by)}
@@ -201,12 +255,16 @@ export function PropertyPriceHistory({
                     </div>
                     {row.old_price != null ? (
                       <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                          down ? "bg-danger-500/10 text-danger-500" : up ? "bg-mint-500/12 text-mint-600" : "bg-ink-950/6 text-text-muted"
+                        className={`numeric inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset ${
+                          down
+                            ? "bg-danger-500/10 text-danger-600 ring-danger-500/25"
+                            : up
+                              ? "bg-mint-500/12 text-mint-700 ring-mint-500/25"
+                              : "bg-ink-950/6 text-text-muted ring-ink-950/10"
                         }`}
                       >
                         {down ? <ArrowDownRight className="h-3 w-3" /> : up ? <ArrowUpRight className="h-3 w-3" /> : null}
-                        {moneyTry(Math.abs(row.new_price - row.old_price))}
+                        {diff !== null ? formatPrice(diff, currency) : "—"}
                         {row.change_pct != null ? ` (%${Math.abs(row.change_pct)})` : ""}
                       </span>
                     ) : (
