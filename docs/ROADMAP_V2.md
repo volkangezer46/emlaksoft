@@ -166,11 +166,20 @@ katmanını yükseltip iyileşmenin kendiliğinden yayılmasını sağlamak.
 
 ## 6. Paylaşılan altyapıyı yaygınlaştırma (U)
 
-- [ ] **U1** `DataTable` → 11 sayfa hâlâ ham `<table>` (yalnızca `teklifler` taşındı)
-- [ ] **U2** Radix `dialog` → **26 dosya** elle dialog kuruyor, primitive hiç kullanılmıyor
-- [ ] **U3** `Select` → native `<select>` kullanan formlar
-- [ ] **U4** `Tabs` → müşteri 360, portföy detay, ayarlar
-- [ ] **U5** `Tooltip` → `title=""` kullanan yerler
+- [x] **U1** `DataTable` — tüm liste tabloları paylaşılan katmanda
+- [x] **U2** Radix `dialog` — 24 elle kurulum → 4. Kalan 4'ün hiçbiri form
+      dialogu değil (kanban paneli, mobil çekmece, sayfa içi panel, sarmalayıcının
+      kendisi). **13 dialogda Esc tuşu hiç çalışmıyordu**; Esc'i elle yazmış olan
+      10'unda da focus trap ve scroll lock yoktu.
+- [x] **U3** Uzun listeler `Combobox`'a (8 dosya) — ilçe/mahalle/müşteri/portföy.
+      Sunucu taraflı arama var: liste `.limit(100)` ile kirpılıyordu.
+      Kısa listelerde native `<select>` **bilinçli olarak kalıyor** (bölüm 11).
+- [x] **U4** `Tabs` — müşteri 360'ın 8 sekmesi Radix'e. Eksik olanlar:
+      `role="tablist"`/`tab`/`tabpanel`, `aria-selected`, ok tuşlarıyla gezinme.
+- [x] **U5** `Tooltip` — ikon-only butonlarda `title=""` → `<Tip>` + `aria-label`.
+      Native `title` klavye odağında açılmıyor, dokunmatikte hiç görünmüyor ve
+      ekran okuyucularda tutarsız okunuyor. Aidat formunda iki tarih alanının
+      **tek etiketi `title`'dı**; gerçek `<label>` ile değiştirildi.
 
 ## 7. re-os.com özellik paritesi (R)
 
@@ -224,13 +233,102 @@ Rakiplerde görmediğim, gerçek acıyı çözen ve savunulabilir olanlar:
 
 ## 9. Kalite güvencesi (Q)
 
-- [ ] **Q1** Test altyapısı **hiç yok** — birim/E2E framework kurulmalı
-  - [ ] Vitest + kritik `lib/` fonksiyonları (permissions, valuation, tufe, clock)
-  - [ ] Playwright + kritik akış (giriş, portföy ekle, teklif, sözleşme imza)
+- [x] **Q1a** Vitest kuruldu, **84 birim testi** yeşil, CI'a bağlandı
+  - `tr-text` (20) · `pgrst` (13) · `phone` (25) · `permissions` (16) · `lead-score` (15)
+  - Kapsam bilinçli: bileşenleri jsdom altında render etmek RSC sınırını taklit
+    etmek demek — kırılgan ve düşük getirili. Testler saf mantıkta.
+  - **Testin bulduğu:** `hasPermission` asimetrisi — boş rol advisor yetkisi
+    alıyor, hatalı rol hiç yetki almıyor. Davranış korundu, gerekçesi yazıldı.
+- [ ] **Q1b** Playwright + kritik akış (giriş, portföy ekle, teklif, sözleşme imza)
 - [ ] **Q2** RLS politika testleri — tenant sızıntısı en büyük SaaS riski
-- [ ] **Q3** CI'a `npm audit --audit-level=high` kapısı
+- [ ] **Q3** CI'a `npm audit --audit-level=high` kapısı (şu an `continue-on-error`)
 - [ ] **Q4** Hata izleme (Sentry sınıfı) — şu an prod hatası görünmüyor
 - [ ] **Q5** Yedekleme/geri yükleme provası
+
+---
+
+## 10. Bu turda bulunan ve kapatılan boşluklar
+
+Planda olmayan, iş yapılırken **ortaya çıkan** kusurlar. Hepsi kapatıldı.
+
+### 10.1 Şemada var, hiçbir formda yok: ilçe/mahalle
+`properties.district_id`, `neighborhood_id`, `customer_demands.district_id`,
+`customers.district_id` kolonları baştan beri duruyordu ama **hiçbir form
+doldurmuyordu**. DB'de 81 il, **973 ilçe, 31.922 mahalle** kayıtlı ve hiçbiri
+kullanılmıyordu. Sonuçları:
+
+| Ne bozuktu | Nasıl |
+|---|---|
+| Emsal motoru | `find_comparables(p_district_id …)` hep NULL ilçeyle çağrılıyordu |
+| Talep eşleştirme | `properties.ts` içinde `district_id: null` **sabiti** vardı |
+| Değerleme | İlçe **serbest metindi**, `geo_districts` ile eşleşemiyordu |
+| Fiyat sağlığı | `districtHint` değişkeni adına rağmen **il** adı taşıyordu |
+
+Çözüm: `Combobox` (973 ilçe native `<select>`e sığmaz) + `GeoSelect` kademeli
+seçici + 8 forma bağlantı. → **[x]**
+
+### 10.2 Yazılıp hiç okunmayan iki tablo (ölü veri)
+- `open_house_visitors`: `registerOpenHouseVisitor` yazıyordu, **hiçbir ekran
+  okumuyordu**. Açık evin asıl çıktısı olan lead listesi görünmüyordu. → **[x]**
+- `campaign_recipients`: her alıcı için durum ve **hata mesajı** tutuluyordu,
+  liste yalnızca "12 hata" sayısını gösteriyordu. Kullanıcı hangi numaraya
+  neden ulaşılmadığını öğrenemiyordu. → **[x]**
+
+Sistematik tarama yapıldı: `property_status_history`, `contract_signers`,
+`iys_consents`, `geo_*_stats` **okunuyor** — desen bu ikisiyle sınırlıymış.
+
+### 10.3 Yanlış yere giden bağlantılar
+- Anlaşma kanban kartı → **müşteri** sayfasına gidiyordu. Müşterisi olmayan
+  anlaşma hiç tıklanamıyordu. → **[x]** anlaşma detayına
+- Açık ev kartı → **portföye** gidiyordu, ziyaretçi listesine yol yoktu. → **[x]**
+
+### 10.4 Arama hataları
+- Portföy araması "konum ara" diyordu ama sunucu filtresi yalnızca kod+başlığa
+  bakıyordu. İstemci tarafındaki il filtresi hiç devreye giremiyordu çünkü
+  sunucu o satırları zaten elemişti. → **[x]**
+- Seçici listeleri `.limit(100)` ile kırpılıyordu; 500 müşterili ofiste eski
+  kayda ulaşmak imkânsızdı. Randevular sayfasında sorgu **hiç limitsizdi**.
+  → **[x]** sunucu taraflı arama (`actions/lookup.ts`)
+- `or()` dizgesine kullanıcı metni gömülüyordu; iki ayrı yerde iki ayrı ve
+  **her biri eksik** temizleme vardı (`%` bırakılan yerde tüm kayıtlar
+  çekilebiliyordu). → **[x]** `lib/pgrst.ts`
+
+### 10.5 Değerlemenin çıktısı yoktu
+Değerleme üretiliyordu ama müşteriye verilecek belge oluşturmak **mümkün
+değildi**; projede tek bir `@media print` kuralı bile yoktu. → **[x]**
+`/app/degerleme/[id]` + yazdırma katmanı. Rapor, hangi kaynağın ne ağırlıkla
+girdiğini gösteriyor ve **SPK ekspertizi olmadığını** açıkça yazıyor.
+
+### 10.6 CI 3 push kırmızı — araç zinciri sürüklenmesi
+`npm install` (yerel npm 11.6.2) lockfile'dan `@emnapi/*` girdilerini düşürdü.
+npm 11.6.2 tolere ediyor, **npm 11.18.0 etmiyor**. CI `.nvmrc: 24`'ten en
+güncel 24.x'i kuruyor, o da 11.18 getiriyor. Actions log API'si public repoda
+bile 403 verdiği için teşhis çalışma sürelerinden gitti (yeşiller ~90 sn,
+kırmızılar 8-12 sn → 496 paket indirilmiyor, anında hata).
+→ **[x]** Yerel Node 24.18.0 + npm 11.18.0'a çıkarıldı; artık CI ile birebir.
+
+---
+
+## 11. Bilinçli olarak YAPILMAYANLAR
+
+Bunlar unutulmadı; yapılmama gerekçeleri var.
+
+- **Dark mode (T4)** — token sistemi hazır ama 259 yerde `bg-white` doğrudan
+  kullanılmış. Hepsini dönüştürmek yüksek regresyon riski taşıyor ve görsel
+  doğrulama imkânı yok. Fayda riski karşılamıyor.
+- **Hero şablonu (T3)** — 58 sayfada kopya ama varyasyonlar gerçek (portföy
+  sayfasının sağında fiyat sağlığı grafiği var, diğerlerinde yok). Görünmeyen
+  bir kazanç için görünür risk.
+- **Kısa listelerde Combobox** — rol, şube, kategori, aciliyet gibi 2-30 öğeli
+  listelerde native `<select>` KALIYOR: mobilde işletim sisteminin kendi
+  seçicisi daha iyi ve JS yükü sıfır. Combobox yalnızca kayıt sayısıyla büyüyen
+  listeler için (8 dosya).
+- **PDF kütüphanesi** — Puppeteer (~300 MB) ya da jsPDF'e Türkçe font gömmek
+  kazanılana göre çok pahalı. Tarayıcının kendi "PDF olarak kaydet" akışı doğru
+  fontu, doğru sayfa kırılmasını ve seçilebilir metni zaten veriyor.
+- **Bundle optimizasyonu (P1)** — ölçüldü: `recharts` yalnızca 4 sayfada,
+  paylaşılan kabukta değil. Kanıtlanabilir bir kazanç görünmediği için
+  spekülatif iş yapılmadı.
 
 ---
 
