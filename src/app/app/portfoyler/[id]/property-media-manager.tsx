@@ -47,13 +47,21 @@ export function PropertyMediaManager({
     if (!files || files.length === 0) return;
     setUploading(true);
     setUploadError(null);
-    for (const file of Array.from(files)) {
-      const fd = new FormData();
-      fd.set("property_id", propertyId);
-      fd.set("file", file);
-      const res = await uploadPropertyMedia(fd);
-      if (res.error) {
-        setUploadError(res.error);
+    // Paralel yükleme (3'lü gruplar) — 10 fotoğraf seri ~30sn yerine ~10sn
+    const list = Array.from(files);
+    const CHUNK = 3;
+    for (let i = 0; i < list.length; i += CHUNK) {
+      const results = await Promise.all(
+        list.slice(i, i + CHUNK).map((file) => {
+          const fd = new FormData();
+          fd.set("property_id", propertyId);
+          fd.set("file", file);
+          return uploadPropertyMedia(fd);
+        }),
+      );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) {
+        setUploadError(failed.error);
         break;
       }
     }

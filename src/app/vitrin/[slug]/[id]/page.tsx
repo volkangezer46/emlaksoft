@@ -5,7 +5,8 @@ import { ArrowLeft, BedDouble, Bath, Building2, MapPin, Ruler, ShieldCheck } fro
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LeadForm } from "@/app/lead/[token]/lead-form";
 
-export const dynamic = "force-dynamic";
+// ISR: vitrin herkese acik — CDN onbellekli, 2 dk tazelenir (jet hiz)
+export const revalidate = 120;
 
 function money(n: number | null, tx?: string | null) {
   if (n == null) return "Fiyat için sorun";

@@ -950,3 +950,13 @@ h1, h2, h3, h4 {
   .path-draw { stroke-dashoffset: 0 !important; }
   .flow-line, .chart-draw, .ring-sweep, .bar-live, .bar-rise { animation: none !important; stroke-dashoffset: 0 !important; transform: none !important; }
 }
+
+/* Panel sayfa geçişi — her navigasyonda zarif giriş (template.tsx ile) */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: none; }
+}
+.page-in { animation: page-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .page-in { animation: none; }
+}
