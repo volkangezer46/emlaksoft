@@ -1,16 +1,15 @@
-import Link from "next/link";
-import {
-  CheckCircle2,
-  Clock,
-  FileSignature,
-  FileText,
-  XCircle,
-} from "lucide-react";
+import { FileSignature } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getDefinitions } from "@/lib/definitions";
 import { listContracts } from "@/app/actions/contracts";
 import { NewContractDialog } from "./new-contract-dialog";
 import { EmptyState } from "@/components/app/empty-state";
+import {
+  DataTable,
+  ROW_HREF,
+  type DataTableColumn,
+  type DataTableRow,
+} from "@/components/ui/data-table";
 
 const TYPE_LABELS: Record<string, string> = {
   satis:     "Satış",
@@ -28,28 +27,31 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "İptal",
 };
 
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    draft:     "bg-zinc-100 text-zinc-600 ring-zinc-500/10",
-    sent:      "bg-blue-50 text-blue-700 ring-blue-600/20",
-    signed:    "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
-    rejected:  "bg-red-50 text-red-700 ring-red-600/20",
-    cancelled: "bg-zinc-50 text-zinc-500 ring-zinc-400/10",
-  };
-  const icons: Record<string, React.ReactNode> = {
-    draft:     <Clock className="h-3 w-3" />,
-    sent:      <FileSignature className="h-3 w-3" />,
-    signed:    <CheckCircle2 className="h-3 w-3" />,
-    rejected:  <XCircle className="h-3 w-3" />,
-    cancelled: <XCircle className="h-3 w-3" />,
-  };
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${styles[status] ?? styles.draft}`}>
-      {icons[status]}
-      {STATUS_LABELS[status] ?? status}
-    </span>
-  );
-}
+/**
+ * Durum → tasarım sistemi rozet tonu.
+ * Eskiden yerel bir StatusBadge bileşeni palet dışı zinc/blue/emerald/red
+ * sınıfları kullanıyordu; artık paylaşılan Badge varyantları.
+ */
+const STATUS_BADGES: DataTableColumn["badges"] = {
+  draft:     { label: STATUS_LABELS.draft,     variant: "default" },
+  sent:      { label: STATUS_LABELS.sent,      variant: "info" },
+  signed:    { label: STATUS_LABELS.signed,    variant: "success" },
+  rejected:  { label: STATUS_LABELS.rejected,  variant: "danger" },
+  cancelled: { label: STATUS_LABELS.cancelled, variant: "outline" },
+};
+
+const TYPE_BADGES: DataTableColumn["badges"] = Object.fromEntries(
+  Object.entries(TYPE_LABELS).map(([k, label]) => [k, { label, variant: "outline" as const }]),
+);
+
+const CONTRACT_COLUMNS: DataTableColumn[] = [
+  { key: "title", header: "Sözleşme", sortable: true, subtitleKey: "propertyTitle" },
+  { key: "contract_type", header: "Tür", format: "badge", badges: TYPE_BADGES, sortable: true },
+  { key: "status", header: "Durum", format: "badge", badges: STATUS_BADGES, sortable: true },
+  { key: "customer", header: "Taraf", sortable: true },
+  { key: "dateLabel", header: "Tarih", searchable: false },
+  { key: "open", header: "", format: "link", linkLabel: "Aç" },
+];
 
 function relativeDate(iso: string) {
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
@@ -85,6 +87,23 @@ export default async function SozlesmelerPage() {
   const total   = contracts.length;
   const signed  = contracts.filter((c) => c.status === "signed").length;
   const pending = contracts.filter((c) => c.status === "sent").length;
+
+  // DataTable'a geçen düz (serileştirilebilir) satırlar
+  const contractRows: DataTableRow[] = contracts.map((c) => ({
+    id:            c.id,
+    [ROW_HREF]:    `/app/sozlesmeler/${c.id}`,
+    title:         c.title,
+    propertyTitle: propertyTitle(c.property),
+    contract_type: c.contract_type,
+    status:        c.status,
+    customer:      customerName(c.customer) ?? null,
+    // Tarih metni sunucuda hesaplanıyor: "İmzalandı: 3 gün önce" gibi koşullu
+    // ifadeyi bildirimsel format ile üretmek mümkün değil.
+    dateLabel:
+      c.status === "signed" && c.signed_at
+        ? `İmzalandı: ${relativeDate(c.signed_at)}`
+        : relativeDate(c.created_at),
+  }));
 
   return (
     <div className="space-y-6">
@@ -135,57 +154,13 @@ export default async function SozlesmelerPage() {
           action={canCreate ? { label: "Yeni sözleşme", node: <NewContractDialog contractTypes={contractTypeOptions} /> } : undefined}
         />
       ) : (
-        <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[700px] text-left text-sm">
-              <thead className="border-b border-line bg-canvas/80 text-text-muted">
-                <tr>
-                  <th className="px-5 py-3 font-semibold">Sözleşme</th>
-                  <th className="px-4 py-3 font-semibold">Tür</th>
-                  <th className="px-4 py-3 font-semibold">Durum</th>
-                  <th className="px-4 py-3 font-semibold">Taraf</th>
-                  <th className="px-4 py-3 font-semibold">Tarih</th>
-                  <th className="px-4 py-3 font-semibold" />
-                </tr>
-              </thead>
-              <tbody>
-                {contracts.map((c) => (
-                  <tr key={c.id} className="group relative cursor-pointer border-b border-line last:border-0 hover:bg-brand-600/[0.03] transition">
-                    <td className="px-5 py-3.5">
-                      <Link href={`/app/sozlesmeler/${c.id}`} className="absolute inset-0" aria-label={`${c.title} sözleşmesini aç`} />
-                      <p className="font-semibold text-ink-950 group-hover:text-brand-600">{c.title}</p>
-                      {propertyTitle(c.property) && (
-                        <p className="text-xs text-text-faint">{propertyTitle(c.property)}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5 text-text-muted">
-                      {TYPE_LABELS[c.contract_type] ?? c.contract_type}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <StatusBadge status={c.status} />
-                    </td>
-                    <td className="px-4 py-3.5 text-text-muted">
-                      {customerName(c.customer) ?? "—"}
-                    </td>
-                    <td className="px-4 py-3.5 text-text-muted">
-                      {c.status === "signed" && c.signed_at
-                        ? `İmzalandı: ${relativeDate(c.signed_at)}`
-                        : relativeDate(c.created_at)}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <Link
-                        href={`/app/sozlesmeler/${c.id}`}
-                        className="inline-flex items-center gap-1.5 rounded-[8px] border border-line px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-600/5"
-                      >
-                        <FileText className="h-3.5 w-3.5" /> Aç
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <DataTable
+          columns={CONTRACT_COLUMNS}
+          rows={contractRows}
+          minWidth={700}
+          searchPlaceholder="Sözleşme, portföy veya taraf ara…"
+          empty={{ description: "Arama terimini değiştirip tekrar deneyin." }}
+        />
       )}
 
       {/* Bilgi kutusu */}

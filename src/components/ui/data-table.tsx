@@ -28,7 +28,9 @@ export type DataTableFormat =
   | "date"
   | "datetime"
   | "percent"
-  | "badge";
+  | "badge"
+  /** Satır sonu aksiyon linki — etiket `linkLabel`, hedef `hrefKey` ya da `_href` */
+  | "link";
 
 export type DataTableColumn = {
   /** Satır nesnesindeki alan adı. */
@@ -46,6 +48,16 @@ export type DataTableColumn = {
   hideBelow?: "sm" | "md" | "lg";
   /** Alt toplam satırında bu kolonu topla (number/money/percent). */
   total?: boolean;
+  /**
+   * İkinci, soluk satır (ör. başlığın altında portföy adı).
+   * Serileştirilebilir kalmak için render fonksiyonu değil, alan adı.
+   * Aramada bu alan da taranır.
+   */
+  subtitleKey?: string;
+  /** `format: "link"` için buton etiketi. */
+  linkLabel?: string;
+  /** `format: "link"` için hedefi taşıyan alan; verilmezse satırın `_href`i. */
+  hrefKey?: string;
 };
 
 export type DataTableRow = Record<string, string | number | boolean | null | undefined>;
@@ -158,7 +170,13 @@ export function DataTable({
     return rows.filter((row) =>
       searchColumns.some((col) => {
         const text = displayText(col, row[col.key]);
-        return text !== "" && normalize(text).includes(q);
+        if (text !== "" && normalize(text).includes(q)) return true;
+        // Alt satır da aranabilir olmalı: kullanıcı portföy adıyla sözleşme arıyor
+        if (col.subtitleKey) {
+          const sub = row[col.subtitleKey];
+          if (sub != null && normalize(String(sub)).includes(q)) return true;
+        }
+        return false;
       }),
     );
   }, [rows, query, searchColumns]);
@@ -320,8 +338,30 @@ export function DataTable({
                                 {badge?.label ?? String(value)}
                               </Badge>
                             )
+                          ) : col.format === "link" ? (
+                            (() => {
+                              const target = col.hrefKey ? row[col.hrefKey] : row[ROW_HREF];
+                              if (typeof target !== "string" || target === "") return null;
+                              return (
+                                <Link
+                                  href={target}
+                                  // relative + z-10: satırı kaplayan görünmez
+                                  // bağlantının üstünde kalsın, tıklama buraya gelsin
+                                  className="focus-ring press relative z-10 inline-flex items-center gap-1.5 rounded-[8px] border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-[var(--elev-1)] transition hover:bg-brand-600/5"
+                                >
+                                  {col.linkLabel ?? "Aç"}
+                                </Link>
+                              );
+                            })()
                           ) : (
-                            formatCell(value, col.format)
+                            <>
+                              {formatCell(value, col.format)}
+                              {col.subtitleKey && row[col.subtitleKey] ? (
+                                <span className="mt-0.5 block text-[11px] font-normal text-text-faint">
+                                  {String(row[col.subtitleKey])}
+                                </span>
+                              ) : null}
+                            </>
                           )}
                         </TD>
                       );
