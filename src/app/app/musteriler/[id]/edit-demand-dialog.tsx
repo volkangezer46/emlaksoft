@@ -2,7 +2,14 @@
 
 import { useActionState, useState, startTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, X } from "lucide-react";
+import { Pencil } from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { updateDemand, type DemandResult } from "@/app/actions/demands";
 
 type Province = { id: string; name: string };
@@ -46,21 +53,17 @@ export function EditDemandDialog({
   }, initial);
 
   return (
-    <>
-      <button type="button" onClick={() => setOpen(true)} className="text-[11px] font-semibold text-brand-600 hover:underline">
-        <span className="inline-flex items-center gap-0.5"><Pencil className="h-3 w-3" /> Düzenle</span>
-      </button>
+    /* Radix Dialog: focus trap + Esc (öncesinde yoktu) + scroll lock + ARIA. */
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button type="button" className="focus-ring rounded-[6px] text-[11px] font-semibold text-brand-700 hover:underline">
+          <span className="inline-flex items-center gap-0.5"><Pencil className="h-3 w-3" /> Düzenle</span>
+        </button>
+      </DialogTrigger>
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/45 p-4 backdrop-blur-sm sm:items-center">
-          <div className="w-full max-w-xl rounded-[20px] border border-line bg-surface shadow-[var(--shadow-lg)]">
-            <div className="flex items-center justify-between border-b border-line px-6 py-4">
-              <h2 className="font-display text-lg font-bold text-ink-950">Talep düzenle</h2>
-              <button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-[8px] text-text-muted hover:bg-canvas" aria-label="Kapat">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <form action={action} className="grid gap-4 p-6 sm:grid-cols-2">
+      <DialogContent size="lg">
+        <DialogHeader icon={<Pencil />} title="Talep düzenle" />
+        <form action={action} className="grid gap-4 p-6 sm:grid-cols-2">
               <input type="hidden" name="id" value={demand.id} />
               <input type="hidden" name="customer_id" value={customerId} />
               <div>
@@ -117,17 +120,21 @@ export function EditDemandDialog({
                   <option value="urgent">Acil</option>
                 </select>
               </div>
-              {state.error ? <p className="sm:col-span-2 text-sm text-danger-500">{state.error}</p> : null}
-              <div className="sm:col-span-2 flex justify-end gap-2">
-                <button type="button" onClick={() => setOpen(false)} className="rounded-[10px] border border-line px-4 py-2.5 text-sm">Vazgeç</button>
-                <button type="submit" disabled={pending} className="rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+              {state.error ? (
+                <p className="sm:col-span-2 text-sm font-medium text-danger-600" role="alert">{state.error}</p>
+              ) : null}
+              <div className="hairline-t sm:col-span-2 flex justify-end gap-2 pt-4">
+                <DialogClose asChild>
+                  <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
+                    Vazgeç
+                  </button>
+                </DialogClose>
+                <button type="submit" disabled={pending} className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
                   {pending ? "Kaydediliyor…" : "Kaydet"}
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
-    </>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
