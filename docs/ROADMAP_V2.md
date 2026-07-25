@@ -240,7 +240,9 @@ Rakiplerde görmediğim, gerçek acıyı çözen ve savunulabilir olanlar:
   - **Testin bulduğu:** `hasPermission` asimetrisi — boş rol advisor yetkisi
     alıyor, hatalı rol hiç yetki almıyor. Davranış korundu, gerekçesi yazıldı.
 - [ ] **Q1b** Playwright + kritik akış (giriş, portföy ekle, teklif, sözleşme imza)
-- [ ] **Q2** RLS politika testleri — tenant sızıntısı en büyük SaaS riski
+- [x] **Q2** RLS denetimi — `npm run db:rls-audit`. İlk koşuda **gerçek bir
+      hata buldu**: `tasks` ve `property_media` normal kullanıcıya görünmüyordu
+      (bkz. 10.6). Şu an 39 tablo, bulgu yok.
 - [ ] **Q3** CI'a `npm audit --audit-level=high` kapısı (şu an `continue-on-error`)
 - [ ] **Q4** Hata izleme (Sentry sınıfı) — şu an prod hatası görünmüyor
 - [ ] **Q5** Yedekleme/geri yükleme provası
@@ -299,7 +301,38 @@ değildi**; projede tek bir `@media print` kuralı bile yoktu. → **[x]**
 `/app/degerleme/[id]` + yazdırma katmanı. Rapor, hangi kaynağın ne ağırlıkla
 girdiğini gösteriyor ve **SPK ekspertizi olmadığını** açıkça yazıyor.
 
-### 10.6 CI 3 push kırmızı — araç zinciri sürüklenmesi
+### 10.6 `tasks` ve `property_media` normal kullanıcıya görünmüyordu
+Bu iki tablonun RLS politikası kiracıyı `auth.jwt() ->> 'tenant_id'` ile
+çözüyordu — yalnızca üst düzey claim. Ama uygulama tenant_id'yi üst düzeye
+**hiç yazmıyor**, `app_metadata` içine yazıyor (`actions/auth.ts:140`,
+`actions/team.ts:67`). Özel bir access-token hook'u da yok. İfade NULL'a
+düşüyor, `tenant_id = NULL` asla TRUE olmuyor.
+
+İkisi de kullanıcı istemcisiyle okunuyor — yani **Görevler modülü ve portföy
+medyası RLS katmanında boş dönüyordu**.
+
+Kök neden sürüklenme: `20260721000002_jwt_claims.sql` yardımcı fonksiyonu
+düzeltmiş (app_metadata yedeği eklemiş), ama bir gün sonra yazılan
+`property_media` ve `tasks` migration'ları yardımcıyı **çağırmak yerine**
+ifadeyi satır içi kopyalamış — ve kopyaladıkları sürüm eskiydi. → **[x]**
+
+Rollback'li canlı testle kanıtlandı: düzeltme öncesi 0 satır, sonrası 1 satır,
+çapraz kiracı erişimi yok.
+
+**Yan ürün: `scripts/rls-audit.ts`** (`npm run db:rls-audit`). Üç şey bakıyor:
+RLS açık mı · politika `current_tenant_id()` kullanıyor mu (satır içi JWT
+kopyası = bu hatanın kendisi) · **gerçek deneme**: `SET LOCAL ROLE
+authenticated` + sahte JWT ile başka kiracı adına yazmaya çalışır. Rol
+değişimi şart — RLS tablo sahibine uygulanmaz, superuser olarak koşan bir
+test her şeyi "güvenli" görürdü. Her şey ROLLBACK ile biter.
+Su anki sonuç: **39 tablo, bulgu yok.**
+
+> Bir ara adımda "26 politikada `WITH CHECK` yok" diye şüphelendim. Denetimi
+> yazıp **denedim**: hiçbiri sızdırmıyor — PostgreSQL ALL/UPDATE
+> politikalarında `WITH CHECK` verilmemişse `USING`'i yazma denetimi olarak da
+> kullanıyor. Rapor etmeden önce doğrulandı.
+
+### 10.7 CI 3 push kırmızı — araç zinciri sürüklenmesi
 `npm install` (yerel npm 11.6.2) lockfile'dan `@emnapi/*` girdilerini düşürdü.
 npm 11.6.2 tolere ediyor, **npm 11.18.0 etmiyor**. CI `.nvmrc: 24`'ten en
 güncel 24.x'i kuruyor, o da 11.18 getiriyor. Actions log API'si public repoda
