@@ -27,7 +27,15 @@ jobs:
         run: npm run type-check
 
       - name: Lint
-        run: npm run lint --if-present
+        # --max-warnings=0: uyari birikmesini engeller. Bilincli istisnalar
+        # kod icinde gerekceli eslint-disable ile isaretli.
+        run: npx eslint . --max-warnings=0
+
+      - name: Güvenlik denetimi (yalnızca çalışma zamanı bağımlılıkları)
+        # --omit=dev bilinçli: ESLint zincirindeki dev-only aciklar (minimatch/
+        # brace-expansion DoS) production'a gitmiyor ve bunlari zorla yukseltmek
+        # linter'i bozuyor. Bu kapi production'a giden koda odaklanir.
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Build
         run: npm run build
