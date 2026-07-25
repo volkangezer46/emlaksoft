@@ -33,10 +33,17 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
   let adaVal = ada || null;
   let parselVal = parsel || null;
 
+  // Emsal motoru için gereken alanlar — portföy seçildiyse oradan gelir
+  let districtId: string | null = null;
+  let propertyType: string | null = null;
+  let transactionType: string | null = null;
+
   if (propertyId) {
     const { data: p } = await supabase
       .from("properties")
-      .select("title, property_code, list_price, features, parcel_block, parcel_lot, province:geo_provinces(name)")
+      .select(
+        "title, property_code, list_price, features, parcel_block, parcel_lot, district_id, property_type, transaction_type, province:geo_provinces(name)",
+      )
       .eq("id", propertyId)
       .eq("tenant_id", gate.tenantId)
       .maybeSingle();
@@ -47,6 +54,9 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
       area = area ?? (feat?.sqm != null ? Number(feat.sqm) : null);
       adaVal = adaVal ?? p.parcel_block ?? null;
       parselVal = parselVal ?? p.parcel_lot ?? null;
+      districtId = p.district_id ?? null;
+      propertyType = p.property_type ?? null;
+      transactionType = p.transaction_type ?? null;
       const provinceRel = p.province as { name?: string } | { name?: string }[] | null;
       const pName = Array.isArray(provinceRel) ? provinceRel[0]?.name : provinceRel?.name;
       provinceName = provinceName ?? pName ?? null;
@@ -60,6 +70,14 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
     provinceName,
     ada: adaVal,
     parsel: parselVal,
+    // Yerli emsal motoru: kendi verimizden gerçek emsal analizi.
+    // Portföy seçilmediyse ilçe/tip bilinmez ve motor sessizce devre dışı kalır.
+    supabase,
+    tenantId: gate.tenantId,
+    districtId,
+    propertyType,
+    transactionType,
+    excludePropertyId: propertyId,
   });
 
   const { data, error } = await supabase

@@ -1,5 +1,7 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getEndeksaValuation, isEndeksaConfigured } from "@/lib/integrations/endeksa";
 import { getTapusorParcelInsight, isTapusorConfigured } from "@/lib/integrations/tapusor";
+import { estimateFromComparables, type ComparableEstimate } from "@/lib/comparables";
 
 export type ValuationSource = {
   name: string;
@@ -26,6 +28,16 @@ export async function estimateMultiSourceValue(input: {
   provinceName?: string | null;
   ada?: string | null;
   parsel?: string | null;
+  /**
+   * Yerli emsal motoru için gerekenler. Verilirse kendi verimizden gerçek
+   * emsal analizi yapılır ve EN YÜKSEK ağırlığı alır.
+   */
+  supabase?: SupabaseClient;
+  tenantId?: string | null;
+  districtId?: string | null;
+  propertyType?: string | null;
+  transactionType?: string | null;
+  excludePropertyId?: string | null;
 }): Promise<MultiSourceValuation> {
   const sources: ValuationSource[] = [];
   const list = input.listPrice && input.listPrice > 0 ? input.listPrice : null;
@@ -41,20 +53,35 @@ export async function estimateMultiSourceValue(input: {
     });
   }
 
-  // Basit m² × bölgesel katsayı (Endeksa yoksa yedek model)
-  const districtFactor =
-    input.districtHint?.toLocaleLowerCase("tr-TR").includes("onikişubat") ||
-    input.districtHint?.toLocaleLowerCase("tr-TR").includes("merkez")
-      ? 42000
-      : 35000;
-  if (sqm && !isEndeksaConfigured()) {
-    const comps = sqm * districtFactor;
-    sources.push({
-      name: "Emsal m² (iç model)",
-      weight: 0.2,
-      value: comps,
-      note: `~${districtFactor.toLocaleString("tr-TR")} ₺/m² × ${sqm} m²`,
+  // ---- Yerli emsal motoru (dış API'siz, en güvenilir iç kaynak) ----------
+  //
+  // Bu blok, eskiden burada duran UYDURMA modelin yerini aldı. Öncesinde
+  // ilçe adında "onikişubat"/"merkez" geçiyorsa 42.000, geçmiyorsa 35.000 ₺/m²
+  // gibi sabit bir katsayı kullanılıyordu — hiçbir veriye dayanmayan bir sayı
+  // kullanıcıya "emsal m²" adıyla gösteriliyordu. Artık gerçek emsaller:
+  // kazanılmış anlaşmalar + aktif portföy, ilçe/tip/m² bandına göre.
+  let comparables: ComparableEstimate | null = null;
+  if (input.supabase && input.tenantId && sqm) {
+    comparables = await estimateFromComparables(input.supabase, {
+      tenantId: input.tenantId,
+      districtId: input.districtId ?? null,
+      propertyType: input.propertyType ?? null,
+      transactionType: input.transactionType ?? null,
+      sqm,
+      excludePropertyId: input.excludePropertyId ?? null,
     });
+
+    if (comparables.estimatedValue && comparables.confidence !== "yetersiz") {
+      // Ağırlık güvene bağlı: az emsalle sonucu domine etmesin.
+      const weight =
+        comparables.confidence === "yüksek" ? 0.5 : comparables.confidence === "orta" ? 0.35 : 0.15;
+      sources.push({
+        name: "Emsal analizi (kendi verimiz)",
+        weight,
+        value: comparables.estimatedValue,
+        note: `${comparables.compCount} emsal (${comparables.wonCount} kapanmış satış) · medyan ${comparables.medianSqmPrice?.toLocaleString("tr-TR")} ₺/m² · güven: ${comparables.confidence}`,
+      });
+    }
   }
 
   // Endeksa — canlı bölge endeksi + AVM
@@ -116,22 +143,11 @@ export async function estimateMultiSourceValue(input: {
     }
   }
 
-  // Makro bant (TÜİK/TCMB proxy — Endeksa/Tapusor yoksa iskelet çarpanı)
-  if ((list || sqm) && !isEndeksaConfigured() && !isTapusorConfigured()) {
-    const base = list ?? (sqm ? sqm * districtFactor : 0);
-    sources.push({
-      name: "Makro endeks bandı",
-      weight: 0.2,
-      value: Math.round(base * 0.97),
-      note: "TCMB/TÜİK bağlanınca canlı endeks",
-    });
-    sources.push({
-      name: "Piyasa yumuşatma",
-      weight: 0.15,
-      value: Math.round(base * 1.03),
-      note: "Likidite / pazarlık payı",
-    });
-  }
+  // NOT — buradan iki "kaynak" kaldırıldı: "Makro endeks bandı" (= liste × 0,97)
+  // ve "Piyasa yumuşatma" (= liste × 1,03). İkisi de liste fiyatının yeniden
+  // etiketlenmiş hâliydi; bağımsız kaynak gibi gösterilip ağırlık alıyorlardı.
+  // Bu, değerlemeyi olduğundan güvenilir gösteriyordu. Gerçek bağımsız iç
+  // kaynak artık emsal analizi; o da yeterli emsal yoksa hiç görünmüyor.
 
   const priceSources = sources.filter((s) => s.weight > 0);
   if (priceSources.length === 0) {
@@ -149,9 +165,25 @@ export async function estimateMultiSourceValue(input: {
 
   const totalW = priceSources.reduce((s, x) => s + x.weight, 0);
   const mid = Math.round(priceSources.reduce((s, x) => s + x.value * x.weight, 0) / totalW);
-  const low = Math.round(mid * 0.92);
-  const high = Math.round(mid * 1.08);
-  const confidence = Math.min(0.95, 0.45 + priceSources.length * 0.12);
+
+  // Aralık: emsal yayılımı biliniyorsa ONU kullan (gerçek veri), yoksa ±%8
+  // varsayılanı. Sabit ±%8 her zaman aynı genişlikte bant üretiyordu — emsaller
+  // birbirine çok yakınken bile "geniş belirsizlik" gösteriyordu.
+  const spread = comparables?.spreadPct ?? null;
+  const band = spread !== null && spread > 0 ? Math.min(Math.max(spread / 200, 0.03), 0.2) : 0.08;
+  const low = Math.round(mid * (1 - band));
+  const high = Math.round(mid * (1 + band));
+
+  // Güven: kaynak sayısı + emsal motorunun kendi güveni birlikte
+  let confidence = Math.min(0.9, 0.4 + priceSources.length * 0.12);
+  if (comparables) {
+    if (comparables.confidence === "yüksek") confidence = Math.min(0.95, confidence + 0.15);
+    else if (comparables.confidence === "yetersiz") confidence = Math.max(0.25, confidence - 0.15);
+  }
+
+  const notes = comparables && comparables.confidence !== "yetersiz"
+    ? `${comparables.compCount} emsal üzerinden hesaplandı (${comparables.wonCount} gerçekleşen satış). İnsan onayı önerilir.`
+    : "Emsal bulunamadı; tahmin liste fiyatı ve varsa dış kaynaklara dayanıyor. İnsan onayı gerekli.";
 
   return {
     low,
@@ -159,7 +191,7 @@ export async function estimateMultiSourceValue(input: {
     high,
     confidence,
     sources,
-    notes: "Çok kaynaklı ön değerleme — insan onayı önerilir.",
+    notes,
     investmentScore,
     legalFlags,
   };
