@@ -1,7 +1,14 @@
 "use client";
 
 import { useActionState, useTransition, useState } from "react";
-import { FileSignature, Plus, X } from "lucide-react";
+import { FileSignature, Plus } from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { createContract, type ContractResult } from "@/app/actions/contracts";
 
 const CONTRACT_TYPES = [
@@ -130,42 +137,25 @@ export function NewContractDialog({
   }
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-[12px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
-      >
-        <Plus className="h-4 w-4" /> Yeni sözleşme
-      </button>
+    /* Radix Dialog: focus trap + Esc (öncesinde yoktu) + scroll lock + ARIA.
+       Düz başlık DialogHeader'a geçince gradient başlık + açıklama kazandı. */
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="focus-ring press inline-flex items-center gap-2 rounded-[12px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+        >
+          <Plus className="h-4 w-4" /> Yeni sözleşme
+        </button>
+      </DialogTrigger>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center">
-          <button
-            type="button"
-            aria-label="Kapat"
-            onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-ink-950/50 backdrop-blur-sm"
-          />
-          <div className="relative my-auto w-full max-w-2xl rounded-[20px] border border-line bg-surface p-6 shadow-[var(--shadow-xl)]">
-            <div className="mb-5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-brand-600/10 text-brand-600">
-                  <FileSignature className="h-4 w-4" />
-                </span>
-                <h2 className="font-display text-lg font-bold text-ink-950">Yeni Sözleşme</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="grid h-8 w-8 place-items-center rounded-[8px] text-text-muted transition hover:bg-canvas hover:text-ink-950"
-                aria-label="Kapat"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
+      <DialogContent size="lg">
+        <DialogHeader
+          icon={<FileSignature />}
+          title="Yeni sözleşme"
+          description="Taslağı oluşturun; imzalayanları ekleyip e-imza linki gönderin."
+        />
+        <form onSubmit={handleSubmit} className="space-y-4 p-6">
               <div className="grid gap-4 sm:grid-cols-2">
                 {/* Başlık */}
                 <div className="sm:col-span-2">
@@ -244,31 +234,33 @@ export function NewContractDialog({
                 />
               </div>
 
+              {/* Palet dışı red-50/red-600 yerine danger tonları */}
               {state?.error && (
-                <p className="rounded-[8px] bg-red-50 px-3 py-2 text-sm text-red-600">{state.error}</p>
+                <p className="rounded-[8px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
+                  {state.error}
+                </p>
               )}
 
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="rounded-[10px] border border-line px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
-                >
-                  Vazgeç
-                </button>
+              <div className="hairline-t flex justify-end gap-2 pt-4">
+                <DialogClose asChild>
+                  <button
+                    type="button"
+                    className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+                  >
+                    Vazgeç
+                  </button>
+                </DialogClose>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+                  className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
                 >
                   <FileSignature className="h-4 w-4" />
                   {isPending ? "Kaydediliyor…" : "Sözleşme oluştur"}
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
