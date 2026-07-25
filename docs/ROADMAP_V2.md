@@ -205,6 +205,13 @@ Araştırıldı. Bizde **olmayan** ve eklenmesi gerekenler:
 
 Rakiplerde görmediğim, gerçek acıyı çözen ve savunulabilir olanlar:
 
+> **Önce kod taraması yapıldı.** X7'yi "yok" varsayarak yazmaya başladım,
+> meğer `commission-simulator.tsx` zaten vardı. İkinci bir kopya eklemek
+> yanlış olurdu. Tarama sonucu: **X1** (`property-health.ts`), **X2**
+> (`lost-sale-detector` → `kayip-satis` sayfası), **X7**, **X8**
+> (`deals.probability`), **X9** (`communication-timeline`), **X12** (komut
+> paleti) kısmen mevcut. **X4** ve **X6** gerçekten yoktu.
+
 - [ ] **X1** **Portföy sağlık skoru** — fiyat/görsel/açıklama/yetki süresi/portal
       durumunu tek skora indir, "bu portföy neden satmıyor" sorusunu cevapla
       (`property-health.ts` var, derinleştirilecek)
@@ -216,10 +223,18 @@ Rakiplerde görmediğim, gerçek acıyı çözen ve savunulabilir olanlar:
       tarih tutarsızlığı, komisyon oranı mevzuat sınırı kontrolü
 - [ ] **X5** **KVKK otomatik yaşam döngüsü** — rıza süresi dolan müşteri verisini
       otomatik anonimleştirme + silme kanıtı (denetimde altın değerinde)
-- [ ] **X6** **Çift kayıt (duplicate) füzyonu** — aynı müşteri/portföyün farklı
-      danışmanlarca girilmiş kopyalarını bulup birleştirme
-- [ ] **X7** **Komisyon simülatörü** — kapanış öncesi net eline geçecek tutar
-      (stopaj, KDV, ofis payı, split) — danışman güveni
+- [~] **X6** Çift kayıt — **tespit yapıldı** (`/app/musteriler/cift-kayit`).
+      Üç sinyal: telefon (normalize, neredeyse kesin) · e-posta · ad soyad
+      (tek başına kanıt değil). Her kayıtta aktivite sayısı gösteriliyor,
+      en dolu kayıt işaretli.
+      **Birleştirme bilinçli olarak yapılmadı**: alt kayıtları (talep, randevu,
+      çağrı, görüşme, anlaşma, teklif, sözleşme, görev) taşıması gereken geri
+      alınamaz bir işlem; yanlış eşleşmede veri kaybı demek.
+- [x] **X7** Komisyon simülatörü — **kısmen zaten vardı**, eksikleri kapatıldı.
+      Yeni bir kopya yazmak yerine mevcut bileşen okundu ve düzeltildi:
+      **KDV dahil modu yoktu** (müşteri "180.000 KDV dahil" dediğinde yanlış
+      rakam), KDV oranı **üç ayrı yerde** sabitti, "elime ne geçecek"
+      sorusuna cevap vermiyordu. `lib/commission.ts` + 19 test.
 - [ ] **X8** **Anlaşma olasılık skoru** — aşama, yaş, aktivite yoğunluğu,
       müşteri sıcaklığından kapanma olasılığı
 - [ ] **X9** **Zaman tüneli** — bir portföyün/müşterinin tüm yaşam öyküsü tek
