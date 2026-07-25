@@ -15,7 +15,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Sürüm .nvmrc'den okunur — tek doğruluk kaynağı. Burada sabit bir
+          # numara yazmak CI ile yerel geliştirmenin ayrışmasına yol açıyordu.
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies

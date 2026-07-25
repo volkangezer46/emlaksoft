@@ -53,7 +53,7 @@
 ## 📦 Kurulum
 
 ### 1) Gereksinimler
-- Node.js 20+
+- Node.js 24 LTS önerilir · **minimum 22** (`@supabase/supabase-js` Node ≥22 şart koşuyor, Node 20'nin desteği Nisan 2026'da bitti). Sürüm `.nvmrc` dosyasında sabit: `nvm use`
 - npm/pnpm/bun
 - Supabase projesi (eu-central-1 önerilir)
 - iyzico merchant hesabı (opsiyonel)
