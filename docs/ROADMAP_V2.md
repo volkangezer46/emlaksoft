@@ -245,10 +245,20 @@ Rakiplerde görmediğim, gerçek acıyı çözen ve savunulabilir olanlar:
       **KDV dahil modu yoktu** (müşteri "180.000 KDV dahil" dediğinde yanlış
       rakam), KDV oranı **üç ayrı yerde** sabitti, "elime ne geçecek"
       sorusuna cevap vermiyordu. `lib/commission.ts` + 19 test.
-- [ ] **X8** **Anlaşma olasılık skoru** — aşama, yaş, aktivite yoğunluğu,
-      müşteri sıcaklığından kapanma olasılığı
-- [ ] **X9** **Zaman tüneli** — bir portföyün/müşterinin tüm yaşam öyküsü tek
-      dikey akışta (fiyat, portal, görüşme, teklif, ziyaret)
+- [x] **X8** Anlaşma kapanma tahmini — 18 test. `deals.probability` **yalnızca
+      aşamadan** türetiliyordu (20/40/60/100), yani aşamanın sayıya çevrilmiş
+      hâliydi. 60 günlük, 40 gündür dokunulmamış bir anlaşma ile dün teklif
+      gelmiş bir anlaşma aynı %60'ı gösteriyordu.
+      Yeni hesap: teklif · görüşme · **hareketsizlik** · yaş · fiyat açığı.
+      Kullanıcının girdisi **üzerine yazılmıyor** — asıl değer ikisinin
+      farkında. Kural tabanlı olduğu, istatistiksel model olmadığı panelde yazılı.
+- [x] **X9** Zaman tüneli (portföy) — yedi kaynağı tek kronolojide birleştirir:
+      fiyat · durum · portal yayın/kaldırma · randevu · teklif · açık ev · medya.
+      Fiyat ve durum geçmişi ayrı iki bölümdü; portal, teklif, randevu ve açık ev
+      **hiçbir kronolojide görünmüyordu**. Portal satırı iki olay üretir
+      (yayın + kaldırma); medya güne göre toplanır — 40 fotoğraf tek başına
+      kronolojiyi doldururdu.
+      Müşteri tarafı için `communication-timeline` zaten vardı.
 - [ ] **X10** **Denetim moduna hazırlık paketi** — mevzuat denetiminde istenen
       tüm evrakı tek tuşla ZIP
 - [ ] **X11** **Ofis kıyaslama (benchmark)** — anonim toplu veriyle "sizin
