@@ -13,6 +13,7 @@ import { ToastProvider } from "@/components/app/toast-provider";
 import { OpsImpersonationBanner } from "@/components/app/ops-impersonation-banner";
 import { LiveOfficeStrip } from "@/components/app/live-office-strip";
 import { RealtimeRefresh } from "@/components/app/realtime-refresh";
+import { KeyboardShortcuts } from "@/components/app/keyboard-shortcuts";
 import { listMyNotifications } from "@/app/actions/notifications";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { getOfficeScoreCached } from "@/lib/office-score";
@@ -138,6 +139,11 @@ export default async function AppLayout({
         <div className={`flex min-h-screen bg-canvas${brandColor ? " brand-scope" : ""}`}>
           <AppPrefetcher tenantId={tenantId} />
           <RealtimeRefresh tenantId={tenantId} />
+          {/* Klavye kisayollari: komut paleti (Ctrl+K) zaten vardi ama tek
+              kisayol oydu. "g" onekli iki tusluk dizi bilincli — tek harf,
+              bir nota yazarken odak kaybolursa sayfayi degistirip yazilani
+              kaybettirir. Detay: keyboard-shortcuts.tsx */}
+          <KeyboardShortcuts />
         <AppSidebar
           officeName={office?.name ?? "EmlakSoft Ofis"}
           plan={planLabel[office?.plan ?? "office"] ?? "Ofis"}

@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { BarCompare, ChartFrame } from "@/components/ui/chart";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { buildCoachActions } from "@/lib/advisor-coach";
+import { CoachPanel } from "./coach-panel";
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -29,7 +31,7 @@ type AdvisorKpi = {
 };
 
 export default async function DanismanKpiPage() {
-  const { tenantId } = await requireModulePage("reports");
+  const { tenantId, userId } = await requireModulePage("reports");
   const supabase = await createClient();
 
   const monthStart = new Date();
@@ -37,9 +39,58 @@ export default async function DanismanKpiPage() {
   monthStart.setHours(0, 0, 0, 0);
 
   // Profiller + tek round-trip aggregate RPC (5 tablo, Postgres tarafında toplanır)
-  const [{ data: profiles }, { data: kpiRows }] = await Promise.all([
+  /*
+   * Koc icin ek sinyaller. Hepsi `head: true` + `count` ile geliyor: satir
+   * cekilmiyor, yalnizca sayilar. Bunlari HER danisman icin ayri sormak
+   * N+1 olurdu; koc kisisel bir arac oldugu icin yalnizca OTURUM ACAN
+   * kullanici icin hesaplaniyor.
+   */
+  const bugun = new Date();
+  const onbesGunSonra = new Date(bugun.getTime() + 15 * 86_400_000).toISOString().slice(0, 10);
+  const bugunISO = bugun.toISOString();
+  const otuzGunOnce = new Date(bugun.getTime() - 30 * 86_400_000).toISOString();
+
+  const [
+    { data: profiles },
+    { data: kpiRows },
+    { count: yetkiBiten },
+    { count: gecikmisGorev },
+    { count: pahaliPortfoy },
+    { count: soguyanMusteri },
+  ] = await Promise.all([
     supabase.from("profiles").select("id, full_name, role").limit(50),
     supabase.rpc("advisor_kpis", { p_tenant_id: tenantId, p_month_start: monthStart.toISOString() }),
+    supabase
+      .from("properties")
+      .select("id", { count: "exact", head: true })
+      .eq("assigned_to", userId)
+      .is("deleted_at", null)
+      .gte("authorization_end", bugunISO.slice(0, 10))
+      .lte("authorization_end", onbesGunSonra),
+    supabase
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("assigned_to", userId)
+      .eq("status", "open")
+      .lt("due_at", bugunISO),
+    supabase
+      .from("properties")
+      .select("id", { count: "exact", head: true })
+      .eq("assigned_to", userId)
+      .is("deleted_at", null)
+      .eq("price_health", "red"),
+    /*
+     * "Soguyan musteri": 30 gunden eski `created_at` ve hic guncellenmemis.
+     * Gercek "son temas" bilgisi communications/calls tablolarinda; onu
+     * saymak burada iki ek JOIN demek. `updated_at` yaklasik ama ucuz bir
+     * vekil ve panelde "uzun sure dokunulmadi" olarak etiketleniyor.
+     */
+    supabase
+      .from("customers")
+      .select("id", { count: "exact", head: true })
+      .eq("assigned_to", userId)
+      .is("deleted_at", null)
+      .lt("updated_at", otuzGunOnce),
   ]);
 
   const kpiByUid = new Map<string, {
@@ -96,6 +147,32 @@ export default async function DanismanKpiPage() {
 
   const topScore = Math.max(1, ...advisors.map((a) => a.score));
 
+  // Koc: oturum acan kullanicinin kendi satiri + ekip ortalamasi.
+  const ben = advisorMap.get(userId) ?? null;
+  const ekipOrtalamaAnlasma =
+    advisors.length > 0 ? advisors.reduce((t, a) => t + a.dealCount, 0) / advisors.length : null;
+
+  const coachActions = ben
+    ? buildCoachActions({
+        customerCount: ben.customerCount,
+        callCount: ben.callCount,
+        appointmentCount: ben.appointCount,
+        offerCount: ben.offerCount,
+        dealCount: ben.dealCount,
+        revenue: ben.revenue,
+        staleCustomerCount: soguyanMusteri ?? 0,
+        // Sicak musteri sayisi lead skoru gerektiriyor; bu sayfada o veri
+        // yok ve yalnizca bunun icin `customer_lead_signals` RPC cagirmak
+        // pahali. Ilgili oneri sicak musteri OLMADIGINDA hic uretilmiyor,
+        // yani 0 gecmek sessiz bir yanlis sonuc uretmiyor.
+        hotCustomerCount: 0,
+        overpricedCount: pahaliPortfoy ?? 0,
+        expiringAuthCount: yetkiBiten ?? 0,
+        overdueTaskCount: gecikmisGorev ?? 0,
+        teamAvgDeals: ekipOrtalamaAnlasma,
+      })
+    : [];
+
   // Grafik verisi: geliri olan ilk 8 danışman (düz, serileştirilebilir dizi)
   const revenueChart = advisors
     .filter((a) => a.revenue > 0)
@@ -130,6 +207,10 @@ export default async function DanismanKpiPage() {
           </div>
         </div>
       </section>
+
+      {/* Kisisel koc: sayfa dogru sayilari gosteriyordu ama "bu hafta ne
+          yapmaliyim" sorusunu cevaplamak danismanin isi olarak kaliyordu. */}
+      <CoachPanel actions={coachActions} adSoyad={ben?.full_name ?? null} />
 
       {/* Gelir kırılımı — tabloyu okumadan önce tek bakışta sıralama.
           Bilinçli olarak tek seri: gelir (₺) ile satış adedi aynı eksende
