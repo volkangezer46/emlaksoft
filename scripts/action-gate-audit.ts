@@ -151,16 +151,69 @@ DENETIM GUVENILMEZ: yalnızca ${exported.length} action bulundu, en az ${MIN_KAP
   process.exit(2);
 }
 
-if (acik.length === 0) {
+/* ===========================================================================
+ * IKINCI KONTROL: service_role + cagiranin verdigi kiraci kimligi
+ * ===========================================================================
+ * `createAdminClient()` RLS'i TAMAMEN atlar. Bir Server Action hem bunu
+ * kullanip hem de kiraci/kullanici kimligini PARAMETRE olarak aliyorsa,
+ * hedefi cagiran seciyor demektir — kiraci izolasyonu ortadan kalkar.
+ *
+ * Bu tam olarak `notifyTenant`ta bulunan sekildi: uc nokta + service_role +
+ * parametreden gelen tenantId + kapi yok. lib/ altina tasinarak coazuldu.
+ *
+ * lib/ altindaki ayni sekil SORUN DEGIL: orasi uc nokta degil, yalnizca
+ * sunucu kodu import edebiliyor.
+ */
+const RISKLI_PARAM = /\btenantId\b|\btenant_id\b|\buserId\b|\buser_id\b/;
+
+/*
+ * DENETIMIN KENDI KENDINI SINAMASI.
+ *
+ * Bu satirlar bir hatadan dogdu: yukaridaki desen bir noktada kelime siniri
+ * yerine GERCEK BACKSPACE karakteri (0x08) iceriyordu. Kaynak kodda goze
+ * normal gorunuyordu, RegExp.source bile dogru basiyordu — ama hicbir seyle
+ * eslesmiyordu. Kontrol sessizce her zaman "temiz" diyordu.
+ *
+ * Bir denetimin en tehlikeli hali, BAKMADAN gecmesidir. Bu yuzden calisma
+ * aninda bilinen bir POZITIF ve bir NEGATIF ornekle kendini sinar.
+ */
+const SINAMA_POZITIF = "export async function x(tenantId: string)";
+const SINAMA_NEGATIF = "export async function y(formData: FormData)";
+if (!RISKLI_PARAM.test(SINAMA_POZITIF) || RISKLI_PARAM.test(SINAMA_NEGATIF)) {
+  console.error("DENETIM BOZUK: RISKLI_PARAM deseni kendi sinama orneklerinde basarisiz. Sonuclara guvenmeyin.");
+  process.exit(2);
+}
+
+const svcAcik = exported.filter((f) => {
+  if (!f.body.includes("createAdminClient()")) return false;
+  const imza = f.body.slice(0, f.body.indexOf(")") + 1);
+  return RISKLI_PARAM.test(imza) && !MUAF[f.key];
+});
+
+if (acik.length === 0 && svcAcik.length === 0) {
   console.log("BULGU YOK — hepsinde yetki kapısı var (doğrudan ya da delegasyonla).");
+  console.log("service_role kullanan action'larda çağıran kaynaklı kiracı kimliği yok.");
   process.exit(0);
 }
 
-console.log(`\n[KAPI YOK] ${acik.length} action:`);
-for (const f of acik) console.log(`   ${f.key}`);
-console.log(
-  "\nHer Server Action tarayıcıdan doğrudan çağrılabilir. Kapı ekleyin ya da\n" +
-    "bilinçli bir istisnaysa scripts/action-gate-audit.ts içindeki MUAF listesine\n" +
-    "GEREKÇESİYLE ekleyin.",
-);
+if (svcAcik.length > 0) {
+  console.log(`\n[SERVICE_ROLE + PARAMETRE] ${svcAcik.length} action:`);
+  for (const f of svcAcik) console.log(`   ${f.key}`);
+  console.log(
+    "\nBu action'lar RLS'i atlayan istemciyi kullanıyor ve hedef kiracıyı\n" +
+      "çağırandan alıyor. Kimliği yetki kapısının sonucundan (gate.tenantId)\n" +
+      "alın ya da fonksiyonu lib/ altına taşıyıp uç nokta olmaktan çıkarın.",
+  );
+}
+
+if (acik.length > 0) {
+  console.log("");
+  console.log("[KAPI YOK] " + acik.length + " action:");
+  for (const f of acik) console.log("   " + f.key);
+  console.log("");
+  console.log("Her Server Action tarayicidan dogrudan cagrilabilir. Kapi ekleyin ya da");
+  console.log("bilincli bir istisnaysa scripts/action-gate-audit.ts icindeki MUAF");
+  console.log("listesine GEREKCESIYLE ekleyin.");
+}
+
 process.exit(1);
