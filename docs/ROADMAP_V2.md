@@ -185,6 +185,13 @@ katmanını yükseltip iyileşmenin kendiliğinden yayılmasını sağlamak.
 
 Araştırıldı. Bizde **olmayan** ve eklenmesi gerekenler:
 
+> **Kod taraması yapıldı.** Gerçekten eksik olanlar: **R2** (kiracılar-arası
+> havuz), **R3** (GİB BTRANS), **R7** (uluslararası portal), **R9** (referans
+> ağı). Dördü de **dış girdi olmadan sorumlulukla yazılamaz**: R3 resmî
+> entegrasyon spesifikasyonu, R7 ticari anlaşma, R2 ve R9 ise kiracılar-arası
+> veri paylaşımı mimarisi ve sözleşme modeli kararı gerektiriyor. Spekülatif
+> iskele kurmak yerine bekletiliyor.
+
 - [ ] **R1** Ofis web sitesi (site builder) — `vitrin/[slug]` bir başlangıç
   - [ ] Tema seçimi, alan adı bağlama, SEO alanları
   - [ ] 360° tur + YouTube gömme
@@ -219,8 +226,11 @@ Rakiplerde görmediğim, gerçek acıyı çözen ve savunulabilir olanlar:
       çıkarıp "bu talebi kaçırma" uyarısı (`lost-sale-detector.ts` temeli var)
 - [ ] **X3** **Danışman koçu** — KPI'lardan kişiselleştirilmiş haftalık aksiyon
       listesi ("bu hafta 3 soğuk lead'i ara, 2 portföyün fiyatı piyasa üstü")
-- [ ] **X4** **Sözleşme risk taraması** — sözleşme metninde eksik zorunlu madde,
-      tarih tutarsızlığı, komisyon oranı mevzuat sınırı kontrolü
+- [x] **X4** Sözleşme risk taraması — 8 mekanik kontrol, 24 test.
+      Şablonlar `___` yer tutucuyla geliyor ve doldurulmamış bir şablonu imzaya
+      göndermek sahada en sık hata; **hiçbir kontrol yoktu**. Seviye bağlama göre:
+      boş alan taslakta uyarı, imzaya gitmişse hata. Komisyon sınırı uyarısı
+      **hukuki hüküm kurmuyor**, teyide yönlendiriyor.
 - [ ] **X5** **KVKK otomatik yaşam döngüsü** — rıza süresi dolan müşteri verisini
       otomatik anonimleştirme + silme kanıtı (denetimde altın değerinde)
 - [~] **X6** Çift kayıt — **tespit yapıldı** (`/app/musteriler/cift-kayit`).
@@ -258,6 +268,12 @@ Rakiplerde görmediğim, gerçek acıyı çözen ve savunulabilir olanlar:
 - [x] **Q2** RLS denetimi — `npm run db:rls-audit`. İlk koşuda **gerçek bir
       hata buldu**: `tasks` ve `property_media` normal kullanıcıya görünmüyordu
       (bkz. 10.6). Şu an 39 tablo, bulgu yok.
+- [x] **Q6** Server Action yetki kapısı denetimi — `npm run audit:actions`, CI'da.
+      **Gerçek bir açık buldu**: `notifyTenant` `"use server"` dosyasından export
+      edildiği için çağırılabilir bir uç noktaydı, `tenantId`'yi parametre alıyor
+      ve `service_role` kullanıyordu — yani RLS'i atlayarak herhangi bir
+      kiracıya bildirim yazılabiliyordu. `lib/notify.ts`'e taşındı.
+      192 action, 17 gerekçeli muafiyet, bulgu yok.
 - [ ] **Q3** CI'a `npm audit --audit-level=high` kapısı (şu an `continue-on-error`)
 - [ ] **Q4** Hata izleme (Sentry sınıfı) — şu an prod hatası görünmüyor
 - [ ] **Q5** Yedekleme/geri yükleme provası
