@@ -54,12 +54,22 @@ const APPT_LABEL: Record<string, string> = {
   contract: "Sözleşme",
 };
 
+/*
+ * `offers.status` bir ENUM: offer_status = draft | submitted | countered |
+ * accepted | rejected | withdrawn.
+ *
+ * Ilk yazimda bu haritada `pending` ve `expired` vardi — IKISI DE ENUM'DA YOK,
+ * yani hic gorunmezdi. Buna karsilik `draft`, `submitted` ve `withdrawn`
+ * EKSIKTI ve ham enum degeri olarak ekrana dusuyordu. Enum'u canli semadan
+ * okuyup hizalandi.
+ */
 const OFFER_LABEL: Record<string, string> = {
-  pending: "beklemede",
+  draft: "taslak",
+  submitted: "iletildi",
+  countered: "karşı teklif verildi",
   accepted: "kabul edildi",
   rejected: "reddedildi",
-  countered: "karşı teklif verildi",
-  expired: "süresi doldu",
+  withdrawn: "geri çekildi",
 };
 
 export async function getPropertyTimeline(propertyId: string): Promise<TimelineEvent[]> {
@@ -191,7 +201,12 @@ export async function getPropertyTimeline(propertyId: string): Promise<TimelineE
       at: r.created_at,
       title: `Teklif ${tl(r.amount)}`,
       detail: OFFER_LABEL[r.status] ?? r.status,
-      tone: r.status === "accepted" ? "ok" : r.status === "rejected" ? "danger" : "warn",
+      tone:
+        r.status === "accepted"
+          ? "ok"
+          : r.status === "rejected" || r.status === "withdrawn"
+            ? "danger"
+            : "warn",
     });
   }
 

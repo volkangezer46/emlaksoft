@@ -3,6 +3,8 @@ import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { IysForm } from "./iys-form";
+import { listErasureLog } from "@/app/actions/kvkk";
+import { KvkkPanel } from "./kvkk-panel";
 
 const channelLabel: Record<string, string> = {
   sms: "SMS",
@@ -19,8 +21,15 @@ const statusLabel: Record<string, string> = {
 };
 
 export default async function CompliancePage() {
-  await requireModulePage("compliance");
+  const { perms } = await requireModulePage("compliance");
   const supabase = await createClient();
+
+  // KVKK silme kaniti + yetki. Anonimlestirme geri alinamaz bir islem oldugu
+  // icin `customers.delete` izni isteniyor; bir danismanin kendi basina
+  // yapabilecegi bir sey olmamali.
+  const canErase = (perms.customers ?? []).includes("delete");
+  const erasureLog = await listErasureLog(50);
+
   const [{ data: consents }, { data: customers }] = await Promise.all([
     supabase
       .from("iys_consents")
@@ -90,6 +99,11 @@ export default async function CompliancePage() {
           )}
         </section>
       </div>
+
+      {/* KVKK yasam dongusu: `deleted_at` isaretli musteriler HIC temizlenmiyordu,
+          yani "silinmis" bir musterinin adi/telefonu/e-postasi veritabaninda
+          sonsuza kadar duruyordu. */}
+      <KvkkPanel initialLog={erasureLog as Parameters<typeof KvkkPanel>[0]["initialLog"]} canErase={canErase} />
 
       <section className="rounded-[20px] border border-amber-400/30 bg-amber-400/5 p-5">
         <h2 className="font-display font-bold text-ink-950">EİDS / yetki kalkanı</h2>

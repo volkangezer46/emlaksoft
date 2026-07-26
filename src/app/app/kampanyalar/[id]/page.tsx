@@ -23,16 +23,30 @@ const STATUS_LABELS: Record<string, string> = {
   failed: "Başarısız",
 };
 
+/*
+ * `campaign_recipients.status` bir ENUM: recipient_status = pending | sent |
+ * delivered | failed | opted_out.
+ *
+ * Ilk yazimda yalnizca uc deger vardi; `delivered` ve `opted_out` ham enum
+ * degeri olarak ekrana dusuyordu. `opted_out` ozellikle onemli: IYS izni
+ * olmadigi icin GONDERILMEDI demek — "ulasmadi" ile ayni sey degil ve
+ * duzeltilecek bir sey de yok.
+ */
 const RECIPIENT_LABELS: Record<string, string> = {
   pending: "Bekliyor",
   sent: "Gönderildi",
+  delivered: "Teslim edildi",
   failed: "Ulaşmadı",
+  opted_out: "İzin yok (gönderilmedi)",
 };
 
 const RECIPIENT_VARIANT: Record<string, "success" | "warning" | "danger" | "default"> = {
+  delivered: "success",
   sent: "success",
   pending: "warning",
   failed: "danger",
+  // İzin yoksa bu bir hata değil, doğru davranış — kırmızı göstermek yanıltır.
+  opted_out: "default",
 };
 
 function tarih(iso: string | null) {
@@ -57,9 +71,19 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   const [campaign, recipients] = await Promise.all([getCampaign(id), listCampaignRecipients(id)]);
   if (!campaign) notFound();
 
-  const gonderilen = recipients.filter((r) => r.status === "sent").length;
+  /*
+   * "Ulasan" hem `sent` hem `delivered` demek. Ilk yazimda yalnizca `sent`
+   * sayiliyordu; teslim onayi gelmis bir alici HICBIR sayacta gorunmuyordu ve
+   * toplam tutmuyordu.
+   *
+   * `opted_out` ayri tutuluyor: IYS izni olmadigi icin gonderilmedi — bu bir
+   * BASARISIZLIK DEGIL, dogru davranis. "Ulasmayan"a katmak, duzeltilecek bir
+   * sorun varmis gibi gosterirdi.
+   */
+  const gonderilen = recipients.filter((r) => r.status === "sent" || r.status === "delivered").length;
   const basarisiz = recipients.filter((r) => r.status === "failed").length;
   const bekleyen = recipients.filter((r) => r.status === "pending").length;
+  const izinsiz = recipients.filter((r) => r.status === "opted_out").length;
 
   /*
    * Kampanya satırındaki sayaçlar ile gerçek alıcı satırları ayrışabilir:
@@ -105,7 +129,11 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
               { label: "Toplam alıcı", value: String(recipients.length), icon: Users },
               { label: "Ulaşan", value: String(gonderilen), icon: CheckCircle2 },
               { label: "Ulaşmayan", value: String(basarisiz), icon: AlertTriangle },
-              { label: "Bekleyen", value: String(bekleyen), icon: Clock3 },
+              {
+                label: izinsiz > 0 ? "İzin yok" : "Bekleyen",
+                value: String(izinsiz > 0 ? izinsiz : bekleyen),
+                icon: Clock3,
+              },
             ].map((k) => (
               <div key={k.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur">
                 <k.icon className="h-4 w-4 text-mint-400" />
