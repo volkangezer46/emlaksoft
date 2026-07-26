@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { requirePermission } from "@/lib/require-permission";
 import { orIlike } from "@/lib/pgrst";
 import type { ComboboxOption } from "@/components/ui/combobox";
 
@@ -26,6 +27,12 @@ const MIN_QUERY = 2;
 const LIMIT = 25;
 
 export async function searchCustomers(query: string): Promise<ComboboxOption[]> {
+  // Yetki kapisi: RLS kiraci ayrimini yapiyor ama MODUL izni ayri bir sey —
+  // musteri modulune erisimi olmayan bir kullanici (or. yalnizca portfoy
+  // goren bir rol) bu uctan musteri adi ve telefonu toplayabilirdi.
+  const gate = await requirePermission("customers", "view");
+  if (!gate.ok) return [];
+
   const q = query.trim();
   if (q.length < MIN_QUERY) return [];
 
@@ -47,6 +54,9 @@ export async function searchCustomers(query: string): Promise<ComboboxOption[]> 
 }
 
 export async function searchProperties(query: string): Promise<ComboboxOption[]> {
+  const gate = await requirePermission("properties", "view");
+  if (!gate.ok) return [];
+
   const q = query.trim();
   if (q.length < MIN_QUERY) return [];
 

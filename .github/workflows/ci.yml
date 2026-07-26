@@ -34,6 +34,11 @@ jobs:
       - name: Testler
         run: npm test
 
+      - name: Server Action yetki kapısı denetimi
+        # DB'ye gitmez, statik tarama — CI'da güvenle koşar.
+        # Yeni bir action eklenip yetki kapısı unutulursa burada kırılır.
+        run: npm run audit:actions
+
       - name: Güvenlik denetimi (bilgilendirme — henüz bloklamıyor)
         # --omit=dev bilinçli: ESLint zincirindeki dev-only açıklar
         # (minimatch/brace-expansion DoS) production'a gitmiyor.

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformStaff } from "@/lib/platform";
-import { notifyTenant } from "@/app/actions/notifications";
+import { notifyTenant } from "@/lib/notify";
 
 export async function markPlatformNotificationRead(id: string): Promise<{ ok: boolean }> {
   const staff = await requirePlatformStaff();

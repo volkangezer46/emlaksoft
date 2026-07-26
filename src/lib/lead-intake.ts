@@ -2,7 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isValidOptionalTurkishMobile, normalizeTurkishPhone } from "@/lib/phone";
-import { notifyTenant } from "@/app/actions/notifications";
+import { notifyTenant } from "@/lib/notify";
 
 export type LeadInput = {
   fullName: string;

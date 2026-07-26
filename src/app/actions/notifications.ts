@@ -3,8 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveTenant } from "@/lib/tenant-guard";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { sendPushToUser } from "@/lib/push";
 
 export type NotificationRow = {
   id: string;
@@ -56,33 +54,17 @@ export async function markAllNotificationsRead(): Promise<void> {
   revalidatePath("/app", "layout");
 }
 
-export async function notifyTenant(input: {
-  tenantId: string;
-  userId?: string | null;
-  title: string;
-  body?: string;
-  href?: string;
-  kind?: "info" | "success" | "warning" | "danger" | "system";
-}) {
-  const admin = createAdminClient();
-  await admin.from("notifications").insert({
-    tenant_id: input.tenantId,
-    user_id: input.userId ?? null,
-    title: input.title,
-    body: input.body ?? null,
-    href: input.href ?? null,
-    kind: input.kind ?? "info",
-  });
-
-  if (input.userId) {
-    // Best-effort: VAPID yoksa sessizce atlar, bildirim satırı zaten yazıldı.
-    void sendPushToUser(input.tenantId, input.userId, {
-      title: input.title,
-      body: input.body,
-      href: input.href,
-    });
-  }
-}
+/*
+ * `notifyTenant` buradan src/lib/notify.ts'e TASINDI.
+ *
+ * Sebep: bu dosya "use server" tasiyor, yani buradan export edilen her
+ * fonksiyon tarayicidan cagrilabilen bir UC NOKTA oluyor. notifyTenant
+ * `tenantId`'yi parametre olarak aliyor ve createAdminClient() (service_role)
+ * kullaniyordu — yani RLS'i atliyordu ve yetki kontrolu de yoktu. Action
+ * kimligini ele geciren biri istedigi kiraciya bildirim yazdirabilirdi.
+ *
+ * lib/ altinda artik uc nokta degil; yalnizca sunucu kodu import edebiliyor.
+ */
 
 export async function subscribeToPush(sub: { endpoint: string; p256dh: string; auth: string }): Promise<{ ok?: boolean; error?: string }> {
   const gate = await requireActiveTenant();

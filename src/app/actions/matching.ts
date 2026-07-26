@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
-import { notifyTenant } from "@/app/actions/notifications";
+import { notifyTenant } from "@/lib/notify";
 import { scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
 
 export type MatchActionResult = { error?: string; ok?: boolean; score?: number };

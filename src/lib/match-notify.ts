@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { notifyTenant } from "@/app/actions/notifications";
+import { notifyTenant } from "@/lib/notify";
 import { scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
 
 /**

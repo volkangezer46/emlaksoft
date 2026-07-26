@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { checkAuthorityShield } from "@/lib/authority-shield";
-import { notifyTenant } from "@/app/actions/notifications";
+import { notifyTenant } from "@/lib/notify";
 import { buildSplits, calculateCommission } from "@/lib/commission";
 
 export type WorkflowResult = { error?: string; ok?: boolean; dealId?: string; commissionId?: string };
