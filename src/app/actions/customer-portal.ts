@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
-import { scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
+import { fetchTenantMatchingWeights, scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
 
 function relName(v: unknown): string | null {
   if (!v) return null;
@@ -145,6 +145,7 @@ export async function getCustomerPortalData(
     { data: demands },
     { data: appointments },
     { data: propRows },
+    weights,
   ] = await Promise.all([
     // Son görülme zamanını güncelle (yalnızca token'a bağlı)
     admin.from("customer_portal_tokens")
@@ -179,6 +180,8 @@ export async function getCustomerPortalData(
       .in("status", ["live", "reserved", "Yayında"])
       .order("created_at", { ascending: false })
       .limit(200),
+    // Ofise özel eşleştirme ağırlıkları — panel/eşleştirme sayfasıyla aynı skor
+    fetchTenantMatchingWeights(admin, tenantId),
   ]);
 
   if (!customer || !tenant) return null;
@@ -191,7 +194,7 @@ export async function getCustomerPortalData(
   const seen = new Set<string>();
   for (const d of activeDemands) {
     for (const p of propRows ?? []) {
-      const result = scoreDemandProperty(d as MatchDemand, p as unknown as MatchProperty);
+      const result = scoreDemandProperty(d as MatchDemand, p as unknown as MatchProperty, weights);
       if (result.score >= 50 && !seen.has(p.id)) {
         seen.add(p.id);
         scored.push({

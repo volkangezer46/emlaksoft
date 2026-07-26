@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 
 type Category = { value: string; label: string };
-type Expense = {
+export type Expense = {
   id: string;
   title: string;
   amount: number;
@@ -21,8 +21,26 @@ type Expense = {
   notes: string | null;
 };
 
-export function ExpenseEditDialog({ expense, categories }: { expense: Expense; categories: readonly Category[] }) {
-  const [open, setOpen] = useState(false);
+export function ExpenseEditDialog({
+  expense,
+  categories,
+  open: openProp,
+  onOpenChange,
+}: {
+  expense: Expense;
+  categories: readonly Category[];
+  /** Kontrollü mod (satır tıklaması ile açma): open + onOpenChange verilirse
+   *  tetikleyici buton render edilmez, açık/kapalı durum dışarıdan yönetilir. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : internalOpen;
+  const setOpen = (v: boolean) => {
+    if (controlled) onOpenChange?.(v);
+    else setInternalOpen(v);
+  };
   // Başarıda kapatma efekt içinde değil, action akışında yapılıyor: efekt
   // gövdesinde senkron setState fazladan bir render turu doğuruyordu.
   const [state, action, pending] = useActionState<ExpenseResult, FormData>(
@@ -41,15 +59,17 @@ export function ExpenseEditDialog({ expense, categories }: { expense: Expense; c
    */
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          className="focus-ring press grid h-7 w-7 place-items-center rounded-[7px] text-text-faint transition hover:bg-brand-50 hover:text-brand-600"
-          aria-label="Gideri düzenle"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-      </DialogTrigger>
+      {!controlled ? (
+        <DialogTrigger asChild>
+          <button
+            type="button"
+            className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[7px] text-text-faint transition hover:bg-brand-50 hover:text-brand-600"
+            aria-label="Gideri düzenle"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        </DialogTrigger>
+      ) : null}
 
       <DialogContent size="sm">
         <DialogHeader icon={<Pencil />} title="Gideri düzenle" />

@@ -13,7 +13,7 @@ const ACTIONS: { value: AppAction; label: string }[] = [
   { value: "delete", label: "Sil" },
 ];
 
-const MODULE_LABELS: Record<AppModule, string> = {
+export const MODULE_LABELS: Record<AppModule, string> = {
   dashboard:   "Ana ekran",
   customers:   "Müşteriler",
   demands:     "Talepler",
@@ -38,6 +38,9 @@ const MODULE_LABELS: Record<AppModule, string> = {
   offers:      "Teklifler",
   targets:     "Hedefler",
   open_house:  "Açık Ev",
+  rentals:     "Kiralama Yönetimi",
+  projects:    "Proje Satış",
+  network:     "Ofisler Arası Ağ",
 };
 
 function cellKey(mod: AppModule, action: AppAction) {
@@ -140,7 +143,7 @@ export function RolePermissionsMatrix({
       <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[560px] border-collapse text-sm">
           <thead>
-            <tr className="border-b border-line text-left text-[10px] font-bold uppercase tracking-[0.08em] text-text-faint">
+            <tr className="border-b border-line text-left text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
               <th className="py-2 pr-3">Modül</th>
               {ACTIONS.map((a) => (
                 <th key={a.value} className="px-2 py-2 text-center">{a.label}</th>

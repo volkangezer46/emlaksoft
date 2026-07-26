@@ -60,10 +60,10 @@ export async function SupportHome({ staffName }: { staffName: string }) {
   const maxPr = Math.max(1, ...priorities.map((p) => p.count));
 
   const kpis = [
-    { label: "Açık talep", value: open, icon: Inbox, tone: "text-brand-400" },
-    { label: "İşleniyor", value: inProgress, icon: Clock, tone: "text-cyan-400" },
-    { label: "Yanıt bekliyor", value: waiting, icon: LifeBuoy, tone: "text-amber-400" },
-    { label: "Acil", value: urgent, icon: Siren, tone: "text-danger-400" },
+    { label: "Açık talep", href: "/admin/tickets?durum=open", value: open, icon: Inbox, tone: "text-brand-400" },
+    { label: "İşleniyor", href: "/admin/tickets?durum=in_progress", value: inProgress, icon: Clock, tone: "text-cyan-400" },
+    { label: "Yanıt bekliyor", href: "/admin/tickets?durum=waiting", value: waiting, icon: LifeBuoy, tone: "text-amber-400" },
+    { label: "Acil", href: "/admin/tickets?oncelik=urgent", value: urgent, icon: Siren, tone: "text-danger-400" },
   ];
 
   return (
@@ -81,11 +81,12 @@ export async function SupportHome({ staffName }: { staffName: string }) {
           </p>
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {kpis.map((k) => (
-              <div key={k.label} className="rounded-[14px] border border-white/12 bg-white/8 p-3 backdrop-blur">
+              <Link key={k.label} href={k.href} className="focus-ring group relative block rounded-[14px] border border-white/12 bg-white/8 p-3 backdrop-blur transition hover:border-white/25 hover:bg-white/12">
                 <k.icon className={`h-4 w-4 ${k.tone}`} />
                 <p className="mt-2 font-display text-xl font-extrabold text-white"><CountUp value={k.value} /></p>
-                <p className="text-[10px] text-white/70">{k.label}</p>
-              </div>
+                <p className="text-[11px] text-white/70">{k.label}</p>
+                <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:opacity-100" />
+              </Link>
             ))}
           </div>
         </div>
@@ -100,24 +101,27 @@ export async function SupportHome({ staffName }: { staffName: string }) {
           <h2 className="mt-1 font-display font-bold text-ink-950">Öncelik dağılımı</h2>
           <div className="mt-5 space-y-3">
             {priorities.map((p, i) => (
-              <div key={p.key}>
+              <Link key={p.key} href={`/admin/tickets?oncelik=${p.key}`} className="focus-ring group block rounded-[8px]">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-ink-950">{p.label}</span>
+                  <span className="font-semibold text-ink-950 transition group-hover:text-brand-600">{p.label}</span>
                   <span className="tabular-nums text-text-muted">{p.count}</span>
                 </div>
                 <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-ink-950/5">
                   <div
-                    className={`bar-live h-full rounded-full ${p.key === "urgent" ? "bg-danger-500" : p.key === "high" ? "bg-amber-400" : "bg-brand-500"}`}
+                    className={`bar-live h-full rounded-full transition group-hover:brightness-110 ${p.key === "urgent" ? "bg-danger-500" : p.key === "high" ? "bg-amber-400" : "bg-brand-500"}`}
                     style={{ width: `${Math.max((p.count / maxPr) * 100, 3)}%`, animationDelay: `${i * 0.08}s` }}
                   />
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
-          <div className="mt-5 flex items-center justify-between border-t border-line pt-4">
-            <span className="text-xs text-text-muted">Bu ay çözülen</span>
-            <span className="font-display text-lg font-extrabold text-mint-600">{resolvedThisMonth}</span>
-          </div>
+          <Link href="/admin/tickets?durum=resolved" className="focus-ring group mt-5 flex items-center justify-between border-t border-line pt-4">
+            <span className="text-xs text-text-muted transition group-hover:text-brand-600">Bu ay çözülen</span>
+            <span className="flex items-center gap-1 font-display text-lg font-extrabold text-mint-600">
+              {resolvedThisMonth}
+              <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+            </span>
+          </Link>
         </section>
 
         {/* Açık talepler */}
@@ -142,11 +146,11 @@ export async function SupportHome({ staffName }: { staffName: string }) {
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink-950">{t.subject}</p>
-                  <p className="text-[10px] text-text-faint">
+                  <p className="text-[11px] text-text-faint">
                     {nameOf(t.tenant as Rel)} · {statusLabel[t.status] ?? t.status} · {new Date(t.created_at).toLocaleDateString("tr-TR")}
                   </p>
                 </div>
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${priorityChip[t.priority] ?? "bg-ink-950/5 text-text-muted"}`}>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${priorityChip[t.priority] ?? "bg-ink-950/5 text-text-muted"}`}>
                   {priorityLabel[t.priority] ?? t.priority}
                 </span>
               </Link>

@@ -20,7 +20,7 @@ export type AdvisorContext = {
   members: number;
 };
 
-const OPENAI_MODEL = "gpt-4o-mini";
+export const OPENAI_MODEL = "gpt-4o-mini";
 
 /** DB ayarı öncelikli, yoksa ortam değişkeni. */
 export async function getOpenAiKey(): Promise<string | null> {
@@ -92,7 +92,7 @@ export async function buildAdvisorContext(): Promise<AdvisorContext> {
   };
 }
 
-function contextToText(c: AdvisorContext): string {
+export function contextToText(c: AdvisorContext): string {
   return [
     `Toplam ofis (tenant): ${c.tenantsTotal}`,
     `Aktif ofis: ${c.tenantsActive}`,
@@ -111,7 +111,7 @@ function contextToText(c: AdvisorContext): string {
   ].join("\n");
 }
 
-const SYSTEM_PROMPT = `Sen EmlakSoft'un yapay zeka iş danışmanısın. EmlakSoft, emlak ofisleri için bir abonelikli CRM platformudur.
+export const SYSTEM_PROMPT = `Sen EmlakSoft'un yapay zeka iş danışmanısın. EmlakSoft, emlak ofisleri için bir abonelikli CRM platformudur.
 Görevin: platform yöneticisine (süper admin/operasyon/muhasebe) verilen canlı verilere dayanarak
 Türkçe, net, uygulanabilir iş tavsiyeleri vermek. Kısa ve öz ol, madde işaretleri kullan.
 Asla tenant, lead, ticket, churn, MRR, ARR, KPI, dashboard gibi İngilizce ürün kelimeleri kullanma.
@@ -152,7 +152,7 @@ async function callOpenAI(apiKey: string, messages: AdvisorMessage[], context: A
 }
 
 /** OpenAI anahtarı yoksa çalışan kural-tabanlı danışman. Bağlama göre içgörü üretir. */
-function fallbackAdvisor(messages: AdvisorMessage[], c: AdvisorContext): string {
+export function fallbackAdvisor(messages: AdvisorMessage[], c: AdvisorContext): string {
   const last = (messages.filter((m) => m.role === "user").pop()?.content ?? "").toLocaleLowerCase("tr-TR");
   const insights: string[] = [];
 

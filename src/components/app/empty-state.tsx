@@ -1,8 +1,8 @@
 import Link from "next/link";
-import type { LucideIcon } from "lucide-react";
 
 /**
- * Premium, tutarlı boş-durum bileşeni.
+ * Premium, tutarlı boş-durum bileşeni — projedeki TEK boş durum standardı
+ * (ui-primitives'teki eski EmptyState buna delege eder).
  * İllüstrasyon: yumuşak gradient orb + ikon tile + ince ızgara dokusu.
  */
 export function EmptyState({
@@ -12,10 +12,10 @@ export function EmptyState({
   action,
   tone = "brand",
 }: {
-  icon: LucideIcon;
+  icon: React.ComponentType<{ className?: string }>;
   title: string;
   description?: string;
-  action?: { href?: string; label: string; node?: React.ReactNode };
+  action?: { href?: string; label?: string; node?: React.ReactNode };
   tone?: "brand" | "mint" | "amber" | "danger";
 }) {
   const toneCls: Record<string, { glow: string; tile: string }> = {

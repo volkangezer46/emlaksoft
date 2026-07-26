@@ -32,6 +32,8 @@
   --mint-300: #6ee0cd;
   --mint-50: #ecfbf7;
 
+  --amber-700: #8f6a24;
+  --amber-600: #b8862f;
   --amber-500: #e0a53a;
   --amber-400: #f2b84b;
   --amber-300: #f7cd7a;
@@ -107,9 +109,26 @@
   --surface-sunken: #f1f4fa;
 
   /* Odak halkası — çift katman: beyaz boşluk + marka halkası.
-     Tek renk halka koyu yüzeyde kayboluyordu. */
+     Tek renk halka koyu yüzeyde kayboluyordu. Renk --accent'ten türetilir;
+     beyaz etiket (brand-scope) marka tonunu değiştirince halka da uyar. */
   --focus-gap: 0 0 0 2px var(--surface);
-  --focus-ring: 0 0 0 4px rgba(20, 99, 255, 0.35);
+  --focus-ring: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent);
+
+  /* ============================================================
+     SEMANTİK KATMAN
+     Komponentler ham skala (--brand-600) yerine bu isimleri kullanır.
+     --accent, var() dolaylaması sayesinde .brand-scope override'ını
+     otomatik takip eder — beyaz etiket için tek nokta.
+     ============================================================ */
+  --accent: var(--brand-600);
+  --accent-hover: var(--brand-700);
+  --accent-subtle: var(--brand-50);
+  --success-fg: var(--mint-600);
+  --success-bg: var(--mint-50);
+  --warning-fg: var(--warn-600);
+  --warning-bg: rgba(245, 165, 36, 0.12);
+  --danger-fg: var(--danger-600);
+  --danger-bg: var(--danger-50);
 }
 
 @theme inline {
@@ -137,9 +156,14 @@
   --color-mint-300: var(--mint-300);
   --color-mint-50: var(--mint-50);
 
+  --color-amber-700: var(--amber-700);
+  --color-amber-600: var(--amber-600);
   --color-amber-500: var(--amber-500);
   --color-amber-400: var(--amber-400);
   --color-amber-300: var(--amber-300);
+
+  --color-accent: var(--accent);
+  --color-accent-subtle: var(--accent-subtle);
 
   --color-danger-700: var(--danger-700);
   --color-danger-600: var(--danger-600);
@@ -177,9 +201,11 @@
   --font-body: var(--font-inter);
   --font-mono: var(--font-geist-mono);
 
+  --radius-chip: 8px;
   --radius-control: 10px;
   --radius-card: 14px;
   --radius-panel: 20px;
+  --radius-hero: 24px;
 
   --animate-float: float 7s ease-in-out infinite;
   --animate-float-slow: float 11s ease-in-out infinite;
@@ -247,11 +273,11 @@ body {
   overflow-x: hidden;
 }
 
-/* Erişilebilirlik: klavye ile gezinirken görünür odak halkası (fare tıklamasında değil) */
+/* Erişilebilirlik: klavye ile gezinirken görünür odak halkası (fare tıklamasında değil).
+   border-radius zorlanmaz — tarayıcı outline'ı elemanın kendi köşe yarıçapına uydurur. */
 :focus-visible {
   outline: 2px solid var(--brand-500);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 /* Koyu bölümlerde (theme-dark) odak halkası kontrastı */
 .theme-dark :focus-visible {
@@ -288,15 +314,32 @@ h1, h2, h3, h4 {
   background: rgba(20, 99, 255, 0.16);
   color: var(--ink-950);
 }
+/* Koyu yüzeylerde (sidebar, landing koyu bölümleri) seçim rengi kaybolmasın */
+.theme-dark ::selection,
+aside ::selection {
+  background: rgba(34, 211, 238, 0.28);
+  color: #fff;
+}
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 11px; height: 11px; }
+/* Scrollbar — Firefox dahil; koyu kapsamda açık gri thumb sırıtmasın diye
+   track saydam, thumb padding-box ile içeriden boşluklu. */
+* { scrollbar-width: thin; scrollbar-color: #c7d0e0 transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: #c7d0e0;
-  border: 3px solid var(--canvas);
+  border: 3px solid transparent;
+  background-clip: padding-box;
   border-radius: 999px;
 }
-::-webkit-scrollbar-thumb:hover { background: #aab6cc; }
+::-webkit-scrollbar-thumb:hover { background: #aab6cc; background-clip: padding-box; }
+aside, .theme-dark { scrollbar-color: rgba(255, 255, 255, 0.22) transparent; }
+aside ::-webkit-scrollbar-thumb,
+aside::-webkit-scrollbar-thumb,
+.theme-dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  background-clip: padding-box;
+}
 
 /* ============================================================
    Utilities
@@ -424,8 +467,8 @@ p {
   transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease, border-color 0.35s ease;
 }
 .card-hover:hover {
-  transform: translateY(-6px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-4px);
+  box-shadow: var(--inner-top), var(--elev-4);
   border-color: var(--brand-300);
 }
 
@@ -519,15 +562,19 @@ p {
 }
 .pulse-ring::after { animation-delay: 1.2s; }
 
-/* scroll reveal */
+/* scroll reveal — fade + kayma birlikte. Başlangıç opaklığı yalnızca JS
+   çalışan tarayıcıda 0'a düşer (scripting media query); JS yoksa içerik
+   her zaman görünür kalır (FOUC/boş sayfa güvencesi). */
 .reveal {
   opacity: 1;
   transform: translateY(10px);
-  transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease;
+}
+.reveal-scale { opacity: 1; transform: scale(0.99); transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease; }
+@media (scripting: enabled) {
+  .reveal, .reveal-scale { opacity: 0; }
 }
 .reveal[data-shown="true"] { opacity: 1; transform: none; }
-
-.reveal-scale { opacity: 1; transform: scale(0.99); transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1); }
 .reveal-scale[data-shown="true"] { opacity: 1; transform: none; }
 
 /* svg chart draw-in */
@@ -601,13 +648,22 @@ p {
   background: linear-gradient(180deg, #0b2247, #0a1e3f);
 }
 
-/* rich hover lift for premium cards */
+/* Hover yükselmesi — TEK sistem: -2px + bir elevation adımı, 0.2s.
+   Büyük sıçramalar (-6/-8px) oyuncaksı duruyordu; premium ürünler
+   1-3px + gölge adımıyla yetinir. Vitrin kartları için .lift-lg (-4px). */
 .lift {
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease, border-color 0.4s ease;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--inner-top), var(--elev-3);
+}
+.lift-lg {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.lift-lg:hover {
   transform: translateY(-4px);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--inner-top), var(--elev-4);
 }
 
 /* animated conic ring border */
@@ -627,22 +683,47 @@ p {
 /* ------------------------------------------------------------
    Radix durum animasyonları (dialog / select / menü / tooltip)
    src/components/ui/* bileşenleri bu sınıfları kullanır.
-   Giriş animasyonu var, çıkış anlık — panelde hızlı his için bilinçli tercih.
+   Giriş yumuşak; çıkış 120-140ms kısa fade — anlık kapanış "kesik"
+   hissettiriyordu, kısa çıkış hız algısını koruyarak yumuşatır.
    prefers-reduced-motion bloğu dosya sonundaki global kural ile karşılanıyor.
    ------------------------------------------------------------ */
 @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes overlay-out { from { opacity: 1; } to { opacity: 0; } }
 @keyframes dialog-in {
   from { opacity: 0; transform: translateY(10px) scale(0.985); }
   to { opacity: 1; transform: none; }
+}
+@keyframes dialog-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(4px) scale(0.99); }
 }
 @keyframes popover-in {
   from { opacity: 0; transform: translateY(-4px) scale(0.98); }
   to { opacity: 1; transform: none; }
 }
+@keyframes popover-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(-4px) scale(0.98); }
+}
 .dialog-overlay[data-state="open"] { animation: overlay-in 0.18s ease both; }
+.dialog-overlay[data-state="closed"] { animation: overlay-out 0.14s ease both; }
 .dialog-content[data-state="open"] { animation: dialog-in 0.26s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.dialog-content[data-state="closed"] { animation: dialog-out 0.14s ease both; }
 .popover-in[data-state="open"],
 .popover-in[data-state="delayed-open"] { animation: popover-in 0.16s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.popover-in[data-state="closed"] { animation: popover-out 0.12s ease both; }
+
+/* Toast giriş/çıkış — spring hissi veren easing ile */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(6px); }
+}
+.toast-in { animation: toast-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.toast-out { animation: toast-out 0.16s ease both; }
 
 .mega-surface {
   background:
@@ -670,9 +751,23 @@ p {
   to { opacity: 1; }
 }
 
-.theme-dark,
-.theme-dark :is(h1, h2, h3, h4) {
-  color: #fff !important;
+/* Koyu bölümler — !important yerine token override: kaskad kilitlenmez,
+   koyu bölümde nüanslı ton (white/62 vb.) inline sınıfla ezmeden çalışır. */
+.theme-dark {
+  --text: #fff;
+  --ink-950: #fff;
+  --ink-900: #fff;
+  --text-muted: rgba(255, 255, 255, 0.62);
+  --text-faint: rgba(255, 255, 255, 0.4);
+  --line: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
+/* Koyu bölüm içindeki açık zeminli öğeler (beyaz/amber pill & buton):
+   ink token'ını geri koyulaştır — yoksa beyaz üstüne beyaz metin görünmez olur. */
+.theme-dark :is(.bg-white, .bg-amber-400) {
+  --ink-950: #071a38;
+  --ink-900: #0a2147;
 }
 
 .photo-stage {
@@ -823,7 +918,7 @@ p {
 }
 
 .property-card:hover {
-  transform: translateY(-8px);
+  transform: translateY(-4px);
   border-color: rgba(34, 211, 238, 0.22);
   box-shadow:
     0 38px 80px -34px rgba(0, 0, 0, 0.92),
@@ -1233,4 +1328,228 @@ p {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ============================================================
+   DASHBOARD 3D KATMANI — /app ana sayfası (yalnız yeni sınıflar)
+   ============================================================ */
+
+/* KPI kartı perspektif mikro-tilt — .lift'in 3D karşılığı. 1-2 derece
+   yeterli; fazlası oyuncaksı. Çift kartlar ters yöne yatar (ritim). */
+.tilt-card {
+  transform-style: preserve-3d;
+  transition:
+    transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.28s ease,
+    border-color 0.2s ease;
+}
+.tilt-card:hover {
+  transform: perspective(900px) translateY(-3px) rotateX(1.6deg) rotateY(-1.2deg);
+  box-shadow: var(--inner-top), var(--elev-4);
+}
+.tilt-card:nth-child(even):hover {
+  transform: perspective(900px) translateY(-3px) rotateX(1.6deg) rotateY(1.2deg);
+}
+
+/* KPI ikon çipine hafif iç parlaklık — üstten ışık, alttan gölge */
+.kpi-chip-shine {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -8px 14px -10px rgba(10, 34, 71, 0.25);
+}
+
+/* Kart arkasında ton renkli yumuşak glow — hover'da belirir */
+.kpi-glow {
+  position: relative;
+}
+.kpi-glow::after {
+  content: "";
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: -12px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--kpi-glow, rgba(20, 99, 255, 0.38));
+  filter: blur(18px);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+  pointer-events: none;
+}
+.kpi-glow:hover::after {
+  opacity: 0.6;
+}
+.kpi-glow-brand { --kpi-glow: rgba(20, 99, 255, 0.4); }
+.kpi-glow-mint { --kpi-glow: rgba(16, 185, 163, 0.38); }
+.kpi-glow-amber { --kpi-glow: rgba(224, 165, 58, 0.38); }
+.kpi-glow-warn { --kpi-glow: rgba(245, 165, 36, 0.38); }
+.kpi-glow-danger { --kpi-glow: rgba(229, 72, 77, 0.36); }
+
+/* Stagger giriş — kart grid'i, 25ms adım, maks 12 öğe */
+@keyframes stagger-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+.stagger-grid > * { animation: stagger-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.stagger-grid > *:nth-child(2) { animation-delay: 25ms; }
+.stagger-grid > *:nth-child(3) { animation-delay: 50ms; }
+.stagger-grid > *:nth-child(4) { animation-delay: 75ms; }
+.stagger-grid > *:nth-child(5) { animation-delay: 100ms; }
+.stagger-grid > *:nth-child(6) { animation-delay: 125ms; }
+.stagger-grid > *:nth-child(7) { animation-delay: 150ms; }
+.stagger-grid > *:nth-child(8) { animation-delay: 175ms; }
+.stagger-grid > *:nth-child(9) { animation-delay: 200ms; }
+.stagger-grid > *:nth-child(10) { animation-delay: 225ms; }
+.stagger-grid > *:nth-child(11) { animation-delay: 250ms; }
+.stagger-grid > *:nth-child(12) { animation-delay: 275ms; }
+
+/* Odometre — dikey kayan basamak (OdometerNumber komponenti) */
+.odometer {
+  display: inline-flex;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+.odometer-digit {
+  display: inline-block;
+  height: 1em;
+  overflow: hidden;
+}
+/* Basamak 0'dan başlayıp inline hedef transform'una kayar */
+@keyframes odometer-roll {
+  from { transform: translateY(0); }
+}
+.odometer-track {
+  display: inline-flex;
+  flex-direction: column;
+  animation: odometer-roll 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform;
+}
+.odometer-track > span,
+.odometer-char {
+  display: block;
+  height: 1em;
+  line-height: 1;
+}
+
+/* TV modu — tüm panel ~%25 büyür (uzaktan okunur), düzen oranları korunur */
+.tv-zoom { zoom: 1.25; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tilt-card:hover,
+  .tilt-card:nth-child(even):hover { transform: none; }
+  .stagger-grid > * { animation: none; }
+  .odometer-track { animation: none; }
+}
+
+/* ============================================================
+   YENİ CSS KATMANI — hepsi progressive enhancement
+   (view transitions · @starting-style · scroll-driven · container queries)
+   Desteklemeyen tarayıcıda bu bloklar yok sayılır; görünüm bugünkü ile aynı.
+   ============================================================ */
+
+/* ---- 1) VIEW TRANSITIONS (experimental.viewTransition + app/template.tsx) ----
+   Root snapshot'ın varsayılan cross-fade'ini 180ms'e çeker; panel içeriği
+   (React <ViewTransition default="page-fade">) aynı süreyle uyumlu. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: ease;
+}
+::view-transition-group(.page-fade),
+::view-transition-old(.page-fade),
+::view-transition-new(.page-fade) {
+  animation-duration: 180ms;
+  animation-timing-function: ease;
+}
+
+/* Çakışma önleme: VT destekli tarayıcıda panel template'inin .page-in
+   keyframe'i kapatılır (yalnız .vt-page — admin template'i VT kullanmadığı
+   için .page-in oradan aynen çalışmaya devam eder). */
+@supports (view-transition-name: root) {
+  .vt-page.page-in { animation: none; }
+}
+
+/* Reduced-motion: ::view-transition pseudo'larına global `*` kuralı ulaşmaz,
+   ayrıca sıfırlanmaları gerekir. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+
+/* ---- 2) @starting-style — yalnız .reveal / .reveal-scale ----
+   Eleman DOM'a girdiği anda (ilk stil karesi) buradaki değerlerden mevcut
+   transition ile hedefe akar. JS'li akışta başlangıç değerleri zaten aynı
+   olduğu için no-op (IntersectionObserver davranışı değişmez); JS'siz
+   tarayıcıda ise içerik "pat" diye belirmek yerine yumuşak girer.
+   dialog-content / popover-in'e BİLEREK dokunulmadı: girişleri keyframe
+   animasyonuyla sürülüyor; üzerine transition + @starting-style eklemek
+   çift mekanizma / Radix çıkış animasyonu riskini getirirdi. */
+@starting-style {
+  .reveal { opacity: 0; transform: translateY(10px); }
+  .reveal-scale { opacity: 0; transform: scale(0.99); }
+}
+
+/* ---- 3) SCROLL-DRIVEN ANIMATIONS (landing, saf CSS) ----
+   Yalnız YENİ sınıflar (.sda-*) — Reveal'ın kendi elemanlarına eklenmedi.
+   .sda-title: bölüm başlığı, viewport'a girerken fade + rise (view() timeline).
+   .sda-parallax: vitrin kartı görseli, kart viewport'ta ilerlerken hafif lag
+   (translate) — taşma payı için sabit scale, kart overflow-hidden içinde.
+   Reduced-motion'da blok tamamen devre dışı. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes sda-title-in {
+      from { opacity: 0.15; transform: translateY(22px); }
+      to { opacity: 1; transform: none; }
+    }
+    .sda-title {
+      animation: sda-title-in linear both;
+      animation-timeline: view();
+      animation-range: entry 10% entry 70%;
+    }
+
+    @keyframes sda-parallax-y {
+      from { translate: 0 -12px; }
+      to { translate: 0 12px; }
+    }
+    .sda-parallax {
+      /* translate kayması kenar boşluğu açmasın diye sabit taşma payı.
+         Not: bu tarayıcılarda hover zoom'un (scale-[1.06]) yerini alır. */
+      scale: 1.12;
+      animation: sda-parallax-y linear both;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+    }
+  }
+}
+
+/* ---- 4) CONTAINER QUERIES — dashboard widget kartları için hazır utility ----
+   Kullanım (henüz hiçbir sayfaya uygulanmadı): widget kartının dış sarmalayıcısına
+   .cq-panel, içindeki büyük KPI değerine .cq-kpi-value verilir; kart hangi grid
+   kolonuna düşerse düşsün darlaştığında font kendiliğinden küçülür.
+   Tailwind v4 alternatifi: parent'a `@container`, child'a `@max-[22rem]:text-xl`
+   gibi container variant'ları — ikisi aynı motoru kullanır, karışık kullanılabilir. */
+.cq-panel { container-type: inline-size; }
+
+@container (max-width: 22rem) {
+  .cq-panel .cq-kpi-value,
+  .cq-kpi-value {
+    font-size: 1.25rem;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* ---- 5) DOKUNMATİK — hover'a bağlı hızlı aksiyonlar ----
+   Masaüstünde davranış aynen korunur (opacity-0 + group-hover:opacity-100);
+   hover'ı olmayan cihazlarda (telefon/tablet) aksiyon her zaman görünür olur.
+   Kullanım: hover'da beliren fonksiyonel butona/linke `.hover-action`,
+   varsa hover'da gizlenen karşıt öğeye `.hover-action-hide`. */
+@media (hover: none) {
+  .hover-action { opacity: 1 !important; }
+  .hover-action-hide { opacity: 0 !important; }
 }

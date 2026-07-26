@@ -65,3 +65,42 @@ export async function createCall(formData: FormData): Promise<CallResult> {
   revalidatePath("/app");
   return { ok: true };
 }
+
+export type CallSummaryResult = { error?: string; summary?: string; nextStep?: string };
+
+/**
+ * AI görüşme özeti — notu olan bir çağrı için 2 cümlelik özet + 1 sonraki adım.
+ * Anlıktır, kaydedilmez (bkz. lib/ai/call-summary). Anahtar yoksa UI'da buton
+ * zaten gösterilmez; yine de burada da null kontrolü yapılır.
+ */
+export async function summarizeCallNotes(callId: string): Promise<CallSummaryResult> {
+  const gate = await requirePermission("calls", "view");
+  if (!gate.ok) return { error: gate.error };
+
+  const id = String(callId ?? "").trim();
+  if (!id) return { error: "Çağrı bulunamadı." };
+
+  const supabase = await createClient();
+  const { data: call } = await supabase
+    .from("calls")
+    .select("id, direction, disposition, notes, duration_sec, started_at, customer:customers(full_name)")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!call) return { error: "Çağrı bulunamadı." };
+  if (!call.notes?.trim()) return { error: "Bu çağrının notu yok." };
+
+  const customer = Array.isArray(call.customer) ? call.customer[0] : call.customer;
+  const { generateCallSummary } = await import("@/lib/ai/call-summary");
+  const result = await generateCallSummary({
+    notes: call.notes,
+    direction: call.direction,
+    disposition: call.disposition,
+    durationSec: call.duration_sec,
+    customerName: customer?.full_name ?? null,
+    startedAt: call.started_at,
+  });
+
+  if (!result) return { error: "AI özeti şu an üretilemedi." };
+  return { summary: result.summary, nextStep: result.nextStep };
+}

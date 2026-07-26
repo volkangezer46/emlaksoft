@@ -91,7 +91,7 @@ export function AddToCalendarButton({ event }: { event: CalendarEvent }) {
           >
             <Download className="h-4 w-4 shrink-0 text-text-muted" />
             ICS dosyası indir
-            <span className="ml-auto text-[10px] text-text-faint">Apple, diğer</span>
+            <span className="ml-auto text-[11px] text-text-faint">Apple, diğer</span>
           </button>
         </div>
       )}

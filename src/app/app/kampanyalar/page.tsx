@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MessageSquare } from "lucide-react";
+import { ArrowUpRight, Loader2, MessageSquare } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listCampaigns } from "@/app/actions/campaigns";
 import { NewCampaignDialog } from "./new-campaign-dialog";
@@ -25,7 +25,32 @@ const STATUS_BADGES: DataTableColumn["badges"] = {
 const CHANNEL_BADGES: DataTableColumn["badges"] = {
   sms:      { label: "SMS",      variant: "info" },
   whatsapp: { label: "WhatsApp", variant: "success" },
+  email:    { label: "E-posta",  variant: "default" },
 };
+
+const DURUM_FILTERS = [
+  { label: "Tümü", value: "" },
+  { label: "Taslak", value: "draft" },
+  { label: "Zamanlandı", value: "scheduled" },
+  { label: "Gönderiliyor", value: "sending" },
+  { label: "Tamamlandı", value: "done" },
+  { label: "Başarısız", value: "failed" },
+] as const;
+
+const KANAL_FILTERS = [
+  { label: "Tüm kanallar", value: "" },
+  { label: "SMS", value: "sms" },
+  { label: "WhatsApp", value: "whatsapp" },
+  { label: "E-posta", value: "email" },
+] as const;
+
+function filterHref(durum: string, kanal: string) {
+  const sp = new URLSearchParams();
+  if (durum) sp.set("durum", durum);
+  if (kanal) sp.set("kanal", kanal);
+  const qs = sp.toString();
+  return qs ? `/app/kampanyalar?${qs}` : "/app/kampanyalar";
+}
 
 function relativeDate(iso: string) {
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
@@ -35,11 +60,23 @@ function relativeDate(iso: string) {
   return new Date(iso).toLocaleDateString("tr-TR");
 }
 
-export default async function KampanyalarPage() {
+export default async function KampanyalarPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ durum?: string; kanal?: string }>;
+}) {
   const { perms } = await requireModulePage("campaigns");
+  const params = (await searchParams) ?? {};
+  const durum = params.durum ?? "";
+  const kanal = params.kanal ?? "";
   const campaigns = await listCampaigns();
 
   const canCreate = perms.campaigns?.includes("create") ?? false;
+
+  const filtered = campaigns.filter(
+    (c) => (!durum || c.status === durum) && (!kanal || c.channel === kanal),
+  );
+  const hasFilter = Boolean(durum || kanal);
 
   const CAMPAIGN_COLUMNS: DataTableColumn[] = [
     { key: "title", header: "Kampanya", sortable: true },
@@ -53,7 +90,7 @@ export default async function KampanyalarPage() {
     { key: "_href", header: "", format: "link", linkLabel: "Detay" },
   ];
 
-  const campaignRows: DataTableRow[] = campaigns.map((c) => ({
+  const campaignRows: DataTableRow[] = filtered.map((c) => ({
     id:      c.id,
     title:   c.title,
     channel: c.channel,
@@ -69,7 +106,7 @@ export default async function KampanyalarPage() {
   }));
 
   const campaignActions: Record<string, React.ReactNode> = Object.fromEntries(
-    campaigns.map((c) => [c.id, <CampaignActions key={c.id} campaign={c} canSend={canCreate} />]),
+    filtered.map((c) => [c.id, <CampaignActions key={c.id} campaign={c} canSend={canCreate} />]),
   );
 
   const total   = campaigns.length;
@@ -97,26 +134,75 @@ export default async function KampanyalarPage() {
           </div>
           <div className="flex gap-3">
             {[
-              { label: "Toplam", value: total },
-              { label: "Gönderildi", value: done },
-              { label: "Gönderilen mesaj", value: totalSent.toLocaleString("tr-TR") },
+              { label: "Toplam", value: total, href: "/app/kampanyalar" },
+              { label: "Gönderildi", value: done, href: "/app/kampanyalar?durum=done" },
+              { label: "Gönderilen mesaj", value: totalSent.toLocaleString("tr-TR"), href: "/app/kampanyalar?durum=done" },
             ].map((k) => (
-              <div key={k.label} className="rounded-[14px] border border-white/12 bg-white/8 p-3 text-center">
+              <Link
+                key={k.label}
+                href={k.href}
+                className="focus-ring press group relative block rounded-[14px] border border-white/12 bg-white/8 p-3 text-center transition hover:border-white/30"
+              >
+                <ArrowUpRight className="hover-action absolute right-2 top-2 h-3.5 w-3.5 text-white/50 opacity-0 transition group-hover:opacity-100" />
                 <p className="font-display text-2xl font-extrabold text-white">{k.value}</p>
-                <p className="text-[10px] text-white/70">{k.label}</p>
-              </div>
+                <p className="text-[11px] text-white/70">{k.label}</p>
+              </Link>
             ))}
           </div>
         </div>
       </section>
 
       {/* Üst toolbar */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-text-muted">
-          {sending > 0 ? `${sending} kampanya şu an gönderiliyor…` : `${total} kampanya`}
+          {sending > 0 ? (
+            <Link
+              href="/app/kampanyalar?durum=sending"
+              className="focus-ring inline-flex items-center gap-1.5 font-semibold text-amber-600 hover:underline"
+            >
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> {sending} kampanya şu an gönderiliyor…
+            </Link>
+          ) : hasFilter ? (
+            `${filtered.length} / ${total} kampanya`
+          ) : (
+            `${total} kampanya`
+          )}
         </p>
         {canCreate && <NewCampaignDialog />}
       </div>
+
+      {/* Filtre çipleri — ?durum= & ?kanal= (linkler diğer parametreyi korur) */}
+      {campaigns.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="flex flex-wrap gap-1.5">
+            {DURUM_FILTERS.map((f) => (
+              <Link
+                key={`d-${f.value}`}
+                href={filterHref(f.value, kanal)}
+                className={`focus-ring rounded-[9px] px-2.5 py-1.5 text-xs font-semibold transition ${
+                  durum === f.value ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
+                }`}
+              >
+                {f.label}
+              </Link>
+            ))}
+          </div>
+          <span aria-hidden className="hidden h-4 w-px bg-line sm:block" />
+          <div className="flex flex-wrap gap-1.5">
+            {KANAL_FILTERS.map((f) => (
+              <Link
+                key={`k-${f.value}`}
+                href={filterHref(durum, f.value)}
+                className={`focus-ring rounded-[9px] px-2.5 py-1.5 text-xs font-semibold transition ${
+                  kanal === f.value ? "bg-brand-600 text-white" : "border border-line text-text-muted hover:text-ink-950"
+                }`}
+              >
+                {f.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {/* Liste */}
       {campaigns.length === 0 ? (
@@ -126,6 +212,13 @@ export default async function KampanyalarPage() {
           description="İlk kampanyanızı oluşturun. Müşteri listenizdeki herkese SMS veya WhatsApp gönderin."
           tone="brand"
           action={canCreate ? { label: "Yeni kampanya", node: <NewCampaignDialog /> } : undefined}
+        />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={MessageSquare}
+          title="Bu filtreyle eşleşen kampanya yok"
+          description="Filtre seçimini değiştirin veya temizleyin."
+          action={{ label: "Filtreyi temizle", href: "/app/kampanyalar" }}
         />
       ) : (
         <DataTable

@@ -9,6 +9,7 @@ import {
   MapPin,
   Plus,
   Sparkles,
+  TriangleAlert,
 } from "lucide-react";
 import { createAppointment } from "@/app/actions/appointments";
 import { Combobox } from "@/components/ui/combobox";
@@ -37,14 +38,21 @@ export function NewAppointmentDialog({
   customers,
   properties,
   typeOptions = DEFAULT_TYPE_OPTIONS,
+  defaultCustomerId,
 }: {
   customers: Option[];
   properties: Option[];
   typeOptions?: { value: string; label: string }[];
+  /** ?customer= ile gelindiğinde (müşteri kartı → "Randevu ver") ön seçim. */
+  defaultCustomerId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Sunucu çakışma bulduğunda uyarı metni gelir; kayıt YAPILMAMIŞTIR.
+  // Form amber bandı gösterir ve gizli confirm_conflict=1 ile ikinci
+  // gönderimde (kullanıcı ısrar ederse) kayıt geçer.
+  const [conflictWarning, setConflictWarning] = useState<string | null>(null);
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -58,9 +66,15 @@ export function NewAppointmentDialog({
     if (result.ok) {
       formRef.current?.reset();
       setOpen(false);
+      setConflictWarning(null);
       router.refresh();
       return;
     }
+    if (result.conflictWarning) {
+      setConflictWarning(result.conflictWarning);
+      return;
+    }
+    setConflictWarning(null);
     setError(result.error ?? "Randevu oluşturulamadı.");
   }
 
@@ -117,6 +131,7 @@ export function NewAppointmentDialog({
                   searchPlaceholder="Müşteri ara…"
                   emptyText="Eşleşen müşteri yok"
                   onSearch={searchCustomers}
+                  defaultValue={defaultCustomerId}
                   options={customers.map((customer) => ({ value: customer.id, label: customer.label }))}
                 />
               </div>
@@ -150,6 +165,23 @@ export function NewAppointmentDialog({
 
               {error ? <p className="sm:col-span-2 text-sm font-medium text-danger-600" role="alert">{error}</p> : null}
 
+              {/* Çakışma freni: sunucu aynı danışmanın örtüşen randevusunu buldu,
+                  kayıt yapılmadı. Gizli confirm_conflict=1 forma eklenir —
+                  kullanıcı ısrar edip tekrar gönderirse kayıt geçer. */}
+              {conflictWarning ? (
+                <div
+                  className="sm:col-span-2 flex items-start gap-2.5 rounded-[12px] border border-amber-400/50 bg-amber-400/10 px-4 py-3 text-xs font-medium leading-relaxed text-amber-700"
+                  role="alert"
+                >
+                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  <span>
+                    <strong>{conflictWarning}</strong> Randevu henüz kaydedilmedi — yine de planlamak
+                    istiyorsanız &quot;Yine de kaydet&quot; ile devam edin.
+                  </span>
+                  <input type="hidden" name="confirm_conflict" value="1" />
+                </div>
+              ) : null}
+
               <div className="hairline-t sm:col-span-2 flex items-center justify-end gap-2 pt-4">
                 <DialogClose asChild>
                   <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
@@ -157,7 +189,7 @@ export function NewAppointmentDialog({
                   </button>
                 </DialogClose>
                 <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
-                  <Check className="h-4 w-4" /> {pending ? "Planlanıyor…" : "Randevuyu planla"}
+                  <Check className="h-4 w-4" /> {pending ? "Planlanıyor…" : conflictWarning ? "Yine de kaydet" : "Randevuyu planla"}
                 </button>
               </div>
         </form>

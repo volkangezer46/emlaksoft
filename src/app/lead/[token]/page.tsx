@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LeadForm } from "./lead-form";
@@ -12,7 +13,7 @@ export default async function PublicLeadPage({ params }: { params: Promise<{ tok
   const [{ data: tenant }, { data: provinces }] = await Promise.all([
     admin
       .from("tenants")
-      .select("name, logo_url, brand_color, lead_capture_enabled")
+      .select("name, slug, logo_url, brand_color, lead_capture_enabled")
       .eq("lead_capture_token", token)
       .maybeSingle(),
     admin.from("geo_provinces").select("id, name").eq("is_active", true).order("name"),
@@ -29,12 +30,24 @@ export default async function PublicLeadPage({ params }: { params: Promise<{ tok
       <div className="pointer-events-none fixed -left-16 bottom-0 -z-10 h-64 w-64 rounded-full bg-mint-500/20 blur-[110px]" />
 
       <div className="mx-auto max-w-lg">
-        <div className="mb-5 flex items-center justify-center gap-2 text-xs font-semibold text-white/60">
-          <span className="grid h-7 w-7 place-items-center rounded-[9px] bg-white/10 text-[12px] font-bold text-white">
-            {tenant.name ? tenant.name[0] : "E"}
-          </span>
-          {tenant.name || "EmlakSoft"}
-        </div>
+        {tenant.slug ? (
+          <Link
+            href={`/vitrin/${tenant.slug}`}
+            className="mb-5 flex items-center justify-center gap-2 text-xs font-semibold text-white/60 transition hover:text-white"
+          >
+            <span className="grid h-7 w-7 place-items-center rounded-[9px] bg-white/10 text-[12px] font-bold text-white">
+              {tenant.name ? tenant.name[0] : "E"}
+            </span>
+            {tenant.name || "EmlakSoft"}
+          </Link>
+        ) : (
+          <div className="mb-5 flex items-center justify-center gap-2 text-xs font-semibold text-white/60">
+            <span className="grid h-7 w-7 place-items-center rounded-[9px] bg-white/10 text-[12px] font-bold text-white">
+              {tenant.name ? tenant.name[0] : "E"}
+            </span>
+            {tenant.name || "EmlakSoft"}
+          </div>
+        )}
 
         <div className="overflow-hidden rounded-[24px] border border-white/15 bg-white/[0.06] p-6 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.7)] backdrop-blur-xl sm:p-8">
           <h1 className="font-display text-2xl font-extrabold leading-tight sm:text-3xl">
@@ -49,12 +62,15 @@ export default async function PublicLeadPage({ params }: { params: Promise<{ tok
               Bu form şu anda kapalı. Lütfen daha sonra tekrar deneyin.
             </p>
           ) : (
-            <LeadForm token={token} provinces={provinces ?? []} />
+            <LeadForm token={token} provinces={provinces ?? []} vitrinSlug={tenant.slug ?? null} />
           )}
         </div>
 
         <p className="mt-6 text-center text-[11px] text-white/30">
-          Powered by EmlakSoft — Türkiye&apos;nin emlak işletim sistemi
+          <Link href="/" className="font-semibold underline-offset-2 transition hover:text-white/70 hover:underline">
+            Powered by EmlakSoft
+          </Link>{" "}
+          — Türkiye&apos;nin emlak işletim sistemi
         </p>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { computePriceHealth, type PriceHealth } from "@/lib/price-health";
 
 /**
  * Yerli emsal (comparable) değerleme motoru — DIŞ API'YE SIFIR BAĞIMLILIK.
@@ -163,6 +164,92 @@ export async function listComparables(
   }));
 }
 
+/** Rapor tablolarında gösterilen emsal satırı: kod + ilçe eklenmiş hâli. */
+export type ComparableDetail = ComparableRow & {
+  property_code: string | null;
+  district_name: string | null;
+};
+
+/**
+ * Değerlemede KULLANILAN emsal kümesinin dökümü — "hangi kayıtlara dayandık?"
+ *
+ * `estimateFromComparables` ile AYNI RPC zincirini (find_comparables) çağırır;
+ * yani burada dönen satırlar tahmine giren kümenin ta kendisidir, ayrı bir
+ * hesap yolu değildir. Mevcut hesap akışına dokunulmaz — bu yalnızca okuma.
+ * Rapor tablosu için portföy kodu ve ilçe adı ikinci bir sorguyla eklenir.
+ */
+export async function listComparableDetails(
+  supabase: SupabaseClient,
+  input: ComparableInput,
+  limit = 8,
+): Promise<ComparableDetail[]> {
+  const rows = await listComparables(supabase, input, limit);
+  if (rows.length === 0) return [];
+
+  const ids = Array.from(new Set(rows.map((r) => r.property_id)));
+  const [{ data: props }, { data: district }] = await Promise.all([
+    supabase.from("properties").select("id, property_code").in("id", ids),
+    input.districtId
+      ? supabase.from("geo_districts").select("name").eq("id", input.districtId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const codeById = new Map<string, string | null>(
+    ((props ?? []) as Array<{ id: string; property_code: string | null }>).map((p) => [
+      p.id,
+      p.property_code ?? null,
+    ]),
+  );
+  const districtName = (district as { name?: string } | null)?.name ?? null;
+
+  return rows.map((r) => ({
+    ...r,
+    property_code: codeById.get(r.property_id) ?? null,
+    district_name: districtName,
+  }));
+}
+
+/**
+ * Değerleme kaydının `sources` jsonb dizisine eklenen EMSAL ANLIK GÖRÜNTÜSÜ.
+ *
+ * Neden burada: `valuations` tablosuna kolon eklemek migration ister; `sources`
+ * zaten jsonb ve rapor sayfaları onu diziden okuyor. Ağırlığı 0 olan, adı sabit
+ * bir eleman olarak saklanır — fiyat hesabına girmez, rapor sayfaları bu adı
+ * bilerek ayıklar (bilgi kaynakları listesine sızmaz).
+ */
+export const COMPARABLES_SOURCE_NAME = "__emsal_dokumu";
+
+export type ComparablesSourceEntry = {
+  name: typeof COMPARABLES_SOURCE_NAME;
+  weight: 0;
+  value: number;
+  note: string;
+  comparables: ComparableDetail[];
+};
+
+export function comparablesSourceEntry(rows: ComparableDetail[]): ComparablesSourceEntry {
+  return {
+    name: COMPARABLES_SOURCE_NAME,
+    weight: 0,
+    value: rows.length,
+    note: "Değerleme anında kullanılan emsal kayıtları (rapor tablosu için).",
+    comparables: rows,
+  };
+}
+
+/** Kayıttaki emsal anlık görüntüsünü çıkarır; yoksa null (eski kayıtlar). */
+export function extractStoredComparables(sources: unknown): ComparableDetail[] | null {
+  if (!Array.isArray(sources)) return null;
+  const entry = sources.find(
+    (s): s is ComparablesSourceEntry =>
+      typeof s === "object" &&
+      s !== null &&
+      (s as { name?: unknown }).name === COMPARABLES_SOURCE_NAME &&
+      Array.isArray((s as { comparables?: unknown }).comparables),
+  );
+  return entry ? entry.comparables : null;
+}
+
 /**
  * Liste fiyatının emsal medyanına göre konumu.
  * Portföy sağlığı ve "neden satmıyor" sorusu için doğrudan sinyal.
@@ -204,4 +291,63 @@ export function pricePosition(
     verdict: "piyasa seviyesinde",
     hint: "Fiyat emsallerle uyumlu.",
   };
+}
+
+/**
+ * Emsal sapmasını fiyat sağlığı bandına çevirir — price-health.ts'teki
+ * m² modeliyle AYNI eşikler (≤%10 green · ≤%20 yellow · üzeri red) ki
+ * iki kaynak arasında geçiş sinyali zıplatmasın.
+ */
+export function healthFromDeviation(deviationPct: number): PriceHealth {
+  const abs = Math.abs(deviationPct);
+  if (abs > 20) return "red";
+  if (abs > 10) return "yellow";
+  return "green";
+}
+
+/**
+ * Kalıcı `properties.price_health` değeri için TEK karar noktası.
+ *
+ * Sıra: önce yerli emsal motoru (gerçekleşen anlaşma + aktif arz — en
+ * güvenilir sinyal); emsal `yetersiz` dönerse il/ilçe m² referans modeli
+ * (computePriceHealth). Her iki yol da 'green'|'yellow'|'red'|'pending'
+ * üretir — liste/detay sayfalarındaki rozetlerin beklediği değerler.
+ *
+ * Hem server action (fiyat güncellenince anında) hem cron (toplu tazeleme)
+ * bu fonksiyonu çağırır; hesap mantığı tek yerde kalır.
+ */
+export async function resolvePriceHealth(
+  supabase: SupabaseClient,
+  input: {
+    tenantId: string;
+    listPrice: number | null;
+    sqm: number | null;
+    districtId: string | null;
+    propertyType: string | null;
+    transactionType: string | null;
+    /** m² modeli için konum ipucu (ilçe adı, yoksa il adı) */
+    districtHint: string | null;
+    excludePropertyId?: string | null;
+  },
+): Promise<PriceHealth> {
+  try {
+    const estimate = await estimateFromComparables(supabase, {
+      tenantId: input.tenantId,
+      districtId: input.districtId,
+      propertyType: input.propertyType,
+      transactionType: input.transactionType,
+      sqm: input.sqm,
+      excludePropertyId: input.excludePropertyId ?? null,
+    });
+    const position = pricePosition(input.listPrice, estimate);
+    if (position) return healthFromDeviation(position.deviationPct);
+  } catch (e) {
+    console.error("resolvePriceHealth comparables", e);
+  }
+  return computePriceHealth({
+    listPrice: input.listPrice,
+    sqm: input.sqm,
+    districtHint: input.districtHint,
+    transactionType: input.transactionType,
+  }).health;
 }

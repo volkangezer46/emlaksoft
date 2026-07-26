@@ -29,7 +29,7 @@ export async function bulkUpdatePropertyStatus(
   // Sadece bu tenanta ait portföyleri güncelle (güvenlik)
   const { data: existing } = await supabase
     .from("properties")
-    .select("id, status")
+    .select("id, status, published_at")
     .in("id", ids)
     .eq("tenant_id", gate.tenantId)
     .is("deleted_at", null);
@@ -39,14 +39,29 @@ export async function bulkUpdatePropertyStatus(
   const validIds = existing.map((p) => p.id);
   const now = new Date().toISOString();
 
-  // Toplu güncelle
-  const { error } = await supabase
-    .from("properties")
-    .update({ status: newStatus, updated_at: now })
-    .in("id", validIds)
-    .eq("tenant_id", gate.tenantId);
+  // Toplu güncelle — live'a geçişte İLK kez yayınlananlar published_at
+  // damgası alır; published_at'i zaten dolu olanlara DOKUNULMAZ (yeniden
+  // yayına almada orijinal yayın tarihi korunur). İki ayrı update ile.
+  const firstLiveIds =
+    newStatus === "live" ? existing.filter((p) => p.published_at == null).map((p) => p.id) : [];
+  const restIds = validIds.filter((id) => !firstLiveIds.includes(id));
 
-  if (error) return { error: "Güncelleme başarısız." };
+  if (firstLiveIds.length) {
+    const { error } = await supabase
+      .from("properties")
+      .update({ status: newStatus, updated_at: now, published_at: now })
+      .in("id", firstLiveIds)
+      .eq("tenant_id", gate.tenantId);
+    if (error) return { error: "Güncelleme başarısız." };
+  }
+  if (restIds.length) {
+    const { error } = await supabase
+      .from("properties")
+      .update({ status: newStatus, updated_at: now })
+      .in("id", restIds)
+      .eq("tenant_id", gate.tenantId);
+    if (error) return { error: "Güncelleme başarısız." };
+  }
 
   // Durum geçmişi kayıtları (toplu insert)
   const historyRows = existing.map((p) => ({

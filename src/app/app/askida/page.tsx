@@ -1,7 +1,8 @@
-import { Lock, Mail, ShieldAlert } from "lucide-react";
+import { CreditCard, Lock, Mail, ShieldAlert } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getPlatformStaff } from "@/lib/platform";
+import { ButtonLink } from "@/components/ui/button";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 
@@ -62,7 +63,7 @@ export default async function SuspendedPage() {
           </span>
         </div>
 
-        <p className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-danger-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[.14em] text-danger-500">
+        <p className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-danger-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-danger-500">
           <Lock className="h-3 w-3" /> Erişim kilitli
         </p>
         <h1 className="mt-3 font-display text-2xl font-extrabold text-ink-950">Hesap erişimi kısıtlandı</h1>
@@ -88,9 +89,18 @@ export default async function SuspendedPage() {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          {!isCancelled ? (
+            <ButtonLink href="/app/abonelik">
+              <CreditCard className="h-4 w-4" /> Ödemeyi tamamla
+            </ButtonLink>
+          ) : null}
           <a
             href="mailto:destek@emlaksoft.com.tr"
-            className="inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
+            className={`inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold ${
+              isCancelled
+                ? "bg-brand-600 text-white hover:bg-brand-700"
+                : "border border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
+            }`}
           >
             <Mail className="h-4 w-4" /> Destek yaz
           </a>

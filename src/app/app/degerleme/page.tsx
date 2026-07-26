@@ -80,10 +80,16 @@ export default async function ValuationPage({
                 const priceSources = sources.filter((s) => s.weight > 0);
                 const investmentScoreSource = sources.find((s) => s.name === "Tapusor yatırım puanı");
                 return (
-                  <article key={v.id} className="rounded-[14px] border border-line bg-canvas/60 p-4">
+                  <article key={v.id} className="group relative rounded-[14px] border border-line bg-canvas/60 p-4 transition hover:border-brand-300">
+                    {/* Kartın tamamı rapora gider; alttaki ikincil linkler z-10 ile üstte kalır */}
+                    <Link
+                      href={`/app/degerleme/${v.id}`}
+                      className="absolute inset-0 rounded-[14px]"
+                      aria-label={`${v.title ?? "Değerleme"} raporunu aç`}
+                    />
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-display font-bold text-ink-950">{v.title}</p>
-                      <span className="text-[10px] font-bold text-mint-600">
+                      <p className="font-display font-bold text-ink-950 group-hover:text-brand-600">{v.title}</p>
+                      <span className="text-[11px] font-bold text-mint-600">
                         %{Math.round(Number(v.confidence || 0) * 100)} güven
                       </span>
                     </div>
@@ -99,7 +105,7 @@ export default async function ValuationPage({
                         {priceSources.map((s) => (
                           <span
                             key={s.name}
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
                               s.name.includes("Endeksa")
                                 ? "bg-cyan-500/10 text-cyan-700"
                                 : s.name.includes("Tapusor")
@@ -123,14 +129,14 @@ export default async function ValuationPage({
                     <div className="hairline-t mt-3 flex flex-wrap items-center gap-3 pt-2.5">
                       <Link
                         href={`/app/degerleme/${v.id}`}
-                        className="focus-ring inline-flex items-center gap-1 rounded-[8px] text-xs font-bold text-brand-600 hover:underline"
+                        className="focus-ring relative z-10 inline-flex items-center gap-1 rounded-[8px] text-xs font-bold text-brand-600 hover:underline"
                       >
                         <FileText className="h-3.5 w-3.5" /> Raporu aç
                       </Link>
                       {v.property_id ? (
                         <Link
                           href={`/app/portfoyler/${v.property_id}`}
-                          className="focus-ring text-xs font-semibold text-text-muted hover:text-brand-600 hover:underline"
+                          className="focus-ring relative z-10 text-xs font-semibold text-text-muted hover:text-brand-600 hover:underline"
                         >
                           Portföye git →
                         </Link>

@@ -69,6 +69,34 @@ export async function confirmPortalListing(formData: FormData): Promise<void> {
   revalidatePath("/app");
 }
 
+/**
+ * Toplu teyit — tekil `confirmPortalListing`in çok kayıtlı hali.
+ * Tek update + `.in()` ile çalışır; yalnızca canlı ilanlar teyitlenir
+ * (kapanmış bir kaydı yanlışlıkla diriltmemek için status koşulu var).
+ */
+export async function confirmPortalListingsBulk(formData: FormData): Promise<void> {
+  const gate = await requirePermission("portals", "edit");
+  if (!gate.ok) return;
+  const ids = [...new Set(formData.getAll("ids").map((v) => String(v).trim()).filter(Boolean))];
+  if (ids.length === 0) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("portal_listings")
+    .update({ last_confirmed_at: new Date().toISOString() })
+    .in("id", ids)
+    .eq("tenant_id", gate.tenantId)
+    .eq("status", "live");
+  if (error) {
+    console.error("confirmPortalListingsBulk", error);
+    return;
+  }
+
+  revalidatePath("/app/portallar");
+  revalidatePath("/app/kayip-kacak");
+  revalidatePath("/app");
+}
+
 export async function closePortalListing(formData: FormData): Promise<PortalResult> {
   const gate = await requirePermission("portals", "edit");
   if (!gate.ok) return { error: gate.error };

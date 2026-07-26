@@ -10,6 +10,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { moneyTry } from "@/lib/leak-shield";
+import { InteractiveChart } from "@/components/app/interactive-chart";
 import type { CSSProperties } from "react";
 import { now } from "@/lib/clock";
 
@@ -49,24 +50,58 @@ function daysSince(value: string | null) {
   return Math.floor((Date.now() - new Date(value).getTime()) / 86_400_000);
 }
 
-export default async function LeakShieldPage() {
+const TIP_FILTERS = ["rakip", "bizim", "islem"] as const;
+type TipFilter = (typeof TIP_FILTERS)[number];
+
+const TIP_LABELS: Record<TipFilter, string> = {
+  rakip: "Rakip kapanış",
+  bizim: "Bizim kapanış",
+  islem: "İşlem var",
+};
+
+const PAGE_SIZE = 50;
+
+/** YYYY-MM-DD biçimindeyse döndür, aksi halde boş — sorguya ham girdi gitmesin. */
+function safeDate(value: string | undefined) {
+  const v = (value ?? "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "";
+}
+
+export default async function LeakShieldPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ neden?: string; tip?: string; from?: string; to?: string; sayfa?: string }>;
+}) {
   await requireModulePage("leak");
+  const params = (await searchParams) ?? {};
+  const nedenF = (params.neden ?? "").trim();
+  const tipF = TIP_FILTERS.includes(params.tip as TipFilter) ? (params.tip as TipFilter) : "";
+  const fromF = safeDate(params.from);
+  const toF = safeDate(params.to);
+  const rangeActive = Boolean(fromF || toF);
   const supabase = await createClient();
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
+  // ?from=&to= sunucu tarafında uygulanır — KPI'lar ve grafikler de dahil
+  // her şey seçili aralıktan hesaplanır.
+  let closuresQuery = supabase
+    .from("listing_closures")
+    .select(
+      "id, reason, deal_happened, deal_amount, closed_by_us, competitor_closed, estimated_lost_commission, created_at, portal_listing:portal_listings(portal_name, portal_listing_id, property:properties(id, property_code, title))",
+    )
+    .order("created_at", { ascending: false })
+    .limit(500);
+  if (fromF) closuresQuery = closuresQuery.gte("created_at", fromF);
+  if (toF) closuresQuery = closuresQuery.lte("created_at", `${toF}T23:59:59.999`);
+
   const [{ data: closures }, { data: listings }] = await Promise.all([
-    supabase
-      .from("listing_closures")
-      .select(
-        "id, reason, deal_happened, deal_amount, closed_by_us, competitor_closed, estimated_lost_commission, created_at, portal_listing:portal_listings(portal_name, portal_listing_id, property:properties(id, property_code, title))",
-      )
-      .order("created_at", { ascending: false })
-      .limit(100),
+    closuresQuery,
     supabase
       .from("portal_listings")
-      .select("id, portal_name, portal_listing_id, status, last_confirmed_at, property:properties(property_code, title)")
+      // property id: teyit gecikmiş ilan kartlarından portföy detayına gidiş için
+      .select("id, portal_name, portal_listing_id, status, last_confirmed_at, property:properties(id, property_code, title)")
       .eq("status", "live")
       .limit(200),
   ]);
@@ -90,14 +125,12 @@ export default async function LeakShieldPage() {
     const idx = 7 - Math.floor((nowMs - new Date(r.created_at).getTime()) / weekMs);
     if (idx >= 0 && idx < 8) buckets[idx] += Number(r.estimated_lost_commission || 0);
   });
-  const maxBucket = Math.max(1, ...buckets);
-  const pts = buckets.map((b, i) => ({
-    x: (i / 7) * 280,
-    y: 72 - (b / maxBucket) * 52 - 8,
+  // Hafta etiketi: kovanın başladığı günün kısa tarihi (etkileşimli grafik + tooltip)
+  const weekFmt = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short" });
+  const trendWeeks = buckets.map((b, i) => ({
+    label: weekFmt.format(new Date(nowMs - (7 - i) * weekMs)),
+    value: b,
   }));
-  const line = pts.map((p) => `${p.x},${p.y}`).join(" ");
-  const area = `0,80 ${line} 280,80`;
-  const last = pts[pts.length - 1] ?? { x: 280, y: 40 };
 
   const reasonCounts = new Map<string, number>();
   rows.forEach((r) => reasonCounts.set(r.reason, (reasonCounts.get(r.reason) ?? 0) + 1));
@@ -108,6 +141,38 @@ export default async function LeakShieldPage() {
   const maxReason = Math.max(1, ...reasonBars.map((r) => r.count));
 
   const leakShare = rows.length ? leakRows.length / rows.length : 0;
+
+  // ?neden= & ?tip= — KPI'lar tüm kayıtlardan, yalnızca kapanış listesi süzülür.
+  // Veri zaten 100 kayıtla sınırlı çekildiği için bellek filtresi yeterli.
+  const listRows = rows.filter((r) => {
+    if (nedenF && r.reason !== nedenF) return false;
+    if (tipF === "rakip" && !r.competitor_closed) return false;
+    if (tipF === "bizim" && !r.closed_by_us) return false;
+    if (tipF === "islem" && !r.deal_happened) return false;
+    return true;
+  });
+  const hasFilter = Boolean(nedenF || tipF || rangeActive);
+
+  // ?sayfa= — kapanış listesi 50'şer sayfalanır; filtre linkleri sayfayı sıfırlar.
+  const totalPages = Math.max(1, Math.ceil(listRows.length / PAGE_SIZE));
+  const page = Math.min(Math.max(1, Number.parseInt(params.sayfa ?? "1", 10) || 1), totalPages);
+  const pageRows = listRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  /** Mevcut filtreyi koruyarak tek parametreyi değiştiren link üretici (sayfa sıfırlanır). */
+  const filterHref = (over: { neden?: string | null; tip?: string | null; from?: string | null; to?: string | null; sayfa?: number }) => {
+    const sp = new URLSearchParams();
+    const neden = over.neden === undefined ? nedenF : (over.neden ?? "");
+    const tip = over.tip === undefined ? tipF : (over.tip ?? "");
+    const from = over.from === undefined ? fromF : (over.from ?? "");
+    const to = over.to === undefined ? toF : (over.to ?? "");
+    if (neden) sp.set("neden", neden);
+    if (tip) sp.set("tip", tip);
+    if (from) sp.set("from", from);
+    if (to) sp.set("to", to);
+    if (over.sayfa && over.sayfa > 1) sp.set("sayfa", String(over.sayfa));
+    const qs = sp.toString();
+    return qs ? `/app/kayip-kacak?${qs}#kapanislar` : "/app/kayip-kacak#kapanislar";
+  };
 
   return (
     <div className="space-y-6">
@@ -124,22 +189,29 @@ export default async function LeakShieldPage() {
               Portal kapanışlarından otomatik hesaplanan tahmini kayıp. Rakip / ofis dışı işlemler burada görünür.
             </p>
             <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-[14px] border border-white/10 bg-white/5 p-3">
-                <p className="font-display text-lg font-extrabold text-danger-400">{moneyTry(lostMonth)}</p>
-                <p className="text-[10px] text-white/45">Bu ay kayıp</p>
-              </div>
-              <div className="rounded-[14px] border border-white/10 bg-white/5 p-3">
-                <p className="font-display text-lg font-extrabold">{moneyTry(lostAll)}</p>
-                <p className="text-[10px] text-white/45">Toplam kayıp</p>
-              </div>
-              <div className="rounded-[14px] border border-white/10 bg-white/5 p-3">
-                <p className="font-display text-lg font-extrabold text-amber-300">{competitor}</p>
-                <p className="text-[10px] text-white/45">Rakip kapanış</p>
-              </div>
-              <div className="rounded-[14px] border border-white/10 bg-white/5 p-3">
-                <p className="font-display text-lg font-extrabold text-warn-500">{overdue.length}</p>
-                <p className="text-[10px] text-white/45">Teyit gecikmiş</p>
-              </div>
+              {[
+                // Tarih aralığı seçiliyken KPI'lar o aralıktan hesaplanır
+                rangeActive
+                  ? { label: "Aralıkta kayıp", value: moneyTry(lostAll), tone: "text-danger-400", href: filterHref({}) }
+                  : { label: "Bu ay kayıp", value: moneyTry(lostMonth), tone: "text-danger-400", href: "/app/kayip-kacak#kapanislar" },
+                rangeActive
+                  ? { label: "Aralıkta kapanış", value: String(rows.length), tone: "", href: filterHref({}) }
+                  : { label: "Toplam kayıp", value: moneyTry(lostAll), tone: "", href: "/app/kayip-kacak#kapanislar" },
+                { label: "Rakip kapanış", value: String(competitor), tone: "text-amber-300", href: filterHref({ tip: "rakip" }) },
+                { label: "Teyit gecikmiş", value: String(overdue.length), tone: "text-warn-500", href: "/app/portallar?durum=teyit" },
+              ].map((k) => (
+                <Link
+                  key={k.label}
+                  href={k.href}
+                  className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 hover:border-white/30"
+                >
+                  <p className={`flex items-center gap-1 font-display text-lg font-extrabold ${k.tone}`}>
+                    {k.value}
+                    <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
+                  </p>
+                  <p className="text-[11px] text-white/45">{k.label}</p>
+                </Link>
+              ))}
             </div>
           </div>
 
@@ -148,31 +220,20 @@ export default async function LeakShieldPage() {
               <p className="flex items-center gap-1.5 text-xs font-semibold text-white/75">
                 <TrendingDown className="h-3.5 w-3.5 text-danger-400" /> Kayıp trend · 8 hafta
               </p>
-              <span className="rounded-full bg-danger-500/15 px-2 py-0.5 text-[10px] font-bold text-danger-300">
+              <span className="rounded-full bg-danger-500/15 px-2 py-0.5 text-[11px] font-bold text-danger-300">
                 {moneyTry(buckets[7] ?? 0)}
               </span>
             </div>
-            <svg viewBox="0 0 280 80" className="mt-3 h-24 w-full overflow-visible" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="leakFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--danger-500)" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="var(--danger-500)" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <polygon points={area} fill="url(#leakFill)" />
-              <polyline
-                className="chart-draw"
-                style={{ "--len": 420 } as CSSProperties}
-                points={line}
-                fill="none"
-                stroke="var(--danger-500)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <circle cx={last.x} cy={last.y} r="4" fill="var(--danger-500)" opacity="0.35" className="glow-halo" />
-              <circle cx={last.x} cy={last.y} r="3" fill="#fff" />
-            </svg>
+            {/* Etkileşimli 8 hafta trendi — crosshair + haftalık kayıp tooltip'i */}
+            <InteractiveChart
+              className="mt-3"
+              data={trendWeeks}
+              name="Kayıp"
+              color="var(--danger-500)"
+              format="money"
+              height={96}
+              labelEvery={2}
+            />
           </div>
         </div>
       </section>
@@ -201,7 +262,7 @@ export default async function LeakShieldPage() {
               </svg>
               <div className="absolute text-center">
                 <p className="font-display text-lg font-extrabold text-ink-950">%{Math.round(leakShare * 100)}</p>
-                <p className="text-[9px] text-text-faint">kaçak</p>
+                <p className="text-[10px] text-text-faint">kaçak</p>
               </div>
             </div>
             <div className="space-y-2 text-xs text-text-muted">
@@ -221,20 +282,32 @@ export default async function LeakShieldPage() {
             <p className="mt-6 text-sm text-text-muted">Henüz kapanış kaydı yok. Portal Kontrol’den ilan kapatınca burada görünür.</p>
           ) : (
             <div className="mt-5 space-y-3">
-              {reasonBars.map((r, i) => (
-                <div key={r.label}>
-                  <div className="mb-1 flex justify-between text-xs">
-                    <span className="font-semibold text-ink-950">{r.label}</span>
-                    <span className="tabular-nums text-text-muted">{r.count}</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-canvas">
-                    <div
-                      className="bar-live h-full rounded-full bg-[image:var(--grad-brand)]"
-                      style={{ width: `${(r.count / maxReason) * 100}%`, animationDelay: `${i * 0.08}s` }}
-                    />
-                  </div>
-                </div>
-              ))}
+              {reasonBars.map((r, i) => {
+                const active = nedenF === r.label;
+                return (
+                  <Link
+                    key={r.label}
+                    // Aktif nedene tekrar tıklamak filtreyi kaldırır
+                    href={filterHref({ neden: active ? null : r.label })}
+                    aria-current={active ? "page" : undefined}
+                    className={`focus-ring group block rounded-[10px] p-1 -m-1 ${active ? "bg-brand-600/5" : ""}`}
+                  >
+                    <div className="mb-1 flex justify-between text-xs">
+                      <span className="flex items-center gap-1 font-semibold text-ink-950">
+                        {r.label}
+                        <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                      </span>
+                      <span className="tabular-nums text-text-muted">{r.count}</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-canvas">
+                      <div
+                        className="bar-live h-full rounded-full bg-[image:var(--grad-brand)]"
+                        style={{ width: `${(r.count / maxReason) * 100}%`, animationDelay: `${i * 0.08}s` }}
+                      />
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </section>
@@ -254,10 +327,28 @@ export default async function LeakShieldPage() {
           <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {overdue.slice(0, 6).map((r) => {
               const prop = Array.isArray(r.property) ? r.property[0] : r.property;
-              return (
-                <div key={r.id} className="rounded-[12px] border border-line bg-surface px-3 py-2.5 text-sm">
-                  <p className="font-semibold text-ink-950">{r.portal_name} {r.portal_listing_id ? `#${r.portal_listing_id}` : ""}</p>
+              const inner = (
+                <>
+                  <p className="flex items-center gap-1 font-semibold text-ink-950">
+                    {r.portal_name} {r.portal_listing_id ? `#${r.portal_listing_id}` : ""}
+                    {prop?.id ? (
+                      <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                    ) : null}
+                  </p>
                   <p className="text-xs text-text-muted">{prop?.property_code ?? "—"} · {daysSince(r.last_confirmed_at)} gündür teyit yok</p>
+                </>
+              );
+              return prop?.id ? (
+                <Link
+                  key={r.id}
+                  href={`/app/portfoyler/${prop.id}`}
+                  className="focus-ring press lift group block rounded-[12px] border border-line bg-surface px-3 py-2.5 text-sm hover:border-brand-300"
+                >
+                  {inner}
+                </Link>
+              ) : (
+                <div key={r.id} className="group rounded-[12px] border border-line bg-surface px-3 py-2.5 text-sm">
+                  {inner}
                 </div>
               );
             })}
@@ -265,23 +356,80 @@ export default async function LeakShieldPage() {
         </section>
       ) : null}
 
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
-        <div className="flex items-center justify-between border-b border-line px-5 py-4">
+      <section id="kapanislar" className="overflow-hidden rounded-[20px] border border-line bg-surface">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
           <div>
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <Radar className="h-4 w-4 text-danger-500" /> Kapanış kayıtları
             </h2>
-            <p className="text-xs text-text-muted">{rows.length} kayıt · tahmini kayıp otomatik hesaplanır</p>
+            <p className="text-xs text-text-muted">
+              {hasFilter ? `${listRows.length} / ${rows.length} kayıt` : `${rows.length} kayıt`}
+              {totalPages > 1 ? ` · sayfa ${page}/${totalPages}` : ""} · tahmini kayıp otomatik hesaplanır
+            </p>
           </div>
-          <Link href="/app/portallar" className="text-xs font-semibold text-brand-600">Portal Kontrol</Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {nedenF ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1 text-[11px] font-semibold text-brand-700">
+                Neden: {nedenF}
+                <Link href={filterHref({ neden: null })} aria-label="Neden filtresini temizle" className="focus-ring rounded-full hover:text-brand-900">
+                  ×
+                </Link>
+              </span>
+            ) : null}
+            {tipF ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1 text-[11px] font-semibold text-brand-700">
+                {TIP_LABELS[tipF]}
+                <Link href={filterHref({ tip: null })} aria-label="Tip filtresini temizle" className="focus-ring rounded-full hover:text-brand-900">
+                  ×
+                </Link>
+              </span>
+            ) : null}
+            <Link href="/app/portallar" className="text-xs font-semibold text-brand-600">Portal Kontrol</Link>
+          </div>
         </div>
+        {/* ?from=&to= — tarih aralığı GET formu; neden/tip gizli alanlarla korunur */}
+        <form method="get" action="/app/kayip-kacak" className="flex flex-wrap items-center gap-2 border-b border-line bg-canvas/50 px-5 py-3">
+          {nedenF ? <input type="hidden" name="neden" value={nedenF} /> : null}
+          {tipF ? <input type="hidden" name="tip" value={tipF} /> : null}
+          <span className="text-xs font-medium text-text-muted">Kapanış tarihi:</span>
+          <input
+            name="from"
+            type="date"
+            defaultValue={fromF}
+            aria-label="Başlangıç tarihi"
+            className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+          />
+          <span className="text-text-faint">—</span>
+          <input
+            name="to"
+            type="date"
+            defaultValue={toF}
+            aria-label="Bitiş tarihi"
+            className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+          />
+          <button type="submit" className="focus-ring press rounded-[9px] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700">
+            Uygula
+          </button>
+          {rangeActive ? (
+            <Link href={filterHref({ from: null, to: null })} className="text-xs font-semibold text-text-muted underline-offset-2 hover:text-danger-500 hover:underline">
+              Aralığı temizle
+            </Link>
+          ) : null}
+        </form>
         {rows.length === 0 ? (
           <p className="px-5 py-12 text-center text-sm text-text-muted">
             Henüz kapanış yok. Yayından kalkan ilanı “Kapat” ile kaydedin — kayıp-kaçak burada oluşur.
           </p>
+        ) : listRows.length === 0 ? (
+          <p className="px-5 py-12 text-center text-sm text-text-muted">
+            Filtreye uyan kapanış yok.{" "}
+            <Link href="/app/kayip-kacak#kapanislar" className="font-semibold text-brand-600 hover:underline">
+              Filtreleri temizle
+            </Link>
+          </p>
         ) : (
           <div className="divide-y divide-line">
-            {rows.map((r) => {
+            {pageRows.map((r) => {
               const listing = listingOf(r);
               const prop = propertyOf(r);
               const lost = Number(r.estimated_lost_commission || 0);
@@ -300,14 +448,30 @@ export default async function LeakShieldPage() {
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
+                    {/* Rozetler filtre linki — relative z-10: satır overlay linkinin üstünde */}
                     {r.competitor_closed ? (
-                      <span className="rounded-full bg-danger-500/10 px-2.5 py-1 text-[10px] font-bold text-danger-500">Rakip</span>
+                      <Link
+                        href={filterHref({ tip: tipF === "rakip" ? null : "rakip" })}
+                        className="focus-ring press relative z-10 rounded-full bg-danger-500/10 px-2.5 py-1 text-[11px] font-bold text-danger-500 hover:bg-danger-500/20"
+                      >
+                        Rakip
+                      </Link>
                     ) : null}
                     {r.closed_by_us ? (
-                      <span className="rounded-full bg-mint-500/12 px-2.5 py-1 text-[10px] font-bold text-mint-600">Bizim</span>
+                      <Link
+                        href={filterHref({ tip: tipF === "bizim" ? null : "bizim" })}
+                        className="focus-ring press relative z-10 rounded-full bg-mint-500/12 px-2.5 py-1 text-[11px] font-bold text-mint-600 hover:bg-mint-500/25"
+                      >
+                        Bizim
+                      </Link>
                     ) : null}
                     {r.deal_happened ? (
-                      <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[10px] font-bold text-brand-600">İşlem var</span>
+                      <Link
+                        href={filterHref({ tip: tipF === "islem" ? null : "islem" })}
+                        className="focus-ring press relative z-10 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 hover:bg-brand-600/20"
+                      >
+                        İşlem var
+                      </Link>
                     ) : null}
                   </div>
                   <div className="text-right">
@@ -323,6 +487,25 @@ export default async function LeakShieldPage() {
             })}
           </div>
         )}
+        {totalPages > 1 ? (
+          <nav aria-label="Sayfalama" className="flex items-center justify-between gap-3 border-t border-line px-5 py-3">
+            {page > 1 ? (
+              <Link href={filterHref({ sayfa: page - 1 })} className="focus-ring press rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+                ← Önceki
+              </Link>
+            ) : (
+              <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">← Önceki</span>
+            )}
+            <span className="text-xs tabular-nums text-text-muted">Sayfa {page} / {totalPages}</span>
+            {page < totalPages ? (
+              <Link href={filterHref({ sayfa: page + 1 })} className="focus-ring press rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+                Sonraki →
+              </Link>
+            ) : (
+              <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">Sonraki →</span>
+            )}
+          </nav>
+        ) : null}
       </section>
     </div>
   );

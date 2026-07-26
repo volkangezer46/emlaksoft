@@ -91,7 +91,7 @@ export function PropertyPriceHistory({
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <TrendingDown className="h-4 w-4 text-brand-600" /> Fiyat geçmişi
             {summary && summary.changeCount > 0 ? (
-              <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-[10px] font-bold text-brand-600">
+              <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-[11px] font-bold text-brand-600">
                 {summary.changeCount} değişim
               </span>
             ) : null}
@@ -175,45 +175,45 @@ export function PropertyPriceHistory({
               ) : null}
               <div className="flex flex-wrap items-center gap-3">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-text-faint">İlk fiyat</p>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">İlk fiyat</p>
                   <p className="numeric font-display text-lg font-extrabold text-ink-950">
                     {formatPrice(display.first, currency)}{suffix}
                   </p>
-                  <p className="text-[10px] text-text-faint">{dateFmt.format(new Date(summary.firstDate))}</p>
+                  <p className="text-[11px] text-text-faint">{dateFmt.format(new Date(summary.firstDate))}</p>
                 </div>
                 <ArrowRight className="h-4 w-4 shrink-0 text-text-faint" />
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-text-faint">Güncel</p>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">Güncel</p>
                   <p className="numeric font-display text-lg font-extrabold text-ink-950">
                     {formatPrice(display.last, currency)}{suffix}
                   </p>
-                  <p className="text-[10px] text-text-faint">{dateFmt.format(new Date(summary.lastDate))}</p>
+                  <p className="text-[11px] text-text-faint">{dateFmt.format(new Date(summary.lastDate))}</p>
                 </div>
               </div>
 
               <div className="mt-4 grid gap-2 sm:grid-cols-4">
                 <div className="surface-sunken rounded-[12px] px-3 py-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-text-faint">Toplam değişim</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">Toplam değişim</p>
                   <p className={`numeric mt-0.5 font-display text-sm font-extrabold ${trendClass}`}>
                     {display.change > 0 ? "+" : display.change < 0 ? "−" : ""}
                     {formatPrice(Math.abs(display.change), currency)}
                   </p>
                 </div>
                 <div className="surface-sunken rounded-[12px] px-3 py-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-text-faint">Yüzde</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">Yüzde</p>
                   <p className={`numeric mt-0.5 font-display text-sm font-extrabold ${trendClass}`}>
                     {display.changePct > 0 ? "+" : ""}
                     %{display.changePct}
                   </p>
                 </div>
                 <div className="surface-sunken rounded-[12px] px-3 py-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-text-faint">İndirim / zam</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">İndirim / zam</p>
                   <p className="numeric mt-0.5 font-display text-sm font-extrabold text-ink-950">
                     {summary.cutCount} / {summary.raiseCount}
                   </p>
                 </div>
                 <div className="surface-sunken rounded-[12px] px-3 py-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-text-faint">Ort. aralık</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">Ort. aralık</p>
                   <p className="numeric mt-0.5 font-display text-sm font-extrabold text-ink-950">
                     {summary.avgDaysBetween > 0 ? `${summary.avgDaysBetween} gün` : "—"}
                   </p>

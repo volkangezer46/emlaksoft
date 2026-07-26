@@ -76,7 +76,7 @@ export function NeighborhoodRow({ neighborhood }: { neighborhood: NeighborhoodRo
     <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5 transition hover:bg-canvas/60">
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-ink-950">{neighborhood.name}</p>
-        <p className="mt-0.5 text-[10px] text-text-muted">
+        <p className="mt-0.5 text-[11px] text-text-muted">
           {neighborhood.postal_code ? `${neighborhood.postal_code} · ` : ""}
           {neighborhood.population ? `${neighborhood.population.toLocaleString("tr-TR")} nüfus` : "—"}
           {!neighborhood.is_active ? " · Pasif" : ""}
@@ -91,10 +91,10 @@ export function NeighborhoodRow({ neighborhood }: { neighborhood: NeighborhoodRo
             <input type="hidden" name="id" value={neighborhood.id} />
             <input type="hidden" name="district_id" value={neighborhood.district_id} />
             <input type="hidden" name="province_id" value={neighborhood.province_id} />
-            <button type="submit" disabled={delPending} className="rounded-[7px] bg-danger-500 px-2 py-1 text-[10px] font-bold text-white disabled:opacity-60">
+            <button type="submit" disabled={delPending} className="rounded-[7px] bg-danger-500 px-2 py-1 text-[11px] font-bold text-white disabled:opacity-60">
               Onayla
             </button>
-            <button type="button" onClick={() => setConfirmingDelete(false)} className="rounded-[7px] border border-line px-1.5 py-1 text-[10px] text-text-muted">
+            <button type="button" onClick={() => setConfirmingDelete(false)} className="rounded-[7px] border border-line px-1.5 py-1 text-[11px] text-text-muted">
               Vazgeç
             </button>
           </form>

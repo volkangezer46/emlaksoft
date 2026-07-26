@@ -1,12 +1,16 @@
-import { Receipt, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight, CalendarRange, Receipt, Plus, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
-import { listExpenses } from "@/app/actions/expenses";
+import { exportExpensesCsv } from "@/app/actions/export";
+import { ExportCsvButton } from "@/components/app/export-csv-button";
+import { listExpenses, listExpenseMonthlyTrend } from "@/app/actions/expenses";
 import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 import { getDefinitions } from "@/lib/definitions";
 import { EmptyState } from "@/components/app/empty-state";
-import { ChartFrame, DonutSplit } from "@/components/ui/chart";
-import { DataTable, type DataTableColumn, type DataTableRow } from "@/components/ui/data-table";
-import { ExpenseEditDialog } from "./expense-edit-dialog";
+import { ChartFrame } from "@/components/ui/chart";
+import { InteractiveChart } from "@/components/app/interactive-chart";
+import { CategoryDonut } from "./category-donut";
+import { ExpensesTable } from "./expenses-table";
 
 // Inline server action wrappers — void return için form action uyumlu
 async function handleCreate(fd: FormData): Promise<void> {
@@ -15,8 +19,10 @@ async function handleCreate(fd: FormData): Promise<void> {
   await createExpense({}, fd);
 }
 
-async function handleDelete(id: string, _fd: FormData): Promise<void> {
+async function handleDelete(fd: FormData): Promise<void> {
   "use server";
+  const id = String(fd.get("id") ?? "").trim();
+  if (!id) return;
   const { deleteExpense: del } = await import("@/app/actions/expenses");
   await del(id);
 }
@@ -25,9 +31,40 @@ function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 }
 
-export default async function GiderlerPage() {
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function fmtDate(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Boş olmayan paramlardan query string üretir — mevcut filtreler korunur. */
+function qs(params: Record<string, string | null | undefined>) {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v) sp.set(k, v);
+  const s = sp.toString();
+  return s ? `?${s}` : "";
+}
+
+function tarihKisa(iso: string) {
+  return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${iso}T00:00:00`));
+}
+
+export default async function GiderlerPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ kategori?: string; from?: string; to?: string }>;
+}) {
   const { perms } = await requireModulePage("expenses");
-  const [expenses, catDefs] = await Promise.all([listExpenses(), getDefinitions("expense_category")]);
+  const params = (await searchParams) ?? {};
+  const fromF = ISO_DATE.test(params.from ?? "") ? params.from! : null;
+  const toF = ISO_DATE.test(params.to ?? "") ? params.to! : null;
+
+  const [expenses, catDefs, trendRows] = await Promise.all([
+    // ?from=&to= sunucu tarafında uygulanır (expense_date aralığı)
+    listExpenses(undefined, { from: fromF ?? undefined, to: toF ?? undefined }),
+    getDefinitions("expense_category"),
+    listExpenseMonthlyTrend(),
+  ]);
   const canCreate = perms.expenses?.includes("create") ?? false;
   const canEdit = perms.expenses?.includes("edit") ?? false;
   const canDelete = perms.expenses?.includes("delete") ?? false;
@@ -36,6 +73,27 @@ export default async function GiderlerPage() {
   const categories = catDefs.length > 0 ? catDefs.map((c) => ({ value: c.value, label: c.label })) : EXPENSE_CATEGORIES;
   const catLabel = (v: string) => categories.find((c) => c.value === v)?.label ?? v;
 
+  // ?kategori= sunucu filtresi — yalnızca tanımlı kategori değerleri kabul edilir
+  const kategoriF = categories.some((c) => c.value === params.kategori) ? params.kategori! : "";
+  const filteredExpenses = kategoriF ? expenses.filter((e) => e.category === kategoriF) : expenses;
+
+  // Mevcut filtreleri koruyan link üretici
+  const href = (next: { kategori?: string | null; from?: string | null; to?: string | null }) =>
+    `/app/giderler${qs({
+      kategori: next.kategori === undefined ? kategoriF || null : next.kategori,
+      from: next.from === undefined ? fromF : next.from,
+      to: next.to === undefined ? toF : next.to,
+    })}`;
+
+  // Hızlı tarih çipleri — sunucu saatine göre
+  const now = new Date();
+  const presets = [
+    { label: "Bu ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth(), 1)), to: fmtDate(now) },
+    { label: "Geçen ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth() - 1, 1)), to: fmtDate(new Date(now.getFullYear(), now.getMonth(), 0)) },
+    { label: "Son 3 ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth() - 2, 1)), to: fmtDate(now) },
+  ];
+
+  // Özet/kırılım tarih aralığına saygılıdır; ?kategori= yalnızca listeyi süzer
   const total = expenses.reduce((s, e) => s + Number(e.amount), 0);
   const byCategory = categories.map((c) => ({
     ...c,
@@ -44,50 +102,34 @@ export default async function GiderlerPage() {
   const activeCategories = byCategory.filter((c) => c.total > 0);
   const categoryChart = activeCategories
     .sort((a, b) => b.total - a.total)
-    .map((c) => ({ name: c.label, value: c.total }));
+    .map((c) => ({ name: c.label, value: c.total, category: c.value }));
 
-  const EXPENSE_COLUMNS: DataTableColumn[] = [
-    { key: "title", header: "Başlık", sortable: true, subtitleKey: "notes" },
-    { key: "category", header: "Kategori", sortable: true },
-    { key: "amount", header: "Tutar", format: "money", align: "right", sortable: true, total: true },
-    { key: "expense_date", header: "Tarih", format: "date", align: "right", sortable: true },
-  ];
+  // Son 6 ay trendi — filtrelerden bağımsız (YYYY-MM anahtarıyla toplanır)
+  const monthKeys: string[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    monthKeys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  const trendTotals = new Map(monthKeys.map((k) => [k, 0]));
+  for (const row of trendRows) {
+    const key = String(row.expense_date ?? "").slice(0, 7);
+    if (trendTotals.has(key)) trendTotals.set(key, (trendTotals.get(key) ?? 0) + Number(row.amount));
+  }
+  const ayFmt = new Intl.DateTimeFormat("tr-TR", { month: "short" });
+  const trendChart = monthKeys.map((k) => ({
+    ay: ayFmt.format(new Date(`${k}-01T00:00:00`)),
+    tutar: Math.round(trendTotals.get(k) ?? 0),
+  }));
+  const hasTrend = trendChart.some((t) => t.tutar > 0);
 
-  const expenseRows: DataTableRow[] = expenses.map((e) => ({
+  const tableExpenses = filteredExpenses.map((e) => ({
     id:           e.id,
     title:        e.title,
-    notes:        e.notes,
-    category:     catLabel(e.category),
     amount:       Number(e.amount),
+    category:     e.category,
     expense_date: e.expense_date,
+    notes:        e.notes,
   }));
-
-  // Satır aksiyonları sunucuda render edilip DataTable'a ELEMENT olarak
-  // geçiyor. Fonksiyon geçirilemez ama React elementi RSC payload'ında taşınır.
-  const expenseActions: Record<string, React.ReactNode> = Object.fromEntries(
-    expenses.map((e) => [
-      e.id,
-      <>
-        {canEdit && (
-          <ExpenseEditDialog
-            expense={{ id: e.id, title: e.title, amount: Number(e.amount), category: e.category, expense_date: e.expense_date, notes: e.notes }}
-            categories={categories}
-          />
-        )}
-        {canDelete && (
-          <form action={handleDelete.bind(null, e.id) as (fd: FormData) => Promise<void>}>
-            <button
-              type="submit"
-              className="focus-ring press grid h-7 w-7 place-items-center rounded-[7px] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600"
-              aria-label={`${e.title} giderini sil`}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </form>
-        )}
-      </>,
-    ]),
-  );
 
   return (
     <div className="space-y-6">
@@ -101,33 +143,132 @@ export default async function GiderlerPage() {
             <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Masraf &amp; Giderler</h1>
             <p className="mt-1 text-sm text-white/75">Ofis giderlerini kategorilere göre takip edin.</p>
           </div>
-          <div className="flex gap-3">
-            <div className="rounded-[14px] border border-white/12 bg-white/8 p-3 text-center">
-              <p className="font-display text-2xl font-extrabold text-white">{expenses.length}</p>
-              <p className="text-[10px] text-white/70">Kayıt</p>
-            </div>
-            <div className="rounded-[14px] border border-white/12 bg-white/8 p-3 text-center">
-              <p className="font-display text-xl font-extrabold text-white">{money(total)}</p>
-              <p className="text-[10px] text-white/70">Toplam gider</p>
-            </div>
+          <div className="flex items-center gap-3">
+            <ExportCsvButton
+              action={exportExpensesCsv}
+              label="Dışa aktar"
+              className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
+            />
+            {/* KPI kartları tüm filtreleri temizleyip tam listeye döner */}
+            <Link
+              href="/app/giderler"
+              className="focus-ring press lift group block rounded-[14px] border border-white/12 bg-white/8 p-3 text-center hover:border-white/30"
+            >
+              <p className="flex items-center justify-center gap-1 font-display text-2xl font-extrabold text-white">
+                {expenses.length}
+                <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
+              </p>
+              <p className="text-[11px] text-white/70">Kayıt</p>
+            </Link>
+            <Link
+              href="/app/giderler"
+              className="focus-ring press lift group block rounded-[14px] border border-white/12 bg-white/8 p-3 text-center hover:border-white/30"
+            >
+              <p className="flex items-center justify-center gap-1 font-display text-xl font-extrabold text-white">
+                {money(total)}
+                <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
+              </p>
+              <p className="text-[11px] text-white/70">Toplam gider</p>
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* Kategori özet — dağılım grafiği + kırılım kartları */}
-      {activeCategories.length > 0 ? (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,340px)_1fr]">
-          <ChartFrame title="Kategori dağılımı" subtitle="Tüm gider kayıtları" height={250}>
-            <DonutSplit data={categoryChart} format="money" centerLabel="Toplam gider" />
-          </ChartFrame>
-          <div className="grid content-start grid-cols-2 gap-3 sm:grid-cols-3">
-            {activeCategories.map((c) => (
-              <div key={c.value} className="rounded-[16px] border border-line bg-surface p-3 text-center">
-                <p className="text-xs font-semibold text-text-muted">{c.label}</p>
-                <p className="mt-1 font-display text-base font-bold text-ink-950">{money(c.total)}</p>
-              </div>
-            ))}
-          </div>
+      {/* Tarih aralığı filtresi — GET formu (?from=&to=) + hızlı çipler; ?kategori= korunur */}
+      <div className="flex flex-wrap items-center gap-2 rounded-[16px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-text-muted"><CalendarRange className="h-3.5 w-3.5" /> Tarih:</span>
+        {presets.map((p) => {
+          const active = fromF === p.from && toF === p.to;
+          return (
+            <Link
+              key={p.label}
+              href={href({ from: p.from, to: p.to })}
+              aria-current={active ? "page" : undefined}
+              className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                active
+                  ? "border-brand-400/50 bg-brand-600/10 text-brand-600"
+                  : "border-line bg-surface text-text-muted hover:border-brand-300 hover:text-brand-600"
+              }`}
+            >
+              {p.label}
+            </Link>
+          );
+        })}
+        <form action="/app/giderler" className="flex flex-wrap items-center gap-2">
+          {kategoriF ? <input type="hidden" name="kategori" value={kategoriF} /> : null}
+          <input
+            name="from"
+            type="date"
+            defaultValue={fromF ?? ""}
+            aria-label="Başlangıç tarihi"
+            className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
+          />
+          <span className="text-xs text-text-faint">—</span>
+          <input
+            name="to"
+            type="date"
+            defaultValue={toF ?? ""}
+            aria-label="Bitiş tarihi"
+            className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
+          />
+          <button type="submit" className="rounded-[9px] bg-brand-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-brand-700">
+            Filtrele
+          </button>
+          {fromF || toF ? (
+            <Link href={href({ from: null, to: null })} className="text-[11px] font-semibold text-text-muted hover:text-danger-500">
+              Tarihi temizle
+            </Link>
+          ) : null}
+        </form>
+      </div>
+
+      {/* Kategori özet — dağılım + aylık trend + kırılım kartları */}
+      {activeCategories.length > 0 || hasTrend ? (
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-[minmax(0,340px)_minmax(0,340px)_1fr]">
+          {activeCategories.length > 0 ? (
+            <ChartFrame
+              title="Kategori dağılımı"
+              subtitle={fromF || toF ? "Seçili tarih aralığı · segmente tıklayın" : "Tüm gider kayıtları · segmente tıklayın"}
+              height={250}
+            >
+              <CategoryDonut data={categoryChart} centerLabel="Toplam gider" />
+            </ChartFrame>
+          ) : null}
+          {hasTrend ? (
+            <ChartFrame title="Aylık gider trendi" subtitle="Son 6 ay · filtrelerden bağımsız" height={250}>
+              {/* Etkileşimli çizgi trend — crosshair + aylık tutar tooltip'i */}
+              <InteractiveChart
+                data={trendChart.map((t) => ({ label: t.ay, value: t.tutar }))}
+                name="Gider"
+                color="var(--brand-600)"
+                format="money"
+                height={210}
+              />
+            </ChartFrame>
+          ) : null}
+          {activeCategories.length > 0 ? (
+            <div className="grid content-start grid-cols-2 gap-3 sm:grid-cols-3 lg:col-span-2 xl:col-span-1">
+              {activeCategories.map((c) => {
+                const active = kategoriF === c.value;
+                return (
+                  <Link
+                    key={c.value}
+                    href={href({ kategori: active ? null : c.value })}
+                    aria-current={active ? "page" : undefined}
+                    className={`focus-ring press lift group block rounded-[16px] border p-3 text-center transition ${
+                      active ? "border-brand-400 bg-brand-600/5" : "border-line bg-surface hover:border-brand-300"
+                    }`}
+                  >
+                    <p className="flex items-center justify-center gap-1 text-xs font-semibold text-text-muted">
+                      {c.label}
+                      <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                    </p>
+                    <p className="mt-1 font-display text-base font-bold text-ink-950">{money(c.total)}</p>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -150,23 +291,55 @@ export default async function GiderlerPage() {
         </section>
       )}
 
+      {/* Aktif filtre çipleri */}
+      {kategoriF || fromF || toF ? (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-text-muted">Filtre:</span>
+          {kategoriF ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1 text-xs font-semibold text-brand-700">
+              {catLabel(kategoriF)}
+              <Link href={href({ kategori: null })} aria-label="Kategori filtresini temizle" className="focus-ring rounded-full hover:text-brand-900">
+                <X className="h-3.5 w-3.5" />
+              </Link>
+            </span>
+          ) : null}
+          {fromF || toF ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1 text-xs font-semibold text-brand-700">
+              {fromF ? tarihKisa(fromF) : "…"} — {toF ? tarihKisa(toF) : "…"}
+              <Link href={href({ from: null, to: null })} aria-label="Tarih filtresini temizle" className="focus-ring rounded-full hover:text-brand-900">
+                <X className="h-3.5 w-3.5" />
+              </Link>
+            </span>
+          ) : null}
+          <span className="numeric text-xs text-text-faint">{filteredExpenses.length} kayıt</span>
+        </div>
+      ) : null}
+
       {/* Liste */}
       {expenses.length === 0 ? (
-        <EmptyState
-          icon={Receipt}
-          title="Henüz gider kaydı yok"
-          description="Ofis giderlerinizi kategorilere göre ekleyin. Kayıtlar burada listelenir."
-          tone="amber"
-        />
+        fromF || toF ? (
+          <div className="grid place-items-center rounded-[18px] border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
+            <Receipt className="h-8 w-8 text-text-faint" />
+            <h2 className="mt-3 font-display text-lg font-bold text-ink-950">Seçili tarih aralığında gider kaydı yok</h2>
+            <Link href={href({ from: null, to: null })} className="mt-2 text-sm font-semibold text-brand-600 hover:underline">
+              Tarih filtresini temizle
+            </Link>
+          </div>
+        ) : (
+          <EmptyState
+            icon={Receipt}
+            title="Henüz gider kaydı yok"
+            description="Ofis giderlerinizi kategorilere göre ekleyin. Kayıtlar burada listelenir."
+            tone="amber"
+          />
+        )
       ) : (
-        <DataTable
-          columns={EXPENSE_COLUMNS}
-          rows={expenseRows}
-          rowActions={expenseActions}
-          showTotals
-          minWidth={600}
-          searchPlaceholder="Gider başlığı veya kategori ara…"
-          empty={{ description: "Arama terimini değiştirip tekrar deneyin." }}
+        <ExpensesTable
+          expenses={tableExpenses}
+          categories={categories}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          deleteAction={handleDelete}
         />
       )}
     </div>

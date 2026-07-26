@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
+import { logActivity } from "@/lib/activity";
 
 export type CommissionSplitInput = { label: string; rate: number };
 export type CommissionResult = { ok?: boolean; error?: string };
@@ -56,4 +57,50 @@ export async function updateCommissionSplits(
 
   revalidatePath("/app/komisyon");
   return { ok: true };
+}
+
+/**
+ * Seçilen komisyonları topluca "tahsil edildi" (paid) işaretler —
+ * workflow.ts'teki tekil mark_commission_paid akışının toplu hali.
+ * Zaten tahsil edilmiş kayıtlar sessizce atlanır.
+ */
+export async function markCommissionsPaidBulk(
+  ids: string[],
+): Promise<CommissionResult & { updated?: number }> {
+  const gate = await requirePermission("commissions", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const clean = Array.from(
+    new Set(ids.map((id) => String(id ?? "").trim()).filter(Boolean)),
+  ).slice(0, 200);
+  if (clean.length === 0) return { error: "En az bir kayıt seçin." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("commissions")
+    .update({ status: "paid" })
+    .in("id", clean)
+    .eq("tenant_id", gate.tenantId)
+    .not("status", "in", "(paid,collected)")
+    .select("id");
+
+  if (error) {
+    console.error("markCommissionsPaidBulk", error);
+    return { error: "Kayıtlar güncellenemedi." };
+  }
+
+  const updatedIds = (data ?? []).map((r) => r.id as string);
+  if (updatedIds.length > 0) {
+    await logActivity({
+      tenantId: gate.tenantId,
+      actorId: gate.userId,
+      action: "commission.paid_bulk",
+      entityType: "commission",
+      entityId: updatedIds[0],
+      newValue: { ids: updatedIds, count: updatedIds.length },
+    });
+  }
+
+  revalidatePath("/app/komisyon");
+  return { ok: true, updated: updatedIds.length };
 }

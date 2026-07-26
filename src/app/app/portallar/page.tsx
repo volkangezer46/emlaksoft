@@ -6,15 +6,19 @@ import {
   Clock3,
   ExternalLink,
   RadioTower,
-  RefreshCw,
   ShieldCheck,
   Siren,
+  X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { confirmPortalListing } from "@/app/actions/portal-listings";
+import { exportPortalListingsCsv } from "@/app/actions/export";
+import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { ClosePortalDialog, NewPortalDialog } from "./portal-dialogs";
+import { ConfirmListingButton } from "./confirm-listing-button";
+import { BulkConfirmForm } from "./bulk-confirm-form";
 import { EmptyState } from "@/components/app/empty-state";
+import { ListLimitNotice } from "@/components/app/list-limit-notice";
 
 type PortalRow = {
   id: string;
@@ -41,6 +45,14 @@ type PortalRow = {
 
 const RING_C = 2 * Math.PI * 42;
 
+// ?durum= kontratı: live | teyit | kapali
+const DURUM_FILTERS = [
+  { label: "Tümü", value: "" },
+  { label: "Yayında", value: "live" },
+  { label: "Teyit bekleyen", value: "teyit" },
+  { label: "Kapanan", value: "kapali" },
+] as const;
+
 function propertyOf(value: PortalRow["property"]) {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -51,21 +63,48 @@ function daysSince(value: string | null) {
 }
 
 function relativeConfirm(value: string | null) {
+  if (!value) return "Hiç teyit edilmedi";
   const days = daysSince(value);
   if (days === 0) return "Bugün teyit edildi";
   if (days === 1) return "Dün teyit edildi";
-  return `${days} gün önce teyit`;
+  return `${days} gün önce teyit edildi`;
 }
 
-export default async function PortalsPage() {
+function matchesDurum(row: PortalRow, durum: string) {
+  if (durum === "live") return row.status === "live";
+  if (durum === "teyit") return row.status === "live" && daysSince(row.last_confirmed_at) >= 7;
+  if (durum === "kapali") return row.status === "removed";
+  return true;
+}
+
+// Filtre linkleri sayfa numarasını sıfırlar (sayfa parametresi yalnızca
+// sayfalama linklerinde taşınır) — filtre değişince 1. sayfadan başlanır.
+function portalHref(durum: string, portal: string, sayfa?: number, property?: string) {
+  const sp = new URLSearchParams();
+  if (durum) sp.set("durum", durum);
+  if (portal) sp.set("portal", portal);
+  if (sayfa && sayfa > 1) sp.set("sayfa", String(sayfa));
+  if (property) sp.set("property", property);
+  const qs = sp.toString();
+  return qs ? `/app/portallar?${qs}` : "/app/portallar";
+}
+
+const PAGE_SIZE = 50;
+
+export default async function PortalsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ durum?: string; portal?: string; sayfa?: string; property?: string }>;
+}) {
   await requireModulePage("portals");
+  const { durum = "", portal = "", sayfa = "", property: propertyF = "" } = (await searchParams) ?? {};
   const supabase = await createClient();
-  const [{ data: listings }, { data: properties }] = await Promise.all([
+  const [{ data: listings, count: listingTotal }, { data: properties }] = await Promise.all([
     supabase
       .from("portal_listings")
-      .select("id, portal_name, portal_listing_id, portal_url, status, last_confirmed_at, published_at, removed_at, removal_reason, property:properties(id,property_code,title,list_price)")
+      .select("id, portal_name, portal_listing_id, portal_url, status, last_confirmed_at, published_at, removed_at, removal_reason, property:properties(id,property_code,title,list_price)", { count: "exact" })
       .order("created_at", { ascending: false })
-      .limit(200),
+      .limit(500),
     supabase
       .from("properties")
       .select("id, property_code, title")
@@ -78,6 +117,25 @@ export default async function PortalsPage() {
   const live = rows.filter((row) => row.status === "live");
   const overdue = live.filter((row) => daysSince(row.last_confirmed_at) >= 7);
   const removed = rows.filter((row) => row.status === "removed");
+
+  // KPI ve dağılım TÜM kayıtlardan; liste ?durum= & ?portal= & ?property= ile daralır.
+  // ?property= — portföy detayındaki "Portal ilanları" kısayolu: tek portföyün
+  // yayın kayıtlarını gösterir.
+  const visible = rows.filter(
+    (row) =>
+      matchesDurum(row, durum) &&
+      (!portal || row.portal_name === portal) &&
+      (!propertyF || propertyOf(row.property)?.id === propertyF),
+  );
+  const propertyChip = propertyF
+    ? propertyOptions.find((p) => p.id === propertyF) ?? null
+    : null;
+
+  // ?sayfa= — bellekten sayfalama (50/sayfa); filtre linkleri sayfayı sıfırlar.
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const page = Math.min(Math.max(1, Number.parseInt(sayfa, 10) || 1), totalPages);
+  const pageRows = visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const liveOnPage = pageRows.filter((row) => row.status === "live").length;
 
   const onTime = live.filter((row) => daysSince(row.last_confirmed_at) < 7).length;
   const healthRate = live.length ? onTime / live.length : 0;
@@ -103,19 +161,33 @@ export default async function PortalsPage() {
               Kayıp-kaçak panosu <ArrowUpRight className="h-3.5 w-3.5" />
             </Link>
           </div>
-          <NewPortalDialog properties={propertyOptions} />
+          <div className="flex items-center gap-2">
+            <ExportCsvButton
+              action={exportPortalListingsCsv}
+              label="Dışa aktar"
+              className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
+            />
+            <NewPortalDialog properties={propertyOptions} />
+          </div>
         </div>
         <div className="relative mt-6 grid grid-cols-3 gap-3">
           {[
-            { label: "Canlı ilan", value: live.length, icon: RadioTower, tone: "text-mint-400" },
-            { label: "Teyit bekleyen", value: overdue.length, icon: Clock3, tone: "text-amber-400" },
-            { label: "Kapanan", value: removed.length, icon: Siren, tone: "text-danger-500" },
+            { label: "Canlı ilan", value: live.length, icon: RadioTower, tone: "text-mint-400", durum: "live" },
+            { label: "Teyit bekleyen", value: overdue.length, icon: Clock3, tone: "text-amber-400", durum: "teyit" },
+            { label: "Kapanan", value: removed.length, icon: Siren, tone: "text-danger-500", durum: "kapali" },
           ].map((item) => (
-            <div key={item.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur">
+            <Link
+              key={item.label}
+              href={portalHref(item.durum, portal, undefined, propertyF)}
+              className={`focus-ring press group relative block rounded-[14px] border bg-white/5 p-3 backdrop-blur transition hover:border-white/30 ${
+                durum === item.durum ? "border-white/40" : "border-white/10"
+              }`}
+            >
+              <ArrowUpRight className="hover-action absolute right-2 top-2 h-3.5 w-3.5 text-white/50 opacity-0 transition group-hover:opacity-100" />
               <item.icon className={`h-4 w-4 ${item.tone}`} />
               <p className="mt-2 font-display text-xl font-extrabold text-white">{item.value}</p>
-              <p className="text-[10px] text-white/45 sm:text-xs">{item.label}</p>
-            </div>
+              <p className="text-[11px] text-white/45 sm:text-xs">{item.label}</p>
+            </Link>
           ))}
         </div>
       </section>
@@ -146,14 +218,28 @@ export default async function PortalsPage() {
             <div>
               <p className="flex items-center gap-1.5 text-sm font-bold text-ink-950"><ShieldCheck className="h-4 w-4 text-mint-600" /> Teyit sağlığı</p>
               <p className="mt-0.5 text-xs text-text-muted">{onTime}/{live.length} ilan zamanında teyitli</p>
-              <p className="mt-1 text-[11px] text-text-faint">{overdue.length} ilan 7+ gündür teyit bekliyor</p>
+              <Link
+                href={portalHref("teyit", portal, undefined, propertyF)}
+                className="focus-ring mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600 hover:underline"
+              >
+                {overdue.length} ilan 7+ gündür teyit bekliyor <ArrowUpRight className="h-3 w-3" />
+              </Link>
             </div>
           </div>
           <div>
             <p className="flex items-center gap-1.5 text-xs font-semibold text-ink-950"><RadioTower className="h-3.5 w-3.5 text-brand-600" /> Portal dağılımı</p>
             <div className="mt-3 flex h-24 items-end gap-4">
               {portalStats.map((p, i) => (
-                <div key={p.name} className="flex flex-1 flex-col items-center gap-1.5">
+                /* Bar tıklanınca liste o portala süzülür; aktif portala
+                   tekrar tıklamak filtreyi kaldırır. */
+                <Link
+                  key={p.name}
+                  href={portalHref(durum, portal === p.name ? "" : p.name, undefined, propertyF)}
+                  aria-label={`${p.name} ilanlarını listele`}
+                  className={`focus-ring group flex h-full flex-1 flex-col items-center gap-1.5 rounded-[8px] px-1 pt-1 transition hover:bg-brand-600/[0.04] ${
+                    portal === p.name ? "bg-brand-600/[0.06]" : ""
+                  }`}
+                >
                   <span className="text-[11px] font-bold tabular-nums text-ink-950">{p.count}</span>
                   <div className="flex h-full w-full items-end justify-center">
                     <div
@@ -161,8 +247,10 @@ export default async function PortalsPage() {
                       style={{ height: `${(p.count / maxCount) * 100}%`, animationDelay: `${i * 0.1}s` }}
                     />
                   </div>
-                  <span className="max-w-[72px] truncate text-[10px] text-text-muted">{p.name}</span>
-                </div>
+                  <span className={`max-w-[72px] truncate text-[10px] transition group-hover:text-brand-600 ${portal === p.name ? "font-bold text-brand-600" : "text-text-muted"}`}>
+                    {p.name}
+                  </span>
+                </Link>
               ))}
             </div>
           </div>
@@ -191,28 +279,100 @@ export default async function PortalsPage() {
       ) : (
         <div className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
-            <div><h2 className="font-display font-bold text-ink-950">Bağlı portal ilanları</h2><p className="text-xs text-text-muted">{rows.length} yayın kaydı</p></div>
-            <div className="flex gap-2">
-              <span className="rounded-full bg-mint-500/10 px-2.5 py-1 text-[10px] font-bold text-mint-600">{live.length} canlı</span>
-              <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-[10px] font-bold text-amber-500">{overdue.length} teyit</span>
+            <div>
+              <h2 className="font-display font-bold text-ink-950">Bağlı portal ilanları</h2>
+              <p className="text-xs text-text-muted">
+                {visible.length} yayın kaydı{visible.length !== rows.length ? ` · ${rows.length} içinden` : ""}
+                {totalPages > 1 ? ` · sayfa ${page}/${totalPages}` : ""}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {DURUM_FILTERS.map((f) => (
+                <Link
+                  key={f.value}
+                  href={portalHref(f.value, portal, undefined, propertyF)}
+                  className={`focus-ring rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
+                    durum === f.value
+                      ? "bg-ink-950 text-white"
+                      : "border border-line text-text-muted hover:text-ink-950"
+                  }`}
+                >
+                  {f.label}
+                </Link>
+              ))}
+              {portal ? (
+                <Link
+                  href={portalHref(durum, "", undefined, propertyF)}
+                  className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/20"
+                  aria-label={`${portal} portal filtresini kaldır`}
+                >
+                  {portal} <X className="h-3 w-3" />
+                </Link>
+              ) : null}
+              {propertyF ? (
+                <Link
+                  href={portalHref(durum, portal)}
+                  className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/20"
+                  aria-label="Portföy filtresini kaldır"
+                >
+                  {propertyChip ? propertyChip.property_code : "Portföy"} <X className="h-3 w-3" />
+                </Link>
+              ) : null}
             </div>
           </div>
+          {visible.length === 0 ? (
+            <div className="grid place-items-center px-6 py-14 text-center">
+              <RadioTower className="h-8 w-8 text-text-faint" />
+              <p className="mt-3 text-sm font-semibold text-ink-950">Bu filtreyle eşleşen yayın kaydı yok</p>
+              <Link href="/app/portallar" className="mt-1 text-sm font-semibold text-brand-600 hover:underline">
+                Filtreyi temizle
+              </Link>
+            </div>
+          ) : (
+          <BulkConfirmForm selectableCount={liveOnPage}>
           <div className="divide-y divide-line">
-            {rows.map((row) => {
+            {pageRows.map((row) => {
               const property = propertyOf(row.property);
               const isLive = row.status === "live";
               const isOverdue = isLive && daysSince(row.last_confirmed_at) >= 7;
               return (
-                <article key={row.id} className="grid gap-4 px-5 py-4 transition hover:bg-brand-600/[0.02] lg:grid-cols-[1.3fr_.8fr_.8fr_auto] lg:items-center">
+                <article key={row.id} className="grid gap-4 px-5 py-4 transition hover:bg-brand-600/[0.02] lg:grid-cols-[auto_1.3fr_.8fr_.8fr_auto] lg:items-center">
+                  {/* Toplu teyit seçimi — yalnızca canlı ilanlar teyitlenebilir */}
+                  {isLive ? (
+                    <input
+                      type="checkbox"
+                      name="ids"
+                      value={row.id}
+                      aria-label={`${property?.property_code ?? row.portal_name} ilanını seç`}
+                      className="focus-ring h-4 w-4 shrink-0 accent-[var(--brand-600)]"
+                    />
+                  ) : (
+                    <span aria-hidden className="h-4 w-4 shrink-0" />
+                  )}
                   <div className="flex min-w-0 items-center gap-3">
                     <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-[12px] ${isLive ? "bg-brand-600/10 text-brand-600" : "bg-ink-950/5 text-text-faint"}`}><RadioTower className="h-5 w-5" /></span>
-                    <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink-950">{property?.title ?? "Portföy bulunamadı"}</p><p className="mt-0.5 text-xs text-text-muted">{property?.property_code ?? "—"} · {row.portal_name}{row.portal_listing_id ? ` #${row.portal_listing_id}` : ""}</p></div>
+                    <div className="min-w-0">
+                      {property ? (
+                        <Link href={`/app/portfoyler/${property.id}`} className="focus-ring group/prop block">
+                          <p className="truncate text-sm font-semibold text-ink-950 transition group-hover/prop:text-brand-600">
+                            {property.title ?? "İsimsiz portföy"}
+                            <ArrowUpRight className="ml-1 inline h-3 w-3 text-text-faint opacity-0 transition group-hover/prop:text-brand-600 group-hover/prop:opacity-100" />
+                          </p>
+                          <p className="mt-0.5 text-xs text-text-muted">{property.property_code} · {row.portal_name}{row.portal_listing_id ? ` #${row.portal_listing_id}` : ""}</p>
+                        </Link>
+                      ) : (
+                        <>
+                          <p className="truncate text-sm font-semibold text-ink-950">Portföy bulunamadı</p>
+                          <p className="mt-0.5 text-xs text-text-muted">— · {row.portal_name}{row.portal_listing_id ? ` #${row.portal_listing_id}` : ""}</p>
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div>
-                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${isLive ? "bg-mint-500/10 text-mint-600" : "bg-ink-950/5 text-text-muted"}`}>
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${isLive ? "bg-mint-500/10 text-mint-600" : "bg-ink-950/5 text-text-muted"}`}>
                       {isLive ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Siren className="h-3.5 w-3.5" />}{isLive ? "Yayında" : "Kapandı"}
                     </span>
-                    {!isLive && row.removal_reason ? <p className="mt-1 text-[10px] text-text-faint">{row.removal_reason}</p> : null}
+                    {!isLive && row.removal_reason ? <p className="mt-1 text-[11px] text-text-faint">{row.removal_reason}</p> : null}
                   </div>
                   <div className={`text-xs ${isOverdue ? "text-amber-500" : "text-text-muted"}`}>
                     <p className="flex items-center gap-1.5">{isOverdue ? <AlertTriangle className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5 text-mint-600" />}{relativeConfirm(row.last_confirmed_at)}</p>
@@ -221,10 +381,7 @@ export default async function PortalsPage() {
                     {row.portal_url ? <a href={row.portal_url} target="_blank" rel="noreferrer" className="grid h-9 w-9 place-items-center rounded-[9px] border border-line text-text-faint transition hover:border-brand-300 hover:text-brand-600" aria-label="İlanı aç"><ExternalLink className="h-4 w-4" /></a> : null}
                     {isLive ? (
                       <>
-                        <form action={confirmPortalListing}>
-                          <input type="hidden" name="id" value={row.id} />
-                          <button type="submit" className="inline-flex items-center gap-1.5 rounded-[9px] border border-mint-500/20 px-3 py-2 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/8"><RefreshCw className="h-3.5 w-3.5" /> Teyit</button>
-                        </form>
+                        <ConfirmListingButton listingId={row.id} />
                         <ClosePortalDialog listingId={row.id} label={`${property?.property_code ?? ""} · ${row.portal_name}`} />
                       </>
                     ) : null}
@@ -233,6 +390,32 @@ export default async function PortalsPage() {
               );
             })}
           </div>
+          </BulkConfirmForm>
+          )}
+          {totalPages > 1 ? (
+            <nav aria-label="Sayfalama" className="flex items-center justify-between gap-3 border-t border-line px-5 py-3">
+              {page > 1 ? (
+                <Link href={portalHref(durum, portal, page - 1, propertyF)} className="focus-ring press rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+                  ← Önceki
+                </Link>
+              ) : (
+                <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">← Önceki</span>
+              )}
+              <span className="text-xs tabular-nums text-text-muted">Sayfa {page} / {totalPages}</span>
+              {page < totalPages ? (
+                <Link href={portalHref(durum, portal, page + 1, propertyF)} className="focus-ring press rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+                  Sonraki →
+                </Link>
+              ) : (
+                <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">Sonraki →</span>
+              )}
+            </nav>
+          ) : null}
+          {listingTotal != null && listingTotal > rows.length ? (
+            <div className="border-t border-line px-5 py-2">
+              <ListLimitNotice shown={rows.length} total={listingTotal} hint="Daha eski kayıtlar için dışa aktarım kullanın." />
+            </div>
+          ) : null}
         </div>
       )}
     </div>

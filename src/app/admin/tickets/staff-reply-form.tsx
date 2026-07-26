@@ -7,9 +7,20 @@ import { replyTicketAsStaff, type TicketResult } from "@/app/actions/tickets";
 
 const initial: TicketResult = {};
 
-export function StaffReplyForm({ ticketId, disabled }: { ticketId: string; disabled?: boolean }) {
+export type TicketMacro = { id: string; title: string; body: string };
+
+export function StaffReplyForm({
+  ticketId,
+  disabled,
+  macros = [],
+}: {
+  ticketId: string;
+  disabled?: boolean;
+  macros?: TicketMacro[];
+}) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [state, action, pending] = useActionState(async (prev: TicketResult, formData: FormData) => {
     const result = await replyTicketAsStaff(prev, formData);
@@ -33,7 +44,29 @@ export function StaffReplyForm({ ticketId, disabled }: { ticketId: string; disab
   return (
     <form ref={formRef} action={action} className="space-y-3">
       <input type="hidden" name="id" value={ticketId} />
+      {macros.length > 0 ? (
+        <select
+          aria-label="Hazır yanıt seç"
+          defaultValue=""
+          onChange={(e) => {
+            // Seçilen makro metni textarea'ya dolar; select geri sıfırlanır
+            const macro = macros.find((m) => m.id === e.target.value);
+            if (macro && textareaRef.current) {
+              textareaRef.current.value = macro.body;
+              textareaRef.current.focus();
+            }
+            e.target.value = "";
+          }}
+          className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-text-muted outline-none focus:border-brand-400"
+        >
+          <option value="">Hazır yanıt seç…</option>
+          {macros.map((m) => (
+            <option key={m.id} value={m.id}>{m.title}</option>
+          ))}
+        </select>
+      ) : null}
       <textarea
+        ref={textareaRef}
         name="body"
         required
         rows={4}

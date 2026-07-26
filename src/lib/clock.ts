@@ -34,6 +34,11 @@ export function daysAgoIso(days: number): string {
   return new Date(Date.now() - days * DAY_MS).toISOString();
 }
 
+/** `days` gün sonrasının ISO karşılığı — vade/pencere hesapları için. */
+export function daysFromNowIso(days: number): string {
+  return new Date(Date.now() + days * DAY_MS).toISOString();
+}
+
 /** Verilen andan bu yana geçen milisaniye (geçmiş için pozitif). */
 export function msSince(value: DateInput): number {
   return Date.now() - ms(value);

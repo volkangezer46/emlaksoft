@@ -39,6 +39,11 @@ export function CountUp({ value, durationMs = 1100, money, suffix, prefix, decim
     const run = () => {
       if (started.current) return;
       started.current = true;
+      // Hareket azaltma tercihi: RAF döngüsünü hiç başlatma
+      if (typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        setDisplay(value);
+        return;
+      }
       const start = performance.now();
       const tick = (now: number) => {
         const t = Math.min(1, (now - start) / durationMs);
@@ -64,7 +69,8 @@ export function CountUp({ value, durationMs = 1100, money, suffix, prefix, decim
   }, [value, durationMs]);
 
   return (
-    <span ref={ref} className={className}>
+    // numeric: tabular rakamlar — sayım sırasında genişlik titremesin
+    <span ref={ref} className={`numeric ${className ?? ""}`.trim()}>
       {prefix}
       {format(display, { money, decimals })}
       {suffix}

@@ -27,10 +27,14 @@ const invStatusColor: Record<string, string> = {
   uncollectible: "bg-danger-500/10 text-danger-500",
 };
 
-type Rel = { name?: string } | { name?: string }[] | null;
+type Rel = { id?: string; name?: string } | { id?: string; name?: string }[] | null;
 function nameOf(v: Rel) {
   if (!v) return "—";
   return Array.isArray(v) ? (v[0]?.name ?? "—") : (v.name ?? "—");
+}
+function idOf(v: Rel) {
+  if (!v) return null;
+  return Array.isArray(v) ? (v[0]?.id ?? null) : (v.id ?? null);
 }
 
 function money(n: number) {
@@ -47,7 +51,7 @@ export async function BillingHome({ staffName }: { staffName: string }) {
       .order("created_at", { ascending: false }),
     admin
       .from("invoices")
-      .select("id, invoice_no, status, total_try, due_at, paid_at, created_at, tenant:tenants(name)")
+      .select("id, invoice_no, status, total_try, due_at, paid_at, created_at, tenant:tenants(id, name)")
       .order("created_at", { ascending: false })
       .limit(60),
   ]);
@@ -84,10 +88,10 @@ export async function BillingHome({ staffName }: { staffName: string }) {
   const maxPlan = Math.max(1, ...planRevenue.map((p) => p.value));
 
   const kpis = [
-    { label: "Aylık yinelenen gelir", value: mrr, money: true, icon: TrendingUp, tone: "text-mint-400" },
-    { label: "Aktif abonelik", value: activeCount, money: false, icon: CreditCard, tone: "text-amber-400" },
-    { label: "Bu ay tahsilat", value: collectedThisMonth, money: true, icon: Wallet, tone: "text-cyan-400" },
-    { label: "Gecikmiş fatura", value: overdueTotal, money: true, icon: AlertTriangle, tone: "text-danger-400" },
+    { label: "Aylık yinelenen gelir", href: "/admin/billing", value: mrr, money: true, icon: TrendingUp, tone: "text-mint-400" },
+    { label: "Aktif abonelik", href: "/admin/billing?durum=active", value: activeCount, money: false, icon: CreditCard, tone: "text-amber-400" },
+    { label: "Bu ay tahsilat", href: "/admin/billing?durum=paid", value: collectedThisMonth, money: true, icon: Wallet, tone: "text-cyan-400" },
+    { label: "Gecikmiş fatura", href: "/admin/billing?durum=open", value: overdueTotal, money: true, icon: AlertTriangle, tone: "text-danger-400" },
   ];
 
   return (
@@ -105,11 +109,12 @@ export async function BillingHome({ staffName }: { staffName: string }) {
           </p>
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {kpis.map((k) => (
-              <div key={k.label} className="rounded-[14px] border border-white/12 bg-white/8 p-3 backdrop-blur">
+              <Link key={k.label} href={k.href} className="focus-ring group relative block rounded-[14px] border border-white/12 bg-white/8 p-3 backdrop-blur transition hover:border-white/25 hover:bg-white/12">
                 <k.icon className={`h-4 w-4 ${k.tone}`} />
                 <p className="mt-2 font-display text-lg font-extrabold tabular-nums text-white"><CountUp value={k.value} money={k.money} /></p>
-                <p className="text-[10px] text-white/70">{k.label}</p>
-              </div>
+                <p className="text-[11px] text-white/70">{k.label}</p>
+                <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:opacity-100" />
+              </Link>
             ))}
           </div>
         </div>
@@ -124,33 +129,33 @@ export async function BillingHome({ staffName }: { staffName: string }) {
           <h2 className="mt-1 font-display font-bold text-ink-950">Gelir dağılımı</h2>
           <div className="mt-5 space-y-3">
             {planRevenue.map((p, i) => (
-              <div key={p.key}>
+              <Link key={p.key} href={`/admin/tenants?plan=${p.key}`} className="focus-ring group block rounded-[8px]">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-ink-950">{p.label}</span>
+                  <span className="font-semibold text-ink-950 transition group-hover:text-brand-600">{p.label}</span>
                   <span className="tabular-nums text-text-muted">{money(p.value)}</span>
                 </div>
                 <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-ink-950/5">
                   <div
-                    className="bar-live h-full rounded-full bg-[image:var(--grad-brand)]"
+                    className="bar-live h-full rounded-full bg-[image:var(--grad-brand)] transition group-hover:brightness-110"
                     style={{ width: `${Math.max((p.value / maxPlan) * 100, 3)}%`, animationDelay: `${i * 0.08}s` }}
                   />
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
           <div className="mt-5 grid grid-cols-3 gap-2 border-t border-line pt-4 text-center">
-            <div>
+            <Link href="/admin/billing?durum=trialing" className="focus-ring group rounded-[10px] py-1 transition hover:bg-canvas">
               <p className="font-display text-lg font-extrabold text-ink-950">{trialing}</p>
-              <p className="text-[10px] text-text-muted">Deneme</p>
-            </div>
-            <div>
+              <p className="text-[11px] text-text-muted transition group-hover:text-brand-600">Deneme</p>
+            </Link>
+            <Link href="/admin/billing?durum=past_due" className="focus-ring group rounded-[10px] py-1 transition hover:bg-canvas">
               <p className="font-display text-lg font-extrabold text-danger-500">{pastDue}</p>
-              <p className="text-[10px] text-text-muted">Gecikmiş abonelik</p>
-            </div>
-            <div>
+              <p className="text-[11px] text-text-muted transition group-hover:text-brand-600">Gecikmiş abonelik</p>
+            </Link>
+            <Link href="/admin/billing?durum=open" className="focus-ring group rounded-[10px] py-1 transition hover:bg-canvas">
               <p className="font-display text-lg font-extrabold text-amber-600">{money(openTotal)}</p>
-              <p className="text-[10px] text-text-muted">Açık bakiye</p>
-            </div>
+              <p className="text-[11px] text-text-muted transition group-hover:text-brand-600">Açık bakiye</p>
+            </Link>
           </div>
         </section>
 
@@ -170,20 +175,30 @@ export async function BillingHome({ staffName }: { staffName: string }) {
           <div className="mt-4 space-y-2">
             {invRows.slice(0, 7).map((i) => {
               const isOverdue = i.status === "open" && i.due_at && new Date(i.due_at).getTime() < nowMs;
-              return (
-                <div key={i.id} className="flex items-center justify-between rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5">
+              const tenantId = idOf(i.tenant as Rel);
+              const inner = (
+                <>
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink-950">{nameOf(i.tenant as Rel)}</p>
-                    <p className="text-[10px] text-text-faint">
+                    <p className="truncate text-sm font-semibold text-ink-950 transition group-hover:text-brand-600">{nameOf(i.tenant as Rel)}</p>
+                    <p className="text-[11px] text-text-faint">
                       {i.invoice_no ?? "—"} · {new Date(i.created_at).toLocaleDateString("tr-TR")}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <span className="tabular-nums text-sm font-semibold text-ink-950">{money(Number(i.total_try || 0))}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${isOverdue ? "bg-danger-500/10 text-danger-500" : invStatusColor[i.status] ?? "bg-ink-950/5 text-text-muted"}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${isOverdue ? "bg-danger-500/10 text-danger-500" : invStatusColor[i.status] ?? "bg-ink-950/5 text-text-muted"}`}>
                       {isOverdue ? "Gecikmiş" : invStatusLabel[i.status] ?? i.status}
                     </span>
                   </div>
+                </>
+              );
+              return tenantId ? (
+                <Link key={i.id} href={`/admin/tenants/${tenantId}`} className="focus-ring group flex items-center justify-between rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5 transition hover:border-brand-300">
+                  {inner}
+                </Link>
+              ) : (
+                <div key={i.id} className="flex items-center justify-between rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5">
+                  {inner}
                 </div>
               );
             })}

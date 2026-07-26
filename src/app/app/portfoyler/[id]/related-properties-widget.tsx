@@ -129,10 +129,10 @@ export async function RelatedPropertiesWidget({
             className="group flex flex-col gap-2 rounded-[14px] border border-line bg-canvas/60 p-3 transition hover:border-brand-300 hover:bg-surface"
           >
             <div className="flex items-start justify-between gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-brand-600">
+              <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">
                 {p.transaction_type}{p.property_type ? ` · ${p.property_type}` : ""}
               </span>
-              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${statusCls[p.status] ?? "bg-zinc-100 text-zinc-500"}`}>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${statusCls[p.status] ?? "bg-zinc-100 text-zinc-500"}`}>
                 {statusLabel[p.status] ?? p.status}
               </span>
             </div>

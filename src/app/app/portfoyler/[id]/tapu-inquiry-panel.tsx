@@ -89,24 +89,24 @@ export function TapuInquiryPanel({
           {result && result.ok && result.configured ? (
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               <div className="rounded-[12px] border border-line bg-canvas p-3">
-                <p className="text-[10px] text-text-muted">Tahmini değer</p>
+                <p className="text-[11px] text-text-muted">Tahmini değer</p>
                 <p className="font-display text-lg font-extrabold text-ink-950">{money(result.insight.estimatedValue)}</p>
               </div>
               <div className="rounded-[12px] border border-line bg-canvas p-3">
-                <p className="flex items-center gap-1 text-[10px] text-text-muted"><TrendingUp className="h-3 w-3" /> Yatırım skoru</p>
+                <p className="flex items-center gap-1 text-[11px] text-text-muted"><TrendingUp className="h-3 w-3" /> Yatırım skoru</p>
                 <p className="font-display text-lg font-extrabold text-violet-600">{result.insight.investmentScore ?? "—"}<span className="text-xs text-text-faint">/100</span></p>
               </div>
               <div className="rounded-[12px] border border-line bg-canvas p-3">
-                <p className="text-[10px] text-text-muted">12 aylık fiyat değişimi</p>
+                <p className="text-[11px] text-text-muted">12 aylık fiyat değişimi</p>
                 <p className="font-display text-lg font-extrabold text-mint-600">{result.insight.priceChange12m != null ? `%${result.insight.priceChange12m}` : "—"}</p>
               </div>
               <div className="rounded-[12px] border border-line bg-canvas p-3">
-                <p className="text-[10px] text-text-muted">Kira geri dönüşü</p>
+                <p className="text-[11px] text-text-muted">Kira geri dönüşü</p>
                 <p className="font-display text-lg font-extrabold text-ink-950">{result.insight.rentYieldMonths != null ? `${result.insight.rentYieldMonths} ay` : "—"}</p>
               </div>
               {result.insight.legalFlags.length > 0 ? (
                 <div className="sm:col-span-2 rounded-[12px] border border-amber-300/50 bg-amber-50 p-3">
-                  <p className="text-[10px] font-semibold text-amber-700">Hukuki notlar</p>
+                  <p className="text-[11px] font-semibold text-amber-700">Hukuki notlar</p>
                   <ul className="mt-1 list-inside list-disc text-xs text-amber-700">
                     {result.insight.legalFlags.map((f, i) => <li key={i}>{f}</li>)}
                   </ul>

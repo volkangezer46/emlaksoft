@@ -129,15 +129,15 @@ export function RentCalculator({ months, latestMonth }: { months: string[]; late
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="rounded-[12px] border border-line bg-canvas p-3">
                 <p className="font-display text-lg font-extrabold text-ink-950">%{result.cappedRatePct.toFixed(2)}</p>
-                <p className="text-[10px] text-text-muted">Uygulanan oran</p>
+                <p className="text-[11px] text-text-muted">Uygulanan oran</p>
               </div>
               <div className="rounded-[12px] border border-line bg-canvas p-3">
                 <p className="font-display text-lg font-extrabold text-brand-600">{money(result.monthlyDiff)}</p>
-                <p className="text-[10px] text-text-muted">Aylık fark</p>
+                <p className="text-[11px] text-text-muted">Aylık fark</p>
               </div>
               <div className="rounded-[12px] border border-line bg-canvas p-3">
                 <p className="font-display text-lg font-extrabold text-mint-600">{money(result.annualDiff)}</p>
-                <p className="text-[10px] text-text-muted">Yıllık fark</p>
+                <p className="text-[11px] text-text-muted">Yıllık fark</p>
               </div>
             </div>
 

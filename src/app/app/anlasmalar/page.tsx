@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Handshake, TrendingUp, Trophy, Wallet } from "lucide-react";
+import { ArrowUpRight, Handshake, TrendingUp, Trophy, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DealBoard, type BoardDeal } from "./deal-board";
@@ -21,8 +21,12 @@ export default async function DealsPage() {
       .from("deals")
       // Pipeline 200 anlaşmayla sınırlı; gerçek toplam olmadan kullanıcı
       // eksik bir kanban görüp bunu tam sanır.
+      // deal_notes(count): Supabase gömülü sayım — ayrı N+1 sorgu yerine tek
+      // istekte not sayısı gelir (PostgREST tarafında aggregate). 200 kartlık
+      // limitte maliyet ihmal edilebilir; idx_deal_notes_tenant_deal indeksi
+      // (tenant_id, deal_id, created_at desc) sayımı da karşılar.
       .select(
-        "id, stage, deal_type, deal_value, probability, assigned_to, updated_at, property_id, customer_id, property:properties(id, title, property_code), customer:customers(id, full_name)",
+        "id, stage, deal_type, deal_value, probability, assigned_to, updated_at, property_id, customer_id, property:properties(id, title, property_code), customer:customers(id, full_name, phone), deal_notes(count)",
         { count: "exact" },
       )
       .order("updated_at", { ascending: false })
@@ -42,14 +46,52 @@ export default async function DealsPage() {
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
   ]);
 
+  // Kazanma sihirbazının tebrik SMS'i için İYS onayları (bkz. gelen-kutusu deseni)
+  const dealCustomerIds = [
+    ...new Set((dealsRaw ?? []).map((d) => d.customer_id).filter((v): v is string => Boolean(v))),
+  ];
+  const { data: smsConsents } = dealCustomerIds.length
+    ? await supabase
+        .from("iys_consents")
+        .select("customer_id, status")
+        .eq("channel", "sms")
+        .in("customer_id", dealCustomerIds)
+    : { data: [] as { customer_id: string; status: string }[] };
+  const smsGranted = new Set(
+    (smsConsents ?? []).filter((c) => c.status === "granted").map((c) => c.customer_id),
+  );
+
+  // Evrak durumu rozeti: tüm kartlar için TEK toplu sorgu (N+1 yok) —
+  // deal_id in-list, zorunlu maddeler client'ta gruplanır (200 kart × ~9 madde).
+  const dealIds = (dealsRaw ?? []).map((d) => d.id);
+  const { data: checklistRows } = dealIds.length
+    ? await supabase
+        .from("deal_checklist_items")
+        .select("deal_id, is_required, is_done")
+        .in("deal_id", dealIds)
+        .eq("is_required", true)
+    : { data: [] as { deal_id: string; is_required: boolean; is_done: boolean }[] };
+  const checklistByDeal = new Map<string, { done: number; total: number }>();
+  for (const r of checklistRows ?? []) {
+    const agg = checklistByDeal.get(r.deal_id) ?? { done: 0, total: 0 };
+    agg.total += 1;
+    if (r.is_done) agg.done += 1;
+    checklistByDeal.set(r.deal_id, agg);
+  }
+
   const deals: BoardDeal[] = (dealsRaw ?? []).map((d) => {
     const prop = d.property as
       | { id?: string; title?: string; property_code?: string }
       | { id?: string; title?: string; property_code?: string }[]
       | null;
-    const cust = d.customer as { id?: string; full_name?: string } | { id?: string; full_name?: string }[] | null;
+    const cust = d.customer as
+      | { id?: string; full_name?: string; phone?: string | null }
+      | { id?: string; full_name?: string; phone?: string | null }[]
+      | null;
     const p = Array.isArray(prop) ? prop[0] : prop;
     const c = Array.isArray(cust) ? cust[0] : cust;
+    // deal_notes(count) → [{ count: N }] biçiminde döner
+    const noteAgg = d.deal_notes as { count?: number }[] | null;
     return {
       id: d.id,
       stage: d.stage,
@@ -63,6 +105,11 @@ export default async function DealsPage() {
       property_id: p?.id ?? d.property_id,
       customer_name: c?.full_name ?? null,
       customer_id: c?.id ?? d.customer_id,
+      customer_phone: c?.phone ?? null,
+      sms_consent: smsGranted.has(c?.id ?? d.customer_id ?? ""),
+      note_count: Number(noteAgg?.[0]?.count ?? 0),
+      checklist_done: checklistByDeal.get(d.id)?.done ?? 0,
+      checklist_total: checklistByDeal.get(d.id)?.total ?? 0,
     };
   });
 
@@ -90,17 +137,26 @@ export default async function DealsPage() {
           {canCreate ? <NewDealDialog properties={properties ?? []} customers={customers ?? []} /> : null}
         </div>
         <div className="relative mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {/* KPI'lar tahtaya çapa: açık metrikler tahtanın başına, kazanılanlar
+              doğrudan "Kazanıldı" sütununa götürür. */}
           {[
-            { label: "Açık hat", value: money(pipelineValue), icon: TrendingUp, tone: "text-cyan-300" },
-            { label: "Kazanılan", value: money(wonValue), icon: Trophy, tone: "text-mint-300" },
-            { label: "Açık kart", value: String(open.length), icon: Handshake, tone: "text-amber-300" },
-            { label: "Kazanma oranı", value: `%${winRate}`, icon: Wallet, tone: "text-white" },
+            { label: "Açık hat", value: money(pipelineValue), icon: TrendingUp, tone: "text-cyan-300", href: "#tahta" },
+            { label: "Kazanılan", value: money(wonValue), icon: Trophy, tone: "text-mint-300", href: "#sutun-won" },
+            { label: "Açık kart", value: String(open.length), icon: Handshake, tone: "text-amber-300", href: "#tahta" },
+            { label: "Kazanma oranı", value: `%${winRate}`, icon: Wallet, tone: "text-white", href: "#sutun-won" },
           ].map((k) => (
-            <div key={k.label} className="rounded-[14px] border border-white/10 bg-white/5 p-4 backdrop-blur">
-              <k.icon className={`h-4 w-4 ${k.tone}`} />
+            <Link
+              key={k.label}
+              href={k.href}
+              className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-4 backdrop-blur transition hover:border-brand-300"
+            >
+              <div className="flex items-start justify-between">
+                <k.icon className={`h-4 w-4 ${k.tone}`} />
+                <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+              </div>
               <p className="mt-2 truncate font-display text-xl font-extrabold">{k.value}</p>
               <p className="text-[11px] text-white/45">{k.label}</p>
-            </div>
+            </Link>
           ))}
         </div>
       </section>

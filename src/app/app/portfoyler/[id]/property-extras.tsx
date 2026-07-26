@@ -65,7 +65,7 @@ export function PropertyStatusHistory({
         <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
           <History className="h-4 w-4 text-brand-600" /> Durum geçmişi
           {history.length > 0 && (
-            <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-[10px] font-bold text-brand-600">{history.length}</span>
+            <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-[11px] font-bold text-brand-600">{history.length}</span>
           )}
         </h2>
         <Clock className={`h-4 w-4 text-text-faint transition ${open ? "rotate-180" : ""}`} />
@@ -85,7 +85,7 @@ export function PropertyStatusHistory({
                   {h.old_status ? `${h.old_status} → ` : ""}{h.new_status}
                 </p>
                 {h.reason && <p className="mt-0.5 text-xs text-text-muted">{h.reason}</p>}
-                <p className="mt-0.5 text-[10px] text-text-faint">{authorName(h.changed_by)} · {relTime(h.created_at)}</p>
+                <p className="mt-0.5 text-[11px] text-text-faint">{authorName(h.changed_by)} · {relTime(h.created_at)}</p>
               </div>
             </div>
           ))}
@@ -144,10 +144,10 @@ export function PropertyAuthorizationPanel({
         <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
           <FileCheck2 className="h-4 w-4 text-amber-600" /> Yetki belgesi
         </h2>
-        {urgency === "expired"  && <span className="rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-bold text-red-600">Süresi doldu</span>}
-        {urgency === "critical" && <span className="rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-bold text-red-600">{daysLeft} gün kaldı</span>}
-        {urgency === "warning"  && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-600">{daysLeft} gün kaldı</span>}
-        {urgency === "ok"       && <span className="rounded-full bg-mint-500/10 px-2.5 py-1 text-[10px] font-bold text-mint-700">{daysLeft} gün kaldı</span>}
+        {urgency === "expired"  && <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-600">Süresi doldu</span>}
+        {urgency === "critical" && <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-600">{daysLeft} gün kaldı</span>}
+        {urgency === "warning"  && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-600">{daysLeft} gün kaldı</span>}
+        {urgency === "ok"       && <span className="rounded-full bg-mint-500/10 px-2.5 py-1 text-[11px] font-bold text-mint-700">{daysLeft} gün kaldı</span>}
         <button type="button" onClick={() => setEditing((s) => !s)} className="text-xs font-semibold text-brand-600 hover:underline">
           {editing ? "İptal" : "Düzenle"}
         </button>
@@ -290,7 +290,7 @@ export function PublishToPortalsPanel({
                 <Send className="h-3.5 w-3.5" /> {p.label}
                 {res?.ok && " ✓"}
               </button>
-              {res?.error && <span className="max-w-[160px] truncate text-[10px] text-danger-500">{res.error}</span>}
+              {res?.error && <span className="max-w-[160px] truncate text-[11px] text-danger-500">{res.error}</span>}
             </div>
           );
         })}

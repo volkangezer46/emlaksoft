@@ -82,14 +82,24 @@ export function DistrictRow({ district }: { district: DistrictRowData }) {
   return (
     <div className="grid gap-3 border-b border-line px-5 py-3.5 transition hover:bg-canvas/60 lg:grid-cols-[1fr_auto_auto_auto_auto] lg:items-center">
       <div>
-        <p className="font-display text-sm font-bold text-ink-950">{district.name}</p>
+        <Link
+          href={`/admin/geo/${district.province_id}/${district.id}`}
+          className="font-display text-sm font-bold text-ink-950 transition hover:text-brand-600"
+        >
+          {district.name}
+        </Link>
         <p className="mt-0.5 text-[11px] text-text-muted">
-          {district.neighborhoodCount} mahalle
+          <Link
+            href={`/admin/geo/${district.province_id}/${district.id}`}
+            className="transition hover:text-brand-600 hover:underline"
+          >
+            {district.neighborhoodCount} mahalle
+          </Link>
           {district.population ? ` · ${district.population.toLocaleString("tr-TR")} nüfus` : ""}
         </p>
       </div>
       {!district.is_active ? (
-        <span className="rounded-full bg-danger-500/10 px-2 py-1 text-[10px] font-bold text-danger-500">Pasif</span>
+        <span className="rounded-full bg-danger-500/10 px-2 py-1 text-[11px] font-bold text-danger-500">Pasif</span>
       ) : (
         <span />
       )}

@@ -80,14 +80,21 @@ export function ProvinceRow({ province }: { province: ProvinceRowData }) {
         {province.plate_code}
       </span>
       <div>
-        <p className="font-display text-sm font-bold text-ink-950">{province.name}</p>
+        <Link
+          href={`/admin/geo/${province.id}`}
+          className="font-display text-sm font-bold text-ink-950 transition hover:text-brand-600"
+        >
+          {province.name}
+        </Link>
         <p className="mt-0.5 text-[11px] text-text-muted">
-          {province.districtCount} ilçe · {province.neighborhoodCount} mahalle
+          <Link href={`/admin/geo/${province.id}`} className="transition hover:text-brand-600 hover:underline">
+            {province.districtCount} ilçe · {province.neighborhoodCount} mahalle
+          </Link>
           {province.population ? ` · ${province.population.toLocaleString("tr-TR")} nüfus` : ""}
         </p>
       </div>
       {!province.is_active ? (
-        <span className="rounded-full bg-danger-500/10 px-2 py-1 text-[10px] font-bold text-danger-500">Pasif</span>
+        <span className="rounded-full bg-danger-500/10 px-2 py-1 text-[11px] font-bold text-danger-500">Pasif</span>
       ) : (
         <span />
       )}

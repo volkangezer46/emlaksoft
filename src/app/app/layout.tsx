@@ -1,6 +1,12 @@
 import Link from "next/link";
-import { LogOut, Shield } from "lucide-react";
+import { Building2, CalendarDays, ListChecks, LogOut, Phone, Plus, Shield, UserPlus } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaff } from "@/lib/platform";
@@ -41,6 +47,16 @@ const NAV_MODULES: AppModule[] = [
   "billing",
   "support",
   "settings",
+  // Sidebar bu modüllerin linklerini de içeriyor; listede olmayan modül
+  // izinden bağımsız herkese gizli kalır (offers/contracts/… kayboluyordu).
+  "campaigns",
+  "contracts",
+  "expenses",
+  "offers",
+  "targets",
+  "open_house",
+  "rentals",
+  "projects",
 ];
 
 export default async function AppLayout({
@@ -156,10 +172,54 @@ export default async function AppLayout({
           <header className="sticky top-0 z-30 flex h-17 items-center justify-between border-b border-line/80 bg-surface/90 px-4 pl-16 backdrop-blur-xl md:px-6">
             <CommandSearch />
             <div className="ml-4 flex items-center gap-2">
-              <span className="hidden items-center gap-2 rounded-full border border-mint-500/20 bg-mint-500/10 px-3 py-1.5 text-xs font-semibold text-mint-600 lg:flex">
+              {/* Hızlı eylem menüsü: en sık kullanılan kayıt akışlarına tek tıkla */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="focus-ring press inline-flex h-10 items-center gap-1.5 rounded-[11px] bg-brand-600 px-3 text-xs font-bold text-white transition hover:bg-brand-700"
+                    aria-label="Hızlı yeni kayıt menüsü"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span className="hidden sm:inline">Yeni</span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-52">
+                  <DropdownMenuItem asChild>
+                    <Link href="/app/musteriler">
+                      <UserPlus /> Yeni müşteri
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/app/portfoyler">
+                      <Building2 /> Yeni portföy
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/app/arama">
+                      <Phone /> Görüşme kaydet
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/app/randevular">
+                      <CalendarDays /> Randevu
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/app/gorevler">
+                      <ListChecks /> Görev
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Link
+                href="/app/raporlar"
+                title="Rapor merkezini aç"
+                className="focus-ring hidden items-center gap-2 rounded-full border border-mint-500/20 bg-mint-500/10 px-3 py-1.5 text-xs font-semibold text-mint-600 transition hover:border-mint-500/45 hover:bg-mint-500/15 lg:flex"
+              >
                 <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-500" />
                 {officeScore != null ? `Ofis skoru ${officeScore} · ${officeScoreLabel}` : "Ofis skoru —"}
-              </span>
+              </Link>
               {platformStaff ? (
                 <Link
                   href="/admin"
@@ -179,7 +239,7 @@ export default async function AppLayout({
                 </div>
                 <div className="hidden text-left xl:block">
                   <p className="max-w-28 truncate text-xs font-semibold text-ink-950">{fullName}</p>
-                  <p className="text-[9px] text-text-faint">{planLabel[office?.plan ?? "office"] ?? "Ofis"} plan</p>
+                  <p className="text-[11px] text-text-faint">{planLabel[office?.plan ?? "office"] ?? "Ofis"} plan</p>
                 </div>
               </Link>
               <form action={signOut}>
@@ -193,7 +253,7 @@ export default async function AppLayout({
               </form>
             </div>
           </header>
-          <main id="main-content" className="flex-1 p-4 md:p-6 lg:p-7">
+          <main id="main-content" className="flex-1 p-4 md:p-6 lg:p-8">
             <LiveOfficeStrip tenantId={tenantId} />
             {children}
           </main>

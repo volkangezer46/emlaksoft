@@ -2,8 +2,9 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Globe, Loader2, Lock, Plus, Trash2 } from "lucide-react";
-import { addDefinition, toggleDefinition, deleteDefinition, type DefinitionResult } from "@/app/actions/definitions";
+import { Check, Globe, Loader2, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { addDefinition, toggleDefinition, deleteDefinition, renameDefinition, type DefinitionResult } from "@/app/actions/definitions";
 
 export type DefRow = {
   id: string;
@@ -50,6 +51,9 @@ function CategoryPanel({ category, tenantId }: { category: Category; tenantId: s
   const formRef = useRef<HTMLFormElement>(null);
   const [state, action, pending] = useActionState(addDefinition, init);
   const [busy, setBusy] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [rowError, setRowError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   useEffect(() => {
@@ -67,17 +71,39 @@ function CategoryPanel({ category, tenantId }: { category: Category; tenantId: s
       router.refresh();
     });
   }
-  function onDelete(id: string) {
+  async function onDelete(id: string) {
     setBusy(id);
+    setRowError(null);
+    const res = await deleteDefinition(id);
+    setBusy(null);
+    if (res.error) setRowError(res.error);
+    router.refresh();
+  }
+  function startEdit(d: DefRow) {
+    setEditingId(d.id);
+    setEditLabel(d.label);
+    setRowError(null);
+  }
+  function onRename(id: string) {
+    const next = editLabel.trim();
+    if (!next) return;
+    setBusy(id);
+    setRowError(null);
     startTransition(async () => {
-      await deleteDefinition(id);
+      const res = await renameDefinition(id, next);
       setBusy(null);
+      if (res.error) {
+        setRowError(res.error);
+      } else {
+        setEditingId(null);
+      }
       router.refresh();
     });
   }
 
   return (
     <div className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      {rowError ? <p className="mb-3 text-sm text-danger-500" role="alert">{rowError}</p> : null}
       <div className="space-y-2">
         {category.items.length === 0 ? (
           <p className="py-6 text-center text-sm text-text-muted">Bu kategoride tanım yok.</p>
@@ -90,14 +116,41 @@ function CategoryPanel({ category, tenantId }: { category: Category; tenantId: s
                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[8px] bg-canvas text-text-faint" title={isGlobal ? "Sistem varsayılanı" : "Ofise özel"}>
                   {isGlobal ? <Globe className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5 text-brand-600" />}
                 </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-ink-950">{d.label}</p>
-                  {d.value !== d.label ? <p className="truncate text-[11px] text-text-faint">değer: {d.value}</p> : null}
-                </div>
+                {editingId === d.id ? (
+                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <input
+                      value={editLabel}
+                      onChange={(e) => setEditLabel(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") { e.preventDefault(); onRename(d.id); }
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                      autoFocus
+                      aria-label="Yeni etiket"
+                      className="w-full min-w-0 flex-1 rounded-[8px] border border-brand-400 bg-canvas px-2.5 py-1.5 text-sm outline-none"
+                    />
+                    <button type="button" onClick={() => onRename(d.id)} disabled={busy === d.id || !editLabel.trim()} aria-label="Kaydet" className="grid h-7 w-7 min-h-9 min-w-9 shrink-0 place-items-center rounded-[8px] bg-brand-600 text-white transition hover:bg-brand-700 disabled:opacity-50">
+                      {busy === d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                    </button>
+                    <button type="button" onClick={() => setEditingId(null)} aria-label="Vazgeç" className="grid h-7 w-7 min-h-9 min-w-9 shrink-0 place-items-center rounded-[8px] text-text-faint transition hover:bg-canvas hover:text-ink-950">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-ink-950">{d.label}</p>
+                    {d.value !== d.label ? <p className="truncate text-[11px] text-text-faint">değer: {d.value}</p> : null}
+                  </div>
+                )}
                 {isGlobal ? (
-                  <span className="rounded-full bg-canvas px-2 py-0.5 text-[10px] font-semibold text-text-muted">Sistem</span>
+                  <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-semibold text-text-muted">Sistem</span>
                 ) : isOwn ? (
                   <div className="flex items-center gap-1.5">
+                    {editingId !== d.id ? (
+                      <button type="button" onClick={() => startEdit(d)} disabled={busy === d.id} aria-label="Yeniden adlandır" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] text-text-faint transition hover:bg-canvas hover:text-brand-600 disabled:opacity-50">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => onToggle(d.id, !d.is_active)}
@@ -106,9 +159,17 @@ function CategoryPanel({ category, tenantId }: { category: Category; tenantId: s
                     >
                       {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : d.is_active ? "Gizle" : "Göster"}
                     </button>
-                    <button type="button" onClick={() => onDelete(d.id)} disabled={busy === d.id} aria-label="Sil" className="grid h-7 w-7 place-items-center rounded-[8px] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-500 disabled:opacity-50">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    <ConfirmDialog
+                      title="Tanımı sil"
+                      description={`"${d.label}" seçeneği kalıcı olarak silinecek. Bu tanımı kullanan kayıtlar etkilenmez ama seçenek listelerden kalkar.`}
+                      confirmLabel="Sil"
+                      onConfirm={() => onDelete(d.id)}
+                      trigger={
+                        <button type="button" disabled={busy === d.id} aria-label="Sil" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-500 disabled:opacity-50">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      }
+                    />
                   </div>
                 ) : null}
               </div>

@@ -39,7 +39,7 @@ export function PropertyHealthCard({ health }: { health: PropertyHealthScore }) 
       <div className="mt-4 flex items-center gap-5">
         {/* Halka grafik */}
         <div className="relative h-16 w-16 shrink-0">
-          <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90">
+          <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90" aria-hidden="true">
             <circle cx="32" cy="32" r="28" fill="none" stroke="var(--line)" strokeWidth="7" />
             <circle
               cx="32" cy="32" r="28"

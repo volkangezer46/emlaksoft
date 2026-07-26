@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Check, Copy, ExternalLink, Link2, Power, RefreshCw, Store, Webhook } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { regenerateLeadToken, setLeadCaptureEnabled } from "@/app/actions/lead-intake";
 
 function CopyRow({ label, value, icon: Icon }: { label: string; value: string; icon: React.ComponentType<{ className?: string }> }) {
@@ -106,18 +107,23 @@ export function LeadCapturePanel({
             >
               <ExternalLink className="h-3.5 w-3.5" /> Formu aç
             </a>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => {
-                if (confirm("Anahtar yenilenirse mevcut form/bağlantılar çalışmaz. Devam edilsin mi?")) {
-                  startTransition(() => regenerateLeadToken());
-                }
+            <ConfirmDialog
+              title="Anahtarı yenile"
+              description="Anahtar yenilenirse mevcut form ve bağlantı uç noktası çalışmaz; sitenize gömdüğünüz formu yeni adresle güncellemeniz gerekir."
+              confirmLabel="Yenile"
+              onConfirm={async () => {
+                await regenerateLeadToken();
               }}
-              className="inline-flex items-center gap-1.5 rounded-[10px] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-danger-500 transition hover:border-danger-500/40 disabled:opacity-60"
-            >
-              <RefreshCw className="h-3.5 w-3.5" /> Anahtarı yenile
-            </button>
+              trigger={
+                <button
+                  type="button"
+                  disabled={pending}
+                  className="inline-flex items-center gap-1.5 rounded-[10px] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-danger-500 transition hover:border-danger-500/40 disabled:opacity-60"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" /> Anahtarı yenile
+                </button>
+              }
+            />
           </div>
         </div>
         <div className="mt-4 grid gap-3">

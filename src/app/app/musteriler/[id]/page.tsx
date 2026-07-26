@@ -2,17 +2,22 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
+  ArrowUpRight,
+  BookUser,
   CalendarDays,
   Mail,
   MapPin,
   MessageCircle,
   PhoneCall,
+  Sparkles,
   Target,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getDefinitions } from "@/lib/definitions";
 import { EditCustomerDialog } from "./edit-customer-dialog";
+import { CustomerTagChips } from "./customer-tag-chips";
+import { fetchTenantTags } from "../tenant-tags";
 import { DeleteCustomerButton } from "./delete-customer-button";
 import { Customer360Tabs } from "./customer-360-tabs";
 import { CustomerTasks, type CustomerTaskRow } from "./customer-tasks";
@@ -20,7 +25,13 @@ import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { computeLeadScore, leadTierCls } from "@/lib/lead-score";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
 import { MatchedPropertiesWidget } from "./matched-properties-widget";
-import type { MatchProperty } from "@/lib/matching";
+import { fetchTenantMatchingWeights, type MatchProperty } from "@/lib/matching";
+import type { TimelineItem } from "./customer-timeline-tab";
+import { COMM_CHANNELS } from "@/lib/comm-types";
+import { computeNextBestAction } from "./next-best-action";
+import { isPast } from "@/lib/clock";
+// Ortak tekil SMS dialogu — tek kopya gelen-kutusu'nda yaşar (Yanıtla da onu kullanır)
+import { SmsDialog } from "../../gelen-kutusu/sms-dialog";
 
 const RING_C = 2 * Math.PI * 42;
 
@@ -48,6 +59,7 @@ type Call = {
   phone: string;
   duration_sec: number | null;
   disposition: string | null;
+  notes: string | null;
   started_at: string;
 };
 
@@ -75,6 +87,46 @@ const apptTypeLabel: Record<string, string> = {
   contract: "Sözleşme",
 };
 
+// Zaman tüneli özet etiketleri — ilgili modül sayfalarındaki karşılıklarla aynı
+const callDirLabel: Record<string, string> = { inbound: "Gelen", outbound: "Giden", missed: "Cevapsız" };
+const apptStatusLabel: Record<string, string> = {
+  pending: "Teyit bekliyor",
+  confirmed: "Onaylandı",
+  signature: "İmza eksik",
+  completed: "Tamamlandı",
+  cancelled: "İptal",
+};
+const offerStatusLabel: Record<string, string> = {
+  draft: "Taslak",
+  submitted: "Sunuldu",
+  countered: "Karşı teklif",
+  accepted: "Kabul edildi",
+  rejected: "Reddedildi",
+  withdrawn: "Geri çekildi",
+};
+const contractStatusLabel: Record<string, string> = {
+  draft: "Taslak",
+  sent: "Gönderildi",
+  signed: "İmzalandı",
+  rejected: "Reddedildi",
+  cancelled: "İptal",
+};
+const contractTypeLabel: Record<string, string> = {
+  satis: "Satış",
+  kira: "Kira",
+  sozlesme: "Sözleşme",
+  teklif: "Teklif",
+  diger: "Diğer",
+};
+
+function moneyTl(value: number) {
+  return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(value);
+}
+
+function shortDate(iso: string) {
+  return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
+}
+
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { perms } = await requireModulePage("customers");
   const canEdit = (perms.customers ?? []).includes("edit");
@@ -99,7 +151,11 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     { data: filesData },
     { data: tasksData },
     { data: commsData },
+    { data: offersData },
+    { data: contractsData },
     { data: propertiesForMatch },
+    matchingWeights,
+    tenantTags,
     customerTypeDefs,
     transactionTypeDefs,
     propertyTypeDefs,
@@ -118,7 +174,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .order("created_at", { ascending: false }),
     supabase
       .from("calls")
-      .select("id, direction, phone, duration_sec, disposition, started_at")
+      .select("id, direction, phone, duration_sec, disposition, notes, started_at")
       .eq("customer_id", id)
       .order("started_at", { ascending: false })
       .limit(50),
@@ -153,7 +209,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .order("created_at", { ascending: false }),
     supabase
       .from("tasks")
-      .select("id, title, kind, priority, status, due_at")
+      .select("id, title, kind, priority, status, due_at, completed_at")
       .eq("customer_id", id)
       .order("status", { ascending: true })
       .order("due_at", { ascending: true, nullsFirst: false })
@@ -164,6 +220,19 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .eq("customer_id", id)
       .order("created_at", { ascending: false })
       .limit(100),
+    // Zaman tüneli sekmesi için dar seçimler (yalnız bu müşteri, son 50)
+    supabase
+      .from("offers")
+      .select("id, amount, status, created_at")
+      .eq("customer_id", id)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    supabase
+      .from("contracts")
+      .select("id, title, contract_type, status, signed_at, created_at")
+      .eq("customer_id", id)
+      .order("created_at", { ascending: false })
+      .limit(50),
     // Portföy öneri widget'ı için — sadece aktif portföyler
     supabase
       .from("properties")
@@ -172,6 +241,10 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .in("status", ["live", "draft", "Yayında"])
       .order("created_at", { ascending: false })
       .limit(100),
+    // Ofise özel eşleştirme ağırlıkları — öneri widget'ı eşleştirme sayfasıyla aynı skoru üretsin
+    fetchTenantMatchingWeights(supabase),
+    // Etiket önerileri — tenant'taki mevcut etiketler (chip input'a prop'la iner)
+    fetchTenantTags(supabase),
     getDefinitions("customer_type"),
     getDefinitions("transaction_type"),
     getDefinitions("property_type"),
@@ -214,6 +287,11 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     features: (p.features ?? {}) as MatchProperty["features"],
   })) as MatchProperty[];
 
+  // İYS SMS onayı — hero'daki SMS dialogu bu durumla kilitlenir/açılır
+  const smsConsentGranted = (consentsData ?? []).some(
+    (c) => c.channel === "sms" && c.status === "granted",
+  );
+
   const province = relName(customer.province as Rel);
   const district = relName(customer.district as Rel);
   const types: string[] = customer.customer_types ?? [];
@@ -241,6 +319,29 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   });
   const score = lead.score;
 
+  // Sonraki en iyi aksiyon — kural motoru, mevcut sayfaverisiyle (bkz. ./next-best-action)
+  const submittedOffer = (offersData ?? []).find((o) => o.status === "submitted") ?? null;
+  const pastAppointmentPending = appts.some(
+    (a) => ["pending", "confirmed"].includes(a.status) && isPast(a.scheduled_at),
+  );
+  const nba = customer.blacklist
+    ? null
+    : computeNextBestAction(
+        {
+          customerId: customer.id,
+          leadTier: lead.tier,
+          leadLabel: lead.label,
+          hasPhone: Boolean(customer.phone),
+          lastActivityAt,
+          createdAt: customer.created_at,
+          openDemandCount: activeDemands.length,
+          candidatePropertyCount: matchProperties.length,
+          submittedOfferId: submittedOffer?.id ?? null,
+          pastAppointmentPending,
+        },
+        customer.phone ? toTelHref(customer.phone) : null,
+      );
+
   type Activity = {
     key: string;
     title: string;
@@ -266,10 +367,89 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     })),
   ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 
+  /*
+   * Zaman tüneli — 4 sekmeye dağılan bilgiyi tek kronolojide birleştirir.
+   * Çağrı+randevu aktivite sekmesinin verisini, iletişim kayıtları iletişim
+   * sekmesinin verisini yeniden kullanır; yalnız teklif+sözleşme için dar
+   * sorgu eklendi. Görevlerden sadece tamamlananlar girer.
+   */
+  const commRows = (commsData ?? []) as {
+    id: string;
+    channel: string;
+    direction: string;
+    subject: string | null;
+    body: string | null;
+    created_at: string;
+  }[];
+  const doneTasks = ((tasksData ?? []) as (CustomerTaskRow & { completed_at?: string | null })[])
+    .filter((t) => t.status === "done" && (t.completed_at || t.due_at));
+  const timeline: TimelineItem[] = [
+    ...calls.map((c): TimelineItem => ({
+      key: `call-${c.id}`,
+      kind: "call",
+      title: `${callDirLabel[c.direction] ?? "Çağrı"} çağrı${c.disposition ? ` · ${c.disposition}` : ""}`,
+      sub: c.notes || null,
+      time: c.started_at,
+      href: null,
+    })),
+    ...appts.map((a): TimelineItem => ({
+      key: `appt-${a.id}`,
+      kind: "appointment",
+      title: `${apptTypeLabel[a.appointment_type] ?? "Randevu"} · ${apptStatusLabel[a.status] ?? a.status}`,
+      sub: a.location,
+      time: a.scheduled_at,
+      href: null,
+    })),
+    ...(offersData ?? []).map((o): TimelineItem => ({
+      key: `offer-${o.id}`,
+      kind: "offer",
+      title: `Teklif · ${o.amount != null ? moneyTl(Number(o.amount)) : "—"} · ${offerStatusLabel[o.status] ?? o.status}`,
+      sub: null,
+      time: o.created_at,
+      href: `/app/teklifler/${o.id}`,
+    })),
+    ...(contractsData ?? []).map((c): TimelineItem => ({
+      key: `contract-${c.id}`,
+      kind: "contract",
+      title: `${contractTypeLabel[c.contract_type] ?? "Sözleşme"} sözleşmesi · ${contractStatusLabel[c.status] ?? c.status}`,
+      sub: [c.title, c.signed_at ? `İmza: ${shortDate(c.signed_at)}` : null].filter(Boolean).join(" · ") || null,
+      time: c.created_at,
+      href: `/app/sozlesmeler/${c.id}`,
+    })),
+    ...doneTasks.map((t): TimelineItem => ({
+      key: `task-${t.id}`,
+      kind: "task",
+      title: `Görev tamamlandı · ${t.title}`,
+      sub: null,
+      time: (t.completed_at ?? t.due_at) as string,
+      href: null,
+    })),
+    ...commRows.map((c): TimelineItem => ({
+      key: `comm-${c.id}`,
+      kind: "comm",
+      title: `${COMM_CHANNELS.find((ch) => ch.value === c.channel)?.label ?? c.channel}${
+        c.direction === "inbound" ? " · Gelen" : c.direction === "outbound" ? " · Giden" : c.direction === "internal" ? " · İç not" : ""
+      }`,
+      sub: c.subject || c.body || null,
+      time: c.created_at,
+      href: null,
+    })),
+    {
+      key: "created",
+      kind: "created" as const,
+      title: "Müşteri kaydı açıldı",
+      sub: null,
+      time: customer.created_at as string,
+      href: null,
+    },
+  ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+
+  // Her kutu ilgili sekmeyi açar (?tab= — Customer360Tabs URL'den okur).
+  // Çağrı ve randevu kayıtları aktivite akışında listelenir.
   const stats = [
-    { label: "Talep", value: demands.length, icon: Target },
-    { label: "Çağrı", value: calls.length, icon: PhoneCall },
-    { label: "Randevu", value: appts.length, icon: CalendarDays },
+    { label: "Talep", value: demands.length, icon: Target, tab: "talepler" },
+    { label: "Çağrı", value: calls.length, icon: PhoneCall, tab: "aktivite" },
+    { label: "Randevu", value: appts.length, icon: CalendarDays, tab: "aktivite" },
   ];
 
   return (
@@ -290,7 +470,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-display text-2xl font-extrabold text-white md:text-3xl">{customer.full_name}</h1>
                 {customer.blacklist ? (
-                  <span className="rounded-full bg-danger-500/20 px-2 py-0.5 text-[10px] font-bold text-danger-400">Kara liste</span>
+                  <span className="rounded-full bg-danger-500/20 px-2 py-0.5 text-[11px] font-bold text-danger-400">Kara liste</span>
                 ) : (
                   <span
                     className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 ring-inset ${leadTierCls(lead.tier)}`}
@@ -309,6 +489,13 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                   <span className="text-xs text-white/40">Tür belirtilmedi</span>
                 )}
               </div>
+              {/* Etiket chip'leri + ekleme — tenant önerileri server'dan gelir */}
+              <CustomerTagChips
+                customerId={customer.id}
+                tags={tags}
+                suggestions={tenantTags}
+                canEdit={canEdit}
+              />
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-white/70">
                 {customer.phone ? (
                   <span className="flex items-center gap-1.5 tabular-nums">
@@ -343,10 +530,24 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                     <MessageCircle className="h-4 w-4" /> WhatsApp
                   </a>
                 ) : null}
-                <Link href="/app/arama" className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                {customer.phone && canEdit ? (
+                  <SmsDialog
+                    customerId={customer.id}
+                    customerName={customer.full_name}
+                    consentGranted={smsConsentGranted}
+                  />
+                ) : null}
+                {/* vCard 3.0 indirme — route: ./vcard/route.ts */}
+                <a
+                  href={`/app/musteriler/${customer.id}/vcard`}
+                  className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                >
+                  <BookUser className="h-4 w-4" /> Rehbere ekle (.vcf)
+                </a>
+                <Link href={`/app/arama?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <PhoneCall className="h-4 w-4" /> Görüşme kaydet
                 </Link>
-                <Link href="/app/randevular" className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                <Link href={`/app/randevular?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <CalendarDays className="h-4 w-4" /> Randevu ver
                 </Link>
                 <Link href={`/app/eslestirme?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
@@ -395,20 +596,57 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               </svg>
               <div className="absolute text-center">
                 <p className="font-display text-2xl font-extrabold text-white">{score}</p>
-                <p className="text-[9px] text-white/55">Müşteri skoru</p>
+                <p className="text-[10px] text-white/55">Müşteri skoru</p>
               </div>
             </div>
             <div className="grid gap-2">
               {stats.map((s) => (
-                <div key={s.label} className="flex items-center gap-2.5 rounded-[12px] border border-white/10 bg-white/5 px-3 py-2 backdrop-blur">
+                <Link
+                  key={s.label}
+                  href={`/app/musteriler/${customer.id}?tab=${s.tab}`}
+                  scroll={false}
+                  className="focus-ring press group flex items-center gap-2.5 rounded-[12px] border border-white/10 bg-white/5 px-3 py-2 backdrop-blur transition hover:border-brand-300 hover:bg-white/10"
+                >
                   <s.icon className="h-4 w-4 text-mint-400" />
                   <span className="font-display text-lg font-extrabold text-white">{s.value}</span>
                   <span className="text-[11px] text-white/50">{s.label}</span>
-                </div>
+                  <ArrowUpRight className="hover-action ml-auto h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:opacity-100" />
+                </Link>
               ))}
             </div>
           </div>
         </div>
+
+        {/* Sonraki en iyi aksiyon — tek öneri, tek buton; kural eşleşmezse kart yok */}
+        {nba ? (
+          <div className="relative mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-mint-400/25 bg-white/[0.06] px-4 py-3 backdrop-blur">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-mint-500/15 text-mint-400">
+                <Sparkles className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-mint-400">Sonraki en iyi aksiyon</p>
+                <p className="truncate text-sm font-semibold text-white">{nba.title}</p>
+                <p className="truncate text-[11px] text-white/50">{nba.reason}</p>
+              </div>
+            </div>
+            {nba.externalHref ? (
+              <a
+                href={nba.externalHref}
+                className="btn-shine inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
+              >
+                <PhoneCall className="h-4 w-4" /> {nba.action}
+              </a>
+            ) : nba.href ? (
+              <Link
+                href={nba.href}
+                className="btn-shine inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
+              >
+                {nba.action} <ArrowUpRight className="h-4 w-4" />
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <Customer360Tabs
@@ -421,6 +659,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         urgencyOptions={demandUrgencyOptions}
         demands={demands}
         activity={activity}
+        timeline={timeline}
         tags={tags}
         notes={customer.notes}
         source={customer.source}
@@ -452,6 +691,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       <MatchedPropertiesWidget
         demands={activeDemands}
         properties={matchProperties}
+        weights={matchingWeights}
       />
     </div>
   );

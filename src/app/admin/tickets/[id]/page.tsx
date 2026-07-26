@@ -1,10 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Building2, LifeBuoy, Shield } from "lucide-react";
+import { ArrowLeft, Building2, LifeBuoy, Shield, Trash2, UserCheck } from "lucide-react";
 import { setTicketStatus } from "@/app/actions/tickets";
+import {
+  assignTicketStaffAction,
+  createTicketMacroAction,
+  deleteTicketMacroAction,
+} from "@/app/actions/admin-ticket-ops";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { StaffReplyForm } from "../staff-reply-form";
+import { slaStateOf } from "../sla";
+import { SlaBadge } from "../sla-badge";
 
 const statusLabel: Record<string, string> = {
   open: "Açık",
@@ -52,15 +59,15 @@ export default async function AdminTicketDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requirePlatformModule("tickets");
+  const viewer = await requirePlatformModule("tickets");
   const { id } = await params;
   const admin = createAdminClient();
 
-  // ticket ve messages ikisi de yalnızca params id'ye bağlı → paralel
-  const [{ data: ticket }, { data: messages }] = await Promise.all([
+  // ticket, messages, personel listesi ve makrolar yalnızca params id'ye bağlı → paralel
+  const [{ data: ticket }, { data: messages }, { data: staffList }, { data: macroRows }] = await Promise.all([
     admin
       .from("support_tickets")
-      .select("id, subject, body, category, priority, status, created_at, updated_at, tenant:tenants(name)")
+      .select("id, subject, body, category, priority, status, created_at, updated_at, tenant_id, assigned_staff_id, tenant:tenants(name)")
       .eq("id", id)
       .maybeSingle(),
     admin
@@ -68,6 +75,8 @@ export default async function AdminTicketDetailPage({
       .select("id, body, author_kind, author_user_id, created_at")
       .eq("ticket_id", id)
       .order("created_at", { ascending: true }),
+    admin.from("platform_staff").select("id, full_name").eq("is_active", true).order("full_name"),
+    admin.from("ticket_macros").select("id, title, body").order("title"),
   ]);
 
   if (!ticket) notFound();
@@ -89,6 +98,19 @@ export default async function AdminTicketDetailPage({
   (staffRows ?? []).forEach((s) => nameMap.set(s.id, s.full_name));
 
   const closed = ticket.status === "closed";
+  const staff = staffList ?? [];
+  const macros = macroRows ?? [];
+  const isSuperAdmin = viewer.role === "super_admin";
+  const assignedName = ticket.assigned_staff_id
+    ? (staff.find((s) => s.id === ticket.assigned_staff_id)?.full_name ??
+      nameMap.get(ticket.assigned_staff_id) ??
+      "Personel")
+    : null;
+  const sla = slaStateOf({
+    status: ticket.status,
+    createdAt: ticket.created_at,
+    hasStaffReply: rows.some((m) => m.author_kind === "staff"),
+  });
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -102,34 +124,91 @@ export default async function AdminTicketDetailPage({
           <div>
             <p className="flex items-center gap-2 text-xs text-white/50">
               <Building2 className="h-3.5 w-3.5 text-amber-400" />
-              {nameOf(ticket.tenant as Rel)} · {categoryLabel[ticket.category] ?? ticket.category} ·{" "}
+              {ticket.tenant_id ? (
+                <Link
+                  href={`/admin/tenants/${ticket.tenant_id}`}
+                  className="font-semibold text-white/80 transition hover:text-amber-300 hover:underline"
+                >
+                  {nameOf(ticket.tenant as Rel)}
+                </Link>
+              ) : (
+                nameOf(ticket.tenant as Rel)
+              )}{" "}
+              · {categoryLabel[ticket.category] ?? ticket.category} ·{" "}
               <span className={priorityCls[ticket.priority] ?? ""}>{priorityLabel[ticket.priority] ?? ticket.priority}</span>
             </p>
             <h1 className="mt-2 font-display text-2xl font-extrabold text-white">{ticket.subject}</h1>
             <p className="mt-1 text-xs text-white/45">
               {dt(ticket.created_at)} · durum: {statusLabel[ticket.status] ?? ticket.status}
             </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <SlaBadge sla={sla} />
+              {assignedName ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-cyan-400/15 px-2.5 py-1 text-[11px] font-bold text-cyan-300">
+                  <UserCheck className="h-3 w-3" /> {assignedName}
+                </span>
+              ) : (
+                <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] font-semibold text-white/50">
+                  Atanmadı
+                </span>
+              )}
+            </div>
           </div>
-          <form action={setTicketStatus} className="flex flex-wrap items-center gap-2 rounded-[14px] border border-white/10 bg-white/5 p-3">
-            <input type="hidden" name="id" value={ticket.id} />
-            <select
-              name="status"
-              defaultValue={ticket.status}
-              className="rounded-[9px] border border-white/15 bg-ink-950/40 px-2 py-1.5 text-xs font-semibold text-white outline-none"
-            >
-              {Object.entries(statusLabel).map(([v, l]) => (
-                <option key={v} value={v}>{l}</option>
-              ))}
-            </select>
-            <button type="submit" className="rounded-[9px] bg-amber-400 px-3 py-1.5 text-xs font-bold text-ink-950">
-              Güncelle
-            </button>
-          </form>
+          <div className="flex flex-col gap-2">
+            <form action={setTicketStatus} className="flex flex-wrap items-center gap-2 rounded-[14px] border border-white/10 bg-white/5 p-3">
+              <input type="hidden" name="id" value={ticket.id} />
+              <select
+                name="status"
+                defaultValue={ticket.status}
+                className="rounded-[9px] border border-white/15 bg-ink-950/40 px-2 py-1.5 text-xs font-semibold text-white outline-none"
+              >
+                {Object.entries(statusLabel).map(([v, l]) => (
+                  <option key={v} value={v}>{l}</option>
+                ))}
+              </select>
+              <button type="submit" className="rounded-[9px] bg-amber-400 px-3 py-1.5 text-xs font-bold text-ink-950">
+                Güncelle
+              </button>
+            </form>
+            <form action={assignTicketStaffAction} className="flex flex-wrap items-center gap-2 rounded-[14px] border border-white/10 bg-white/5 p-3">
+              <input type="hidden" name="id" value={ticket.id} />
+              <select
+                name="staff_id"
+                defaultValue={ticket.assigned_staff_id ?? ""}
+                aria-label="Personel ata"
+                className="rounded-[9px] border border-white/15 bg-ink-950/40 px-2 py-1.5 text-xs font-semibold text-white outline-none"
+              >
+                <option value="">Atanmadı</option>
+                {staff.map((s) => (
+                  <option key={s.id} value={s.id}>{s.full_name}</option>
+                ))}
+              </select>
+              <button type="submit" className="rounded-[9px] border border-white/20 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-white/10">
+                Ata
+              </button>
+            </form>
+          </div>
         </div>
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[1.2fr_.9fr]">
         <section className="space-y-3">
+          {ticket.body?.trim() ? (
+            // Talebin açılış metni — konuşma dizisinin ilk mesajı
+            <article className="rounded-[16px] border border-line bg-surface p-4">
+              <div className="flex items-center gap-2">
+                <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-brand-600/10 text-brand-600">
+                  <LifeBuoy className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-ink-950">{nameOf(ticket.tenant as Rel)}</p>
+                  <p className="text-[11px] text-text-faint">{dt(ticket.created_at)} · talebi açtı</p>
+                </div>
+                <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">Ofis</span>
+              </div>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-ink-950/90">{ticket.body}</p>
+            </article>
+          ) : null}
           {rows.map((m) => {
             const isStaff = m.author_kind === "staff";
             const name =
@@ -154,7 +233,7 @@ export default async function AdminTicketDetailPage({
                     <p className="text-sm font-semibold text-ink-950">{name}</p>
                     <p className="text-[11px] text-text-faint">{dt(m.created_at)}</p>
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wide text-text-faint">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
                     {isStaff ? "Personel" : "Ofis"}
                   </span>
                 </div>
@@ -168,8 +247,62 @@ export default async function AdminTicketDetailPage({
           <h2 className="font-display font-bold text-ink-950">Personel yanıtı</h2>
           <p className="mt-1 text-xs text-text-muted">Yanıt sonrası talep “yanıt bekliyor” durumuna alınır.</p>
           <div className="mt-4">
-            <StaffReplyForm ticketId={ticket.id} disabled={closed} />
+            <StaffReplyForm ticketId={ticket.id} disabled={closed} macros={macros} />
           </div>
+
+          {isSuperAdmin ? (
+            <details className="mt-4 rounded-[12px] border border-line bg-canvas/60 px-3 py-2">
+              <summary className="cursor-pointer text-xs font-semibold text-text-muted transition hover:text-ink-950">
+                Makroları yönet
+              </summary>
+              <div className="mt-3 space-y-3">
+                {macros.length === 0 ? (
+                  <p className="text-xs text-text-faint">Henüz hazır yanıt yok.</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {macros.map((m) => (
+                      <li key={m.id} className="flex items-start gap-2 rounded-[9px] border border-line bg-surface px-2.5 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-ink-950">{m.title}</p>
+                          <p className="mt-0.5 line-clamp-2 text-[11px] text-text-muted">{m.body}</p>
+                        </div>
+                        <form action={deleteTicketMacroAction}>
+                          <input type="hidden" name="id" value={m.id} />
+                          <button
+                            type="submit"
+                            aria-label={`"${m.title}" makrosunu sil`}
+                            className="focus-ring rounded-[7px] p-1.5 text-text-faint transition hover:bg-danger-500/10 hover:text-danger-500"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </form>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <form action={createTicketMacroAction} className="space-y-2">
+                  <input
+                    type="text"
+                    name="title"
+                    required
+                    maxLength={120}
+                    placeholder="Makro başlığı (ör. Fatura gecikmesi)"
+                    className="w-full rounded-[9px] border border-line bg-surface px-2.5 py-2 text-xs outline-none focus:border-brand-400"
+                  />
+                  <textarea
+                    name="body"
+                    required
+                    rows={3}
+                    placeholder="Hazır yanıt metni…"
+                    className="w-full resize-none rounded-[9px] border border-line bg-surface px-2.5 py-2 text-xs outline-none focus:border-brand-400"
+                  />
+                  <button type="submit" className="rounded-[9px] bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white">
+                    Makro ekle
+                  </button>
+                </form>
+              </div>
+            </details>
+          ) : null}
         </section>
       </div>
     </div>

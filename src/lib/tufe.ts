@@ -52,6 +52,27 @@ export function tufeRateForMonth(month: string): { rate: number; sourceMonth: st
   return { rate: TUFE_12M_AVG[latest] ?? 0, sourceMonth: latest, exact: false };
 }
 
+/** Verilen "YYYY-MM" ayı için geçerli yasal tavan oranını (%) döndürür — kısa yol. */
+export function getTufeRate(month: string): number {
+  return tufeRateForMonth(month).rate;
+}
+
+export type LegalIncrease = {
+  newRent: number;      // TÜFE tavanıyla hesaplanan yeni kira (₺, yuvarlanmış)
+  appliedRate: number;  // Uygulanan oran (%) — yenileme ayının 12 aylık ort. TÜFE'si
+  capped: boolean;      // Ay verisi yoksa en güncel aya düşüldü mü (fallback)
+};
+
+/**
+ * Yasal tavanla (12 aylık ort. TÜFE) yeni kirayı hesaplar.
+ * Yenileme radarı ve "artışı uygula" akışının tek hesap kaynağı.
+ */
+export function computeLegalIncrease(currentRent: number, renewalMonth: string): LegalIncrease {
+  const tufe = tufeRateForMonth(renewalMonth);
+  const r = computeRentIncrease(currentRent, tufe.rate);
+  return { newRent: r.newRent, appliedRate: r.cappedRatePct, capped: !tufe.exact };
+}
+
 export type RentIncreaseResult = {
   currentRent: number;
   ratePct: number;

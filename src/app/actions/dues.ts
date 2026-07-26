@@ -60,6 +60,39 @@ export async function toggleDuePaid(id: string, paid: boolean): Promise<DueResul
   return { ok: true };
 }
 
+/**
+ * Seçilen aidat kayıtlarını topluca "ödendi" işaretler — toggleDuePaid'in
+ * toplu hali. Zaten ödenmiş kayıtlar sessizce atlanır.
+ */
+export async function markDuesPaidBulk(
+  ids: string[],
+): Promise<DueResult & { updated?: number }> {
+  const gate = await requirePermission("expenses", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const clean = Array.from(
+    new Set(ids.map((id) => String(id ?? "").trim()).filter(Boolean)),
+  ).slice(0, 200);
+  if (clean.length === 0) return { error: "En az bir kayıt seçin." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("property_dues")
+    .update({ status: "paid", paid_at: new Date().toISOString() })
+    .in("id", clean)
+    .eq("tenant_id", gate.tenantId)
+    .neq("status", "paid")
+    .select("id");
+
+  if (error) {
+    console.error("markDuesPaidBulk", error);
+    return { error: "Kayıtlar güncellenemedi." };
+  }
+
+  revalidatePath("/app/aidat");
+  return { ok: true, updated: (data ?? []).length };
+}
+
 export async function deleteDue(id: string): Promise<DueResult> {
   const gate = await requirePermission("expenses", "delete");
   if (!gate.ok) return { error: gate.error };

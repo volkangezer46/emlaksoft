@@ -15,7 +15,25 @@ const FLOW: { from: DealStage; to: DealStage; label: string; tone: string }[] = 
   { from: "new", to: "lost", label: "Kaybedildi", tone: "bg-danger-500" },
 ];
 
-export function StatusTransitionBar({ dealId, stage }: { dealId: string; stage: string }) {
+/** Tahta DnD'si de aynı kuralları izlesin diye tek kaynak: butonlarda hangi
+ *  geçiş serbestse sürükle-bırakta da yalnız o serbesttir (won/lost'tan geri yok). */
+export function isAllowedTransition(from: string, to: DealStage) {
+  return FLOW.some((f) => f.from === from && f.to === to);
+}
+
+export function StatusTransitionBar({
+  dealId,
+  stage,
+  onWonStart,
+  onWonError,
+}: {
+  dealId: string;
+  stage: string;
+  /** Won geçişi başlarken (server onayı beklenmeden) — kutlama sihirbazını açar; verildiğinde won toast'ı atlanır. */
+  onWonStart?: () => void;
+  /** Won geçişi hata verirse — sihirbaz kapatılır (mevcut geri sarma korunur). */
+  onWonError?: () => void;
+}) {
   const router = useRouter();
   const { push } = useToast();
   const [open, setOpen] = useState(false);
@@ -26,15 +44,22 @@ export function StatusTransitionBar({ dealId, stage }: { dealId: string; stage: 
   if (options.length === 0) return null;
 
   function run(to: DealStage) {
+    // Kutlama sihirbazı optimistic açılır — server onayı beklenmez
+    if (to === "won") onWonStart?.();
     startTransition(async () => {
       const fd = new FormData();
       fd.set("deal_id", dealId);
       fd.set("stage", to);
       if (to === "lost") fd.set("loss_reason", "Durum geçişi");
       const res = await updateDealStage(fd);
-      if (res.error) push(res.error, "err");
-      else {
-        push(to === "won" ? "Kazanıldı · komisyon üretildi" : "Aşama güncellendi", "ok");
+      if (res.error) {
+        push(res.error, "err");
+        if (to === "won") onWonError?.();
+      } else {
+        // Sihirbaz devralmışsa won toast'ı gösterilmez
+        if (!(to === "won" && onWonStart)) {
+          push(to === "won" ? "Kazanıldı · komisyon üretildi" : "Aşama güncellendi", "ok");
+        }
         setOpen(false);
         router.refresh();
       }
@@ -55,7 +80,7 @@ export function StatusTransitionBar({ dealId, stage }: { dealId: string; stage: 
         <>
           <button type="button" className="fixed inset-0 z-40" aria-label="Kapat" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-9 z-50 min-w-[200px] overflow-hidden rounded-[12px] border border-line bg-surface shadow-[var(--shadow-lg)]">
-            <p className="border-b border-line px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-text-faint">
+            <p className="border-b border-line px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
               Aşama geçişi
             </p>
             {options.map((o) => (

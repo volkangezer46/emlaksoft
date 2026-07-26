@@ -39,15 +39,20 @@ export function CallConsole({
   customers,
   matchCounts = {},
   demandCounts = {},
+  initialCustomerId,
 }: {
   customers: Customer[];
   /** müşteri id → eşleşen portföy adedi (sunucu hesabı) */
   matchCounts?: Record<string, number>;
   /** müşteri id → açık talep adedi */
   demandCounts?: Record<string, number>;
+  /** ?customer= kısayolu — konsol bu müşteriyle açılır */
+  initialCustomerId?: string;
 }) {
-  const [customerId, setCustomerId] = useState(customers[0]?.id ?? "");
-  const [phone, setPhone] = useState(customers[0]?.phone ?? "");
+  const initialCustomer =
+    customers.find((item) => item.id === initialCustomerId) ?? customers[0];
+  const [customerId, setCustomerId] = useState(initialCustomer?.id ?? "");
+  const [phone, setPhone] = useState(initialCustomer?.phone ?? "");
   const [direction, setDirection] = useState("inbound");
   const [disposition, setDisposition] = useState("Ulaşıldı");
   const [pending, setPending] = useState(false);
@@ -87,7 +92,7 @@ export function CallConsole({
         <div className="pointer-events-none absolute -right-14 -top-14 h-52 w-52 rounded-full bg-mint-500/25 blur-[70px]" />
         <div className="relative flex items-center justify-between">
           <span className="flex items-center gap-2 text-xs font-semibold text-mint-400"><Radio className="h-4 w-4" /> Görüşme kaydı</span>
-          <span className="rounded-full bg-mint-400/12 px-2.5 py-1 text-[10px] font-bold text-mint-400">MANUEL</span>
+          <span className="rounded-full bg-mint-400/12 px-2.5 py-1 text-[11px] font-bold text-mint-400">MANUEL</span>
         </div>
 
         <div className="relative mt-8 text-center">
@@ -97,22 +102,22 @@ export function CallConsole({
           <h2 className="mt-5 font-display text-2xl font-extrabold text-white">{customer?.full_name ?? "Bilinmeyen arayan"}</h2>
           <p className="mt-1 text-sm tabular-nums text-white/55">{phone ? formatTurkishPhone(phone) : "Telefon girilmedi"}</p>
           <div className="mt-3 flex justify-center gap-2">
-            {(customer?.customer_types ?? ["Yeni arayan"]).slice(0, 2).map((type) => <span key={type} className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[10px] font-semibold text-cyan-400">{type}</span>)}
+            {(customer?.customer_types ?? ["Yeni arayan"]).slice(0, 2).map((type) => <span key={type} className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[11px] font-semibold text-cyan-400">{type}</span>)}
           </div>
         </div>
 
         <div className="relative mt-7 space-y-2">
           <div className="rounded-[12px] border border-white/10 bg-white/5 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-[.1em] text-white/35">Müşteri bağlamı</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-white/35">Müşteri bağlamı</p>
             <p className="mt-1 text-xs leading-relaxed text-white/70">{customer?.notes || "Henüz talep notu bulunmuyor. Görüşme sonunda sonuç kodu ve not ekleyin."}</p>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-[11px] border border-white/10 bg-white/5 p-3">
-              <p className="text-[9px] text-white/35">Açık talep</p>
+              <p className="text-[11px] text-white/35">Açık talep</p>
               <p className="mt-1 font-display text-lg font-bold text-white">{demandN}</p>
             </div>
             <div className="rounded-[11px] border border-white/10 bg-white/5 p-3">
-              <p className="text-[9px] text-white/35">Müşteri skoru</p>
+              <p className="text-[11px] text-white/35">Müşteri skoru</p>
               <p className="mt-1 font-display text-lg font-bold text-mint-400">{customer ? score : "—"}</p>
             </div>
           </div>
@@ -122,7 +127,7 @@ export function CallConsole({
       <form action={submit} className="dashboard-panel rounded-[22px] border border-line bg-surface p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div><p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><PhoneCall className="h-4 w-4" /> Görüşme konsolu</p><h2 className="mt-1 font-display text-lg font-bold text-ink-950">Çağrı kaydı ve sonuç kodu</h2></div>
-          <span className="flex items-center gap-1.5 rounded-full bg-brand-600/8 px-2.5 py-1 text-[10px] font-semibold text-brand-600"><Clock3 className="h-3.5 w-3.5" /> Realtime kayıt</span>
+          <span className="flex items-center gap-1.5 rounded-full bg-brand-600/8 px-2.5 py-1 text-[11px] font-semibold text-brand-600"><Clock3 className="h-3.5 w-3.5" /> Realtime kayıt</span>
         </div>
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -180,7 +185,8 @@ export function CallConsole({
         </div>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-[120px_1fr]">
-          <label className="text-sm font-medium text-ink-950">Süre (sn)<input name="duration_sec" inputMode="numeric" defaultValue="180" className="mt-1.5 w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" /></label>
+          {/* Ön dolu 180 sn kaldırıldı: gerçek süre girilmeden kaydedilen çağrılar ortalamayı bozuyordu */}
+          <label className="text-sm font-medium text-ink-950">Süre (sn)<input name="duration_sec" inputMode="numeric" placeholder="örn. 120" className="mt-1.5 w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" /></label>
           <label className="text-sm font-medium text-ink-950">Görüşme notu<textarea name="notes" rows={2} className="mt-1.5 w-full resize-none rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" placeholder="Talep, itiraz, takip notu…" /></label>
         </div>
 

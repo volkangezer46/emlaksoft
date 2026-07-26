@@ -49,6 +49,25 @@ const RECIPIENT_VARIANT: Record<string, "success" | "warning" | "danger" | "defa
   opted_out: "default",
 };
 
+/*
+ * ?durum= kontratı: ham enum değerleri + "ulasan" bileşimi.
+ * "Ulaşan" KPI'ı sent+delivered toplamı olduğundan tek enum değerine
+ * indirgenemez; bileşik değer bu sayfada tanımlı ve yalnızca burada üretilir.
+ */
+function matchesRecipientDurum(status: string, durum: string) {
+  if (!durum) return true;
+  if (durum === "ulasan") return status === "sent" || status === "delivered";
+  return status === durum;
+}
+
+const RECIPIENT_FILTERS = [
+  { label: "Tümü", value: "" },
+  { label: "Ulaşan", value: "ulasan" },
+  { label: "Bekleyen", value: "pending" },
+  { label: "Ulaşmayan", value: "failed" },
+  { label: "İzin yok", value: "opted_out" },
+] as const;
+
 function tarih(iso: string | null) {
   if (!iso) return "—";
   return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
@@ -64,12 +83,22 @@ function tarih(iso: string | null) {
  * düzeltmenin bir yolu yoktu — numarayı düzeltip yeniden denemek için önce
  * hangi numara olduğunu bilmek gerekir.
  */
-export default async function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CampaignDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ durum?: string }>;
+}) {
   await requireModulePage("campaigns");
   const { id } = await params;
+  const { durum = "" } = (await searchParams) ?? {};
 
   const [campaign, recipients] = await Promise.all([getCampaign(id), listCampaignRecipients(id)]);
   if (!campaign) notFound();
+
+  const basePath = `/app/kampanyalar/${id}`;
+  const durumHref = (value: string) => (value ? `${basePath}?durum=${value}` : basePath);
 
   /*
    * "Ulasan" hem `sent` hem `delivered` demek. Ilk yazimda yalnizca `sent`
@@ -84,6 +113,11 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   const basarisiz = recipients.filter((r) => r.status === "failed").length;
   const bekleyen = recipients.filter((r) => r.status === "pending").length;
   const izinsiz = recipients.filter((r) => r.status === "opted_out").length;
+
+  // KPI kartlarından ve hata özetinden URL parametresiyle daraltılan görünüm.
+  const visibleRecipients = durum
+    ? recipients.filter((r) => matchesRecipientDurum(r.status, durum))
+    : recipients;
 
   /*
    * Kampanya satırındaki sayaçlar ile gerçek alıcı satırları ayrışabilir:
@@ -124,22 +158,31 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             {campaign.sent_at ? ` · ${tarih(campaign.sent_at)} tarihinde gönderildi` : ""}
           </p>
 
+          {/* KPI kartları alıcı tablosunu ?durum= parametresiyle süzer */}
           <div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
-              { label: "Toplam alıcı", value: String(recipients.length), icon: Users },
-              { label: "Ulaşan", value: String(gonderilen), icon: CheckCircle2 },
-              { label: "Ulaşmayan", value: String(basarisiz), icon: AlertTriangle },
+              { label: "Toplam alıcı", value: String(recipients.length), icon: Users, durum: "" },
+              { label: "Ulaşan", value: String(gonderilen), icon: CheckCircle2, durum: "ulasan" },
+              { label: "Ulaşmayan", value: String(basarisiz), icon: AlertTriangle, durum: "failed" },
               {
                 label: izinsiz > 0 ? "İzin yok" : "Bekleyen",
                 value: String(izinsiz > 0 ? izinsiz : bekleyen),
                 icon: Clock3,
+                durum: izinsiz > 0 ? "opted_out" : "pending",
               },
             ].map((k) => (
-              <div key={k.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur">
+              <Link
+                key={k.label}
+                href={durumHref(k.durum)}
+                className={`focus-ring press group relative block rounded-[14px] border bg-white/5 p-3 backdrop-blur transition hover:border-white/30 ${
+                  durum === k.durum && k.durum !== "" ? "border-white/40" : "border-white/10"
+                }`}
+              >
+                <ArrowUpRight className="hover-action absolute right-2 top-2 h-3.5 w-3.5 text-white/50 opacity-0 transition group-hover:opacity-100" />
                 <k.icon className="h-4 w-4 text-mint-400" />
                 <p className="numeric mt-2 font-display text-lg font-extrabold text-white">{k.value}</p>
-                <p className="text-[10px] text-white/45 sm:text-xs">{k.label}</p>
-              </div>
+                <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+              </Link>
             ))}
           </div>
         </div>
@@ -175,14 +218,17 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             {[...hataGruplari.entries()]
               .sort((a, b) => b[1] - a[1])
               .map(([mesaj, adet]) => (
-                <li
-                  key={mesaj}
-                  className="flex flex-wrap items-start justify-between gap-3 rounded-[12px] border border-danger-500/20 bg-surface px-4 py-2.5"
-                >
-                  <span className="min-w-0 text-sm text-ink-950">{mesaj}</span>
-                  <span className="shrink-0 rounded-full bg-danger-500/10 px-2.5 py-0.5 text-xs font-bold text-danger-600">
-                    {adet} alıcı
-                  </span>
+                <li key={mesaj}>
+                  <Link
+                    href={durumHref("failed")}
+                    className="focus-ring group flex flex-wrap items-start justify-between gap-3 rounded-[12px] border border-danger-500/20 bg-surface px-4 py-2.5 transition hover:border-danger-500/40"
+                  >
+                    <span className="min-w-0 text-sm text-ink-950">{mesaj}</span>
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-danger-500/10 px-2.5 py-0.5 text-xs font-bold text-danger-600">
+                      {adet} alıcı
+                      <ArrowUpRight className="hover-action h-3 w-3 opacity-0 transition group-hover:opacity-100" />
+                    </span>
+                  </Link>
                 </li>
               ))}
           </ul>
@@ -195,13 +241,38 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             <Users className="h-4 w-4 text-brand-600" /> Alıcılar
           </h2>
           <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-semibold text-brand-600">
-            {recipients.length} kayıt
+            {visibleRecipients.length} kayıt
+            {visibleRecipients.length !== recipients.length ? ` · ${recipients.length} içinden` : ""}
           </span>
         </div>
+
+        {/* Durum filtre çipleri — KPI kartlarıyla aynı ?durum= kontratı */}
+        {recipients.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {RECIPIENT_FILTERS.map((f) => (
+              <Link
+                key={f.value}
+                href={durumHref(f.value)}
+                className={`focus-ring rounded-[9px] px-2.5 py-1.5 text-xs font-semibold transition ${
+                  durum === f.value ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
+                }`}
+              >
+                {f.label}
+              </Link>
+            ))}
+          </div>
+        ) : null}
 
         {recipients.length === 0 ? (
           <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
             Bu kampanyaya alıcı eklenmemiş.
+          </p>
+        ) : visibleRecipients.length === 0 ? (
+          <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
+            Bu durumda alıcı yok.{" "}
+            <Link href={basePath} className="font-semibold text-brand-600 hover:underline">
+              Filtreyi temizle
+            </Link>
           </p>
         ) : (
           <>
@@ -217,7 +288,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                   </TR>
                 </THead>
                 <TBody>
-                  {recipients.map((r) => {
+                  {visibleRecipients.map((r) => {
                     const tel = toTelHref(r.phone);
                     return (
                       <TR key={r.id}>

@@ -89,7 +89,7 @@ export function BranchCard({
     <div className="rounded-[14px] border border-line bg-canvas/60 p-4">
       <div className="flex items-center justify-between">
         <span className="grid h-9 w-9 place-items-center rounded-[11px] bg-brand-600/10 text-brand-600"><Building2 className="h-4 w-4" /></span>
-        <span className="rounded-full bg-mint-500/10 px-2 py-0.5 text-[10px] font-bold text-mint-600">{memberCount} üye</span>
+        <span className="rounded-full bg-mint-500/10 px-2 py-0.5 text-[11px] font-bold text-mint-600">{memberCount} üye</span>
       </div>
       <p className="mt-3 font-display font-bold text-ink-950">{branch.name}</p>
       <p className="text-xs text-text-muted">{provinceName ?? "Konum belirtilmedi"}</p>

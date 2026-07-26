@@ -161,7 +161,7 @@ export function Pricing() {
                   <plan.icon className="h-5 w-5" />
                 </span>
                 <div>
-                  <span className={`text-[9px] font-extrabold tracking-[0.12em] ${plan.popular ? "text-mint-400" : "text-text-faint"}`}>{plan.eyebrow}</span>
+                  <span className={`text-[11px] font-extrabold tracking-[0.08em] ${plan.popular ? "text-mint-400" : "text-text-faint"}`}>{plan.eyebrow}</span>
                   <h3
                 className={`font-display text-lg font-bold ${
                   plan.popular ? "text-white" : "text-ink-950"
@@ -243,7 +243,7 @@ export function Pricing() {
               >
                 14 gün ücretsiz başla <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
-              <p className={`mt-3 flex items-center justify-center gap-1.5 text-[10px] ${plan.popular ? "text-white/45" : "text-text-faint"}`}>
+              <p className={`mt-3 flex items-center justify-center gap-1.5 text-[11px] ${plan.popular ? "text-white/45" : "text-text-faint"}`}>
                 <ShieldCheck className="h-3.5 w-3.5" /> Kurulum ve veri aktarımı dahil
               </p>
             </div>

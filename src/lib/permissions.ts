@@ -32,7 +32,10 @@ export type AppModule =
   | "expenses"
   | "offers"
   | "targets"
-  | "open_house";
+  | "open_house"
+  | "rentals"
+  | "projects"
+  | "network";
 
 export type AppAction = "view" | "create" | "edit" | "delete";
 
@@ -75,6 +78,9 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
         "offers",
         "targets",
         "open_house",
+        "rentals",
+        "projects",
+        "network",
       ] as AppModule[]
     ).map((m) => [m, ALL]),
   ),
@@ -103,6 +109,9 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     offers:       ALL,
     targets:      ALL,
     open_house:   ALL,
+    rentals:      ALL,
+    projects:     ALL,
+    network:      ALL,
   },
   branch_manager: {
     dashboard:    VIEW,
@@ -122,6 +131,10 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     valuation:    CRUD_NO_DEL,
     campaigns:    CRUD_NO_DEL,
     contracts:    CRUD_NO_DEL,
+    rentals:      CRUD_NO_DEL,
+    network:      CRUD_NO_DEL,
+    // DB seed'i (20260726000075) ile senkron: proje satış şube müdüründe tam yetki
+    projects:     ALL,
   },
   team_lead: {
     dashboard:    VIEW,
@@ -158,6 +171,10 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     compliance:   VIEW,
     campaigns:    VIEW,
     contracts:    CRUD_NO_DEL,
+    rentals:      VIEW,
+    network:      VIEW,
+    // DB seed'i (20260726000075) ile senkron
+    projects:     CRUD_NO_DEL,
   },
   call_center: {
     dashboard: VIEW,

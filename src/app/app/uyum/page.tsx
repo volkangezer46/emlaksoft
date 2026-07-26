@@ -20,8 +20,30 @@ const statusLabel: Record<string, string> = {
   pending: "Bekliyor",
 };
 
-export default async function CompliancePage() {
+const CHANNELS = Object.keys(channelLabel);
+const STATUSES = Object.keys(statusLabel);
+
+/** Bellek-içi filtre bağlantısı — aynı değere tıklanınca filtre kalkar (toggle). */
+function consentFilterHref(current: { kanal?: string; durum?: string }, patch: { kanal?: string; durum?: string }) {
+  const next = { ...current, ...patch };
+  if (patch.kanal !== undefined && current.kanal === patch.kanal) next.kanal = undefined;
+  if (patch.durum !== undefined && current.durum === patch.durum) next.durum = undefined;
+  const sp = new URLSearchParams();
+  if (next.kanal) sp.set("kanal", next.kanal);
+  if (next.durum) sp.set("durum", next.durum);
+  const qs = sp.toString();
+  return qs ? `/app/uyum?${qs}` : "/app/uyum";
+}
+
+export default async function CompliancePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ kanal?: string; durum?: string }>;
+}) {
   const { perms } = await requireModulePage("compliance");
+  const params = (await searchParams) ?? {};
+  const kanal = CHANNELS.includes(params.kanal ?? "") ? params.kanal : undefined;
+  const durum = STATUSES.includes(params.durum ?? "") ? params.durum : undefined;
   const supabase = await createClient();
 
   // KVKK silme kaniti + yetki. Anonimlestirme geri alinamaz bir islem oldugu
@@ -44,6 +66,10 @@ export default async function CompliancePage() {
       .limit(200),
   ]);
 
+  const filteredConsents = (consents ?? []).filter(
+    (c) => (!kanal || c.channel === kanal) && (!durum || c.status === durum),
+  );
+
   return (
     <div className="space-y-6">
       <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
@@ -62,16 +88,31 @@ export default async function CompliancePage() {
       <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
         <IysForm customers={customers ?? []} />
         <section className="rounded-[20px] border border-line bg-surface p-5">
-          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-            <ShieldAlert className="h-4 w-4 text-amber-500" /> Kayıtlı izinler
-          </h2>
-          {(consents ?? []).length === 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+              <ShieldAlert className="h-4 w-4 text-amber-500" /> Kayıtlı izinler
+            </h2>
+            {kanal || durum ? (
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                {kanal ? (
+                  <span className="rounded-full bg-brand-600/10 px-2 py-0.5 font-semibold text-brand-600">{channelLabel[kanal]}</span>
+                ) : null}
+                {durum ? (
+                  <span className="rounded-full bg-brand-600/10 px-2 py-0.5 font-semibold text-brand-600">{statusLabel[durum]}</span>
+                ) : null}
+                <Link href="/app/uyum" className="font-semibold text-text-muted underline-offset-2 hover:text-brand-600 hover:underline">
+                  Filtreyi temizle
+                </Link>
+              </div>
+            ) : null}
+          </div>
+          {filteredConsents.length === 0 ? (
             <p className="mt-6 rounded-[12px] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
-              Henüz İYS kaydı yok.
+              {(consents ?? []).length === 0 ? "Henüz İYS kaydı yok." : "Filtreye uyan izin kaydı yok."}
             </p>
           ) : (
             <div className="mt-4 space-y-2">
-              {(consents ?? []).map((c) => {
+              {filteredConsents.map((c) => {
                 const cust = c.customer as { id?: string; full_name?: string } | { id?: string; full_name?: string }[] | null;
                 const custRow = Array.isArray(cust) ? cust[0] : cust;
                 const name = custRow?.full_name;
@@ -83,15 +124,24 @@ export default async function CompliancePage() {
                     ) : null}
                     <div>
                       <p className="font-semibold text-ink-950">{name ?? "Müşteri"}</p>
-                      <p className="text-xs text-text-muted">{channelLabel[c.channel] ?? c.channel}</p>
+                      {/* Overlay müşteri linkinin üstünde kalması için relative z-10 */}
+                      <Link
+                        href={consentFilterHref({ kanal, durum }, { kanal: c.channel })}
+                        className={`relative z-10 text-xs underline-offset-2 transition hover:underline ${kanal === c.channel ? "font-semibold text-brand-600" : "text-text-muted hover:text-brand-600"}`}
+                        title={`${channelLabel[c.channel] ?? c.channel} kanalına göre filtrele`}
+                      >
+                        {channelLabel[c.channel] ?? c.channel}
+                      </Link>
                     </div>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    <Link
+                      href={consentFilterHref({ kanal, durum }, { durum: c.status })}
+                      title={`${statusLabel[c.status] ?? c.status} durumuna göre filtrele`}
+                      className={`relative z-10 rounded-full px-2 py-0.5 text-[11px] font-bold transition hover:ring-1 hover:ring-brand-300 ${
                         c.status === "granted" ? "bg-mint-500/10 text-mint-600" : c.status === "denied" ? "bg-danger-500/10 text-danger-500" : "bg-amber-400/15 text-amber-600"
-                      }`}
+                      } ${durum === c.status ? "ring-1 ring-brand-400" : ""}`}
                     >
                       {statusLabel[c.status] ?? c.status}
-                    </span>
+                    </Link>
                   </div>
                 );
               })}

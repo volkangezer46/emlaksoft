@@ -22,7 +22,7 @@ export function DataPartnerStatus({
       </span>
       <div className="min-w-0">
         <p className="text-xs font-bold text-white">{name}</p>
-        <p className={`flex items-center gap-1 text-[10px] font-semibold ${configured ? "text-mint-300" : "text-white/40"}`}>
+        <p className={`flex items-center gap-1 text-[11px] font-semibold ${configured ? "text-mint-300" : "text-white/40"}`}>
           {configured ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
           {configured ? "Bağlı · canlı" : "Bağlantı bekliyor"}
         </p>
@@ -51,7 +51,7 @@ export function DataPartnerCard({
         </span>
         <div>
           <p className="font-display font-bold text-ink-950">{name}</p>
-          <span className="text-[10px] font-bold uppercase tracking-wide text-mint-600">{tag}</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-mint-600">{tag}</span>
         </div>
       </div>
       <p className="mt-3 text-sm leading-relaxed text-text-muted">{description}</p>

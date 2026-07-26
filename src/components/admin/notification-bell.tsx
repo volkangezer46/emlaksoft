@@ -102,8 +102,16 @@ export function NotificationBell() {
     const onClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
+    // Elle kurulmuş popover: Escape ile kapanma (Radix'teki davranışın dengi).
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
     document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
   }, []);
 
   const shown = tab === "unread" ? items.filter((n) => !n.read_at) : items;
@@ -145,7 +153,7 @@ export function NotificationBell() {
               {!n.read_at ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-600" /> : null}
               <span className="truncate text-sm font-semibold text-ink-950">{n.title}</span>
             </span>
-            <span className="shrink-0 text-[10px] text-text-faint">{relTime(n.created_at)}</span>
+            <span className="shrink-0 text-[11px] text-text-faint">{relTime(n.created_at)}</span>
           </span>
           {n.body ? <span className="mt-0.5 block truncate text-[11px] text-text-muted">{n.body}</span> : null}
         </span>
@@ -163,7 +171,7 @@ export function NotificationBell() {
       >
         <Bell className="h-4 w-4" />
         {unread > 0 ? (
-          <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-danger-500 px-1 text-[9px] font-bold text-white">
+          <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-danger-500 px-1 text-[10px] font-bold text-white">
             {unread > 9 ? "9+" : unread}
           </span>
         ) : null}
@@ -174,7 +182,7 @@ export function NotificationBell() {
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
             <div className="flex items-center gap-2">
               <p className="text-sm font-semibold text-ink-950">Bildirimler</p>
-              {unread > 0 ? <span className="rounded-full bg-danger-500/10 px-1.5 py-0.5 text-[10px] font-bold text-danger-600">{unread} yeni</span> : null}
+              {unread > 0 ? <span className="rounded-full bg-danger-500/10 px-1.5 py-0.5 text-[11px] font-bold text-danger-600">{unread} yeni</span> : null}
             </div>
             {unread > 0 ? (
               <button type="button" onClick={markAll} className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:underline">
@@ -208,7 +216,7 @@ export function NotificationBell() {
             ) : (
               groups.map((g) => (
                 <div key={g.label}>
-                  <p className="sticky top-0 z-10 bg-canvas/90 px-4 py-1.5 text-[10px] font-bold uppercase tracking-wide text-text-faint backdrop-blur">{g.label}</p>
+                  <p className="sticky top-0 z-10 bg-canvas/90 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint backdrop-blur">{g.label}</p>
                   {g.items.map(renderItem)}
                 </div>
               ))

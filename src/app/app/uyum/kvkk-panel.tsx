@@ -233,7 +233,7 @@ export function KvkkPanel({ initialLog, canErase }: { initialLog: LogRow[]; canE
                     {Object.entries(r.affected).map(([tablo, adet]) => (
                       <span
                         key={tablo}
-                        className="numeric rounded-full bg-surface px-2 py-0.5 text-[10px] font-semibold text-text-muted"
+                        className="numeric rounded-full bg-surface px-2 py-0.5 text-[11px] font-semibold text-text-muted"
                       >
                         {tablo} {adet}
                       </span>

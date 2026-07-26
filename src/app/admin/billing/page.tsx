@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, CreditCard, FileText, TrendingUp } from "lucide-react";
+import { Activity, ArrowUpRight, CreditCard, FileText, TrendingUp, X } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { exportSubscriptionsCsv } from "@/app/actions/platform-export";
@@ -53,24 +53,61 @@ function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 }
 
-export default async function AdminBillingPage() {
+/** `?from=&to=` — yalnızca geçerli YYYY-AA-GG kabul edilir; bozuk değer yok sayılır. */
+function parseDateParam(raw: string | undefined): string | undefined {
+  const v = (raw ?? "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined;
+}
+
+function billingHref(p: { durum?: string; from?: string; to?: string }) {
+  const sp = new URLSearchParams();
+  if (p.durum) sp.set("durum", p.durum);
+  if (p.from) sp.set("from", p.from);
+  if (p.to) sp.set("to", p.to);
+  const s = sp.toString();
+  return s ? `/admin/billing?${s}` : "/admin/billing";
+}
+
+export default async function AdminBillingPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ durum?: string; from?: string; to?: string }>;
+}) {
   await requirePlatformModule("billing");
+  const sp = (await searchParams) ?? {};
+  const durum = sp.durum && subStatus[sp.durum] ? sp.durum : undefined;
+  const from = parseDateParam(sp.from);
+  const to = parseDateParam(sp.to);
+  const dateFiltered = Boolean(from || to);
+
   const admin = createAdminClient();
 
-  const [{ data: subs }, { data: invoices }] = await Promise.all([
-    admin
-      .from("subscriptions")
-      .select("id, plan, status, billing_cycle, amount_try, trial_ends_at, current_period_end, created_at, tenant:tenants(id, name)")
-      .order("created_at", { ascending: false })
-      .limit(500),
-    admin
-      .from("invoices")
-      .select("id, invoice_no, status, total_try, due_at, paid_at, created_at, tenant:tenants(id, name)")
-      .order("created_at", { ascending: false })
-      .limit(100),
+  let subsQuery = admin
+    .from("subscriptions")
+    .select("id, plan, status, billing_cycle, amount_try, trial_ends_at, current_period_end, created_at, tenant:tenants(id, name)")
+    .order("created_at", { ascending: false })
+    .limit(500);
+  if (durum) subsQuery = subsQuery.eq("status", durum);
+  if (from) subsQuery = subsQuery.gte("created_at", from);
+  if (to) subsQuery = subsQuery.lte("created_at", `${to}T23:59:59.999`);
+
+  let invQuery = admin
+    .from("invoices")
+    .select("id, invoice_no, status, total_try, due_at, paid_at, created_at, reminder_count, last_reminder_at, tenant:tenants(id, name)")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (from) invQuery = invQuery.gte("created_at", from);
+  if (to) invQuery = invQuery.lte("created_at", `${to}T23:59:59.999`);
+
+  // Halka, trend ve hero sayıları filtreden bağımsız — liste sorguları ayrı daralır
+  const [{ data: subs }, { data: statRows }, { data: invoices }] = await Promise.all([
+    subsQuery,
+    admin.from("subscriptions").select("status, amount_try, created_at").limit(1000),
+    invQuery,
   ]);
 
-  const subRows = subs ?? [];
+  const listRows = subs ?? [];
+  const subRows = statRows ?? [];
   const invRows = invoices ?? [];
   const mrr = subRows.filter((s) => s.status === "active").reduce((sum, s) => sum + Number(s.amount_try || 0), 0);
   const trialing = subRows.filter((s) => s.status === "trialing").length;
@@ -145,18 +182,29 @@ export default async function AdminBillingPage() {
               <ExportButton action={exportSubscriptionsCsv} label="Abonelikleri indir" />
             </div>
             <div className="mt-5 grid grid-cols-3 gap-3">
-              <div className="rounded-[14px] border border-white/12 bg-white/8 p-3">
-                <p className="font-display text-xl font-extrabold text-white">{money(mrr)}</p>
-                <p className="text-[10px] text-white/70">Aktif aylık gelir</p>
-              </div>
-              <div className="rounded-[14px] border border-white/12 bg-white/8 p-3">
-                <p className="font-display text-xl font-extrabold text-amber-300">{trialing}</p>
-                <p className="text-[10px] text-white/70">Deneme</p>
-              </div>
-              <div className="rounded-[14px] border border-white/12 bg-white/8 p-3">
-                <p className="font-display text-xl font-extrabold text-danger-400">{pastDue}</p>
-                <p className="text-[10px] text-white/70">Gecikmiş</p>
-              </div>
+              {[
+                { key: "active", value: money(mrr), label: "Aktif aylık gelir", tone: "text-white" },
+                { key: "trialing", value: String(trialing), label: "Deneme", tone: "text-amber-300" },
+                { key: "past_due", value: String(pastDue), label: "Gecikmiş", tone: "text-danger-400" },
+              ].map((k) => {
+                const active = durum === k.key;
+                return (
+                  <Link
+                    key={k.key}
+                    href={billingHref({ durum: active ? undefined : k.key, from, to })}
+                    aria-current={active ? "page" : undefined}
+                    className={`focus-ring press group relative block rounded-[14px] border p-3 transition ${
+                      active
+                        ? "border-amber-300/50 bg-white/15"
+                        : "border-white/12 bg-white/8 hover:border-white/25 hover:bg-white/12"
+                    }`}
+                  >
+                    <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:text-amber-300 group-hover:opacity-100" />
+                    <p className={`font-display text-xl font-extrabold ${k.tone}`}>{k.value}</p>
+                    <p className="text-[11px] text-white/70">{k.label}</p>
+                  </Link>
+                );
+              })}
             </div>
           </div>
 
@@ -165,7 +213,7 @@ export default async function AdminBillingPage() {
               <p className="flex items-center gap-1.5 text-xs font-semibold text-white/75">
                 <TrendingUp className="h-3.5 w-3.5 text-amber-400" /> Aylık gelir trendi · 8 ay
               </p>
-              <span className="rounded-full bg-mint-500/15 px-2 py-0.5 text-[10px] font-bold text-mint-300">{money(mrr)}</span>
+              <span className="rounded-full bg-mint-500/15 px-2 py-0.5 text-[11px] font-bold text-mint-300">{money(mrr)}</span>
             </div>
             <svg viewBox="0 0 280 80" className="mt-3 h-24 w-full overflow-visible" preserveAspectRatio="none">
               <defs>
@@ -188,8 +236,14 @@ export default async function AdminBillingPage() {
               <polyline className="flow-line" points={line} fill="none" stroke="rgba(52,211,153,0.45)" strokeWidth="1.5" />
               <circle cx={last.x} cy={last.y} r="4" fill="var(--mint-400)" opacity="0.35" className="glow-halo" />
               <circle cx={last.x} cy={last.y} r="3" fill="#fff" />
+              {/* Nokta başına native tooltip: ay + o ayki kümülatif gelir */}
+              {pts.map((p, i) => (
+                <circle key={i} cx={p.x} cy={p.y} r="8" fill="transparent" className="cursor-help">
+                  <title>{`${months[i]?.label ?? ""}: ${money(trendVals[i] ?? 0)}`}</title>
+                </circle>
+              ))}
             </svg>
-            <div className="mt-1 flex justify-between text-[9px] text-white/35">
+            <div className="mt-1 flex justify-between text-[10px] text-white/35">
               {trend.map((m) => (
                 <span key={m.key}>{m.label}</span>
               ))}
@@ -197,6 +251,49 @@ export default async function AdminBillingPage() {
           </div>
         </div>
       </section>
+
+      {/* Tarih aralığı — yalnızca abonelik ve fatura LİSTELERİNİ daraltır */}
+      <form
+        action="/admin/billing"
+        className="flex flex-wrap items-end gap-3 rounded-[16px] border border-line bg-surface p-3"
+      >
+        {durum ? <input type="hidden" name="durum" value={durum} /> : null}
+        <label className="text-xs font-semibold text-text-muted">
+          Başlangıç
+          <input
+            type="date"
+            name="from"
+            defaultValue={from}
+            className="mt-1 block rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
+          />
+        </label>
+        <label className="text-xs font-semibold text-text-muted">
+          Bitiş
+          <input
+            type="date"
+            name="to"
+            defaultValue={to}
+            className="mt-1 block rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
+          />
+        </label>
+        <button
+          type="submit"
+          className="focus-ring press rounded-[9px] bg-ink-950 px-3 py-2 text-xs font-semibold text-white"
+        >
+          Uygula
+        </button>
+        {dateFiltered ? (
+          <Link
+            href={billingHref({ durum })}
+            className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
+          >
+            Tarih: {from ?? "…"} → {to ?? "…"} <X className="h-3 w-3" />
+          </Link>
+        ) : null}
+        <p className="ml-auto text-[11px] text-text-faint">
+          Aralık, abonelik ve fatura listelerine uygulanır; özet kartlar tüm veriyi gösterir.
+        </p>
+      </form>
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
@@ -228,29 +325,48 @@ export default async function AdminBillingPage() {
               </svg>
               <div className="absolute text-center">
                 <p className="font-display text-lg font-extrabold text-ink-950">{subRows.length}</p>
-                <p className="text-[9px] text-text-faint">abonelik</p>
+                <p className="text-[10px] text-text-faint">abonelik</p>
               </div>
             </div>
-            <div className="space-y-1.5 text-xs">
-              {statusCounts.filter((s) => s.count > 0 || ["active", "trialing"].includes(s.key)).map((s) => (
-                <div key={s.key} className="flex items-center gap-2 text-text-muted">
-                  <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
-                  <span className="flex-1">{s.label}</span>
-                  <span className="font-bold text-ink-950">{s.count}</span>
-                </div>
-              ))}
+            <div className="space-y-1 text-xs">
+              {statusCounts.filter((s) => s.count > 0 || ["active", "trialing"].includes(s.key)).map((s) => {
+                const active = durum === s.key;
+                return (
+                  <Link
+                    key={s.key}
+                    href={billingHref({ durum: active ? undefined : s.key, from, to })}
+                    aria-current={active ? "page" : undefined}
+                    title={active ? "Durum filtresini kaldır" : `Yalnızca "${s.label}" abonelikleri listele`}
+                    className={`focus-ring flex items-center gap-2 rounded-[7px] px-1.5 py-0.5 transition ${
+                      active ? "bg-brand-600/10 text-ink-950" : "text-text-muted hover:bg-canvas hover:text-ink-950"
+                    }`}
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
+                    <span className={`flex-1 ${active ? "font-bold" : ""}`}>{s.label}</span>
+                    <span className="font-bold text-ink-950">{s.count}</span>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         </section>
 
         <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
-          <div className="border-b border-line px-5 py-4">
+          <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <CreditCard className="h-4 w-4 text-brand-600" /> Abonelikler
             </h2>
+            {durum ? (
+              <Link
+                href={billingHref({ from, to })}
+                className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
+              >
+                Durum: {subStatus[durum]} <X className="h-3 w-3" />
+              </Link>
+            ) : null}
           </div>
           <div className="divide-y divide-line">
-            {subRows.map((s) => {
+            {listRows.map((s) => {
               const tenantId = idOf(s.tenant as Rel);
               return (
               <div key={s.id} className="group relative grid gap-2 px-5 py-3 transition hover:bg-brand-600/[0.02] sm:grid-cols-[1.2fr_.8fr_.7fr_.7fr] sm:items-center">
@@ -260,13 +376,17 @@ export default async function AdminBillingPage() {
                 <p className="text-sm font-semibold text-ink-950">{nameOf(s.tenant as Rel)}</p>
                 <p className="text-xs text-text-muted">{planLabel[s.plan] ?? s.plan} · {s.billing_cycle}</p>
                 <p className="text-xs font-semibold text-ink-950">{money(Number(s.amount_try))}</p>
-                <span className="w-fit rounded-full bg-amber-400/15 px-2.5 py-1 text-[10px] font-bold text-amber-600">
+                <span className="w-fit rounded-full bg-amber-400/15 px-2.5 py-1 text-[11px] font-bold text-amber-600">
                   {subStatus[s.status] ?? s.status}
                 </span>
               </div>
               );
             })}
-            {subRows.length === 0 ? <p className="px-5 py-10 text-center text-sm text-text-muted">Abonelik kaydı yok.</p> : null}
+            {listRows.length === 0 ? (
+              <p className="px-5 py-10 text-center text-sm text-text-muted">
+                {durum || dateFiltered ? "Filtreyle eşleşen abonelik yok." : "Abonelik kaydı yok."}
+              </p>
+            ) : null}
           </div>
         </section>
       </div>
@@ -279,7 +399,9 @@ export default async function AdminBillingPage() {
         </div>
         {invRows.length === 0 ? (
           <p className="px-5 py-10 text-center text-sm text-text-muted">
-            Henüz fatura yok. iyzico bağlandığında otomatik oluşacak; şimdilik abonelik iskeleti üzerinden takip edebilirsiniz.
+            {dateFiltered
+              ? "Seçili tarih aralığında fatura yok."
+              : "Henüz fatura yok. iyzico bağlandığında otomatik oluşacak; şimdilik abonelik iskeleti üzerinden takip edebilirsiniz."}
           </p>
         ) : (
           <div className="divide-y divide-line">
@@ -295,9 +417,24 @@ export default async function AdminBillingPage() {
                   <p className="text-xs text-text-muted">{nameOf(inv.tenant as Rel)}</p>
                 </div>
                 <p className="text-xs font-semibold">{money(Number(inv.total_try))}</p>
-                <span className="w-fit rounded-full bg-brand-600/10 px-2.5 py-1 text-[10px] font-bold text-brand-600">
-                  {invStatus[inv.status] ?? inv.status}
-                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="w-fit rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">
+                    {invStatus[inv.status] ?? inv.status}
+                  </span>
+                  {Number(inv.reminder_count) > 0 ? (
+                    // Dunning cron'unun bıraktığı iz: kaç hatırlatma gitti?
+                    <span
+                      className="w-fit rounded-full bg-amber-400/15 px-2.5 py-1 text-[11px] font-bold text-amber-600"
+                      title={
+                        inv.last_reminder_at
+                          ? `Son hatırlatma: ${new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(inv.last_reminder_at))}`
+                          : undefined
+                      }
+                    >
+                      {inv.reminder_count} hatırlatma
+                    </span>
+                  ) : null}
+                </div>
                 <p className="text-xs text-text-faint">
                   {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(inv.created_at))}
                 </p>

@@ -14,6 +14,7 @@ import { updateProperty } from "@/app/actions/properties";
 import { useToast } from "@/components/app/toast-provider";
 import { LatLngPicker } from "@/components/app/lat-lng-picker";
 import { GeoSelect } from "@/components/app/geo-select";
+import { HEATING_OPTIONS, FACADE_OPTIONS } from "@/app/app/portfoyler/new-property-dialog";
 
 type Province = { id: string; name: string };
 
@@ -30,9 +31,18 @@ type Props = {
     province_id: string | null;
     district_id: string | null;
     neighborhood_id: string | null;
+    parcel_block: string | null;
+    parcel_lot: string | null;
     lat: number | null;
     lng: number | null;
-    features: { rooms?: string | null; sqm?: number | null };
+    features: {
+      rooms?: string | null;
+      sqm?: number | null;
+      floor?: number | string | null;
+      heating?: string | null;
+      building_age?: number | string | null;
+      facade?: string | null;
+    };
   };
   provinces: Province[];
   transactionTypes?: string[];
@@ -127,6 +137,48 @@ export function EditPropertyDialog({
                 m²
                 <input name="sqm" defaultValue={property.features.sqm ?? ""} className={field} />
               </label>
+              {/* Detay bilgiler — features anahtarları portal/broşürle aynı;
+                  tapu ada/parsel OCR'ın doldurduğu kolonların manuel karşılığı. */}
+              <details className="sm:col-span-2 rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5" open={Boolean(property.features.floor ?? property.features.heating ?? property.features.building_age ?? property.parcel_block)}>
+                <summary className="cursor-pointer select-none text-xs font-semibold text-ink-950">
+                  Detay bilgiler <span className="font-normal text-text-muted">(kat, ısınma, bina yaşı, tapu…)</span>
+                </summary>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="text-xs font-medium text-text-muted">
+                    Bulunduğu kat
+                    <input name="floor" inputMode="numeric" defaultValue={property.features.floor ?? ""} className={field} />
+                  </label>
+                  <label className="text-xs font-medium text-text-muted">
+                    Isınma
+                    <select name="heating" defaultValue={property.features.heating ?? ""} className={field}>
+                      <option value="">Seçilmedi</option>
+                      {HEATING_OPTIONS.map((h) => <option key={h}>{h}</option>)}
+                      {property.features.heating && !HEATING_OPTIONS.includes(property.features.heating)
+                        ? <option>{property.features.heating}</option>
+                        : null}
+                    </select>
+                  </label>
+                  <label className="text-xs font-medium text-text-muted">
+                    Bina yaşı
+                    <input name="building_age" inputMode="numeric" defaultValue={property.features.building_age ?? ""} className={field} />
+                  </label>
+                  <label className="text-xs font-medium text-text-muted">
+                    Cephe (ops.)
+                    <select name="facade" defaultValue={property.features.facade ?? ""} className={field}>
+                      <option value="">Seçilmedi</option>
+                      {FACADE_OPTIONS.map((f) => <option key={f}>{f}</option>)}
+                    </select>
+                  </label>
+                  <label className="text-xs font-medium text-text-muted">
+                    Tapu — Ada
+                    <input name="parcel_block" defaultValue={property.parcel_block ?? ""} className={field} />
+                  </label>
+                  <label className="text-xs font-medium text-text-muted">
+                    Tapu — Parsel
+                    <input name="parcel_lot" defaultValue={property.parcel_lot ?? ""} className={field} />
+                  </label>
+                </div>
+              </details>
               {/* Duzenleme formunda da ilce/mahalle: kayit acilirken mevcut
                   il/ilcenin alt listeleri kendiliginden yuklenir. */}
               <div className="sm:col-span-2">

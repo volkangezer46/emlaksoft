@@ -30,7 +30,7 @@ export async function requireModulePage(mod: AppModule) {
   const role = profile?.role ?? "advisor";
   const tenantId = profile?.tenant_id ?? (user.app_metadata?.tenant_id as string | undefined) ?? null;
 
-  const perms = await getEffectivePermissions(tenantId, role);
+  const perms = await getEffectivePermissions(tenantId, role, user.id);
   if (!effectiveCanAccessModule(perms, mod)) {
     redirect("/app?yetki=yok");
   }

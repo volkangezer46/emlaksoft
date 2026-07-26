@@ -54,6 +54,20 @@ export async function markAllNotificationsRead(): Promise<void> {
   revalidatePath("/app", "layout");
 }
 
+/**
+ * /app/bildirimler arşiv sayfası için form-action sarmalayıcıları — server
+ * component'te <form action={...}> yalnız FormData imzası kabul eder.
+ */
+export async function markNotificationReadForm(formData: FormData): Promise<void> {
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return;
+  await markNotificationRead(id);
+}
+
+export async function markAllNotificationsReadForm(): Promise<void> {
+  await markAllNotificationsRead();
+}
+
 /*
  * `notifyTenant` buradan src/lib/notify.ts'e TASINDI.
  *

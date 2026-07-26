@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, CreditCard, Handshake, LifeBuoy, Settings2, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowUpRight, Building2, CreditCard, Handshake, LifeBuoy, Settings2, Sparkles, TrendingUp } from "lucide-react";
 import { requirePlatformModule } from "@/lib/platform";
 import { buildAdvisorContext, isAiConfigured } from "@/lib/ai-advisor";
 import { AdvisorChat } from "./advisor-chat";
@@ -11,10 +11,10 @@ export default async function AdvisorPage() {
   const [ctx, aiEnabled] = await Promise.all([buildAdvisorContext(), isAiConfigured()]);
 
   const kpis = [
-    { label: "Aylık gelir", value: money(ctx.mrr), icon: TrendingUp, tone: "text-mint-400" },
-    { label: "Aktif ofis", value: String(ctx.tenantsActive), icon: Building2, tone: "text-brand-400" },
-    { label: "Yeni aday", value: String(ctx.newDemos), icon: Handshake, tone: "text-cyan-400" },
-    { label: "Açık talep", value: String(ctx.openTickets), icon: LifeBuoy, tone: "text-amber-400" },
+    { label: "Aylık gelir", value: money(ctx.mrr), icon: TrendingUp, tone: "text-mint-400", href: "/admin/billing" },
+    { label: "Aktif ofis", value: String(ctx.tenantsActive), icon: Building2, tone: "text-brand-400", href: "/admin/tenants" },
+    { label: "Yeni aday", value: String(ctx.newDemos), icon: Handshake, tone: "text-cyan-400", href: "/admin/satis?durum=new" },
+    { label: "Açık talep", value: String(ctx.openTickets), icon: LifeBuoy, tone: "text-amber-400", href: "/admin/tickets" },
   ];
 
   return (
@@ -44,11 +44,16 @@ export default async function AdvisorPage() {
         </div>
         <div className="relative mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {kpis.map((k) => (
-            <div key={k.label} className="rounded-[14px] border border-white/12 bg-white/8 p-3 backdrop-blur">
+            <Link
+              key={k.label}
+              href={k.href}
+              className="focus-ring press group relative block rounded-[14px] border border-white/12 bg-white/8 p-3 backdrop-blur transition hover:border-white/25 hover:bg-white/12"
+            >
+              <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:text-amber-300 group-hover:opacity-100" />
               <k.icon className={`h-4 w-4 ${k.tone}`} />
               <p className="mt-2 font-display text-xl font-extrabold text-white">{k.value}</p>
-              <p className="text-[10px] text-white/70">{k.label}</p>
-            </div>
+              <p className="text-[11px] text-white/70">{k.label}</p>
+            </Link>
           ))}
         </div>
       </section>

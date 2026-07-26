@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
+import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { checkAuthorityShield } from "@/lib/authority-shield";
 import { notifyTenant } from "@/lib/notify";
 import { buildSplits, calculateCommission } from "@/lib/commission";
@@ -112,6 +113,23 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
     newValue: { stage, loss_reason: lossReason },
   });
 
+  // Otomasyon tetikle — hata ana işlemi asla bozmasın
+  if (stage === "lost" && existing.stage !== "lost") {
+    try {
+      await dispatchAutomationEvent(gate.tenantId, "deal_lost", {
+        entityType: "deal",
+        entityId: id,
+        dealId: id,
+        customerId: existing.customer_id,
+        propertyId: existing.property_id,
+        assignedTo: gate.userId,
+        fields: { loss_reason: lossReason, deal_type: existing.deal_type, deal_value: existing.deal_value },
+      });
+    } catch (e) {
+      console.error("automation deal_lost", e);
+    }
+  }
+
   // Won’a geçişte komisyon yoksa üret (pipeline içi — yetki property workflow’da zorunlu)
   if (stage === "won" && existing.property_id && existing.stage !== "won") {
     const { data: existingComm } = await supabase
@@ -131,6 +149,21 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
       href: "/app/komisyon",
       kind: "success",
     });
+
+    // Otomasyon tetikle — hata ana işlemi asla bozmasın
+    try {
+      await dispatchAutomationEvent(gate.tenantId, "deal_won", {
+        entityType: "deal",
+        entityId: id,
+        dealId: id,
+        customerId: existing.customer_id,
+        propertyId: existing.property_id,
+        assignedTo: gate.userId,
+        fields: { deal_type: existing.deal_type, deal_value: existing.deal_value },
+      });
+    } catch (e) {
+      console.error("automation deal_won", e);
+    }
   }
 
   revalidatePath("/app/anlasmalar");
@@ -183,6 +216,255 @@ export async function updateDeal(formData: FormData): Promise<DealResult> {
   revalidatePath("/app/anlasmalar");
   revalidatePath("/app/komisyon");
   return { ok: true, dealId: id };
+}
+
+// ============================================================
+// İşlem dosyası — kapora + masraf kalemleri (deal_costs)
+// ============================================================
+
+export const DEAL_COST_KINDS = ["kapora", "tapu_harci", "ekspertiz", "komisyon_dis", "diger"] as const;
+export type DealCostKind = (typeof DEAL_COST_KINDS)[number];
+
+export type DealCost = {
+  id: string;
+  kind: DealCostKind;
+  label: string | null;
+  amount: number;
+  paid: boolean;
+  paid_at: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+/** Anlaşmanın işlem dosyası kalemlerini kronolojik sırayla getirir. */
+export async function listDealCosts(dealId: string): Promise<DealCost[]> {
+  const gate = await requirePermission("commissions", "view");
+  if (!gate.ok) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("deal_costs")
+    .select("id, kind, label, amount, paid, paid_at, notes, created_at")
+    .eq("deal_id", dealId)
+    .eq("tenant_id", gate.tenantId)
+    .order("created_at", { ascending: true });
+
+  return (data as DealCost[] | null) ?? [];
+}
+
+/** İşlem dosyasına kalem ekler; kapora kaleminde anlaşma aktivitesine düşer. */
+export async function addDealCost(_prev: DealResult, fd: FormData): Promise<DealResult> {
+  const gate = await requirePermission("commissions", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const dealId = String(fd.get("deal_id") ?? "").trim();
+  const kindRaw = String(fd.get("kind") ?? "").trim();
+  const label = String(fd.get("label") ?? "").trim() || null;
+  const amount = parseFloat(String(fd.get("amount") ?? "0"));
+  const notes = String(fd.get("notes") ?? "").trim() || null;
+
+  if (!dealId) return { error: "Anlaşma bulunamadı." };
+  if (!(DEAL_COST_KINDS as readonly string[]).includes(kindRaw)) {
+    return { error: "Geçerli bir kalem türü seçin." };
+  }
+  if (isNaN(amount) || amount <= 0) return { error: "Geçerli bir tutar girin." };
+  const kind = kindRaw as DealCostKind;
+
+  const supabase = await createClient();
+  const { data: deal } = await supabase
+    .from("deals")
+    .select("id")
+    .eq("id", dealId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!deal) return { error: "Anlaşma bulunamadı." };
+
+  const { error } = await supabase.from("deal_costs").insert({
+    tenant_id: gate.tenantId,
+    deal_id: dealId,
+    kind,
+    label,
+    amount,
+    notes,
+    created_by: gate.userId,
+  });
+
+  if (error) {
+    console.error("addDealCost", error);
+    return { error: "Kalem kaydedilemedi." };
+  }
+
+  // Kapora anlaşmanın kilit anıdır — zaman çizgisine/aktiviteye düşsün
+  if (kind === "kapora") {
+    await logActivity({
+      tenantId: gate.tenantId,
+      actorId: gate.userId,
+      action: "deal.kapora",
+      entityType: "deal",
+      entityId: dealId,
+      newValue: { amount, label },
+    });
+  }
+
+  revalidatePath(`/app/anlasmalar/${dealId}`);
+  return { ok: true, dealId };
+}
+
+/** Kalemin ödendi durumunu tersine çevirir; paid_at buna göre yazılır/silinir. */
+export async function toggleDealCostPaid(costId: string, dealId: string): Promise<DealResult> {
+  const gate = await requirePermission("commissions", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const supabase = await createClient();
+  const { data: cost } = await supabase
+    .from("deal_costs")
+    .select("id, paid, deal_id")
+    .eq("id", costId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!cost) return { error: "Kalem bulunamadı." };
+
+  const nextPaid = !cost.paid;
+  const { error } = await supabase
+    .from("deal_costs")
+    .update({ paid: nextPaid, paid_at: nextPaid ? new Date().toISOString() : null })
+    .eq("id", costId)
+    .eq("tenant_id", gate.tenantId);
+
+  if (error) return { error: "Durum güncellenemedi." };
+
+  revalidatePath(`/app/anlasmalar/${dealId}`);
+  return { ok: true, dealId };
+}
+
+/** İşlem dosyası kalemini siler — ConfirmDialog formAction deseni. */
+export async function deleteDealCost(fd: FormData): Promise<void> {
+  const gate = await requirePermission("commissions", "edit");
+  if (!gate.ok) return;
+
+  const costId = String(fd.get("cost_id") ?? "").trim();
+  const dealId = String(fd.get("deal_id") ?? "").trim();
+  if (!costId) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("deal_costs")
+    .delete()
+    .eq("id", costId)
+    .eq("tenant_id", gate.tenantId);
+  if (error) console.error("deleteDealCost", error);
+
+  if (dealId) revalidatePath(`/app/anlasmalar/${dealId}`);
+}
+
+// ============================================================
+// Not/yorum akışı (deal_notes) — denetim bulgusu: anlaşmaya yorum yazılamıyordu
+// ============================================================
+
+export type DealNote = {
+  id: string;
+  body: string;
+  author_id: string | null;
+  author_name: string | null;
+  created_at: string;
+};
+
+/** Anlaşmanın notlarını kronolojik (eski → yeni) sırayla getirir. */
+export async function listDealNotes(dealId: string): Promise<DealNote[]> {
+  const gate = await requirePermission("commissions", "view");
+  if (!gate.ok) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("deal_notes")
+    .select("id, body, author_id, created_at, author:profiles(full_name)")
+    .eq("deal_id", dealId)
+    .eq("tenant_id", gate.tenantId)
+    .order("created_at", { ascending: true })
+    .limit(200);
+
+  return (data ?? []).map((n) => {
+    const author = n.author as { full_name?: string } | { full_name?: string }[] | null;
+    const a = Array.isArray(author) ? author[0] : author;
+    return {
+      id: n.id as string,
+      body: n.body as string,
+      author_id: (n.author_id as string | null) ?? null,
+      author_name: a?.full_name ?? null,
+      created_at: n.created_at as string,
+    };
+  });
+}
+
+/** Anlaşmaya not ekler — 1-2000 karakter (DB check ile aynı sınır). */
+export async function addDealNote(_prev: DealResult, fd: FormData): Promise<DealResult> {
+  const gate = await requirePermission("commissions", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const dealId = String(fd.get("deal_id") ?? "").trim();
+  const body = String(fd.get("body") ?? "").trim();
+  if (!dealId) return { error: "Anlaşma bulunamadı." };
+  if (!body) return { error: "Not boş olamaz." };
+  if (body.length > 2000) return { error: "Not en fazla 2000 karakter olabilir." };
+
+  const supabase = await createClient();
+  const { data: deal } = await supabase
+    .from("deals")
+    .select("id")
+    .eq("id", dealId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!deal) return { error: "Anlaşma bulunamadı." };
+
+  const { error } = await supabase.from("deal_notes").insert({
+    tenant_id: gate.tenantId,
+    deal_id: dealId,
+    author_id: gate.userId,
+    body,
+  });
+
+  if (error) {
+    console.error("addDealNote", error);
+    return { error: "Not kaydedilemedi." };
+  }
+
+  revalidatePath(`/app/anlasmalar/${dealId}`);
+  revalidatePath("/app/anlasmalar");
+  return { ok: true, dealId };
+}
+
+/**
+ * Notu siler — YALNIZ yazarı silebilir. RLS zaten kilitliyor; action'da da
+ * kontrol edilir ki kullanıcı sessiz no-op yerine anlamlı hata görsün.
+ * ConfirmDialog formAction deseni (bkz. deleteDealCost).
+ */
+export async function deleteDealNote(fd: FormData): Promise<void> {
+  const gate = await requirePermission("commissions", "edit");
+  if (!gate.ok) return;
+
+  const noteId = String(fd.get("note_id") ?? "").trim();
+  const dealId = String(fd.get("deal_id") ?? "").trim();
+  if (!noteId) return;
+
+  const supabase = await createClient();
+  const { data: note } = await supabase
+    .from("deal_notes")
+    .select("id, author_id")
+    .eq("id", noteId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!note || note.author_id !== gate.userId) return; // yalnız kendi notu
+
+  const { error } = await supabase
+    .from("deal_notes")
+    .delete()
+    .eq("id", noteId)
+    .eq("tenant_id", gate.tenantId)
+    .eq("author_id", gate.userId);
+  if (error) console.error("deleteDealNote", error);
+
+  if (dealId) revalidatePath(`/app/anlasmalar/${dealId}`);
+  revalidatePath("/app/anlasmalar");
 }
 
 async function ensureCommissionForDeal(

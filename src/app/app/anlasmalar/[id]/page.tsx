@@ -18,6 +18,11 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { computeDealScore, scoreGap } from "@/lib/deal-score";
+import type { DealCost, DealNote } from "@/app/actions/deals";
+import type { ChecklistItem } from "@/app/actions/deal-checklist";
+import { DealCostsSection } from "./deal-costs-section";
+import { DealNotesSection } from "./deal-notes-section";
+import { DealChecklistSection } from "./deal-checklist-section";
 
 export const metadata = { title: "Anlaşma detayı" };
 
@@ -60,7 +65,7 @@ function rel<T>(value: T | T[] | null | undefined): T | null {
  * etiketleniyor ("aynı portföy + müşteri").
  */
 export default async function DealDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { perms } = await requireModulePage("commissions");
+  const { perms, userId } = await requireModulePage("commissions");
   const { id } = await params;
   const supabase = await createClient();
 
@@ -150,6 +155,65 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
           .neq("status", "cancelled")
       : Promise.resolve({ count: 0 }),
   ]);
+
+  /*
+   * İşlem dosyası kalemleri (deal_costs — migration 20260726000069).
+   * Tablo henüz oluşmadıysa sorgu hata döner; data null kalır ve bölüm
+   * boş listeyle render edilir — sayfa asla kırılmaz.
+   */
+  const { data: costRows } = await supabase
+    .from("deal_costs")
+    .select("id, kind, label, amount, paid, paid_at, notes, created_at")
+    .eq("deal_id", id)
+    .order("created_at", { ascending: true });
+  const islemDosyasi = (costRows as DealCost[] | null) ?? [];
+
+  /*
+   * Evrak kontrol listesi (deal_checklist_items — migration 20260727000103).
+   * done_by profil join'i işaretleyenin adı için; tablo yoksa data null kalır
+   * ve bölüm boş listeyle render edilir — sayfa kırılmaz.
+   */
+  const { data: checklistRows } = await supabase
+    .from("deal_checklist_items")
+    .select("id, label, is_required, is_done, done_at, note, sort_order, done_by:profiles(full_name)")
+    .eq("deal_id", id)
+    .order("sort_order", { ascending: true });
+  const evraklar: ChecklistItem[] = (checklistRows ?? []).map((r) => {
+    const doneBy = rel(r.done_by as { full_name?: string } | { full_name?: string }[] | null);
+    return {
+      id: r.id as string,
+      label: r.label as string,
+      is_required: Boolean(r.is_required),
+      is_done: Boolean(r.is_done),
+      done_at: (r.done_at as string | null) ?? null,
+      done_by_name: doneBy?.full_name ?? null,
+      note: (r.note as string | null) ?? null,
+      sort_order: Number(r.sort_order ?? 0),
+    };
+  });
+
+  /*
+   * Not/yorum akışı (deal_notes — migration 20260726000094). Kronolojik
+   * (eski → yeni); yazar adı profiles join'inden. Tablo yoksa data null
+   * kalır ve bölüm boş akışla render edilir — sayfa kırılmaz.
+   */
+  const { data: noteRows } = await supabase
+    .from("deal_notes")
+    .select("id, body, author_id, created_at, author:profiles(full_name)")
+    .eq("deal_id", id)
+    .order("created_at", { ascending: true })
+    .limit(200);
+  const notlar: DealNote[] = (noteRows ?? []).map((n) => {
+    const author = n.author as { full_name?: string } | { full_name?: string }[] | null;
+    const a = rel(author);
+    return {
+      id: n.id as string,
+      body: n.body as string,
+      author_id: (n.author_id as string | null) ?? null,
+      author_name: a?.full_name ?? null,
+      created_at: n.created_at as string,
+    };
+  });
 
   const stageIdx = STAGES.findIndex((s) => s.key === deal.stage);
   const kayip = deal.stage === "lost";
@@ -251,21 +315,37 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
 
           <div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
-              { label: "Anlaşma tutarı", value: money(dealValue), icon: Banknote },
+              { label: "Anlaşma tutarı", value: money(dealValue), icon: Banknote, href: undefined },
               {
                 label: kazanildi || kayip ? "Sonuç" : "Beklenen değer",
                 value: beklenen != null ? money(beklenen) : skor.label,
                 icon: TrendingUp,
+                href: undefined,
               },
-              { label: "Komisyon (brüt)", value: canSeeCommission ? money(brutToplam) : "—", icon: Tag },
-              { label: "Açık görev", value: String(acikGorev), icon: ListChecks },
-            ].map((k) => (
-              <div key={k.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur">
-                <k.icon className="h-4 w-4 text-mint-400" />
-                <p className="numeric mt-2 truncate font-display text-lg font-extrabold text-white">{k.value}</p>
-                <p className="text-[10px] text-white/45 sm:text-xs">{k.label}</p>
-              </div>
-            ))}
+              { label: "Komisyon (brüt)", value: canSeeCommission ? money(brutToplam) : "—", icon: Tag, href: undefined },
+              { label: "Açık görev", value: String(acikGorev), icon: ListChecks, href: "#gorevler" },
+            ].map((k) =>
+              k.href ? (
+                <Link
+                  key={k.label}
+                  href={k.href}
+                  className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
+                >
+                  <div className="flex items-start justify-between">
+                    <k.icon className="h-4 w-4 text-mint-400" />
+                    <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                  </div>
+                  <p className="numeric mt-2 truncate font-display text-lg font-extrabold text-white">{k.value}</p>
+                  <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+                </Link>
+              ) : (
+                <div key={k.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur">
+                  <k.icon className="h-4 w-4 text-mint-400" />
+                  <p className="numeric mt-2 truncate font-display text-lg font-extrabold text-white">{k.value}</p>
+                  <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+                </div>
+              ),
+            )}
           </div>
         </div>
       </section>
@@ -352,7 +432,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-brand-600">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">
                     {property.property_code}
                   </p>
                   <p className="mt-0.5 truncate font-semibold text-ink-950">{property.title ?? "Başlıksız"}</p>
@@ -406,7 +486,18 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
           <dl className="mt-3 space-y-1.5">
             <div className="hairline-t flex justify-between gap-3 pt-2 text-sm">
               <dt className="text-text-muted">Sorumlu danışman</dt>
-              <dd className="font-semibold text-ink-950">{assignee?.full_name ?? "Atanmadı"}</dd>
+              <dd className="font-semibold text-ink-950">
+                {deal.assigned_to ? (
+                  <Link
+                    href={`/app/ekip/${deal.assigned_to}`}
+                    className="focus-ring rounded-[6px] text-brand-600 hover:underline"
+                  >
+                    {assignee?.full_name ?? "Danışman"}
+                  </Link>
+                ) : (
+                  "Atanmadı"
+                )}
+              </dd>
             </div>
             <div className="flex justify-between gap-3 text-sm">
               <dt className="text-text-muted">Son güncelleme</dt>
@@ -458,16 +549,27 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                     </TR>
                   </THead>
                   <TBody>
-                    {komisyonlar.map((c) => (
-                      <TR key={c.id}>
-                        <TD>{tarih(c.created_at)}</TD>
-                        <TD align="right">{money(Number(c.gross_amount))}</TD>
-                        <TD align="right">{money(Number(c.vat_amount))}</TD>
-                        <TD>
-                          <Badge variant={c.status === "paid" ? "success" : "warning"}>{c.status ?? "—"}</Badge>
-                        </TD>
-                      </TR>
-                    ))}
+                    {komisyonlar.map((c) => {
+                      const tahsil = c.status === "paid" || c.status === "collected";
+                      return (
+                        <TR key={c.id} interactive>
+                          <TD>
+                            {/* Satır → komisyon defteri, kaydın durumuna uyan filtreyle */}
+                            <Link
+                              href={`/app/komisyon?durum=${tahsil ? "tahsil" : "bekleyen"}`}
+                              className="absolute inset-0"
+                              aria-label="Komisyon defterinde aç"
+                            />
+                            {tarih(c.created_at)}
+                          </TD>
+                          <TD align="right">{money(Number(c.gross_amount))}</TD>
+                          <TD align="right">{money(Number(c.vat_amount))}</TD>
+                          <TD>
+                            <Badge variant={tahsil ? "success" : "warning"}>{c.status ?? "—"}</Badge>
+                          </TD>
+                        </TR>
+                      );
+                    })}
                   </TBody>
                 </Table>
               </TableFrame>
@@ -475,6 +577,29 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
           )}
         </section>
       ) : null}
+
+      {/* Evrak dosyası — kapanış evrakları kontrol listesi (deal_checklist_items) */}
+      <DealChecklistSection
+        dealId={deal.id}
+        dealType={deal.deal_type}
+        items={evraklar}
+        canEdit={(perms.commissions ?? []).includes("edit")}
+      />
+
+      {/* İşlem dosyası — kapora + kapanış masrafları (deal_costs ile GERÇEK bağ) */}
+      <DealCostsSection
+        dealId={deal.id}
+        costs={islemDosyasi}
+        canEdit={(perms.commissions ?? []).includes("edit")}
+      />
+
+      {/* Notlar — ekip içi yorum akışı + sistem izleri (deal_notes ile GERÇEK bağ) */}
+      <DealNotesSection
+        dealId={deal.id}
+        notes={notlar}
+        canEdit={(perms.commissions ?? []).includes("edit")}
+        currentUserId={userId}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Teklifler ve sözleşmeler: yaklaşık eşleşme, bu açıkça yazılıyor */}
@@ -542,7 +667,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
       </div>
 
       {/* Görevler — deal_id ile GERÇEK bağ */}
-      <section className="surface-card rounded-[var(--radius-panel)] p-5">
+      <section id="gorevler" className="surface-card scroll-mt-24 rounded-[var(--radius-panel)] p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <ListChecks className="h-4 w-4 text-brand-600" /> Bağlı görevler
@@ -560,19 +685,22 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             {(tasks ?? []).map((t) => {
               const bitti = t.status === "done" || t.status === "Tamamlandı";
               return (
-                <li
-                  key={t.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-line bg-canvas px-4 py-2.5"
-                >
-                  <span className={`font-medium ${bitti ? "text-text-faint line-through" : "text-ink-950"}`}>
-                    {t.title}
-                  </span>
-                  <span className="flex items-center gap-2 text-xs text-text-muted">
-                    {t.due_at ? tarih(t.due_at) : "Tarihsiz"}
-                    <Badge variant={bitti ? "success" : t.priority === "high" ? "danger" : "default"}>
-                      {bitti ? "Tamam" : (t.status ?? "Açık")}
-                    </Badge>
-                  </span>
+                <li key={t.id}>
+                  <Link
+                    href={`/app/gorevler?filter=${bitti ? "done" : "open"}`}
+                    className="focus-ring flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-line bg-canvas px-4 py-2.5 transition hover:border-brand-300"
+                  >
+                    <span className={`font-medium ${bitti ? "text-text-faint line-through" : "text-ink-950"}`}>
+                      {t.title}
+                    </span>
+                    <span className="flex items-center gap-2 text-xs text-text-muted">
+                      {t.due_at ? tarih(t.due_at) : "Tarihsiz"}
+                      <Badge variant={bitti ? "success" : t.priority === "high" ? "danger" : "default"}>
+                        {bitti ? "Tamam" : (t.status ?? "Açık")}
+                      </Badge>
+                      <ArrowUpRight className="h-3.5 w-3.5" />
+                    </span>
+                  </Link>
                 </li>
               );
             })}

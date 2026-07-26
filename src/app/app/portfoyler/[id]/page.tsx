@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
+  ArrowUpRight,
   Building2,
   ExternalLink,
   FileCheck2,
@@ -10,13 +11,17 @@ import {
   MapPin,
   MapPinned,
   Percent,
+  Printer,
   RadioTower,
   Siren,
   Sparkles,
+  Timer,
+  TrendingUp,
   UserRound,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { ButtonLink } from "@/components/ui/button";
 import { getDefinitions } from "@/lib/definitions";
 import { moneyTry } from "@/lib/leak-shield";
 import { setPropertyStatus } from "@/app/actions/properties";
@@ -99,14 +104,14 @@ export default async function PropertyDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { perms } = await requireModulePage("properties");
+  const { perms, tenantId } = await requireModulePage("properties");
   const canEdit = (perms.properties ?? []).includes("edit");
   const canDelete = (perms.properties ?? []).includes("delete");
   const { id } = await params;
   const supabase = await createClient();
 
   // 1. tur — hepsi yalnızca `id`'ye bağlı, tam paralel
-  const [{ data: property }, { data: portalsData }, statusHistory, priceHistory, timeline, configuredPortals, propertyTypeDefs, transactionTypeDefs] = await Promise.all([
+  const [{ data: property }, { data: portalsData }, { data: dealsData }, statusHistory, priceHistory, timeline, configuredPortals, propertyTypeDefs, transactionTypeDefs] = await Promise.all([
     supabase
       .from("properties")
       .select(
@@ -120,6 +125,13 @@ export default async function PropertyDetailPage({
       .select("id, portal_name, portal_listing_id, portal_url, status, last_confirmed_at, removed_at, removal_reason")
       .eq("property_id", id)
       .order("created_at", { ascending: false }),
+    // Pipeline butonu için bu portföyün anlaşması: varsa açık olan, yoksa en güncel
+    supabase
+      .from("deals")
+      .select("id, stage")
+      .eq("property_id", id)
+      .order("updated_at", { ascending: false })
+      .limit(20),
     getPropertyStatusHistory(id),
     getPropertyPriceHistory(id),
     getPropertyTimeline(id),
@@ -136,7 +148,13 @@ export default async function PropertyDetailPage({
   const portals = (portalsData ?? []) as Portal[];
   const portalIds = portals.map((p) => p.id);
 
-  const [{ data: closuresData }, { data: assigneeProfile }, { data: provinces }, { data: teamMembers }, { data: mediaData }] = await Promise.all([
+  // Yatırım görünümü için bölge medyanları — ilçe yoksa hiç sorgulanmaz
+  const regionStatsFor = (txType: string) =>
+    property.district_id && tenantId
+      ? supabase.rpc("region_stats", { p_tenant_id: tenantId, p_transaction_type: txType, p_months_back: 12 })
+      : Promise.resolve({ data: null });
+
+  const [{ data: closuresData }, { data: assigneeProfile }, { data: provinces }, { data: teamMembers }, { data: mediaData }, regionSaleRes, regionRentRes] = await Promise.all([
     portalIds.length
       ? supabase
           .from("listing_closures")
@@ -155,10 +173,15 @@ export default async function PropertyDetailPage({
       .eq("property_id", id)
       .order("is_cover", { ascending: false })
       .order("sort_order", { ascending: true }),
+    regionStatsFor("Satılık"),
+    regionStatsFor("Kiralık"),
   ]);
 
   const closures = (closuresData ?? []) as Closure[];
   const media = (mediaData ?? []) as MediaItem[];
+  const dealRows = (dealsData ?? []) as { id: string; stage: string }[];
+  const relatedDeal = dealRows.find((d) => d.stage !== "won" && d.stage !== "lost") ?? dealRows[0] ?? null;
+  const pipelineHref = relatedDeal ? `/app/anlasmalar/${relatedDeal.id}` : "/app/anlasmalar";
   const livePortals = portals.filter((p) => p.status === "live");
   const overdue = livePortals.filter((p) => daysSince(p.last_confirmed_at) >= 7);
   const lostTotal = closures.reduce((s, c) => s + Number(c.estimated_lost_commission || 0), 0);
@@ -187,6 +210,56 @@ export default async function PropertyDetailPage({
     sqm: features.sqm != null ? Number(features.sqm) : null,
     districtHint: district ?? province,
   });
+
+  // ---- Yatırım görünümü (bölge kira çarpanı + tahmini satış süresi) --------
+  // Kaynak: yalnızca ofisin kendi verisinden hesaplanan region_stats medyanları.
+  type RegionStatLite = { district_id: string; median_sqm_price: number | string | null; avg_days_listed: number | string | null };
+  const findRegionRow = (res: { data: unknown } | null) =>
+    ((res?.data ?? []) as RegionStatLite[]).find((r) => r.district_id === property.district_id) ?? null;
+  const saleRegion = findRegionRow(regionSaleRes);
+  const rentRegion = findRegionRow(regionRentRes);
+  const saleMedianSqm = saleRegion?.median_sqm_price != null && Number(saleRegion.median_sqm_price) > 0 ? Number(saleRegion.median_sqm_price) : null;
+  const rentMedianSqm = rentRegion?.median_sqm_price != null && Number(rentRegion.median_sqm_price) > 0 ? Number(rentRegion.median_sqm_price) : null;
+
+  const isRentListing =
+    property.transaction_type === "rent" || property.transaction_type === "Kiralık" || property.transaction_type === "kiralik";
+  const sqmNum = features.sqm != null && Number(features.sqm) > 0 ? Number(features.sqm) : null;
+  const listPriceNum = property.list_price != null && Number(property.list_price) > 0 ? Number(property.list_price) : null;
+
+  // Bölge kira çarpanı: satılık medyan ₺/m² ÷ (kiralık medyan aylık ₺/m² × 12)
+  const regionMultiplier = saleMedianSqm != null && rentMedianSqm != null ? saleMedianSqm / (rentMedianSqm * 12) : null;
+
+  // Portföye özgü amortisman: kendi fiyatı + karşı tipin bölge medyanı.
+  // m² veya fiyat yoksa bölge çarpanına düşülür; o da yoksa hesap yapılmaz.
+  let amortYears: number | null = null;
+  if (isRentListing) {
+    amortYears =
+      listPriceNum != null && sqmNum != null && saleMedianSqm != null
+        ? (saleMedianSqm * sqmNum) / (listPriceNum * 12)
+        : regionMultiplier;
+  } else {
+    amortYears =
+      listPriceNum != null && sqmNum != null && rentMedianSqm != null
+        ? listPriceNum / (rentMedianSqm * sqmNum * 12)
+        : regionMultiplier;
+  }
+  if (amortYears != null && (!Number.isFinite(amortYears) || amortYears <= 0)) amortYears = null;
+  const grossYieldPct = amortYears != null ? 100 / amortYears : null;
+
+  // Tahmini satış/kiralama süresi: bölge ort. listede kalma × fiyat sağlığı
+  // düzeltmesi (yeşil −%25'e kadar hızlı, kırmızı +%25'e kadar yavaş).
+  const regionDaysRaw = (isRentListing ? rentRegion : saleRegion)?.avg_days_listed;
+  const baseDays = regionDaysRaw != null && Number(regionDaysRaw) > 0 ? Number(regionDaysRaw) : null;
+  let daysRange: [number, number] | null = null;
+  if (baseDays != null) {
+    const [lo, hi] =
+      priceSignal.health === "green" ? [0.75, 1] : priceSignal.health === "red" ? [1, 1.25] : [0.85, 1.15];
+    daysRange = [Math.max(1, Math.round(baseDays * lo)), Math.max(1, Math.round(baseDays * hi))];
+  }
+
+  // Veri yetersizse kart tamamen gizli
+  const showInvestmentCard = Boolean(property.district_id) && (amortYears != null || daysRange != null);
+  const oneDecimal = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 });
 
   // Portföy sağlık skoru
   const propertyHealth = computePropertyHealth({
@@ -221,9 +294,26 @@ export default async function PropertyDetailPage({
 
   return (
     <div className="space-y-6">
-      <Link href="/app/portfoyler" className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600">
-        <ArrowLeft className="h-4 w-4" /> Portföy merkezine dön
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link href="/app/portfoyler" className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600">
+          <ArrowLeft className="h-4 w-4" /> Portföy merkezine dön
+        </Link>
+        {/* Sayfa içi çapa navigasyonu — bölüm id'leri scroll-mt-24 ile sabit üst çubuğu telafi eder */}
+        <nav aria-label="Sayfa içi bölümler" className="flex flex-wrap items-center gap-1 rounded-full border border-line bg-surface p-1 text-xs font-semibold text-text-muted shadow-[var(--shadow-xs)]">
+          {([
+            ["#medya", "Medya"],
+            ["#fiyat", "Fiyat"],
+            ["#portallar", "Portallar"],
+            ["#saglik", "Sağlık"],
+            ["#harita", "Harita"],
+            ["#gecmis", "Geçmiş"],
+          ] as const).map(([href, label]) => (
+            <Link key={href} href={href} className="focus-ring rounded-full px-2.5 py-1 transition hover:bg-canvas hover:text-ink-950">
+              {label}
+            </Link>
+          ))}
+        </nav>
+      </div>
 
       <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
@@ -231,11 +321,11 @@ export default async function PropertyDetailPage({
         <div className="relative grid gap-6 lg:grid-cols-[1.35fr_1fr] lg:items-center">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-white/80">{property.property_code}</span>
-              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${healthGood ? "bg-mint-500/20 text-mint-300" : healthWarn ? "bg-amber-400/20 text-amber-300" : "bg-white/10 text-white/60"}`}>
+              <span className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white/80">{property.property_code}</span>
+              <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${healthGood ? "bg-mint-500/20 text-mint-300" : healthWarn ? "bg-amber-400/20 text-amber-300" : "bg-white/10 text-white/60"}`}>
                 Fiyat {property.price_health ?? "bekliyor"}
               </span>
-              <span className="rounded-full bg-brand-600/20 px-2.5 py-1 text-[10px] font-bold text-cyan-300">{property.status}</span>
+              <span className="rounded-full bg-brand-600/20 px-2.5 py-1 text-[11px] font-bold text-cyan-300">{property.status}</span>
             </div>
             <h1 className="mt-3 font-display text-2xl font-extrabold text-white md:text-3xl">
               {property.title ?? property.property_code}
@@ -264,7 +354,7 @@ export default async function PropertyDetailPage({
                 >
                   <MapPin className="h-3.5 w-3.5 text-mint-400" />
                   <span className="underline-offset-2 group-hover:underline">{label}</span>
-                  <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold text-mint-300">Haritada göster</span>
+                  <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[11px] font-semibold text-mint-300">Haritada göster</span>
                 </a>
               );
             })()}
@@ -272,7 +362,7 @@ export default async function PropertyDetailPage({
               {formatPrice(property.list_price != null ? Number(property.list_price) : null, property.transaction_type)}
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Link href="/app/portallar" className="btn-shine inline-flex items-center gap-1.5 rounded-[10px] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950">
+              <Link href={`/app/portallar?property=${property.id}`} className="btn-shine inline-flex items-center gap-1.5 rounded-[10px] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950">
                 <RadioTower className="h-4 w-4" /> Portal bağla
               </Link>
               {canEdit ? (
@@ -289,23 +379,44 @@ export default async function PropertyDetailPage({
                     province_id: property.province_id,
                     district_id: property.district_id,
                     neighborhood_id: property.neighborhood_id,
+                    parcel_block: property.parcel_block,
+                    parcel_lot: property.parcel_lot,
                     lat: property.lat as number | null,
                     lng: property.lng as number | null,
-                    features: (property.features ?? {}) as { rooms?: string | null; sqm?: number | null },
+                    features: (property.features ?? {}) as {
+                      rooms?: string | null;
+                      sqm?: number | null;
+                      floor?: number | string | null;
+                      heating?: string | null;
+                      building_age?: number | string | null;
+                      facade?: string | null;
+                    },
                   }}
                   provinces={provinces ?? []}
                   propertyTypes={propertyTypeOptions}
                   transactionTypes={transactionTypeOptions}
                 />
               ) : null}
+              {/* A4 ilan broşürü — vitrine asılan / müşteriye elden verilen çıktı */}
+              <ButtonLink
+                href={`/app/portfoyler/${property.id}/brosur`}
+                variant="secondary"
+                className="h-auto border-white/15 bg-white/5 px-3.5 py-2 text-white hover:bg-white/10"
+              >
+                <Printer className="h-4 w-4" /> Broşür
+              </ButtonLink>
+              {/* Müşteriye özel sunum — bu portföy ön seçili olarak sunum sihirbazını açar */}
+              <Link href={`/app/portfoyler/sunumlar?portfoy=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
+                Sunuma ekle
+              </Link>
               <Link href="/app/kayip-kacak" className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
                 <Siren className="h-4 w-4" /> Kayıp-kaçak
               </Link>
               <Link href={`/app/eslestirme?property=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
                 Eşleştir
               </Link>
-              <Link href="/app/anlasmalar" className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
-                Pipeline
+              <Link href={pipelineHref} className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
+                Pipeline{relatedDeal ? <ArrowUpRight className="h-3.5 w-3.5 text-white/60" /> : null}
               </Link>
               {canDelete ? <DeletePropertyButton propertyId={property.id} /> : null}
             </div>
@@ -333,7 +444,7 @@ export default async function PropertyDetailPage({
               </svg>
               <div className="absolute text-center">
                 <p className="font-display text-xl font-extrabold">%{Math.round(portalHealth * 100)}</p>
-                <p className="text-[9px] text-white/45">teyit</p>
+                <p className="text-[10px] text-white/45">teyit</p>
               </div>
             </div>
             <div className="space-y-2 text-xs text-white/70">
@@ -343,14 +454,25 @@ export default async function PropertyDetailPage({
               {canEdit ? (
                 <ReassignProperty propertyId={property.id} currentAssignee={property.assigned_to} members={teamMembers ?? []} />
               ) : (
-                <div className="flex items-center gap-2"><UserRound className="h-3.5 w-3.5 text-white/50" /> {assignee ?? "Atanmadı"}</div>
+                <div className="flex items-center gap-2">
+                  <UserRound className="h-3.5 w-3.5 text-white/50" />
+                  {property.assigned_to && assignee ? (
+                    <Link href={`/app/ekip/${property.assigned_to}`} className="font-semibold text-white underline-offset-2 hover:underline">
+                      {assignee}
+                    </Link>
+                  ) : (
+                    assignee ?? "Atanmadı"
+                  )}
+                </div>
               )}
             </div>
           </div>
         </div>
       </section>
 
-      <PropertyMediaManager propertyId={property.id} media={media} canEdit={canEdit} />
+      <div id="medya" className="scroll-mt-24">
+        <PropertyMediaManager propertyId={property.id} media={media} canEdit={canEdit} />
+      </div>
 
       <AiContentPanel propertyId={property.id} />
 
@@ -361,11 +483,13 @@ export default async function PropertyDetailPage({
       />
 
       {/* Fiyat geçmişi — trigger ile otomatik biriken tarihçe */}
-      <PropertyPriceHistory
-        propertyId={property.id}
-        initialHistory={priceHistory}
-        isRent={property.transaction_type === "rent" || property.transaction_type === "Kiralık" || property.transaction_type === "kiralik"}
-      />
+      <div id="fiyat" className="scroll-mt-24">
+        <PropertyPriceHistory
+          propertyId={property.id}
+          initialHistory={priceHistory}
+          isRent={property.transaction_type === "rent" || property.transaction_type === "Kiralık" || property.transaction_type === "kiralik"}
+        />
+      </div>
 
       <section className="rounded-[20px] border border-line bg-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -405,6 +529,71 @@ export default async function PropertyDetailPage({
         </div>
       </section>
 
+      {/* Yatırım görünümü — bölge medyanlarından getiri + satış süresi tahmini.
+          Veri yetersizse (ilçe yok / bölge medyanı yok) kart hiç görünmez. */}
+      {showInvestmentCard ? (
+        <section className="rounded-[20px] border border-line bg-surface p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
+                <TrendingUp className="h-4 w-4" /> Yatırım görünümü
+              </p>
+              <h2 className="mt-1 font-display font-bold text-ink-950">Bölge verisine göre tahmin</h2>
+            </div>
+            <Link href={`/app/bolge-analizi?district=${property.district_id}#trend`} className="text-xs font-semibold text-brand-600">
+              Bölge analizi
+            </Link>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {grossYieldPct != null ? (
+              <div
+                className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5"
+                title={
+                  isRentListing
+                    ? "Yıllık kira (liste fiyatı × 12) ÷ tahmini değer (bölge satılık medyan ₺/m² × m²). m² veya fiyat yoksa bölge kira çarpanı kullanılır."
+                    : "Tahmini yıllık kira (bölge kiralık medyan ₺/m² × m² × 12) ÷ liste fiyatı. m² veya fiyat yoksa bölge kira çarpanı kullanılır."
+                }
+              >
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">
+                  <Percent className="h-3.5 w-3.5 text-mint-600" /> Tahmini yıllık getiri
+                </p>
+                <p className="mt-1 font-display text-2xl font-extrabold text-ink-950">~%{oneDecimal.format(grossYieldPct)}</p>
+                <p className="text-[11px] text-text-muted">brüt kira getirisi</p>
+              </div>
+            ) : null}
+            {amortYears != null ? (
+              <div
+                className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5"
+                title="Amortisman = satılık değerin kaç yıllık kira geliriyle karşılandığı (bölge kira çarpanı esaslı)."
+              >
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">
+                  <Landmark className="h-3.5 w-3.5 text-brand-600" /> Amortisman
+                </p>
+                <p className="mt-1 font-display text-2xl font-extrabold text-ink-950">{oneDecimal.format(amortYears)} yıl</p>
+                <p className="text-[11px] text-text-muted">kira ile geri dönüş süresi</p>
+              </div>
+            ) : null}
+            {daysRange ? (
+              <div
+                className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5"
+                title={`Bölgedeki ${isRentListing ? "kiralık" : "satılık"} portföylerin ortalama listede kalma süresi (${Math.round(baseDays ?? 0)} gün), fiyat sağlığına göre ±%25 düzeltilir: yeşil fiyat hızlandırır, kırmızı yavaşlatır.`}
+              >
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">
+                  <Timer className="h-3.5 w-3.5 text-amber-600" /> Tahmini {isRentListing ? "kiralama" : "satış"} süresi
+                </p>
+                <p className="mt-1 font-display text-2xl font-extrabold text-ink-950">
+                  ~{daysRange[0]}–{daysRange[1]} gün
+                </p>
+                <p className="text-[11px] text-text-muted">bölge ortalaması + fiyat sağlığı</p>
+              </div>
+            ) : null}
+          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-text-muted">
+            Tahminler yalnızca ofisinizin kendi bölge verisinden (ilçe medyanları) üretilir; dış piyasa endeksi değildir.
+          </p>
+        </section>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-[1.1fr_.9fr]">
         <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Gauge className="h-4 w-4" /> Portföy özeti</p>
@@ -419,7 +608,7 @@ export default async function PropertyDetailPage({
               ["Oluşturma", new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(property.created_at))],
             ].map(([k, v]) => (
               <div key={k} className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5">
-                <dt className="text-[10px] font-semibold uppercase tracking-wide text-text-faint">{k}</dt>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">{k}</dt>
                 <dd className="mt-0.5 text-sm font-semibold text-ink-950">{v}</dd>
               </div>
             ))}
@@ -433,7 +622,7 @@ export default async function PropertyDetailPage({
             <p className="mt-1 text-[11px] text-text-muted">Liste fiyatı × komisyon oranı (kayıp-kaçak hesabında da kullanılır)</p>
           </div>
           <div className="mt-3 rounded-[14px] border border-line bg-canvas/60 px-3 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-text-faint">Price Health</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">Price Health</p>
             <p className="mt-1 text-sm font-semibold text-ink-950">
               {priceSignal.health === "green" ? "Yeşil" : priceSignal.health === "yellow" ? "Sarı" : priceSignal.health === "red" ? "Kırmızı" : "Bekliyor"}
               {priceSignal.deltaPct != null ? ` · %${priceSignal.deltaPct}` : ""}
@@ -469,7 +658,7 @@ export default async function PropertyDetailPage({
         </section>
       </div>
 
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+      <section id="portallar" className="scroll-mt-24 overflow-hidden rounded-[20px] border border-line bg-surface">
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -508,7 +697,7 @@ export default async function PropertyDetailPage({
                     ) : null}
                   </div>
                   <div>
-                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${isLive ? "bg-mint-500/12 text-mint-600" : "bg-ink-950/8 text-text-muted"}`}>
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${isLive ? "bg-mint-500/12 text-mint-600" : "bg-ink-950/8 text-text-muted"}`}>
                       {isLive ? "Canlı" : p.status}
                     </span>
                   </div>
@@ -534,14 +723,20 @@ export default async function PropertyDetailPage({
 
       {closures.length > 0 ? (
         <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
-          <div className="border-b border-line px-5 py-4">
+          <div className="flex items-center justify-between border-b border-line px-5 py-4">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <Siren className="h-4 w-4 text-danger-500" /> Kapanış / kayıp kayıtları
             </h2>
+            <Link href="/app/kayip-kacak" className="text-xs font-semibold text-brand-600">Kayıp-kaçak panosu</Link>
           </div>
           <div className="divide-y divide-line">
             {closures.map((c) => (
-              <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
+              // Satır kayıp-kaçak panosuna gider; ?neden= değeri listing_closures.reason kolonunun ham hali
+              <Link
+                key={c.id}
+                href={`/app/kayip-kacak?neden=${encodeURIComponent(c.reason)}#kapanislar`}
+                className="group flex flex-wrap items-center justify-between gap-2 px-5 py-3 transition hover:bg-canvas/60"
+              >
                 <div>
                   <p className="text-sm font-semibold text-ink-950">{c.reason}</p>
                   <p className="text-xs text-text-muted">
@@ -550,19 +745,22 @@ export default async function PropertyDetailPage({
                     {c.closed_by_us ? " · Bizim" : ""}
                   </p>
                 </div>
-                <p className={`font-display text-sm font-extrabold ${Number(c.estimated_lost_commission || 0) > 0 ? "text-danger-500" : "text-mint-600"}`}>
-                  {Number(c.estimated_lost_commission || 0) > 0
-                    ? `−${moneyTry(Number(c.estimated_lost_commission))}`
-                    : "Kayıp yok"}
-                </p>
-              </div>
+                <span className="flex items-center gap-2">
+                  <span className={`font-display text-sm font-extrabold ${Number(c.estimated_lost_commission || 0) > 0 ? "text-danger-500" : "text-mint-600"}`}>
+                    {Number(c.estimated_lost_commission || 0) > 0
+                      ? `−${moneyTry(Number(c.estimated_lost_commission))}`
+                      : "Kayıp yok"}
+                  </span>
+                  <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                </span>
+              </Link>
             ))}
           </div>
         </section>
       ) : null}
 
       {/* Portföy sağlık skoru + ilan kalite puanı */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div id="saglik" className="grid scroll-mt-24 gap-4 lg:grid-cols-2">
         <PropertyHealthCard health={propertyHealth} />
         {listingQuality && <ListingQualityCard quality={listingQuality} />}
       </div>
@@ -587,7 +785,9 @@ export default async function PropertyDetailPage({
       {/* Zaman tuneli: fiyat ve durum gecmisi ayri ayri dogruydu ama HIKAYEYI
           anlatmiyorlardi. Portal yayini, teklif, randevu ve acik ev ise
           hicbir kronolojide gorunmuyordu. */}
-      <PropertyTimeline events={timeline} simdi={new Date().getTime()} />
+      <div id="gecmis" className="scroll-mt-24">
+        <PropertyTimeline events={timeline} simdi={new Date().getTime()} />
+      </div>
 
       {/* Durum geçmişi */}
       <PropertyStatusHistory
@@ -596,7 +796,7 @@ export default async function PropertyDetailPage({
       />
 
       {/* Konum haritası (OpenStreetMap) */}
-      <section>
+      <section id="harita" className="scroll-mt-24">
         <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-ink-950"><MapPin className="h-4 w-4 text-brand-600" /> Konum</h2>
         <PropertyMap
           lat={property.lat as number | null}

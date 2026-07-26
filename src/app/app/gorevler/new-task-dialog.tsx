@@ -27,10 +27,20 @@ const kindOptions = [
   { value: "other", label: "Diğer" },
 ];
 
+const recurrenceOptions = [
+  { value: "", label: "Yok" },
+  { value: "daily", label: "Her gün" },
+  { value: "weekly", label: "Her hafta" },
+  { value: "biweekly", label: "İki haftada bir" },
+  { value: "monthly", label: "Her ay" },
+];
+
 export function NewTaskDialog({ members, customers }: { members: Option[]; customers: Option[] }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Tekrar yalnız terminli görevde seçilebilir — termin alanını izle.
+  const [due, setDue] = useState("");
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -41,6 +51,7 @@ export function NewTaskDialog({ members, customers }: { members: Option[]; custo
     setPending(false);
     if (result.ok) {
       formRef.current?.reset();
+      setDue("");
       setOpen(false);
       router.refresh();
       return;
@@ -94,7 +105,23 @@ export function NewTaskDialog({ members, customers }: { members: Option[]; custo
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="task-due">Son tarih</label>
-                <input id="task-due" name="due_at" type="datetime-local" className={fieldClass} />
+                <input id="task-due" name="due_at" type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} className={fieldClass} />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="task-recurrence">Tekrar</label>
+                <div className="relative">
+                  <select
+                    id="task-recurrence"
+                    name="recurrence"
+                    defaultValue=""
+                    disabled={!due}
+                    className={`${fieldClass} appearance-none disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    {recurrenceOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+                </div>
+                {!due ? <p className="mt-1 text-[11px] text-text-faint">Tekrar için önce son tarih seçin.</p> : null}
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="task-assignee">Atanan</label>

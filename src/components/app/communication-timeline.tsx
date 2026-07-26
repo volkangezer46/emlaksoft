@@ -213,20 +213,20 @@ export function CommunicationTimeline({
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-bold text-ink-950">{channelDef?.label ?? item.channel}</span>
                     {item.direction === "inbound" && (
-                      <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600">Gelen</span>
+                      <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[11px] font-semibold text-blue-600">Gelen</span>
                     )}
                     {outcomeDef && (
-                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600">{outcomeDef.label}</span>
+                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">{outcomeDef.label}</span>
                     )}
                     {item.duration_sec && (
-                      <span className="flex items-center gap-1 text-[10px] text-text-faint">
+                      <span className="flex items-center gap-1 text-[11px] text-text-faint">
                         <Clock className="h-3 w-3" /> {formatDuration(item.duration_sec)}
                       </span>
                     )}
                   </div>
                   {item.subject && <p className="mt-0.5 text-xs font-semibold text-text-muted">{item.subject}</p>}
                   {item.body && <p className="mt-1 text-xs leading-relaxed text-text-muted line-clamp-3">{item.body}</p>}
-                  <p className="mt-1 text-[10px] text-text-faint">{authorName(item.created_by)} · {relTime(item.created_at)}</p>
+                  <p className="mt-1 text-[11px] text-text-faint">{authorName(item.created_by)} · {relTime(item.created_at)}</p>
                 </div>
 
                 {/* Sil */}

@@ -23,6 +23,24 @@ import { sendPushToUser } from "@/lib/push";
  * kullanıcıdan BAŞKASINA yazılıyor (ör. eşleşme bulununca portföyün
  * danışmanına) ve o satırı kullanıcının kendi oturumu RLS yüzünden yazamaz.
  */
+/**
+ * Tercih anahtarları — profiles.notification_prefs jsonb'sindeki boolean
+ * bayraklar. Eksik anahtar AÇIK sayılır (marketing hariç; onun UI varsayılanı
+ * kapalı). Yeni tür ekleyince buraya, UI ROWS'a ve action DEFAULTS'a da ekle.
+ */
+export type NotifPrefKey =
+  | "portal"
+  | "appointment"
+  | "commission"
+  | "digest"
+  | "marketing"
+  | "priceDrop"
+  | "savedSearch"
+  | "share"
+  | "dunning"
+  | "rentOverdue"
+  | "network";
+
 export async function notifyTenant(input: {
   tenantId: string;
   userId?: string | null;
@@ -30,8 +48,27 @@ export async function notifyTenant(input: {
   body?: string;
   href?: string;
   kind?: "info" | "success" | "warning" | "danger" | "system";
+  /**
+   * Verilirse ve hedef KULLANICI bu türü kapattıysa bildirim TAMAMEN atlanır
+   * (zil satırı + push) — gunluk-ozet cron'unun `wantsDigest` deseniyle aynı.
+   * Tercih kaydı yoksa varsayılan AÇIK. userId'siz (tenant-geneli) bildirimde
+   * sunucu tarafında kişi bazlı tercih uygulanamaz; o satırları zil tarafında
+   * `filterByNotifPrefs` (notification-prefs.tsx) kullanıcı bazında süzer.
+   */
+  prefKey?: NotifPrefKey;
 }) {
   const admin = createAdminClient();
+
+  if (input.prefKey && input.userId) {
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("notification_prefs")
+      .eq("id", input.userId)
+      .maybeSingle();
+    const prefs = profile?.notification_prefs as Record<string, unknown> | null | undefined;
+    if (prefs && typeof prefs === "object" && prefs[input.prefKey] === false) return;
+  }
+
   await admin.from("notifications").insert({
     tenant_id: input.tenantId,
     user_id: input.userId ?? null,

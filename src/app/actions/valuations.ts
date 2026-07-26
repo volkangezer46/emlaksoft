@@ -1,12 +1,67 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { estimateMultiSourceValue } from "@/lib/valuation";
+import { comparablesSourceEntry, listComparableDetails } from "@/lib/comparables";
 
 export type ValuationResult = { error?: string; ok?: boolean; id?: string };
+export type ValuationShareResult = { error?: string; ok?: boolean; url?: string };
+
+function appUrl() {
+  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+}
+
+/**
+ * Değerleme raporu için public paylaşım linki üretir (/degerleme-raporu/[token]).
+ *
+ * İdempotent: token bir kez üretilir, tekrar basılınca AYNI link döner —
+ * müşteriye gönderilmiş eski linki sessizce öldürmemek için. RLS'e dokunulmaz;
+ * public sayfa token'ı service role ile çözer (paylas/[token] deseni).
+ */
+export async function generateValuationShareLink(id: string): Promise<ValuationShareResult> {
+  const gate = await requirePermission("valuation", "view");
+  if (!gate.ok) return { error: gate.error };
+  const valuationId = String(id ?? "").trim();
+  if (!valuationId) return { error: "Değerleme zorunlu." };
+
+  const supabase = await createClient();
+  const { data: valuation } = await supabase
+    .from("valuations")
+    .select("id, share_token")
+    .eq("id", valuationId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!valuation) return { error: "Değerleme bulunamadı." };
+
+  let token = (valuation.share_token as string | null) ?? null;
+  if (!token) {
+    token = randomUUID();
+    const { error } = await supabase
+      .from("valuations")
+      .update({ share_token: token, shared_at: new Date().toISOString() })
+      .eq("id", valuationId)
+      .eq("tenant_id", gate.tenantId);
+    if (error) {
+      console.error("generateValuationShareLink", error);
+      return { error: "Paylaşım linki oluşturulamadı." };
+    }
+    await logActivity({
+      tenantId: gate.tenantId,
+      actorId: gate.userId,
+      action: "valuation.share",
+      entityType: "valuation",
+      entityId: valuationId,
+      newValue: { token },
+    });
+    revalidatePath(`/app/degerleme/${valuationId}`);
+  }
+
+  return { ok: true, url: `${appUrl()}/degerleme-raporu/${token}` };
+}
 
 export async function createValuation(formData: FormData): Promise<ValuationResult> {
   const gate = await requirePermission("valuation", "create");
@@ -105,6 +160,20 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
     excludePropertyId: propertyId,
   });
 
+  // Emsal ANLIK GÖRÜNTÜSÜ: motorun kullandığı küme (aynı RPC zinciri) rapor
+  // tablosu için kayda gömülür. Böylece rapor, aylar sonra açılsa bile
+  // "o gün hangi emsaller vardı?" sorusuna kayıttan cevap verir; eski
+  // kayıtlar için rapor sayfaları görüntüleme anında yeniden hesaplar.
+  const compRows = await listComparableDetails(supabase, {
+    tenantId: gate.tenantId,
+    districtId,
+    propertyType,
+    transactionType,
+    sqm: area,
+    excludePropertyId: propertyId,
+  });
+  const sourcesToSave = compRows.length > 0 ? [...est.sources, comparablesSourceEntry(compRows)] : est.sources;
+
   const { data, error } = await supabase
     .from("valuations")
     .insert({
@@ -115,7 +184,7 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
       estimated_mid: est.mid,
       estimated_high: est.high,
       confidence: est.confidence,
-      sources: est.sources,
+      sources: sourcesToSave,
       notes: est.notes,
       created_by: gate.userId,
     })

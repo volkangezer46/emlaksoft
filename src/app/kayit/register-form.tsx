@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { signUp, type AuthResult } from "@/app/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { PasswordStrengthMeter } from "@/components/auth/password-strength";
 import { PhoneInput } from "@/components/ui/phone-input";
 
 const initial: AuthResult = {};
@@ -35,23 +36,15 @@ const TEAM_OPTIONS = [
   { value: "50+", title: "50+", desc: "Zincir / franchise" },
 ];
 
-function passwordScore(pw: string) {
-  let s = 0;
-  if (pw.length >= 8) s++;
-  if (pw.length >= 12) s++;
-  if (/[A-ZĞÜŞİÖÇ]/.test(pw) && /[a-zğüşıöç]/.test(pw)) s++;
-  if (/\d/.test(pw)) s++;
-  if (/[^A-Za-z0-9ĞÜŞİÖÇğüşıöç]/.test(pw)) s++;
-  return Math.min(s, 4); // 0-4
+/**
+ * Sunucu hatasını ilgili adıma eşler — kullanıcı 3. adımda gönderir ama hata
+ * 1. adımdaki e-posta/telefona ya da 2. adımdaki ofis bilgisine ait olabilir.
+ */
+function errorStep(message: string): 1 | 2 | null {
+  if (message.includes("e-posta zaten") || message.includes("cep telefonu")) return 1;
+  if (message.includes("Ofis")) return 2;
+  return null;
 }
-
-const STRENGTH = [
-  { label: "Çok zayıf", cls: "bg-danger-500", w: "w-1/4" },
-  { label: "Zayıf", cls: "bg-danger-500", w: "w-1/4" },
-  { label: "Orta", cls: "bg-amber-400", w: "w-2/4" },
-  { label: "İyi", cls: "bg-mint-500", w: "w-3/4" },
-  { label: "Güçlü", cls: "bg-mint-600", w: "w-full" },
-];
 
 export function RegisterForm() {
   const [state, action, pending] = useActionState(signUp, initial);
@@ -61,8 +54,7 @@ export function RegisterForm() {
   const step1Ref = useRef<HTMLDivElement>(null);
   const step2Ref = useRef<HTMLDivElement>(null);
 
-  const score = passwordScore(pw);
-  const strength = STRENGTH[score];
+  const errorTargetStep = state.error ? errorStep(state.error) : null;
 
   function validateStep(ref: React.RefObject<HTMLDivElement | null>) {
     const inputs = ref.current?.querySelectorAll<HTMLInputElement>("input");
@@ -91,27 +83,38 @@ export function RegisterForm() {
         <h1 className="font-display text-3xl font-extrabold text-ink-950">Ücretsiz başlayın</h1>
         <p className="mt-2 text-sm text-text-muted">3 kısa adımda çalışma alanınız hazır.</p>
 
-        {/* Adım göstergesi */}
+        {/* Adım göstergesi — tamamlanmış adımlar tıklanarak geri dönülebilir */}
         <ol className="mt-7 flex items-center gap-2" aria-label="Kayıt adımları">
-          {STEPS.map((s, i) => {
+          {STEPS.map((s) => {
             const done = step > s.no;
             const active = step === s.no;
+            const circleCls = `grid h-9 w-9 shrink-0 place-items-center rounded-full border text-xs font-bold transition ${
+              done
+                ? "border-mint-500 bg-mint-500 text-white"
+                : active
+                  ? "border-brand-600 bg-brand-600 text-white shadow-[var(--shadow-glow-brand)]"
+                  : "border-line bg-surface text-text-faint"
+            }`;
             return (
               <li key={s.no} className="flex flex-1 items-center gap-2">
-                <span
-                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border text-xs font-bold transition ${
-                    done
-                      ? "border-mint-500 bg-mint-500 text-white"
-                      : active
-                        ? "border-brand-600 bg-brand-600 text-white shadow-[var(--shadow-glow-brand)]"
-                        : "border-line bg-surface text-text-faint"
-                  }`}
-                >
-                  {done ? <Check className="h-4 w-4" /> : <s.icon className="h-4 w-4" />}
-                </span>
+                {done ? (
+                  <button
+                    type="button"
+                    onClick={() => setStep(s.no)}
+                    className={`${circleCls} cursor-pointer hover:brightness-110 focus-ring`}
+                    aria-label={`${s.no}. adıma dön: ${s.label}`}
+                    title={`${s.label} adımına dön`}
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <span className={circleCls}>
+                    <s.icon className="h-4 w-4" />
+                  </span>
+                )}
                 <div className="min-w-0">
                   <p className={`text-[11px] font-bold ${active || done ? "text-ink-950" : "text-text-faint"}`}>{s.label}</p>
-                  <div className={`mt-1 h-1 rounded-full ${done ? "bg-mint-500" : active ? "bg-brand-600" : "bg-line"} ${i === STEPS.length - 1 ? "" : ""}`} />
+                  <div className={`mt-1 h-1 rounded-full ${done ? "bg-mint-500" : active ? "bg-brand-600" : "bg-line"}`} />
                 </div>
               </li>
             );
@@ -207,14 +210,7 @@ export function RegisterForm() {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-              {pw ? (
-                <div className="mt-2">
-                  <div className="h-1.5 overflow-hidden rounded-full bg-line">
-                    <div className={`h-full rounded-full transition-all ${strength.cls} ${strength.w}`} />
-                  </div>
-                  <p className="mt-1 text-[11px] font-semibold text-text-muted">Şifre gücü: {strength.label}</p>
-                </div>
-              ) : null}
+              <PasswordStrengthMeter password={pw} />
             </div>
 
             <label className="flex cursor-pointer items-start gap-2.5 rounded-[12px] border border-line bg-surface px-3.5 py-3 text-[12px] leading-relaxed text-text-muted transition hover:border-brand-300">
@@ -226,9 +222,23 @@ export function RegisterForm() {
             </label>
 
             {state.error ? (
-              <p className="rounded-[10px] border border-danger-500/25 bg-danger-500/8 px-3.5 py-2.5 text-sm font-medium text-danger-600" role="alert">
-                {state.error}
-              </p>
+              <div className="rounded-[10px] border border-danger-500/25 bg-danger-500/8 px-3.5 py-2.5" role="alert">
+                <p className="text-sm font-medium text-danger-600">{state.error}</p>
+                {errorTargetStep ? (
+                  <>
+                    <p className="mt-1 text-xs text-danger-600/80">
+                      Bu hata {errorTargetStep}. adımdaki ({STEPS[errorTargetStep - 1].label}) bilgilerle ilgili.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setStep(errorTargetStep)}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-[8px] border border-danger-500/30 bg-surface px-3 py-1.5 text-xs font-semibold text-danger-600 transition hover:bg-danger-500/10"
+                    >
+                      <ArrowLeft className="h-3.5 w-3.5" /> {errorTargetStep}. adıma dön
+                    </button>
+                  </>
+                ) : null}
+              </div>
             ) : null}
 
             <div className="flex gap-2.5">

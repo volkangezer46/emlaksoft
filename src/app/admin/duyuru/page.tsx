@@ -1,51 +1,70 @@
-"use client";
+import Link from "next/link";
+import { Bell, History, Megaphone } from "lucide-react";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { requirePlatformModule } from "@/lib/platform";
+import { BroadcastForm, KIND_OPTIONS } from "./broadcast-form";
 
-import { useTransition, useState, useRef } from "react";
-import {
-  Bell,
-  CheckCircle2,
-  ChevronDown,
-  Loader2,
-  Megaphone,
-  Send,
-} from "lucide-react";
-import { sendBroadcast, type BroadcastTarget } from "@/app/actions/platform-notifications";
+const audienceLabel: Record<string, string> = {
+  all: "Tüm ofisler",
+  active: "Aktif ofisler",
+  trial: "Deneme ofisleri",
+  specific: "Belirli ofis",
+};
 
-const TARGET_OPTIONS: { value: BroadcastTarget; label: string; hint: string }[] = [
-  { value: "all", label: "Tüm ofisler", hint: "İptal edilmemiş her ofise gönderir" },
-  { value: "active", label: "Aktif ofisler", hint: "Yalnızca aktif aboneliği olanlar" },
-  { value: "trial", label: "Deneme ofisleri", hint: "14 günlük deneme süreci" },
-  { value: "specific", label: "Belirli ofis", hint: "Ofis ID ile tekil hedef" },
-];
+type AnnouncementRow = {
+  id: string;
+  title: string;
+  kind: string;
+  audience: string;
+  tenant_id: string | null;
+  sent_count: number;
+  created_at: string;
+  tenant: { name?: string } | { name?: string }[] | null;
+};
 
-const KIND_OPTIONS = [
-  { value: "info", label: "Bilgi", cls: "bg-brand-600/15 text-brand-600" },
-  { value: "success", label: "Başarılı", cls: "bg-mint-500/15 text-mint-600" },
-  { value: "warning", label: "Uyarı", cls: "bg-amber-400/15 text-amber-600" },
-  { value: "danger", label: "Kritik", cls: "bg-danger-500/15 text-danger-500" },
-  { value: "system", label: "Sistem", cls: "bg-cyan-400/15 text-cyan-600" },
-];
+function tenantNameOf(v: AnnouncementRow["tenant"]) {
+  if (!v) return null;
+  return (Array.isArray(v) ? v[0]?.name : v.name) ?? null;
+}
 
-const field =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400";
+export default async function BroadcastPage() {
+  await requirePlatformModule("broadcast");
+  const admin = createAdminClient();
 
-export default function BroadcastPage() {
-  const [pending, startTransition] = useTransition();
-  const [target, setTarget] = useState<BroadcastTarget>("all");
-  const [kind, setKind] = useState("info");
-  const [result, setResult] = useState<{ ok?: boolean; error?: string; sent?: number } | null>(null);
-  const formRef = useRef<HTMLFormElement>(null);
+  /*
+   * Hedef kitle sayıları + combobox kısayol listesi + duyuru geçmişi tek turda.
+   * Sayılar client'a props olarak iner: audience değişince istek atılmaz.
+   */
+  const [
+    { count: allCount },
+    { count: activeCount },
+    { count: trialCount },
+    { data: recentTenants },
+    { data: history },
+  ] = await Promise.all([
+    admin.from("tenants").select("id", { count: "exact", head: true }).neq("status", "cancelled"),
+    admin.from("tenants").select("id", { count: "exact", head: true }).eq("status", "active"),
+    admin.from("tenants").select("id", { count: "exact", head: true }).eq("status", "trial"),
+    admin
+      .from("tenants")
+      .select("id, name, slug, status")
+      .neq("status", "cancelled")
+      .order("created_at", { ascending: false })
+      .limit(20),
+    admin
+      .from("platform_announcements")
+      .select("id, title, kind, audience, tenant_id, sent_count, created_at, tenant:tenants(name)")
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
 
-  function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    setResult(null);
-    startTransition(async () => {
-      const res = await sendBroadcast(fd);
-      setResult(res);
-      if (res.ok) formRef.current?.reset();
-    });
-  }
+  const tenantOptions = (recentTenants ?? []).map((t) => ({
+    value: t.id,
+    label: t.name,
+    hint: `/${t.slug} · ${t.status}`,
+  }));
+
+  const rows = (history ?? []) as unknown as AnnouncementRow[];
 
   return (
     <div className="space-y-6">
@@ -67,145 +86,11 @@ export default function BroadcastPage() {
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
-        {/* Form */}
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-6">
-          <div className="flex items-center gap-2 border-b border-line pb-4">
-            <Send className="h-4 w-4 text-brand-600" />
-            <h2 className="font-display font-bold text-ink-950">Duyuru oluştur</h2>
-          </div>
-
-          <form ref={formRef} onSubmit={submit} className="mt-5 grid gap-4">
-            {/* Başlık */}
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="bc-title">
-                Başlık <span className="text-danger-500">*</span>
-              </label>
-              <input
-                id="bc-title"
-                name="title"
-                required
-                maxLength={120}
-                className={field}
-                placeholder="Örn: Yeni özellik yayında — portallar güncellendi"
-              />
-            </div>
-
-            {/* Mesaj */}
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="bc-body">
-                Mesaj (opsiyonel)
-              </label>
-              <textarea
-                id="bc-body"
-                name="body"
-                rows={3}
-                className={`${field} resize-none`}
-                placeholder="Detay, link veya açıklama ekleyebilirsiniz…"
-              />
-            </div>
-
-            {/* Bağlantı */}
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="bc-href">
-                Bağlantı (opsiyonel)
-              </label>
-              <input
-                id="bc-href"
-                name="href"
-                className={field}
-                placeholder="https:// veya /app/... ile başlayan URL"
-              />
-            </div>
-
-            {/* Tür */}
-            <div>
-              <p className="mb-2 text-sm font-medium text-ink-950">Bildirim türü</p>
-              <div className="flex flex-wrap gap-2">
-                {KIND_OPTIONS.map((k) => (
-                  <label key={k.value} className="cursor-pointer">
-                    <input
-                      type="radio"
-                      name="kind"
-                      value={k.value}
-                      checked={kind === k.value}
-                      onChange={() => setKind(k.value)}
-                      className="sr-only"
-                    />
-                    <span
-                      className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ring-2 transition ${
-                        kind === k.value
-                          ? `${k.cls} ring-current`
-                          : "bg-canvas text-text-muted ring-transparent hover:ring-line"
-                      }`}
-                    >
-                      {k.label}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Hedef */}
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="bc-target">
-                Hedef kitle
-              </label>
-              <div className="relative">
-                <select
-                  id="bc-target"
-                  name="target"
-                  value={target}
-                  onChange={(e) => setTarget(e.target.value as BroadcastTarget)}
-                  className={`${field} appearance-none pr-9`}
-                >
-                  {TARGET_OPTIONS.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label} — {t.hint}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-              </div>
-            </div>
-
-            {/* Belirli ofis ID */}
-            {target === "specific" ? (
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="bc-tenant">
-                  Ofis ID <span className="text-danger-500">*</span>
-                </label>
-                <input
-                  id="bc-tenant"
-                  name="tenant_id"
-                  required
-                  className={field}
-                  placeholder="UUID formatında ofis kimliği"
-                />
-              </div>
-            ) : null}
-
-            {/* Hata / sonuç */}
-            {result?.error ? (
-              <p className="rounded-[10px] bg-danger-500/8 px-3 py-2 text-sm text-danger-500" role="alert">
-                {result.error}
-              </p>
-            ) : null}
-            {result?.ok ? (
-              <p className="flex items-center gap-2 rounded-[10px] bg-mint-500/10 px-3 py-2 text-sm font-semibold text-mint-600" role="status">
-                <CheckCircle2 className="h-4 w-4" /> {result.sent} ofise duyuru iletildi.
-              </p>
-            ) : null}
-
-            <button
-              type="submit"
-              disabled={pending}
-              className="btn-shine mt-1 inline-flex items-center gap-2 rounded-[11px] bg-ink-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
-            >
-              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              {pending ? "Gönderiliyor…" : "Duyuruyu gönder"}
-            </button>
-          </form>
-        </section>
+        {/* Form — hedef kitle sayıları sunucuda hesaplandı */}
+        <BroadcastForm
+          audienceCounts={{ all: allCount ?? 0, active: activeCount ?? 0, trial: trialCount ?? 0 }}
+          tenantOptions={tenantOptions}
+        />
 
         {/* Bilgi paneli */}
         <aside className="space-y-4">
@@ -239,7 +124,7 @@ export default function BroadcastPage() {
             <div className="mt-3 space-y-2">
               {KIND_OPTIONS.map((k) => (
                 <div key={k.value} className="flex items-center gap-3">
-                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${k.cls}`}>{k.label}</span>
+                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${k.cls}`}>{k.label}</span>
                   <span className="text-xs text-text-muted">
                     {k.value === "info" && "Yeni özellik, duyuru, genel bilgi"}
                     {k.value === "success" && "Başarılı güncelleme, plan yükseltme"}
@@ -257,6 +142,56 @@ export default function BroadcastPage() {
           </div>
         </aside>
       </div>
+
+      {/* Duyuru geçmişi — gönderim başına tek arşiv satırı */}
+      <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
+          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+            <History className="h-4 w-4 text-brand-600" /> Son duyurular
+          </h2>
+          <span className="text-xs text-text-faint">Son {rows.length} gönderim</span>
+        </div>
+        {rows.length === 0 ? (
+          <p className="px-5 py-10 text-center text-sm text-text-muted">
+            Henüz duyuru gönderilmemiş. Gönderimler burada arşivlenir.
+          </p>
+        ) : (
+          <div className="divide-y divide-line">
+            {rows.map((a) => {
+              const kindOpt = KIND_OPTIONS.find((k) => k.value === a.kind);
+              const tenantName = tenantNameOf(a.tenant);
+              return (
+                <div
+                  key={a.id}
+                  className="grid gap-2 px-5 py-3 transition hover:bg-brand-600/[0.02] sm:grid-cols-[1.4fr_1fr_auto_auto] sm:items-center"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${kindOpt?.cls ?? "bg-canvas text-text-muted"}`}>
+                      {kindOpt?.label ?? a.kind}
+                    </span>
+                    <p className="truncate text-sm font-semibold text-ink-950">{a.title}</p>
+                  </div>
+                  <p className="text-xs text-text-muted">
+                    {a.audience === "specific" && a.tenant_id ? (
+                      <Link href={`/admin/tenants/${a.tenant_id}`} className="font-semibold text-brand-600 transition hover:underline">
+                        {tenantName ?? "Belirli ofis"}
+                      </Link>
+                    ) : (
+                      (audienceLabel[a.audience] ?? a.audience)
+                    )}
+                  </p>
+                  <span className="numeric w-fit rounded-full bg-mint-500/10 px-2.5 py-1 text-[11px] font-bold text-mint-600">
+                    {a.sent_count} ofis
+                  </span>
+                  <p className="text-xs text-text-faint">
+                    {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(a.created_at))}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

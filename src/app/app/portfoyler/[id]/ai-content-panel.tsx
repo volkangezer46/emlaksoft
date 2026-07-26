@@ -46,7 +46,7 @@ export function AiContentPanel({ propertyId }: { propertyId: string }) {
           <p className="text-xs text-text-muted">İlan, WhatsApp, sosyal medya ve e-posta metnini tek tıkla üret.</p>
         </div>
         {source ? (
-          <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${source === "ai" ? "bg-violet-500/12 text-violet-600" : "bg-ink-950/8 text-text-muted"}`}>
+          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${source === "ai" ? "bg-violet-500/12 text-violet-600" : "bg-ink-950/8 text-text-muted"}`}>
             {source === "ai" ? "AI üretti" : "Akıllı şablon"}
           </span>
         ) : null}

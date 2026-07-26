@@ -5,6 +5,7 @@ import {
   tierCls,
   tierLabel,
   type MatchDemand,
+  type MatchingWeights,
   type MatchProperty,
 } from "@/lib/matching";
 import { moneyTry } from "@/lib/leak-shield";
@@ -12,6 +13,8 @@ import { moneyTry } from "@/lib/leak-shield";
 type Props = {
   demands: MatchDemand[];
   properties: MatchProperty[];
+  /** Ofise özel kriter ağırlıkları — null/tanımsızsa varsayılan set (eski davranış). */
+  weights?: MatchingWeights | null;
 };
 
 function budgetLabel(min: number | null, max: number | null) {
@@ -21,7 +24,7 @@ function budgetLabel(min: number | null, max: number | null) {
   return null;
 }
 
-export function MatchedPropertiesWidget({ demands, properties }: Props) {
+export function MatchedPropertiesWidget({ demands, properties, weights }: Props) {
   if (demands.length === 0) return null;
 
   type Pair = {
@@ -34,7 +37,7 @@ export function MatchedPropertiesWidget({ demands, properties }: Props) {
   const pairs: Pair[] = [];
   for (const demand of demands) {
     for (const property of properties) {
-      const result = scoreDemandProperty(demand, property);
+      const result = scoreDemandProperty(demand, property, weights);
       if (result.score >= 45) {
         pairs.push({ demand, property, score: result.score, tier: result.tier });
       }
@@ -99,7 +102,7 @@ export function MatchedPropertiesWidget({ demands, properties }: Props) {
                 <span className="font-display text-xl font-extrabold text-ink-950">
                   {pair.score}
                 </span>
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tierCls(pair.tier)}`}>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${tierCls(pair.tier)}`}>
                   {tierLabel(pair.tier)}
                 </span>
                 <Crosshair className="h-4 w-4 text-text-faint" />

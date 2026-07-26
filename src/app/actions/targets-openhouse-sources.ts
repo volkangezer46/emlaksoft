@@ -45,6 +45,112 @@ export async function upsertTarget(
   return { ok: true, id: data.id };
 }
 
+const TARGET_PERIODS = ["monthly", "quarterly", "yearly"] as const;
+
+/** Hedef formu alanlarını tek yerden ayrıştırır (create + update aynı formu kullanır). */
+function parseTargetFields(fd: FormData) {
+  const profileId = String(fd.get("profile_id") ?? "").trim() || null;
+  const periodRaw = String(fd.get("period") ?? "monthly").trim();
+  const period = (TARGET_PERIODS as readonly string[]).includes(periodRaw) ? periodRaw : "monthly";
+
+  // <input type="month"> "YYYY-AA" gönderir; date kolonu için ayın ilk günü eklenir.
+  let periodStart = String(fd.get("period_start") ?? "").trim();
+  if (/^\d{4}-\d{2}$/.test(periodStart)) periodStart = `${periodStart}-01`;
+
+  const targetDeals   = parseInt(String(fd.get("target_deals")   ?? "0"));
+  const targetRevenue = parseFloat(String(fd.get("target_revenue") ?? "0"));
+
+  return {
+    profileId,
+    period,
+    periodStart,
+    targetDeals:   isNaN(targetDeals)   || targetDeals   < 0 ? 0 : targetDeals,
+    targetRevenue: isNaN(targetRevenue) || targetRevenue < 0 ? 0 : targetRevenue,
+  };
+}
+
+export async function createTarget(
+  _prev: TargetResult,
+  fd: FormData,
+): Promise<TargetResult> {
+  const gate = await requirePermission("targets", "create");
+  if (!gate.ok) return { error: gate.error };
+
+  const f = parseTargetFields(fd);
+  if (!f.periodStart) return { error: "Dönem başlangıcı zorunludur." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("targets")
+    .insert({
+      tenant_id:      gate.tenantId,
+      profile_id:     f.profileId,
+      period:         f.period,
+      period_start:   f.periodStart,
+      target_deals:   f.targetDeals,
+      target_revenue: f.targetRevenue,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    if (error?.code === "23505") return { error: "Bu dönem için zaten bir hedef tanımlı." };
+    return { error: "Hedef oluşturulamadı." };
+  }
+
+  revalidatePath("/app/hedefler");
+  return { ok: true, id: data.id };
+}
+
+export async function updateTarget(
+  _prev: TargetResult,
+  fd: FormData,
+): Promise<TargetResult> {
+  const gate = await requirePermission("targets", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const id = String(fd.get("id") ?? "").trim();
+  if (!id) return { error: "Hedef bulunamadı." };
+
+  const f = parseTargetFields(fd);
+  if (!f.periodStart) return { error: "Dönem başlangıcı zorunludur." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("targets")
+    .update({
+      profile_id:     f.profileId,
+      period:         f.period,
+      period_start:   f.periodStart,
+      target_deals:   f.targetDeals,
+      target_revenue: f.targetRevenue,
+      updated_at:     new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId);
+
+  if (error) {
+    if (error.code === "23505") return { error: "Bu dönem için zaten bir hedef tanımlı." };
+    return { error: "Hedef güncellenemedi." };
+  }
+
+  revalidatePath("/app/hedefler");
+  return { ok: true, id };
+}
+
+/** ConfirmDialog `formAction` deseniyle uyumlu silme (bkz. `deleteTask`). */
+export async function deleteTarget(formData: FormData): Promise<void> {
+  const gate = await requirePermission("targets", "delete");
+  if (!gate.ok) return;
+
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return;
+
+  const supabase = await createClient();
+  await supabase.from("targets").delete().eq("id", id).eq("tenant_id", gate.tenantId);
+  revalidatePath("/app/hedefler");
+}
+
 export async function listTargets(period?: string) {
   const gate = await requirePermission("reports", "view");
   if (!gate.ok) return [];
@@ -166,7 +272,7 @@ export async function getOpenHouse(openHouseId: string) {
   const { data } = await supabase
     .from("open_houses")
     .select(
-      "id, scheduled_at, duration_min, location, status, visitor_count, max_visitors, notes, created_at, property:properties(id, property_code, title, address_line, list_price)",
+      "id, scheduled_at, duration_min, location, status, visitor_count, max_visitors, notes, created_at, public_token, property:properties(id, property_code, title, address_line, list_price)",
     )
     .eq("id", openHouseId)
     .eq("tenant_id", gate.tenantId)

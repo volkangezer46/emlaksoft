@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyTenant } from "@/lib/notify";
-import { scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
+import { fetchTenantMatchingWeights, scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
 
 /**
  * Yeni bir portföy eklendiğinde, aktif taleplerle anlık eşleştirir ve güçlü
@@ -16,6 +16,8 @@ export async function notifyMatchingDemandsForProperty(
 ): Promise<number> {
   try {
     const admin = createAdminClient();
+    // Ofise özel ağırlıklar — döngü DIŞINDA tek sorgu; tanımsızsa varsayılan davranış.
+    const weightsPromise = fetchTenantMatchingWeights(admin, tenantId);
     const { data: demands } = await admin
       .from("customer_demands")
       .select("id, transaction_type, property_type, province_id, district_id, budget_min, budget_max, rooms, min_sqm, urgency, status, customer:customers(full_name)")
@@ -25,10 +27,11 @@ export async function notifyMatchingDemandsForProperty(
 
     if (!demands?.length) return 0;
 
+    const weights = await weightsPromise;
     const MATCH_THRESHOLD = 60; // "iyi/güçlü" eşleşme
     const matched: { name: string; score: number }[] = [];
     for (const d of demands) {
-      const result = scoreDemandProperty(d as unknown as MatchDemand, property);
+      const result = scoreDemandProperty(d as unknown as MatchDemand, property, weights);
       if (result.score >= MATCH_THRESHOLD) {
         const c = d.customer as { full_name?: string } | { full_name?: string }[] | null;
         const name = (Array.isArray(c) ? c[0]?.full_name : c?.full_name) ?? "Müşteri";

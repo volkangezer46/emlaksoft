@@ -47,9 +47,14 @@ export function LoginForm({ next, demoEnabled }: { next: string; demoEnabled: bo
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="password">
-              Şifre
-            </label>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="block text-sm font-semibold text-ink-900" htmlFor="password">
+                Şifre
+              </label>
+              <Link href="/sifre-sifirla" className="text-xs font-semibold text-brand-600 hover:underline">
+                Şifremi unuttum
+              </Link>
+            </div>
             <div className="relative">
               <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
               <input

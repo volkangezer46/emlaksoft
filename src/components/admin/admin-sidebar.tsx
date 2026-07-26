@@ -112,7 +112,7 @@ export function AdminSidebar({
         </span>
         <div className="relative">
           <p className="font-display text-sm font-extrabold text-white">EmlakSoft</p>
-          <p className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[.16em] text-amber-400">
+          <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-400">
             <span className="status-pulse h-1.5 w-1.5 rounded-full bg-amber-400" /> {roleLabel}
           </p>
         </div>
@@ -122,7 +122,7 @@ export function AdminSidebar({
         {sections.map((section) => (
           <div key={section.title ?? "root"}>
             {section.title ? (
-              <p className="mb-1.5 px-3 text-[9px] font-bold uppercase tracking-[.16em] text-white/45">{section.title}</p>
+              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/45">{section.title}</p>
             ) : null}
             <nav className="space-y-1">
               {section.items.map((item) => {
@@ -148,13 +148,13 @@ export function AdminSidebar({
                     </span>
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate">{item.label}</span>
-                      <span className={`text-[10px] font-normal ${active ? "text-white/55" : "text-white/40"}`}>
+                      <span className={`text-[11px] font-normal ${active ? "text-white/55" : "text-white/40"}`}>
                         {item.hint}
                       </span>
                     </span>
                     {badge && badge > 0 ? (
                       <span
-                        className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                        className={`shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-bold ${
                           item.badgeKey === "risk"
                             ? "bg-danger-500/20 text-danger-400"
                             : item.badgeKey === "sales"
@@ -176,8 +176,8 @@ export function AdminSidebar({
       <div className="border-t border-white/8 p-4">
         <div className="rounded-[14px] border border-white/8 bg-white/[0.04] p-3">
           <p className="truncate text-xs font-semibold text-white">{staffName}</p>
-          <p className="mt-0.5 text-[10px] uppercase tracking-wide text-amber-400/80">{roleLabel}</p>
-          <div className="mt-2 flex items-center gap-1.5 text-[10px] text-mint-400/80">
+          <p className="mt-0.5 text-[11px] uppercase tracking-[0.08em] text-amber-400/80">{roleLabel}</p>
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-mint-400/80">
             <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-400" /> Operasyon oturumu açık
           </div>
         </div>

@@ -84,7 +84,7 @@ export function AdminTopbar({
           <Radio className="h-4 w-4" />
         </span>
         <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-[.14em] text-amber-600">
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-amber-600">
             EmlakSoft · {roleLabel}
           </p>
           <p className="truncate text-sm font-semibold text-ink-950">
@@ -128,7 +128,7 @@ export function AdminTopbar({
           </div>
         ) : null}
 
-        <span className="hidden items-center gap-1.5 rounded-full bg-mint-500/10 px-2.5 py-1 text-[10px] font-bold text-mint-600 lg:inline-flex">
+        <span className="hidden items-center gap-1.5 rounded-full bg-mint-500/10 px-2.5 py-1 text-[11px] font-bold text-mint-600 lg:inline-flex">
           <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-500" /> {clock}
         </span>
 

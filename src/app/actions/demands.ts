@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
+import { dispatchAutomationEvent } from "@/lib/automation-engine";
 
 export type DemandResult = { error?: string; ok?: boolean; id?: string };
 
@@ -93,6 +94,19 @@ export async function createDemand(
     entityId: data.id,
     newValue: { customer_id: customerId, transaction_type: transactionType },
   });
+
+  // Otomasyon tetikle — hata ana işlemi asla bozmasın
+  try {
+    await dispatchAutomationEvent(gate.tenantId, "new_demand", {
+      entityType: "demand",
+      entityId: data.id,
+      customerId,
+      assignedTo: gate.userId,
+      fields: { transaction_type: transactionType, property_type: propertyType || null },
+    });
+  } catch (e) {
+    console.error("automation new_demand", e);
+  }
 
   revalidateDemandPaths(customerId);
   return { ok: true, id: data.id };

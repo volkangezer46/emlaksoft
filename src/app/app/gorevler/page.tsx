@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { AlarmClock, CalendarClock, CheckCircle2, ListChecks } from "lucide-react";
+import { AlarmClock, ArrowUpRight, CalendarClock, CheckCircle2, ListChecks, Repeat } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { NewTaskDialog } from "./new-task-dialog";
 import { TaskCard, type TaskRow } from "./task-card";
+import { TaskBulkList } from "./task-bulk-list";
 import { EmptyState } from "@/components/app/empty-state";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 
@@ -15,6 +16,14 @@ const FILTERS = [
   { key: "today", label: "Bugün" },
   { key: "done", label: "Tamamlanan" },
   { key: "all", label: "Tümü" },
+];
+
+// ?tur= filtre çipleri — değerler tasks.kind kolonundaki gerçek değerler.
+const KIND_FILTERS = [
+  { key: "call", label: "Arama" },
+  { key: "visit", label: "Ziyaret" },
+  { key: "document", label: "Evrak" },
+  { key: "followup", label: "Takip" },
 ];
 
 function startOfToday() {
@@ -31,7 +40,7 @@ function endOfToday() {
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ filter?: string; mine?: string }>;
+  searchParams?: Promise<{ filter?: string; mine?: string; tur?: string; tekrar?: string }>;
 }) {
   const ctx = await requireModulePage("tasks");
   const canEdit = (ctx.perms.tasks ?? []).includes("edit");
@@ -40,6 +49,22 @@ export default async function TasksPage({
   const params = (await searchParams) ?? {};
   const filter = FILTERS.some((f) => f.key === params.filter) ? params.filter! : "open";
   const mine = params.mine === "1";
+  const tur = KIND_FILTERS.some((k) => k.key === params.tur) ? params.tur! : "";
+  const tekrar = params.tekrar === "1";
+
+  // Filtre linkleri diğer parametreleri korur (filter ⇄ mine ⇄ tur ⇄ tekrar bağımsız).
+  const taskHref = (patch: { filter?: string; mine?: boolean; tur?: string; tekrar?: boolean }) => {
+    const f = patch.filter !== undefined ? patch.filter : filter;
+    const m = patch.mine !== undefined ? patch.mine : mine;
+    const t = patch.tur !== undefined ? patch.tur : tur;
+    const r = patch.tekrar !== undefined ? patch.tekrar : tekrar;
+    const q = new URLSearchParams();
+    q.set("filter", f);
+    if (m) q.set("mine", "1");
+    if (t) q.set("tur", t);
+    if (r) q.set("tekrar", "1");
+    return `/app/gorevler?${q.toString()}`;
+  };
 
   const supabase = await createClient();
 
@@ -48,12 +73,14 @@ export default async function TasksPage({
     // count: filtreye göre 100/200 sınırı var; hangi filtrede olursa olsun
     // kullanıcı kaç görevin listede olmadığını görebilmeli.
     .select(
-      "id, title, notes, kind, priority, status, due_at, assigned_to, customer_id, property_id, created_at, assignee:profiles!tasks_assigned_to_fkey(full_name), customer:customers(full_name)",
+      "id, title, notes, kind, priority, status, due_at, assigned_to, customer_id, property_id, recurrence, created_at, assignee:profiles!tasks_assigned_to_fkey(full_name), customer:customers(full_name)",
       { count: "exact" },
     )
     .eq("tenant_id", ctx.tenantId);
 
   if (mine) query = query.eq("assigned_to", ctx.userId);
+  if (tur) query = query.eq("kind", tur);
+  if (tekrar) query = query.not("recurrence", "is", null);
 
   if (filter === "done") {
     query = query.eq("status", "done").order("completed_at", { ascending: false }).limit(100);
@@ -117,17 +144,23 @@ export default async function TasksPage({
           {canCreate ? <NewTaskDialog members={members ?? []} customers={customers ?? []} /> : null}
         </div>
         <div className="relative mt-5 grid grid-cols-3 gap-3">
+          {/* Sayaçlar mevcut ?filter= parametresiyle ilgili listeye iner. */}
           {[
-            { label: "Açık görev", value: counts.open, icon: CalendarClock, tone: "text-cyan-300" },
-            { label: "Gecikmiş", value: counts.overdue, icon: AlarmClock, tone: "text-danger-300" },
-            { label: "Tamamlanan", value: counts.done, icon: CheckCircle2, tone: "text-mint-300" },
+            { label: "Açık görev", value: counts.open, icon: CalendarClock, tone: "text-cyan-300", href: taskHref({ filter: "open" }) },
+            { label: "Gecikmiş", value: counts.overdue, icon: AlarmClock, tone: "text-danger-300", href: taskHref({ filter: "overdue" }) },
+            { label: "Tamamlanan", value: counts.done, icon: CheckCircle2, tone: "text-mint-300", href: taskHref({ filter: "done" }) },
           ].map((s) => (
-            <div key={s.label} className="rounded-[14px] border border-white/10 bg-white/[0.05] px-4 py-3">
+            <Link
+              key={s.label}
+              href={s.href}
+              className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/[0.05] px-4 py-3 transition hover:border-brand-300"
+            >
               <p className={`flex items-center gap-1.5 font-display text-2xl font-extrabold ${s.tone}`}>
                 <s.icon className="h-4 w-4" /> {s.value}
+                <ArrowUpRight className="hover-action ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
               </p>
-              <p className="text-[10px] text-white/50">{s.label}</p>
-            </div>
+              <p className="text-[11px] text-white/50">{s.label}</p>
+            </Link>
           ))}
         </div>
       </section>
@@ -135,11 +168,10 @@ export default async function TasksPage({
       <div className="flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => {
           const active = f.key === filter;
-          const href = `/app/gorevler?filter=${f.key}${mine ? "&mine=1" : ""}`;
           return (
             <Link
               key={f.key}
-              href={href}
+              href={taskHref({ filter: f.key })}
               className={`rounded-[10px] border px-3.5 py-2 text-xs font-semibold transition ${
                 active ? "border-brand-400/50 bg-brand-600/10 text-brand-600" : "border-line bg-surface text-ink-950 hover:border-brand-300"
               }`}
@@ -148,8 +180,33 @@ export default async function TasksPage({
             </Link>
           );
         })}
+        <span className="mx-1 hidden h-4 w-px bg-line sm:block" aria-hidden />
+        {/* Tür çipleri: aktifken tekrar tıklamak filtreyi kaldırır */}
+        {KIND_FILTERS.map((k) => {
+          const active = k.key === tur;
+          return (
+            <Link
+              key={k.key}
+              href={taskHref({ tur: active ? "" : k.key })}
+              className={`rounded-[10px] border px-3.5 py-2 text-xs font-semibold transition ${
+                active ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-600" : "border-line bg-surface text-text-muted hover:border-cyan-400/50 hover:text-cyan-600"
+              }`}
+            >
+              {k.label}
+            </Link>
+          );
+        })}
+        {/* Tekrarlayan çipi: ?tekrar=1 → sunucu filtresi recurrence not null */}
         <Link
-          href={`/app/gorevler?filter=${filter}${mine ? "" : "&mine=1"}`}
+          href={taskHref({ tekrar: !tekrar })}
+          className={`flex items-center gap-1.5 rounded-[10px] border px-3.5 py-2 text-xs font-semibold transition ${
+            tekrar ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-600" : "border-line bg-surface text-text-muted hover:border-cyan-400/50 hover:text-cyan-600"
+          }`}
+        >
+          <Repeat className="h-3.5 w-3.5" /> Tekrarlayan
+        </Link>
+        <Link
+          href={taskHref({ mine: !mine })}
           className={`ml-auto rounded-[10px] border px-3.5 py-2 text-xs font-semibold transition ${
             mine ? "border-mint-400/50 bg-mint-500/10 text-mint-600" : "border-line bg-surface text-text-muted hover:border-brand-300"
           }`}
@@ -168,9 +225,14 @@ export default async function TasksPage({
       ) : (
         <div className="space-y-2">
           <ListLimitNotice shown={tasks.length} total={taskTotal} hint="Filtre uygulayarak daraltın." />
-          {tasks.map((t) => (
-            <TaskCard key={t.id} task={t} canEdit={canEdit} canDelete={canDelete} />
-          ))}
+          {/* Toplu tamamlama: checkbox seçimi + tek .in() UPDATE (completeTasksBulk) */}
+          <TaskBulkList
+            items={tasks.map((t) => ({
+              id: t.id,
+              selectable: canEdit && t.status === "open",
+              card: <TaskCard task={t} canEdit={canEdit} canDelete={canDelete} />,
+            }))}
+          />
         </div>
       )}
     </div>

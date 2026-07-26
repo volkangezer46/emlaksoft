@@ -2,12 +2,15 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Check,
+  ChevronDown,
   CreditCard,
   Sparkles,
   ShieldCheck,
+  Users2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { DAY_MS, msUntil } from "@/lib/clock";
 import { PLANS, planAmountTry, planLabel, type BillingCycle } from "@/lib/billing/plans";
 import { isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { CheckoutButton } from "./checkout-button";
@@ -40,7 +43,7 @@ export default async function BillingPage({
   } = await supabase.auth.getUser();
   const tenantId = user?.app_metadata?.tenant_id as string | undefined;
 
-  const [{ data: tenant }, { data: sub }, { data: invoices }] = await Promise.all([
+  const [{ data: tenant }, { data: sub }, { data: invoices }, { count: memberCount }] = await Promise.all([
     tenantId
       ? supabase.from("tenants").select("id, name, plan, status").eq("id", tenantId).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -59,9 +62,17 @@ export default async function BillingPage({
           .order("created_at", { ascending: false })
           .limit(8)
       : Promise.resolve({ data: [] }),
+    tenantId
+      ? supabase.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId)
+      : Promise.resolve({ count: null }),
   ]);
 
   const currentPlan = sub?.plan ?? tenant?.plan ?? "office";
+
+  // Deneme geri sayımı — yalnızca trialing durumunda anlamlı
+  const trialEnds = sub?.trial_ends_at ? new Date(sub.trial_ends_at) : null;
+  const trialDaysLeft = trialEnds ? Math.ceil(msUntil(trialEnds) / DAY_MS) : null;
+  const showTrial = (sub?.status ?? "trialing") === "trialing" && trialDaysLeft != null;
 
   return (
     <div className="space-y-6">
@@ -85,12 +96,26 @@ export default async function BillingPage({
             </p>
           </div>
           <div className="rounded-[16px] border border-white/10 bg-white/5 px-5 py-4 backdrop-blur">
-            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/45">Mevcut paket</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-white/45">Mevcut paket</p>
             <p className="mt-1 font-display text-2xl font-extrabold">{planLabel(currentPlan)}</p>
             <p className="mt-1 text-xs text-mint-400">
               {statusLabel[sub?.status ?? "trialing"] ?? sub?.status ?? "Deneme"}
               {sub?.billing_cycle ? ` · ${sub.billing_cycle === "yearly" ? "Yıllık" : "Aylık"}` : ""}
             </p>
+            {/* Plan tanımlarında yapısal kullanıcı limiti yok — yalnızca gerçek kullanım gösteriliyor */}
+            <Link
+              href="/app/ekip"
+              className="focus-ring mt-2 inline-flex items-center gap-1.5 rounded-[8px] text-xs text-white/70 transition hover:text-white"
+            >
+              <Users2 className="h-3.5 w-3.5" /> {memberCount ?? 0} kullanıcı · ekibi yönet
+            </Link>
+            {showTrial ? (
+              <p className={`mt-1.5 text-[11px] font-semibold ${trialDaysLeft! > 3 ? "text-white/60" : "text-amber-400"}`}>
+                {trialDaysLeft! > 0
+                  ? `Deneme bitişine ${trialDaysLeft} gün (${new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(trialEnds!)})`
+                  : "Deneme süresi doldu — paket seçin."}
+              </p>
+            ) : null}
           </div>
         </div>
       </section>
@@ -140,11 +165,11 @@ export default async function BillingPage({
               }`}
             >
               {current ? (
-                <span className="absolute right-4 top-4 rounded-full bg-mint-500/15 px-2 py-0.5 text-[10px] font-bold text-mint-600">
+                <span className="absolute right-4 top-4 rounded-full bg-mint-500/15 px-2 py-0.5 text-[11px] font-bold text-mint-600">
                   Aktif
                 </span>
               ) : null}
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-brand-600">{plan.blurb}</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">{plan.blurb}</p>
               <h2 className="mt-1 font-display text-xl font-extrabold text-ink-950">{plan.name}</h2>
               <p className="mt-3 font-display text-3xl font-extrabold text-ink-950">
                 {money(amount)}
@@ -184,20 +209,51 @@ export default async function BillingPage({
         ) : (
           <div className="mt-4 divide-y divide-line">
             {(invoices ?? []).map((inv) => (
-              <div key={inv.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
-                <div>
-                  <p className="font-semibold text-ink-950">{inv.invoice_no}</p>
-                  <p className="text-xs text-text-muted">
-                    {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(inv.created_at))}
+              <details key={inv.id} className="group">
+                <summary className="focus-ring flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 rounded-[10px] py-3 text-sm transition hover:bg-canvas/60 [&::-webkit-details-marker]:hidden">
+                  <div className="flex items-center gap-2">
+                    <ChevronDown className="h-4 w-4 shrink-0 text-text-faint transition group-open:rotate-180" />
+                    <div>
+                      <p className="font-semibold text-ink-950">{inv.invoice_no}</p>
+                      <p className="text-xs text-text-muted">
+                        {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(inv.created_at))}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-display font-bold text-ink-950">{money(Number(inv.total_try))}</p>
+                    <p className={`text-[11px] font-semibold ${inv.status === "paid" ? "text-mint-600" : "text-amber-600"}`}>
+                      {inv.status === "paid" ? "Ödendi" : inv.status}
+                    </p>
+                  </div>
+                </summary>
+                <div className="mb-3 ml-6 grid gap-2 rounded-[12px] border border-line bg-canvas/60 p-3 text-xs text-text-muted sm:grid-cols-2">
+                  <p>
+                    <span className="text-text-faint">Fatura no:</span>{" "}
+                    <span className="font-semibold text-ink-950">{inv.invoice_no}</span>
+                  </p>
+                  <p>
+                    <span className="text-text-faint">Tutar:</span>{" "}
+                    <span className="font-semibold text-ink-950">{money(Number(inv.total_try))}</span>
+                  </p>
+                  <p>
+                    <span className="text-text-faint">Kesim tarihi:</span>{" "}
+                    {new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date(inv.created_at))}
+                  </p>
+                  <p>
+                    <span className="text-text-faint">Ödeme:</span>{" "}
+                    {inv.paid_at
+                      ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date(inv.paid_at))
+                      : "Henüz ödenmedi"}
+                  </p>
+                  <p className="sm:col-span-2">
+                    <span className="text-text-faint">Durum:</span>{" "}
+                    <span className={`font-semibold ${inv.status === "paid" ? "text-mint-600" : "text-amber-600"}`}>
+                      {inv.status === "paid" ? "Ödendi" : inv.status}
+                    </span>
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="font-display font-bold text-ink-950">{money(Number(inv.total_try))}</p>
-                  <p className={`text-[11px] font-semibold ${inv.status === "paid" ? "text-mint-600" : "text-amber-600"}`}>
-                    {inv.status === "paid" ? "Ödendi" : inv.status}
-                  </p>
-                </div>
-              </div>
+              </details>
             ))}
           </div>
         )}

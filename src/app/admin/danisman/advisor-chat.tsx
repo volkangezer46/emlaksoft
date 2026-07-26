@@ -1,19 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import {
   ArrowUp,
   Bot,
   Clock,
   Download,
   MessageSquarePlus,
+  RotateCcw,
   Sparkles,
+  Square,
   Trash2,
   User,
   Zap,
 } from "lucide-react";
 import {
-  askAdvisor,
   listAdvisorSessions,
   loadAdvisorSession,
   deleteAdvisorSession,
@@ -21,6 +22,7 @@ import {
   type PersistedMessage,
 } from "@/app/actions/ai-advisor";
 import type { AdvisorMessage } from "@/lib/ai-advisor";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -33,9 +35,20 @@ const SUGGESTIONS = [
   "Bugün öncelik vermem gereken 3 şey nedir?",
 ];
 
-function renderContent(text: string) {
-  return text.split("\n").map((line, i) => {
-    if (!line.trim()) return <span key={i} className="block h-2" />;
+function renderContent(text: string, streaming = false) {
+  const lines = text.split("\n");
+  return lines.map((line, i) => {
+    const cursor =
+      streaming && i === lines.length - 1 ? (
+        <span key="cursor" className="ml-0.5 animate-pulse text-brand-600">▍</span>
+      ) : null;
+    if (!line.trim()) {
+      return cursor ? (
+        <p key={i} className="leading-relaxed">{cursor}</p>
+      ) : (
+        <span key={i} className="block h-2" />
+      );
+    }
     const parts = line.split(/(\*\*[^*]+\*\*)/g);
     return (
       <p key={i} className="leading-relaxed">
@@ -48,6 +61,7 @@ function renderContent(text: string) {
             <span key={j}>{p}</span>
           ),
         )}
+        {cursor}
       </p>
     );
   });
@@ -63,7 +77,19 @@ function relativeTime(iso: string): string {
   return `${Math.floor(hrs / 24)} gün önce`;
 }
 
-type ChatMsg = AdvisorMessage & { usedAI?: boolean };
+type ChatMsg = AdvisorMessage & { usedAI?: boolean; streaming?: boolean };
+
+/** Akış aşaması: boşta → düşünüyor (ilk parça bekleniyor) → yazıyor. */
+type Phase = "idle" | "thinking" | "streaming";
+
+/** SSE olayı — bkz. lib/ai/streaming.ts kablo protokolü. */
+type StreamEvent = {
+  delta?: string;
+  error?: string;
+  done?: boolean;
+  sessionId?: string;
+  usedAI?: boolean;
+};
 
 // ---------------------------------------------------------------------------
 // Session sidebar
@@ -81,7 +107,7 @@ function SessionSidebar({
   activeId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => void | Promise<void>;
   loading: boolean;
 }) {
   return (
@@ -104,14 +130,19 @@ function SessionSidebar({
           <p className="px-3 py-6 text-center text-[11px] text-text-faint">Henüz sohbet yok</p>
         ) : (
           sessions.map((s) => (
+            // Seçim ayrı bir buton: dialog portalından köpüren tıklamalar
+            // yanlışlıkla oturumu seçmesin
             <div
               key={s.id}
-              className={`group flex cursor-pointer items-start justify-between gap-1 px-3 py-2 transition ${
+              className={`group flex items-start justify-between gap-1 px-3 py-2 transition ${
                 activeId === s.id ? "bg-brand-600/10" : "hover:bg-canvas"
               }`}
-              onClick={() => onSelect(s.id)}
             >
-              <div className="min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={() => onSelect(s.id)}
+                className="focus-ring min-w-0 flex-1 cursor-pointer rounded-[6px] text-left"
+              >
                 <p
                   className={`truncate text-xs font-semibold ${
                     activeId === s.id ? "text-brand-600" : "text-ink-950"
@@ -119,18 +150,25 @@ function SessionSidebar({
                 >
                   {s.title ?? "Sohbet"}
                 </p>
-                <p className="flex items-center gap-1 text-[10px] text-text-faint">
+                <p className="flex items-center gap-1 text-[11px] text-text-faint">
                   <Clock className="h-2.5 w-2.5" /> {relativeTime(s.updated_at)}
                 </p>
-              </div>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onDelete(s.id); }}
-                className="focus-ring mt-0.5 hidden h-5 w-5 shrink-0 place-items-center rounded text-text-faint transition hover:text-danger-500 group-hover:grid"
-                aria-label="Sohbeti sil"
-              >
-                <Trash2 className="h-3 w-3" />
               </button>
+              <ConfirmDialog
+                trigger={
+                  <button
+                    type="button"
+                    className="focus-ring mt-0.5 hidden h-5 w-5 shrink-0 place-items-center rounded text-text-faint transition hover:text-danger-500 group-hover:grid"
+                    aria-label="Sohbeti sil"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                }
+                title="Sohbet silinsin mi?"
+                description={`"${s.title ?? "Sohbet"}" oturumu ve tüm mesaj geçmişi kalıcı olarak silinir.`}
+                confirmLabel="Sil"
+                onConfirm={() => onDelete(s.id)}
+              />
             </div>
           ))
         )}
@@ -164,7 +202,7 @@ function exportChatAsTxt(messages: ChatMsg[], sessionTitle?: string | null): voi
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `danisман-sohbet-${new Date().toISOString().slice(0, 10)}.txt`;
+  a.download = `danisman-sohbet-${new Date().toISOString().slice(0, 10)}.txt`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -172,12 +210,16 @@ function exportChatAsTxt(messages: ChatMsg[], sessionTitle?: string | null): voi
 export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
-  const [pending, startTransition] = useTransition();
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const pending = phase !== "idle";
 
   // Oturum listesini yükle
   // Durum güncellemeleri bilinçli olarak `.then()` içinde: `async/await`
@@ -198,13 +240,18 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
     void refreshSessions();
   }, [refreshSessions]);
 
+  // Bileşen kaldırılırsa açık akışı iptal et
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   // Mesaj gelince aşağı kaydır
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, pending]);
+  }, [messages, phase]);
 
   // Geçmiş oturumu yükle
   const selectSession = useCallback(async (id: string) => {
+    abortRef.current?.abort();
+    setError(null);
     setLoadingHistory(true);
     setSessionId(id);
     setMessages([]);
@@ -215,6 +262,8 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
 
   // Yeni sohbet
   const newChat = useCallback(() => {
+    abortRef.current?.abort();
+    setError(null);
     setSessionId(null);
     setMessages([]);
   }, []);
@@ -226,31 +275,136 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
     await refreshSessions();
   }, [sessionId, newChat, refreshSessions]);
 
-  const send = (text: string) => {
-    const q = text.trim();
-    if (!q || pending) return;
-    const next: ChatMsg[] = [...messages, { role: "user", content: q }];
-    setMessages(next);
-    setInput("");
-    startTransition(async () => {
-      const res = await askAdvisor(
-        next.map((m) => ({ role: m.role, content: m.content })),
-        sessionId,
-      );
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: res.reply, usedAI: res.usedAI },
-      ]);
-      // Yeni oturum oluşturulduysa ID'yi kaydet ve listeyi yenile
-      if (!sessionId && res.sessionId) {
-        setSessionId(res.sessionId);
-        await refreshSessions();
-      } else if (sessionId) {
-        // updated_at güncellendi, listeyi yenile
+  /**
+   * Bir sohbet turunu /api/ai/admin-chat üzerinden akışla çalıştırır.
+   * `transcript` son kullanıcı mesajını da içerir; asistan mesajı ilk parça
+   * geldiğinde eklenir ve parça parça büyütülür.
+   */
+  const runTurn = useCallback(
+    async (transcript: ChatMsg[]) => {
+      setError(null);
+      setPhase("thinking");
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      let gotDelta = false;
+      let doneMeta: { sessionId?: string; usedAI?: boolean } | null = null;
+      let streamError: string | null = null;
+
+      const appendDelta = (chunk: string) => {
+        if (!gotDelta) {
+          gotDelta = true;
+          setPhase("streaming");
+          setMessages((prev) => [...prev, { role: "assistant", content: chunk, streaming: true }]);
+          return;
+        }
+        setMessages((prev) => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last && last.role === "assistant" && last.streaming) {
+            next[next.length - 1] = { ...last, content: last.content + chunk };
+          }
+          return next;
+        });
+      };
+
+      try {
+        const res = await fetch("/api/ai/admin-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: transcript.map((m) => ({ role: m.role, content: m.content })),
+            sessionId,
+          }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok || !res.body) {
+          const j = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(j?.error || "Yanıt alınamadı. Lütfen tekrar deneyin.");
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            const data = trimmed.slice(5).trim();
+            if (data === "[DONE]") continue;
+            let evt: StreamEvent;
+            try {
+              evt = JSON.parse(data) as StreamEvent;
+            } catch {
+              continue;
+            }
+            if (evt.error) streamError = evt.error;
+            if (typeof evt.delta === "string" && evt.delta) appendDelta(evt.delta);
+            if (evt.done) doneMeta = { sessionId: evt.sessionId, usedAI: evt.usedAI };
+          }
+        }
+      } catch (e) {
+        if ((e as Error)?.name !== "AbortError") {
+          streamError =
+            e instanceof Error && e.message
+              ? e.message
+              : "Bağlantı hatası oluştu. Lütfen tekrar deneyin.";
+        }
+      } finally {
+        abortRef.current = null;
+      }
+
+      // Akışı sonlandır: imleci kaldır, meta bilgisini işle
+      setMessages((prev) => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last && last.role === "assistant" && last.streaming) {
+          next[next.length - 1] = { ...last, streaming: false, usedAI: doneMeta?.usedAI ?? last.usedAI };
+        }
+        return next;
+      });
+      setPhase("idle");
+
+      // Hata yalnızca hiç içerik gelmediyse gösterilir (yeniden dene ile)
+      if (streamError && !gotDelta) setError(streamError);
+
+      if (doneMeta?.sessionId) {
+        if (!sessionId) setSessionId(doneMeta.sessionId);
         await refreshSessions();
       }
-    });
-  };
+    },
+    [sessionId, refreshSessions],
+  );
+
+  const send = useCallback(
+    (text: string) => {
+      const q = text.trim();
+      if (!q || pending) return;
+      const next: ChatMsg[] = [...messages, { role: "user", content: q }];
+      setMessages(next);
+      setInput("");
+      void runTurn(next);
+    },
+    [messages, pending, runTurn],
+  );
+
+  // Hata sonrası: son kullanıcı mesajı zaten listede — aynı transkriptle tekrar dene
+  const retry = useCallback(() => {
+    if (pending || messages.length === 0) return;
+    void runTurn(messages);
+  }, [messages, pending, runTurn]);
+
+  // Akışı iptal et — o ana kadar gelen kısım korunur
+  const cancel = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
 
   return (
     <div className="flex h-[calc(100vh-11rem)] min-h-[520px] overflow-hidden rounded-[18px] border border-line bg-surface">
@@ -276,7 +430,7 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
           </p>
           <div className="flex items-center gap-2">
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${
                 aiEnabled ? "bg-mint-500/12 text-mint-600" : "bg-amber-400/15 text-amber-600"
               }`}
             >
@@ -347,13 +501,13 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
                 >
                   {m.role === "user"
                     ? <p className="leading-relaxed">{m.content}</p>
-                    : renderContent(m.content)}
+                    : renderContent(m.content, m.streaming)}
                 </div>
               </div>
             ))
           )}
 
-          {pending ? (
+          {phase === "thinking" ? (
             <div className="flex gap-3">
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[image:var(--grad-brand)] text-white">
                 <Sparkles className="h-4 w-4" />
@@ -363,6 +517,19 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
                 <span className="h-2 w-2 animate-bounce rounded-full bg-brand-400 [animation-delay:-0.1s]" />
                 <span className="h-2 w-2 animate-bounce rounded-full bg-brand-400" />
               </div>
+            </div>
+          ) : null}
+
+          {error ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-danger-500/30 bg-danger-500/8 px-4 py-3">
+              <p className="text-sm text-danger-500">{error}</p>
+              <button
+                type="button"
+                onClick={retry}
+                className="focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-[10px] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> Yeniden dene
+              </button>
             </div>
           ) : null}
         </div>
@@ -383,15 +550,27 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
               placeholder="Bir soru sorun… (örn. gelirimi nasıl artırırım?)"
               className="max-h-32 flex-1 resize-none rounded-[12px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300"
             />
-            <button
-              type="button"
-              onClick={() => send(input)}
-              disabled={pending || !input.trim()}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-brand-600 text-white transition hover:bg-brand-700 disabled:opacity-40"
-              aria-label="Gönder"
-            >
-              <ArrowUp className="h-4 w-4" />
-            </button>
+            {pending ? (
+              <button
+                type="button"
+                onClick={cancel}
+                title="Yanıtı durdur"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-ink-950 text-white transition hover:opacity-85"
+                aria-label="Yanıtı durdur"
+              >
+                <Square className="h-3.5 w-3.5 fill-current" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => send(input)}
+                disabled={!input.trim()}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-brand-600 text-white transition hover:bg-brand-700 disabled:opacity-40"
+                aria-label="Gönder"
+              >
+                <ArrowUp className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>

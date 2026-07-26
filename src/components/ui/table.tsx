@@ -108,6 +108,7 @@ export function TH({
 }: Omit<ComponentProps<"th">, "align"> & { align?: keyof typeof alignClass }) {
   return (
     <th
+      scope="col"
       {...props}
       className={cn(
         "px-4 py-2.5 whitespace-nowrap",

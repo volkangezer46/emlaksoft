@@ -17,6 +17,8 @@ export type LeadInput = {
   budgetMin?: number | null;
   budgetMax?: number | null;
   rooms?: string;
+  /** Müşteri tipleri (definitions/customer_type). Verilmezse ['alici'] — geriye uyumlu. */
+  customer_types?: string[];
 };
 
 export type LeadResult =
@@ -127,7 +129,7 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
         full_name: fullName,
         phone: phone || null,
         email: input.email?.trim() || null,
-        customer_types: ["alici"],
+        customer_types: input.customer_types?.length ? input.customer_types : ["alici"],
         province_id: input.provinceId || null,
         source,
         lead_channel: channel,

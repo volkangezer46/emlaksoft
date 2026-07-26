@@ -30,7 +30,7 @@ export async function requirePermission(mod: AppModule, action: AppAction): Prom
     }
   }
 
-  const perms = await getEffectivePermissions(gate.tenantId, role);
+  const perms = await getEffectivePermissions(gate.tenantId, role, gate.userId);
   if (!effectiveHasPermission(perms, mod, action)) {
     return { ok: false, error: "Bu işlem için yetkiniz yok." };
   }

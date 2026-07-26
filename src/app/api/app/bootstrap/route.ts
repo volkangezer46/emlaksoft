@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { computeOfficeScore, loadOfficeScoreInputs } from "@/lib/office-score";
+import { twoFactorSatisfied } from "@/lib/tenant-guard";
 
 export async function GET() {
   const supabase = await createClient();
@@ -8,6 +9,10 @@ export async function GET() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  // Middleware yalnız sayfaları korur — 2FA açık hesap kodu geçmeden veri okuyamaz
+  if (!(await twoFactorSatisfied(user.id))) {
+    return NextResponse.json({ error: "two_factor_required" }, { status: 401 });
+  }
 
   const [{ count: customers }, { count: properties }, { count: demands }, scoreInputs, { count: unread }] =
     await Promise.all([

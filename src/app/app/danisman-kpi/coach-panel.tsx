@@ -1,5 +1,9 @@
-import { AlertTriangle, Sparkles, ThumbsUp, TrendingUp } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, ArrowUpRight, Sparkles, ThumbsUp, TrendingUp } from "lucide-react";
 import type { CoachAction } from "@/lib/advisor-coach";
+
+/** Koç önerisi + ilgili ekran bağlantısı (sayfa tarafında eşlenir). */
+export type CoachActionWithLink = CoachAction & { href?: string; hrefLabel?: string };
 
 const STIL: Record<CoachAction["kind"], { cls: string; icon: typeof AlertTriangle; etiket: string }> = {
   urgent: {
@@ -31,7 +35,7 @@ const STIL: Record<CoachAction["kind"], { cls: string; icon: typeof AlertTriangl
  * hem N+1 sorgu demek hem de kimsenin okumadığı bir liste. Panel oturum açan
  * kullanıcının kendi verisiyle çalışıyor.
  */
-export function CoachPanel({ actions, adSoyad }: { actions: CoachAction[]; adSoyad: string | null }) {
+export function CoachPanel({ actions, adSoyad }: { actions: CoachActionWithLink[]; adSoyad: string | null }) {
   if (actions.length === 0) return null;
 
   return (
@@ -62,6 +66,15 @@ export function CoachPanel({ actions, adSoyad }: { actions: CoachAction[]; adSoy
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-ink-950">{a.title}</p>
                 <p className="mt-0.5 text-xs leading-relaxed text-text-muted">{a.detail}</p>
+                {a.href ? (
+                  <Link
+                    href={a.href}
+                    className="focus-ring mt-1.5 inline-flex items-center gap-1 rounded-[6px] text-xs font-semibold text-brand-700 hover:underline"
+                  >
+                    {a.hrefLabel ?? "İlgili ekrana git"}
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </Link>
+                ) : null}
               </div>
             </li>
           );

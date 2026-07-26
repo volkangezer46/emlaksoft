@@ -15,6 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 import { VisitorForm } from "./visitor-form";
+import { RegistrationQrCard } from "./registration-qr-card";
+import { StatusSelect } from "./status-select";
+import { ConvertVisitorButton } from "./convert-visitor-button";
 
 export const metadata = { title: "Açık ev detayı" };
 
@@ -71,6 +74,10 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
   const date = new Date(event.scheduled_at);
   const gecmis = date < new Date();
 
+  // Self check-in public linki — kapıya asılan QR bu sayfayı açar.
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const checkinUrl = event.public_token ? `${baseUrl}/acik-ev-kayit/${event.public_token}` : null;
+
   // `visitor_count` sayacı RPC ile artıyor; gerçek satır sayısıyla ayrışabilir
   // (silinen kayıt, yarım kalan işlem). Listeyi gerçek satırdan sayıyoruz ve
   // fark varsa sessizce geçmiyoruz — sayaç bozuksa görünür olsun.
@@ -81,6 +88,8 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
   const telefonlu = visitors.filter((v) => v.phone).length;
   const musteriyeDonusen = visitors.filter((v) => v.created_customer_id).length;
   const canCreate = (perms.open_house ?? perms.appointments ?? []).includes("create");
+  const canEdit = (perms.open_house ?? perms.appointments ?? []).includes("edit");
+  const canConvert = (perms.customers ?? []).includes("create");
 
   return (
     <div className="space-y-6">
@@ -134,7 +143,7 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
               <div key={k.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur">
                 <k.icon className="h-4 w-4 text-mint-400" />
                 <p className="numeric mt-2 font-display text-lg font-extrabold text-white">{k.value}</p>
-                <p className="text-[10px] text-white/45 sm:text-xs">{k.label}</p>
+                <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
               </div>
             ))}
           </div>
@@ -142,9 +151,13 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
       </section>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Badge variant={STATUS_VARIANT[event.status] ?? "default"}>
-          {STATUS_LABELS[event.status] ?? event.status}
-        </Badge>
+        {canEdit ? (
+          <StatusSelect openHouseId={event.id} status={event.status} />
+        ) : (
+          <Badge variant={STATUS_VARIANT[event.status] ?? "default"}>
+            {STATUS_LABELS[event.status] ?? event.status}
+          </Badge>
+        )}
         {gecmis && event.status === "planned" ? (
           <span className="text-xs text-text-muted">Tarihi geçmiş ama durumu hâlâ &quot;Planlandı&quot;.</span>
         ) : null}
@@ -161,7 +174,7 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
           className="lift-hover focus-ring group surface-card flex items-start justify-between gap-3 rounded-[var(--radius-panel)] p-5 transition hover:border-brand-300"
         >
           <div className="min-w-0">
-            <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em] text-brand-600">
+            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">
               <Building2 className="h-3.5 w-3.5" /> {property.property_code}
             </p>
             <p className="mt-1 truncate font-semibold text-ink-950">{property.title ?? "Başlıksız"}</p>
@@ -176,6 +189,11 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
             <ArrowUpRight className="h-4 w-4" />
           </span>
         </Link>
+      ) : null}
+
+      {/* Etkinlik bitmişse QR anlamsız — kart yalnızca aktif/planlı etkinlikte görünür. */}
+      {checkinUrl && event.status !== "cancelled" && event.status !== "completed" ? (
+        <RegistrationQrCard publicUrl={checkinUrl} />
       ) : null}
 
       {canCreate ? (
@@ -229,7 +247,12 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
                             {v.full_name} <ArrowUpRight className="h-3 w-3" />
                           </Link>
                         ) : (
-                          v.full_name
+                          <span className="inline-flex flex-wrap items-center gap-2">
+                            {v.full_name}
+                            {canConvert ? (
+                              <ConvertVisitorButton visitorId={v.id} openHouseId={event.id} />
+                            ) : null}
+                          </span>
                         )}
                       </TD>
                       <TD>

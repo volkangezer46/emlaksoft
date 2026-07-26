@@ -12,6 +12,12 @@ export type NotifPrefs = {
   commission: boolean;
   digest: boolean;
   marketing: boolean;
+  priceDrop: boolean;
+  savedSearch: boolean;
+  share: boolean;
+  dunning: boolean;
+  rentOverdue: boolean;
+  network: boolean;
 };
 
 const KEY = "es_notif_prefs_v1";
@@ -21,6 +27,12 @@ const DEFAULTS: NotifPrefs = {
   commission: true,
   digest: true,
   marketing: false,
+  priceDrop: true,
+  savedSearch: true,
+  share: true,
+  dunning: true,
+  rentOverdue: true,
+  network: true,
 };
 
 /** Geriye dönük: bell hâlâ local cache okuyabilir; sunucu öncelikli */
@@ -41,6 +53,12 @@ const ROWS: { key: keyof NotifPrefs; label: string; desc: string }[] = [
   { key: "commission", label: "Komisyon / deal", desc: "Tahsilat ve kazanılan anlaşmalar" },
   { key: "digest", label: "Günlük özet", desc: "Sabah ofis digest bildirimi (cron)" },
   { key: "marketing", label: "Ürün duyuruları", desc: "EmlakSoft yenilikleri (opsiyonel)" },
+  { key: "priceDrop", label: "Fiyat düşüşü eşleşmeleri", desc: "Fiyatı düşen portföyle eşleşen talepler" },
+  { key: "savedSearch", label: "Vitrin kayıtlı aramaları", desc: "Ziyaretçi aramaları ve yeni ilan eşleşmeleri" },
+  { key: "share", label: "Paylaşım bildirimleri", desc: "Paylaşım linki açılış ve beğenileri" },
+  { key: "dunning", label: "Ödeme hatırlatmaları", desc: "Gecikmiş fatura ve abonelik uyarıları" },
+  { key: "rentOverdue", label: "Kira gecikmeleri", desc: "Geciken kira tahakkuk ve kira yenileme bildirimleri" },
+  { key: "network", label: "Ağ iş birliği talepleri", desc: "Ofisler arası iş birliği bildirimleri" },
 ];
 
 export function NotificationPrefsPanel({ initial }: { initial?: NotifPrefs }) {
@@ -110,5 +128,11 @@ export function filterByNotifPrefs(title: string, body: string | null, prefs: No
   if (!prefs.commission && (t.includes("komisyon") || t.includes("anlaşma") || t.includes("satış kapandı"))) return false;
   if (!prefs.digest && t.includes("günlük")) return false;
   if (!prefs.marketing && (t.includes("duyuru") || t.includes("yeni özellik"))) return false;
+  if (!prefs.priceDrop && t.includes("fiyatı düştü")) return false;
+  if (!prefs.savedSearch && t.includes("kayıtlı arama")) return false;
+  if (!prefs.share && (t.includes("paylaşım") || t.includes("paylaştığınız"))) return false;
+  if (!prefs.dunning && (t.includes("ödemeniz gecikti") || t.includes("fatura"))) return false;
+  if (!prefs.rentOverdue && (t.includes("kira tahakkuku") || t.includes("kira yenileme"))) return false;
+  if (!prefs.network && t.includes("iş birliği")) return false;
   return true;
 }

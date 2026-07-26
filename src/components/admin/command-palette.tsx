@@ -164,7 +164,7 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
       >
         <Search className="h-4 w-4 shrink-0 transition group-hover:text-brand-500" />
         <span className="flex-1 truncate text-left text-[13px]">Ara… ofis, üye, destek talebi</span>
-        <kbd className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-[7px] border border-hairline bg-surface px-2 py-1 text-[10px] font-semibold text-text-faint">
+        <kbd className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-[7px] border border-hairline bg-surface px-2 py-1 text-[11px] font-semibold text-text-faint">
           Ctrl <span className="font-bold">K</span>
         </kbd>
       </button>
@@ -202,7 +202,7 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
 
             <div className="max-h-[min(60vh,28rem)] overflow-y-auto p-2">
               {filteredNav.length > 0 ? (
-                <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-text-faint">Sayfalar</p>
+                <p className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">Sayfalar</p>
               ) : null}
               {flat.map((item, i) => {
                 const Icon = item.kind === "nav" ? item.icon : typeIcon[item.type];
@@ -211,7 +211,7 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
                 return (
                   <div key={`${item.kind}-${item.href}-${i}`}>
                     {isFirstHit ? (
-                      <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-text-faint">Kayıtlar</p>
+                      <p className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">Kayıtlar</p>
                     ) : null}
                     <button
                       type="button"
@@ -249,7 +249,7 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
               ) : null}
             </div>
 
-            <div className="hairline-t surface-sunken flex items-center justify-between px-4 py-2 text-[10px] text-text-faint">
+            <div className="hairline-t surface-sunken flex items-center justify-between px-4 py-2 text-[11px] text-text-faint">
               <span className="flex items-center gap-2">
                 <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5">↑↓</kbd> gezin
                 <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5">↵</kbd> aç

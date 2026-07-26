@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { recordHeartbeat } from "@/lib/cron-heartbeat";
 
 /**
  * Cron: Bugün doğum günü veya yıldönümü olan müşterileri tespit et,
@@ -85,6 +86,8 @@ export async function GET(req: Request) {
     });
     notifCount++;
   }
+
+  await recordHeartbeat("dogum-gunu", "ok", `${notifCount} ofise özel gün bildirimi`);
 
   return NextResponse.json({
     ok: true,

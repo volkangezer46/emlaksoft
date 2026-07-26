@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isTwoFactorCookieValid, TWO_FACTOR_COOKIE } from "@/lib/two-factor";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -64,6 +65,31 @@ export async function updateSession(request: NextRequest) {
       ) {
         const redirect = request.nextUrl.clone();
         redirect.pathname = "/app/askida";
+        return NextResponse.redirect(redirect);
+      }
+    }
+  }
+
+  // SMS 2FA: şifre doğru ama kod henüz doğrulanmadıysa panel kullanılamaz.
+  // Çerez geçerliyse (HMAC, kullanıcıya özel) ek sorgu YOK; değilse tek
+  // profil sorgusuyla 2FA'nın açık olup olmadığına bakılır.
+  // /giris/dogrulama matcher dışında olduğundan yönlendirme döngüsü oluşmaz.
+  if ((isApp || isAdmin) && user) {
+    const verified = await isTwoFactorCookieValid(
+      request.cookies.get(TWO_FACTOR_COOKIE)?.value,
+      user.id,
+    );
+    if (!verified) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("two_factor_sms, phone")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profile?.two_factor_sms && profile.phone) {
+        const redirect = request.nextUrl.clone();
+        redirect.pathname = "/giris/dogrulama";
+        redirect.search = "";
+        redirect.searchParams.set("next", path);
         return NextResponse.redirect(redirect);
       }
     }

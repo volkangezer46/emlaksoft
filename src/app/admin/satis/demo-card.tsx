@@ -117,7 +117,7 @@ export function DemoCard({ row, staff }: { row: DemoRow; staff: { id: string; fu
         <div className="min-w-0">
           <Link href={`/admin/satis/${row.id}`} className="group inline-flex max-w-full items-center gap-1 truncate font-display font-bold text-ink-950 transition hover:text-brand-600">
             <span className="truncate">{row.full_name}</span>
-            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 opacity-0 transition group-hover:opacity-100" />
+            <ArrowUpRight className="hover-action h-3.5 w-3.5 shrink-0 opacity-0 transition group-hover:opacity-100" />
           </Link>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-text-faint">
             {row.company ? <span className="flex items-center gap-1"><Building2 className="h-3 w-3" /> {row.company}</span> : null}
@@ -126,7 +126,7 @@ export function DemoCard({ row, staff }: { row: DemoRow; staff: { id: string; fu
             <span>{relTime(row.created_at)}</span>
           </div>
         </div>
-        <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${current.cls}`}>{current.label}</span>
+        <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${current.cls}`}>{current.label}</span>
       </div>
 
       {row.message ? (
@@ -195,7 +195,7 @@ export function DemoCard({ row, staff }: { row: DemoRow; staff: { id: string; fu
             <p><span className="text-text-faint">E-posta:</span> {creds.email}</p>
             <p><span className="text-text-faint">Geçici şifre:</span> <span className="font-bold">{creds.tempPassword}</span></p>
           </div>
-          <p className="mt-1.5 text-[10px] text-text-muted">Bu bilgileri müşteriyle paylaşın. Şifre yalnızca şimdi görünür.</p>
+          <p className="mt-1.5 text-[11px] text-text-muted">Bu bilgileri müşteriyle paylaşın. Şifre yalnızca şimdi görünür.</p>
         </div>
       ) : null}
 
@@ -224,11 +224,11 @@ export function DemoCard({ row, staff }: { row: DemoRow; staff: { id: string; fu
 
       <div className="mt-3 grid grid-cols-2 gap-2 border-t border-line pt-3">
         <label className="flex items-center gap-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-text-faint">Durum</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">Durum</span>
         </label>
         <label className="flex items-center gap-1.5">
           <UserPlus className="h-3 w-3 text-text-faint" />
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-text-faint">Sorumlu</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">Sorumlu</span>
         </label>
         <select
           value={row.status}

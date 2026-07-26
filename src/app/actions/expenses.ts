@@ -93,7 +93,10 @@ export async function deleteExpense(id: string): Promise<ExpenseResult> {
   return { ok: true };
 }
 
-export async function listExpenses(month?: string) {
+export async function listExpenses(
+  month?: string,
+  range?: { from?: string; to?: string },
+) {
   const gate = await requirePermission("expenses", "view");
   if (!gate.ok) return [];
 
@@ -112,6 +115,33 @@ export async function listExpenses(month?: string) {
     query = query.gte("expense_date", `${month}-01`).lt("expense_date", next);
   }
 
+  // Serbest tarih aralığı — expense_date `date` kolonu, `lte` uç günü kapsar
+  if (range?.from) query = query.gte("expense_date", range.from);
+  if (range?.to) query = query.lte("expense_date", range.to);
+
   const { data } = await query;
   return data ?? [];
+}
+
+/**
+ * Son 6 ayın gider kayıtları (tutar + tarih) — aylık trend grafiği için.
+ * Sayfadaki tarih/kategori filtresinden bağımsız çalışır.
+ */
+export async function listExpenseMonthlyTrend() {
+  const gate = await requirePermission("expenses", "view");
+  if (!gate.ok) return [];
+
+  const supabase = await createClient();
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+  const from = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-01`;
+
+  const { data } = await supabase
+    .from("expenses")
+    .select("amount, expense_date")
+    .eq("tenant_id", gate.tenantId)
+    .gte("expense_date", from)
+    .limit(5000);
+
+  return (data ?? []) as { amount: number; expense_date: string }[];
 }

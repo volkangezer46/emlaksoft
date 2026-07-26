@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Loader2, Pencil, Sparkles, X } from "lucide-react";
+import { ArrowRight, FileCheck2, GripVertical, Loader2, MessageSquare, Pencil, Sparkles, X } from "lucide-react";
 import { updateDealStage, updateDeal, type DealStage } from "@/app/actions/deals";
 import { useToast } from "@/components/app/toast-provider";
-import { StatusTransitionBar } from "./status-transition";
+import { StatusTransitionBar, isAllowedTransition } from "./status-transition";
+import { WinCelebrationDialog } from "./win-celebration-dialog";
 
 export type BoardDeal = {
   id: string;
@@ -21,6 +22,15 @@ export type BoardDeal = {
   property_id: string | null;
   customer_name: string | null;
   customer_id: string | null;
+  customer_phone: string | null;
+  /** İYS SMS onayı (channel=sms, status=granted) — kazanma sihirbazının tebrik SMS'i için */
+  sms_consent: boolean;
+  /** Not sayısı (deal_notes gömülü count) — kartta rozet olarak gösterilir */
+  note_count: number;
+  /** Tamamlanan zorunlu evrak sayısı (deal_checklist_items) — evrak rozeti için */
+  checklist_done: number;
+  /** Toplam zorunlu evrak sayısı; 0 ise liste oluşturulmamış, rozet gizlenir */
+  checklist_total: number;
 };
 
 type Member = { id: string; full_name: string };
@@ -36,6 +46,23 @@ const STAGES: { key: DealStage; label: string; tone: string; ring: string }[] = 
 function money(n: number | null) {
   if (n == null) return "—";
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+}
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .map((p) => p[0] ?? "")
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+/** Kartta hareketsizliği gösterir: bayat anlaşma tek bakışta seçilsin. */
+function updatedAgo(iso: string) {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 0) return "Bugün güncellendi";
+  if (days === 1) return "Dün güncellendi";
+  return `${days} gün önce güncellendi`;
 }
 
 export function DealBoard({
@@ -54,29 +81,71 @@ export function DealBoard({
   const [editing, setEditing] = useState<BoardDeal | null>(null);
   const [lossFor, setLossFor] = useState<BoardDeal | null>(null);
   const [lossReason, setLossReason] = useState("");
+  // Kazanma sihirbazı — yalnız won'a İLK geçişte açılır (move zaten sadece
+  // won olmayan karttan tetiklenebilir); optimistic açılır, hatada kapanır.
+  const [wonFor, setWonFor] = useState<BoardDeal | null>(null);
+  // HTML5 sürükle-bırak durumu. Dokunmatikte dragstart hiç ateşlenmediği için
+  // DnD kendiliğinden devre dışı kalır — butonlar zaten görünür (yedek akış).
+  const [dragging, setDragging] = useState<{ id: string; stage: string } | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<DealStage | null>(null);
+  const [droppedId, setDroppedId] = useState<string | null>(null);
+
+  // React 19 optimistic desen: kart tıklandığı anda hedef sütunda görünür,
+  // server action arkada çalışır. Transition bitince taban `deals` prop'una
+  // geri dönülür — başarıda revalidate edilmiş veri zaten aynı sütunu gösterir,
+  // hatada kart kendiliğinden eski sütununa döner (+ toast ve refresh).
+  const [optimisticDeals, applyStagePatch] = useOptimistic(
+    deals,
+    (state, patch: { id: string; stage: DealStage }) =>
+      state.map((d) =>
+        d.id === patch.id ? { ...d, stage: patch.stage, updated_at: new Date().toISOString() } : d,
+      ),
+  );
 
   const columns = useMemo(() => {
     const map = Object.fromEntries(STAGES.map((s) => [s.key, [] as BoardDeal[]])) as Record<DealStage, BoardDeal[]>;
-    for (const d of deals) {
+    for (const d of optimisticDeals) {
       const key = (STAGES.some((s) => s.key === d.stage) ? d.stage : "new") as DealStage;
       map[key].push(d);
     }
     return map;
-  }, [deals]);
+  }, [optimisticDeals]);
+
+  const memberById = useMemo(() => new Map(members.map((m) => [m.id, m.full_name])), [members]);
 
   function move(dealId: string, stage: DealStage, reason?: string) {
+    if (busyId === dealId && pending) return; // çifte tıklama koruması
     setBusyId(dealId);
+    // Won'a ilk geçiş: kutlama sihirbazı server onayı beklenmeden açılır
+    // (optimistic); FLOW gereği won'dan won'a geçiş zaten mümkün değil.
+    const prior = optimisticDeals.find((x) => x.id === dealId);
+    if (stage === "won" && prior && prior.stage !== "won") setWonFor(prior);
+    // Yeni sütununa inen karta kısa vurgu (animate-rise + brand halka) — kozmetik
+    setDroppedId(dealId);
+    window.setTimeout(() => setDroppedId((v) => (v === dealId ? null : v)), 900);
     startTransition(async () => {
+      applyStagePatch({ id: dealId, stage }); // kart HEMEN hedef sütuna taşınır
       const fd = new FormData();
       fd.set("deal_id", dealId);
       fd.set("stage", stage);
       if (stage === "lost") fd.set("loss_reason", reason?.trim() || "Neden belirtilmedi");
-      const res = await updateDealStage(fd);
-      setBusyId(null);
-      if (res.error) push(res.error, "err");
-      else {
-        push(stage === "won" ? "Kazanıldı · komisyon kontrol edin" : "Aşama güncellendi", "ok");
+      try {
+        const res = await updateDealStage(fd);
+        if (res.error) {
+          push(res.error || "Taşınamadı", "err");
+          setWonFor((v) => (v?.id === dealId ? null : v)); // hata: sihirbaz kapanır
+          router.refresh(); // optimistic durum geri sarılır, sunucu gerçeği gelir
+        } else {
+          // Won'da toast yerine kutlama sihirbazı zaten açık
+          if (stage !== "won") push("Aşama güncellendi", "ok");
+          router.refresh();
+        }
+      } catch {
+        push("Taşınamadı", "err");
+        setWonFor((v) => (v?.id === dealId ? null : v));
         router.refresh();
+      } finally {
+        setBusyId(null);
       }
     });
   }
@@ -94,15 +163,54 @@ export function DealBoard({
   }
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2">
+    <div id="tahta" className="flex scroll-mt-24 gap-3 overflow-x-auto pb-2">
       {STAGES.map((col, colIdx) => {
         const rows = columns[col.key];
         const sum = rows.reduce((s, d) => s + (Number(d.deal_value) || 0), 0);
+        // Sürükleme sırasında geçerli hedef sütun kesikli brand konturla vurgulanır
+        const isDropTarget =
+          dragging != null && dragOverCol === col.key && dragging.stage !== col.key && isAllowedTransition(dragging.stage, col.key);
         return (
           <section
             key={col.key}
-            className={`min-w-[260px] flex-1 rounded-[18px] border ${col.ring} backdrop-blur`}
+            id={`sutun-${col.key}`}
+            className={`min-w-[260px] flex-1 scroll-mt-24 rounded-[18px] border backdrop-blur transition-colors duration-150 ${
+              isDropTarget ? "border-dashed border-brand-400/80 bg-brand-600/10" : col.ring
+            }`}
             style={{ animationDelay: `${colIdx * 60}ms` }}
+            onDragOver={(e) => {
+              if (!dragging) return;
+              // Geçersiz hedefte de drop'u kabul ediyoruz ki bırakınca
+              // "desteklenmiyor" toast'ı gösterebilelim (no-op + geri bildirim).
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              if (dragOverCol !== col.key) setDragOverCol(col.key);
+            }}
+            onDragLeave={(e) => {
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+              setDragOverCol((c) => (c === col.key ? null : c));
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const id = dragging?.id ?? e.dataTransfer.getData("text/plain");
+              setDragging(null);
+              setDragOverCol(null);
+              if (!id) return;
+              const deal = optimisticDeals.find((x) => x.id === id);
+              if (!deal || deal.stage === col.key) return; // aynı sütun: sessiz no-op
+              if (!isAllowedTransition(deal.stage, col.key)) {
+                push("Bu taşıma desteklenmiyor", "err");
+                return;
+              }
+              if (col.key === "lost") {
+                // Kayıp akışı korunur: neden onaylanmadan optimistic taşıma YOK;
+                // diyalog iptal edilirse kart yerinde kalır.
+                setLossReason("");
+                setLossFor(deal);
+                return;
+              }
+              move(id, col.key);
+            }}
           >
             <header className="flex items-center justify-between border-b border-line/60 px-3.5 py-3">
               <div>
@@ -123,10 +231,28 @@ export function DealBoard({
                   const idx = STAGES.findIndex((s) => s.key === d.stage);
                   const next = idx >= 0 && idx < STAGES.length - 1 ? STAGES[idx + 1] : null;
                   const busy = busyId === d.id && pending;
+                  const isDragging = dragging?.id === d.id;
+                  const justDropped = droppedId === d.id;
                   return (
                     <article
                       key={d.id}
-                      className="lift group relative rounded-[14px] border border-line bg-surface p-3 shadow-[var(--shadow-xs)] transition hover:border-brand-300"
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/plain", d.id);
+                        e.dataTransfer.effectAllowed = "move";
+                        setDragging({ id: d.id, stage: d.stage });
+                      }}
+                      onDragEnd={() => {
+                        setDragging(null);
+                        setDragOverCol(null);
+                      }}
+                      className={`lift group relative cursor-grab rounded-[14px] border bg-surface p-3 shadow-[var(--shadow-xs)] transition active:cursor-grabbing ${
+                        isDragging
+                          ? "border-brand-300 opacity-40 [transform:rotate(1.5deg)_scale(0.98)]"
+                          : justDropped
+                            ? "animate-rise border-brand-400 ring-2 ring-brand-400/35"
+                            : "border-line hover:border-brand-300"
+                      }`}
                     >
                       {/* Kart ustundeki ortu-link ONCEDEN MUSTERI sayfasina
                           gidiyordu; kullanici anlasma kartina tikladiginda
@@ -135,6 +261,7 @@ export function DealBoard({
                           detayina gidiyor ve her kartta var. */}
                       <Link
                         href={`/app/anlasmalar/${d.id}`}
+                        draggable={false}
                         className="focus-ring absolute inset-0 rounded-[14px]"
                         aria-label={`${d.property_title ?? d.property_code ?? "Anlaşma"} detayını aç`}
                       />
@@ -147,7 +274,40 @@ export function DealBoard({
                             {d.customer_name ?? "Müşteri atanmadı"} · {d.deal_type === "rent" ? "Kiralama" : "Satış"}
                           </p>
                         </div>
-                        {busy ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-brand-600" /> : null}
+                        <div className="flex shrink-0 items-center gap-1">
+                          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin text-brand-600" /> : null}
+                          {/* Evrak durumu — zorunlu evraklardan tamamlanan/toplam; liste yoksa gizli */}
+                          {d.checklist_total > 0 ? (
+                            <span
+                              title={`${d.checklist_done}/${d.checklist_total} zorunlu evrak tamam`}
+                              className={`numeric inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                                d.checklist_done === d.checklist_total
+                                  ? "bg-mint-500/12 text-mint-700"
+                                  : "bg-canvas text-text-muted"
+                              }`}
+                            >
+                              <FileCheck2 className="h-3 w-3" /> {d.checklist_done}/{d.checklist_total}
+                            </span>
+                          ) : null}
+                          {/* Not sayacı — detaydaki not akışına işaret; 0 ise gösterilmez */}
+                          {d.note_count > 0 ? (
+                            <span
+                              title={`${d.note_count} not`}
+                              className="numeric inline-flex items-center gap-0.5 rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-bold text-text-muted"
+                            >
+                              <MessageSquare className="h-3 w-3" /> {d.note_count}
+                            </span>
+                          ) : null}
+                          {/* Klavye kullanıcıları için geçiş butonları zaten var;
+                              tutamaç fare sürüklemesinin görsel ipucu + etiketi. */}
+                          <span
+                            aria-label="Sürükleyerek taşı"
+                            title="Sürükleyerek taşı"
+                            className="text-text-faint transition group-hover:text-text-muted"
+                          >
+                            <GripVertical className="h-3.5 w-3.5" />
+                          </span>
+                        </div>
                       </div>
                       <p className="mt-2 font-display text-base font-extrabold text-ink-950">{money(d.deal_value)}</p>
                       <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-canvas">
@@ -156,13 +316,38 @@ export function DealBoard({
                           style={{ width: `${Math.min(100, Number(d.probability) || 20)}%` }}
                         />
                       </div>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        {d.assigned_to ? (
+                          <Link
+                            href={`/app/ekip/${d.assigned_to}`}
+                            draggable={false}
+                            className="focus-ring group/danisman relative z-10 flex min-w-0 items-center gap-1.5 rounded-[6px]"
+                            title="Danışman profilini aç"
+                          >
+                            <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[image:var(--grad-brand)] text-[8px] font-bold text-white">
+                              {initials(memberById.get(d.assigned_to) ?? "?")}
+                            </span>
+                            <span className="truncate text-[11px] font-semibold text-text-muted transition group-hover/danisman:text-brand-600">
+                              {memberById.get(d.assigned_to) ?? "Danışman"}
+                            </span>
+                          </Link>
+                        ) : (
+                          <span className="text-[11px] text-text-faint">Danışman atanmadı</span>
+                        )}
+                        <span className="shrink-0 text-[11px] text-text-faint">{updatedAgo(d.updated_at)}</span>
+                      </div>
                       <div className="relative z-10 mt-3 flex flex-wrap items-center gap-1.5">
-                        <StatusTransitionBar dealId={d.id} stage={d.stage} />
+                        <StatusTransitionBar
+                          dealId={d.id}
+                          stage={d.stage}
+                          onWonStart={() => setWonFor(d)}
+                          onWonError={() => setWonFor((v) => (v?.id === d.id ? null : v))}
+                        />
                         {canEdit ? (
                           <button
                             type="button"
                             onClick={() => setEditing(d)}
-                            className="inline-flex items-center gap-1 rounded-[7px] border border-line px-2 py-1 text-[10px] font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
+                            className="inline-flex items-center gap-1 rounded-[7px] border border-line px-2 py-1 text-[11px] font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
                           >
                             <Pencil className="h-3 w-3" /> Düzenle
                           </button>
@@ -170,7 +355,8 @@ export function DealBoard({
                         {d.property_id ? (
                           <Link
                             href={`/app/portfoyler/${d.property_id}`}
-                            className="rounded-[7px] border border-line px-2 py-1 text-[10px] font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
+                            draggable={false}
+                            className="rounded-[7px] border border-line px-2 py-1 text-[11px] font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
                           >
                             Portföy
                           </Link>
@@ -178,7 +364,8 @@ export function DealBoard({
                         {d.customer_id ? (
                           <Link
                             href={`/app/musteriler/${d.customer_id}`}
-                            className="rounded-[7px] border border-line px-2 py-1 text-[10px] font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
+                            draggable={false}
+                            className="rounded-[7px] border border-line px-2 py-1 text-[11px] font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
                           >
                             Müşteri
                           </Link>
@@ -188,7 +375,7 @@ export function DealBoard({
                             type="button"
                             disabled={busy}
                             onClick={() => move(d.id, next.key)}
-                            className="ml-auto inline-flex items-center gap-1 rounded-[7px] bg-ink-950 px-2 py-1 text-[10px] font-bold text-white disabled:opacity-50"
+                            className="ml-auto inline-flex items-center gap-1 rounded-[7px] bg-ink-950 px-2 py-1 text-[11px] font-bold text-white disabled:opacity-50"
                           >
                             {next.label} <ArrowRight className="h-3 w-3" />
                           </button>
@@ -198,7 +385,7 @@ export function DealBoard({
                             type="button"
                             disabled={busy}
                             onClick={() => move(d.id, "won")}
-                            className="inline-flex items-center gap-1 rounded-[7px] bg-mint-500/15 px-2 py-1 text-[10px] font-bold text-mint-700 disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded-[7px] bg-mint-500/15 px-2 py-1 text-[11px] font-bold text-mint-700 disabled:opacity-50"
                           >
                             <Sparkles className="h-3 w-3" /> Kazan
                           </button>
@@ -208,7 +395,7 @@ export function DealBoard({
                             type="button"
                             disabled={busy}
                             onClick={() => { setLossReason(""); setLossFor(d); }}
-                            className="rounded-[7px] px-2 py-1 text-[10px] font-semibold text-danger-500 hover:bg-danger-500/10 disabled:opacity-50"
+                            className="rounded-[7px] px-2 py-1 text-[11px] font-semibold text-danger-500 hover:bg-danger-500/10 disabled:opacity-50"
                           >
                             Kayıp
                           </button>
@@ -271,6 +458,8 @@ export function DealBoard({
           </div>
         </div>
       ) : null}
+
+      {wonFor ? <WinCelebrationDialog deal={wonFor} onClose={() => setWonFor(null)} /> : null}
 
       {lossFor ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/40 p-4 backdrop-blur-sm sm:items-center" onClick={() => setLossFor(null)}>

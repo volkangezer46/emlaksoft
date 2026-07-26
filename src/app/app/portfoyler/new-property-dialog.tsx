@@ -29,6 +29,20 @@ const fieldClass =
 const DEFAULT_PROPERTY_TYPES = ["Daire", "Villa", "Arsa", "İşyeri", "Müstakil ev", "Bina"];
 const DEFAULT_TRANSACTION_TYPES = ["Satılık", "Kiralık"];
 
+/** Isınma türleri — sabit liste (portallerde filtrelenen standart değerler). */
+export const HEATING_OPTIONS = [
+  "Kombi (Doğalgaz)",
+  "Merkezi",
+  "Merkezi (Pay ölçer)",
+  "Yerden ısıtma",
+  "Klima",
+  "Soba",
+  "Yok",
+];
+
+/** Cephe seçenekleri — opsiyonel alan. */
+export const FACADE_OPTIONS = ["Kuzey", "Güney", "Doğu", "Batı", "Güneydoğu", "Güneybatı", "Kuzeydoğu", "Kuzeybatı"];
+
 export function NewPropertyDialog({
   provinces,
   branches = [],
@@ -118,6 +132,53 @@ export function NewPropertyDialog({
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="sqm">Brüt m²</label>
                 <input id="sqm" name="sqm" inputMode="decimal" className={fieldClass} placeholder="185" />
               </div>
+
+              {/* Detay bilgiler: features jsonb'ye portal/broşürle AYNI anahtarlarla
+                  yazılır (floor, heating, building_age, facade) + tapu ada/parsel.
+                  <details> ile katlanır — temel akışın hızını bozmaz. */}
+              <details className="sm:col-span-2 rounded-[12px] border border-line bg-canvas/60 px-4 py-3 open:bg-surface">
+                <summary className="cursor-pointer select-none text-sm font-semibold text-ink-950">
+                  Detay bilgiler <span className="font-normal text-text-muted">(kat, ısınma, bina yaşı, tapu…)</span>
+                </summary>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="floor">Bulunduğu kat</label>
+                    <input id="floor" name="floor" inputMode="numeric" className={fieldClass} placeholder="Örn. 3 (bodrum için -1)" />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="heating">Isınma</label>
+                    <div className="relative">
+                      <select id="heating" name="heating" defaultValue="" className={`${fieldClass} appearance-none`}>
+                        <option value="">Seçilmedi</option>
+                        {HEATING_OPTIONS.map((h) => <option key={h}>{h}</option>)}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="building-age">Bina yaşı</label>
+                    <input id="building-age" name="building_age" inputMode="numeric" className={fieldClass} placeholder="Örn. 5" />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="facade">Cephe (ops.)</label>
+                    <div className="relative">
+                      <select id="facade" name="facade" defaultValue="" className={`${fieldClass} appearance-none`}>
+                        <option value="">Seçilmedi</option>
+                        {FACADE_OPTIONS.map((f) => <option key={f}>{f}</option>)}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="parcel-block">Tapu — Ada</label>
+                    <input id="parcel-block" name="parcel_block" className={fieldClass} placeholder="Örn. 1234" />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="parcel-lot">Tapu — Parsel</label>
+                    <input id="parcel-lot" name="parcel_lot" className={fieldClass} placeholder="Örn. 56" />
+                  </div>
+                </div>
+              </details>
               {/* İl/İlçe/Mahalle: önceki hâlde yalnızca il sorulur, `district_id`
                   ve `neighborhood_id` kolonları hep NULL kalırdı. Emsal motoru
                   (find_comparables) ilçe üzerinden çalıştığı için veri bulamıyordu. */}

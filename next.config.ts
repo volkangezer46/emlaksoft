@@ -8,10 +8,10 @@ const nextConfig: NextConfig = {
   cacheMaxMemorySize: 0, // disk cache'e devret, RAM'i serbest bırak
 
   turbopack: {
-    // Kökü açıkça sabitliyoruz. Otomatik tespit lockfile arayarak yukarı
-    // yürüyor; geliştirme makinesinde ~/.pnpm gibi işaretçiler varsa kökü
-    // proje dışına (hatta src/app'e) kaydırıp modül çözümlemesini bozuyor —
-    // recharts'ın @reduxjs/toolkit bağımlılığı bu yüzden "not found" oluyordu.
+    // Workspace kökünü açıkça sabitliyoruz. Otomatik tespit lockfile arayarak
+    // yukarı yürüyor; bu makinede C:\Users\Laptop altında .pnpm/.pnpm-state
+    // işaretçileri var, tespit belirsiz. __dirname burada mutlak yol döndüğü
+    // doğrulandı (Next config CJS olarak yükleniyor).
     root: __dirname,
   },
 
@@ -31,6 +31,10 @@ const nextConfig: NextConfig = {
   },
 
   experimental: {
+    // React <ViewTransition> entegrasyonu (docs: 01-next-config-js/viewTransition.md).
+    // Navigasyonlarda tarayıcının View Transitions API'si devreye girer;
+    // desteklemeyen tarayıcıda hiçbir şey değişmez (progressive enhancement).
+    viewTransition: true,
     // Barrel-import maliyetini düşür: yalnızca kullanılan alt modüller derlenir.
     // Buradaki her paket gerçekten kurulu olmalı — aksi halde satır ölü kalır.
     optimizePackageImports: [

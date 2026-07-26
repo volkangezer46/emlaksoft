@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, TriangleAlert } from "lucide-react";
 import { updateAppointment } from "@/app/actions/appointments";
 import {
   Dialog,
@@ -46,6 +46,9 @@ export function AppointmentEditDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Çakışma freni: sunucu uyarı döndüyse kayıt YAPILMAMIŞTIR; amber bant
+  // gösterilir ve gizli confirm_conflict=1 ile ikinci gönderim kaydeder.
+  const [conflictWarning, setConflictWarning] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const types = typeOptions && typeOptions.length > 0 ? typeOptions : DEFAULT_TYPES;
   const { date, time } = localParts(appointment.scheduled_at);
@@ -54,6 +57,11 @@ export function AppointmentEditDialog({
     setError(null);
     startTransition(async () => {
       const res = await updateAppointment(fd);
+      if (res?.conflictWarning) {
+        setConflictWarning(res.conflictWarning);
+        return;
+      }
+      setConflictWarning(null);
       if (res?.error) setError(res.error);
       else setOpen(false);
     });
@@ -136,6 +144,20 @@ export function AppointmentEditDialog({
                   placeholder="Not (opsiyonel)"
                   className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                 />
+          {/* Çakışma freni bandı — kayıt yapılmadı, ikinci gönderim confirm_conflict ile geçer */}
+          {conflictWarning && (
+            <div
+              className="flex items-start gap-2.5 rounded-[12px] border border-amber-400/50 bg-amber-400/10 px-4 py-3 text-xs font-medium leading-relaxed text-amber-700"
+              role="alert"
+            >
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+              <span>
+                <strong>{conflictWarning}</strong> Değişiklik henüz kaydedilmedi — yine de istiyorsanız
+                &quot;Yine de kaydet&quot; ile devam edin.
+              </span>
+              <input type="hidden" name="confirm_conflict" value="1" />
+            </div>
+          )}
           {/* Palet dışı red-600 → danger-600, role="alert" eklendi */}
           {error && (
             <p className="text-xs font-semibold text-danger-600" role="alert">{error}</p>
@@ -154,7 +176,7 @@ export function AppointmentEditDialog({
               disabled={pending}
               className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
             >
-              {pending ? "Kaydediliyor…" : "Kaydet"}
+              {pending ? "Kaydediliyor…" : conflictWarning ? "Yine de kaydet" : "Kaydet"}
             </button>
           </div>
         </form>

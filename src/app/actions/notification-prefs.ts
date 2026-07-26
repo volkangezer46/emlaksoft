@@ -11,6 +11,12 @@ const DEFAULTS: NotifPrefs = {
   commission: true,
   digest: true,
   marketing: false,
+  priceDrop: true,
+  savedSearch: true,
+  share: true,
+  dunning: true,
+  rentOverdue: true,
+  network: true,
 };
 
 // Helper function (not exported, not a server action)
@@ -44,6 +50,14 @@ export async function saveNotificationPrefs(prefs: NotifPrefs): Promise<{ error?
     commission: Boolean(prefs.commission),
     digest: Boolean(prefs.digest),
     marketing: Boolean(prefs.marketing),
+    // Yeni anahtarlar `!== false`: eski istemci paketinden anahtar gelmezse
+    // varsayılan AÇIK kalsın (Boolean(undefined) türü sessizce kapatırdı)
+    priceDrop: prefs.priceDrop !== false,
+    savedSearch: prefs.savedSearch !== false,
+    share: prefs.share !== false,
+    dunning: prefs.dunning !== false,
+    rentOverdue: prefs.rentOverdue !== false,
+    network: prefs.network !== false,
   };
 
   const supabase = await createClient();

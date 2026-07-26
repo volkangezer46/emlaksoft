@@ -128,7 +128,7 @@ export function CustomerFilesTab({ customerId, files }: { customerId: string; fi
                       {f.file_name}
                     </p>
                     {f.label ? <p className="mt-0.5 text-xs text-text-muted">{f.label}</p> : null}
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-text-faint">
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-text-faint">
                       <span>{formatBytes(f.file_size)}</span>
                       <span>·</span>
                       <span>{uploaderName(f.uploader)}</span>

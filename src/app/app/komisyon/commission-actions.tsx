@@ -83,7 +83,7 @@ export function CommissionActions({
         </button>
       </div>
       {linkUrl ? (
-        <a href={linkUrl} target="_blank" rel="noreferrer" className="max-w-[220px] truncate text-[10px] font-semibold text-brand-600 hover:underline">
+        <a href={linkUrl} target="_blank" rel="noreferrer" className="max-w-[220px] truncate text-[11px] font-semibold text-brand-600 hover:underline">
           {linkUrl}
         </a>
       ) : null}

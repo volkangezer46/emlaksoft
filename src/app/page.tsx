@@ -33,7 +33,6 @@ import {
   RefreshCw,
   Ruler,
   Scale,
-  Send,
   ShieldCheck,
   Siren,
   Sparkles,
@@ -54,11 +53,11 @@ import { IntegrationHub } from "@/components/marketing/integration-hub";
 const portals = ["Sahibinden", "Hepsiemlak", "Emlakjet", "Zingat", "Hürriyet Emlak", "Milliyet Emlak"];
 
 const features = [
-  { icon: Siren, title: "Kayıp-kaçak motoru", text: "İlan yayından düşünce nedeni zorunlu sorulur. Ay sonunda kaçan komisyonu rakamla görürsünüz.", tone: "danger", span: "lg:col-span-2", metric: { label: "Aylık korunan", value: "₺95B", bars: [40, 55, 48, 68, 60, 82, 95] } },
-  { icon: PhoneIncoming, title: "Akıllı Arama OS", text: "Telefon çalınca müşteri kartı, eşleşen portföy ve önerilen sonuç kodu ekranda hazır.", tone: "mint", metric: { label: "Yanıt hızı", value: "-42%", bars: [80, 70, 62, 55, 48, 40, 34] } },
-  { icon: TrendingUp, title: "Fiyat vicdanı", text: "TCMB, TÜİK ve kendi verinizle bölgeye göre pahalı/ucuz sinyali.", tone: "brand", metric: { label: "Doğru fiyat", value: "%88", bars: [50, 58, 64, 70, 76, 82, 88] } },
-  { icon: Scale, title: "Mevzuat rayı", text: "İYS izin ve EİDS yetki akışı ürünün içinde; ceza riskini azaltın.", tone: "amber", metric: { label: "İYS uyum", value: "%94", bars: [60, 68, 74, 80, 86, 90, 94] } },
-  { icon: Wallet, title: "Komisyon & hakediş defteri", text: "Bölüşüm, ofis payı ve danışman hakedişi şeffaf; anlaşmazlık biter.", tone: "brand", metric: { label: "Şeffaflık", value: "%100", bars: [55, 62, 70, 78, 85, 93, 100] } },
+  { icon: Siren, title: "Kayıp-kaçak motoru", text: "İlan yayından düşünce nedeni zorunlu sorulur. Ay sonunda kaçan komisyonu rakamla görürsünüz.", tone: "danger", span: "lg:col-span-2", href: "#kayip-kacak", metric: { label: "Aylık korunan", value: "₺95B", bars: [40, 55, 48, 68, 60, 82, 95] } },
+  { icon: PhoneIncoming, title: "Akıllı Arama OS", text: "Telefon çalınca müşteri kartı, eşleşen portföy ve önerilen sonuç kodu ekranda hazır.", tone: "mint", href: "#akilli-arama", metric: { label: "Yanıt hızı", value: "-42%", bars: [80, 70, 62, 55, 48, 40, 34] } },
+  { icon: TrendingUp, title: "Fiyat vicdanı", text: "TCMB, TÜİK ve kendi verinizle bölgeye göre pahalı/ucuz sinyali.", tone: "brand", href: "#veri-ortaklari", metric: { label: "Doğru fiyat", value: "%88", bars: [50, 58, 64, 70, 76, 82, 88] } },
+  { icon: Scale, title: "Mevzuat rayı", text: "İYS izin ve EİDS yetki akışı ürünün içinde; ceza riskini azaltın.", tone: "amber", href: "#guvenlik", metric: { label: "İYS uyum", value: "%94", bars: [60, 68, 74, 80, 86, 90, 94] } },
+  { icon: Wallet, title: "Komisyon & hakediş defteri", text: "Bölüşüm, ofis payı ve danışman hakedişi şeffaf; anlaşmazlık biter.", tone: "brand", href: "#analitik", metric: { label: "Şeffaflık", value: "%100", bars: [55, 62, 70, 78, 85, 93, 100] } },
 ];
 
 const toneBar: Record<string, string> = {
@@ -242,13 +241,13 @@ export default function HomePage() {
                 <div><b className="block font-display text-lg text-ink-950">12</b><span className="text-[11px] text-text-muted">yeni müşteri talebi</span></div>
               </div>
               <div className="mt-3 flex -space-x-2">
-                {["AK", "SY", "MO", "+9"].map((x, i) => <span key={x} className={`grid h-7 w-7 place-items-center rounded-full border-2 border-white text-[9px] font-bold ${i === 3 ? "bg-mint-500 text-white" : "bg-ink-800 text-white"}`}>{x}</span>)}
+                {["AK", "SY", "MO", "+9"].map((x, i) => <span key={x} className={`grid h-7 w-7 place-items-center rounded-full border-2 border-white text-[10px] font-bold ${i === 3 ? "bg-mint-500 text-white" : "bg-ink-800 text-white"}`}>{x}</span>)}
               </div>
             </div>
           </div>
           <div className="pointer-events-none absolute right-[5%] top-44 hidden xl:block">
             <div className="animate-float-slow w-48 rounded-[18px] border border-white/80 bg-white/75 p-4 shadow-[var(--shadow-card)] backdrop-blur-xl">
-              <div className="flex items-center justify-between"><span className="grid h-9 w-9 place-items-center rounded-[11px] bg-mint-500/12 text-mint-600"><ShieldCheck className="h-4 w-4" /></span><span className="rounded-full bg-mint-500/10 px-2 py-1 text-[9px] font-bold text-mint-600">UYUMLU</span></div>
+              <div className="flex items-center justify-between"><span className="grid h-9 w-9 place-items-center rounded-[11px] bg-mint-500/12 text-mint-600"><ShieldCheck className="h-4 w-4" /></span><span className="rounded-full bg-mint-500/10 px-2 py-1 text-[11px] font-bold text-mint-600">UYUMLU</span></div>
               <p className="mt-3 text-[11px] font-semibold text-text-muted">İYS izin sağlığı</p>
               <p className="font-display text-2xl font-extrabold text-ink-950">%94</p>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line"><div className="h-full w-[94%] rounded-full bg-[image:var(--grad-brand)]" /></div>
@@ -264,7 +263,7 @@ export default function HomePage() {
               Türkiye’nin emlak işletim sistemi
             </span>
 
-            <h1 className="animate-rise mt-6 font-display text-4xl font-extrabold leading-[1.04] text-ink-950 sm:text-5xl lg:text-[68px]" style={{ animationDelay: "80ms" }}>
+            <h1 className="animate-rise mt-6 font-display text-4xl font-extrabold leading-[1.04] text-ink-950 sm:text-5xl lg:text-[68px] lg:tracking-[-0.035em]" style={{ animationDelay: "80ms" }}>
               Emlak ofisinizi baştan sona
               <br className="hidden sm:block" /> <span className="text-gradient">tek platformdan</span> yönetin
             </h1>
@@ -329,7 +328,7 @@ export default function HomePage() {
                     </div>
                   </div>
                   <div className="animate-float-slow absolute -right-4 bottom-12 hidden w-48 rounded-[16px] border border-line bg-surface/90 p-3.5 shadow-[var(--shadow-card)] backdrop-blur md:block">
-                    <div className="flex items-center gap-2 text-amber-500">
+                    <div className="flex items-center gap-2 text-amber-600">
                       <Wallet className="h-4 w-4" />
                       <span className="text-[11px] font-semibold">Kaçak önlendi</span>
                     </div>
@@ -392,7 +391,6 @@ export default function HomePage() {
                   src="/emlaksoft-premium-team.png"
                   alt="EmlakSoft ile operasyon verilerini inceleyen emlak profesyonelleri"
                   fill
-                  priority
                   sizes="(max-width: 1200px) 100vw, 1152px"
                   className="object-cover object-center transition duration-[1400ms] hover:scale-[1.025]"
                 />
@@ -421,7 +419,7 @@ export default function HomePage() {
                 <div className="absolute bottom-7 right-7 z-[4] hidden w-64 rounded-[18px] border border-white/20 bg-ink-950/82 p-4 text-white shadow-[var(--shadow-lg)] backdrop-blur-xl md:block">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-white/65">Bu ay dönüşüm</span>
-                    <span className="flex items-center gap-1 rounded-full bg-mint-400/15 px-2 py-1 text-[10px] font-bold text-mint-400"><TrendingUp className="h-3 w-3" /> +18%</span>
+                    <span className="flex items-center gap-1 rounded-full bg-mint-400/15 px-2 py-1 text-[11px] font-bold text-mint-400"><TrendingUp className="h-3 w-3" /> +18%</span>
                   </div>
                   <div className="mt-3 flex items-end justify-between">
                     <b className="font-display text-3xl">₺2,4M</b>
@@ -431,9 +429,9 @@ export default function HomePage() {
                     </svg>
                   </div>
                   <div className="mt-3 grid grid-cols-3 gap-2 border-t border-white/10 pt-3 text-center">
-                    <div><b className="block text-sm">28</b><span className="text-[9px] text-white/45">talep</span></div>
-                    <div><b className="block text-sm">11</b><span className="text-[9px] text-white/45">sunum</span></div>
-                    <div><b className="block text-sm">4</b><span className="text-[9px] text-white/45">kapanış</span></div>
+                    <div><b className="block text-sm">28</b><span className="text-[11px] text-white/45">talep</span></div>
+                    <div><b className="block text-sm">11</b><span className="text-[11px] text-white/45">sunum</span></div>
+                    <div><b className="block text-sm">4</b><span className="text-[11px] text-white/45">kapanış</span></div>
                   </div>
                 </div>
               </div>
@@ -445,7 +443,7 @@ export default function HomePage() {
         <section id="ozellikler" className="premium-section mx-auto max-w-6xl px-4 py-12 md:py-16">
           <Reveal className="mx-auto max-w-2xl text-center">
             <span className="eyebrow bg-brand-600/10 text-brand-600"><Sparkles className="h-3.5 w-3.5" /> Ofis sahibinin gerçek acıları için</span>
-            <h2 className="mt-4 font-display text-3xl font-bold text-ink-950 md:text-4xl">Bir CRM’den çok daha fazlası</h2>
+            <h2 className="sda-title mt-4 font-display text-3xl font-bold text-ink-950 md:text-4xl">Bir CRM’den çok daha fazlası</h2>
             <p className="mt-3 text-text-muted">RE-OS ve Revy’nin güçlü yanlarını aldık; üzerine mevzuat, komisyon ve kayıp-kaçak disiplinini ekledik.</p>
           </Reveal>
 
@@ -462,8 +460,8 @@ export default function HomePage() {
                 {/* live mini metric */}
                 <div className="relative mt-5 flex items-end justify-between gap-3 rounded-[12px] border border-line bg-canvas/70 px-3.5 py-3">
                   <div>
-                    <p className="text-[10px] font-medium uppercase tracking-wide text-text-faint">{f.metric.label}</p>
-                    <p className={`font-display text-xl font-extrabold ${f.tone === "danger" ? "text-danger-500" : f.tone === "amber" ? "text-amber-500" : f.tone === "mint" ? "text-mint-600" : "text-brand-600"}`}>{f.metric.value}</p>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-faint">{f.metric.label}</p>
+                    <p className={`font-display text-xl font-extrabold ${f.tone === "danger" ? "text-danger-500" : f.tone === "amber" ? "text-amber-600" : f.tone === "mint" ? "text-mint-600" : "text-brand-600"}`}>{f.metric.value}</p>
                   </div>
                   <div className="flex h-9 items-end gap-[3px]">
                     {f.metric.bars.map((h, bi) => (
@@ -478,7 +476,7 @@ export default function HomePage() {
 
                 <div className="relative mt-4 flex items-center justify-between border-t border-line pt-4">
                   <span className="flex items-center gap-1.5 text-[11px] font-semibold text-text-faint"><Zap className="h-3.5 w-3.5 text-amber-500" /> Otomatik iş akışı</span>
-                  <span className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 transition group-hover:translate-x-1">Detay <ArrowUpRight className="h-4 w-4" /></span>
+                  <Link href={f.href} aria-label={`${f.title} detayı`} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 transition hover:text-brand-700 group-hover:translate-x-1">Detay <ArrowUpRight className="h-4 w-4" /></Link>
                 </div>
               </Reveal>
             ))}
@@ -496,7 +494,7 @@ export default function HomePage() {
                     <p className="mt-1.5 max-w-md text-sm leading-relaxed text-white/70">Teyit, kaçak, dönüşüm ve hakediş tek skorda birleşir; ofisin nabzını her sabah görün.</p>
                     <div className="mt-3.5 flex flex-wrap gap-2">
                       {["Teyit", "Kaçak", "Dönüşüm", "Hakediş"].map((x) => (
-                        <span key={x} className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-white/70">
+                        <span key={x} className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-white/70">
                           <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-400" /> {x}
                         </span>
                       ))}
@@ -524,7 +522,7 @@ export default function HomePage() {
         </section>
 
         {/* ================= VERİ ORTAKLARIMIZ: ENDEKSA & TAPUSOR ================= */}
-        <section className="border-y border-line bg-surface-2">
+        <section id="veri-ortaklari" className="scroll-mt-24 border-y border-line bg-surface-2">
           <div className="mx-auto max-w-6xl px-4 py-12 md:py-16">
             <Reveal className="mx-auto max-w-2xl text-center">
               <span className="eyebrow bg-cyan-500/10 text-cyan-700"><Database className="h-3.5 w-3.5" /> Türkiye’nin veri devleriyle entegre</span>
@@ -554,8 +552,8 @@ export default function HomePage() {
               </Reveal>
 
               <Reveal delay={80} className="feature-rich-card lift group relative overflow-hidden rounded-[22px] border border-line bg-surface p-6">
-                <MapPinned className="pointer-events-none absolute -bottom-5 -right-4 h-32 w-32 text-violet-600/[0.05] transition duration-500 group-hover:-translate-y-2 group-hover:text-violet-600/[0.08]" />
-                <div className="relative mb-5 grid h-12 w-12 place-items-center rounded-[14px] bg-violet-500/10 text-violet-700 shadow-[var(--shadow-xs)]">
+                <MapPinned className="pointer-events-none absolute -bottom-5 -right-4 h-32 w-32 text-cyan-600/[0.05] transition duration-500 group-hover:-translate-y-2 group-hover:text-cyan-600/[0.08]" />
+                <div className="relative mb-5 grid h-12 w-12 place-items-center rounded-[14px] bg-cyan-500/10 text-cyan-700 shadow-[var(--shadow-xs)]">
                   <MapPinned className="h-6 w-6" />
                 </div>
                 <h3 className="relative font-display text-lg font-bold text-ink-950">Tapusor EDİ + yatırım puanı</h3>
@@ -591,7 +589,7 @@ export default function HomePage() {
             <Reveal className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
               <div className="max-w-2xl">
                 <span className="eyebrow border border-white/10 bg-white/8 text-cyan-400"><Building2 className="h-3.5 w-3.5" /> Akıllı portföy vitrini</span>
-                <h2 className="mt-4 font-display text-3xl font-extrabold text-white md:text-4xl">Her portföy yalnızca ilan değil,<br className="hidden md:block" /> canlı bir iş sinyali</h2>
+                <h2 className="sda-title mt-4 font-display text-3xl font-extrabold text-white md:text-4xl">Her portföy yalnızca ilan değil,<br className="hidden md:block" /> canlı bir iş sinyali</h2>
                 <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/65 md:text-base">Fiyat sağlığı, portal durumu, yetki ve talep yoğunluğu görsel portföy kartında sürekli güncel.</p>
               </div>
               <Link href="/kayit" className="inline-flex w-fit items-center gap-2 rounded-[12px] border border-white/15 bg-white/8 px-5 py-3 text-sm font-semibold text-white backdrop-blur transition hover:border-white/30 hover:bg-white/12">
@@ -603,14 +601,14 @@ export default function HomePage() {
               {propertyStories.map((property, index) => (
                 <Reveal key={property.title} delay={index * 90} className="property-card group overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.065] shadow-[0_24px_60px_-30px_rgba(0,0,0,.8)] backdrop-blur">
                   <div className="relative aspect-[4/3] overflow-hidden">
-                    <Image src={property.image} alt={property.title} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover transition duration-700 group-hover:scale-[1.06]" />
+                    <Image src={property.image} alt={property.title} fill sizes="(max-width: 768px) 100vw, 33vw" className="sda-parallax object-cover transition duration-700 group-hover:scale-[1.06]" />
                     <div className="absolute inset-0 bg-gradient-to-t from-ink-950/85 via-transparent to-ink-950/15" />
                     <div className="absolute left-4 top-4 flex items-center gap-2">
-                      <span className="rounded-full border border-white/15 bg-ink-950/55 px-2.5 py-1 text-[9px] font-extrabold tracking-[0.14em] text-white backdrop-blur">{property.label}</span>
+                      <span className="rounded-full border border-white/15 bg-ink-950/55 px-2.5 py-1 text-[11px] font-extrabold tracking-[0.08em] text-white backdrop-blur">{property.label}</span>
                       <span className="status-pulse h-2 w-2 rounded-full bg-mint-400" />
                     </div>
                     <div className="absolute right-4 top-4 rounded-[12px] border border-white/15 bg-ink-950/60 px-3 py-2 text-right backdrop-blur">
-                      <p className="text-[9px] font-semibold uppercase tracking-wider text-white/50">Portföy skoru</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">Portföy skoru</p>
                       <p className="font-display text-xl font-extrabold text-mint-400">{property.score}</p>
                     </div>
                     <div className="absolute inset-x-4 bottom-4">
@@ -621,7 +619,7 @@ export default function HomePage() {
                   <div className="p-5">
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-display text-xl font-extrabold text-white">{property.price}</p>
-                      <span className="rounded-full bg-mint-400/12 px-2.5 py-1 text-[10px] font-bold text-mint-400">{property.signal}</span>
+                      <span className="rounded-full bg-mint-400/12 px-2.5 py-1 text-[11px] font-bold text-mint-400">{property.signal}</span>
                     </div>
                     <div className="mt-4 grid grid-cols-3 divide-x divide-white/10 rounded-[12px] border border-white/10 bg-white/[0.035] py-2.5 text-center">
                       <span className="flex items-center justify-center gap-1.5 text-xs text-white/65"><BedDouble className="h-3.5 w-3.5" /> {property.rooms}</span>
@@ -630,7 +628,7 @@ export default function HomePage() {
                     </div>
                     <div className="mt-4 flex items-center justify-between text-[11px]">
                       <span className="flex items-center gap-1.5 text-white/45"><CircleCheck className="h-3.5 w-3.5 text-mint-400" /> {property.portal}</span>
-                      <span className="font-bold text-cyan-400">Detay →</span>
+                      <Link href="/demo" aria-label={`${property.title} — canlı demoda incele`} className="font-bold text-cyan-400 transition hover:text-cyan-300">Detay →</Link>
                     </div>
                   </div>
                 </Reveal>
@@ -643,7 +641,7 @@ export default function HomePage() {
         <section id="nasil" className="border-y border-line bg-surface-2">
           <div className="mx-auto max-w-6xl px-4 py-12 md:py-16">
             <Reveal className="mx-auto max-w-2xl text-center">
-              <h2 className="font-display text-3xl font-bold text-ink-950 md:text-4xl">Dört adımda kaçan geliri durdurun</h2>
+              <h2 className="sda-title font-display text-3xl font-bold text-ink-950 md:text-4xl">Dört adımda kaçan geliri durdurun</h2>
               <p className="mt-3 text-text-muted">Karmaşık kurulum yok. Ekibiniz ilk günden akışa girer.</p>
             </Reveal>
             <div className="relative mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -663,7 +661,7 @@ export default function HomePage() {
                   </div>
                   <h3 className="relative mt-5 font-display text-base font-bold text-ink-950">{s.title}</h3>
                   <p className="relative mt-2 text-sm leading-relaxed text-text-muted">{s.text}</p>
-                  <div className="relative mt-5 flex items-center gap-2 border-t border-line pt-3 text-[10px] font-bold uppercase tracking-[0.1em] text-mint-600">
+                  <div className="relative mt-5 flex items-center gap-2 border-t border-line pt-3 text-[11px] font-bold uppercase tracking-[0.08em] text-mint-600">
                     <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-500" /> Otomatik işlenir
                   </div>
                 </Reveal>
@@ -676,7 +674,7 @@ export default function HomePage() {
         <LiveAnalytics />
 
         {/* ================= DEEP: LEAK ================= */}
-        <section className="mx-auto max-w-6xl px-4 py-12 md:py-16">
+        <section id="kayip-kacak" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-12 md:py-16">
           <div className="grid items-center gap-12 lg:grid-cols-2">
             <Reveal>
               <span className="eyebrow bg-danger-500/10 text-danger-500"><Siren className="h-3.5 w-3.5" /> Kayıp-kaçak motoru</span>
@@ -704,7 +702,7 @@ export default function HomePage() {
                 <div className="mt-5 rounded-[14px] border border-line bg-surface-2 p-4">
                   <div className="flex items-center justify-between">
                     <p className="text-[11px] font-semibold text-text-muted">Kaçak trendi · son 7 hafta</p>
-                    <span className="flex items-center gap-1 rounded-full bg-mint-500/12 px-2 py-0.5 text-[10px] font-bold text-mint-600"><TrendingUp className="h-3 w-3 rotate-180" /> %31 iyileşme</span>
+                    <span className="flex items-center gap-1 rounded-full bg-mint-500/12 px-2 py-0.5 text-[11px] font-bold text-mint-600"><TrendingUp className="h-3 w-3 rotate-180" /> %31 iyileşme</span>
                   </div>
                   <div className="relative mt-3">
                     <svg viewBox="0 0 320 88" className="h-20 w-full" preserveAspectRatio="none" role="img" aria-label="Kaçak trendi grafiği">
@@ -739,18 +737,18 @@ export default function HomePage() {
                         <p className="text-sm font-semibold text-ink-950">{r.p}</p>
                         <p className="text-xs text-text-faint">Danışman: {r.d}</p>
                       </div>
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${r.tone === "danger" ? "bg-danger-500/10 text-danger-500" : r.tone === "amber" ? "bg-amber-400/15 text-amber-500" : "bg-mint-500/12 text-mint-600"}`}>{r.s}</span>
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${r.tone === "danger" ? "bg-danger-500/10 text-danger-500" : r.tone === "amber" ? "bg-amber-400/15 text-amber-600" : "bg-mint-500/12 text-mint-600"}`}>{r.s}</span>
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="pointer-events-none absolute -right-6 -top-6 -z-10 h-40 w-40 rounded-full bg-danger-500/20 blur-3xl" />
+              <div className="pointer-events-none absolute right-0 -top-6 -z-10 h-40 w-40 rounded-full bg-danger-500/20 blur-3xl md:-right-6" />
             </Reveal>
           </div>
         </section>
 
         {/* ================= DEEP: PHONE ================= */}
-        <section className="border-y border-line bg-surface-2">
+        <section id="akilli-arama" className="scroll-mt-24 border-y border-line bg-surface-2">
           <div className="mx-auto max-w-6xl px-4 py-12 md:py-16">
             <div className="grid items-center gap-12 lg:grid-cols-2">
               <Reveal variant="scale" className="order-2 lg:order-1">
@@ -788,7 +786,7 @@ export default function HomePage() {
                     <div className="mt-4 space-y-2 text-sm">
                       <div className="rounded-[10px] bg-surface-2 px-3 py-2.5 text-text">Talep: Onikişubat <b>3+1</b> · 4–6M ₺</div>
                       <div className="rounded-[10px] bg-surface-2 px-3 py-2.5 text-text"><b>12</b> eşleşen portföy · Fiyat sağlığı <span className="text-mint-600">yeşil</span></div>
-                      <div className="rounded-[10px] bg-amber-400/15 px-3 py-2.5 font-medium text-amber-500">Son görüşme: Dün · Tekrar aranacak</div>
+                      <div className="rounded-[10px] bg-amber-400/15 px-3 py-2.5 font-medium text-amber-600">Son görüşme: Dün · Tekrar aranacak</div>
                     </div>
                     <div className="mt-5 grid grid-cols-3 gap-2 text-center text-xs font-semibold">
                       <span className="rounded-[10px] bg-mint-500/12 py-2 text-mint-600">Yer göster</span>
@@ -827,7 +825,7 @@ export default function HomePage() {
                 <p.icon className="pointer-events-none absolute -right-5 -top-5 h-32 w-32 text-brand-600/[0.035] transition duration-500 group-hover:scale-110 group-hover:rotate-6" />
                 <div className="relative flex items-center justify-between">
                   <div className="grid h-12 w-12 place-items-center rounded-[14px] bg-brand-600/10 text-brand-600 shadow-[var(--shadow-xs)]"><p.icon className="h-6 w-6" /></div>
-                  <span className="rounded-full bg-canvas px-2.5 py-1 text-[9px] font-extrabold tracking-[0.12em] text-text-faint">0{i + 1}</span>
+                  <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-extrabold tracking-[0.08em] text-text-faint">0{i + 1}</span>
                 </div>
                 <h3 className="relative mt-5 font-display text-lg font-bold text-ink-950">{p.title}</h3>
                 <p className="relative mt-1 text-sm text-text-muted">{p.text}</p>
@@ -849,6 +847,7 @@ export default function HomePage() {
                     <ArrowUpRight className="h-4 w-4 text-brand-600 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                   </div>
                 </div>
+                <Link href="/kayit" aria-label={`${p.title} için ücretsiz kayıt olun`} className="absolute inset-0" />
               </Reveal>
             ))}
           </div>
@@ -904,7 +903,7 @@ export default function HomePage() {
               <p className="mt-3 max-w-md text-sm leading-relaxed text-white/65 md:text-base">Veri kaynakları, ödeme ve iletişim kanalları EmlakSoft çekirdeğine canlı bağlanır; veriler tek akışta, gerçek zamanlı senkron.</p>
               <div className="mt-7 grid grid-cols-2 gap-2.5 sm:grid-cols-2">
                 {integrations.map((it) => (
-                  <div key={it.name} className="integration-card group relative flex items-center gap-3 overflow-hidden rounded-[14px] border border-white/10 bg-white/[0.05] p-3 backdrop-blur transition hover:border-white/25">
+                  <div key={it.name} title={`${it.name}: ${it.desc}`} className="integration-card group relative flex cursor-default items-center gap-3 overflow-hidden rounded-[14px] border border-white/10 bg-white/[0.05] p-3 backdrop-blur transition hover:border-white/25">
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-white/8 text-cyan-400 transition group-hover:scale-110"><it.icon className="h-4 w-4" /></span>
                     <div className="min-w-0"><p className="truncate text-sm font-bold text-white">{it.name}</p><p className="truncate text-[11px] text-white/50">{it.desc}</p></div>
                     <span className="status-pulse absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-mint-400" />
@@ -919,7 +918,7 @@ export default function HomePage() {
         </section>
 
         {/* ================= SECURITY ================= */}
-        <section className="theme-dark relative overflow-hidden bg-[image:var(--grad-ink)] py-12 text-white md:py-16">
+        <section id="guvenlik" className="theme-dark relative scroll-mt-24 overflow-hidden bg-[image:var(--grad-ink)] py-12 text-white md:py-16">
           <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-40" />
           <div className="relative mx-auto max-w-6xl px-4">
             <Reveal className="mx-auto max-w-2xl text-center">
@@ -930,13 +929,13 @@ export default function HomePage() {
             <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {security.map((s, i) => (
                 <Reveal key={s.title} delay={i * 60} className="group relative overflow-hidden rounded-[18px] border border-white/10 bg-white/5 p-5 backdrop-blur transition duration-500 hover:-translate-y-1 hover:border-white/25 hover:bg-white/[0.08]">
-                  <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-mint-500/10 opacity-0 blur-2xl transition duration-500 group-hover:opacity-100" />
+                  <div className="hover-action pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-mint-500/10 opacity-0 blur-2xl transition duration-500 group-hover:opacity-100" />
                   <div className="shield-ring relative grid h-11 w-11 place-items-center rounded-[12px] bg-white/10 text-mint-400">
                     <s.icon className="relative z-10 h-5 w-5 transition duration-500 group-hover:scale-110" />
                   </div>
                   <h3 className="relative mt-4 font-display text-base font-bold text-white">{s.title}</h3>
                   <p className="relative mt-1 text-sm text-white/65">{s.text}</p>
-                  <span className="relative mt-4 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-mint-400 opacity-0 transition duration-500 group-hover:opacity-100">
+                  <span className="hover-action relative mt-4 inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-mint-400 opacity-0 transition duration-500 group-hover:opacity-100">
                     <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-400" /> Aktif koruma
                   </span>
                 </Reveal>
@@ -948,7 +947,7 @@ export default function HomePage() {
         {/* ================= QUOTES ================= */}
         <section className="mx-auto max-w-6xl px-4 py-12 md:py-16">
           <Reveal className="mx-auto max-w-2xl text-center">
-            <span className="eyebrow bg-amber-400/15 text-amber-500"><Quote className="h-3.5 w-3.5" /> Tanıdık geldi mi?</span>
+            <span className="eyebrow bg-amber-400/15 text-amber-600"><Quote className="h-3.5 w-3.5" /> Tanıdık geldi mi?</span>
             <h2 className="mt-4 font-display text-3xl font-bold text-ink-950 md:text-4xl">Sahadaki en sık dertler</h2>
             <p className="mt-3 text-text-muted">EmlakSoft tam da bu senaryolar için kuruldu.</p>
           </Reveal>
@@ -958,7 +957,7 @@ export default function HomePage() {
                 <Quote className="pointer-events-none absolute -right-3 -top-4 h-28 w-28 text-brand-600/[0.045]" />
                 <div className="relative flex items-center justify-between">
                   <div className="flex items-center gap-1 text-amber-400">{Array.from({ length: 5 }).map((_, j) => (<Star key={j} className="h-4 w-4 fill-current" />))}</div>
-                  <span className="rounded-full bg-mint-500/10 px-2 py-1 text-[9px] font-bold text-mint-600">DOĞRULANDI</span>
+                  <span className="rounded-full bg-mint-500/10 px-2 py-1 text-[11px] font-bold text-mint-600">DOĞRULANDI</span>
                 </div>
                 <p className="relative mt-5 flex-1 text-sm font-medium leading-relaxed text-text">{q.text}</p>
                 <div className="relative mt-5 flex items-center gap-3 border-t border-line pt-4">
@@ -1083,11 +1082,6 @@ export default function HomePage() {
               <Link href="/kayit" className="btn-shine mt-3 inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white">
                 Ücretsiz başlayın <ArrowRight className="h-4 w-4" />
               </Link>
-              <div className="mt-4 flex gap-2">
-                {[MessageCircle, Send].map((Ic, i) => (
-                  <span key={i} className="grid h-9 w-9 place-items-center rounded-[10px] border border-white/10 text-white/55"><Ic className="h-4 w-4" /></span>
-                ))}
-              </div>
             </div>
           </div>
 

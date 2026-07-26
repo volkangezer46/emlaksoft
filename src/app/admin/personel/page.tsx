@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition, useState, useRef, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   ChevronDown,
   Loader2,
@@ -9,6 +10,7 @@ import {
   UserMinus,
   UserPlus,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   addPlatformStaff,
   updateStaffRole,
@@ -165,12 +167,22 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => void }) 
     });
   }
 
-  function toggle() {
+  // Pasifleştirme ConfirmDialog üzerinden gelir (dialog kendi transition'ını yönetir)
+  async function deactivate() {
+    const fd = new FormData();
+    fd.set("id", member.id);
+    setErr(null);
+    const res = await deactivateStaff(fd);
+    if (res.error) setErr(res.error);
+    else onDone();
+  }
+
+  function reactivate() {
     const fd = new FormData();
     fd.set("id", member.id);
     setErr(null);
     startTransition(async () => {
-      const res = member.is_active ? await deactivateStaff(fd) : await reactivateStaff(fd);
+      const res = await reactivateStaff(fd);
       if (res.error) setErr(res.error);
       else onDone();
     });
@@ -179,7 +191,13 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => void }) 
   return (
     <TR>
       <TD>
-        <p className="font-semibold text-ink-950">{member.full_name}</p>
+        <Link
+          href="/admin/aktivite"
+          title="Platform aktivite kaydına git"
+          className="font-semibold text-ink-950 transition hover:text-brand-600"
+        >
+          {member.full_name}
+        </Link>
         <p className="text-xs text-text-faint">{member.email}</p>
         {err ? <p className="mt-0.5 text-xs font-medium text-danger-600" role="alert">{err}</p> : null}
       </TD>
@@ -208,24 +226,32 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => void }) 
         {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(member.created_at))}
       </TD>
       <TD align="right">
-        <button
-          type="button"
-          onClick={toggle}
-          disabled={pending}
-          className={`focus-ring press inline-flex items-center gap-1 rounded-[9px] border px-2.5 py-1.5 text-xs font-semibold shadow-[var(--elev-1)] transition disabled:opacity-50 ${
-            member.is_active
-              ? "border-danger-500/30 bg-surface text-danger-600 hover:bg-danger-500/8"
-              : "border-mint-500/30 bg-surface text-mint-700 hover:bg-mint-500/8"
-          }`}
-        >
-          {pending ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : member.is_active ? (
-            <><UserMinus className="h-3 w-3" /> Pasif yap</>
-          ) : (
-            <><UserPlus className="h-3 w-3" /> Aktif yap</>
-          )}
-        </button>
+        {member.is_active ? (
+          <ConfirmDialog
+            trigger={
+              <button
+                type="button"
+                disabled={pending}
+                className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-danger-500/30 bg-surface px-2.5 py-1.5 text-xs font-semibold text-danger-600 shadow-[var(--elev-1)] transition hover:bg-danger-500/8 disabled:opacity-50"
+              >
+                <UserMinus className="h-3 w-3" /> Pasif yap
+              </button>
+            }
+            title={`${member.full_name} pasif yapılsın mı?`}
+            description="Pasif personel admin paneline giriş yapamaz. Kayıt silinmez; daha sonra tekrar aktif edilebilir."
+            confirmLabel="Pasif yap"
+            onConfirm={deactivate}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={reactivate}
+            disabled={pending}
+            className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-mint-500/30 bg-surface px-2.5 py-1.5 text-xs font-semibold text-mint-700 shadow-[var(--elev-1)] transition hover:bg-mint-500/8 disabled:opacity-50"
+          >
+            {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <><UserPlus className="h-3 w-3" /> Aktif yap</>}
+          </button>
+        )}
       </TD>
     </TR>
   );
@@ -297,7 +323,7 @@ export default function PersonelPage() {
           <div className="flex items-center gap-3">
             <div className="rounded-[14px] border border-white/10 bg-white/5 px-4 py-3 text-center">
               <p className="font-display text-2xl font-extrabold">{active.length}</p>
-              <p className="text-[10px] text-white/50">Aktif</p>
+              <p className="text-[11px] text-white/50">Aktif</p>
             </div>
             <AddStaffDialog onDone={load} />
           </div>
@@ -309,7 +335,7 @@ export default function PersonelPage() {
         <div className="flex items-center gap-2 border-b border-line px-5 py-3.5">
           <ShieldCheck className="h-4 w-4 text-amber-500" />
           <h2 className="font-display font-bold text-ink-950">Aktif personel</h2>
-          <span className="ml-auto rounded-full bg-brand-600/10 px-2.5 py-0.5 text-[10px] font-bold text-brand-600">{active.length}</span>
+          <span className="ml-auto rounded-full bg-brand-600/10 px-2.5 py-0.5 text-[11px] font-bold text-brand-600">{active.length}</span>
         </div>
         {loading ? (
           <div className="px-5 py-10 text-center text-sm text-text-muted">Yükleniyor…</div>
@@ -326,7 +352,7 @@ export default function PersonelPage() {
           <div className="flex items-center gap-2 border-b border-line px-5 py-3.5">
             <UserMinus className="h-4 w-4 text-text-faint" />
             <h2 className="font-display font-bold text-ink-950">Pasif personel</h2>
-            <span className="ml-auto rounded-full bg-canvas px-2.5 py-0.5 text-[10px] font-bold text-text-faint">{passive.length}</span>
+            <span className="ml-auto rounded-full bg-canvas px-2.5 py-0.5 text-[11px] font-bold text-text-faint">{passive.length}</span>
           </div>
           <StaffTable rows={passive} onDone={load} />
         </section>

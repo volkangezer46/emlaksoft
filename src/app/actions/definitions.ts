@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 
@@ -43,6 +43,8 @@ export async function addDefinition(_prev: DefinitionResult, fd: FormData): Prom
     return { error: "Tanım eklenemedi (aynı değer zaten olabilir)." };
   }
   revalidatePath("/app/ayarlar/tanimlar");
+  revalidateTag(`definitions:${gate.tenantId}`, "max");
+  revalidateTag("definitions", "max");
   return { ok: true, id: data.id };
 }
 
@@ -58,6 +60,27 @@ export async function toggleDefinition(id: string, active: boolean): Promise<Def
     .eq("tenant_id", gate.tenantId);
   if (error) return { error: "Güncellenemedi." };
   revalidatePath("/app/ayarlar/tanimlar");
+  revalidateTag(`definitions:${gate.tenantId}`, "max");
+  revalidateTag("definitions", "max");
+  return { ok: true };
+}
+
+/** Ofise özel tanımın etiketini günceller (inline rename). Global tanımlara dokunmaz. */
+export async function renameDefinition(id: string, label: string): Promise<DefinitionResult> {
+  const gate = await requirePermission("settings", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const trimmed = label.trim();
+  if (!trimmed) return { error: "Etiket zorunludur." };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("definitions")
+    .update({ label: trimmed })
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId);
+  if (error) return { error: "Güncellenemedi." };
+  revalidatePath("/app/ayarlar/tanimlar");
+  revalidateTag(`definitions:${gate.tenantId}`, "max");
+  revalidateTag("definitions", "max");
   return { ok: true };
 }
 
@@ -68,5 +91,7 @@ export async function deleteDefinition(id: string): Promise<DefinitionResult> {
   const supabase = await createClient();
   await supabase.from("definitions").delete().eq("id", id).eq("tenant_id", gate.tenantId);
   revalidatePath("/app/ayarlar/tanimlar");
+  revalidateTag(`definitions:${gate.tenantId}`, "max");
+  revalidateTag("definitions", "max");
   return { ok: true };
 }

@@ -81,7 +81,7 @@ export function IntegrationHub() {
               <span className="grid h-12 w-12 place-items-center rounded-[14px] border border-white/12 bg-white/8 backdrop-blur">
                 <node.icon className={`h-5 w-5 ${node.tone}`} />
               </span>
-              <span className="rounded-full bg-ink-950/60 px-2 py-0.5 text-[9px] font-semibold text-white/70 backdrop-blur">{node.name}</span>
+              <span className="rounded-full bg-ink-950/60 px-2 py-0.5 text-[10px] font-semibold text-white/70 backdrop-blur">{node.name}</span>
             </div>
           </div>
         );

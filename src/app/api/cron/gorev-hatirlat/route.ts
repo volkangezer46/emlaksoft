@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/lib/notify-batch";
+import { recordHeartbeat } from "@/lib/cron-heartbeat";
 
 function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -59,6 +60,8 @@ export async function GET(req: NextRequest) {
   }
 
   const notified = await insertNotifications(admin, toInsert);
+
+  await recordHeartbeat("gorev-hatirlat", "ok", `${notified} bildirim, ${skipped} atlandı`);
 
   return NextResponse.json({ ok: true, notified, skipped });
 }

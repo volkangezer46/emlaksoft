@@ -106,7 +106,7 @@ export function DashboardMock() {
               </svg>
               <div className="grid grid-cols-3 gap-1 text-center">
                 {["Oca", "Şub", "Mar"].map((m) => (
-                  <span key={m} className="text-[9px] text-text-faint">{m}</span>
+                  <span key={m} className="text-[10px] text-text-faint">{m}</span>
                 ))}
               </div>
             </div>
@@ -120,11 +120,11 @@ export function DashboardMock() {
               <div className="mt-2 space-y-1.5">
                 <div className="rounded-[8px] bg-danger-500/8 px-2 py-1.5">
                   <p className="text-[10px] font-semibold text-ink-950">#99211 düştü</p>
-                  <p className="text-[9px] text-text-muted">Sebep yok</p>
+                  <p className="text-[10px] text-text-muted">Sebep yok</p>
                 </div>
                 <div className="rounded-[8px] bg-warn-500/10 px-2 py-1.5">
                   <p className="text-[10px] font-semibold text-ink-950">7 gün teyitsiz</p>
-                  <p className="text-[9px] text-text-muted">12 ilan</p>
+                  <p className="text-[10px] text-text-muted">12 ilan</p>
                 </div>
                 <div className="flex items-center gap-1.5 rounded-[8px] bg-mint-500/10 px-2 py-1.5">
                   <Bell className="h-3 w-3 text-mint-600" />

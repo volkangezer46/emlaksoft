@@ -57,15 +57,15 @@ export default async function AdminGeoPage({
           <div className="flex gap-3">
             <div className="rounded-[14px] border border-white/10 bg-white/[0.04] px-4 py-3 text-center">
               <p className="font-display text-xl font-extrabold text-white">{rows.length}/81</p>
-              <p className="text-[10px] text-white/50">İl</p>
+              <p className="text-[11px] text-white/50">İl</p>
             </div>
             <div className="rounded-[14px] border border-white/10 bg-white/[0.04] px-4 py-3 text-center">
               <p className="font-display text-xl font-extrabold text-white">{totalDistricts.toLocaleString("tr-TR")}</p>
-              <p className="text-[10px] text-white/50">İlçe</p>
+              <p className="text-[11px] text-white/50">İlçe</p>
             </div>
             <div className="rounded-[14px] border border-white/10 bg-white/[0.04] px-4 py-3 text-center">
               <p className="font-display text-xl font-extrabold text-white">{totalNeighborhoods.toLocaleString("tr-TR")}</p>
-              <p className="text-[10px] text-white/50">Mahalle</p>
+              <p className="text-[11px] text-white/50">Mahalle</p>
             </div>
           </div>
         </div>
@@ -83,7 +83,7 @@ export default async function AdminGeoPage({
               className="w-full rounded-[10px] border border-line bg-canvas px-8 py-2 text-sm outline-none focus:border-brand-400"
             />
           </form>
-          <p className="text-xs text-text-muted">İl adına ve enlem/boylama tıklayıp düzenleyin.</p>
+          <p className="text-xs text-text-muted">İl adı ilçe listesini açar; düzenlemek için satırdaki kalem simgesini kullanın.</p>
         </div>
         <div>
           {rows.map((p) => (

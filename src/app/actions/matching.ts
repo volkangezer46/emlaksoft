@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { notifyTenant } from "@/lib/notify";
-import { scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
+import { fetchTenantMatchingWeights, scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
 
 export type MatchActionResult = { error?: string; ok?: boolean; score?: number };
 
@@ -19,7 +19,8 @@ export async function saveMatchAndNotify(formData: FormData): Promise<MatchActio
   if (!demandId || !propertyId) return { error: "Talep ve portföy zorunlu." };
 
   const supabase = await createClient();
-  const [{ data: demand }, { data: property }] = await Promise.all([
+  // Ofise özel ağırlıklar — eşleştirme sayfasıyla aynı skor için tek ek sorgu.
+  const [{ data: demand }, { data: property }, weights] = await Promise.all([
     supabase
       .from("customer_demands")
       .select(
@@ -36,6 +37,7 @@ export async function saveMatchAndNotify(formData: FormData): Promise<MatchActio
       .eq("id", propertyId)
       .eq("tenant_id", gate.tenantId)
       .maybeSingle(),
+    fetchTenantMatchingWeights(supabase, gate.tenantId),
   ]);
 
   if (!demand || !property) return { error: "Kayıt bulunamadı." };
@@ -66,7 +68,7 @@ export async function saveMatchAndNotify(formData: FormData): Promise<MatchActio
     features: (property.features ?? {}) as MatchProperty["features"],
   };
 
-  const scored = scoreDemandProperty(matchDemand, matchProperty);
+  const scored = scoreDemandProperty(matchDemand, matchProperty, weights);
 
   const { error: updateError } = await supabase
     .from("customer_demands")

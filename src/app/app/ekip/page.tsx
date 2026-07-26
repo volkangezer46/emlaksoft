@@ -10,11 +10,14 @@ import {
   Users,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireModulePage } from "@/lib/require-module-page";
 import { setMemberActive, setMemberRole } from "@/app/actions/team";
+import { resendInvite } from "./invite-actions";
 import { AddBranchDialog, AddMemberDialog } from "./team-dialogs";
 import { BranchCard } from "./branch-card";
 import { formatTurkishPhone } from "@/lib/phone";
+import { relativeTimeTR } from "@/lib/admin-format";
 import type { CSSProperties } from "react";
 
 const RING_C = 2 * Math.PI * 42;
@@ -70,6 +73,35 @@ export default async function TeamPage() {
   ]);
 
   const members = (membersData ?? []) as Member[];
+
+  /*
+   * Son giriş bilgisi — login_events'ten üye başına en son başarılı giriş.
+   * Tablo henüz yoksa / şema farklıysa sorgu hata döner: loginDataAvailable=false
+   * olur ve giriş rozetleri hiç gösterilmez (yanlış "hiç girmedi" iddiasındansa sessizlik).
+   * Admin client: login_events RLS politikasından bağımsız, tenant_id ile daraltılmış okuma.
+   */
+  const lastLoginByUser = new Map<string, string>();
+  let loginDataAvailable = false;
+  if (tenantId) {
+    try {
+      const admin = createAdminClient();
+      const { data: loginRows, error: loginError } = await admin
+        .from("login_events")
+        .select("user_id, created_at")
+        .eq("tenant_id", tenantId)
+        .eq("result", "success")
+        .order("created_at", { ascending: false })
+        .limit(2000);
+      if (!loginError && loginRows) {
+        loginDataAvailable = true;
+        for (const row of loginRows as { user_id: string | null; created_at: string }[]) {
+          if (row.user_id && !lastLoginByUser.has(row.user_id)) lastLoginByUser.set(row.user_id, row.created_at);
+        }
+      }
+    } catch (e) {
+      console.error("ekip login_events", e);
+    }
+  }
   const branches = (branchesData ?? []) as { id: string; name: string; is_active: boolean; province_id: string | null; province: Rel }[];
   const provinces = provincesData ?? [];
 
@@ -107,11 +139,12 @@ export default async function TeamPage() {
     .slice(0, 6);
   const maxLoad = Math.max(1, ...loadRows.map((r) => r.count));
 
+  // KPI'lar sayfa içi bölüm çapalarına iner (#uyeler / #subeler)
   const kpis = [
-    { label: "Ekip üyesi", value: members.length, icon: Users },
-    { label: "Aktif", value: activeCount, icon: ShieldCheck },
-    { label: "Saha danışmanı", value: advisorCount, icon: UserRound },
-    { label: "Şube", value: branches.length, icon: Building2 },
+    { label: "Ekip üyesi", value: members.length, icon: Users, href: "#uyeler" },
+    { label: "Aktif", value: activeCount, icon: ShieldCheck, href: "#uyeler" },
+    { label: "Saha danışmanı", value: advisorCount, icon: UserRound, href: "#uyeler" },
+    { label: "Şube", value: branches.length, icon: Building2, href: "#subeler" },
   ];
 
   return (
@@ -137,11 +170,18 @@ export default async function TeamPage() {
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {kpis.map((k) => (
-                <div key={k.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur">
-                  <k.icon className="h-4 w-4 text-mint-400" />
+                <Link
+                  key={k.label}
+                  href={k.href}
+                  className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur hover:border-white/30"
+                >
+                  <span className="flex items-start justify-between">
+                    <k.icon className="h-4 w-4 text-mint-400" />
+                    <ArrowUpRight className="hover-action h-4 w-4 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
+                  </span>
                   <p className="mt-2 font-display text-xl font-extrabold text-white">{k.value}</p>
-                  <p className="text-[10px] text-white/45 sm:text-xs">{k.label}</p>
-                </div>
+                  <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+                </Link>
               ))}
             </div>
           </div>
@@ -168,14 +208,14 @@ export default async function TeamPage() {
               </svg>
               <div className="absolute text-center">
                 <p className="font-display text-xl font-extrabold text-white">%{Math.round(activeRate * 100)}</p>
-                <p className="text-[9px] text-white/45">aktif</p>
+                <p className="text-[10px] text-white/45">aktif</p>
               </div>
             </div>
             <div className="min-w-0 flex-1 space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-white/45">Rol karışımı</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/45">Rol karışımı</p>
               {roleMix.slice(0, 4).map((r, i) => (
                 <div key={r.key}>
-                  <div className="mb-0.5 flex justify-between text-[10px] text-white/60">
+                  <div className="mb-0.5 flex justify-between text-[11px] text-white/60">
                     <span>{r.label}</span>
                     <span className="font-bold text-white">{r.count}</span>
                   </div>
@@ -208,27 +248,28 @@ export default async function TeamPage() {
           <h2 className="mt-1 font-display font-bold text-ink-950">Müşteri dağılımı</h2>
           <div className="mt-4 space-y-3">
             {loadRows.map((r, i) => (
-              <div key={r.id} className="grid grid-cols-[1fr_auto] items-center gap-3">
-                <div>
-                  <div className="mb-1 flex justify-between text-xs">
-                    <span className="font-semibold text-ink-950">{r.name}</span>
-                    <span className="tabular-nums text-text-muted">{r.count}</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-canvas">
-                    <div
-                      className="bar-live h-full rounded-full bg-[image:var(--grad-brand)]"
-                      style={{ width: `${Math.max((r.count / maxLoad) * 100, 4)}%`, animationDelay: `${i * 0.07}s` }}
-                    />
-                  </div>
+              <Link key={r.id} href={`/app/ekip/${r.id}`} className="focus-ring group block rounded-[10px] p-1 -m-1">
+                <div className="mb-1 flex justify-between text-xs">
+                  <span className="flex items-center gap-1 font-semibold text-ink-950 group-hover:text-brand-600">
+                    {r.name}
+                    <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                  </span>
+                  <span className="tabular-nums text-text-muted">{r.count}</span>
                 </div>
-              </div>
+                <div className="h-2 overflow-hidden rounded-full bg-canvas">
+                  <div
+                    className="bar-live h-full rounded-full bg-[image:var(--grad-brand)]"
+                    style={{ width: `${Math.max((r.count / maxLoad) * 100, 4)}%`, animationDelay: `${i * 0.07}s` }}
+                  />
+                </div>
+              </Link>
             ))}
           </div>
         </section>
       ) : null}
 
       {/* team list */}
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+      <section id="uyeler" className="scroll-mt-24 overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950"><Users className="h-4 w-4 text-brand-600" /> Ekip üyeleri</h2>
@@ -251,20 +292,44 @@ export default async function TeamPage() {
                   <div className="min-w-0">
                     <Link href={`/app/ekip/${m.id}`} className="group inline-flex items-center gap-1 truncate text-sm font-semibold text-ink-950 transition hover:text-brand-600">
                       <span className="truncate">{m.full_name}</span>
-                      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 opacity-0 transition group-hover:opacity-100" />
+                      <ArrowUpRight className="hover-action h-3.5 w-3.5 shrink-0 opacity-0 transition group-hover:opacity-100" />
                     </Link>
                     <p className="mt-0.5 truncate text-xs text-text-muted">{m.phone ? formatTurkishPhone(m.phone) : "Telefon yok"}{relName(m.branch) ? ` · ${relName(m.branch)}` : ""}</p>
                   </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
-                  {!m.is_active ? <span className="rounded-full bg-ink-950/8 px-2 py-0.5 text-[10px] font-semibold text-text-muted">Pasif</span> : null}
+                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${meta.cls}`}>{meta.label}</span>
+                  {!m.is_active ? <span className="rounded-full bg-ink-950/8 px-2 py-0.5 text-[11px] font-semibold text-text-muted">Pasif</span> : null}
+                  {loginDataAvailable ? (
+                    lastLoginByUser.has(m.id) ? (
+                      <span className="text-[11px] text-text-faint">Son giriş: {relativeTimeTR(lastLoginByUser.get(m.id)!)}</span>
+                    ) : (
+                      <>
+                        <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-600">Hiç giriş yapmadı</span>
+                        {canManage && !isOwner ? (
+                          <form action={resendInvite}>
+                            <input type="hidden" name="id" value={m.id} />
+                            <button
+                              type="submit"
+                              className="rounded-[9px] border border-line px-2.5 py-1 text-[11px] font-semibold text-brand-600 transition hover:border-brand-300"
+                            >
+                              Daveti yinele
+                            </button>
+                          </form>
+                        ) : null}
+                      </>
+                    )
+                  ) : null}
                 </div>
 
-                <div className="text-xs text-text-muted">
+                <Link
+                  href={`/app/musteriler?assigned=${m.id}`}
+                  className="focus-ring rounded-[6px] text-xs text-text-muted transition hover:text-brand-600"
+                  aria-label={`${m.full_name} müşterileri`}
+                >
                   <span className="font-display text-base font-extrabold text-ink-950">{custCount}</span> müşteri
-                </div>
+                </Link>
 
                 <div className="flex items-center justify-end gap-2">
                   {canManage && !isOwner ? (
@@ -301,7 +366,7 @@ export default async function TeamPage() {
       </section>
 
       {/* branches */}
-      <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <section id="subeler" className="scroll-mt-24 rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950"><Building2 className="h-4 w-4 text-brand-600" /> Şubeler</h2>
           {canManage ? <AddBranchDialog provinces={provinces} /> : null}

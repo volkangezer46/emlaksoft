@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformStaff } from "@/lib/platform";
 
@@ -71,6 +71,7 @@ export async function createDistrict(formData: FormData): Promise<GeoActionResul
   }
 
   revalidatePath(`/admin/geo/${provinceId}`);
+  revalidateTag("geo", "max");
   return { ok: true };
 }
 
@@ -98,6 +99,7 @@ export async function updateDistrict(formData: FormData): Promise<GeoActionResul
   }
 
   revalidatePath(`/admin/geo/${provinceId}`);
+  revalidateTag("geo", "max");
   return { ok: true };
 }
 
@@ -124,6 +126,7 @@ export async function deleteDistrict(formData: FormData): Promise<GeoActionResul
   }
 
   revalidatePath(`/admin/geo/${provinceId}`);
+  revalidateTag("geo", "max");
   return { ok: true };
 }
 
@@ -152,6 +155,7 @@ export async function createNeighborhood(formData: FormData): Promise<GeoActionR
   }
 
   revalidatePath(`/admin/geo/${provinceId}/${districtId}`);
+  revalidateTag("geo", "max");
   return { ok: true };
 }
 
@@ -179,6 +183,7 @@ export async function updateNeighborhood(formData: FormData): Promise<GeoActionR
   }
 
   revalidatePath(`/admin/geo/${provinceId}/${districtId}`);
+  revalidateTag("geo", "max");
   return { ok: true };
 }
 
@@ -197,5 +202,6 @@ export async function deleteNeighborhood(formData: FormData): Promise<GeoActionR
   }
 
   revalidatePath(`/admin/geo/${provinceId}/${districtId}`);
+  revalidateTag("geo", "max");
   return { ok: true };
 }

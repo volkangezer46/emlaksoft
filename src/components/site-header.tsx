@@ -192,7 +192,7 @@ export function SiteHeader() {
                       <span>
                         <span className="flex items-center gap-2 text-sm font-semibold text-ink-950">
                           {f.title}
-                          {f.title === "Kayıp-kaçak motoru" ? <em className="rounded-full bg-danger-500/10 px-1.5 py-0.5 text-[9px] font-bold not-italic text-danger-500">YENİ</em> : null}
+                          {f.title === "Kayıp-kaçak motoru" ? <em className="rounded-full bg-danger-500/10 px-1.5 py-0.5 text-[10px] font-bold not-italic text-danger-500">YENİ</em> : null}
                         </span>
                         <span className="mt-0.5 block text-xs leading-relaxed text-text-muted">{f.desc}</span>
                       </span>
@@ -205,13 +205,13 @@ export function SiteHeader() {
                   <div className="relative">
                     <div className="flex items-center justify-between">
                       <span className="grid h-9 w-9 place-items-center rounded-[11px] bg-white/10"><Gauge className="h-5 w-5 text-mint-400" /></span>
-                      <span className="rounded-full bg-mint-400/15 px-2 py-1 text-[10px] font-bold text-mint-400">CANLI</span>
+                      <span className="rounded-full bg-mint-400/15 px-2 py-1 text-[11px] font-bold text-mint-400">CANLI</span>
                     </div>
                     <p className="mt-4 font-display text-base font-bold">Ofis Sağlık Skoru</p>
                     <p className="mt-1 text-xs leading-relaxed text-white/65">Teyit, kaçak, dönüşüm ve hakediş tek skorda.</p>
                     <div className="mt-4 flex items-end justify-between">
                       <div><b className="font-display text-4xl text-mint-400">78</b><span className="text-xs text-white/40"> / 100</span></div>
-                      <svg viewBox="0 0 100 32" className="h-9 w-24">
+                      <svg viewBox="0 0 100 32" className="h-9 w-24" aria-hidden="true">
                         <path d="M2 28 C18 28 20 21 34 22 S51 13 64 16 S80 6 98 4" fill="none" stroke="#34d3bd" strokeWidth="2.4" strokeLinecap="round" />
                       </svg>
                     </div>

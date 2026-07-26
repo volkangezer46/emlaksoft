@@ -1,19 +1,16 @@
 # EmlakSoft — Master Uygulama Planı
 
-**Son güncelleme:** 2026-07-22 (premium-plus)  
-**Kaynaklar:** Chat vizyonu · ROADMAP S0–S11 · HGDekor (`C:\projeler\hgdekor`) derin inceleme · mevcut kod envanteri  
-**Kalan envanter:** `docs/PREMIUM_PLUS.md`
+**Son güncelleme:** 2026-07-26 (uygulama dalgaları A–D sonrası)  
+**Kaynaklar:** Chat vizyonu · ROADMAP S0–S11 · ROADMAP_V2 · `docs/OZELLIK_MASTER_LISTESI.md` durum bölümü  
+**Kalan envanter:** `docs/OZELLIK_MASTER_LISTESI.md` Faz 2–3 + ROADMAP_V2 açık maddeler
 
 **Hedef:** Ticari beta (güvenilir Ofis paketi) → tam vizyon (14–18 ay).
 
-### Wave 2–3
-- `/app/anlasmalar` deal board · `/app/denetim` · portföy düzenle · `requirePermission` · gerçek JWT impersonation + banner · `useAppApi` strip · günlük özet cron · randevu dedupe
-- Wave 3: permission genişleme · Price Health motor · EİDS kalkanı (deal) · müşteri 360 anlaşma/İYS · bildirim tercihleri · PWA SW
-
-### Premium Plus (bu oturum)
-- ✅ Sayfa modül kapısı · StatusTransition · eşleştirme kaydet/bildir · realtime refresh · sidebar prefetch
-- ✅ Denetim actor/diff/CSV · `notification_prefs` sunucu + cron · ödeme linki iyzico Checkout
-- ✅ Dashboard/Phone OS sahte KPI temizliği · müşteri dosya deposu · proaktif leak SLA · `tsc` yeşil
+### DURUM — 2026-07-26 (dalga A–D tamam)
+- Kapsam: ~90 ekran tıklanabilirlik master planı + Faz 0 tamamı + liste standardı (sunucu filtre/sayfalama/toplu işlem) her ekranda · SMS 2FA + giriş geçmişi + çöp kutusu · kullanıcı bazlı izin istisnaları · 3D premium dashboard (TV modu dahil) · tenant AI asistanı (`/app/asistan`) + belge OCR · teklif→anlaşma + işlem dosyası · sözleşme şablon galerisi + sürüm + SMS OTP e-imza · vitrin analitik/QR/kayıtlı arama · malik & müşteri portalı v2 · otomasyon motoru (cron + 6 tetikleyici + 11 şablon) · danışman cüzdanı + PDF bordro · admin dunning + ticket SLA + cron sağlık panosu · **Mülk Yönetimi v1 (`/app/kiralama`)** · **Proje Satış v1 (`/app/projeler`)**.
+- Altyapı: migration 000–078 dev DB'de uygulı · 13 cron `vercel.json`'da · Realtime publication (078) · Playwright E2E 7 smoke · `tsc` yeşil.
+- ROADMAP_V2'den fiilen kapananlar (işaret güncellenmemiş olsa da kodda var): Q1b Playwright E2E · F3 CVE override'ları · F4 env örneği · V1 TCMB kur (cron `tcmb-kur`) · V3 fiyat düşüş bildirimi · D1 emsal motoru · D2 bölge trendi · D4 kira çarpanı/yield · D5 satış süresi tahmini.
+- Kalan: yalnız dış hesap/anlaşma gerektirenler (WhatsApp API, CTI, İYS/EİDS, portal API'leri, e-fatura) · MLS mimari kararı · F5 sır rotasyonu (deploy günü) · **DEPLOY YAPILMADI** — bilinçli; rehber: `docs/DEPLOY_CHECKLIST.md`.
 
 ---
 

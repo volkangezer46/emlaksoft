@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { AlertTriangle, Bug, CheckCircle2, Clock3, Info, Repeat } from "lucide-react";
+import { AlertTriangle, Bug, CheckCircle2, ChevronDown, Clock3, Info, Repeat } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
+import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { ResolveErrorButton } from "./resolve-button";
 
 export const metadata = { title: "Üretim hataları" };
@@ -13,6 +14,7 @@ type Row = {
   source: string;
   digest: string | null;
   message: string;
+  stack: string | null;
   path: string | null;
   occurrences: number;
   first_seen: string;
@@ -20,6 +22,15 @@ type Row = {
   resolved_at: string | null;
   tenant: { name: string } | { name: string }[] | null;
 };
+
+function hrefWith(p: { durum?: string; son?: string; sayfa?: number }) {
+  const sp = new URLSearchParams();
+  if (p.durum) sp.set("durum", p.durum);
+  if (p.son) sp.set("son", p.son);
+  if (p.sayfa && p.sayfa > 1) sp.set("sayfa", String(p.sayfa));
+  const s = sp.toString();
+  return s ? `/admin/hatalar?${s}` : "/admin/hatalar";
+}
 
 function rel<T>(v: T | T[] | null): T | null {
   if (!v) return null;
@@ -42,10 +53,9 @@ function ne_zaman(iso: string, simdi: number) {
  * yardimciya tasimak hem kurali gecirir hem de "simdi"yi tek bir noktada
  * sabitler — satirlar arasi tutarli bir referans an olur.
  */
-function ozetle(rows: Row[], simdi: number) {
+function ozetle(rows: Row[]) {
   return {
     toplamOlay: rows.reduce((s, r) => s + (r.occurrences ?? 0), 0),
-    sonSaat: rows.filter((r) => simdi - new Date(r.last_seen).getTime() < 3_600_000).length,
   };
 }
 
@@ -66,31 +76,44 @@ function ozetle(rows: Row[], simdi: number) {
 export default async function ErrorLogsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string }>;
+  searchParams?: Promise<{ durum?: string; son?: string; sayfa?: string }>;
 }) {
   await requirePlatformModule("sistem");
   const params = (await searchParams) ?? {};
   const cozulmusGoster = params.durum === "cozulmus";
+  const sonBirSaat = params.son === "1saat";
+  const sayfa = parsePage(params.sayfa);
+  const simdi = new Date().getTime();
 
   const admin = createAdminClient();
   let q = admin
     .from("error_logs")
-    .select("id, tenant_id, source, digest, message, path, occurrences, first_seen, last_seen, resolved_at, tenant:tenants(name)", {
+    .select("id, tenant_id, source, digest, message, stack, path, occurrences, first_seen, last_seen, resolved_at, tenant:tenants(name)", {
       count: "exact",
     })
     .order("last_seen", { ascending: false })
-    .limit(100);
+    .range(...pageRange(sayfa));
 
   q = cozulmusGoster ? q.not("resolved_at", "is", null) : q.is("resolved_at", null);
+  if (sonBirSaat) q = q.gte("last_seen", new Date(simdi - 3_600_000).toISOString());
 
-  const [{ data, count }, { count: acikSayi }] = await Promise.all([
+  // "Son 1 saatte" kartı sayfa dilimine değil, aynı durum filtresindeki TÜM
+  // kayıtlara bakar — sayfa 2'de yanlış sayı göstermesin.
+  let sonSaatQ = admin
+    .from("error_logs")
+    .select("id", { count: "exact", head: true })
+    .gte("last_seen", new Date(simdi - 3_600_000).toISOString());
+  sonSaatQ = cozulmusGoster ? sonSaatQ.not("resolved_at", "is", null) : sonSaatQ.is("resolved_at", null);
+
+  const [{ data, count }, { count: acikSayi }, { count: sonSaatSayi }] = await Promise.all([
     q,
     admin.from("error_logs").select("id", { count: "exact", head: true }).is("resolved_at", null),
+    sonSaatQ,
   ]);
 
   const rows = (data ?? []) as unknown as Row[];
-  const simdi = new Date().getTime();
-  const { toplamOlay, sonSaat } = ozetle(rows, simdi);
+  const { toplamOlay } = ozetle(rows);
+  const sonSaat = sonSaatSayi ?? 0;
 
   return (
     <div className="space-y-6">
@@ -109,29 +132,50 @@ export default async function ErrorLogsPage({
 
           <div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
-              { label: "Açık hata türü", value: String(acikSayi ?? 0), icon: AlertTriangle },
-              { label: "Listelenen", value: String(rows.length), icon: Info },
-              { label: "Toplam olay", value: String(toplamOlay), icon: Repeat },
-              { label: "Son 1 saatte", value: String(sonSaat), icon: Clock3 },
-            ].map((k) => (
-              <div key={k.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur">
-                <k.icon className="h-4 w-4 text-danger-300" />
-                <p className="numeric mt-2 font-display text-lg font-extrabold text-white">{k.value}</p>
-                <p className="text-[10px] text-white/45 sm:text-xs">{k.label}</p>
-              </div>
-            ))}
+              { label: "Açık hata türü", value: String(acikSayi ?? 0), icon: AlertTriangle, href: "/admin/hatalar", active: false },
+              { label: "Listelenen", value: String(rows.length), icon: Info, href: null, active: false },
+              { label: "Sayfadaki olay", value: String(toplamOlay), icon: Repeat, href: null, active: false },
+              {
+                label: "Son 1 saatte",
+                value: String(sonSaat),
+                icon: Clock3,
+                href: hrefWith({ durum: params.durum, son: sonBirSaat ? undefined : "1saat" }),
+                active: sonBirSaat,
+              },
+            ].map((k) =>
+              k.href ? (
+                <Link
+                  key={k.label}
+                  href={k.href}
+                  aria-current={k.active ? "page" : undefined}
+                  className={`focus-ring press group relative block rounded-[14px] border p-3 backdrop-blur transition ${
+                    k.active ? "border-danger-300/50 bg-white/12" : "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10"
+                  }`}
+                >
+                  <k.icon className="h-4 w-4 text-danger-300" />
+                  <p className="numeric mt-2 font-display text-lg font-extrabold text-white">{k.value}</p>
+                  <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+                </Link>
+              ) : (
+                <div key={k.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur">
+                  <k.icon className="h-4 w-4 text-danger-300" />
+                  <p className="numeric mt-2 font-display text-lg font-extrabold text-white">{k.value}</p>
+                  <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+                </div>
+              ),
+            )}
           </div>
         </div>
       </section>
 
-      <nav aria-label="Durum filtresi" className="flex gap-2 rounded-[16px] border border-line bg-surface p-3">
+      <nav aria-label="Durum filtresi" className="flex flex-wrap gap-2 rounded-[16px] border border-line bg-surface p-3">
         {[
           { v: "", l: "Açık" },
           { v: "cozulmus", l: "Çözülmüş" },
         ].map((o) => (
           <Link
             key={o.l}
-            href={o.v ? `/admin/hatalar?durum=${o.v}` : "/admin/hatalar"}
+            href={hrefWith({ durum: o.v || undefined, son: sonBirSaat ? "1saat" : undefined })}
             aria-current={(o.v === "cozulmus") === cozulmusGoster ? "page" : undefined}
             className={`focus-ring press rounded-[9px] px-3 py-2 text-xs font-semibold transition ${
               (o.v === "cozulmus") === cozulmusGoster
@@ -142,6 +186,15 @@ export default async function ErrorLogsPage({
             {o.l}
           </Link>
         ))}
+        <Link
+          href={hrefWith({ durum: params.durum, son: sonBirSaat ? undefined : "1saat" })}
+          aria-current={sonBirSaat ? "page" : undefined}
+          className={`focus-ring press ml-auto inline-flex items-center gap-1.5 rounded-[9px] px-3 py-2 text-xs font-semibold transition ${
+            sonBirSaat ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
+          }`}
+        >
+          <Clock3 className="h-3.5 w-3.5" /> Son 1 saat
+        </Link>
       </nav>
 
       {rows.length === 0 ? (
@@ -150,12 +203,14 @@ export default async function ErrorLogsPage({
             <CheckCircle2 className="h-8 w-8" />
           </span>
           <h2 className="mt-5 font-display text-xl font-bold text-ink-950">
-            {cozulmusGoster ? "Çözülmüş kayıt yok" : "Açık hata yok"}
+            {sonBirSaat ? "Son 1 saatte kayıt yok" : cozulmusGoster ? "Çözülmüş kayıt yok" : "Açık hata yok"}
           </h2>
           <p className="mt-2 max-w-lg text-sm leading-relaxed text-text-muted">
-            {cozulmusGoster
-              ? "Henüz hiçbir hata çözüldü olarak işaretlenmemiş."
-              : "Tarayıcı hata sınırlarından bu yana kayıt düşmedi. Bu sayfa Vercel loglarının yerine geçmez; oradaki sunucu hataları ayrıca incelenmeli."}
+            {sonBirSaat
+              ? "Bu filtrede son 1 saat içinde görülen hata bulunmuyor."
+              : cozulmusGoster
+                ? "Henüz hiçbir hata çözüldü olarak işaretlenmemiş."
+                : "Tarayıcı hata sınırlarından bu yana kayıt düşmedi. Bu sayfa Vercel loglarının yerine geçmez; oradaki sunucu hataları ayrıca incelenmeli."}
           </p>
         </div>
       ) : (
@@ -175,7 +230,16 @@ export default async function ErrorLogsPage({
                           {r.occurrences}× tekrar
                         </span>
                       ) : null}
-                      <span className="text-xs text-text-muted">{tenant?.name ?? "Kiracı bilinmiyor"}</span>
+                      {r.tenant_id ? (
+                        <Link
+                          href={`/admin/tenants/${r.tenant_id}`}
+                          className="text-xs font-semibold text-brand-600 transition hover:underline"
+                        >
+                          {tenant?.name ?? "Kiracı"}
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-text-muted">Kiracı bilinmiyor</span>
+                      )}
                     </p>
                     <p className="mt-2 break-words font-semibold text-ink-950">{r.message}</p>
                     <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-text-faint">
@@ -195,15 +259,35 @@ export default async function ErrorLogsPage({
                     <ResolveErrorButton id={r.id} />
                   )}
                 </div>
+                {r.digest || r.stack ? (
+                  <details className="group mt-3">
+                    <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 text-[11px] font-semibold text-text-muted transition hover:text-ink-950 [&::-webkit-details-marker]:hidden">
+                      <ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" /> Teknik detay
+                    </summary>
+                    <div className="mt-2 space-y-2 rounded-[10px] border border-line bg-canvas p-3">
+                      {r.digest ? (
+                        <p className="numeric break-all text-[11px] text-text-muted">
+                          digest: <span className="font-semibold text-ink-950">{r.digest}</span>
+                        </p>
+                      ) : null}
+                      {r.stack ? (
+                        <pre className="numeric max-h-64 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-relaxed text-text-muted">
+                          {r.stack}
+                        </pre>
+                      ) : null}
+                    </div>
+                  </details>
+                ) : null}
               </article>
             );
           })}
-          {(count ?? 0) > rows.length ? (
-            <p className="rounded-[12px] border border-amber-400/35 bg-amber-400/[0.07] px-4 py-2.5 text-xs text-ink-950">
-              Toplam <strong className="numeric">{count}</strong> kayıttan{" "}
-              <strong className="numeric">{rows.length}</strong> tanesi listeleniyor.
-            </p>
-          ) : null}
+          <Pagination
+            page={sayfa}
+            total={count ?? 0}
+            hrefFor={(p) =>
+              hrefWith({ durum: params.durum, son: sonBirSaat ? "1saat" : undefined, sayfa: p })
+            }
+          />
         </div>
       )}
 

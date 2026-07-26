@@ -15,12 +15,16 @@
     "test:smoke": "node scripts/smoke-test.js",
     "cron:smoke": "node scripts/cron-smoke.js",
     "geo:sync": "tsx scripts/geo-sync.ts",
+    "kur:backfill": "tsx scripts/tcmb-backfill.ts",
     "db:migrate": "tsx scripts/apply-migrations.ts",
     "db:smoke": "tsx scripts/smoke-auth.ts",
+    "seed:demo": "tsx scripts/seed-demo.ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
     "db:rls-audit": "tsx scripts/rls-audit.ts",
     "audit:actions": "tsx scripts/action-gate-audit.ts",
+    "check:links": "tsx scripts/check-link-contracts.ts",
     "audit:deps": "tsx scripts/audit-gate.ts"
   },
   "dependencies": {
@@ -47,6 +51,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24.13.3",
     "@types/react": "^19",
@@ -58,5 +63,12 @@
     "tsx": "^4.23.1",
     "typescript": "^5",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "sharp": "^0.35.3",
+    "postcss": "^8.5.23",
+    "minimatch@>=10": {
+      "brace-expansion": "^5.0.8"
+    }
   }
 }

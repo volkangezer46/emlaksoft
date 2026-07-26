@@ -41,7 +41,7 @@ export function LiveAnalytics() {
   const gauge = gaugeGeometry(78);
 
   return (
-    <section className="theme-dark relative overflow-hidden bg-[image:var(--grad-ink)] py-14 text-white md:py-20">
+    <section id="analitik" className="theme-dark relative scroll-mt-24 overflow-hidden bg-[image:var(--grad-ink)] py-14 text-white md:py-20">
       <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
       <div className="pointer-events-none absolute left-[-6%] top-[-10%] h-96 w-96 rounded-full bg-brand-600/25 blur-[120px]" />
       <div className="pointer-events-none absolute bottom-[-15%] right-[-4%] h-96 w-96 rounded-full bg-mint-500/20 blur-[120px]" />
@@ -157,7 +157,7 @@ export function LiveAnalytics() {
               </div>
               <div className="relative mx-auto mt-3 grid h-44 w-44 place-items-center">
                 <div className="conic-spin pointer-events-none absolute inset-0 rounded-full opacity-40" style={{ background: "conic-gradient(from 0deg, transparent 0 60%, rgba(52,211,189,0.6) 78%, rgba(34,211,238,0.6) 90%, transparent 100%)", filter: "blur(14px)" }} />
-                <svg viewBox="0 0 180 180" className="relative h-44 w-44 -rotate-90">
+                <svg viewBox="0 0 180 180" className="relative h-44 w-44 -rotate-90" aria-hidden="true">
                   <defs>
                     <linearGradient id="gaugeStroke" x1="0" y1="0" x2="1" y2="1">
                       <stop stopColor="var(--mint-400)" />
@@ -184,7 +184,7 @@ export function LiveAnalytics() {
               </div>
               <div className="mt-2 grid grid-cols-3 gap-2 text-center">
                 {[{ l: "Teyit", v: "%92" }, { l: "Dönüşüm", v: "%8,3" }, { l: "Kaçak", v: "-8%" }].map((x) => (
-                  <div key={x.l} className="rounded-[11px] border border-white/8 bg-white/5 py-2"><p className="font-display text-sm font-bold text-white">{x.v}</p><p className="text-[9px] text-white/40">{x.l}</p></div>
+                  <div key={x.l} className="rounded-[11px] border border-white/8 bg-white/5 py-2"><p className="font-display text-sm font-bold text-white">{x.v}</p><p className="text-[10px] text-white/40">{x.l}</p></div>
                 ))}
               </div>
             </Reveal>
@@ -201,7 +201,7 @@ export function LiveAnalytics() {
                         style={{ height: `${b.v}%`, animationDelay: `${i * 90}ms, ${i * 200}ms` }}
                       />
                     </div>
-                    <span className="text-[9px] text-white/40">{b.m}</span>
+                    <span className="text-[10px] text-white/40">{b.m}</span>
                   </div>
                 ))}
               </div>

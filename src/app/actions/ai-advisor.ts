@@ -5,6 +5,7 @@ import { requirePlatformModule, requirePlatformStaff } from "@/lib/platform";
 import { setPlatformSetting } from "@/lib/platform-settings";
 import { runAdvisor, type AdvisorMessage, type AdvisorResult } from "@/lib/ai-advisor";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const MAX_MESSAGES = 12;
 const MAX_LEN = 2000;
@@ -25,6 +26,17 @@ export async function askAdvisor(
 ): Promise<AskAdvisorResult> {
   const staff = await requirePlatformModule("advisor");
 
+  // Hız sınırı — 'use server' export'u route'u atlayıp doğrudan çağrılabilir;
+  // sınırsız OpenAI çağrısını engelle (tenant asistanıyla aynı politika).
+  const { allowed } = await checkRateLimit(`ai-chat:${staff.id}`, { limit: 10, windowSec: 60 });
+  if (!allowed) {
+    return {
+      reply: "Çok hızlı gidiyorsunuz — lütfen bir dakika sonra tekrar deneyin.",
+      usedAI: false,
+      sessionId: sessionId ?? "",
+    };
+  }
+
   const clean = (Array.isArray(messages) ? messages : [])
     .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
     .slice(-MAX_MESSAGES)
@@ -44,6 +56,18 @@ export async function askAdvisor(
   try {
     const admin = createAdminClient();
     let sid = sessionId;
+
+    // Oturum sahipliği: service-role RLS'i atladığından, istemciden gelen
+    // sessionId'nin bu personele ait olduğu doğrulanmalı (enjeksiyon koruması).
+    if (sid) {
+      const { data: owned } = await admin
+        .from("advisor_sessions")
+        .select("id")
+        .eq("id", sid)
+        .eq("staff_id", staff.id)
+        .maybeSingle();
+      if (!owned) sid = null;
+    }
 
     if (!sid) {
       // Yeni oturum — başlık ilk sorudan türetilir (ilk 60 karakter)

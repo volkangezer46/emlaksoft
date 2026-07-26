@@ -3,8 +3,15 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Building2, Gauge, Info, Scale, TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import {
+  COMPARABLES_SOURCE_NAME,
+  extractStoredComparables,
+  listComparableDetails,
+  type ComparableDetail,
+} from "@/lib/comparables";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { PrintButton } from "./print-button";
+import { ShareButton } from "./share-button";
 
 export const metadata = { title: "Değerleme raporu" };
 
@@ -79,7 +86,7 @@ export default async function ValuationReportPage({
       ? supabase
           .from("properties")
           .select(
-            "property_code, title, address_line, list_price, features, province:geo_provinces(name), district:geo_districts(name)",
+            "property_code, title, address_line, list_price, features, district_id, property_type, transaction_type, province:geo_provinces(name), district:geo_districts(name)",
           )
           .eq("id", valuation.property_id)
           .maybeSingle()
@@ -89,7 +96,12 @@ export default async function ValuationReportPage({
       : Promise.resolve({ data: null }),
   ]);
 
-  const sources = (Array.isArray(valuation.sources) ? valuation.sources : []) as ValuationSource[];
+  // Emsal anlık görüntüsü `sources` jsonb'sinde saklanıyor (yeni kayıtlar);
+  // ağırlık/bilgi listelerine sızmasın diye adıyla ayıklanır.
+  const storedComparables = extractStoredComparables(valuation.sources);
+  const sources = (Array.isArray(valuation.sources) ? valuation.sources : []).filter(
+    (s: ValuationSource) => s.name !== COMPARABLES_SOURCE_NAME,
+  ) as ValuationSource[];
   const priceSources = sources.filter((s) => s.weight > 0);
   const infoSources = sources.filter((s) => s.weight === 0);
 
@@ -113,6 +125,27 @@ export default async function ValuationReportPage({
 
   const konum = [province?.name, district?.name].filter(Boolean).join(" / ") || "Belirtilmedi";
 
+  // ---- Kullanılan emsaller ------------------------------------------------
+  // Yeni kayıtlarda emsal kümesi kayda gömülü (storedComparables). Eski
+  // kayıtlarda gömülü değil; portföy bağlıysa AYNI parametrelerle görüntüleme
+  // anında yeniden hesaplanır — veri değişmiş olabileceği dipnotla söylenir.
+  let comparableRows: ComparableDetail[] = storedComparables ?? [];
+  let comparablesRecomputed = false;
+  if (!storedComparables && tenantId && property?.district_id && property.property_type && property.transaction_type && sqm) {
+    comparableRows = await listComparableDetails(supabase, {
+      tenantId,
+      districtId: property.district_id,
+      propertyType: property.property_type,
+      transactionType: property.transaction_type,
+      sqm,
+      excludePropertyId: valuation.property_id,
+    });
+    comparablesRecomputed = comparableRows.length > 0;
+  }
+  comparableRows = comparableRows.slice(0, 8);
+  const sourceLabel = (s: ComparableDetail["source"]) =>
+    s === "won_deal" ? "Kapanış (satış)" : "Ofis portföyü";
+
   return (
     <div className="space-y-6">
       <div className="no-print flex flex-wrap items-center justify-between gap-3">
@@ -122,7 +155,10 @@ export default async function ValuationReportPage({
         >
           <ArrowLeft className="h-4 w-4" /> Değerleme merkezine dön
         </Link>
-        <PrintButton />
+        <div className="flex flex-wrap items-center gap-2">
+          <ShareButton valuationId={valuation.id} title={valuation.title} />
+          <PrintButton />
+        </div>
       </div>
 
       <article className="print-sheet surface-card rounded-[var(--radius-panel)] p-6 sm:p-8">
@@ -144,7 +180,18 @@ export default async function ValuationReportPage({
             </div>
             <div className="mt-1 flex justify-end gap-2">
               <dt>Hazırlayan</dt>
-              <dd className="font-semibold text-ink-950">{author?.full_name ?? "—"}</dd>
+              <dd className="font-semibold text-ink-950">
+                {valuation.created_by && author?.full_name ? (
+                  <Link
+                    href={`/app/ekip/${valuation.created_by}`}
+                    className="focus-ring rounded-[6px] hover:text-brand-600 hover:underline"
+                  >
+                    {author.full_name}
+                  </Link>
+                ) : (
+                  author?.full_name ?? "—"
+                )}
+              </dd>
             </div>
             <div className="mt-1 flex justify-end gap-2">
               <dt>Rapor no</dt>
@@ -208,15 +255,28 @@ export default async function ValuationReportPage({
             <Building2 className="h-4 w-4 text-brand-600" /> Taşınmaz bilgileri
           </h2>
           <dl className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2">
-            {[
-              ["Portföy kodu", property?.property_code ?? "—"],
+            {([
+              [
+                "Portföy kodu",
+                // Portföy koduna tıklayınca portföy detayına gidilir (çıktıda düz metin görünür)
+                valuation.property_id && property?.property_code ? (
+                  <Link
+                    href={`/app/portfoyler/${valuation.property_id}`}
+                    className="focus-ring rounded-[6px] hover:text-brand-600 hover:underline"
+                  >
+                    {property.property_code}
+                  </Link>
+                ) : (
+                  property?.property_code ?? "—"
+                ),
+              ],
               ["Başlık", property?.title ?? "—"],
               ["Konum", konum],
               ["Adres", property?.address_line ?? "—"],
               ["Brüt m²", sqm ? `${sqm} m²` : "—"],
               ["Oda", features.rooms ?? "—"],
               ["Liste fiyatı", money(listPrice)],
-            ].map(([k, v]) => (
+            ] as Array<[string, React.ReactNode]>).map(([k, v]) => (
               <div key={k} className="hairline-b flex justify-between gap-4 py-1.5">
                 <dt className="text-sm text-text-muted">{k}</dt>
                 <dd className="text-sm font-semibold text-ink-950">{v}</dd>
@@ -278,6 +338,63 @@ export default async function ValuationReportPage({
             </>
           ) : null}
         </section>
+
+        {/* Kullanılan emsaller — tahminin dayandığı somut kayıtlar */}
+        {comparableRows.length > 0 ? (
+          <section className="print-avoid-break mt-7">
+            <h2 className="flex items-center gap-2 font-display text-base font-bold text-ink-950">
+              <Building2 className="h-4 w-4 text-brand-600" /> Kullanılan emsaller
+            </h2>
+            <p className="mt-1 text-[11px] text-text-faint">
+              Emsal motoru bu kayıtlara dayandı — aynı ilçe/tip, m² bandı ±%30, son 18 ay.
+            </p>
+            <TableFrame className="mt-3" minWidth={640}>
+              <Table>
+                <THead>
+                  <TR>
+                    <TH>Portföy kodu</TH>
+                    <TH>İlçe</TH>
+                    <TH>Oda</TH>
+                    <TH align="right">m²</TH>
+                    <TH align="right">Fiyat</TH>
+                    <TH align="right">₺/m²</TH>
+                    <TH>Kaynak</TH>
+                  </TR>
+                </THead>
+                <TBody>
+                  {comparableRows.map((c, i) => (
+                    <TR key={`${c.property_id}-${c.source}-${i}`}>
+                      <TD className="font-semibold text-ink-950">
+                        {c.property_code ? (
+                          <Link
+                            href={`/app/portfoyler/${c.property_id}`}
+                            className="focus-ring rounded-[6px] hover:text-brand-600 hover:underline"
+                          >
+                            {c.property_code}
+                          </Link>
+                        ) : (
+                          "—"
+                        )}
+                      </TD>
+                      <TD>{c.district_name ?? district?.name ?? "—"}</TD>
+                      <TD>{c.rooms ?? "—"}</TD>
+                      <TD align="right">{c.sqm != null ? `${c.sqm}` : "—"}</TD>
+                      <TD align="right">{money(c.price)}</TD>
+                      <TD align="right">{c.price_per_sqm != null ? money(c.price_per_sqm) : "—"}</TD>
+                      <TD className="text-text-muted">{sourceLabel(c.source)}</TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            </TableFrame>
+            {comparablesRecomputed ? (
+              <p className="mt-2 text-[11px] text-text-faint">
+                Bu kayıtta emsal listesi saklanmadığı için emsaller görüntüleme anında aynı
+                parametrelerle yeniden hesaplandı; sonuç, rapor tarihindeki kümeden farklı olabilir.
+              </p>
+            ) : null}
+          </section>
+        ) : null}
 
         {valuation.notes ? (
           <section className="print-avoid-break mt-7">

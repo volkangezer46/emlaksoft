@@ -3,10 +3,12 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, Coins, Loader2, Plus, Trash2, Undo2 } from "lucide-react";
-import { createDue, toggleDuePaid, deleteDue, type DueResult } from "@/app/actions/dues";
+import { Check, CheckCheck, Coins, Loader2, Plus, Trash2, Undo2, X } from "lucide-react";
+import { createDue, toggleDuePaid, deleteDue, markDuesPaidBulk, type DueResult } from "@/app/actions/dues";
+import { useToast } from "@/components/app/toast-provider";
 import { EmptyState } from "@/components/app/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { Combobox } from "@/components/ui/combobox";
 import { searchProperties } from "@/app/actions/lookup";
@@ -35,12 +37,50 @@ function propOf(p: Due["property"]) {
   return Array.isArray(p) ? p[0] : p;
 }
 
-export function DuesClient({ dues, properties, canCreate }: { dues: Due[]; properties: Property[]; canCreate: boolean }) {
+export function DuesClient({
+  dues,
+  properties,
+  canCreate,
+  canBulk = false,
+}: {
+  dues: Due[];
+  properties: Property[];
+  canCreate: boolean;
+  /** Toplu "ödendi" işaretleme (expenses edit yetkisi) */
+  canBulk?: boolean;
+}) {
   const router = useRouter();
+  const { push } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, action, pending] = useActionState(createDue, init);
   const [, startTransition] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
+  // Toplu seçim — yalnızca ödenmemiş kayıtlar seçilebilir
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const unpaidIds = dues.filter((d) => d.status !== "paid").map((d) => d.id);
+  const allSelected = selected.size > 0 && unpaidIds.every((id) => selected.has(id));
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function bulkPaid() {
+    if (selected.size === 0) return;
+    setBusy("bulk");
+    const res = await markDuesPaidBulk(Array.from(selected));
+    setBusy(null);
+    if (res.error) push(res.error, "err");
+    else {
+      push(`${res.updated ?? 0} aidat ödendi olarak işaretlendi`, "ok");
+      setSelected(new Set());
+      router.refresh();
+    }
+  }
 
   useEffect(() => {
     if (state.ok) {
@@ -57,13 +97,12 @@ export function DuesClient({ dues, properties, canCreate }: { dues: Due[]; prope
       router.refresh();
     });
   }
-  function remove(id: string) {
+  // ConfirmDialog onConfirm'den çağrılır; onay penceresi kapanınca liste tazelenir
+  async function remove(id: string) {
     setBusy(id);
-    startTransition(async () => {
-      await deleteDue(id);
-      setBusy(null);
-      router.refresh();
-    });
+    await deleteDue(id);
+    setBusy(null);
+    router.refresh();
   }
 
   return (
@@ -117,10 +156,53 @@ export function DuesClient({ dues, properties, canCreate }: { dues: Due[]; prope
           tone="amber"
         />
       ) : (
+        <>
+        {/* Toplu işlem çubuğu — seçim varken görünür */}
+        {canBulk && unpaidIds.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-[14px] border border-line bg-surface px-4 py-2.5 shadow-[var(--shadow-xs)]">
+            <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-text-muted">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={() => setSelected(allSelected ? new Set() : new Set(unpaidIds))}
+                aria-label="Bekleyen tüm aidatları seç"
+                className="focus-ring h-4 w-4 cursor-pointer rounded border-line accent-[var(--brand-600)]"
+              />
+              Tümünü seç
+            </label>
+            {selected.size > 0 ? (
+              <>
+                <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">
+                  {selected.size} seçili
+                </span>
+                <button
+                  type="button"
+                  onClick={bulkPaid}
+                  disabled={busy === "bulk"}
+                  className="focus-ring press inline-flex items-center gap-1.5 rounded-[9px] bg-mint-500/15 px-3 py-1.5 text-[11px] font-bold text-mint-700 transition hover:bg-mint-500/25 disabled:opacity-50"
+                >
+                  {busy === "bulk" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5" />}
+                  Seçilenleri ödendi işaretle
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelected(new Set())}
+                  disabled={busy === "bulk"}
+                  className="focus-ring inline-flex items-center gap-1 rounded-[9px] px-2 py-1.5 text-[11px] font-semibold text-text-muted transition hover:text-danger-500 disabled:opacity-50"
+                >
+                  <X className="h-3.5 w-3.5" /> Seçimi bırak
+                </button>
+              </>
+            ) : (
+              <span className="text-[11px] text-text-faint">Bekleyen kayıtları işaretleyip topluca ödendi yapın</span>
+            )}
+          </div>
+        ) : null}
         <TableFrame minWidth={720}>
           <Table>
             <THead>
               <TR>
+                {canBulk ? <TH><span className="sr-only">Seç</span></TH> : null}
                 <TH>Başlık</TH>
                 <TH>Portföy</TH>
                 <TH>Dönem</TH>
@@ -139,6 +221,22 @@ export function DuesClient({ dues, properties, canCreate }: { dues: Due[]; prope
                        sayfalarıyla tutarlı. Aidatın kendi detay sayfası yok,
                        bağlamsal olarak doğru hedef portföy. */
                     <TR key={d.id} interactive={Boolean(prop)}>
+                      {canBulk ? (
+                        <TD>
+                          {/* relative + z-10: satır örtü linkinin üstünde kalsın */}
+                          {!paid ? (
+                            <input
+                              type="checkbox"
+                              checked={selected.has(d.id)}
+                              onChange={() => toggleSelect(d.id)}
+                              aria-label={`${d.title} kaydını seç`}
+                              className="focus-ring relative z-10 h-4 w-4 cursor-pointer rounded border-line accent-[var(--brand-600)]"
+                            />
+                          ) : (
+                            <span className="inline-block h-4 w-4" aria-hidden />
+                          )}
+                        </TD>
+                      ) : null}
                       <TD className="font-semibold text-ink-950">
                         {prop ? (
                           <Link
@@ -167,10 +265,18 @@ export function DuesClient({ dues, properties, canCreate }: { dues: Due[]; prope
                             {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : paid ? <Undo2 className="h-3 w-3" /> : <Check className="h-3 w-3 text-mint-600" />}
                             {paid ? "Geri al" : "Ödendi"}
                           </button>
-                          <button type="button" onClick={() => remove(d.id)} disabled={busy === d.id} aria-label={`${d.title} aidatını sil`}
-                            className="focus-ring press grid h-7 w-7 place-items-center rounded-[8px] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600 disabled:opacity-50">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          <ConfirmDialog
+                            title="Aidat kaydını sil"
+                            description={`"${d.title}" kaydı kalıcı olarak silinecek. Bu işlem geri alınamaz.`}
+                            confirmLabel="Sil"
+                            onConfirm={() => remove(d.id)}
+                            trigger={
+                              <button type="button" disabled={busy === d.id} aria-label={`${d.title} aidatını sil`}
+                                className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600 disabled:opacity-50">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            }
+                          />
                         </div>
                       </TD>
                     </TR>
@@ -179,6 +285,7 @@ export function DuesClient({ dues, properties, canCreate }: { dues: Due[]; prope
             </TBody>
           </Table>
         </TableFrame>
+        </>
       )}
     </div>
   );

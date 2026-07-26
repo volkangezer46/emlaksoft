@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Activity,
+  ArrowUpRight,
   CalendarDays,
   FileText,
   Folder,
   Handshake,
+  History,
   MessageSquare,
   PhoneCall,
   ShieldCheck,
@@ -21,6 +23,7 @@ import { EditDemandDialog } from "./edit-demand-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CustomerFilesTab } from "./customer-files-tab";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
+import { CustomerTimelineTab, type TimelineItem } from "./customer-timeline-tab";
 
 type Province = { id: string; name: string };
 
@@ -72,6 +75,8 @@ function dateTime(iso: string) {
 }
 
 const tabs = [
+  // "Zaman tüneli" ilk sırada; varsayılan seçili sekme yine "talepler" (aşağıdaki fallback)
+  { id: "zaman",    label: "Zaman tüneli", icon: History },
   { id: "talepler",  label: "Talepler",   icon: Target },
   { id: "anlasmalar", label: "Anlaşmalar", icon: Handshake },
   { id: "iletisim", label: "İletişim",   icon: MessageSquare },
@@ -133,6 +138,7 @@ export function Customer360Tabs({
   urgencyOptions,
   demands,
   activity,
+  timeline = [],
   tags,
   notes,
   source,
@@ -153,6 +159,7 @@ export function Customer360Tabs({
   urgencyOptions?: { value: string; label: string }[];
   demands: Demand[];
   activity: ActivityItem[];
+  timeline?: TimelineItem[];
   tags: string[];
   notes: string | null;
   source: string | null;
@@ -164,7 +171,20 @@ export function Customer360Tabs({
   communications?: CommRow[];
   canCreateComm?: boolean;
 }) {
-  const [tab, setTab] = useState<TabId>("talepler");
+  /*
+   * Sekme durumu URL'den (?tab=) okunur: hero istatistik kutuları ve dış
+   * sayfalar (örn. /app/talepler kartı) belirli bir sekmeye link verebilsin.
+   * Sekme değişiminde replaceState kullanılır — Next router'a entegre olduğu
+   * için useSearchParams güncellenir ama sunucuya yeniden istek gitmez.
+   */
+  const searchParams = useSearchParams();
+  const spTab = searchParams.get("tab");
+  const tab: TabId = tabs.some((t) => t.id === spTab) ? (spTab as TabId) : "talepler";
+  function setTab(next: TabId) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", next);
+    window.history.replaceState(null, "", url);
+  }
 
   const stageLabel: Record<string, string> = {
     new: "Yeni",
@@ -197,7 +217,8 @@ export function Customer360Tabs({
       <TabsList className="flex-wrap border-0 bg-transparent p-0">
         {tabs.map((t) => {
           const count =
-            t.id === "talepler"   ? demands.length
+            t.id === "zaman"      ? timeline.length
+            : t.id === "talepler"   ? demands.length
             : t.id === "anlasmalar" ? deals.length
             : t.id === "iletisim" ? communications.length
             : t.id === "dosyalar" ? (files ?? []).length
@@ -220,6 +241,10 @@ export function Customer360Tabs({
           );
         })}
       </TabsList>
+
+      <TabsContent value="zaman">
+        <CustomerTimelineTab items={timeline} />
+      </TabsContent>
 
       <TabsContent value="talepler">
         <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
@@ -246,11 +271,11 @@ export function Customer360Tabs({
               {demands.map((d) => (
                 <div key={d.id} className="rounded-[14px] border border-line bg-canvas/60 p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-brand-600">
+                    <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">
                       {d.transaction_type}{d.property_type ? ` · ${d.property_type}` : ""}
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-mint-500/10 px-2 py-0.5 text-[10px] font-bold text-mint-600">
+                      <span className="rounded-full bg-mint-500/10 px-2 py-0.5 text-[11px] font-bold text-mint-600">
                         {demandStatus[d.status] ?? d.status}
                       </span>
                       <EditDemandDialog demand={d} provinces={provinces} customerId={customerId} />
@@ -290,17 +315,24 @@ export function Customer360Tabs({
           ) : (
             <div className="mt-4 space-y-2">
               {deals.map((d) => (
-                <div key={d.id} className="flex items-center justify-between gap-3 rounded-[12px] border border-line bg-canvas/50 px-3 py-3">
+                <Link
+                  key={d.id}
+                  href={`/app/anlasmalar/${d.id}`}
+                  className="focus-ring group flex items-center justify-between gap-3 rounded-[12px] border border-line bg-canvas/50 px-3 py-3 transition hover:border-brand-300"
+                >
                   <div>
                     <p className="text-sm font-semibold text-ink-950">
                       {d.deal_type === "rent" ? "Kiralama" : "Satış"} · {stageLabel[d.stage] ?? d.stage}
                     </p>
                     <p className="text-[11px] text-text-muted">{dateTime(d.updated_at)}</p>
                   </div>
-                  <p className="font-display text-sm font-extrabold text-brand-600">
-                    {d.deal_value != null ? money(d.deal_value) : "—"}
-                  </p>
-                </div>
+                  <span className="flex items-center gap-2">
+                    <span className="font-display text-sm font-extrabold text-brand-600">
+                      {d.deal_value != null ? money(d.deal_value) : "—"}
+                    </span>
+                    <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                  </span>
+                </Link>
               ))}
             </div>
           )}
@@ -334,16 +366,23 @@ export function Customer360Tabs({
           ) : (
             <div className="mt-4 space-y-2">
               {consents.map((c) => (
-                <div key={c.id} className="flex items-center justify-between rounded-[12px] border border-line bg-canvas/50 px-3 py-2.5 text-sm">
+                <Link
+                  key={c.id}
+                  href="/app/uyum"
+                  className="focus-ring group flex items-center justify-between rounded-[12px] border border-line bg-canvas/50 px-3 py-2.5 text-sm transition hover:border-brand-300"
+                >
                   <span className="font-semibold text-ink-950">{channelLabel[c.channel] ?? c.channel}</span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                      c.status === "granted" ? "bg-mint-500/10 text-mint-600" : c.status === "denied" ? "bg-danger-500/10 text-danger-500" : "bg-amber-400/15 text-amber-600"
-                    }`}
-                  >
-                    {c.status === "granted" ? "İzinli" : c.status === "denied" ? "Ret" : c.status}
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                        c.status === "granted" ? "bg-mint-500/10 text-mint-600" : c.status === "denied" ? "bg-danger-500/10 text-danger-500" : "bg-amber-400/15 text-amber-600"
+                      }`}
+                    >
+                      {c.status === "granted" ? "İzinli" : c.status === "denied" ? "Ret" : c.status}
+                    </span>
+                    <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                   </span>
-                </div>
+                </Link>
               ))}
             </div>
           )}
@@ -370,7 +409,7 @@ export function Customer360Tabs({
                     <p className="text-sm font-semibold text-ink-950">{a.title}</p>
                     <p className="text-xs text-text-muted">{a.sub}</p>
                   </div>
-                  <span className="shrink-0 text-[10px] text-text-faint">{dateTime(a.time)}</span>
+                  <span className="shrink-0 text-[11px] text-text-faint">{dateTime(a.time)}</span>
                 </div>
               ))}
             </div>

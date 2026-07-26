@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { ArrowLeft, Radio, Zap } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Radio, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { LeadCapturePanel } from "./lead-capture-panel";
+import { VitrinQr } from "@/components/public/vitrin-qr";
 
 export const dynamic = "force-dynamic";
 
@@ -49,16 +50,23 @@ export default async function LeadCaptureSettingsPage() {
               en uygun danışmana atanır ve anında bildirim gönderilir.
             </p>
           </div>
-          <div className="rounded-[14px] border border-white/12 bg-white/[0.05] px-5 py-3 text-center">
+          <Link
+            href="/app/musteriler"
+            className="focus-ring press lift group relative block rounded-[14px] border border-white/12 bg-white/[0.05] px-5 py-3 text-center transition hover:border-mint-400/40"
+          >
+            <ArrowUpRight className="hover-action absolute right-2 top-2 h-4 w-4 text-white/40 opacity-0 transition group-hover:text-mint-300 group-hover:opacity-100" />
             <p className="flex items-center justify-center gap-1.5 font-display text-2xl font-extrabold text-mint-300">
               <Zap className="h-5 w-5" /> {leadCount ?? 0}
             </p>
-            <p className="text-[10px] text-white/50">otomatik atanan aday</p>
-          </div>
+            <p className="text-[11px] text-white/50">otomatik atanan aday · müşterilere git</p>
+          </Link>
         </div>
       </section>
 
       <LeadCapturePanel token={token} enabled={enabled} baseUrl={baseUrl} vitrinUrl={vitrinUrl} />
+
+      {/* Vitrin QR kodu — basılı materyal için indirme + yazdırma */}
+      <VitrinQr vitrinUrl={vitrinUrl} />
     </div>
   );
 }

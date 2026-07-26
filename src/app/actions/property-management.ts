@@ -23,17 +23,20 @@ export async function changePropertyStatus(
   // Mevcut durumu al
   const { data: prop } = await supabase
     .from("properties")
-    .select("status")
+    .select("status, published_at")
     .eq("id", propertyId)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
 
   if (!prop) return { error: "Portföy bulunamadı." };
 
-  // Durumu güncelle
+  // Durumu güncelle — İLK live geçişinde published_at damgalanır; zaten
+  // doluysa DOKUNMA (yeniden yayına almada orijinal yayın tarihi korunur).
+  const patch: Record<string, unknown> = { status: newStatus, updated_at: new Date().toISOString() };
+  if (newStatus === "live" && prop.published_at == null) patch.published_at = new Date().toISOString();
   const { error } = await supabase
     .from("properties")
-    .update({ status: newStatus, updated_at: new Date().toISOString() })
+    .update(patch)
     .eq("id", propertyId)
     .eq("tenant_id", gate.tenantId);
 

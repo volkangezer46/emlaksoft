@@ -57,7 +57,8 @@ export function CustomerTasks({
     router.refresh();
   }
 
-  function act(fn: (fd: FormData) => Promise<void>, id: string) {
+  // completeTask artık sonraki tekrar bilgisini döndürüyor — dönüş burada kullanılmaz.
+  function act(fn: (fd: FormData) => Promise<unknown>, id: string) {
     const fd = new FormData();
     fd.set("id", id);
     startTransition(async () => {
@@ -122,13 +123,13 @@ export function CustomerTasks({
               {canEdit ? (
                 isDone ? (
                   <Tip label="Yeniden aç">
-                    <button type="button" disabled={pending} onClick={() => act(reopenTask, t.id)} aria-label="Görevi yeniden aç" className="focus-ring press grid h-7 w-7 place-items-center rounded-[8px] border border-line text-text-muted transition hover:border-brand-300">
+                    <button type="button" disabled={pending} onClick={() => act(reopenTask, t.id)} aria-label="Görevi yeniden aç" className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] border border-line text-text-muted transition hover:border-brand-300">
                       <RotateCcw className="h-3.5 w-3.5" />
                     </button>
                   </Tip>
                 ) : (
                   <Tip label="Tamamla">
-                    <button type="button" disabled={pending} onClick={() => act(completeTask, t.id)} aria-label="Görevi tamamla" className="focus-ring press grid h-7 w-7 place-items-center rounded-[8px] bg-mint-500/10 text-mint-600 transition hover:bg-mint-500/20">
+                    <button type="button" disabled={pending} onClick={() => act(completeTask, t.id)} aria-label="Görevi tamamla" className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] bg-mint-500/10 text-mint-600 transition hover:bg-mint-500/20">
                       <CheckCircle2 className="h-3.5 w-3.5" />
                     </button>
                   </Tip>
@@ -136,7 +137,7 @@ export function CustomerTasks({
               ) : null}
               {canDelete ? (
                 <Tip label="Sil">
-                  <button type="button" disabled={pending} onClick={() => act(deleteTask, t.id)} aria-label="Görevi sil" className="focus-ring press grid h-7 w-7 place-items-center rounded-[8px] border border-line text-danger-500 transition hover:border-danger-500/40">
+                  <button type="button" disabled={pending} onClick={() => act(deleteTask, t.id)} aria-label="Görevi sil" className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] border border-line text-danger-500 transition hover:border-danger-500/40">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </Tip>

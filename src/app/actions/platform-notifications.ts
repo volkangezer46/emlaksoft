@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requirePlatformStaff } from "@/lib/platform";
+import { getPlatformStaff, requirePlatformStaff } from "@/lib/platform";
 import { notifyTenant } from "@/lib/notify";
+import type { ComboboxOption } from "@/components/ui/combobox";
 
 export async function markPlatformNotificationRead(id: string): Promise<{ ok: boolean }> {
   const staff = await requirePlatformStaff();
@@ -36,6 +37,11 @@ export async function markAllPlatformNotificationsReadForm(): Promise<void> {
   await markAllPlatformNotificationsRead();
 }
 
+/** `<form action>` için tekil okundu sarmalayıcısı (href'siz bildirim satırları). */
+export async function markPlatformNotificationReadForm(formData: FormData): Promise<void> {
+  await markPlatformNotificationRead(String(formData.get("id") ?? "").trim());
+}
+
 // ---------------------------------------------------------------------------
 // Toplu duyuru (platform personelinden ofislere)
 // ---------------------------------------------------------------------------
@@ -63,7 +69,13 @@ export async function sendBroadcast(fd: FormData): Promise<BroadcastResult> {
   const body = (fd.get("body") as string | null)?.trim() || undefined;
   const kind = (fd.get("kind") as string | null) ?? "info";
   const href = (fd.get("href") as string | null)?.trim() || undefined;
-  const target = (fd.get("target") as BroadcastTarget | null) ?? "all";
+  const rawTarget = (fd.get("target") as string | null) ?? "all";
+  // Arşiv tablosundaki check kısıtıyla birebir — bilinmeyen değer "all"a düşer.
+  const target: BroadcastTarget = (["all", "trial", "active", "specific"] as const).includes(
+    rawTarget as BroadcastTarget,
+  )
+    ? (rawTarget as BroadcastTarget)
+    : "all";
   const specificId = (fd.get("tenant_id") as string | null)?.trim() || undefined;
 
   if (!title) return { error: "Başlık zorunludur." };
@@ -94,6 +106,20 @@ export async function sendBroadcast(fd: FormData): Promise<BroadcastResult> {
     sent++;
   }
 
+  // Arşiv: gönderim başına TEK satır — geçmiş listesi ve "kaç ofise ulaştı"
+  // buradan okunur. Arşiv yazımı başarısız olsa bile duyurular gitti; işlemi
+  // geriye düşürmeyiz, yalnızca loglarız.
+  const { error: archiveErr } = await admin.from("platform_announcements").insert({
+    title,
+    body: body ?? null,
+    kind: validKind,
+    audience: target,
+    tenant_id: target === "specific" ? (specificId ?? null) : null,
+    sent_count: sent,
+    created_by: staff.id,
+  });
+  if (archiveErr) console.error("duyuru arşivi yazılamadı", archiveErr);
+
   revalidatePath("/admin/duyuru");
   return { ok: true, sent };
 }
@@ -112,4 +138,33 @@ export async function listRecentBroadcasts(limit = 20) {
     .order("created_at", { ascending: false })
     .limit(limit);
   return data ?? [];
+}
+
+/**
+ * "Belirli ofis" hedefi için Combobox sunucu araması. UUID kopyala-yapıştır
+ * yerine ad ile arama — admin client kullanılır, bu yüzden yetki kapısı şart:
+ * duyuru gönderemeyen rol (support/billing) ofis listesini de tarayamaz.
+ */
+export async function searchTenantsBroadcast(query: string): Promise<ComboboxOption[]> {
+  const staff = await getPlatformStaff();
+  if (!staff || !["super_admin", "ops"].includes(staff.role)) return [];
+
+  const q = query.trim();
+  if (q.length < 2) return [];
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("tenants")
+    .select("id, name, slug, status")
+    .neq("status", "cancelled")
+    .ilike("name", `%${q}%`)
+    .order("name")
+    .limit(25);
+
+  if (error || !data) return [];
+  return data.map((t) => ({
+    value: t.id,
+    label: t.name,
+    hint: `/${t.slug} · ${t.status}`,
+  }));
 }

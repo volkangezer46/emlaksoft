@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, startTransition } from "react";
+import { useEffect, useMemo, useState, startTransition } from "react";
 import Link from "next/link";
 import {
   AlertOctagon,
@@ -20,6 +20,7 @@ import {
   type NotificationRow,
 } from "@/app/actions/notifications";
 import { filterByNotifPrefs, readNotifPrefs, type NotifPrefs } from "@/components/app/notification-prefs";
+import { onNotificationInsert } from "@/lib/realtime";
 
 const KIND_META: Record<string, { icon: LucideIcon; cls: string }> = {
   success: { icon: CheckCircle2, cls: "bg-mint-500/12 text-mint-600" },
@@ -68,6 +69,44 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
   const [items, setItems] = useState(initial);
   const [prefs, setPrefs] = useState<NotifPrefs | null>(null);
   const [tab, setTab] = useState<"all" | "unread">("all");
+  const [shake, setShake] = useState(false);
+
+  // Canlı bildirim: RealtimeRefresh, notifications INSERT'lerini window event
+  // olarak köprülüyor (tenant/user filtresi orada, RLS'li kanal — bkz.
+  // src/lib/realtime.ts). Burada listeye anında ekle + zili bir kez salla.
+  // Realtime kopuksa event gelmez; mevcut davranış (panel açılınca fetch +
+  // soft refresh ile yeni `initial`) aynen sürer.
+  useEffect(() => {
+    return onNotificationInsert((row) => {
+      setItems((prev) =>
+        prev.some((n) => n.id === row.id)
+          ? prev
+          : [
+              {
+                id: row.id,
+                title: row.title,
+                body: row.body,
+                href: row.href,
+                kind: row.kind,
+                read_at: row.read_at,
+                created_at: row.created_at,
+              },
+              ...prev,
+            ],
+      );
+      setShake(true);
+    });
+  }, []);
+
+  // Elle kurulmuş popover: Escape ile kapanma (Radix'teki davranışın dengi).
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   // Sunucudan yeni `initial` geldiğinde yerel listeyi tazele. Efekt yerine
   // React'in belgelediği "prop değişiminde render sırasında state ayarla"
@@ -87,6 +126,24 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
   const shown = tab === "unread" ? visible.filter((n) => !n.read_at) : visible;
   const groups = groupByTime(shown);
 
+  // App Badge API: PWA yüklüyse ana ekran ikonunda okunmamış rozeti.
+  // Desteklemeyen tarayıcılarda (typeof kontrolü) sessizce atlanır.
+  useEffect(() => {
+    const nav = navigator as Navigator & {
+      setAppBadge?: (count?: number) => Promise<void>;
+      clearAppBadge?: () => Promise<void>;
+    };
+    try {
+      if (unread > 0 && typeof nav.setAppBadge === "function") {
+        void nav.setAppBadge(unread).catch(() => {});
+      } else if (unread === 0 && typeof nav.clearAppBadge === "function") {
+        void nav.clearAppBadge().catch(() => {});
+      }
+    } catch {
+      // Rozet desteklenmiyor — görsel zil sayacı zaten var.
+    }
+  }, [unread]);
+
   async function refresh() {
     const next = await listMyNotifications();
     startTransition(() => setItems(next));
@@ -103,8 +160,10 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
   }
 
   async function onRead(id: string) {
-    await markNotificationRead(id);
+    // Okunmuşa tekrar tıklanınca sunucuya boş yere yazma + revalidate olmasın.
+    if (items.find((n) => n.id === id)?.read_at) return;
     setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)));
+    await markNotificationRead(id);
   }
 
   async function onReadAll() {
@@ -127,7 +186,7 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
             <span className="truncate">{n.title}</span>
           </p>
           {n.body ? <p className="mt-0.5 line-clamp-2 text-xs text-text-muted">{n.body}</p> : null}
-          <p className="mt-1 text-[10px] text-text-faint">{relTime(n.created_at)}</p>
+          <p className="mt-1 text-[11px] text-text-faint">{relTime(n.created_at)}</p>
         </div>
       </div>
     );
@@ -152,15 +211,30 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
 
   return (
     <div className="relative">
+      {/* Yeni bildirimde zile tek seferlik küçük sallanma; hareket azaltma
+          tercihinde kapalı. Global stile dokunmamak için bileşen içi <style>. */}
+      <style>{`
+        @keyframes es-bell-shake {
+          0%, 100% { transform: rotate(0deg); }
+          20% { transform: rotate(12deg); }
+          40% { transform: rotate(-10deg); }
+          60% { transform: rotate(6deg); }
+          80% { transform: rotate(-3deg); }
+        }
+        .es-bell-shake { animation: es-bell-shake 0.55s ease-in-out 1; transform-origin: 50% 0%; }
+        @media (prefers-reduced-motion: reduce) {
+          .es-bell-shake { animation: none; }
+        }
+      `}</style>
       <button
         type="button"
         onClick={onOpen}
         className="relative grid h-10 w-10 place-items-center rounded-[11px] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
         aria-label={`Bildirimler${unread > 0 ? ` (${unread} okunmamış)` : ""}`}
       >
-        <Bell className="h-4 w-4" />
+        <Bell className={`h-4 w-4${shake ? " es-bell-shake" : ""}`} onAnimationEnd={() => setShake(false)} />
         {unread > 0 ? (
-          <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full border-2 border-white bg-danger-500 px-1 text-[9px] font-bold leading-none text-white">
+          <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full border-2 border-white bg-danger-500 px-1 text-[10px] font-bold leading-none text-white">
             {unread > 9 ? "9+" : unread}
           </span>
         ) : null}
@@ -174,7 +248,7 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
               <div className="flex items-center gap-2">
                 <p className="font-display text-sm font-bold text-ink-950">Bildirimler</p>
                 {unread > 0 ? (
-                  <span className="rounded-full bg-danger-500/10 px-1.5 py-0.5 text-[10px] font-bold text-danger-600">{unread} yeni</span>
+                  <span className="rounded-full bg-danger-500/10 px-1.5 py-0.5 text-[11px] font-bold text-danger-600">{unread} yeni</span>
                 ) : null}
               </div>
               {unread > 0 ? (
@@ -213,11 +287,22 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
               ) : (
                 groups.map((g) => (
                   <div key={g.label}>
-                    <p className="sticky top-0 z-10 bg-canvas/90 px-4 py-1.5 text-[10px] font-bold uppercase tracking-wide text-text-faint backdrop-blur">{g.label}</p>
+                    <p className="sticky top-0 z-10 bg-canvas/90 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint backdrop-blur">{g.label}</p>
                     {g.items.map(renderItem)}
                   </div>
                 ))
               )}
+            </div>
+
+            {/* Arşiv: tüm bildirimlerin filtreli/sayfalı tam listesi */}
+            <div className="border-t border-line">
+              <Link
+                href="/app/bildirimler"
+                onClick={() => setOpen(false)}
+                className="block px-4 py-2.5 text-center text-xs font-semibold text-brand-600 transition hover:bg-canvas"
+              >
+                Tümünü gör
+              </Link>
             </div>
           </div>
         </>

@@ -100,7 +100,7 @@ export function PropertyBulkActions({
           <button
             type="button"
             onClick={() => setSelectedIds(new Set())}
-            className="ml-auto grid h-7 w-7 place-items-center rounded-[7px] text-text-muted hover:bg-line"
+            className="ml-auto grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[7px] text-text-muted hover:bg-line"
             aria-label="Seçimi temizle"
           >
             <X className="h-4 w-4" />

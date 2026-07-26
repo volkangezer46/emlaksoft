@@ -1,13 +1,31 @@
 import Link from "next/link";
-import { ArrowUpRight, Bug, CheckCircle2, Database, KeyRound, Landmark, MapPin, MapPinned, Radar, XCircle } from "lucide-react";
+import { ArrowUpRight, Bug, CheckCircle2, Clock3, Database, HeartPulse, KeyRound, Landmark, MapPin, MapPinned, Radar, XCircle } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { getPlatformSetting } from "@/lib/platform-settings";
+import { relativeTimeTR } from "@/lib/admin-format";
+import { DAY_MS, msSince } from "@/lib/clock";
 import { OpenAiKeyForm } from "@/components/admin/openai-key-form";
 import { EndeksaKeyForm, TapusorKeyForm } from "@/components/admin/integration-keys-form";
 import { PortalApiKeysSection } from "@/components/admin/portal-keys-form";
 
 const TOTAL_PROVINCES = 81;
+
+/** Beklenen cron uçları — route klasör adlarıyla birebir. Kalp atışı hiç
+ *  düşmemiş olsa bile listede görünsünler ("Kayıt yok"). */
+const CRON_JOBS: { job: string; label: string }[] = [
+  { job: "abonelik-kontrol", label: "Abonelik kontrolü" },
+  { job: "dogum-gunu", label: "Doğum günü / yıldönümü" },
+  { job: "gorev-hatirlat", label: "Görev hatırlatma" },
+  { job: "gunluk-ozet", label: "Günlük ofis özeti" },
+  { job: "leak-sla", label: "Kayıp-kaçak SLA" },
+  { job: "otomasyon", label: "Otomasyon motoru" },
+  { job: "portal-teyit", label: "Portal teyit takibi" },
+  { job: "randevu-hatirlat", label: "Randevu hatırlatma" },
+  { job: "tcmb-kur", label: "TCMB kur çekimi" },
+];
+
+type Heartbeat = { job: string; last_run_at: string; last_status: string; last_detail: string | null };
 
 function StatusPill({ ok, okLabel, badLabel }: { ok: boolean; okLabel: string; badLabel: string }) {
   return (
@@ -38,6 +56,7 @@ export default async function AdminSystemPage() {
     dbEndeksaId, dbEndeksaSecret, dbTapusorKey,
     dbSahibindenKey, dbHepsiemlakKey, dbZingatKey,
     { count: provinces }, { count: districts }, { count: neighborhoods },
+    { data: heartbeatRows },
   ] = await Promise.all([
     getPlatformSetting("openai_api_key"),
     getPlatformSetting("endeksa_client_id"),
@@ -49,7 +68,11 @@ export default async function AdminSystemPage() {
     admin.from("geo_provinces").select("id", { count: "exact", head: true }),
     admin.from("geo_districts").select("id", { count: "exact", head: true }),
     admin.from("geo_neighborhoods").select("id", { count: "exact", head: true }),
+    admin.from("cron_heartbeats").select("job, last_run_at, last_status, last_detail"),
   ]);
+
+  const heartbeats = new Map<string, Heartbeat>();
+  for (const h of (heartbeatRows ?? []) as Heartbeat[]) heartbeats.set(h.job, h);
 
   // OpenAI
   const envKey = process.env.OPENAI_API_KEY?.trim() || null;
@@ -109,15 +132,15 @@ export default async function AdminSystemPage() {
           <div className="mt-4 grid grid-cols-3 gap-3">
             <div className="rounded-[12px] border border-line bg-canvas/60 p-3 text-center">
               <p className="font-display text-xl font-extrabold text-ink-950">{provinces ?? 0}/{TOTAL_PROVINCES}</p>
-              <p className="text-[10px] text-text-muted">İl (%{provinceCoverage})</p>
+              <p className="text-[11px] text-text-muted">İl (%{provinceCoverage})</p>
             </div>
             <div className="rounded-[12px] border border-line bg-canvas/60 p-3 text-center">
               <p className="font-display text-xl font-extrabold text-ink-950">{(districts ?? 0).toLocaleString("tr-TR")}</p>
-              <p className="text-[10px] text-text-muted">İlçe</p>
+              <p className="text-[11px] text-text-muted">İlçe</p>
             </div>
             <div className="rounded-[12px] border border-line bg-canvas/60 p-3 text-center">
               <p className="font-display text-xl font-extrabold text-ink-950">{(neighborhoods ?? 0).toLocaleString("tr-TR")}</p>
-              <p className="text-[10px] text-text-muted">Mahalle</p>
+              <p className="text-[11px] text-text-muted">Mahalle</p>
             </div>
           </div>
           <p className="mt-4 text-xs text-text-muted">
@@ -155,6 +178,54 @@ export default async function AdminSystemPage() {
           >
             Hataları aç <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>
+        </section>
+
+        {/* Cron sağlığı: her job son çalışmasında cron_heartbeats'e tek satır
+            düşer. 24 saatten eski (veya hiç düşmemiş) kayıt "gecikmiş" sayılır. */}
+        <section className="rounded-[20px] border border-line bg-surface p-5">
+          <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
+            <HeartPulse className="h-4 w-4" /> Cron sağlığı
+          </p>
+          <h2 className="mt-1 font-display font-bold text-ink-950">Zamanlanmış görevler</h2>
+          <div className="mt-4 space-y-2">
+            {CRON_JOBS.map(({ job, label }) => {
+              const hb = heartbeats.get(job);
+              const stale = !hb || msSince(hb.last_run_at) > DAY_MS;
+              const failed = hb?.last_status === "error";
+              return (
+                <div
+                  key={job}
+                  className="flex items-center justify-between gap-3 rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink-950">{label}</p>
+                    <p className="truncate text-[11px] text-text-faint">
+                      <span className="numeric">{job}</span>
+                      {hb ? ` · ${relativeTimeTR(hb.last_run_at)}` : " · hiç çalışmadı"}
+                      {hb?.last_detail ? ` · ${hb.last_detail}` : ""}
+                    </p>
+                  </div>
+                  {failed ? (
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-danger-500/10 px-2.5 py-1 text-[11px] font-bold text-danger-500">
+                      <XCircle className="h-3.5 w-3.5" /> Hata
+                    </span>
+                  ) : stale ? (
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-400/15 px-2.5 py-1 text-[11px] font-bold text-amber-600">
+                      <Clock3 className="h-3.5 w-3.5" /> Gecikmiş
+                    </span>
+                  ) : (
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-mint-500/12 px-2.5 py-1 text-[11px] font-bold text-mint-600">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Sağlıklı
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-3 text-[11px] text-text-faint">
+            Son çalışma 24 saatten eskiyse görev &quot;gecikmiş&quot; sayılır. Kalp atışı, cron
+            çalışmasının sonunda yazılır ve asıl işi asla bloklamaz.
+          </p>
         </section>
 
         <section className="rounded-[20px] border border-line bg-surface p-5">

@@ -48,6 +48,12 @@ export function CountUp({
     const run = () => {
       if (started.current) return;
       started.current = true;
+      // Hareket azaltma tercihi: CSS kuralı JS RAF döngüsünü durdurmaz,
+      // burada elle sonlandırıyoruz.
+      if (typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        el.textContent = `${prefix}${format(to, decimals, separator)}${suffix}`;
+        return;
+      }
       const start = performance.now();
       const tick = (now: number) => {
         const p = Math.min((now - start) / duration, 1);
@@ -80,7 +86,8 @@ export function CountUp({
   }, [decimals, duration, from, prefix, separator, suffix, to]);
 
   return (
-    <span ref={ref} className={className}>
+    // numeric: tabular rakamlar — sayım sırasında genişlik titremesin
+    <span ref={ref} className={`numeric ${className}`.trim()}>
       {prefix}
       {format(from, decimals, separator)}
       {suffix}

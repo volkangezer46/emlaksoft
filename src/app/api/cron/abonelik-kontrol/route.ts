@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { recordHeartbeat } from "@/lib/cron-heartbeat";
 
 function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -33,6 +34,8 @@ export async function GET(req: NextRequest) {
     });
     updated += 1;
   }
+
+  await recordHeartbeat("abonelik-kontrol", "ok", `${updated} abonelik güncellendi`);
 
   return NextResponse.json({ ok: true, updated });
 }

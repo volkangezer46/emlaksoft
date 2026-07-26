@@ -14,7 +14,7 @@ export function CustomerRowDelete({ customerId, name }: { customerId: string; na
           <input type="hidden" name="id" value={customerId} />
           <button
             type="submit"
-            className="rounded-[7px] bg-danger-500 px-2 py-1 text-[10px] font-bold text-white hover:bg-danger-600"
+            className="rounded-[7px] bg-danger-500 px-2 py-1 text-[11px] font-bold text-white hover:bg-danger-600"
           >
             Sil
           </button>
@@ -22,7 +22,7 @@ export function CustomerRowDelete({ customerId, name }: { customerId: string; na
         <button
           type="button"
           onClick={() => setConfirming(false)}
-          className="rounded-[7px] px-1.5 py-1 text-[10px] font-semibold text-text-muted hover:text-ink-950"
+          className="rounded-[7px] px-1.5 py-1 text-[11px] font-semibold text-text-muted hover:text-ink-950"
         >
           Vazgeç
         </button>

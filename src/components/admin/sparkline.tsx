@@ -36,6 +36,7 @@ export function Sparkline({
 
   return (
     <svg
+      aria-hidden="true"
       viewBox={`0 0 ${width} ${height}`}
       className={className}
       preserveAspectRatio="none"

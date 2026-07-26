@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- %18 köşe yarıçapı (512 * 0.18 ≈ 92); duraklar marka gradyanı (grad-brand) ile aynı -->
+  <defs>
+    <linearGradient id="es-bg" x1="0" y1="0" x2="1" y2="0.58">
+      <stop offset="0" stop-color="#1463ff"/>
+      <stop offset="0.55" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#10b9a3"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="92" fill="url(#es-bg)"/>
+  <!-- Ekstra bold "E" — font gömmek yerine yuvarlatılmış dikdörtgenlerle çizildi (Manrope hissi) -->
+  <g fill="#ffffff">
+    <rect x="168" y="131" width="55" height="250" rx="12"/>
+    <rect x="168" y="131" width="175" height="55" rx="12"/>
+    <rect x="168" y="228.5" width="150" height="55" rx="12"/>
+    <rect x="168" y="326" width="175" height="55" rx="12"/>
+  </g>
+</svg>

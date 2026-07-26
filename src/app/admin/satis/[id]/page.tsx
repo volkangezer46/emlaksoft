@@ -41,11 +41,11 @@ export default async function AdminLeadDetailPage({ params }: { params: Promise<
   }
 
   const staffList = staff ?? [];
-  const facts = [
-    { icon: Phone, label: "Telefon", value: lead.phone || "—" },
-    { icon: Mail, label: "E-posta", value: lead.email || "—" },
+  const facts: { icon: typeof Phone; label: string; value: string; href?: string }[] = [
+    { icon: Phone, label: "Telefon", value: lead.phone || "—", href: lead.phone ? `tel:${lead.phone}` : undefined },
+    { icon: Mail, label: "E-posta", value: lead.email || "—", href: lead.email ? `mailto:${lead.email}` : undefined },
     { icon: Building2, label: "Şirket", value: lead.company || "—" },
-    { icon: MapPin, label: "Şehir", value: lead.city || "—" },
+    { icon: MapPin, label: "Şehir", value: lead.city || "—", href: lead.city ? "/admin/satis" : undefined },
     { icon: Users, label: "Ekip", value: lead.team_size || "—" },
     { icon: Calendar, label: "Geliş", value: dateTime(lead.created_at) },
   ];
@@ -78,13 +78,36 @@ export default async function AdminLeadDetailPage({ params }: { params: Promise<
           </div>
         </div>
         <div className="relative mt-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {facts.map((f) => (
-            <div key={f.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3">
-              <f.icon className="h-4 w-4 text-cyan-400" />
-              <p className="mt-1.5 truncate text-sm font-semibold text-white" title={f.value}>{f.value}</p>
-              <p className="text-[10px] text-white/45">{f.label}</p>
-            </div>
-          ))}
+          {facts.map((f) => {
+            const inner = (
+              <>
+                <f.icon className="h-4 w-4 text-cyan-400" />
+                <p className="mt-1.5 truncate text-sm font-semibold text-white" title={f.value}>{f.value}</p>
+                <p className="text-[11px] text-white/45">{f.label}</p>
+              </>
+            );
+            const linkedCls =
+              "focus-ring group block rounded-[14px] border border-white/10 bg-white/5 p-3 transition hover:border-white/25 hover:bg-white/10";
+            if (f.href?.startsWith("/")) {
+              return (
+                <Link key={f.label} href={f.href} className={linkedCls}>
+                  {inner}
+                </Link>
+              );
+            }
+            if (f.href) {
+              return (
+                <a key={f.label} href={f.href} className={linkedCls}>
+                  {inner}
+                </a>
+              );
+            }
+            return (
+              <div key={f.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3">
+                {inner}
+              </div>
+            );
+          })}
         </div>
       </section>
 

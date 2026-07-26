@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchTcmbRate, fetchLatestTcmbRate } from "@/lib/tcmb";
+import { recordHeartbeat } from "@/lib/cron-heartbeat";
 
 /**
  * TCMB günlük kur çekme cron'u.
@@ -70,6 +71,8 @@ export async function GET(req: NextRequest) {
       else inserted += 1;
     }
 
+    await recordHeartbeat("tcmb-kur", "ok", `backfill: ${inserted} gün eklendi`);
+
     return NextResponse.json({
       mode: "backfill",
       days: backfillDays,
@@ -86,6 +89,7 @@ export async function GET(req: NextRequest) {
   if (!result.ok) {
     // Yayın yokluğu normal durum → 200. Ağ/parse hatası → 502.
     if (result.reason === "no-publication") {
+      await recordHeartbeat("tcmb-kur", "ok", "TCMB yayını yok (hafta sonu/tatil)");
       return NextResponse.json({ skipped: true, reason: "TCMB yayını yok (hafta sonu/tatil)" });
     }
     return NextResponse.json(
@@ -108,6 +112,8 @@ export async function GET(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: "db", detail: error.message }, { status: 500 });
   }
+
+  await recordHeartbeat("tcmb-kur", "ok", `kur alındı: ${result.rate.rateDate}`);
 
   return NextResponse.json({
     ok: true,

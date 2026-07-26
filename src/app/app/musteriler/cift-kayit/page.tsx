@@ -2,8 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowUpRight, CheckCircle2, Copy, Info, Mail, Phone, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { Badge } from "@/components/ui/badge";
-import { formatTurkishPhone } from "@/lib/phone";
+import { DuplicateGroupsClient } from "./groups-client";
 
 export const metadata = { title: "Çift kayıt kontrolü" };
 
@@ -43,10 +42,6 @@ const SIGNAL_META: Record<
   },
 };
 
-function tarih(iso: string) {
-  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(iso));
-}
-
 /**
  * Çift müşteri kaydı kontrolü (X6).
  *
@@ -56,16 +51,26 @@ function tarih(iso: string) {
  * danışman tarafından aranır, lead kaynağı istatistikleri bölünür, görüşme
  * geçmişi ikiye ayrılır ve İYS izni bir kayıtta olup diğerinde olmayabilir.
  *
- * NEDEN OTOMATİK BİRLEŞTİRME YOK: Birleştirme alt kayıtları (talep, randevu,
- * çağrı, görüşme, anlaşma, teklif, sözleşme, görev) taşımayı gerektiren geri
- * alınamaz bir işlem. Yanlış eşleşmede veri kaybı demek — özellikle "aynı ad
- * soyad" sinyali tek başına kanıt değil. Bu sayfa kararı kullanıcıya
- * bırakıyor; hangi kaydın daha dolu olduğunu (aktivite sayısı) göstererek
- * kararı kolaylaştırıyor.
+ * NEDEN SİHİRBAZLI (OTOMATİK DEĞİL) BİRLEŞTİRME: Birleştirme alt kayıtları
+ * (talep, randevu, çağrı, görüşme, anlaşma, teklif, sözleşme, görev...)
+ * taşımayı gerektiren geri alınamaz bir işlem. Yanlış eşleşmede veri kaybı
+ * demek — özellikle "aynı ad soyad" sinyali tek başına kanıt değil. Bu
+ * yüzden birleştirme hiçbir zaman otomatik çalışmaz: kullanıcı üç adımlı
+ * sihirbazda ana kaydı seçer, taşınacakların özetini görür ve ayrı bir
+ * onayla işlemi başlatır (bkz. merge-wizard.tsx / mergeCustomers).
+ * Yanlış eşleşen gruplar "Bu grup mükerrer değil" ile cihaz bazında
+ * gizlenebilir (localStorage — DB'siz hafif çözüm, bkz. groups-client.tsx).
  */
-export default async function DuplicateCustomersPage() {
+export default async function DuplicateCustomersPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ signal?: string }>;
+}) {
   const { tenantId } = await requireModulePage("customers");
   const supabase = await createClient();
+  const sp = (await searchParams) ?? {};
+  const signalF: Row["signal"] | "" =
+    sp.signal === "phone" || sp.signal === "email" || sp.signal === "name" ? sp.signal : "";
 
   const { data, error } = await supabase.rpc("find_duplicate_customers", { p_tenant_id: tenantId });
   const rows = (data ?? []) as Row[];
@@ -79,12 +84,21 @@ export default async function DuplicateCustomersPage() {
     gruplar.get(k)!.kayitlar.push(r);
   }
   const liste = [...gruplar.values()];
+  // KPI'lar tam kümeden sayılır; ?signal= yalnızca aşağıdaki listeyi daraltır.
+  const gosterilen = signalF ? liste.filter((g) => g.signal === signalF) : liste;
 
   const telefonGrup = liste.filter((g) => g.signal === "phone").length;
   const epostaGrup = liste.filter((g) => g.signal === "email").length;
   const adGrup = liste.filter((g) => g.signal === "name").length;
   // Aynı kayıt birden çok sinyalde görünebilir; benzersiz sayıyoruz.
   const etkilenen = new Set(rows.map((r) => r.customer_id)).size;
+
+  const sinyalSekmeleri = [
+    { key: "" as const, label: "Tümü", count: liste.length },
+    { key: "phone" as const, label: SIGNAL_META.phone.label, count: telefonGrup },
+    { key: "email" as const, label: SIGNAL_META.email.label, count: epostaGrup },
+    { key: "name" as const, label: SIGNAL_META.name.label, count: adGrup },
+  ];
 
   return (
     <div className="space-y-6">
@@ -110,20 +124,50 @@ export default async function DuplicateCustomersPage() {
 
           <div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
-              { label: "Etkilenen kayıt", value: String(etkilenen), icon: UserRound },
-              { label: "Aynı telefon", value: String(telefonGrup), icon: Phone },
-              { label: "Aynı e-posta", value: String(epostaGrup), icon: Mail },
-              { label: "Aynı ad", value: String(adGrup), icon: Copy },
+              { label: "Etkilenen kayıt", value: String(etkilenen), icon: UserRound, href: "/app/musteriler/cift-kayit" },
+              { label: "Aynı telefon", value: String(telefonGrup), icon: Phone, href: "/app/musteriler/cift-kayit?signal=phone" },
+              { label: "Aynı e-posta", value: String(epostaGrup), icon: Mail, href: "/app/musteriler/cift-kayit?signal=email" },
+              { label: "Aynı ad", value: String(adGrup), icon: Copy, href: "/app/musteriler/cift-kayit?signal=name" },
             ].map((k) => (
-              <div key={k.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur">
-                <k.icon className="h-4 w-4 text-amber-400" />
+              <Link
+                key={k.label}
+                href={k.href}
+                className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
+              >
+                <div className="flex items-start justify-between">
+                  <k.icon className="h-4 w-4 text-amber-400" />
+                  <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                </div>
                 <p className="numeric mt-2 font-display text-lg font-extrabold text-white">{k.value}</p>
-                <p className="text-[10px] text-white/45 sm:text-xs">{k.label}</p>
-              </div>
+                <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+              </Link>
             ))}
           </div>
         </div>
       </section>
+
+      {/* Sinyal türü filtre sekmeleri — hero KPI'larıyla aynı ?signal= kontratı */}
+      {liste.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {sinyalSekmeleri.map((s) => {
+            const active = s.key === signalF;
+            const href = s.key ? `/app/musteriler/cift-kayit?signal=${s.key}` : "/app/musteriler/cift-kayit";
+            return (
+              <Link
+                key={s.key || "all"}
+                href={href}
+                className={`focus-ring press rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                  active
+                    ? "bg-brand-600 text-white"
+                    : "border border-line bg-surface text-text-muted hover:border-brand-400 hover:text-brand-600"
+                }`}
+              >
+                {s.label} <span className={active ? "text-white/70" : "text-text-faint"}>{s.count}</span>
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
 
       {error ? (
         <p className="rounded-[14px] border border-danger-500/30 bg-danger-500/5 px-4 py-3 text-sm text-danger-600" role="alert">
@@ -141,76 +185,44 @@ export default async function DuplicateCustomersPage() {
             çakışabilir.
           </p>
         </div>
-      ) : (
-        <div className="space-y-4">
-          {liste.map((g) => {
-            const meta = SIGNAL_META[g.signal];
-            // En dolu kayıt: birleştirmede genelde bu tutulur.
-            const enDolu = Math.max(...g.kayitlar.map((k) => k.activity));
-            return (
-              <section key={`${g.signal}-${g.key}`} className="surface-card rounded-[var(--radius-panel)] p-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="flex items-center gap-2">
-                      <Badge variant={meta.variant}>{meta.label}</Badge>
-                      <span className="numeric truncate text-sm font-semibold text-ink-950">
-                        {g.signal === "phone" ? formatTurkishPhone(g.key) : g.key}
-                      </span>
-                    </p>
-                    <p className="mt-1 text-[11px] text-text-faint">{meta.desc}</p>
-                  </div>
-                  <span className="shrink-0 rounded-full bg-canvas px-2.5 py-1 text-xs font-semibold text-text-muted">
-                    {g.kayitlar.length} kayıt
-                  </span>
-                </div>
-
-                <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {g.kayitlar.map((k) => {
-                    const onerilen = k.activity === enDolu && enDolu > 0;
-                    return (
-                      <li key={k.customer_id}>
-                        <Link
-                          href={`/app/musteriler/${k.customer_id}`}
-                          className={`lift-hover focus-ring group flex h-full items-start justify-between gap-3 rounded-[14px] border p-4 transition ${
-                            onerilen ? "border-mint-500/40 bg-mint-500/[0.05]" : "border-line bg-canvas"
-                          }`}
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate font-semibold text-ink-950">{k.full_name ?? "İsimsiz"}</p>
-                            <p className="numeric mt-0.5 text-xs text-text-muted">
-                              {k.phone ? formatTurkishPhone(k.phone) : "Telefon yok"}
-                            </p>
-                            <p className="mt-0.5 truncate text-xs text-text-muted">{k.email ?? "E-posta yok"}</p>
-                            <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-text-faint">
-                              <span>{tarih(k.created_at)} tarihinde eklendi</span>
-                              <span className="numeric">{k.activity} kayıt hareketi</span>
-                              {onerilen ? (
-                                <span className="font-semibold text-mint-600">en dolu kayıt</span>
-                              ) : null}
-                            </p>
-                          </div>
-                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-surface text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
-                            <ArrowUpRight className="h-4 w-4" />
-                          </span>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            );
-          })}
+      ) : gosterilen.length === 0 ? (
+        <div className="grid place-items-center rounded-[20px] border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
+          <CheckCircle2 className="h-8 w-8 text-mint-600" />
+          <h2 className="mt-3 font-display text-lg font-bold text-ink-950">Bu sinyalde çift kayıt yok</h2>
+          <p className="mt-1 text-sm text-text-muted">
+            {signalF ? SIGNAL_META[signalF].label : "Seçili"} sinyalinde eşleşen grup bulunamadı.
+          </p>
+          <Link href="/app/musteriler/cift-kayit" className="mt-4 text-sm font-semibold text-brand-600 hover:underline">
+            Tüm sinyalleri göster
+          </Link>
         </div>
+      ) : (
+        <DuplicateGroupsClient
+          groups={gosterilen.map((g) => ({
+            signal: g.signal,
+            key: g.key,
+            kayitlar: g.kayitlar.map((k) => ({
+              customer_id: k.customer_id,
+              full_name: k.full_name,
+              phone: k.phone,
+              email: k.email,
+              created_at: k.created_at,
+              activity: k.activity,
+            })),
+          }))}
+        />
       )}
 
       <p className="flex items-start gap-2 rounded-[14px] border border-line bg-canvas px-4 py-3 text-xs leading-relaxed text-text-muted">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
         <span>
-          Bu sayfa <strong>birleştirme yapmaz</strong>. Birleştirme; talep, randevu, çağrı, görüşme,
-          anlaşma, teklif ve görev kayıtlarını taşımayı gerektiren geri alınamaz bir işlemdir ve
-          yanlış eşleşmede veri kaybına yol açar — özellikle &quot;aynı ad soyad&quot; sinyali tek
-          başına kanıt değildir. Kararı siz verin: tutacağınız kaydı açın, diğerindeki bilgileri
-          taşıyın ve fazlalığı silin. <strong>En dolu kayıt</strong> yeşil çerçeveyle işaretli.
+          Birleştirme; talep, randevu, çağrı, görüşme, anlaşma, teklif ve görev kayıtlarını taşıyan{" "}
+          <strong>geri alınamaz</strong> bir işlemdir ve yanlış eşleşmede veriler karışır —
+          özellikle &quot;aynı ad soyad&quot; sinyali tek başına kanıt değildir. Emin olduğunuz
+          gruplarda <strong>Birleştir</strong> sihirbazını kullanın: ana kaydı seçin, taşınacakların
+          özetini görün, onaylayın. <strong>En dolu kayıt</strong> yeşil çerçeveyle işaretli. Aynı
+          kişi olmadığından eminseniz <strong>Bu grup mükerrer değil</strong> ile grubu bu cihazda
+          gizleyebilirsiniz.
         </span>
       </p>
     </div>

@@ -13,15 +13,21 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { listContractVersions } from "@/app/actions/contracts";
 import { ContractSignPanel } from "./contract-sign-panel";
+import { CopySignLink } from "./copy-sign-link";
+import { FillFieldsDialog } from "./fill-fields-dialog";
+import { VersionHistory } from "./version-history";
 import { riskSummary, scanContract } from "@/lib/contract-risk";
 
 const TYPE_LABELS: Record<string, string> = {
-  satis:    "Satış",
-  kira:     "Kira",
-  sozlesme: "Sözleşme",
-  teklif:   "Teklif",
-  diger:    "Diğer",
+  satis:        "Satış",
+  kira:         "Kira",
+  sozlesme:     "Sözleşme",
+  teklif:       "Teklif",
+  yer_gosterme: "Yer gösterme",
+  kapora:       "Kapora",
+  diger:        "Diğer",
 };
 
 const STATUS_STYLES: Record<string, { cls: string; icon: React.ReactNode; label: string }> = {
@@ -50,11 +56,14 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
 
   const { data } = await supabase
     .from("contracts")
-    .select("id, title, contract_type, body, status, signed_at, expires_at, created_at, updated_at, property:properties(id,property_code,title,commission_rate), customer:customers(id,full_name), signers:contract_signers(id,full_name,email,phone,status,signed_at)")
+    .select("id, title, contract_type, body, status, signed_at, expires_at, created_at, updated_at, property:properties(id,property_code,title,commission_rate,address_line,list_price), customer:customers(id,full_name,phone,email), signers:contract_signers(id,full_name,email,phone,status,signed_at,token,verified_at)")
     .eq("id", id)
     .maybeSingle();
 
   if (!data) notFound();
+
+  // Sürüm geçmişi — içerik düzenlendikçe önceki haller burada listelenir
+  const versions = await listContractVersions(id);
 
   const contract = data;
   const statusInfo = STATUS_STYLES[contract.status] ?? STATUS_STYLES.draft;
@@ -69,6 +78,10 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
    * gondermek sahada en sik yapilan hata.
    */
   const propertyRel = Array.isArray(contract.property) ? contract.property[0] : contract.property;
+  // BUG düzeltmesi: müşteri linki yalnızca ilişki DİZİ döndüğünde üretiliyordu;
+  // supabase tekil nesne döndürdüğünde ad düz metin kalıyordu. İki biçim de
+  // tek yerden çözülüyor, link her iki durumda da çıkıyor.
+  const customerRel = Array.isArray(contract.customer) ? contract.customer[0] : contract.customer;
   const riskler = scanContract({
     contractType: contract.contract_type,
     title: contract.title,
@@ -121,9 +134,13 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
               <User className="h-4 w-4 text-mint-400" />
               <span className="text-white/80">Müşteri:</span>
               <span className="font-semibold text-white">
-                {Array.isArray(contract.customer)
-                  ? <Link href={`/app/musteriler/${(contract.customer[0] as {id:string})?.id}`} className="hover:underline">{customerName}</Link>
-                  : customerName}
+                {customerRel?.id ? (
+                  <Link href={`/app/musteriler/${customerRel.id}`} className="focus-ring rounded-[6px] hover:underline">
+                    {customerName}
+                  </Link>
+                ) : (
+                  customerName
+                )}
               </span>
             </div>
           )}
@@ -131,7 +148,15 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
             <div className="flex items-center gap-2 rounded-[12px] border border-white/10 bg-white/5 px-3 py-2 text-sm">
               <Building2 className="h-4 w-4 text-cyan-400" />
               <span className="text-white/80">Portföy:</span>
-              <span className="font-semibold text-white">{propertyName}</span>
+              <span className="font-semibold text-white">
+                {propertyRel?.id ? (
+                  <Link href={`/app/portfoyler/${propertyRel.id}`} className="focus-ring rounded-[6px] hover:underline">
+                    {propertyName}
+                  </Link>
+                ) : (
+                  propertyName
+                )}
+              </span>
             </div>
           )}
           {contract.expires_at && (
@@ -213,17 +238,40 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
             </p>
           )}
 
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <FileText className="h-4 w-4 text-brand-600" /> İçerik
             </h2>
             {canEdit && contract.status === "draft" && (
-              <Link
-                href={`/app/sozlesmeler/${id}/duzenle`}
-                className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-600/5"
-              >
-                Düzenle
-              </Link>
+              <div className="flex items-center gap-2">
+                {/* Değişken doldurma sihirbazı — ___ / {{...}} kalıplarını
+                    müşteri+portföy verisinden önerilerle doldurur. key:
+                    içerik değişince alan listesi ve öneriler tazelensin. */}
+                <FillFieldsDialog
+                  key={contract.updated_at ?? contract.body.length}
+                  contractId={id}
+                  body={contract.body ?? ""}
+                  suggestions={{
+                    customerName:    customerRel?.full_name ?? null,
+                    customerPhone:   customerRel?.phone ?? null,
+                    customerEmail:   customerRel?.email ?? null,
+                    propertyLabel:   propertyRel
+                      ? (propertyRel.title ?? propertyRel.property_code ?? null)
+                      : null,
+                    propertyAddress: propertyRel?.address_line ?? null,
+                    priceText:       propertyRel?.list_price != null
+                      ? `${new Intl.NumberFormat("tr-TR").format(Number(propertyRel.list_price))} TL`
+                      : null,
+                    todayText: new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date()),
+                  }}
+                />
+                <Link
+                  href={`/app/sozlesmeler/${id}/duzenle`}
+                  className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-600/5"
+                >
+                  Düzenle
+                </Link>
+              </div>
             )}
           </div>
           <div className="mt-4 max-h-[60vh] overflow-y-auto">
@@ -264,11 +312,20 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-ink-950">{s.full_name as string}</p>
-                      <p className="text-[10px] text-text-faint">
+                      <p className="text-[11px] text-text-faint">
                         {s.email as string | null ?? s.phone as string | null ?? "—"}
                       </p>
                     </div>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    {/* SMS ulaşmadıysa imza linki elle iletilebilsin — token
+                        gönderimde DB tarafında üretiliyor, /imza/{token} */}
+                    {s.status === "pending" && s.token ? <CopySignLink token={String(s.token)} /> : null}
+                    {/* SMS OTP ile telefonunu doğrulayan imzalayan rozeti */}
+                    {s.verified_at ? (
+                      <span className="whitespace-nowrap rounded-full bg-mint-500/12 px-2 py-0.5 text-[11px] font-bold text-mint-600" title="Telefon SMS koduyla doğrulandı">
+                        SMS ile doğrulandı ✓
+                      </span>
+                    ) : null}
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
                       s.status === "signed" ? "bg-mint-500/12 text-mint-600" :
                       s.status === "rejected" ? "bg-danger-500/12 text-danger-500" :
                       "bg-zinc-100 text-zinc-500"
@@ -285,6 +342,13 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
           {canEdit && (
             <ContractSignPanel contractId={id} status={contract.status} />
           )}
+
+          {/* Sürüm geçmişi — içerik düzenlendikçe önceki haller (geri dönülebilir) */}
+          <VersionHistory
+            contractId={id}
+            versions={versions}
+            canRestore={canEdit && contract.status === "draft"}
+          />
 
           {/* İmzalanma tarihi */}
           {contract.signed_at && (
