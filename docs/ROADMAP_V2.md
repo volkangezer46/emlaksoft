@@ -275,7 +275,16 @@ Rakiplerde görmediğim, gerçek acıyı çözen ve savunulabilir olanlar:
       kiracıya bildirim yazılabiliyordu. `lib/notify.ts`'e taşındı.
       192 action, 17 gerekçeli muafiyet, bulgu yok.
 - [ ] **Q3** CI'a `npm audit --audit-level=high` kapısı (şu an `continue-on-error`)
-- [ ] **Q4** Hata izleme (Sentry sınıfı) — şu an prod hatası görünmüyor
+- [x] **Q4** Üretim hata kaydı — `/admin/hatalar`. **Bağımlılıksız**: Sentry
+      sınıfı bir servis ücretli bir karar olduğu için DB tabanlı çözüm seçildi.
+      Aynı parmak izi yeni satır değil **sayaç** artışı üretiyor; mesajdaki uuid
+      ve uzun sayılar maskeleniyor ("Customer 8f3a… not found" ile
+      "Customer b21c… not found" tek hata).
+      **Kendi kodumda bir hata buldu**: ilk migration RLS politikasını kurdu
+      ama `GRANT` vermedi — `service_role` tabloya yazamıyordu (42501) ve
+      `logError` hatayı yuttuğu için hiçbir iz yoktu. Bundan çıkan ders koda
+      işlendi: supabase-js hata **fırlatmaz, döndürür** — artık dönen hata da
+      kontrol ediliyor ve süreç ömründe en fazla bir uyarı basılıyor.
 - [ ] **Q5** Yedekleme/geri yükleme provası
 
 ---
