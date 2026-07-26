@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShieldAlert, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, FileCheck2, ShieldAlert, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { IysForm } from "./iys-form";
@@ -104,6 +104,28 @@ export default async function CompliancePage() {
           yani "silinmis" bir musterinin adi/telefonu/e-postasi veritabaninda
           sonsuza kadar duruyordu. */}
       <KvkkPanel initialLog={erasureLog as Parameters<typeof KvkkPanel>[0]["initialLog"]} canErase={canErase} />
+
+      {/* Denetim dosyasi: yetki belgeleri, sozlesmeler, hizmet bedeli ve IYS
+          rizalari BES AYRI SAYFAYA dagilmisti; denetim aninda tek tek toplamak
+          gerekiyordu. */}
+      <Link
+        href="/app/uyum/denetim-dosyasi"
+        className="lift-hover focus-ring group surface-card flex items-center justify-between gap-3 rounded-[var(--radius-panel)] p-5 transition hover:border-brand-300"
+      >
+        <div>
+          <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
+            <FileCheck2 className="h-4 w-4" /> Denetime hazırlık
+          </p>
+          <h2 className="mt-1 font-display font-bold text-ink-950">Denetim dosyası</h2>
+          <p className="mt-0.5 text-sm text-text-muted">
+            Yetki belgeleri, sözleşmeler, hizmet bedeli ve İYS rızaları tek yazdırılabilir sayfada —
+            eksikler dahil.
+          </p>
+        </div>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-canvas text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
+          <ArrowUpRight className="h-4 w-4" />
+        </span>
+      </Link>
 
       <section className="rounded-[20px] border border-amber-400/30 bg-amber-400/5 p-5">
         <h2 className="font-display font-bold text-ink-950">EİDS / yetki kalkanı</h2>
