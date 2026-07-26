@@ -118,7 +118,13 @@ katmanını yükseltip iyileşmenin kendiliğinden yayılmasını sağlamak.
   - [ ] Hero/başlık bloğu tek bileşene indirgenmeli (şu an her sayfada kopyalanıyor)
   - [ ] Liste sayfası şablonu (başlık + filtre + tablo + boş durum)
   - [ ] Detay sayfası şablonu (özet şerit + sekmeler + yan panel)
-- [ ] **T4** Koyu tema (`.theme-dark` iskeleti var, tamamlanmadı)
+- [x] **T4** Koyu tema — **UYGULANDI, SONRA KULLANICI İSTEĞİYLE GERİ ALINDI.**
+      Token katmanı hazırdı ama `--ink-950` **aşırı yüklü**: hem ana metin rengi
+      (760 kullanım) hem koyu buton zemini. Token'ı bölmek 800+ dosya
+      düzenlemesi demek; utility sınıflarını tema kapsamında geçersiz kılan
+      ~15 CSS kuralıyla çözülmüştü (varsayılan kapalı, tema seçici + parlama
+      önleyici betik). Kullanıcı gerek olmadığını belirtti; **hiç iz bırakmadan
+      geri alındı** (doğrulandı: `data-theme`/`ThemeToggle`/`ThemeScript` sıfır).
 - [ ] **T5** Yazdırma/PDF görünümü (sözleşme, teklif, portföy broşürü)
 
 ## 3. Fiyat geçmişi ve para birimi (V)
@@ -224,15 +230,28 @@ Rakiplerde görmediğim, gerçek acıyı çözen ve savunulabilir olanlar:
       (`property-health.ts` var, derinleştirilecek)
 - [ ] **X2** **Kaçan fırsat radarı** — kapanan/kaybedilen işlemlerden desen
       çıkarıp "bu talebi kaçırma" uyarısı (`lost-sale-detector.ts` temeli var)
-- [ ] **X3** **Danışman koçu** — KPI'lardan kişiselleştirilmiş haftalık aksiyon
-      listesi ("bu hafta 3 soğuk lead'i ara, 2 portföyün fiyatı piyasa üstü")
+- [x] **X3** Danışman koçu — 18 test. Sayfa doğru sayıları gösteriyordu ama
+      "bu hafta ne yapmalıyım" sorusunu cevaplamak danışmanın işiydi.
+      **En fazla 4 madde** (onbirlik liste kimsenin okumadığı listedir),
+      **her öneri ölçülebilir bir sayı içerir** (bir test bunu zorluyor),
+      **liste hiç boş kalmaz**, huni kopması **tek öneriye** indirilir.
+      Yetki belgesi uyarısı her şeyin önünde — mevzuat riski bir dönüşüm
+      oranı tavsiyesinin altında kalamaz.
 - [x] **X4** Sözleşme risk taraması — 8 mekanik kontrol, 24 test.
       Şablonlar `___` yer tutucuyla geliyor ve doldurulmamış bir şablonu imzaya
       göndermek sahada en sık hata; **hiçbir kontrol yoktu**. Seviye bağlama göre:
       boş alan taslakta uyarı, imzaya gitmişse hata. Komisyon sınırı uyarısı
       **hukuki hüküm kurmuyor**, teyide yönlendiriyor.
-- [ ] **X5** **KVKK otomatik yaşam döngüsü** — rıza süresi dolan müşteri verisini
-      otomatik anonimleştirme + silme kanıtı (denetimde altın değerinde)
+- [x] **X5** KVKK yaşam döngüsü — canlı doğrulanmış.
+      **Bulgu:** `deleted_at` yalnızca 2 tabloda ve **hiçbir şey temizlemiyordu** —
+      "silinmiş" bir müşterinin adı/telefonu/e-postası süresiz duruyordu.
+      **Gerçek silme zaten mümkün değil:** `deals`/`calls` FK'ları kısıtlayıcı ve
+      ticari kayıtlar TTK gereği saklanmak zorunda → anonimleştirme.
+      **Denormalize kopyalar** (`campaign_recipients`, `open_house_visitors`)
+      dahil — atlanırsa anonimleştirme sahte olur.
+      Canlı testte **3 şema hatası** ortaya çıktı ve düzeltildi
+      (`iys_consents.status` 'revoked' kabul etmiyor, `calls.phone` NOT NULL +
+      format kısıtlı, `customers.address_line` yok).
 - [~] **X6** Çift kayıt — **tespit yapıldı** (`/app/musteriler/cift-kayit`).
       Üç sinyal: telefon (normalize, neredeyse kesin) · e-posta · ad soyad
       (tek başına kanıt değil). Her kayıtta aktivite sayısı gösteriliyor,
@@ -259,12 +278,20 @@ Rakiplerde görmediğim, gerçek acıyı çözen ve savunulabilir olanlar:
       (yayın + kaldırma); medya güne göre toplanır — 40 fotoğraf tek başına
       kronolojiyi doldururdu.
       Müşteri tarafı için `communication-timeline` zaten vardı.
-- [ ] **X10** **Denetim moduna hazırlık paketi** — mevzuat denetiminde istenen
-      tüm evrakı tek tuşla ZIP
-- [ ] **X11** **Ofis kıyaslama (benchmark)** — anonim toplu veriyle "sizin
-      dönüşüm oranınız benzer ofislerin %X'i kadar"
-- [ ] **X12** **Klavye-öncelikli operasyon** — komut paleti var; her kritik
-      aksiyona kısayol (güç kullanıcı verimliliği)
+- [x] **X10** Denetim dosyası — yetki belgeleri, sözleşmeler, hizmet bedeli ve
+      İYS rızaları **beş ayrı sayfaya** dağılmıştı. Tek yazdırılabilir sayfa.
+      **ZIP bilinçli olarak yok:** bir bağımlılık ister ve denetmen evrakı
+      ekranda/kağıtta ister. **Eksikleri de gösteriyor** (yetkisiz portföy,
+      süresi geçmiş yetki, rızasız müşteri) — yalnızca iyi tarafı gösteren bir
+      denetim dosyası hazırlık değil, kendini kandırmadır.
+- [ ] **X11** Ofis kıyaslama — **KULLANICI KARARI BEKLİYOR.** Kiracılar-arası
+      anonim veri toplama mimarisi ve sözleşme modeli kararı gerektiriyor
+      (R2/R9 ile aynı karar). Spekülatif iskele kurulmadı.
+- [x] **X12** Klavye kısayolları — Ctrl+K vardı ama **tek kısayol oydu**.
+      10 gidiş kısayolu + `?` yardım penceresi.
+      **`g` önekli iki tuş, tek harf değil:** tek harfli kısayol bir nota yazarken
+      odak kaybolursa sayfayı değiştirip yazılanı kaybettirir. Girdi alanında
+      hiçbir kısayol çalışmıyor + 1,2 sn zaman aşımı.
 
 ## 9. Kalite güvencesi (Q)
 
@@ -284,7 +311,12 @@ Rakiplerde görmediğim, gerçek acıyı çözen ve savunulabilir olanlar:
       ve `service_role` kullanıyordu — yani RLS'i atlayarak herhangi bir
       kiracıya bildirim yazılabiliyordu. `lib/notify.ts`'e taşındı.
       192 action, 17 gerekçeli muafiyet, bulgu yok.
-- [ ] **Q3** CI'a `npm audit --audit-level=high` kapısı (şu an `continue-on-error`)
+- [x] **Q3** Bağımlılık açığı kapısı — `continue-on-error` **kaldırıldı**, CI
+      artık blokluyor. Düz `npm audit --audit-level=high` CI'ı **kalıcı
+      kırmızı** yapardı (12 high, 9'u dev-only; 3'ü Next'in kendi iç
+      bağımlılıklarında ve npm'in "fix"i Next 16 → 9.3.3 düşürmek).
+      Kapı 3'ü **gerekçesiyle** bekletiyor, yeni her açıkta kırıyor.
+      Deneyle doğrulandı: istisna kaldırılınca exit 1, geri konunca exit 0.
 - [x] **Q4** Üretim hata kaydı — `/admin/hatalar`. **Bağımlılıksız**: Sentry
       sınıfı bir servis ücretli bir karar olduğu için DB tabanlı çözüm seçildi.
       Aynı parmak izi yeni satır değil **sayaç** artışı üretiyor; mesajdaki uuid
@@ -408,6 +440,17 @@ güncel 24.x'i kuruyor, o da 11.18 getiriyor. Actions log API'si public repoda
 bile 403 verdiği için teşhis çalışma sürelerinden gitti (yeşiller ~90 sn,
 kırmızılar 8-12 sn → 496 paket indirilmiyor, anında hata).
 → **[x]** Yerel Node 24.18.0 + npm 11.18.0'a çıkarıldı; artık CI ile birebir.
+
+---
+
+## 10.9 T3 hero şablonu — neden atlandı
+
+58 sayfada hero bloğu kopya. İlk gerekçe "koyu temayı tek yerde çözmek"ti;
+koyu tema geri alınınca o gerekçe de kalmadı. Kalan tek kazanç kod tekrarının
+azalması — **kullanıcıya görünmeyen** bir iyileştirme karşılığında 58 sayfada
+regresyon riski. Üstelik varyasyonlar gerçek: portföy sayfasının sağında fiyat
+sağlığı grafiği var, diğerlerinde yok. **Üretim testinden hemen önce yapılması
+yanlış olurdu.**
 
 ---
 
