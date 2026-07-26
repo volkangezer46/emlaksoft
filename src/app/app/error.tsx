@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { reportClientError } from "@/app/actions/report-error";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 
 export default function AppError({
@@ -12,6 +13,14 @@ export default function AppError({
 }) {
   useEffect(() => {
     console.error("App route error:", error);
+    // Vercel loguna ek olarak DB'ye de yaz: log satirlari toplanmiyor ve
+    // aranamiyordu. Ayni hata tekrar gelirse yeni satir degil sayac artiyor.
+    void reportClientError({
+      message: error.message || "Bilinmeyen hata",
+      digest: error.digest,
+      stack: error.stack,
+      path: typeof window !== "undefined" ? window.location.pathname : undefined,
+    });
   }, [error]);
 
   return (

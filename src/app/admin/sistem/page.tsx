@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, CheckCircle2, Database, KeyRound, Landmark, MapPin, MapPinned, Radar, XCircle } from "lucide-react";
+import { ArrowUpRight, Bug, CheckCircle2, Database, KeyRound, Landmark, MapPin, MapPinned, Radar, XCircle } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { getPlatformSetting } from "@/lib/platform-settings";
@@ -134,6 +134,26 @@ export default async function AdminSystemPage() {
             className="mt-4 inline-flex items-center gap-1.5 rounded-[10px] border border-line px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-400"
           >
             Coğrafya yönetimine git <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
+        </section>
+
+        {/* Uretim hatalari: onceden yalnizca Vercel loglarinda vardi ve
+            toplanmiyordu — ayni hata bir kez mi 400 kez mi olmus,
+            gorunmuyordu. */}
+        <section className="rounded-[20px] border border-line bg-surface p-5">
+          <p className="flex items-center gap-2 text-xs font-semibold text-danger-500">
+            <Bug className="h-4 w-4" /> Üretim izleme
+          </p>
+          <h2 className="mt-1 font-display font-bold text-ink-950">Hata kayıtları</h2>
+          <p className="mt-2 text-sm leading-relaxed text-text-muted">
+            Tarayıcı hata sınırlarından gelen kayıtlar. Aynı hata tekrar geldiğinde yeni satır
+            açılmaz, sayaç artar — kaç <strong>farklı</strong> sorun olduğu görünür.
+          </p>
+          <Link
+            href="/admin/hatalar"
+            className="mt-4 inline-flex items-center gap-1.5 rounded-[10px] border border-line px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-400"
+          >
+            Hataları aç <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>
         </section>
 
