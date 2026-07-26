@@ -72,7 +72,39 @@ Vercel prod env'de yüklü: Supabase üçlüsü, `CRON_SECRET` (yeni üretildi, 
    `PLATFORM_ADMIN_EMAILS`'e gerçek admin adresi
 7. Vercel projesini bu GitHub repo'suna bağlamak (push = otomatik deploy): Vercel → Settings → Git
 
-## 6) Bilinen davranışlar / tuzaklar
+## 6) Sohbet kronolojisi (kullanıcı talimatları, sırasıyla)
+
+Yeni oturumun "chat hafızası" budur — kullanıcının verdiği her ana talimat ve karşılığı:
+
+1. "Sistemi full tara, eklenmesi gereken özellik listesi çıkar; dashboardlarda tüm kayıtlar tıklanabilir olsun; ultra premium tema listesi" → `docs/OZELLIK_MASTER_LISTESI.md` üretildi.
+2. 35 bölümlük "Emlak İşletim Sistemi" vizyon metni yapıştırıldı → mantıklı olanlar master listeye işlendi.
+3. **"dark mode istemiyorum, listeden çıkar; diğerlerinin hepsini hızlı uygula"** → kalıcı kural.
+4. "otomatik uygula, işlemleri hızlı ve toplu yap" → paralel ajan dalgaları düzeni kuruldu.
+5. **"canlıya alma en son; localde geliştir"** → deploy sona bırakıldı (27'sinde yapıldı, madde 15).
+6. "devam et" ×N → dalgalar sürdü (A–K: liste standardı, 2FA, çöp kutusu, izin istisnaları,
+   3D dashboard, AI asistan, Realtime, PWA, kanban, Kiralama, Projeler, MLS ağı, gelen kutusu,
+   emsal motoru, birleştirme RPC, CSV import, vitrin analitik...).
+7. "başka neler kaldı, tam liste" → kalanlar listelendi (lokal / dış hesap / mimari karar).
+8. "hepsini eksiksiz tamamla; hız optimizasyonu en iyi seviye; dashboard 3D ultra premium;
+   tüm kayıtlar tıklanabilir ve işlem yapılabilir; çok gelişmiş kullanıcı yönetimi" → uygulandı.
+9. **"migration yasak değil, herşeyi full otomatik uygulayacaksın"** → kalıcı kural (CLAUDE.md'de).
+10. "herşeyi geliştir yap devam et" → **Dalga L**: talep detay sayfası, açık ev QR check-in,
+    eşleştirme ağırlıkları her tüketicide, bildirim arşivi, mobil saha çekimi.
+11. "geliştir ve devam et" → **Dalga M**: talep-arz haritası, ICS takvim + çakışma freni,
+    portföy sunum dosyaları, müşteri sıcaklık segmentasyonu, perf/cron dalgası.
+12. "devam et geliştir" → **Dalga N**: anlaşma evrak kontrol listesi, NPS anketi + raporu,
+    günün rotası, vitrin v2 (benzer/favori/fiyat alarmı), ofis duyuru panosu.
+13. "şimdiye kadar yapılanları test et, canlıya al, kalan işleri listele" → tam test turu yeşil,
+    RLS fix (107), Vercel'e deploy edildi, kalanlar raporlandı (bölüm 5).
+14. "istediğin bilgi var mı, herşeyi otomatik tamamla" → env yükleme + deploy + duman testi bitirildi.
+15. "yapılan tüm işleri ve chati git'e yükle, başka pc ile devam edeceğim" → bu depo + bu belge.
+16. **"env local'ı her zaman koy, geliştirme aşamasındayız"** → `.env.local` repo'da tutuluyor
+    (`.gitignore`'da `!.env.local` istisnası). Not: ham Claude sohbet transkriptlerinin repo'ya
+    kopyalanması güvenlik katmanınca engellendi; bu kronoloji onun yerine geçer. Ham transkriptler
+    eski makinede `C:\Users\Laptop\.claude\projects\c--Users-Laptop-Desktop-emlaksoft\*.jsonl`
+    yolunda durur; istenirse kullanıcı elle kopyalayabilir.
+
+## 7) Bilinen davranışlar / tuzaklar
 
 - E2E'de 2-3 test hidrasyon yarışıyla flaky olabilir → `retries: 1` tasarımı bunu karşılar; build ile
   aynı anda E2E koşturma (CPU çekişmesi kırmızı yaratır).
