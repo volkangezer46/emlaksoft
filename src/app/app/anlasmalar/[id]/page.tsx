@@ -6,6 +6,7 @@ import {
   Banknote,
   Building2,
   CalendarClock,
+  Gauge,
   Handshake,
   ListChecks,
   Tag,
@@ -16,6 +17,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { computeDealScore, scoreGap } from "@/lib/deal-score";
 
 export const metadata = { title: "Anlaşma detayı" };
 
@@ -114,7 +116,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
    * bu anlaşmaya bağlar, bu yanlış olur.
    */
   const capraz = Boolean(deal.property_id && deal.customer_id);
-  const [{ data: offers }, { data: contracts }] = await Promise.all([
+  const [{ data: offers }, { data: contracts }, { count: gorusmeSayisi }] = await Promise.all([
     capraz
       ? supabase
           .from("offers")
@@ -133,6 +135,20 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
           .order("created_at", { ascending: false })
           .limit(10)
       : Promise.resolve({ data: null }),
+    /*
+     * Gorusme sayisi kapanma tahmininde kullaniliyor. Ilk yazimda bu deger
+     * SABIT 0 birakilmisti — yani "gorusme" faktoru hic calismiyordu ve skor
+     * sessizce eksik hesaplaniyordu. Randevuda `deal_id` yok; teklif ve
+     * sozlesmeyle ayni yaklasimla portfoy+musteri ikilisinden eslestiriliyor.
+     */
+    capraz
+      ? supabase
+          .from("appointments")
+          .select("id", { count: "exact", head: true })
+          .eq("property_id", deal.property_id!)
+          .eq("customer_id", deal.customer_id!)
+          .neq("status", "cancelled")
+      : Promise.resolve({ count: 0 }),
   ]);
 
   const stageIdx = STAGES.findIndex((s) => s.key === deal.stage);
@@ -158,6 +174,33 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
       : null;
 
   const canSeeCommission = (perms.commissions ?? []).includes("view");
+
+  /*
+   * Sistem tahmini (X8). `deals.probability` YALNIZCA asamadan turetiliyordu
+   * (20/40/60/100), yani asamanin sayiya cevrilmis haliydi ve ek bilgi
+   * tasimiyordu. Bu hesap teklif, gorusme, hareketsizlik, yas ve fiyat
+   * acigini da isin icine katiyor.
+   *
+   * Kullanicinin elle girdigi `probability` UZERINE YAZILMIYOR — yaninda
+   * duruyor. Asil deger ikisinin farkinda: danisman %80 diyorsa ve sistem
+   * %35 diyorsa sebebini gormek gerekir.
+   */
+  const simdi = new Date().getTime();
+  const skor = computeDealScore(
+    {
+      stage: deal.stage,
+      createdAt: deal.created_at,
+      updatedAt: deal.updated_at,
+      offerCount: (offers ?? []).length,
+      hasAcceptedOffer: (offers ?? []).some((o) => o.status === "accepted"),
+      appointmentCount: gorusmeSayisi ?? 0,
+      openTaskCount: acikGorev,
+      dealValue,
+      listPrice: property?.list_price != null ? Number(property.list_price) : null,
+    },
+    simdi,
+  );
+  const sapma = scoreGap(olasilik, skor.score);
 
   return (
     <div className="space-y-6">
@@ -210,8 +253,8 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             {[
               { label: "Anlaşma tutarı", value: money(dealValue), icon: Banknote },
               {
-                label: kazanildi || kayip ? "Olasılık (kapandı)" : "Beklenen değer",
-                value: beklenen != null ? money(beklenen) : olasilik != null ? `%${Math.round(olasilik > 1 ? olasilik : olasilik * 100)}` : "—",
+                label: kazanildi || kayip ? "Sonuç" : "Beklenen değer",
+                value: beklenen != null ? money(beklenen) : skor.label,
                 icon: TrendingUp,
               },
               { label: "Komisyon (brüt)", value: canSeeCommission ? money(brutToplam) : "—", icon: Tag },
@@ -234,6 +277,66 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         >
           <span className="font-bold">Kayıp nedeni:</span> {deal.loss_reason}
         </p>
+      ) : null}
+
+      {!kazanildi && !kayip ? (
+        <section className="surface-card rounded-[var(--radius-panel)] p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                <Gauge className="h-4 w-4 text-brand-600" /> Kapanma tahmini
+              </h2>
+              <p className="mt-0.5 text-[11px] text-text-faint">
+                Kural tabanlı puanlama — istatistiksel model değil. Her faktör aşağıda gerekçesiyle.
+              </p>
+            </div>
+            <div className="text-right">
+              <p
+                className={`numeric font-display text-3xl font-extrabold ${
+                  skor.tier === "high"
+                    ? "text-mint-600"
+                    : skor.tier === "medium"
+                      ? "text-amber-600"
+                      : "text-danger-600"
+                }`}
+              >
+                %{skor.score}
+              </p>
+              <p className="text-[11px] text-text-muted">sistem tahmini</p>
+            </div>
+          </div>
+
+          {/* Faktor dokumu: kullanici katilmadiginda NEDENINI gorebilmeli. */}
+          <ul className="mt-4 grid gap-1.5 sm:grid-cols-2">
+            {skor.factors.map((f) => (
+              <li
+                key={f.label}
+                className="flex items-center justify-between gap-3 rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm"
+              >
+                <span className="text-text-muted">{f.label}</span>
+                <span
+                  className={`numeric font-bold ${f.points < 0 ? "text-danger-600" : "text-ink-950"}`}
+                >
+                  {f.points > 0 ? "+" : ""}
+                  {f.points}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          {/* Sapma uyarisi: 20 puan altindaki fark gurultu sayiliyor. */}
+          {sapma != null ? (
+            <p
+              className="mt-3 rounded-[12px] border border-amber-400/35 bg-amber-400/[0.07] px-4 py-2.5 text-xs leading-relaxed text-ink-950"
+              role="status"
+            >
+              Kayıtlı olasılık <strong className="numeric">%{Math.round(olasilik ?? 0)}</strong>, sistem
+              tahmini <strong className="numeric">%{skor.score}</strong> —{" "}
+              <strong className="numeric">{Math.abs(sapma)} puan</strong>{" "}
+              {sapma > 0 ? "daha iyimser" : "daha karamsar"}. Yukarıdaki faktörlere bakın.
+            </p>
+          ) : null}
+        </section>
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
