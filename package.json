@@ -20,7 +20,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:rls-audit": "tsx scripts/rls-audit.ts",
-    "audit:actions": "tsx scripts/action-gate-audit.ts"
+    "audit:actions": "tsx scripts/action-gate-audit.ts",
+    "audit:deps": "tsx scripts/audit-gate.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",

@@ -39,17 +39,19 @@ jobs:
         # Yeni bir action eklenip yetki kapısı unutulursa burada kırılır.
         run: npm run audit:actions
 
-      - name: Güvenlik denetimi (bilgilendirme — henüz bloklamıyor)
-        # --omit=dev bilinçli: ESLint zincirindeki dev-only açıklar
-        # (minimatch/brace-expansion DoS) production'a gitmiyor.
+      - name: Bağımlılık açığı kapısı
+        # ARTIK BLOKLUYOR. `continue-on-error` kaldırıldı.
         #
-        # continue-on-error GEÇİCİ: sharp/postcss `overrides` düzeltmesi CI'da
-        # `npm ci`yi kırdığı için geri alındı (bkz. .npmrc ve ROADMAP_V2 F3).
-        # sharp 0.34.5 libvips CVE'lerini taşıyor ve prod bağımlılığı, yani bu
-        # adım şu an KIRMIZI raporlayacak — bilinçli. Override CI-güvenli
-        # biçimde geri gelince continue-on-error kaldırılacak.
-        continue-on-error: true
-        run: npm audit --omit=dev --audit-level=high
+        # Düz `npm audit --audit-level=high` CI'ı KALICI KIRMIZI yapardı ve
+        # kırmızı bir CI hiçbir şey söylemez — herkes görmezden gelir. Sebep:
+        #   npm audit            -> 12 high
+        #   npm audit --omit=dev ->  3 high
+        # 9'u dev-only (eslint zinciri), 3'ü Next'in KENDI ic bagimliliklarinda
+        # (postcss, sharp) ve npm'in onerdigi "fix" Next 16 -> 9.3.3 dusurmek.
+        #
+        # Kapı bu 3'ü GEREKÇESİYLE bekletiyor, geri kalan her yeni high/critical
+        # açıkta CI'ı kırıyor. İstisna listesi scripts/audit-gate.ts içinde.
+        run: npm run audit:deps
 
       - name: Build
         run: npm run build
