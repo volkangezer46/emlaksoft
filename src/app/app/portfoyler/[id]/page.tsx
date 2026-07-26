@@ -40,6 +40,8 @@ import { isTapusorConfigured } from "@/lib/integrations/tapusor";
 import { getConfiguredPortals } from "@/app/actions/portal-publish";
 import { getPropertyStatusHistory } from "@/app/actions/property-management";
 import { getPropertyPriceHistory } from "@/app/actions/property-price-history";
+import { getPropertyTimeline } from "@/app/actions/property-timeline";
+import { PropertyTimeline } from "./property-timeline";
 import type { CSSProperties } from "react";
 
 const RING_C = 2 * Math.PI * 42;
@@ -104,7 +106,7 @@ export default async function PropertyDetailPage({
   const supabase = await createClient();
 
   // 1. tur — hepsi yalnızca `id`'ye bağlı, tam paralel
-  const [{ data: property }, { data: portalsData }, statusHistory, priceHistory, configuredPortals, propertyTypeDefs, transactionTypeDefs] = await Promise.all([
+  const [{ data: property }, { data: portalsData }, statusHistory, priceHistory, timeline, configuredPortals, propertyTypeDefs, transactionTypeDefs] = await Promise.all([
     supabase
       .from("properties")
       .select(
@@ -120,6 +122,7 @@ export default async function PropertyDetailPage({
       .order("created_at", { ascending: false }),
     getPropertyStatusHistory(id),
     getPropertyPriceHistory(id),
+    getPropertyTimeline(id),
     getConfiguredPortals(),
     getDefinitions("property_type"),
     getDefinitions("transaction_type"),
@@ -580,6 +583,11 @@ export default async function PropertyDetailPage({
         propertyId={id}
         configuredPortals={configuredPortals}
       />
+
+      {/* Zaman tuneli: fiyat ve durum gecmisi ayri ayri dogruydu ama HIKAYEYI
+          anlatmiyorlardi. Portal yayini, teklif, randevu ve acik ev ise
+          hicbir kronolojide gorunmuyordu. */}
+      <PropertyTimeline events={timeline} simdi={new Date().getTime()} />
 
       {/* Durum geçmişi */}
       <PropertyStatusHistory
