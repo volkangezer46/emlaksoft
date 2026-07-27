@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { daysAgoIso } from "@/lib/clock";
+import { DAY_MS, daysAgoIso, msSince, now } from "@/lib/clock";
 import { COMM_CHANNELS, COMM_OUTCOMES } from "@/lib/comm-types";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { EmptyState } from "@/components/app/empty-state";
@@ -69,16 +69,22 @@ const CHANNEL_META: Record<string, { label: string; icon: React.ComponentType<{ 
   call:     { label: "Telefon",  icon: Phone,         cls: "bg-brand-600/10 text-brand-600" },
   whatsapp: { label: "WhatsApp", icon: MessageCircle, cls: "bg-mint-500/12 text-mint-600" },
   sms:      { label: "SMS",      icon: MessageSquare, cls: "bg-cyan-500/12 text-cyan-600" },
-  email:    { label: "E-posta",  icon: Mail,          cls: "bg-violet-500/12 text-violet-600" },
+  email:    { label: "E-posta",  icon: Mail,          cls: "bg-brand-500/12 text-brand-700" },
   meeting:  { label: "Görüşme",  icon: Users,         cls: "bg-amber-400/15 text-amber-600" },
   note:     { label: "Not",      icon: StickyNote,    cls: "bg-ink-950/5 text-text-muted" },
 };
 
 const OUTCOME_LABELS = new Map<string, string>(COMM_OUTCOMES.map((o) => [o.value, o.label]));
 
+/** ?yon= akıllı filtresi — Türkçe değer → DB direction eşlemesi. */
+const YON_FILTERS = [
+  { value: "gelen",    label: "Gelen",    direction: "inbound" },
+  { value: "giden",    label: "Giden",    direction: "outbound" },
+  { value: "cevapsiz", label: "Cevapsız", direction: "missed" },
+] as const;
+
 function relativeTime(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60_000);
+  const mins = Math.floor(msSince(iso) / 60_000);
   if (mins < 1) return "Az önce";
   if (mins < 60) return `${mins} dk önce`;
   const hours = Math.floor(mins / 60);
@@ -106,6 +112,7 @@ export default async function InboxPage({
   searchParams: Promise<{
     q?: string;
     kanal?: string;
+    yon?: string;
     from?: string;
     to?: string;
     durum?: string;
@@ -119,6 +126,8 @@ export default async function InboxPage({
 
   const q = sp.q ?? "";
   const kanalF = COMM_CHANNELS.some((c) => c.value === sp.kanal) ? String(sp.kanal) : "";
+  const yonF = YON_FILTERS.some((f) => f.value === sp.yon) ? String(sp.yon) : "";
+  const dirF = YON_FILTERS.find((f) => f.value === yonF)?.direction ?? "";
   const fromF = sp.from ?? "";
   const toF = sp.to ?? "";
   const unmatchedOnly = sp.durum === "eslesmemis";
@@ -142,6 +151,7 @@ export default async function InboxPage({
     .order("created_at", { ascending: false })
     .range(0, fetchCeil - 1);
   if (kanalF) commQuery = commQuery.eq("channel", kanalF);
+  if (dirF) commQuery = commQuery.eq("direction", dirF);
   if (fromF) commQuery = commQuery.gte("created_at", fromF);
   if (toF) commQuery = commQuery.lte("created_at", `${toF}T23:59:59`);
   if (unmatchedOnly) commQuery = commQuery.is("customer_id", null);
@@ -156,13 +166,14 @@ export default async function InboxPage({
     .select(callSelect, { count: "exact" })
     .order("started_at", { ascending: false })
     .range(0, fetchCeil - 1);
+  if (dirF) callQuery = callQuery.eq("direction", dirF);
   if (fromF) callQuery = callQuery.gte("started_at", fromF);
   if (toF) callQuery = callQuery.lte("started_at", `${toF}T23:59:59`);
   if (unmatchedOnly) callQuery = callQuery.is("customer_id", null);
   if (term) callQuery = callQuery.ilike("customer.full_name", `%${term}%`);
 
   // ---- KPI head-count sorguları -------------------------------------------
-  const todayStart = new Date();
+  const todayStart = new Date(now());
   todayStart.setHours(0, 0, 0, 0);
   const todayIso = todayStart.toISOString();
   const weekAgoIso = daysAgoIso(7);
@@ -176,6 +187,7 @@ export default async function InboxPage({
     { count: callWeek },
     { count: commUnmatched },
     { count: callUnmatched },
+    { count: missedWeek },
   ] = await Promise.all([
     commQuery,
     includeCalls
@@ -187,6 +199,7 @@ export default async function InboxPage({
     supabase.from("calls").select("id", { count: "exact", head: true }).gte("started_at", weekAgoIso),
     supabase.from("communications").select("id", { count: "exact", head: true }).is("customer_id", null),
     supabase.from("calls").select("id", { count: "exact", head: true }).is("customer_id", null),
+    supabase.from("calls").select("id", { count: "exact", head: true }).eq("direction", "missed").gte("started_at", weekAgoIso),
   ]);
 
   // ---- Birleştirme ---------------------------------------------------------
@@ -262,6 +275,7 @@ export default async function InboxPage({
   const kpiToday = (commInToday ?? 0) + (callInToday ?? 0);
   const kpiWeek = (commWeek ?? 0) + (callWeek ?? 0);
   const kpiUnmatched = (commUnmatched ?? 0) + (callUnmatched ?? 0);
+  const kpiMissed = missedWeek ?? 0;
 
   const todayParam = todayIso.slice(0, 10);
   const weekParam = weekAgoIso.slice(0, 10);
@@ -270,6 +284,7 @@ export default async function InboxPage({
   const baseParams: Record<string, string> = {};
   if (q) baseParams.q = q;
   if (kanalF) baseParams.kanal = kanalF;
+  if (yonF) baseParams.yon = yonF;
   if (fromF) baseParams.from = fromF;
   if (toF) baseParams.to = toF;
   if (unmatchedOnly) baseParams.durum = "eslesmemis";
@@ -282,7 +297,7 @@ export default async function InboxPage({
     return qs ? `/app/gelen-kutusu?${qs}` : "/app/gelen-kutusu";
   };
 
-  const hasAnyFilter = Boolean(q || kanalF || fromF || toF || unmatchedOnly);
+  const hasAnyFilter = Boolean(q || kanalF || yonF || fromF || toF || unmatchedOnly);
 
   return (
     <div className="space-y-6">
@@ -301,10 +316,11 @@ export default async function InboxPage({
             </p>
           </div>
         </div>
-        <div className="relative mt-6 grid grid-cols-3 gap-3">
+        <div className="relative mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { label: "Bugün gelen", value: kpiToday, icon: ArrowDownLeft, href: `/app/gelen-kutusu?from=${todayParam}` },
+            { label: "Bugün gelen", value: kpiToday, icon: ArrowDownLeft, href: `/app/gelen-kutusu?yon=gelen&from=${todayParam}` },
             { label: "Bu hafta", value: kpiWeek, icon: CalendarClock, href: `/app/gelen-kutusu?from=${weekParam}` },
+            { label: "Cevapsız (7g)", value: kpiMissed, icon: PhoneMissed, href: `/app/gelen-kutusu?yon=cevapsiz&from=${weekParam}` },
             { label: "Eşleşmemiş", value: kpiUnmatched, icon: UserX, href: "/app/gelen-kutusu?durum=eslesmemis" },
           ].map((item) => (
             <Link
@@ -327,6 +343,7 @@ export default async function InboxPage({
       <div className="rounded-[16px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] space-y-3">
         <form className="flex flex-wrap items-center gap-3" action="/app/gelen-kutusu">
           {kanalF ? <input type="hidden" name="kanal" value={kanalF} /> : null}
+          {yonF ? <input type="hidden" name="yon" value={yonF} /> : null}
           {unmatchedOnly ? <input type="hidden" name="durum" value="eslesmemis" /> : null}
           <div className="relative min-w-[200px] flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
@@ -338,20 +355,20 @@ export default async function InboxPage({
               className="w-full rounded-[11px] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
             />
           </div>
-          <div className="flex items-center gap-2 text-sm text-text-muted">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-text-muted">
             <span className="text-xs font-medium">Tarih:</span>
             <input
               name="from"
               type="date"
               defaultValue={fromF}
-              className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+              className="min-w-0 max-w-[150px] flex-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 sm:flex-none"
             />
             <span>—</span>
             <input
               name="to"
               type="date"
               defaultValue={toF}
-              className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+              className="min-w-0 max-w-[150px] flex-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 sm:flex-none"
             />
           </div>
           <button type="submit" className="rounded-[10px] bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700">
@@ -380,6 +397,22 @@ export default async function InboxPage({
               className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${kanalF === c.value ? "bg-brand-600 text-white" : "border border-line text-text-muted hover:border-brand-400 hover:text-brand-600"}`}
             >
               {c.emoji} {c.label}
+            </Link>
+          ))}
+          <span aria-hidden className="mx-1 hidden h-4 w-px bg-line sm:block" />
+          {YON_FILTERS.map((f) => (
+            <Link
+              key={f.value}
+              href={hrefWith({ yon: yonF === f.value ? undefined : f.value, sayfa: undefined })}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                yonF === f.value
+                  ? f.value === "cevapsiz"
+                    ? "bg-danger-500 text-white"
+                    : "bg-ink-950 text-white"
+                  : "border border-line text-text-muted hover:border-brand-400 hover:text-brand-600"
+              }`}
+            >
+              {f.value === "cevapsiz" ? "☎ " : ""}{f.label}
             </Link>
           ))}
           {unmatchedOnly ? (
@@ -443,6 +476,13 @@ export default async function InboxPage({
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.direction === "inbound" ? "bg-mint-500/12 text-mint-600" : item.direction === "missed" ? "bg-danger-500/10 text-danger-500" : "bg-ink-950/5 text-text-muted"}`}>
                       {item.direction === "inbound" ? "Gelen" : item.direction === "missed" ? "Cevapsız" : item.direction === "internal" ? "Dahili" : "Giden"}
                     </span>
+                    {/* Öncelik rozetleri — gerçek veriden türetilir (yön + tazelik) */}
+                    {item.direction === "missed" && msSince(item.at) < 2 * DAY_MS ? (
+                      <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-600">Öncelikli</span>
+                    ) : null}
+                    {item.direction === "inbound" && msSince(item.at) < DAY_MS ? (
+                      <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-[11px] font-bold text-brand-600">Yeni</span>
+                    ) : null}
                     {item.outcome ? (
                       <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-medium text-text-muted">{item.outcome}</span>
                     ) : null}

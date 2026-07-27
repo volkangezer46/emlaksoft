@@ -57,6 +57,7 @@ const NAV_MODULES: AppModule[] = [
   "open_house",
   "rentals",
   "projects",
+  "network",
 ];
 
 export default async function AppLayout({
@@ -171,7 +172,7 @@ export default async function AppLayout({
           {impersonating && platformStaff ? <OpsImpersonationBanner tenantName={impName || office?.name || "Ofis"} /> : null}
           <header className="sticky top-0 z-30 flex h-17 items-center justify-between border-b border-line/80 bg-surface/90 px-4 pl-16 backdrop-blur-xl md:px-6">
             <CommandSearch />
-            <div className="ml-4 flex items-center gap-2">
+            <div className="ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
               {/* Hızlı eylem menüsü: en sık kullanılan kayıt akışlarına tek tıkla */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -230,7 +231,7 @@ export default async function AppLayout({
                 </Link>
               ) : null}
               <NotificationBell initial={notifications} />
-              <Link href="/app/ayarlar" className="flex items-center gap-2 rounded-[11px] border border-line bg-surface p-1.5 pr-3 transition hover:border-brand-300">
+              <Link href="/app/ayarlar" className="flex items-center gap-2 rounded-[11px] border border-line bg-surface p-1.5 sm:pr-3 transition hover:border-brand-300">
                 <div
                   className="grid h-8 w-8 place-items-center rounded-[9px] bg-[image:var(--grad-brand)] text-xs font-bold text-white"
                   title={profile?.full_name ?? ""}
@@ -253,7 +254,7 @@ export default async function AppLayout({
               </form>
             </div>
           </header>
-          <main id="main-content" className="flex-1 p-4 md:p-6 lg:p-8">
+          <main id="main-content" className="flex-1 p-4 pb-28 md:p-6 lg:p-8">
             <LiveOfficeStrip tenantId={tenantId} />
             {children}
           </main>

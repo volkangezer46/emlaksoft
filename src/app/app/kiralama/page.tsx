@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { daysFromNowIso } from "@/lib/clock";
-import { AlertTriangle, CalendarClock, Hourglass, KeyRound, Wallet, Wrench, X } from "lucide-react";
+import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
+import { Activity, AlertTriangle, CalendarClock, Hourglass, KeyRound, Wallet, Wrench, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { computeLegalIncrease } from "@/lib/tufe";
@@ -33,6 +33,17 @@ const DURUM_LABELS: Record<DurumFilter, string> = {
   overdue: "Geciken",
 };
 
+/** Sözleşme yaşam döngüsü evreleri — şerit ve çipler listeyi ?evre= ile süzer. */
+const EVRELER = ["yeni", "devam", "yenileme", "bitiyor", "bitti"] as const;
+type Evre = (typeof EVRELER)[number];
+const EVRE_META: Record<Evre, { label: string; bar: string; dot: string; text: string }> = {
+  yeni:     { label: "Yeni (ilk 90 gün)",    bar: "bg-brand-500",   dot: "bg-brand-500",   text: "text-brand-600" },
+  devam:    { label: "Devam eden",           bar: "bg-mint-500",    dot: "bg-mint-500",    text: "text-mint-600" },
+  yenileme: { label: "Yenileme penceresi",   bar: "bg-amber-400",   dot: "bg-amber-400",   text: "text-amber-600" },
+  bitiyor:  { label: "Bitmek üzere (30 gün)", bar: "bg-danger-500", dot: "bg-danger-500",  text: "text-danger-500" },
+  bitti:    { label: "Sona ermiş",           bar: "bg-ink-950/25",  dot: "bg-ink-950/25",  text: "text-text-muted" },
+};
+
 /** `YYYY-MM` + vade günü → `YYYY-MM-DD` vade tarihi (string karşılaştırması yeterli). */
 function dueDateOf(month: string, dueDay: number) {
   return `${month}-${String(dueDay).padStart(2, "0")}`;
@@ -59,12 +70,13 @@ function nextAnniversaryOf(startDate: string, today: string): string | null {
 export default async function KiralamaPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; ariza?: string }>;
+  searchParams?: Promise<{ durum?: string; ariza?: string; evre?: string }>;
 }) {
   const { perms } = await requireModulePage("rentals");
   const params = (await searchParams) ?? {};
   const durumF = DURUM_FILTERS.includes(params.durum as DurumFilter) ? (params.durum as DurumFilter) : "";
   const arizaF = params.ariza === "acik";
+  const evreF = EVRELER.includes(params.evre as Evre) ? (params.evre as Evre) : "";
   const canCreate = perms.rentals?.includes("create") ?? false;
 
   const supabase = await createClient();
@@ -101,7 +113,7 @@ export default async function KiralamaPage({
   const charges = chargeData ?? [];
   const maints = maintData ?? [];
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = daysAgoIso(0).slice(0, 10);
   const curMonth = today.slice(0, 7);
   const curPeriodPrefix = `${curMonth}-01`;
   const in30 = daysFromNowIso(30).slice(0, 10);
@@ -154,8 +166,22 @@ export default async function KiralamaPage({
     })
     .sort((a, b) => (a.renewalDate < b.renewalDate ? -1 : 1));
 
+  // ---- Sözleşme yaşam döngüsü: her kayıt tek evreye düşer (öncelik sıralı) ----
+  const renewalIds = new Set(renewalRadar.map(({ rental }) => String(rental.id)));
+  const yeni90 = daysAgoIso(90).slice(0, 10);
+  const evreOf = (r: (typeof rentals)[number]): Evre => {
+    if (r.status !== "active") return "bitti";
+    if (r.end_date && r.end_date >= today && r.end_date <= in30) return "bitiyor";
+    if (renewalIds.has(String(r.id))) return "yenileme";
+    if (String(r.start_date) >= yeni90) return "yeni";
+    return "devam";
+  };
+  const evreCounts: Record<Evre, number> = { yeni: 0, devam: 0, yenileme: 0, bitiyor: 0, bitti: 0 };
+  for (const r of rentals) evreCounts[evreOf(r)] += 1;
+
   // Liste filtreleri — KPI kartlarının drill-down hedefleri
   const filtered = rentals.filter((r) => {
+    if (evreF && evreOf(r) !== evreF) return false;
     if (arizaF && !openMaintRentals.has(r.id as string)) return false;
     if (durumF === "overdue") return overdueRentals.has(r.id as string);
     if (durumF === "paid") return curMonthByRental.get(r.id as string)?.status === "paid";
@@ -198,6 +224,50 @@ export default async function KiralamaPage({
         <StatCard label="Geciken tahakkuk" value={overdueCount} icon={AlertTriangle} tone="danger" href="/app/kiralama?durum=overdue" />
         <StatCard label="Açık arıza" value={openMaint} icon={Wrench} tone={openMaint > 0 ? "warning" : "neutral"} href="/app/kiralama?ariza=acik" />
       </div>
+
+      {/* Sözleşme yaşam döngüsü — portföyün evre dağılımı; her segment/çip listeyi süzer */}
+      {rentals.length > 0 ? (
+        <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-ink-950">
+              <Activity className="h-4 w-4 text-brand-600" /> Sözleşme yaşam döngüsü
+            </h2>
+            <p className="text-xs text-text-muted">
+              {rentals.length} sözleşme — imzadan yenilemeye, tüm evreler tek şeritte.
+            </p>
+          </div>
+          <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-ink-950/6" role="img" aria-label="Sözleşme evre dağılımı">
+            {EVRELER.map((e) =>
+              evreCounts[e] > 0 ? (
+                <div
+                  key={e}
+                  className={`h-full ${EVRE_META[e].bar} transition-all`}
+                  style={{ width: `${(evreCounts[e] / rentals.length) * 100}%` }}
+                  title={`${EVRE_META[e].label}: ${evreCounts[e]}`}
+                />
+              ) : null,
+            )}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {EVRELER.map((e) => (
+              <Link
+                key={e}
+                href={evreF === e ? "/app/kiralama" : `/app/kiralama?evre=${e}`}
+                aria-current={evreF === e ? "page" : undefined}
+                className={`focus-ring press inline-flex min-h-10 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  evreF === e
+                    ? "border-brand-400/50 bg-brand-600/10 text-brand-700"
+                    : "border-line bg-canvas text-text-muted hover:border-brand-300 hover:text-brand-600"
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${EVRE_META[e].dot}`} />
+                {EVRE_META[e].label}
+                <span className={`numeric font-bold ${EVRE_META[e].text}`}>{evreCounts[e]}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {/* Yenileme radarı — yıldönümü/bitişi 60 gün içindeki aktif kiralar */}
       {renewalRadar.length > 0 ? (
@@ -276,9 +346,17 @@ export default async function KiralamaPage({
       ) : null}
 
       {/* Aktif filtre çipleri */}
-      {durumF || arizaF ? (
+      {durumF || arizaF || evreF ? (
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-text-muted">Filtre:</span>
+          {evreF ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1 text-xs font-semibold text-brand-700">
+              {EVRE_META[evreF].label}
+              <Link href="/app/kiralama" aria-label="Evre filtresini temizle" className="focus-ring rounded-full hover:text-brand-900">
+                <X className="h-3.5 w-3.5" />
+              </Link>
+            </span>
+          ) : null}
           {durumF ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1 text-xs font-semibold text-brand-700">
               {DURUM_LABELS[durumF]}
@@ -309,7 +387,13 @@ export default async function KiralamaPage({
               : "Filtreyi temizleyip tüm kira kayıtlarını görüntüleyebilirsiniz."
           }
           tone="brand"
-          action={rentals.length > 0 ? { href: "/app/kiralama", label: "Filtreyi temizle" } : undefined}
+          action={
+            rentals.length > 0
+              ? { href: "/app/kiralama", label: "Filtreyi temizle" }
+              : canCreate
+                ? { node: <NewRentalDialog properties={propData ?? []} customers={custData ?? []} /> }
+                : undefined
+          }
         />
       ) : (
         <TableFrame minWidth={860}>

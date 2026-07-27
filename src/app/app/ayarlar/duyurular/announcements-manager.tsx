@@ -83,7 +83,7 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_1.35fr]">
       {/* Yeni duyuru / düzenleme formu */}
-      <section className="dashboard-panel h-fit rounded-[20px] border border-line bg-surface p-6">
+      <section className="dashboard-panel h-fit rounded-[20px] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center justify-between gap-3 border-b border-line pb-4">
           <div className="flex items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-brand-600/10 text-brand-600">
@@ -199,7 +199,7 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
       </section>
 
       {/* Duyuru listesi */}
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-6">
+      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center justify-between border-b border-line pb-4">
           <div>
             <h2 className="font-display font-bold text-ink-950">Yayınlanan duyurular</h2>

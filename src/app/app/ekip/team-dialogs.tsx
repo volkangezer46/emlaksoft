@@ -81,7 +81,7 @@ export function AddMemberDialog({ branches }: { branches: Branch[] }) {
 
       <DialogContent size="md">
         <DialogHeader icon={<UserPlus />} title="Ekip üyesi ekle" description="Yeni danışman veya personel hesabı açın." />
-        <form ref={formRef} action={action} className="grid gap-4 p-6 sm:grid-cols-2">
+        <form ref={formRef} action={action} className="grid gap-4 p-4 sm:grid-cols-2 md:p-6">
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="full_name">Ad soyad *</label>
                 <input id="full_name" name="full_name" required className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" placeholder="Örn. Merve Akın" />
@@ -157,7 +157,7 @@ export function AddBranchDialog({ provinces }: { provinces: Province[] }) {
 
       <DialogContent size="sm">
         <DialogHeader icon={<Building2 />} title="Şube ekle" description="Ofisinize yeni bir şube tanımlayın." />
-        <form ref={formRef} action={action} className="grid gap-4 p-6">
+        <form ref={formRef} action={action} className="grid gap-4 p-4 md:p-6">
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="branch_name">Şube adı *</label>
                 <input id="branch_name" name="name" required className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" placeholder="Örn. Merkez Şube" />

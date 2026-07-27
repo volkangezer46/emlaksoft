@@ -195,21 +195,58 @@ export default async function AgPage({
     ? propertyTypeDefs.map((d) => d.value)
     : [...new Set(pool.map((p) => p.propertyType))];
 
+  // ---- Havuz istatistikleri — gerçek havuz verisinden türetilir ----
+  const poolOffices = new Set(pool.map((p) => p.officeName)).size;
+  const poolAvgShare = pool.length
+    ? Math.round(pool.reduce((s, p) => s + p.commissionSharePct, 0) / pool.length)
+    : 0;
+  const pricedPool = pool.filter((p) => p.price != null);
+  const poolVolume = pricedPool.reduce((s, p) => s + (p.price ?? 0), 0);
+  const demandOffices = new Set(demandPool.map((d) => d.officeName)).size;
+  const demandAvgShare = demandPool.length
+    ? Math.round(demandPool.reduce((s, d) => s + d.commissionSharePct, 0) / demandPool.length)
+    : 0;
+
   return (
     <div className="space-y-6">
       <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
+        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-500/25 blur-[70px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>
             <span className="flex items-center gap-2 text-xs font-semibold text-brand-300">
               <Globe2 className="h-4 w-4" /> Ofisler arası ağ
             </span>
             <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Ağ</h1>
-            <p className="mt-1 text-sm text-white/75">
+            <p className="mt-1 max-w-xl text-sm text-white/75">
               Portföyünüzü diğer ofislerin talebine açın; komisyon paylaşımlı iş birliği kurun.
             </p>
+            {canCreate ? (
+              <div className="mt-4">
+                <ShareNetworkDialog properties={liveProperties} />
+              </div>
+            ) : null}
           </div>
-          {canCreate ? <ShareNetworkDialog properties={liveProperties} /> : null}
+          <div className="flex gap-3">
+            {[
+              { label: "Havuzdaki ilan", value: pool.length, href: "#havuz" },
+              { label: "Havuzdaki talep", value: demandPool.length, href: "#talep-havuzu" },
+              {
+                label: "Bekleyen işlem",
+                value: incomingPending + outgoingPending + demandIncomingPending + demandOutgoingPending,
+                href: incomingPending > 0 ? "#paylastiklarim" : "#taleplerim",
+              },
+            ].map((k) => (
+              <a
+                key={k.label}
+                href={k.href}
+                className="focus-ring press lift block min-w-[92px] rounded-[14px] border border-white/12 bg-white/8 p-3 text-center transition hover:border-white/30"
+              >
+                <p className="numeric font-display text-2xl font-extrabold text-white">{k.value}</p>
+                <p className="text-[11px] text-white/70">{k.label}</p>
+              </a>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -250,6 +287,33 @@ export default async function AgPage({
       {/* ============ (a) AĞ HAVUZU ============ */}
       <section id="havuz" className="scroll-mt-24 space-y-4">
         <h2 className="font-display text-lg font-bold text-ink-950">Ağ havuzu</h2>
+
+        {/* Havuz nabzı — filtrelenmiş havuzun canlı istatistikleri */}
+        {pool.length > 0 ? (
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+            {[
+              { label: "Açık ilan", value: String(pool.length), icon: Globe2, tint: "bg-brand-600/10 text-brand-600" },
+              { label: "Katılımcı ofis", value: String(poolOffices), icon: Building2, tint: "bg-mint-500/12 text-mint-600" },
+              { label: "Ort. komisyon paylaşımı", value: `%${poolAvgShare}`, icon: Handshake, tint: "bg-amber-400/15 text-amber-600" },
+              { label: "Havuz hacmi", value: poolVolume > 0 ? formatTry(poolVolume) : "—", icon: Trophy, tint: "bg-brand-600/10 text-brand-600" },
+            ].map((s) => (
+              <a
+                key={s.label}
+                href="#havuz"
+                className="focus-ring press lift group flex items-center gap-3 rounded-[16px] border border-line bg-surface p-4 hover:border-brand-300"
+              >
+                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[11px] ${s.tint}`}>
+                  <s.icon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="numeric block truncate font-display text-lg font-extrabold text-ink-950">{s.value}</span>
+                  <span className="block text-[11px] text-text-muted">{s.label}</span>
+                </span>
+              </a>
+            ))}
+          </div>
+        ) : null}
+
         <PoolFilters
           provinces={provinces}
           propertyTypes={propertyTypes}
@@ -260,7 +324,9 @@ export default async function AgPage({
           <EmptyState
             icon={Globe2}
             title="Havuzda ilan yok"
-            description="Seçili filtrelerde ağa açılmış ilan bulunamadı. Filtreleri genişletin ya da ilk paylaşımı siz yapın."
+            description="Seçili filtrelerde ağa açılmış ilan bulunamadı. Filtreleri genişletin ya da ilk paylaşımı siz yapın — paylaşan ofis, gelen her iş birliğinde komisyonun aslan payını korur."
+            tone="brand"
+            action={canCreate ? { node: <ShareNetworkDialog properties={liveProperties} /> } : undefined}
           />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -344,7 +410,8 @@ export default async function AgPage({
           <EmptyState
             icon={Share2}
             title="Henüz portföy paylaşmadınız"
-            description="Yayındaki bir portföyünüzü komisyon paylaşım oranıyla ağa açın; diğer ofislerden iş birliği talepleri alın."
+            description="Yayındaki bir portföyünüzü komisyon paylaşım oranıyla ağa açın; diğer ofislerden iş birliği talepleri alın. Malik bilgisi ve açık adres her zaman maskeli kalır."
+            tone="mint"
             action={canCreate ? { node: <ShareNetworkDialog properties={liveProperties} /> } : undefined}
           />
         ) : (
@@ -414,7 +481,9 @@ export default async function AgPage({
           <EmptyState
             icon={Send}
             title="Henüz talep göndermediniz"
-            description="Ağ havuzundan ilginizi çeken bir ilana iş birliği talebi gönderin; kabul edilince iletişim burada açılır."
+            description="Ağ havuzundan ilginizi çeken bir ilana iş birliği talebi gönderin; kabul edilince ofis iletişim bilgileri burada açılır."
+            tone="brand"
+            action={pool.length > 0 ? { href: "#havuz", label: "Ağ havuzuna göz at" } : undefined}
           />
         ) : (
           <div className="space-y-3">
@@ -459,6 +528,31 @@ export default async function AgPage({
           </div>
           {canCreate ? <ShareDemandDialog demands={myOpenDemands} /> : null}
         </div>
+
+        {/* Talep havuzu nabzı */}
+        {demandPool.length > 0 ? (
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
+            {[
+              { label: "Açık talep", value: String(demandPool.length), icon: Megaphone, tint: "bg-brand-600/10 text-brand-600" },
+              { label: "Talep sahibi ofis", value: String(demandOffices), icon: Building2, tint: "bg-mint-500/12 text-mint-600" },
+              { label: "Ort. komisyon paylaşımı", value: `%${demandAvgShare}`, icon: Handshake, tint: "bg-amber-400/15 text-amber-600" },
+            ].map((s) => (
+              <a
+                key={s.label}
+                href="#talep-havuzu"
+                className="focus-ring press lift flex items-center gap-3 rounded-[16px] border border-line bg-surface p-4 hover:border-brand-300"
+              >
+                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[11px] ${s.tint}`}>
+                  <s.icon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="numeric block truncate font-display text-lg font-extrabold text-ink-950">{s.value}</span>
+                  <span className="block text-[11px] text-text-muted">{s.label}</span>
+                </span>
+              </a>
+            ))}
+          </div>
+        ) : null}
 
         <PoolFilters
           provinces={provinces}
@@ -549,7 +643,8 @@ export default async function AgPage({
           <EmptyState
             icon={Megaphone}
             title="Henüz talep paylaşmadınız"
-            description="Açık bir alıcı talebinizi komisyon paylaşım oranıyla ağa açın; diğer ofislerden portföy önerileri alın."
+            description="Açık bir alıcı talebinizi komisyon paylaşım oranıyla ağa açın; diğer ofislerden portföy önerileri alın. Müşteri kimliği maskeli, bütçe yuvarlanmış aralık olarak görünür."
+            tone="amber"
             action={canCreate ? { node: <ShareDemandDialog demands={myOpenDemands} /> } : undefined}
           />
         ) : (
@@ -630,6 +725,8 @@ export default async function AgPage({
             icon={Home}
             title="Henüz portföy önerisi göndermediniz"
             description="Talep havuzundan uygun bir talebe portföy önerinizi gönderin; kabul edilince iletişim burada açılır."
+            tone="mint"
+            action={demandPool.length > 0 ? { href: "#talep-havuzu", label: "Talep havuzuna göz at" } : undefined}
           />
         ) : (
           <div className="space-y-3">

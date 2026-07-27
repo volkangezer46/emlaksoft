@@ -96,7 +96,7 @@ export function NewAppointmentDialog({
           title="Yeni randevu planla"
           description="Yer gösterme, değerleme veya ofis görüşmesi ekleyin."
         />
-        <form ref={formRef} action={submit} className="grid gap-4 p-6 sm:grid-cols-2">
+        <form ref={formRef} action={submit} className="grid gap-4 p-4 sm:grid-cols-2 md:p-6">
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="appointment-type">Randevu türü *</label>
                 <div className="relative">

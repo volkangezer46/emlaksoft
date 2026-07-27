@@ -1,7 +1,19 @@
 import Link from "next/link";
-import { Zap, Play, Pause, BarChart3, ArrowUpRight, ChevronDown, Plus } from "lucide-react";
+import {
+  Zap,
+  Play,
+  Pause,
+  BarChart3,
+  ArrowUpRight,
+  Bolt,
+  ChevronDown,
+  Filter,
+  History,
+  Plus,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { daysAgoIso, msSince } from "@/lib/clock";
 import { ApplyTemplateButton, AutomationRowActions } from "./automation-actions";
 import { AutomationWizard } from "./automation-wizard";
 import { TRIGGER_LABELS, ACTION_LABELS } from "./labels";
@@ -11,12 +23,37 @@ type AutomationRow = {
   name:         string;
   description:  string | null;
   trigger_type: string;
+  conditions:   unknown[] | null;
   actions:      { type: string }[];
   status:       string;
   run_count:    number;
   last_run_at:  string | null;
   updated_at:   string;
 };
+
+type RecentLog = {
+  id:            string;
+  automation_id: string;
+  result:        string;
+  error_msg:     string | null;
+  created_at:    string;
+};
+
+const LOG_RESULT_BADGES: Record<string, { label: string; className: string }> = {
+  ok:    { label: "Çalıştı", className: "bg-mint-50 text-mint-700" },
+  skip:  { label: "Atlandı", className: "bg-zinc-100 text-zinc-500" },
+  error: { label: "Hata",    className: "bg-danger-500/10 text-danger-500" },
+};
+
+/** Bağıl zaman — clock.msSince üzerinden (render'da Date.now yok). */
+function relativeTime(iso: string): string {
+  const mins = Math.floor(msSince(iso) / 60_000);
+  if (mins < 1) return "az önce";
+  if (mins < 60) return `${mins} dk önce`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} sa önce`;
+  return `${Math.floor(hrs / 24)} gün önce`;
+}
 
 // ?durum= kontratı: aktif | pasif. "pasif" active olmayan her durumu kapsar
 // (inactive/paused/draft) — KPI sayısı ile tıklama sonucu aynı kümeyi görsün.
@@ -43,14 +80,21 @@ export default async function OtomasyonlarPage({
   const durum = params.durum ?? "";
   const supabase = await createClient();
 
-  const [{ data }, { data: staffData }] = await Promise.all([
+  const [{ data }, { data: staffData }, { data: logData }] = await Promise.all([
     supabase
       .from("automations")
-      .select("id, name, description, trigger_type, actions, status, run_count, last_run_at, updated_at")
+      .select("id, name, description, trigger_type, conditions, actions, status, run_count, last_run_at, updated_at")
       .order("updated_at", { ascending: false })
       .limit(50),
     // Sihirbazdaki "Danışmana ata" aksiyonu için aktif ekip listesi
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
+    // Son 7 günün çalışma geçmişi — KPI + "Son çalışmalar" özeti
+    supabase
+      .from("automation_logs")
+      .select("id, automation_id, result, error_msg, created_at")
+      .gte("created_at", daysAgoIso(7))
+      .order("created_at", { ascending: false })
+      .limit(200),
   ]);
   const staff = (staffData ?? []) as { id: string; full_name: string }[];
 
@@ -58,6 +102,12 @@ export default async function OtomasyonlarPage({
   const active   = rows.filter((r) => r.status === "active").length;
   const inactive = rows.length - active;
   const visible  = durum ? rows.filter((r) => matchesDurum(r.status, durum)) : rows;
+
+  const logs = (logData ?? []) as RecentLog[];
+  const runs7  = logs.length;
+  const err7   = logs.filter((l) => l.result === "error").length;
+  const nameById = new Map(rows.map((r) => [r.id, r.name]));
+  const recentLogs = logs.slice(0, 6);
 
   return (
     <div className="space-y-6">
@@ -89,19 +139,23 @@ export default async function OtomasyonlarPage({
               </div>
             )}
           </div>
-          <div className="flex gap-3">
-            {[
+          <div className="grid grid-cols-2 gap-3 sm:flex">
+            {([
               { label: "Aktif", value: active, href: "/app/otomasyonlar?durum=aktif" },
               { label: "Pasif", value: inactive, href: "/app/otomasyonlar?durum=pasif" },
               { label: "Toplam çalışma", value: rows.reduce((s, r) => s + r.run_count, 0), href: "/app/otomasyonlar" },
-            ].map((k) => (
+              { label: "Çalışma (7g)", value: runs7, href: "#son-calismalar" },
+              { label: "Hata (7g)", value: err7, href: "#son-calismalar", danger: err7 > 0 },
+            ] as { label: string; value: number; href: string; danger?: boolean }[]).map((k) => (
               <Link
                 key={k.label}
                 href={k.href}
-                className="focus-ring press group relative block rounded-[14px] border border-white/12 bg-white/8 p-3 text-center transition hover:border-white/30"
+                className={`focus-ring press group relative block min-w-[92px] rounded-[14px] border p-3 text-center transition hover:border-white/30 ${
+                  k.danger ? "border-danger-500/40 bg-danger-500/15" : "border-white/12 bg-white/8"
+                }`}
               >
                 <ArrowUpRight className="hover-action absolute right-2 top-2 h-3.5 w-3.5 text-white/50 opacity-0 transition group-hover:opacity-100" />
-                <p className="font-display text-2xl font-extrabold text-white">{k.value}</p>
+                <p className="numeric font-display text-2xl font-extrabold text-white">{k.value}</p>
                 <p className="text-[11px] text-white/70">{k.label}</p>
               </Link>
             ))}
@@ -205,6 +259,7 @@ export default async function OtomasyonlarPage({
           <div className="divide-y divide-line">
             {visible.map((r) => {
               const acts = Array.isArray(r.actions) ? r.actions : [];
+              const condCount = Array.isArray(r.conditions) ? r.conditions.length : 0;
               return (
                 <div key={r.id} className="group relative flex items-center gap-3 px-5 py-3.5 transition hover:bg-brand-600/[0.03]">
                   <Link href={`/app/otomasyonlar/${r.id}`} className="absolute inset-0" aria-label={`${r.name} otomasyon detayı`} />
@@ -215,10 +270,26 @@ export default async function OtomasyonlarPage({
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold text-ink-950 group-hover:text-brand-600">{r.name}</p>
-                    <p className="text-xs text-text-muted">
-                      {TRIGGER_LABELS[r.trigger_type] ?? r.trigger_type}
-                      {acts.length > 0 && ` → ${acts.map((a) => ACTION_LABELS[a.type] ?? a.type).join(", ")}`}
-                    </p>
+                    {/* Tetikleyici → koşul → aksiyon zinciri görselleştirmesi */}
+                    <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px]">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 font-semibold text-amber-700">
+                        <Bolt className="h-3 w-3" /> {TRIGGER_LABELS[r.trigger_type] ?? r.trigger_type}
+                      </span>
+                      <span aria-hidden className="text-text-faint">→</span>
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold ${
+                        condCount > 0 ? "bg-brand-600/10 text-brand-700" : "bg-ink-950/5 text-text-faint"
+                      }`}>
+                        <Filter className="h-3 w-3" /> {condCount > 0 ? `${condCount} koşul` : "Koşulsuz"}
+                      </span>
+                      {acts.map((a, i) => (
+                        <span key={i} className="inline-flex items-center gap-1">
+                          <span aria-hidden className="text-text-faint">→</span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-mint-500/12 px-2 py-0.5 font-semibold text-mint-700">
+                            <Zap className="h-3 w-3" /> {ACTION_LABELS[a.type] ?? a.type}
+                          </span>
+                        </span>
+                      ))}
+                    </div>
                   </div>
                   <div className="relative z-10 shrink-0 text-right">
                     <Link
@@ -243,6 +314,55 @@ export default async function OtomasyonlarPage({
                   <div className="relative z-10">
                     <AutomationRowActions row={r} />
                   </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Son çalışmalar — automation_logs son 7 gün özeti */}
+      <section id="son-calismalar" className="scroll-mt-6 overflow-hidden rounded-[20px] border border-line bg-surface">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3.5">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-ink-950">
+            <History className="h-4 w-4 text-brand-600" /> Son çalışmalar
+          </h2>
+          <span className="text-xs text-text-faint">
+            Son 7 gün · {runs7.toLocaleString("tr-TR")} çalışma
+            {err7 > 0 ? ` · ${err7} hata` : ""}
+          </span>
+        </div>
+        {recentLogs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <History className="h-9 w-9 text-text-faint" />
+            <p className="mt-3 font-semibold text-ink-950">Son 7 günde çalışma kaydı yok</p>
+            <p className="mt-1 max-w-sm text-sm text-text-muted">
+              Aktif bir kural tetiklendiğinde her çalışma burada sonuç rozetiyle listelenir.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-line">
+            {recentLogs.map((log) => {
+              const badge = LOG_RESULT_BADGES[log.result] ?? LOG_RESULT_BADGES.skip;
+              return (
+                <div key={log.id} className="group relative flex items-center gap-3 px-5 py-3 transition hover:bg-brand-600/[0.03]">
+                  <Link
+                    href={`/app/otomasyonlar/${log.automation_id}#calisma-gecmisi`}
+                    className="absolute inset-0"
+                    aria-label={`${nameById.get(log.automation_id) ?? "Otomasyon"} çalışma geçmişi`}
+                  />
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${badge.className}`}>
+                    {badge.label}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-ink-950 group-hover:text-brand-600">
+                      {nameById.get(log.automation_id) ?? "Otomasyon kuralı"}
+                    </p>
+                    {log.result === "error" && log.error_msg ? (
+                      <p className="truncate text-[11px] text-danger-500">{log.error_msg}</p>
+                    ) : null}
+                  </div>
+                  <span className="shrink-0 text-xs text-text-faint">{relativeTime(log.created_at)}</span>
                 </div>
               );
             })}

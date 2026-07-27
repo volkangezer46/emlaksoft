@@ -79,7 +79,11 @@ export function useAppApi<T>(
   const enabled = opts?.enabled !== false && Boolean(tenantId && url);
   const key = tenantId && url ? cacheKey(tenantId, url) : null;
 
-  const cached = key ? (memory.get(key) as CacheEntry<T> | undefined) ?? readLS<T>(key) : null;
+  // İlk state YALNIZ bellek cache'inden beslenir. localStorage burada okunursa
+  // tam sayfa yüklemede SSR "yükleniyor…" ile istemcinin ilk render'ı uyuşmaz
+  // (hidrasyon hatası). LS okuması hidrasyon sonrası effect'te yapılır; bellek
+  // cache'i istemci içi geçişlerde ani boyamayı korur.
+  const cached = key ? ((memory.get(key) as CacheEntry<T> | undefined) ?? null) : null;
   const [data, setData] = useState<T | null>(cached?.data ?? null);
   const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);

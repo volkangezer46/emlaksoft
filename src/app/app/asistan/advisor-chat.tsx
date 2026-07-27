@@ -23,6 +23,7 @@ import {
   type TenantSessionSummary,
   type TenantPersistedMessage,
 } from "@/app/actions/ai-tenant-advisor";
+import { msSince } from "@/lib/clock";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AdvisorActionCards } from "./action-cards";
 
@@ -72,8 +73,7 @@ function renderContent(text: string, streaming = false) {
 }
 
 function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60_000);
+  const mins = Math.floor(msSince(iso) / 60_000);
   if (mins < 1) return "az önce";
   if (mins < 60) return `${mins} dk önce`;
   const hrs = Math.floor(mins / 60);
@@ -222,10 +222,13 @@ function exportChatAsTxt(messages: ChatMsg[], sessionTitle?: string | null): voi
 export function TenantAdvisorChat({
   aiEnabled,
   initialQuestion,
+  initialSessionId,
 }: {
   aiEnabled: boolean;
   /** Komut paletinden gelen ?q — sayfa açılınca ilk mesaj olarak gönderilir. */
   initialQuestion?: string;
+  /** "Son konuşmalar" kartından gelen ?oturum — açılışta geçmiş sohbeti yükler. */
+  initialSessionId?: string;
 }) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
@@ -447,6 +450,16 @@ export function TenantAdvisorChat({
     initialFired.current = true;
     queueMicrotask(() => send(q));
   }, [initialQuestion, send]);
+
+  // ?oturum= ile gelindiyse geçmiş sohbeti aç (bir kez; ?q önceliklidir)
+  const sessionFired = useRef(false);
+  useEffect(() => {
+    if (sessionFired.current || initialFired.current) return;
+    const id = initialSessionId?.trim();
+    if (!id) return;
+    sessionFired.current = true;
+    queueMicrotask(() => void selectSession(id));
+  }, [initialSessionId, selectSession]);
 
   return (
     <div className="flex h-[calc(100vh-11rem)] min-h-[520px] overflow-hidden rounded-[18px] border border-line bg-surface">

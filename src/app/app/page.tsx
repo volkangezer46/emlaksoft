@@ -891,7 +891,7 @@ export default async function AppHomePage({
           data-tour="brifing" burada yedek hedef: brifing kartı koşullu render edilir,
           yoksa tur ilk adımda hero'yu spotlar (querySelector ilk görüneni alır). */}
       <div data-tour="brifing" className="premium-ring rounded-[26px]">
-        <div className="theme-dark relative overflow-hidden rounded-[26px] bg-[image:var(--grad-ink)] p-6 text-white">
+        <div className="theme-dark relative overflow-hidden rounded-[26px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
           <div className="hero-aurora" style={{ inset: "-45% -10%", height: "220%", opacity: 0.4 }} />
           <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-40" />
           <div className="noise pointer-events-none absolute inset-0 opacity-[0.05] mix-blend-overlay" />

@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { ArrowUpRight, Handshake, TrendingUp, Trophy, Wallet } from "lucide-react";
+import { AlarmClock, ArrowUpRight, Filter, Handshake, Target, TrendingUp, Trophy, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { DAY_MS, msSince } from "@/lib/clock";
 import { DealBoard, type BoardDeal } from "./deal-board";
 import { NewDealDialog } from "./new-deal-dialog";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
@@ -9,6 +10,17 @@ import { ListLimitNotice } from "@/components/app/list-limit-notice";
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
 }
+
+/**
+ * Satış hunisi görselleştirmesi — aşama sırası deal-board ile aynı; renkler de
+ * sütun tonlarını izler (renk varlığı takip eder). Her satır ilgili sütuna iner.
+ */
+const FUNNEL_STAGES: { key: string; label: string; bar: string; text: string }[] = [
+  { key: "new", label: "Yeni", bar: "bg-cyan-500", text: "text-cyan-600" },
+  { key: "qualified", label: "Nitelikli", bar: "bg-brand-600", text: "text-brand-600" },
+  { key: "negotiation", label: "Müzakere", bar: "bg-amber-400", text: "text-amber-600" },
+  { key: "won", label: "Kazanıldı", bar: "bg-mint-500", text: "text-mint-600" },
+];
 
 export default async function DealsPage() {
   const { perms } = await requireModulePage("commissions");
@@ -115,9 +127,28 @@ export default async function DealsPage() {
 
   const open = deals.filter((d) => !["won", "lost"].includes(d.stage));
   const won = deals.filter((d) => d.stage === "won");
+  const lost = deals.filter((d) => d.stage === "lost");
   const pipelineValue = open.reduce((s, d) => s + (d.deal_value || 0), 0);
   const wonValue = won.reduce((s, d) => s + (d.deal_value || 0), 0);
   const winRate = deals.length ? Math.round((won.length / deals.length) * 100) : 0;
+
+  // Kapanma tahmini: şemada tarih alanı yok — açık kartların değeri olasılıkla
+  // ağırlıklandırılır (probability boşsa varsayılan %20, tahta ile aynı kabul).
+  const weightedForecast = open.reduce(
+    (s, d) => s + (d.deal_value || 0) * (Math.min(100, d.probability ?? 20) / 100),
+    0,
+  );
+  // Bayat açık anlaşma: 14+ gündür güncellenmemiş — hareket bekleyen kartlar.
+  const staleOpen = open.filter((d) => msSince(d.updated_at) > 14 * DAY_MS).length;
+
+  // Huni satırları: aşamaya ULAŞAN kart sayısı kümülatif okunmaz (aşamalar
+  // arası geri dönüş yok); mevcut dağılım + bir sonraki aşamaya oran gösterilir.
+  const funnel = FUNNEL_STAGES.map((s) => {
+    const rows = s.key === "won" ? won : open.filter((d) => d.stage === s.key);
+    return { ...s, count: rows.length, value: rows.reduce((t, d) => t + (d.deal_value || 0), 0) };
+  });
+  const funnelMax = Math.max(1, ...funnel.map((f) => f.count));
+  const lostValue = lost.reduce((s, d) => s + (d.deal_value || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -136,11 +167,12 @@ export default async function DealsPage() {
           </div>
           {canCreate ? <NewDealDialog properties={properties ?? []} customers={customers ?? []} /> : null}
         </div>
-        <div className="relative mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="relative mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {/* KPI'lar tahtaya çapa: açık metrikler tahtanın başına, kazanılanlar
               doğrudan "Kazanıldı" sütununa götürür. */}
           {[
             { label: "Açık hat", value: money(pipelineValue), icon: TrendingUp, tone: "text-cyan-300", href: "#tahta" },
+            { label: "Ağırlıklı tahmin", value: money(Math.round(weightedForecast)), icon: Target, tone: "text-brand-300", href: "#huni" },
             { label: "Kazanılan", value: money(wonValue), icon: Trophy, tone: "text-mint-300", href: "#sutun-won" },
             { label: "Açık kart", value: String(open.length), icon: Handshake, tone: "text-amber-300", href: "#tahta" },
             { label: "Kazanma oranı", value: `%${winRate}`, icon: Wallet, tone: "text-white", href: "#sutun-won" },
@@ -179,6 +211,117 @@ export default async function DealsPage() {
         </div>
       ) : (
         <>
+          {/* Satış hunisi — mevcut dağılım + aşamalar arası oran; satırlar sütuna iner */}
+          <section id="huni" className="scroll-mt-24 grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+            <div className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">
+                  Satış hunisi
+                </h2>
+                <span className="text-[11px] text-text-faint">Aşamadaki kart sayısına göre</span>
+              </div>
+              <div className="mt-4 space-y-3">
+                {funnel.map((f, i) => {
+                  const nextF = funnel[i + 1];
+                  const conv = nextF && f.count > 0 ? Math.round((nextF.count / f.count) * 100) : null;
+                  return (
+                    <div key={f.key}>
+                      <Link
+                        href={`#sutun-${f.key}`}
+                        className="focus-ring group block rounded-[12px] px-1 py-0.5 transition hover:bg-canvas"
+                      >
+                        <div className="flex items-center justify-between gap-3 text-xs">
+                          <span className={`font-bold ${f.text}`}>{f.label}</span>
+                          <span className="numeric text-text-muted">
+                            <span className="font-extrabold text-ink-950">{f.count}</span> kart · {money(f.value)}
+                            <ArrowUpRight className="ml-1 inline h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                          </span>
+                        </div>
+                        <div className="mt-1.5 h-3 overflow-hidden rounded-[6px] bg-canvas">
+                          <div
+                            className={`h-full rounded-[6px] ${f.bar} transition-all`}
+                            style={{ width: `${Math.max(f.count > 0 ? 4 : 0, Math.round((f.count / funnelMax) * 100))}%` }}
+                          />
+                        </div>
+                      </Link>
+                      {conv != null && f.key !== "won" ? (
+                        <p className="mt-0.5 pl-1 text-[10px] text-text-faint">↓ sonraki aşamaya oran %{conv}</p>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+              {lost.length > 0 ? (
+                <Link
+                  href="#sutun-lost"
+                  className="focus-ring mt-4 flex items-center justify-between rounded-[12px] border border-danger-500/15 bg-danger-500/5 px-3 py-2 text-xs transition hover:border-danger-500/30"
+                >
+                  <span className="font-semibold text-danger-500">Kaybedilen</span>
+                  <span className="numeric text-text-muted">
+                    <span className="font-extrabold text-ink-950">{lost.length}</span> kart · {money(lostValue)}
+                  </span>
+                </Link>
+              ) : null}
+            </div>
+
+            {/* Aşama bazlı toplam değer şeridi + hat sağlığı */}
+            <div className="flex flex-col gap-4">
+              <div className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+                <h2 className="font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">
+                  Aşama bazlı değer
+                </h2>
+                {pipelineValue + wonValue > 0 ? (
+                  <>
+                    {/* Yığılmış şerit — 2px yüzey boşluklu segmentler, her biri sütuna iner */}
+                    <div className="mt-4 flex h-4 gap-0.5 overflow-hidden rounded-[8px]">
+                      {funnel
+                        .filter((f) => f.value > 0)
+                        .map((f) => (
+                          <Link
+                            key={f.key}
+                            href={`#sutun-${f.key}`}
+                            title={`${f.label}: ${money(f.value)}`}
+                            className={`${f.bar} focus-ring block h-full transition hover:opacity-80`}
+                            style={{ width: `${Math.max(3, Math.round((f.value / (pipelineValue + wonValue)) * 100))}%` }}
+                            aria-label={`${f.label} sütununa git — ${money(f.value)}`}
+                          />
+                        ))}
+                    </div>
+                    <ul className="mt-3 space-y-1.5">
+                      {funnel.map((f) => (
+                        <li key={f.key} className="flex items-center gap-2 text-xs">
+                          <span className={`h-2.5 w-2.5 shrink-0 rounded-[3px] ${f.bar}`} aria-hidden />
+                          <span className="text-text-muted">{f.label}</span>
+                          <Link href={`#sutun-${f.key}`} className="numeric focus-ring ml-auto rounded-[6px] font-bold text-ink-950 hover:text-brand-600 hover:underline">
+                            {money(f.value)}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <p className="mt-3 text-xs text-text-muted">Kartlara anlaşma değeri girildiğinde dağılım burada görünür.</p>
+                )}
+              </div>
+
+              {staleOpen > 0 ? (
+                <Link
+                  href="#tahta"
+                  className="focus-ring press flex items-start gap-3 rounded-[16px] border border-amber-400/40 bg-amber-400/10 p-4 transition hover:border-amber-400/70"
+                >
+                  <AlarmClock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                  <span className="text-xs text-text-muted">
+                    <span className="font-bold text-amber-600">{staleOpen} açık anlaşma</span> 14+ gündür güncellenmedi —
+                    tahtada bayat kartları öne alın.
+                  </span>
+                </Link>
+              ) : null}
+            </div>
+          </section>
+
+          <div className="flex items-center gap-2 text-xs font-semibold text-text-muted">
+            <Filter className="h-3.5 w-3.5" /> Tahta — sürükleyerek veya aşama butonlarıyla taşıyın
+          </div>
           <ListLimitNotice
             shown={deals.length}
             total={dealTotal}

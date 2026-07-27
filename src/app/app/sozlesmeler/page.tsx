@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowUpRight, CalendarRange, FileSignature } from "lucide-react";
+import { AlarmClock, ArrowUpRight, CalendarRange, FileSignature, PenLine } from "lucide-react";
+import { DAY_MS, daysFromNowIso, msSince, msUntil, now } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getDefinitions } from "@/lib/definitions";
 import { createClient } from "@/lib/supabase/server";
@@ -37,7 +38,7 @@ const STATUS_VARIANTS: Record<string, BadgeVariant> = {
 };
 
 function relativeDate(iso: string) {
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  const d = Math.floor(msSince(iso) / DAY_MS);
   if (d <= 0) return "Bugün";
   if (d === 1) return "Dün";
   if (d < 30) return `${d} gün önce`;
@@ -50,8 +51,14 @@ function relativeDate(iso: string) {
  */
 function renewalDays(expiresAt: string | null, status: string) {
   if (!expiresAt || status === "cancelled" || status === "rejected") return null;
-  const days = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86_400_000);
+  const days = Math.ceil(msUntil(expiresAt) / DAY_MS);
   return days >= 0 && days <= 30 ? days : null;
+}
+
+/** Süresi geçmiş (iptal/red hariç) — listede kırmızı rozetle işaretlenir. */
+function isExpired(expiresAt: string | null, status: string) {
+  if (!expiresAt || status === "cancelled" || status === "rejected") return false;
+  return msUntil(expiresAt) < 0;
 }
 
 function one<T>(v: T | T[] | null | undefined): T | null {
@@ -83,7 +90,7 @@ function qs(params: Record<string, string | null | undefined>) {
 export default async function SozlesmelerPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; customer?: string; property?: string; from?: string; to?: string }>;
+  searchParams?: Promise<{ durum?: string; customer?: string; property?: string; from?: string; to?: string; yenileme?: string }>;
 }) {
   const { perms } = await requireModulePage("contracts");
   const params = (await searchParams) ?? {};
@@ -91,21 +98,24 @@ export default async function SozlesmelerPage({
   const durum = params.durum && STATUS_LABELS[params.durum] ? params.durum : null;
   const from = ISO_DATE.test(params.from ?? "") ? params.from! : null;
   const to = ISO_DATE.test(params.to ?? "") ? params.to! : null;
+  // ?yenileme=1 → yalnız süresi 30 gün içinde dolacak sözleşmeler
+  const yenileme = params.yenileme === "1";
 
   // Mevcut filtreleri koruyan link üretici
-  const href = (next: { durum?: string | null; from?: string | null; to?: string | null }) =>
+  const href = (next: { durum?: string | null; from?: string | null; to?: string | null; yenileme?: boolean }) =>
     `/app/sozlesmeler${qs({
       durum: next.durum === undefined ? durum : next.durum,
       from: next.from === undefined ? from : next.from,
       to: next.to === undefined ? to : next.to,
+      yenileme: (next.yenileme === undefined ? yenileme : next.yenileme) ? "1" : null,
     })}`;
 
-  // Hızlı tarih çipleri — sunucu saatine göre
-  const now = new Date();
+  // Hızlı tarih çipleri — zaman okuması clock.ts üzerinden (tek kaynak)
+  const nowD = new Date(now());
   const presets = [
-    { label: "Bu ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth(), 1)), to: fmtDate(now) },
-    { label: "Geçen ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth() - 1, 1)), to: fmtDate(new Date(now.getFullYear(), now.getMonth(), 0)) },
-    { label: "Son 3 ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth() - 2, 1)), to: fmtDate(now) },
+    { label: "Bu ay", from: fmtDate(new Date(nowD.getFullYear(), nowD.getMonth(), 1)), to: fmtDate(nowD) },
+    { label: "Geçen ay", from: fmtDate(new Date(nowD.getFullYear(), nowD.getMonth() - 1, 1)), to: fmtDate(new Date(nowD.getFullYear(), nowD.getMonth(), 0)) },
+    { label: "Son 3 ay", from: fmtDate(new Date(nowD.getFullYear(), nowD.getMonth() - 2, 1)), to: fmtDate(nowD) },
   ];
 
   const supabase = await createClient();
@@ -117,17 +127,28 @@ export default async function SozlesmelerPage({
     .select(
       "id, title, contract_type, status, created_at, signed_at, expires_at, property:properties(id, property_code, title), customer:customers(id, full_name)",
     )
-    .order("created_at", { ascending: false })
     .limit(100);
   if (durum) contractQuery = contractQuery.eq("status", durum);
   // ?from=&to= sunucu filtresi — created_at aralığı, uç gün dahil
   if (from) contractQuery = contractQuery.gte("created_at", from);
   if (to) contractQuery = contractQuery.lt("created_at", nextDay(to));
+  // ?yenileme=1 — süresi önümüzdeki 30 günde dolan, iptal/red olmayan sözleşmeler;
+  // en yakın süre sonu en üstte. Diğer görünümler yeniden eskiye sıralanır.
+  if (yenileme) {
+    contractQuery = contractQuery
+      .not("expires_at", "is", null)
+      .gte("expires_at", new Date(now()).toISOString())
+      .lte("expires_at", daysFromNowIso(30))
+      .not("status", "in", "(cancelled,rejected)")
+      .order("expires_at", { ascending: true });
+  } else {
+    contractQuery = contractQuery.order("created_at", { ascending: false });
+  }
 
   const [{ data: contractData }, { data: statusData }, contractTypeDefs, templates] = await Promise.all([
     contractQuery,
-    // KPI sayıları filtreden bağımsız
-    supabase.from("contracts").select("status").limit(1000),
+    // KPI sayıları filtreden bağımsız — süre sonu şeridi için expires_at da gelir
+    supabase.from("contracts").select("status, expires_at").limit(1000),
     getDefinitions("contract_type"),
     // "Şablondan başla" galerisi — global hazır şablonlar + ofis şablonları
     listContractTemplates(),
@@ -156,10 +177,24 @@ export default async function SozlesmelerPage({
     };
   });
 
-  const statuses = (statusData ?? []).map((r) => r.status as string);
+  const allContracts = (statusData ?? []).map((r) => ({
+    status: r.status as string,
+    expires_at: (r as { expires_at?: string | null }).expires_at ?? null,
+  }));
+  const statuses = allContracts.map((r) => r.status);
   const total   = statuses.length;
   const signed  = statuses.filter((s) => s === "signed").length;
   const pending = statuses.filter((s) => s === "sent").length;
+  // İmza oranı: taslak/iptal dışında sonuca bağlananlar içinde imzalananlar
+  const signRate = signed + pending > 0 ? Math.round((signed / (signed + pending)) * 100) : null;
+
+  // Yaklaşan süre sonu — 30 gün penceresi, 7 gün içi "acil" (iptal/red hariç)
+  const expiring = allContracts.filter((c) => renewalDays(c.expires_at, c.status) != null);
+  const expiringUrgent = expiring.filter((c) => {
+    const d = renewalDays(c.expires_at, c.status);
+    return d != null && d <= 7;
+  });
+  const expiredCount = allContracts.filter((c) => isExpired(c.expires_at, c.status)).length;
 
   return (
     <div className="space-y-6">
@@ -182,9 +217,10 @@ export default async function SozlesmelerPage({
           <div className="flex flex-wrap gap-3">
             {/* KPI'lar durum filtresine bağlı (tarih aralığı korunur) */}
             {[
-              { label: "Toplam", value: total, href: href({ durum: null }), active: durum === null },
+              { label: "Toplam", value: total, href: href({ durum: null, yenileme: false }), active: durum === null && !yenileme },
               { label: "İmzalandı", value: signed, href: href({ durum: "signed" }), active: durum === "signed" },
               { label: "İmza bekliyor", value: pending, href: href({ durum: "sent" }), active: durum === "sent" },
+              { label: "Süresi yaklaşan", value: expiring.length, href: href({ durum: null, yenileme: true }), active: yenileme },
             ].map((k) => (
               <Link
                 key={k.label}
@@ -202,7 +238,36 @@ export default async function SozlesmelerPage({
             ))}
           </div>
         </div>
+        {signRate != null ? (
+          <div className="relative mt-5 max-w-md">
+            <div className="flex items-center justify-between text-[11px] text-white/60">
+              <span className="flex items-center gap-1.5"><PenLine className="h-3.5 w-3.5 text-mint-400" /> İmza oranı (gönderilen + imzalanan)</span>
+              <span className="numeric font-bold text-white">%{signRate}</span>
+            </div>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full bg-mint-500 transition-all" style={{ width: `${signRate}%` }} />
+            </div>
+          </div>
+        ) : null}
       </section>
+
+      {/* Yaklaşan süre sonu uyarı şeridi — tıklayınca ?yenileme=1 filtresine iner */}
+      {expiring.length > 0 ? (
+        <Link
+          href={href({ durum: null, yenileme: true })}
+          className="focus-ring press flex flex-wrap items-center gap-3 rounded-[16px] border border-amber-400/40 bg-amber-400/10 px-4 py-3 transition hover:border-amber-400/70"
+        >
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-amber-400/20 text-amber-600">
+            <AlarmClock className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1 text-sm text-text-muted">
+            <span className="font-bold text-amber-600">{expiring.length} sözleşmenin süresi 30 gün içinde doluyor.</span>
+            {expiringUrgent.length > 0 ? <> {expiringUrgent.length} tanesi 7 gün içinde — yenileme görüşmesini başlatın.</> : " Yenileme planını şimdi yapın."}
+            {expiredCount > 0 ? <span className="ml-1 font-semibold text-danger-500">{expiredCount} sözleşmenin süresi zaten geçti.</span> : null}
+          </span>
+          <span className="text-xs font-bold text-amber-600">Listele →</span>
+        </Link>
+      ) : null}
 
       {/* Üst toolbar */}
       <div className="flex items-center justify-between">
@@ -246,6 +311,16 @@ export default async function SozlesmelerPage({
                 {label}
               </Link>
             ))}
+            <Link
+              href={href({ yenileme: !yenileme })}
+              className={`flex items-center gap-1.5 rounded-[10px] border px-3.5 py-2 text-xs font-semibold transition ${
+                yenileme
+                  ? "border-amber-400/60 bg-amber-400/10 text-amber-600"
+                  : "border-line bg-surface text-text-muted hover:border-amber-400/50 hover:text-amber-600"
+              }`}
+            >
+              <AlarmClock className="h-3.5 w-3.5" /> Süresi yaklaşan
+            </Link>
             <span className="numeric ml-auto text-[11px] font-medium tracking-wide text-text-faint">
               {contracts.length} kayıt
             </span>
@@ -343,6 +418,9 @@ export default async function SozlesmelerPage({
                               <Badge variant="warning" size="sm">
                                 Yenileme yaklaşıyor · {kalanGun === 0 ? "bugün" : `${kalanGun} gün`}
                               </Badge>
+                            ) : null}
+                            {isExpired(c.expires_at, c.status) ? (
+                              <Badge variant="danger" size="sm">Süresi doldu</Badge>
                             ) : null}
                           </span>
                         </TD>

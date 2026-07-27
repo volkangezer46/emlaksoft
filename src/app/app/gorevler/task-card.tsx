@@ -143,6 +143,9 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
           {highPr && !done ? (
             <span className="rounded-full bg-danger-500/10 px-2 py-0.5 text-[11px] font-bold text-danger-500">Yüksek</span>
           ) : null}
+          {task.priority === "low" && !done ? (
+            <span className="rounded-full bg-ink-950/6 px-2 py-0.5 text-[11px] font-bold text-text-faint">Düşük</span>
+          ) : null}
         </div>
         {task.notes ? <p className="mt-0.5 line-clamp-1 text-xs text-text-muted">{task.notes}</p> : null}
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">

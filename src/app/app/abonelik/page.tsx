@@ -1,9 +1,12 @@
 import Link from "next/link";
 import {
   ArrowLeft,
+  ArrowUpRight,
+  Building2,
   Check,
-  ChevronDown,
+  Contact2,
   CreditCard,
+  Gauge,
   Sparkles,
   ShieldCheck,
   Users2,
@@ -13,6 +16,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { DAY_MS, msUntil } from "@/lib/clock";
 import { PLANS, planAmountTry, planLabel, type BillingCycle } from "@/lib/billing/plans";
 import { isIyzicoConfigured } from "@/lib/billing/iyzico";
+import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { CheckoutButton } from "./checkout-button";
 
 function money(n: number) {
@@ -43,7 +47,14 @@ export default async function BillingPage({
   } = await supabase.auth.getUser();
   const tenantId = user?.app_metadata?.tenant_id as string | undefined;
 
-  const [{ data: tenant }, { data: sub }, { data: invoices }, { count: memberCount }] = await Promise.all([
+  const [
+    { data: tenant },
+    { data: sub },
+    { data: invoices },
+    { count: memberCount },
+    { count: propertyCount },
+    { count: customerCount },
+  ] = await Promise.all([
     tenantId
       ? supabase.from("tenants").select("id, name, plan, status").eq("id", tenantId).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -65,9 +76,25 @@ export default async function BillingPage({
     tenantId
       ? supabase.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId)
       : Promise.resolve({ count: null }),
+    // Kullanım göstergeleri — gerçek kayıt sayıları (RLS tenant kapsamında)
+    supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null),
+    supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
   ]);
 
   const currentPlan = sub?.plan ?? tenant?.plan ?? "office";
+
+  /**
+   * Kullanım göstergeleri — plan tanımlarında yapısal kayıt limiti YOK;
+   * tek sayısal sınır Danışman paketinin "1 kullanıcı" özelliği (PLANS).
+   * Limitli metrikte doluluk çubuğu, limitsizde yalnız gerçek sayım gösterilir.
+   */
+  const USER_LIMIT_BY_PLAN: Partial<Record<string, number>> = { advisor: 1 };
+  const userLimit = USER_LIMIT_BY_PLAN[currentPlan] ?? null;
+  const usage = [
+    { label: "Kullanıcı", value: memberCount ?? 0, limit: userLimit, icon: Users2, href: "/app/ekip", tone: "text-brand-600 bg-brand-600/10" },
+    { label: "Portföy kaydı", value: propertyCount ?? 0, limit: null, icon: Building2, href: "/app/portfoyler", tone: "text-mint-600 bg-mint-500/10" },
+    { label: "Müşteri kaydı", value: customerCount ?? 0, limit: null, icon: Contact2, href: "/app/musteriler", tone: "text-amber-600 bg-amber-400/10" },
+  ];
 
   // Deneme geri sayımı — yalnızca trialing durumunda anlamlı
   const trialEnds = sub?.trial_ends_at ? new Date(sub.trial_ends_at) : null;
@@ -134,6 +161,56 @@ export default async function BillingPage({
         </div>
       ) : null}
 
+      {/* Kullanım göstergeleri — gerçek kayıt sayıları; kartlar ilgili modüle gider */}
+      <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Gauge className="h-4 w-4" /> Kullanım</p>
+            <h2 className="mt-1 font-display font-bold text-ink-950">Hesap kullanım göstergeleri</h2>
+          </div>
+          <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">{planLabel(currentPlan)} paketi</span>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          {usage.map((u) => {
+            const doluluk = u.limit ? Math.min(100, Math.round((u.value / u.limit) * 100)) : null;
+            return (
+              <Link
+                key={u.label}
+                href={u.href}
+                className="focus-ring press lift group block rounded-[16px] border border-line bg-canvas/50 p-4 transition hover:border-brand-300"
+              >
+                <div className="flex items-start justify-between">
+                  <span className={`grid h-9 w-9 place-items-center rounded-[10px] ${u.tone}`}>
+                    <u.icon className="h-4.5 w-4.5" />
+                  </span>
+                  <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                </div>
+                <p className="mt-3 text-xs font-semibold text-text-muted">{u.label}</p>
+                <p className="numeric mt-0.5 font-display text-xl font-extrabold text-ink-950">
+                  {u.value.toLocaleString("tr-TR")}
+                  {u.limit ? <span className="ml-1 text-sm font-semibold text-text-faint">/ {u.limit}</span> : null}
+                </p>
+                {doluluk !== null ? (
+                  <>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line/60">
+                      <div
+                        className={`h-full rounded-full ${doluluk >= 100 ? "bg-danger-500" : doluluk >= 80 ? "bg-amber-400" : "bg-mint-500"}`}
+                        style={{ width: `${Math.max(4, doluluk)}%` }}
+                      />
+                    </div>
+                    <p className={`mt-1 text-[11px] font-semibold ${doluluk >= 100 ? "text-danger-500" : "text-text-muted"}`}>
+                      {doluluk >= 100 ? "Paket limiti doldu — üst pakete geçin" : `Limitin %${doluluk}'i kullanımda`}
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-1 text-[11px] text-text-faint">Bu pakette kayıt sınırı uygulanmıyor</p>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
       <div className="flex flex-wrap items-center gap-2">
         <Link
           href="/app/abonelik?cycle=monthly"
@@ -177,7 +254,10 @@ export default async function BillingPage({
                   /{cycle === "yearly" ? "yıl" : "ay"}
                 </span>
               </p>
-              <p className="mt-1 text-[11px] text-text-faint">KDV hariç</p>
+              <p className="mt-1 text-[11px] text-text-faint">
+                KDV hariç
+                {cycle === "yearly" ? ` · aylık ${money(Math.round(amount / 12))}'ye gelir` : ""}
+              </p>
               <ul className="mt-4 flex-1 space-y-2">
                 {plan.features.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-xs text-text-muted">
@@ -199,63 +279,64 @@ export default async function BillingPage({
         })}
       </div>
 
+      {/* Fatura geçmişi — okunabilir tablo düzeni (mobilde yatay kaydırma) */}
       <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-amber-500" />
-          <h2 className="font-display font-bold text-ink-950">Son faturalar</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-amber-500" />
+            <h2 className="font-display font-bold text-ink-950">Fatura geçmişi</h2>
+          </div>
+          {(invoices ?? []).length > 0 ? (
+            <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">
+              Son {(invoices ?? []).length} fatura
+            </span>
+          ) : null}
         </div>
         {(invoices ?? []).length === 0 ? (
-          <p className="mt-4 text-sm text-text-muted">Henüz fatura yok.</p>
+          <p className="mt-4 rounded-[12px] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
+            Henüz fatura kesilmedi — ilk ödeme sonrası faturalar burada listelenir.
+          </p>
         ) : (
-          <div className="mt-4 divide-y divide-line">
-            {(invoices ?? []).map((inv) => (
-              <details key={inv.id} className="group">
-                <summary className="focus-ring flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 rounded-[10px] py-3 text-sm transition hover:bg-canvas/60 [&::-webkit-details-marker]:hidden">
-                  <div className="flex items-center gap-2">
-                    <ChevronDown className="h-4 w-4 shrink-0 text-text-faint transition group-open:rotate-180" />
-                    <div>
-                      <p className="font-semibold text-ink-950">{inv.invoice_no}</p>
-                      <p className="text-xs text-text-muted">
-                        {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(inv.created_at))}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-display font-bold text-ink-950">{money(Number(inv.total_try))}</p>
-                    <p className={`text-[11px] font-semibold ${inv.status === "paid" ? "text-mint-600" : "text-amber-600"}`}>
-                      {inv.status === "paid" ? "Ödendi" : inv.status}
-                    </p>
-                  </div>
-                </summary>
-                <div className="mb-3 ml-6 grid gap-2 rounded-[12px] border border-line bg-canvas/60 p-3 text-xs text-text-muted sm:grid-cols-2">
-                  <p>
-                    <span className="text-text-faint">Fatura no:</span>{" "}
-                    <span className="font-semibold text-ink-950">{inv.invoice_no}</span>
-                  </p>
-                  <p>
-                    <span className="text-text-faint">Tutar:</span>{" "}
-                    <span className="font-semibold text-ink-950">{money(Number(inv.total_try))}</span>
-                  </p>
-                  <p>
-                    <span className="text-text-faint">Kesim tarihi:</span>{" "}
-                    {new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date(inv.created_at))}
-                  </p>
-                  <p>
-                    <span className="text-text-faint">Ödeme:</span>{" "}
-                    {inv.paid_at
-                      ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date(inv.paid_at))
-                      : "Henüz ödenmedi"}
-                  </p>
-                  <p className="sm:col-span-2">
-                    <span className="text-text-faint">Durum:</span>{" "}
-                    <span className={`font-semibold ${inv.status === "paid" ? "text-mint-600" : "text-amber-600"}`}>
-                      {inv.status === "paid" ? "Ödendi" : inv.status}
-                    </span>
-                  </p>
-                </div>
-              </details>
-            ))}
-          </div>
+          <TableFrame className="mt-4" minWidth={560}>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Fatura no</TH>
+                  <TH>Kesim tarihi</TH>
+                  <TH>Ödeme tarihi</TH>
+                  <TH>Durum</TH>
+                  <TH align="right">Tutar</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {(invoices ?? []).map((inv) => (
+                  <TR key={inv.id}>
+                    <TD className="font-semibold text-ink-950">{inv.invoice_no}</TD>
+                    <TD className="text-text-muted">
+                      {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(inv.created_at))}
+                    </TD>
+                    <TD className="text-text-muted">
+                      {inv.paid_at
+                        ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(inv.paid_at))
+                        : "—"}
+                    </TD>
+                    <TD>
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                          inv.status === "paid" ? "bg-mint-500/10 text-mint-600" : "bg-amber-400/15 text-amber-600"
+                        }`}
+                      >
+                        {inv.status === "paid" ? "Ödendi" : inv.status === "pending" ? "Bekliyor" : inv.status}
+                      </span>
+                    </TD>
+                    <TD align="right" className="numeric font-display font-bold text-ink-950">
+                      {money(Number(inv.total_try))}
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </TableFrame>
         )}
       </section>
     </div>

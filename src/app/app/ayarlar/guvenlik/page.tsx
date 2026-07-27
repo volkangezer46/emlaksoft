@@ -91,7 +91,7 @@ export default async function SecuritySettingsPage() {
       </div>
 
       {/* 2FA */}
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-6">
+      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center gap-3 border-b border-line pb-4">
           <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-mint-500/12 text-mint-600">
             <ShieldCheck className="h-5 w-5" />
@@ -113,7 +113,7 @@ export default async function SecuritySettingsPage() {
       </section>
 
       {/* Son girişler */}
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-6">
+      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center gap-3 border-b border-line pb-4">
           <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-brand-600/10 text-brand-600">
             <History className="h-5 w-5" />

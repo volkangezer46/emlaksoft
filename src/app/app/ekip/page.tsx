@@ -150,7 +150,7 @@ export default async function TeamPage() {
   return (
     <div className="space-y-6">
       {/* premium header */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-brand-600/30 blur-[90px]" />
         <div className="relative grid gap-6 lg:grid-cols-[1.25fr_1fr] lg:items-center">

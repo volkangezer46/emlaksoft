@@ -54,7 +54,7 @@ export function NewPortalDialog({ properties }: { properties: PropertyOption[] }
         <Plus className="h-4 w-4" /> Portal ilanı ekle
       </button>
       <DialogShell open={open} onOpenChange={setOpen} title="Portal ilanı bağla" description="Portföyü yayın ağına ekleyin." icon={RadioTower}>
-          <form ref={formRef} action={submit} className="grid gap-4 p-6">
+          <form ref={formRef} action={submit} className="grid gap-4 p-4 md:p-6">
             <div className="text-sm font-medium text-ink-950">
               Portföy *
               {/* Zorunlu alan: temizleme düğmesi kapalı (`required`),
@@ -131,7 +131,7 @@ export function ClosePortalDialog({
     <>
       <button type="button" onClick={() => setOpen(true)} className="rounded-[9px] border border-danger-500/20 px-3 py-2 text-xs font-semibold text-danger-500 transition hover:bg-danger-500/8">Kapat</button>
       <DialogShell open={open} onOpenChange={setOpen} title="İlan kapanış formu" description={label} icon={Siren} danger>
-          <form action={submit} className="grid gap-4 p-6">
+          <form action={submit} className="grid gap-4 p-4 md:p-6">
             <input type="hidden" name="portal_listing_id" value={listingId} />
             <label className="text-sm font-medium text-ink-950">
               Kapanış nedeni *

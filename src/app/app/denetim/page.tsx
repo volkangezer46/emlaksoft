@@ -5,12 +5,13 @@ import {
   Fingerprint,
   ScrollText,
   Shield,
+  ShieldAlert,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { exportAuditCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
-import { DAY_MS, msSince, now } from "@/lib/clock";
+import { daysAgoIso, now } from "@/lib/clock";
 
 // `logActivity` çağrılarında geçen TÜM aksiyon kodları (grep: action: "...").
 // Haritada olmayan kod ham haliyle görünür — sessizce kaybolmaz.
@@ -70,6 +71,52 @@ const actionLabel: Record<string, string> = {
   "sales.convert": "Satış kaydı dönüştürüldü",
 };
 
+/**
+ * Risk sınıflandırması — aksiyon koduna göre.
+ * Yüksek: geri alınamaz / veri kaybı / kimlik-yetki değişimi.
+ * Orta: yapılandırma, devir ve erişim biçimini değiştiren işlemler.
+ * Kalanı rutin operasyon (düşük).
+ */
+const HIGH_RISK_ACTIONS = [
+  "customer.delete",
+  "property.delete",
+  "customer_file.delete",
+  "kvkk.erasure",
+  "kvkk.purge",
+  "ops.impersonate.start",
+  "ops.impersonate.stop",
+  "platform_staff.role_change",
+  "platform_staff.deactivate",
+] as const;
+const MED_RISK_ACTIONS = [
+  "settings.update",
+  "customer.reassign",
+  "property.reassign",
+  "property.bulk_status",
+  "portal.close",
+  "lead.capture.toggle",
+  "lead.capture.regenerate_token",
+  "integration.endeksa.save",
+  "integration.endeksa.clear",
+  "integration.tapusor.save",
+  "integration.tapusor.clear",
+  "platform_staff.add",
+  "platform_staff.invite",
+  "platform_staff.reactivate",
+  "sales.assign",
+] as const;
+
+type RiskLevel = "yuksek" | "orta" | "dusuk";
+function riskOf(action: string): RiskLevel {
+  if ((HIGH_RISK_ACTIONS as readonly string[]).includes(action)) return "yuksek";
+  if ((MED_RISK_ACTIONS as readonly string[]).includes(action)) return "orta";
+  return "dusuk";
+}
+const riskChip: Record<Exclude<RiskLevel, "dusuk">, { label: string; cls: string }> = {
+  yuksek: { label: "Yüksek risk", cls: "bg-danger-500/10 text-danger-500" },
+  orta: { label: "Orta risk", cls: "bg-amber-400/15 text-amber-600" },
+};
+
 /*
  * entity_id → ilgili kayıt. Yalnızca panelde detay sayfası olan tipler
  * linklenir; bilinmeyen tip linksiz kalır (yanlış yere götürmekten iyidir).
@@ -106,16 +153,17 @@ function safeDate(value: string | undefined) {
 export default async function AuditPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ sayfa?: string; from?: string; to?: string; aktor?: string }>;
+  searchParams?: Promise<{ sayfa?: string; from?: string; to?: string; aktor?: string; risk?: string }>;
 }) {
   await requireModulePage("settings");
   const params = (await searchParams) ?? {};
   const fromF = safeDate(params.from);
   const toF = safeDate(params.to);
   const aktorF = (params.aktor ?? "").trim();
+  const riskF: RiskLevel | "" = params.risk === "yuksek" || params.risk === "orta" ? params.risk : "";
   const pageParam = Math.max(1, Number.parseInt(params.sayfa ?? "1", 10) || 1);
   const offset = (pageParam - 1) * PAGE_SIZE;
-  const hasFilter = Boolean(fromF || toF || aktorF);
+  const hasFilter = Boolean(fromF || toF || aktorF || riskF);
 
   const supabase = await createClient();
   // Sayfalama + tarih aralığı + aktör filtresi tamamen sunucu tarafında.
@@ -132,7 +180,15 @@ export default async function AuditPage({
   if (fromF) logQuery = logQuery.gte("created_at", fromF);
   if (toF) logQuery = logQuery.lte("created_at", `${toF}T23:59:59.999`);
   if (aktorF) logQuery = logQuery.eq("actor_id", aktorF);
-  const { data: logs, count: logTotal } = await logQuery.range(offset, offset + PAGE_SIZE - 1);
+  // Risk filtresi sunucu tarafında: seviye, sonlu aksiyon listesine çevrilir.
+  if (riskF === "yuksek") logQuery = logQuery.in("action", [...HIGH_RISK_ACTIONS]);
+  if (riskF === "orta") logQuery = logQuery.in("action", [...MED_RISK_ACTIONS]);
+  const [{ data: logs, count: logTotal }, { count: highCount }, { count: last24Count }] = await Promise.all([
+    logQuery.range(offset, offset + PAGE_SIZE - 1),
+    // KPI'lar gerçek sayım: sayfadaki 60 kayıt değil, tüm günlük.
+    supabase.from("audit_logs").select("id", { count: "exact", head: true }).in("action", [...HIGH_RISK_ACTIONS]),
+    supabase.from("audit_logs").select("id", { count: "exact", head: true }).gte("created_at", daysAgoIso(1)),
+  ]);
 
   const total = logTotal ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -157,12 +213,11 @@ export default async function AuditPage({
     if (fromF) sp.set("from", fromF);
     if (toF) sp.set("to", toF);
     if (aktorF) sp.set("aktor", aktorF);
+    if (riskF) sp.set("risk", riskF);
     if (sayfa > 1) sp.set("sayfa", String(sayfa));
     const qs = sp.toString();
     return qs ? `/app/denetim?${qs}` : "/app/denetim";
   };
-
-  const today = rows.filter((r) => msSince(r.created_at) < DAY_MS).length;
 
   const buckets = Array.from({ length: 12 }, () => 0);
   const nowMs = now();
@@ -171,6 +226,16 @@ export default async function AuditPage({
     if (hours >= 0 && hours < 12) buckets[11 - hours] += 1;
   });
   const maxB = Math.max(1, ...buckets);
+
+  // Zaman çizelgesi görünümü — kayıtlar gün başlıklarıyla gruplanır.
+  const dayFmt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "full" });
+  const dayGroups: Array<{ day: string; items: typeof rows }> = [];
+  for (const r of rows) {
+    const day = dayFmt.format(new Date(r.created_at));
+    const last = dayGroups[dayGroups.length - 1];
+    if (last && last.day === day) last.items.push(r);
+    else dayGroups.push({ day, items: [r] });
+  }
 
   return (
     <div className="space-y-6">
@@ -186,17 +251,25 @@ export default async function AuditPage({
             <p className="mt-2 max-w-lg text-sm text-white/60">
               Yazma işlemlerinin immutable günlüğü. Sahte aktivite yok — yalnızca `logActivity` kayıtları.
             </p>
-            <div className="mt-5 grid grid-cols-3 gap-3">
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
-                { label: hasFilter ? "Filtre sonucu" : "Toplam kayıt", value: total, icon: ScrollText },
-                { label: "Sayfada son 24s", value: today, icon: Activity },
-                { label: "Aktör", value: actorOptions.length, icon: Fingerprint },
+                { label: hasFilter ? "Filtre sonucu" : "Toplam kayıt", value: total, icon: ScrollText, href: "/app/denetim", tone: "text-amber-300" },
+                { label: "Son 24 saat", value: last24Count ?? 0, icon: Activity, href: `/app/denetim?from=${daysAgoIso(1).slice(0, 10)}`, tone: "text-mint-400" },
+                { label: "Yüksek riskli", value: highCount ?? 0, icon: ShieldAlert, href: "/app/denetim?risk=yuksek", tone: "text-danger-300" },
+                { label: "Aktör", value: actorOptions.length, icon: Fingerprint, href: "#akis", tone: "text-cyan-400" },
               ].map((k) => (
-                <div key={k.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3">
-                  <k.icon className="h-4 w-4 text-amber-300" />
-                  <p className="mt-1 font-display text-xl font-extrabold">{k.value}</p>
+                <a
+                  key={k.label}
+                  href={k.href}
+                  className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 transition hover:border-white/30"
+                >
+                  <span className="flex items-start justify-between">
+                    <k.icon className={`h-4 w-4 ${k.tone}`} />
+                    <ArrowUpRight className="h-4 w-4 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
+                  </span>
+                  <p className="numeric mt-1 font-display text-xl font-extrabold">{k.value}</p>
                   <p className="text-[11px] text-white/45">{k.label}</p>
-                </div>
+                </a>
               ))}
             </div>
           </div>
@@ -215,12 +288,12 @@ export default async function AuditPage({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+      <section id="akis" className="scroll-mt-24 overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
           <div>
             <h2 className="font-display font-bold text-ink-950">Olay akışı</h2>
             <p className="text-xs text-text-muted">
-              Aktör + değişiklik · ofis izole{totalPages > 1 ? ` · sayfa ${page}/${totalPages}` : ""}
+              Zaman çizelgesi · aktör + değişiklik · ofis izole{totalPages > 1 ? ` · sayfa ${page}/${totalPages}` : ""}
             </p>
           </div>
           <ExportCsvButton label="CSV dışa aktar" action={exportAuditCsv} />
@@ -254,6 +327,16 @@ export default async function AuditPage({
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </select>
+          <select
+            name="risk"
+            defaultValue={riskF}
+            aria-label="Risk filtresi"
+            className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+          >
+            <option value="">Tüm riskler</option>
+            <option value="yuksek">Yüksek risk</option>
+            <option value="orta">Orta risk</option>
+          </select>
           <button type="submit" className="focus-ring press rounded-[9px] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700">
             Filtrele
           </button>
@@ -284,18 +367,40 @@ export default async function AuditPage({
             ) : null}
           </div>
         ) : (
-          <div className="divide-y divide-line">
-            {rows.map((r) => {
+          <div>
+            {dayGroups.map((g) => (
+              <div key={g.day}>
+                <p className="border-y border-line bg-canvas/60 px-5 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
+                  {g.day}
+                </p>
+                <div className="divide-y divide-line">
+            {g.items.map((r) => {
               const entityRoute = r.entity_type ? ENTITY_ROUTES[r.entity_type] : undefined;
               const entityLine = `${r.entity_type ?? "—"}${r.entity_id ? ` · ${String(r.entity_id).slice(0, 8)}…` : ""}`;
+              const risk = riskOf(r.action);
               // Aktör linki yalnızca ofis profili çözüldüyse: platform
               // personeli /app/ekip altında yok, 404'e link vermeyelim.
               const actorName = r.actor_id ? actorNames.get(r.actor_id) : undefined;
               return (
                 <article key={r.id} className="grid gap-2 px-5 py-3.5 transition hover:bg-brand-600/[0.02] md:grid-cols-[1.1fr_1.2fr_.7fr_auto] md:items-center">
                   <div>
-                    <p className="text-sm font-semibold text-ink-950">
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink-950">
+                      <span
+                        className={`h-2 w-2 shrink-0 rounded-full ${
+                          risk === "yuksek" ? "bg-danger-500" : risk === "orta" ? "bg-amber-400" : "bg-mint-500"
+                        }`}
+                        aria-hidden
+                      />
                       {actionLabel[r.action] ?? r.action}
+                      {risk !== "dusuk" ? (
+                        <Link
+                          href={`/app/denetim?risk=${risk}`}
+                          title="Bu risk seviyesine göre filtrele"
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition hover:ring-1 hover:ring-brand-300 ${riskChip[risk].cls}`}
+                        >
+                          {riskChip[risk].label}
+                        </Link>
+                      ) : null}
                     </p>
                     {entityRoute && r.entity_id ? (
                       <Link
@@ -325,11 +430,14 @@ export default async function AuditPage({
                     </p>
                   )}
                   <time className="text-xs font-semibold text-text-muted tabular-nums">
-                    {new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(new Date(r.created_at))}
+                    {new Intl.DateTimeFormat("tr-TR", { timeStyle: "short" }).format(new Date(r.created_at))}
                   </time>
                 </article>
               );
             })}
+                </div>
+              </div>
+            ))}
           </div>
         )}
         {totalPages > 1 ? (

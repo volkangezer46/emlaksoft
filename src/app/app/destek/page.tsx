@@ -1,8 +1,19 @@
 import Link from "next/link";
-import { ArrowUpRight, CheckCircle2, Clock3, LifeBuoy } from "lucide-react";
+import {
+  ArrowUpRight,
+  CheckCircle2,
+  Clock3,
+  Hourglass,
+  LifeBuoy,
+  Search,
+  Sparkles,
+  Tag,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getDefinitions } from "@/lib/definitions";
+import { DAY_MS, msSince } from "@/lib/clock";
+import { relativeTimeTR } from "@/lib/admin-format";
 import { NewTicketDialog } from "./new-ticket-dialog";
 import type { CSSProperties } from "react";
 
@@ -49,10 +60,18 @@ const priorityLabel: Record<string, string> = {
   urgent: "Acil",
 };
 
+const priorityCls: Record<string, string> = {
+  low: "bg-ink-950/6 text-text-muted",
+  normal: "bg-brand-600/8 text-brand-600",
+  high: "bg-amber-400/15 text-amber-600",
+  urgent: "bg-danger-500/10 text-danger-500",
+};
+
 /*
- * ?durum= kontratı: ham durum değerleri + "acik" bileşimi.
- * "Açık / bekleyen" KPI'ı üç durumu (open+in_progress+waiting) topladığı için
- * tek enum değerine indirgenemez; bileşik değer yalnızca bu sayfada üretilir.
+ * URL kontratı — üç bağımsız filtre, hepsi bu sayfada okunur:
+ *  ?durum=   ham durum değerleri + "acik" bileşimi (open+in_progress+waiting)
+ *  ?kategori= talep kategorisi (general|billing|bug|...)
+ *  ?ara=     konu içinde serbest metin (tr-küçük harf karşılaştırma)
  */
 function matchesDurum(status: string, durum: string) {
   if (!durum) return true;
@@ -60,17 +79,17 @@ function matchesDurum(status: string, durum: string) {
   return status === durum;
 }
 
-function durumHref(value: string) {
-  return value ? `/app/destek?durum=${value}` : "/app/destek";
-}
-
 export default async function SupportPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string }>;
+  searchParams?: Promise<{ durum?: string; kategori?: string; ara?: string }>;
 }) {
   await requireModulePage("support");
-  const { durum = "" } = (await searchParams) ?? {};
+  const sp = (await searchParams) ?? {};
+  const durum = sp.durum ?? "";
+  const kategori = sp.kategori ?? "";
+  const ara = (sp.ara ?? "").trim();
+
   const supabase = await createClient();
   const [{ data: tickets }, categoryDefs] = await Promise.all([
     supabase
@@ -84,13 +103,35 @@ export default async function SupportPage({
   const categoryOptions = categoryDefs.length
     ? categoryDefs.map((d) => ({ value: d.value, label: d.label }))
     : undefined;
+  const catName = (v: string) =>
+    categoryOptions?.find((c) => c.value === v)?.label ?? catLabel[v] ?? v;
 
   const rows = tickets ?? [];
   const openCount = rows.filter((t) => t.status === "open" || t.status === "in_progress" || t.status === "waiting").length;
   const resolved = rows.filter((t) => t.status === "resolved").length;
+  const waitingCount = rows.filter((t) => t.status === "waiting").length;
 
-  // KPI/halka tüm kayıtlardan; liste ?durum= ile daralır.
-  const visible = durum ? rows.filter((t) => matchesDurum(t.status, durum)) : rows;
+  /** Aktif filtreleri koruyarak href üretir — çipler URL'i iki yönlü günceller. */
+  const buildHref = (patch: { durum?: string | null; kategori?: string | null; ara?: string | null }) => {
+    const params = new URLSearchParams();
+    const d = patch.durum === undefined ? durum : patch.durum ?? "";
+    const k = patch.kategori === undefined ? kategori : patch.kategori ?? "";
+    const a = patch.ara === undefined ? ara : patch.ara ?? "";
+    if (d) params.set("durum", d);
+    if (k) params.set("kategori", k);
+    if (a) params.set("ara", a);
+    const qs = params.toString();
+    return qs ? `/app/destek?${qs}` : "/app/destek";
+  };
+
+  // KPI/halka tüm kayıtlardan; liste durum + kategori + arama ile daralır.
+  const araLower = ara.toLocaleLowerCase("tr-TR");
+  const visible = rows.filter(
+    (t) =>
+      matchesDurum(t.status, durum) &&
+      (!kategori || t.category === kategori) &&
+      (!araLower || (t.subject ?? "").toLocaleLowerCase("tr-TR").includes(araLower)),
+  );
 
   const statusKeys = ["open", "in_progress", "waiting", "resolved", "closed"] as const;
   const statusCounts = statusKeys.map((k) => ({
@@ -109,9 +150,26 @@ export default async function SupportPage({
   });
   const resolveRate = rows.length ? resolved / rows.length : 0;
 
+  // Kategori dağılımı — çipler ?kategori= ile listeyi süzer.
+  const categoryCounts = new Map<string, number>();
+  for (const t of rows) categoryCounts.set(t.category, (categoryCounts.get(t.category) ?? 0) + 1);
+  const categoryChips = [...categoryCounts.entries()].sort((a, b) => b[1] - a[1]);
+
+  // İçgörüler — tamamı gerçek kayıtlardan türetilir.
+  const week = rows.filter((t) => msSince(t.created_at) <= 7 * DAY_MS).length;
+  const oldestOpen = [...rows]
+    .filter((t) => t.status === "open" || t.status === "in_progress" || t.status === "waiting")
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0];
+  const oldestOpenDays = oldestOpen ? Math.floor(msSince(oldestOpen.created_at) / DAY_MS) : null;
+  const lastUpdated = [...rows].sort(
+    (a, b) => new Date(b.updated_at ?? b.created_at).getTime() - new Date(a.updated_at ?? a.created_at).getTime(),
+  )[0];
+
+  const filtersActive = Boolean(durum || kategori || ara);
+
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-mint-500/20 blur-[90px]" />
         <div className="relative grid gap-6 lg:grid-cols-[1.2fr_1fr] lg:items-center">
@@ -127,21 +185,22 @@ export default async function SupportPage({
               <NewTicketDialog categoryOptions={categoryOptions} />
             </div>
             {/* KPI kartları listeyi ?durum= parametresiyle süzer */}
-            <div className="mt-6 grid grid-cols-3 gap-3">
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
-                { label: "Toplam talep", value: rows.length, cls: "", durum: "" },
+                { label: "Toplam talep", value: rows.length, cls: "text-white", durum: "" },
                 { label: "Açık / bekleyen", value: openCount, cls: "text-amber-300", durum: "acik" },
+                { label: "Yanıt bekleyen", value: waitingCount, cls: "text-cyan-400", durum: "waiting" },
                 { label: "Çözülen", value: resolved, cls: "text-mint-400", durum: "resolved" },
               ].map((k) => (
                 <Link
                   key={k.label}
-                  href={durumHref(k.durum)}
+                  href={buildHref({ durum: k.durum || null })}
                   className={`focus-ring press group relative block rounded-[14px] border bg-white/5 p-3 transition hover:border-white/30 ${
                     durum === k.durum && k.durum !== "" ? "border-white/40" : "border-white/10"
                   }`}
                 >
                   <ArrowUpRight className="hover-action absolute right-2 top-2 h-3.5 w-3.5 text-white/50 opacity-0 transition group-hover:opacity-100" />
-                  <p className={`font-display text-xl font-extrabold ${k.cls}`}>{k.value}</p>
+                  <p className={`numeric font-display text-xl font-extrabold tabular-nums ${k.cls}`}>{k.value}</p>
                   <p className="text-[11px] text-white/45">{k.label}</p>
                 </Link>
               ))}
@@ -171,7 +230,7 @@ export default async function SupportPage({
                 ) : (
                   arcs.filter((a) => a.count > 0).map((a) => (
                     /* SVG içi <a>: segment tıklanınca liste o duruma süzülür */
-                    <a key={a.key} href={durumHref(a.key)} aria-label={`${a.label} taleplerini listele`} className="cursor-pointer">
+                    <a key={a.key} href={buildHref({ durum: a.key })} aria-label={`${a.label} taleplerini listele`} className="cursor-pointer">
                       <circle
                         cx="50"
                         cy="50"
@@ -195,7 +254,7 @@ export default async function SupportPage({
               {statusCounts.map((s) => (
                 <Link
                   key={s.key}
-                  href={durumHref(s.key)}
+                  href={buildHref({ durum: s.key })}
                   className={`focus-ring group flex items-center gap-2 rounded-[6px] px-1 py-0.5 transition hover:bg-white/5 ${
                     durum === s.key ? "bg-white/10 text-white" : "text-white/70"
                   }`}
@@ -210,17 +269,97 @@ export default async function SupportPage({
         </div>
       </section>
 
+      {/* İçgörü kartları — tümü gerçek kayıtlardan */}
+      {rows.length > 0 ? (
+        <section className="grid gap-3 sm:grid-cols-3">
+          <Link
+            href={buildHref({ durum: null, kategori: null, ara: null })}
+            className="focus-ring press lift group relative block rounded-[16px] border border-line bg-surface p-4"
+          >
+            <ArrowUpRight className="hover-action absolute right-3 top-3 h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+            <span className="flex items-center gap-2 text-xs font-semibold text-text-muted">
+              <Sparkles className="h-3.5 w-3.5 text-brand-600" /> Son 7 gün
+            </span>
+            <p className="numeric mt-1.5 font-display text-lg font-extrabold text-ink-950">{week} yeni talep</p>
+            <p className="mt-0.5 text-[11px] text-text-muted">{week > 0 ? "Ekibimiz en geç 1 iş günü içinde döner." : "Bu hafta yeni talep açılmadı."}</p>
+          </Link>
+          {oldestOpen ? (
+            <Link
+              href={`/app/destek/${oldestOpen.id}`}
+              className="focus-ring press lift group relative block rounded-[16px] border border-line bg-surface p-4"
+            >
+              <ArrowUpRight className="hover-action absolute right-3 top-3 h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+              <span className="flex items-center gap-2 text-xs font-semibold text-text-muted">
+                <Hourglass className="h-3.5 w-3.5 text-amber-600" /> En eski açık talep
+              </span>
+              <p className="numeric mt-1.5 font-display text-lg font-extrabold text-ink-950">
+                {oldestOpenDays === 0 ? "Bugün açıldı" : `${oldestOpenDays} gündür açık`}
+              </p>
+              <p className="mt-0.5 truncate text-[11px] text-text-muted">{oldestOpen.subject}</p>
+            </Link>
+          ) : (
+            <Link
+              href={buildHref({ durum: "resolved" })}
+              className="focus-ring press lift group relative block rounded-[16px] border border-line bg-surface p-4"
+            >
+              <ArrowUpRight className="hover-action absolute right-3 top-3 h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+              <span className="flex items-center gap-2 text-xs font-semibold text-text-muted">
+                <CheckCircle2 className="h-3.5 w-3.5 text-mint-600" /> Açık talep yok
+              </span>
+              <p className="mt-1.5 font-display text-lg font-extrabold text-ink-950">Her şey çözüldü</p>
+              <p className="mt-0.5 text-[11px] text-text-muted">Tüm talepleriniz sonuçlandırıldı.</p>
+            </Link>
+          )}
+          {lastUpdated ? (
+            <Link
+              href={`/app/destek/${lastUpdated.id}`}
+              className="focus-ring press lift group relative block rounded-[16px] border border-line bg-surface p-4"
+            >
+              <ArrowUpRight className="hover-action absolute right-3 top-3 h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+              <span className="flex items-center gap-2 text-xs font-semibold text-text-muted">
+                <Clock3 className="h-3.5 w-3.5 text-cyan-600" /> Son hareket
+              </span>
+              <p className="mt-1.5 font-display text-lg font-extrabold text-ink-950">
+                {relativeTimeTR(lastUpdated.updated_at ?? lastUpdated.created_at)}
+              </p>
+              <p className="mt-0.5 truncate text-[11px] text-text-muted">{lastUpdated.subject}</p>
+            </Link>
+          ) : null}
+        </section>
+      ) : null}
+
       <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
-          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-            <Clock3 className="h-4 w-4 text-brand-600" /> Talep geçmişi
-          </h2>
+        <div className="space-y-3 border-b border-line px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+              <Clock3 className="h-4 w-4 text-brand-600" /> Talep geçmişi
+              <span className="text-xs font-semibold text-text-faint">
+                {visible.length}/{rows.length}
+              </span>
+            </h2>
+            {rows.length > 0 ? (
+              /* Konu içinde arama — GET formu, ?ara= bu sayfada okunur */
+              <form action="/app/destek" className="relative">
+                {durum ? <input type="hidden" name="durum" value={durum} /> : null}
+                {kategori ? <input type="hidden" name="kategori" value={kategori} /> : null}
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-faint" />
+                <input
+                  name="ara"
+                  type="search"
+                  defaultValue={ara}
+                  placeholder="Konu içinde ara…"
+                  aria-label="Taleplerde ara"
+                  className="w-full min-w-[200px] rounded-[10px] border border-line bg-canvas/60 py-2 pl-9 pr-3 text-xs text-ink-950 outline-none transition focus:border-brand-300 sm:w-56"
+                />
+              </form>
+            ) : null}
+          </div>
           {rows.length > 0 ? (
             <div className="flex flex-wrap items-center gap-1.5">
               {[{ label: "Tümü", value: "" }, ...statusKeys.map((k) => ({ label: statusLabel[k], value: k as string }))].map((f) => (
                 <Link
                   key={f.value}
-                  href={durumHref(f.value)}
+                  href={buildHref({ durum: f.value || null })}
                   className={`focus-ring rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
                     durum === f.value ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
                   }`}
@@ -228,21 +367,45 @@ export default async function SupportPage({
                   {f.label}
                 </Link>
               ))}
+              {categoryChips.length > 1 ? (
+                <>
+                  <span aria-hidden className="mx-1 h-4 w-px bg-line" />
+                  {categoryChips.map(([cat, n]) => (
+                    <Link
+                      key={cat}
+                      href={buildHref({ kategori: kategori === cat ? null : cat })}
+                      className={`focus-ring inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
+                        kategori === cat ? "bg-brand-600 text-white" : "border border-line text-text-muted hover:text-ink-950"
+                      }`}
+                    >
+                      <Tag className="h-3 w-3" /> {catName(cat)} · {n}
+                    </Link>
+                  ))}
+                </>
+              ) : null}
             </div>
           ) : null}
         </div>
         {rows.length === 0 ? (
-          <div className="grid place-items-center px-6 py-14 text-center">
-            <LifeBuoy className="h-8 w-8 text-text-faint" />
-            <p className="mt-3 font-display font-bold text-ink-950">Henüz talep yok</p>
-            <p className="mt-1 text-sm text-text-muted">İlk destek talebinizi oluşturduğunuzda burada listelenir.</p>
+          <div className="relative grid place-items-center overflow-hidden px-6 py-16 text-center">
+            <div className="pointer-events-none absolute left-1/2 top-6 h-32 w-32 -translate-x-1/2 rounded-full bg-mint-500/15 blur-[60px]" />
+            <span className="relative grid h-14 w-14 place-items-center rounded-[16px] bg-mint-500/12 text-mint-600">
+              <LifeBuoy className="h-7 w-7" />
+            </span>
+            <p className="relative mt-3 font-display font-bold text-ink-950">Henüz talep yok</p>
+            <p className="relative mt-1 max-w-sm text-sm text-text-muted">
+              Fatura, kurulum veya teknik bir konuda yardıma mı ihtiyacınız var? Yukarıdaki &quot;Yeni talep&quot;
+              düğmesiyle ilk destek talebinizi oluşturun.
+            </p>
           </div>
         ) : visible.length === 0 ? (
           <div className="grid place-items-center px-6 py-14 text-center">
             <LifeBuoy className="h-8 w-8 text-text-faint" />
-            <p className="mt-3 font-display font-bold text-ink-950">Bu durumda talep yok</p>
+            <p className="mt-3 font-display font-bold text-ink-950">
+              {ara ? `"${ara}" için sonuç yok` : "Bu filtrede talep yok"}
+            </p>
             <Link href="/app/destek" className="mt-1 text-sm font-semibold text-brand-600 hover:underline">
-              Filtreyi temizle
+              Filtreleri temizle
             </Link>
           </div>
         ) : (
@@ -261,11 +424,24 @@ export default async function SupportPage({
                       <LifeBuoy className="h-4 w-4" />
                     )}
                   </span>
-                  <div>
-                    <p className="text-sm font-semibold text-ink-950">{t.subject}</p>
-                    <p className="mt-1 text-xs text-text-muted">
-                      {catLabel[t.category] ?? t.category} · {priorityLabel[t.priority] ?? t.priority} ·{" "}
-                      {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(t.created_at))}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink-950">{t.subject}</p>
+                    <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-text-muted">
+                      <span>{catName(t.category)}</span>
+                      <span aria-hidden>·</span>
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${priorityCls[t.priority] ?? priorityCls.normal}`}>
+                        {priorityLabel[t.priority] ?? t.priority}
+                      </span>
+                      <span aria-hidden>·</span>
+                      <span>
+                        {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(t.created_at))}
+                      </span>
+                      {t.updated_at && t.updated_at !== t.created_at ? (
+                        <>
+                          <span aria-hidden>·</span>
+                          <span className="text-text-faint">güncelleme {relativeTimeTR(t.updated_at)}</span>
+                        </>
+                      ) : null}
                     </p>
                   </div>
                 </div>
@@ -277,6 +453,23 @@ export default async function SupportPage({
           </div>
         )}
       </section>
+
+      {filtersActive && rows.length > 0 ? (
+        <p className="px-1 text-xs text-text-muted">
+          Aktif filtre:{" "}
+          {[
+            durum ? `durum "${durum === "acik" ? "Açık / bekleyen" : statusLabel[durum] ?? durum}"` : null,
+            kategori ? `kategori "${catName(kategori)}"` : null,
+            ara ? `arama "${ara}"` : null,
+          ]
+            .filter(Boolean)
+            .join(" + ")}{" "}
+          ·{" "}
+          <Link href="/app/destek" className="font-semibold text-brand-600 hover:underline">
+            Temizle
+          </Link>
+        </p>
+      ) : null}
     </div>
   );
 }

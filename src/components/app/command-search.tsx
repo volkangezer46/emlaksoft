@@ -322,7 +322,7 @@ export function CommandSearch() {
   return (
     /* Panel arama kutusuna bağlı açılıyor (admin paletiyle aynı desen).
        Öncesinde ekran ortasında modal olarak açılıp kutudan kopuk duruyordu. */
-    <div className="relative w-full max-w-lg">
+    <div className="relative w-full min-w-0 max-w-lg">
       <button
         type="button"
         onClick={() => {
@@ -332,10 +332,11 @@ export function CommandSearch() {
         }}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="focus-ring relative flex w-full items-center rounded-[11px] border border-hairline bg-canvas py-2.5 pl-10 pr-20 text-left text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300 hover:bg-surface hover:shadow-[var(--elev-2)]"
+        className="focus-ring relative flex w-full items-center rounded-[11px] border border-hairline bg-canvas py-2.5 pl-10 pr-4 text-left text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300 hover:bg-surface hover:shadow-[var(--elev-2)] sm:pr-20"
       >
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-        <span className="truncate">Müşteri, portföy, anlaşma, görev, ilan no ara…</span>
+        <span className="truncate sm:hidden">Ara…</span>
+        <span className="hidden truncate sm:inline">Müşteri, portföy, anlaşma, görev, ilan no ara…</span>
         <span className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded-[7px] border border-hairline bg-surface px-2 py-1 text-[11px] text-text-faint sm:flex">
           <Command className="h-3 w-3" /> K
         </span>

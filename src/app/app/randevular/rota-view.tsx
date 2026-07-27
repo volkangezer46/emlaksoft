@@ -284,7 +284,7 @@ export function RotaView({
               ) : null}
             </div>
           ) : (
-            <div className="grid place-items-center rounded-[20px] border border-dashed border-line-strong bg-surface p-8 text-center">
+            <div className="grid place-items-center rounded-[20px] border border-dashed border-line-strong bg-surface p-4 text-center md:p-8">
               <div>
                 <span className="mx-auto grid h-14 w-14 place-items-center rounded-[16px] bg-amber-400/15 text-amber-600">
                   <MapPinOff className="h-7 w-7" />

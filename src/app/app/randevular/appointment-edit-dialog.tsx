@@ -85,7 +85,7 @@ export function AppointmentEditDialog({
 
       <DialogContent size="sm">
         <DialogHeader icon={<CalendarClock />} title="Randevuyu ertele / düzenle" />
-        <form action={onSubmit} className="grid gap-3 p-6">
+        <form action={onSubmit} className="grid gap-3 p-4 md:p-6">
                 <input type="hidden" name="id" value={appointment.id} />
                 <select
                   name="appointment_type"

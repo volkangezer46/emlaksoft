@@ -12,7 +12,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { now as nowMs } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
+import { ChartFrame } from "@/components/ui/chart";
+import { InteractiveChart } from "@/components/app/interactive-chart";
 import { exportCommissionsCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { listSavedViews } from "@/app/actions/saved-views";
@@ -97,7 +100,7 @@ export default async function CommissionPage({
   const sayfa = Math.max(1, Number.parseInt(params.sayfa ?? "1", 10) || 1);
 
   // Hızlı tarih çipleri — sunucu saatine göre hesaplanır
-  const now = new Date();
+  const now = new Date(nowMs());
   const presets = [
     { label: "Bu ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth(), 1)), to: fmtDate(now) },
     { label: "Geçen ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth() - 1, 1)), to: fmtDate(new Date(now.getFullYear(), now.getMonth(), 0)) },
@@ -126,19 +129,70 @@ export default async function CommissionPage({
 
   const [{ data, count: commissionTotal }, { data: statRows }, { data: memberRows }] = await Promise.all([
     ledgerQuery,
-    // KPI toplamları filtreden ve sayfalamadan bağımsız
-    supabase.from("commissions").select("gross_amount, status").limit(1000),
+    // KPI toplamları filtreden ve sayfalamadan bağımsız — splits/created_at
+    // danışman dağılımı ve dönem KPI'ları için okunur
+    supabase.from("commissions").select("gross_amount, status, splits, created_at").limit(1000),
     // Split etiketini danışman profiline bağlamak için ad → id eşlemesi
     supabase.from("profiles").select("id, full_name").eq("is_active", true),
   ]);
 
   const rows = (data ?? []) as CommissionRow[];
-  const stats = statRows ?? [];
+  const stats = (statRows ?? []) as {
+    gross_amount: number;
+    status: string;
+    splits: { label?: string; amount?: number; rate?: number }[] | null;
+    created_at: string;
+  }[];
+  const statPaid = (s: { status: string }) => s.status === "paid" || s.status === "collected";
   const total = stats.reduce((sum, row) => sum + Number(row.gross_amount), 0);
-  const paid = stats
-    .filter((row) => row.status === "paid" || row.status === "collected")
-    .reduce((sum, row) => sum + Number(row.gross_amount), 0);
+  const paid = stats.filter(statPaid).reduce((sum, row) => sum + Number(row.gross_amount), 0);
   const pending = total - paid;
+
+  // Dönem (bu ay) KPI şeridi — filtrelerden bağımsız, ayın 1'inden bugüne
+  const donemLabel = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(now);
+  const donemStats = stats.filter((r) => String(r.created_at).slice(0, 10) >= presets[0].from);
+  const donemToplam = donemStats.reduce((s, r) => s + Number(r.gross_amount), 0);
+  const donemTahsil = donemStats.filter(statPaid).reduce((s, r) => s + Number(r.gross_amount), 0);
+  const donemBekleyen = donemToplam - donemTahsil;
+
+  // Danışman bazlı dağılım — split etiketlerine göre pay (brüt × oran)
+  const advisorTotals = new Map<string, { pay: number; adet: number }>();
+  for (const r of stats) {
+    const splits = Array.isArray(r.splits) ? r.splits : [];
+    for (const s of splits) {
+      const label = (s.label ?? "").trim();
+      const rate = Number(s.rate) || 0;
+      if (!label || rate <= 0) continue;
+      const entry = advisorTotals.get(label) ?? { pay: 0, adet: 0 };
+      entry.pay += Math.round(Number(r.gross_amount) * (rate / 100));
+      entry.adet += 1;
+      advisorTotals.set(label, entry);
+    }
+  }
+  const advisorDist = Array.from(advisorTotals, ([label, v]) => ({ label, ...v }))
+    .sort((a, b) => b.pay - a.pay)
+    .slice(0, 8);
+  const advisorMax = Math.max(1, ...advisorDist.map((a) => a.pay));
+
+  // Beklenen vs tahsil edilen — son 6 ay, çift seri (tahakkuk / tahsilat)
+  const kpiAyFmt = new Intl.DateTimeFormat("tr-TR", { month: "short" });
+  const aylikSeri = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    return {
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      label: kpiAyFmt.format(d),
+      value: 0,
+      value2: 0,
+    };
+  });
+  const seriIndex = new Map(aylikSeri.map((m, i) => [m.key, i]));
+  for (const r of stats) {
+    const idx = seriIndex.get(String(r.created_at).slice(0, 7));
+    if (idx === undefined) continue;
+    aylikSeri[idx].value += Number(r.gross_amount);
+    if (statPaid(r)) aylikSeri[idx].value2 += Number(r.gross_amount);
+  }
+  const hasAylikSeri = aylikSeri.some((m) => m.value > 0);
 
   const totalCount = commissionTotal ?? rows.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -200,6 +254,105 @@ export default async function CommissionPage({
           ))}
         </div>
       </section>
+
+      {/* Dönem KPI şeridi — bu ayın tahakkuk/tahsilat özeti; kartlar defteri
+          ilgili tarih aralığı + durumla süzer (?from/?to/?durum). */}
+      <section className="rounded-[18px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+        <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.1em] text-text-faint">
+          <CalendarRange className="h-3.5 w-3.5 text-brand-600" /> Dönem özeti · {donemLabel}
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[
+            { label: "Dönem komisyonu", value: money(donemToplam), href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "text-ink-950" },
+            { label: "Tahsil edilen", value: money(donemTahsil), href: filterHref({ durum: "tahsil", from: presets[0].from, to: presets[0].to }), tone: "text-mint-600" },
+            { label: "Bekleyen", value: money(donemBekleyen), href: filterHref({ durum: "bekleyen", from: presets[0].from, to: presets[0].to }), tone: "text-amber-600" },
+            { label: "Kayıt", value: donemStats.length.toLocaleString("tr-TR"), href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "text-brand-600" },
+          ].map((k) => (
+            <Link
+              key={k.label}
+              href={k.href}
+              className="focus-ring press lift group block rounded-[14px] border border-line bg-canvas/50 p-3 transition hover:border-brand-300"
+            >
+              <p className="flex items-center gap-1 text-[11px] font-semibold text-text-muted">
+                {k.label}
+                <ArrowUpRight className="hover-action h-3 w-3 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+              </p>
+              <p className={`numeric mt-1 truncate font-display text-lg font-extrabold ${k.tone}`}>{k.value}</p>
+            </Link>
+          ))}
+        </div>
+        {/* Dönem tahsilat oranı çubuğu */}
+        {donemToplam > 0 ? (
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-[11px] font-semibold text-text-muted">
+              <span>Dönem tahsilat oranı</span>
+              <span className="numeric text-mint-600">%{Math.round((donemTahsil / donemToplam) * 100)}</span>
+            </div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-canvas">
+              <div className="h-full rounded-full bg-mint-500" style={{ width: `${Math.round((donemTahsil / donemToplam) * 100)}%` }} />
+            </div>
+          </div>
+        ) : null}
+      </section>
+
+      {/* Danışman bazlı dağılım + beklenen vs tahsil edilen trend */}
+      {advisorDist.length > 0 || hasAylikSeri ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {advisorDist.length > 0 ? (
+            <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+              <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Wallet className="h-4 w-4" /> Paylaşım analizi</p>
+              <h2 className="mt-1 font-display font-bold text-ink-950">Danışman bazlı dağılım</h2>
+              <p className="mt-0.5 text-[11px] text-text-muted">Split oranlarından hesaplanan pay toplamları — tüm defter</p>
+              <ul className="mt-4 space-y-3">
+                {advisorDist.map((a) => {
+                  const memberId = memberIdByName.get(a.label);
+                  return (
+                    <li key={a.label}>
+                      <div className="flex items-center justify-between gap-2 text-sm">
+                        {memberId ? (
+                          <Link href={`/app/ekip/${memberId}`} className="focus-ring rounded-[4px] font-semibold text-brand-600 hover:underline">
+                            {a.label}
+                          </Link>
+                        ) : (
+                          <span className="font-semibold text-ink-950">{a.label}</span>
+                        )}
+                        <span className="numeric font-display text-sm font-bold text-ink-950">{money(a.pay)}</span>
+                      </div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-canvas">
+                          <div
+                            className="bar-live h-full rounded-full bg-[image:var(--grad-brand)]"
+                            style={{ width: `${Math.max(3, Math.round((a.pay / advisorMax) * 100))}%` }}
+                          />
+                        </div>
+                        <span className="numeric w-14 shrink-0 text-right text-[11px] font-semibold text-text-muted">{a.adet} kayıt</span>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ) : null}
+          {hasAylikSeri ? (
+            <ChartFrame
+              title="Beklenen vs tahsil edilen"
+              subtitle="Son 6 ay · tahakkuk eden brüt komisyon ve tahsilatı"
+              height={advisorDist.length > 0 ? 300 : 260}
+            >
+              <InteractiveChart
+                data={aylikSeri.map((m) => ({ label: m.label, value: Math.round(m.value), value2: Math.round(m.value2) }))}
+                name="Tahakkuk"
+                name2="Tahsil edilen"
+                color="var(--brand-600)"
+                color2="var(--mint-500)"
+                diffLabel="Bekleyen"
+                format="money"
+                height={210}
+              />
+            </ChartFrame>
+          ) : null}
+        </div>
+      ) : null}
 
       <CommissionSimulator />
 

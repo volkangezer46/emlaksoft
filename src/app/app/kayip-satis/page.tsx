@@ -1,12 +1,14 @@
 import Link from "next/link";
-import { now as nowMs } from "@/lib/clock";
+import { now as nowMs, daysAgoIso } from "@/lib/clock";
 import {
-  AlarmClock, AlertTriangle, ClipboardPlus, MessageCircle, Phone, PhoneCall, TrendingDown, Zap,
+  AlarmClock, AlertTriangle, ArrowUpRight, BadgeDollarSign, ClipboardPlus, Compass, Lightbulb,
+  MessageCircle, Phone, PhoneCall, PieChart, Timer, TrendingDown, TrendingUp, Zap,
 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { detectLostSaleRisks, estimateLostRevenue } from "@/lib/lost-sale-detector";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
+import { EmptyState } from "@/components/app/empty-state";
 import { dismissLostSaleRisk } from "./actions";
 
 function money(n: number) {
@@ -15,6 +17,121 @@ function money(n: number) {
 
 const DAY = 86_400_000;
 
+type DealRow = {
+  id: string;
+  stage: string;
+  deal_type: string | null;
+  deal_value: number | null;
+  loss_reason: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * "Kaçan fırsat radarı" — kapanan (won/lost) anlaşmalardan desen çıkarır.
+ * Migration yok: yalnız mevcut deals kolonları (loss_reason, deal_value,
+ * created_at → updated_at döngü süresi) okunur. Yetersiz veri → içgörü üretmez.
+ */
+function buildLossInsights(deals: DealRow[], now: number) {
+  const lost = deals.filter((d) => d.stage === "lost");
+  const won = deals.filter((d) => d.stage === "won");
+  const insights: Array<{
+    icon: typeof Lightbulb;
+    tone: "danger" | "amber" | "brand" | "mint";
+    title: string;
+    body: string;
+    href: string;
+    hrefLabel: string;
+  }> = [];
+
+  // 1) Baskın kayıp nedeni (min 3 kayıp, pay ≥ %30)
+  if (lost.length >= 3) {
+    const byReason = new Map<string, number>();
+    for (const d of lost) {
+      const r = (d.loss_reason ?? "").trim() || "Belirtilmemiş";
+      byReason.set(r, (byReason.get(r) ?? 0) + 1);
+    }
+    const [topReason, topCount] = [...byReason.entries()].sort((a, b) => b[1] - a[1])[0];
+    const share = Math.round((topCount / lost.length) * 100);
+    if (share >= 30) {
+      insights.push({
+        icon: Compass,
+        tone: "danger",
+        title: `Kayıpların %${share}'i tek nedene bağlı`,
+        body: `Son 12 ayda kaybedilen ${lost.length} anlaşmanın ${topCount} tanesi "${topReason}" nedeniyle kapandı. Bu nedeni süreçte erken yakalayan bir kontrol adımı ekleyin.`,
+        href: "/app/anlasmalar",
+        hrefLabel: "Anlaşmalara git",
+      });
+    }
+  }
+
+  // 2) Döngü süresi: kaybedilen anlaşmalar kazanılanlardan belirgin yavaşsa
+  const cycleDays = (d: DealRow) =>
+    Math.max(0, Math.round((new Date(d.updated_at).getTime() - new Date(d.created_at).getTime()) / DAY));
+  if (lost.length >= 3 && won.length >= 3) {
+    const avg = (arr: DealRow[]) => arr.reduce((s, d) => s + cycleDays(d), 0) / arr.length;
+    const lostAvg = Math.round(avg(lost));
+    const wonAvg = Math.round(avg(won));
+    if (lostAvg >= wonAvg + 7) {
+      insights.push({
+        icon: Timer,
+        tone: "amber",
+        title: "Uzayan anlaşma kaybettiriyor",
+        body: `Kaybedilen anlaşmalar ortalama ${lostAvg} günde sonuçlanırken kazanılanlar ${wonAvg} günde kapanıyor. ${wonAvg + 7}. günü geçen anlaşmalara erken müdahale planlayın.`,
+        href: "/app/anlasmalar",
+        hrefLabel: "Açık anlaşmaları incele",
+      });
+    }
+  }
+
+  // 3) Son 90 gün vs önceki 90 gün kayıp ciro momentumu
+  const in90 = (d: DealRow, fromDaysAgo: number, toDaysAgo: number) => {
+    const t = new Date(d.updated_at).getTime();
+    return t >= now - fromDaysAgo * DAY && t < now - toDaysAgo * DAY;
+  };
+  const recentLost = lost.filter((d) => in90(d, 90, 0)).reduce((s, d) => s + Number(d.deal_value || 0), 0);
+  const priorLost = lost.filter((d) => in90(d, 180, 90)).reduce((s, d) => s + Number(d.deal_value || 0), 0);
+  if (recentLost > 0 || priorLost > 0) {
+    const rising = recentLost > priorLost;
+    insights.push({
+      icon: rising ? TrendingDown : TrendingUp,
+      tone: rising ? "danger" : "mint",
+      title: rising ? "Kayıp ciro ivmeleniyor" : "Kayıp ciro geriliyor",
+      body: rising
+        ? `Son 90 günde ${money(recentLost)} tutarında anlaşma kaybedildi; önceki 90 günde bu ${money(priorLost)} idi. Kayıp nedenlerini haftalık ekip toplantısına taşıyın.`
+        : `Son 90 günde kaybedilen ciro ${money(recentLost)} — önceki 90 güne (${money(priorLost)}) göre azaldı. Mevcut takip disiplinini koruyun.`,
+      href: "/app/anlasmalar",
+      hrefLabel: "Anlaşma panosu",
+    });
+  }
+
+  // 4) En kırılgan anlaşma türü (tür başına min 4 kapanış, kayıp oranı ≥ %50)
+  const byType = new Map<string, { lost: number; won: number }>();
+  for (const d of deals) {
+    const t = (d.deal_type ?? "").trim() || "Diğer";
+    const rec = byType.get(t) ?? { lost: 0, won: 0 };
+    if (d.stage === "lost") rec.lost += 1;
+    else rec.won += 1;
+    byType.set(t, rec);
+  }
+  const fragile = [...byType.entries()]
+    .filter(([, v]) => v.lost + v.won >= 4 && v.lost / (v.lost + v.won) >= 0.5)
+    .sort((a, b) => b[1].lost / (b[1].lost + b[1].won) - a[1].lost / (a[1].lost + a[1].won))[0];
+  if (fragile) {
+    const [type, v] = fragile;
+    insights.push({
+      icon: PieChart,
+      tone: "brand",
+      title: `"${type}" işlemlerinde kayıp oranı yüksek`,
+      body: `${type} türündeki ${v.lost + v.won} kapanışın ${v.lost} tanesi kaybedildi (%${Math.round((v.lost / (v.lost + v.won)) * 100)}). Bu segment için sunum ve fiyatlama şablonlarını gözden geçirin.`,
+      href: "/app/anlasmalar",
+      hrefLabel: "Anlaşmalara git",
+    });
+  }
+
+  return { insights, lost, won };
+}
+
 export default async function KayipSatisPage() {
   const ctx = await requireModulePage("customers");
   const detected = await detectLostSaleRisks(50);
@@ -22,10 +139,20 @@ export default async function KayipSatisPage() {
   // Snooze/arandı filtresi: dismissed_until gelecekte olanlar ve son 30 günde
   // "called" işaretlenenler listeden düşer (bkz. lost_sale_dismissals).
   const supabase = await createClient();
-  const { data: dismissals } = await supabase
-    .from("lost_sale_dismissals")
-    .select("customer_id, dismissed_until, reason, created_at")
-    .eq("tenant_id", ctx.tenantId);
+  const [{ data: dismissals }, { data: closedDeals }] = await Promise.all([
+    supabase
+      .from("lost_sale_dismissals")
+      .select("customer_id, dismissed_until, reason, created_at")
+      .eq("tenant_id", ctx.tenantId),
+    // Kaçan fırsat radarı: son 12 ayın kapanan anlaşmaları (won + lost).
+    // RLS tenant kapsamını uygular; dar select, migration yok.
+    supabase
+      .from("deals")
+      .select("id, stage, deal_type, deal_value, loss_reason, created_at, updated_at")
+      .in("stage", ["won", "lost"])
+      .gte("updated_at", daysAgoIso(365))
+      .limit(1000),
+  ]);
 
   const now = nowMs();
   const dismissedIds = new Set(
@@ -43,6 +170,28 @@ export default async function KayipSatisPage() {
 
   const critical = risks.filter((r) => r.urgency === "critical");
   const warning  = risks.filter((r) => r.urgency === "warning");
+
+  // ── Kaçan fırsat radarı: kapanan anlaşmalardan gerçek desenler ────────────
+  const deals = (closedDeals ?? []) as DealRow[];
+  const { insights, lost, won } = buildLossInsights(deals, now);
+  const lostRevenue = lost.reduce((s, d) => s + Number(d.deal_value || 0), 0);
+  const closedTotal = lost.length + won.length;
+  const winRate = closedTotal > 0 ? Math.round((won.length / closedTotal) * 100) : null;
+
+  // Neden dağılımı: adet + kaybedilen tutar birlikte
+  const reasonAgg = new Map<string, { count: number; value: number }>();
+  for (const d of lost) {
+    const r = (d.loss_reason ?? "").trim() || "Belirtilmemiş";
+    const rec = reasonAgg.get(r) ?? { count: 0, value: 0 };
+    rec.count += 1;
+    rec.value += Number(d.deal_value || 0);
+    reasonAgg.set(r, rec);
+  }
+  const reasonBars = [...reasonAgg.entries()]
+    .map(([label, v]) => ({ label, ...v }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+  const maxReasonCount = Math.max(1, ...reasonBars.map((r) => r.count));
 
   return (
     <div className="space-y-6">
@@ -86,6 +235,14 @@ export default async function KayipSatisPage() {
               <p className="font-display text-lg font-extrabold text-white">{money(estLost)}</p>
               <p className="text-[11px] text-white/70">Tahmini kayıp</p>
             </Link>
+            {/* Kaybedilen ciro: son 12 ayın lost anlaşmalarının gerçek toplamı */}
+            <Link
+              href="#radar"
+              className="focus-ring press lift block rounded-[14px] border border-danger-500/30 bg-danger-500/15 p-3 text-center hover:border-danger-400/60"
+            >
+              <p className="font-display text-lg font-extrabold text-danger-300">{money(lostRevenue)}</p>
+              <p className="text-[11px] text-white/70">Kaybedilen ciro · 12 ay</p>
+            </Link>
           </div>
         </div>
       </section>
@@ -97,13 +254,13 @@ export default async function KayipSatisPage() {
       ) : null}
 
       {risks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-[20px] border border-emerald-200 bg-emerald-50 py-16 text-center">
-          <Zap className="h-12 w-12 text-emerald-500" />
-          <h3 className="mt-3 text-lg font-bold text-emerald-900">Mükemmel! Risk yok</h3>
-          <p className="mt-1 text-sm text-emerald-700">
-            Tüm aktif müşterileriniz düzenli takip altında.
-          </p>
-        </div>
+        <EmptyState
+          icon={Zap}
+          tone="mint"
+          title="Mükemmel! Risk yok"
+          description="Tüm aktif müşterileriniz düzenli takip altında. Yeni riskler oluştuğunda burada listelenir."
+          action={{ href: "/app/musteriler", label: "Müşterilere git" }}
+        />
       ) : (
         <div className="space-y-4">
           {/* Kritik */}
@@ -135,6 +292,131 @@ export default async function KayipSatisPage() {
           )}
         </div>
       )}
+
+      {/* ── Kaçan fırsat radarı: kapanan anlaşmalardan ders çıkarma ────────── */}
+      <section id="radar" className="scroll-mt-24 space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <p className="flex items-center gap-2 text-xs font-semibold text-danger-500">
+              <Compass className="h-4 w-4" /> Kaçan fırsat radarı
+            </p>
+            <h2 className="mt-1 font-display text-lg font-bold text-ink-950">Kapanan işlemlerden ders çıkar</h2>
+          </div>
+          <Link href="/app/anlasmalar" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">
+            Anlaşma panosu <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+
+        {lost.length === 0 ? (
+          <EmptyState
+            icon={Compass}
+            tone="brand"
+            title="Henüz kaybedilen anlaşma kaydı yok"
+            description="Bir anlaşma 'kaybedildi' aşamasına taşındığında radar; kayıp nedenlerini, kaybedilen ciroyu ve tekrarlayan desenleri burada analiz eder."
+            action={{ href: "/app/anlasmalar", label: "Anlaşma panosunu aç" }}
+          />
+        ) : (
+          <>
+            <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
+              {/* Kaybedilen ciro paneli */}
+              <div className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+                <p className="flex items-center gap-2 text-xs font-semibold text-danger-500">
+                  <BadgeDollarSign className="h-4 w-4" /> Kaybedilen ciro · 12 ay
+                </p>
+                <Link href="/app/anlasmalar" className="focus-ring group mt-2 block rounded-[10px]">
+                  <p className="numeric flex items-center gap-1 font-display text-3xl font-extrabold text-danger-500">
+                    −{money(lostRevenue)}
+                    <ArrowUpRight className="h-4 w-4 text-text-faint opacity-0 transition group-hover:text-danger-500 group-hover:opacity-100" />
+                  </p>
+                </Link>
+                <p className="mt-1 text-xs text-text-muted">
+                  {lost.length} kaybedilen anlaşmanın toplam değeri
+                </p>
+                <div className="mt-4 space-y-2 border-t border-line pt-4 text-xs text-text-muted">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-mint-500" /> Kazanılan</span>
+                    <span className="tabular-nums font-semibold text-ink-950">{won.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-danger-500" /> Kaybedilen</span>
+                    <span className="tabular-nums font-semibold text-ink-950">{lost.length}</span>
+                  </div>
+                  {winRate !== null ? (
+                    <>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-danger-500/15">
+                        <div className="bar-live h-full rounded-full bg-mint-500" style={{ width: `${winRate}%` }} />
+                      </div>
+                      <p className="text-[11px] text-text-faint">Kazanma oranı %{winRate}</p>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Kayıp nedenleri dağılımı */}
+              <div className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+                <p className="flex items-center gap-2 text-xs font-semibold text-amber-600">
+                  <PieChart className="h-4 w-4" /> Kayıp nedenleri dağılımı
+                </p>
+                <h3 className="mt-1 font-display font-bold text-ink-950">Neden kaybediyoruz?</h3>
+                <div className="mt-5 space-y-3">
+                  {reasonBars.map((r, i) => (
+                    <Link key={r.label} href="/app/anlasmalar" className="focus-ring group -m-1 block rounded-[10px] p-1">
+                      <div className="mb-1 flex justify-between gap-3 text-xs">
+                        <span className="flex min-w-0 items-center gap-1 font-semibold text-ink-950">
+                          <span className="truncate">{r.label}</span>
+                          <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                        </span>
+                        <span className="shrink-0 tabular-nums text-text-muted">
+                          {r.count} anlaşma{r.value > 0 ? ` · ${money(r.value)}` : ""}
+                        </span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-canvas">
+                        <div
+                          className="bar-live h-full rounded-full bg-danger-500/70"
+                          style={{ width: `${(r.count / maxReasonCount) * 100}%`, animationDelay: `${i * 0.08}s` }}
+                        />
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* İçgörü kartları */}
+            {insights.length > 0 ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                {insights.map((ins) => {
+                  const toneCls = {
+                    danger: "bg-danger-500/10 text-danger-500",
+                    amber: "bg-amber-400/15 text-amber-600",
+                    brand: "bg-brand-600/10 text-brand-600",
+                    mint: "bg-mint-500/12 text-mint-600",
+                  }[ins.tone];
+                  return (
+                    <article key={ins.title} className="lift flex gap-3 rounded-[18px] border border-line bg-surface p-5">
+                      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[12px] ${toneCls}`}>
+                        <ins.icon className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-0">
+                        <h3 className="font-display text-sm font-bold text-ink-950">{ins.title}</h3>
+                        <p className="mt-1 text-xs leading-relaxed text-text-muted">{ins.body}</p>
+                        <Link href={ins.href} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">
+                          {ins.hrefLabel} <ArrowUpRight className="h-3.5 w-3.5" />
+                        </Link>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="flex items-start gap-2 rounded-[14px] border border-line bg-canvas px-4 py-3 text-xs text-text-muted">
+                <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                Desen çıkarmak için henüz yeterli kapanış verisi yok — anlaşmaları kapatırken kayıp nedeni girmek radarın isabetini artırır.
+              </p>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }
@@ -150,7 +432,7 @@ function RiskCard({ risk }: { risk: Awaited<ReturnType<typeof detectLostSaleRisk
   const isCritical = risk.urgency === "critical";
 
   return (
-    <div className={`flex items-center gap-3 rounded-[16px] border px-4 py-3 transition hover:bg-canvas/60 ${
+    <div className={`flex flex-wrap items-center gap-3 rounded-[16px] border px-4 py-3 transition hover:bg-canvas/60 ${
       isCritical ? "border-red-200 bg-red-50/50" : "border-amber-200 bg-amber-50/40"
     }`}>
       {/* Avatar */}
@@ -177,8 +459,8 @@ function RiskCard({ risk }: { risk: Awaited<ReturnType<typeof detectLostSaleRisk
         )}
       </div>
 
-      {/* Aksiyonlar */}
-      <div className="flex shrink-0 items-center gap-1.5">
+      {/* Aksiyonlar — mobilde tam satıra sarar, geniş ekranda sağda tek satır */}
+      <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:shrink-0">
         {risk.phone && (
           <>
             <a

@@ -44,7 +44,7 @@ export function CompanyForm({ tenant }: { tenant: Tenant }) {
   }
 
   return (
-    <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-6">
+    <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-4 md:p-6">
       <div className="flex items-center gap-3">
         <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-brand-600/10 text-brand-600"><Building2 className="h-5 w-5" /></span>
         <div>

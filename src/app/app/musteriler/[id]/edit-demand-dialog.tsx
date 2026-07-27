@@ -66,7 +66,7 @@ export function EditDemandDialog({
 
       <DialogContent size="lg">
         <DialogHeader icon={<Pencil />} title="Talep düzenle" />
-        <form action={action} className="grid gap-4 p-6 sm:grid-cols-2">
+        <form action={action} className="grid gap-4 p-4 sm:grid-cols-2 md:p-6">
               <input type="hidden" name="id" value={demand.id} />
               <input type="hidden" name="customer_id" value={customerId} />
               <div>

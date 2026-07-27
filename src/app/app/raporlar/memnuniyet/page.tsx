@@ -131,7 +131,7 @@ export default async function SatisfactionReportPage() {
   return (
     <div className="space-y-6">
       {/* Hero — rapor merkezi deseni (koyu bant + KPI kartları) */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="relative">
           <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-cyan-400">

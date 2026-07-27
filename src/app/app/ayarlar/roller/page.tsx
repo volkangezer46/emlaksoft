@@ -128,7 +128,7 @@ export default async function RolePermissionsPage({
         </Link>
       </div>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/35 blur-[80px]" />
         <div className="relative">
@@ -197,7 +197,7 @@ export default async function RolePermissionsPage({
           </div>
 
           {isOwnerRole ? (
-            <section className="rounded-[20px] border border-dashed border-line-strong bg-surface p-6 text-center">
+            <section className="rounded-[20px] border border-dashed border-line-strong bg-surface p-4 md:p-6 text-center">
               <span className="mx-auto grid h-12 w-12 place-items-center rounded-[14px] bg-brand-600/10 text-brand-600">
                 <ShieldCheck className="h-6 w-6" />
               </span>

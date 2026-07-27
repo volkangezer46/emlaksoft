@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { ArrowUpRight, ChevronLeft, ChevronRight, Trophy } from "lucide-react";
+import {
+  ArrowUpRight, CalendarCheck2, ChevronLeft, ChevronRight, Crown, FileSignature,
+  Handshake, PhoneCall, Trophy,
+} from "lucide-react";
+import { StatCard } from "@/components/app/stat-card";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { ChartFrame } from "@/components/ui/chart";
@@ -339,6 +343,36 @@ export default async function DanismanKpiPage({
   for (const r of rozetler) rozetByUid.set(r.sahip.id, [...(rozetByUid.get(r.sahip.id) ?? []), r]);
   const yeniLider = Boolean(prevLeader && lider && prevLeader.id !== lider.id);
 
+  // ── Liderlik podyumu: skor > 0 olan ilk üç danışman ───────────────────────
+  const podium = advisors.filter((a) => a.score > 0).slice(0, 3);
+
+  // ── Dönem kıyası metrik kartları: ekip toplamları, önceki aya karşı ───────
+  // prevKpiByUid scoreOnly çekildi — skor bileşenleri (çağrı/randevu/teklif/
+  // satış/gelir) mevcut; müşteri sayısı yok ve burada kullanılmıyor.
+  const teamNow = { call: 0, appoint: 0, offer: 0, deal: 0 };
+  const teamPrev = { call: 0, appoint: 0, offer: 0, deal: 0 };
+  for (const a of advisors) {
+    teamNow.call += a.callCount;
+    teamNow.appoint += a.appointCount;
+    teamNow.offer += a.offerCount;
+    teamNow.deal += a.dealCount;
+    const pk = prevKpiByUid.get(a.id);
+    if (pk) {
+      teamPrev.call += pk.call_count;
+      teamPrev.appoint += pk.appoint_count;
+      teamPrev.offer += pk.offer_count;
+      teamPrev.deal += pk.deal_count;
+    }
+  }
+  /** Önceki aya göre değişim → StatCard trend props'u. */
+  const trendOf = (cur: number, prev: number): { trend: "up" | "down" | "neutral"; trendLabel: string } => {
+    const diff = cur - prev;
+    if (diff === 0) return { trend: "neutral", trendLabel: "±0" };
+    return diff > 0 ? { trend: "up", trendLabel: `+${diff}` } : { trend: "down", trendLabel: `−${Math.abs(diff)}` };
+  };
+  const convNow = teamNow.offer > 0 ? Math.round((teamNow.deal / teamNow.offer) * 100) : null;
+  const convPrev = teamPrev.offer > 0 ? Math.round((teamPrev.deal / teamPrev.offer) * 100) : null;
+
   // Koc: oturum acan kullanicinin kendi satiri + ekip ortalamasi.
   const ben = advisorMap.get(userId) ?? null;
   const ekipOrtalamaAnlasma =
@@ -453,6 +487,89 @@ export default async function DanismanKpiPage({
           </div>
         </div>
       </section>
+
+      {/* ── Liderlik podyumu: skoru olan ilk üç danışman (ekran, çıktı dışı) ── */}
+      {podium.length > 0 ? (
+        <section className="no-print dashboard-panel relative overflow-hidden rounded-[22px] border border-line bg-surface p-6">
+          <div className="pointer-events-none absolute -left-10 -top-16 h-48 w-48 rounded-full bg-amber-400/15 blur-[70px]" />
+          <div className="relative">
+            <p className="flex items-center gap-2 text-xs font-semibold text-amber-600">
+              <Crown className="h-4 w-4" /> Liderlik podyumu
+            </p>
+            <h2 className="mt-1 font-display text-lg font-bold text-ink-950">
+              {isCurrentMonth ? "Bu ayın" : `${donem} döneminin`} ilk üçü
+            </h2>
+            <div className="mt-6 grid gap-3 sm:grid-cols-3 sm:items-end">
+              {podium.map((a, i) => {
+                const sira = i + 1;
+                const stil = [
+                  { order: "sm:order-2", bar: "h-24 bg-[image:var(--grad-brand)]", ring: "bg-amber-400 text-ink-950", medal: "🥇" },
+                  { order: "sm:order-1", bar: "h-16 bg-brand-600/25", ring: "bg-canvas text-text-muted border border-line", medal: "🥈" },
+                  { order: "sm:order-3", bar: "h-12 bg-amber-700/25", ring: "bg-amber-700/15 text-amber-700", medal: "🥉" },
+                ][i];
+                const initials = a.full_name.split(" ").map((p) => p[0] ?? "").join("").slice(0, 2).toUpperCase();
+                return (
+                  <Link
+                    key={a.id}
+                    href={`/app/ekip/${a.id}`}
+                    className={`focus-ring press lift group flex flex-col rounded-[18px] border border-line bg-canvas/40 p-4 text-center transition hover:border-brand-300 ${stil.order}`}
+                    aria-label={`${sira}. sıra: ${a.full_name} — skor ${a.score}`}
+                  >
+                    <span className={`mx-auto grid h-12 w-12 place-items-center rounded-full font-display text-sm font-extrabold ${stil.ring}`}>
+                      {initials}
+                    </span>
+                    <p className="mt-2 flex items-center justify-center gap-1 truncate font-display text-sm font-bold text-ink-950 group-hover:text-brand-600">
+                      <span aria-hidden="true">{stil.medal}</span> {a.full_name}
+                    </p>
+                    <p className="text-[11px] text-text-muted">
+                      Skor <span className="numeric font-bold text-ink-950">{a.score}</span>
+                      {a.revenue > 0 ? ` · ${money(a.revenue)}` : ""} · {a.dealCount} satış
+                    </p>
+                    <div className={`mt-3 w-full rounded-t-[10px] ${stil.bar}`} aria-hidden="true" />
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {/* ── Ekip metrik kartları — önceki döneme kıyasla (ekran, çıktı dışı) ── */}
+      <div className="no-print grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Ekip çağrısı"
+          value={teamNow.call}
+          icon={PhoneCall}
+          href="/app/arama"
+          {...trendOf(teamNow.call, teamPrev.call)}
+        />
+        <StatCard
+          label="Ekip randevusu"
+          value={teamNow.appoint}
+          icon={CalendarCheck2}
+          tone="success"
+          href="/app/randevular"
+          {...trendOf(teamNow.appoint, teamPrev.appoint)}
+        />
+        <StatCard
+          label="Ekip teklifi"
+          value={teamNow.offer}
+          icon={FileSignature}
+          tone="warning"
+          href="/app/teklifler"
+          {...trendOf(teamNow.offer, teamPrev.offer)}
+        />
+        <StatCard
+          label="Teklif → satış dönüşümü"
+          value={convNow !== null ? `%${convNow}` : "—"}
+          icon={Handshake}
+          tone={convNow !== null && convPrev !== null && convNow < convPrev ? "danger" : "success"}
+          href="/app/anlasmalar"
+          {...(convNow !== null && convPrev !== null
+            ? trendOf(convNow, convPrev)
+            : { trend: "neutral" as const, trendLabel: "önceki ay verisi yok" })}
+        />
+      </div>
 
       {/* Rozet şeridi — seçili ayın verisinden türetilir, veri yoksa gizli.
           Bilinçli olarak sade: tablodaki madalya renk diliyle uyumlu amber

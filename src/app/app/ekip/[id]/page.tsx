@@ -90,7 +90,7 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
         <ArrowLeft className="h-4 w-4" /> Ekip
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/30 blur-[70px]" />
         <div className="relative flex flex-wrap items-center justify-between gap-5">

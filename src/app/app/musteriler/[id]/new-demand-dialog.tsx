@@ -76,7 +76,7 @@ export function NewDemandDialog({
 
       <DialogContent size="lg">
         <DialogHeader icon={<Target />} title="Yeni talep" description={customerName} />
-        <form ref={formRef} action={action} className="grid gap-4 p-6 sm:grid-cols-2">
+        <form ref={formRef} action={action} className="grid gap-4 p-4 sm:grid-cols-2 md:p-6">
               <input type="hidden" name="customer_id" value={customerId} />
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="demand-tx">İşlem türü *</label>

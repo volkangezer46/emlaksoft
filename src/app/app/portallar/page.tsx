@@ -149,7 +149,7 @@ export default async function PortalsPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-cyan-400/20 blur-[80px]" />
         <div className="relative flex flex-wrap items-center justify-between gap-5">

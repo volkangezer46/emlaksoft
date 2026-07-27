@@ -104,6 +104,17 @@ Yeni oturumun "chat hafızası" budur — kullanıcının verdiği her ana talim
     eski makinede `C:\Users\Laptop\.claude\projects\c--Users-Laptop-Desktop-emlaksoft\*.jsonl`
     yolunda durur; istenirse kullanıcı elle kopyalayabilir.
 
+17. **"panelde mobilde menüde görünmüyor ... tüm panel ekranlarını ultra premium yap, yarım kalanları devam ettir"**
+    → **Dalga O (2026-07-27, yeni makine):** (a) Mobil kök neden: üst bar araması sağ menüyü ekran
+    dışına itiyordu — kompakt arama + premium alt gezinme çubuğu (Ana ekran/Müşteri/Portföy/Randevu/Menü)
+    eklendi; `network` modülü NAV_MODULES'e eklendi (sidebar'da kimseye görünmüyordu). (b) 8 paralel
+    ajanla 35+ panel ekranı ultra premium'a çekildi (hero + gerçek verili tıklanabilir KPI + gelişmiş
+    filtre + içgörü kartları). (c) ROADMAP_V2: D4 (kira getirisi), D5 (satış süresi tahmini), R8
+    (franchise içerik) kapandı; X2 ruhunda kaçan fırsat radarı kayıp-satışta. (d) Kökten düzeltme:
+    `use-app-api.ts` ilk render'da localStorage okuyup hidrasyon hatası üretiyordu — LS okuması
+    effect'e taşındı (bellek cache'i korunarak). (e) Doğrulama: tsc/lint/188 test/build/check:links/E2E
+    (21 geçti, 0 kaldı) + 390px'te 12+ ekran Playwright taraması (taşma 0, sayfa hatası 0).
+
 ## 7) Bilinen davranışlar / tuzaklar
 
 - E2E'de 2-3 test hidrasyon yarışıyla flaky olabilir → `retries: 1` tasarımı bunu karşılar; build ile

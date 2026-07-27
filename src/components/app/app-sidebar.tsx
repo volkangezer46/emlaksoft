@@ -207,6 +207,15 @@ export function AppSidebar({
     </>
   );
 
+  // Mobil alt gezinme: en sık kullanılan dört rota + menü çekmecesi.
+  // İzin filtresi sidebar ile aynı kaynaktan (accessibleModules) beslenir.
+  const tabItems = [
+    { href: "/app", label: "Ana ekran", icon: LayoutDashboard, module: "dashboard" as AppModule },
+    { href: "/app/musteriler", label: "Müşteri", icon: Users, module: "customers" as AppModule },
+    { href: "/app/portfoyler", label: "Portföy", icon: Building2, module: "properties" as AppModule },
+    { href: "/app/randevular", label: "Randevu", icon: CalendarDays, module: "appointments" as AppModule },
+  ].filter((t) => accessibleModules.includes(t.module));
+
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className="fixed left-3 top-3 z-40 grid h-10 w-10 place-items-center rounded-[11px] bg-ink-950 text-white shadow-[var(--shadow-card)] md:hidden" aria-label="Panel menüsünü aç">
@@ -224,6 +233,41 @@ export function AppSidebar({
           </aside>
         </div>
       ) : null}
+      <nav
+        aria-label="Mobil hızlı gezinme"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line/70 bg-surface/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
+      >
+        <div className="mx-auto grid max-w-md" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}>
+          {tabItems.map((tab) => {
+            const active = tab.href === "/app" ? pathname === "/app" : pathname.startsWith(tab.href);
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                onClick={() => setOpen(false)}
+                className={`flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold transition ${
+                  active ? "text-brand-600" : "text-text-faint hover:text-ink-950"
+                }`}
+              >
+                <span className={`grid h-7 w-11 place-items-center rounded-full transition ${active ? "bg-brand-600/12" : ""}`}>
+                  <tab.icon className="h-[18px] w-[18px]" />
+                </span>
+                {tab.label}
+              </Link>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold text-text-faint transition hover:text-ink-950"
+          >
+            <span className="grid h-7 w-11 place-items-center rounded-full">
+              <Menu className="h-[18px] w-[18px]" />
+            </span>
+            Menü
+          </button>
+        </div>
+      </nav>
     </>
   );
 }

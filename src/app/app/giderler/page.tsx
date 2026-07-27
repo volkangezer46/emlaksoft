@@ -122,6 +122,18 @@ export default async function GiderlerPage({
   }));
   const hasTrend = trendChart.some((t) => t.tutar > 0);
 
+  // Ay karşılaştırması — içinde bulunulan ay vs önceki ay (filtrelerden bağımsız)
+  const buAyKey = monthKeys[monthKeys.length - 1];
+  const gecenAyKey = monthKeys[monthKeys.length - 2];
+  const buAyTutar = Math.round(trendTotals.get(buAyKey) ?? 0);
+  const gecenAyTutar = Math.round(trendTotals.get(gecenAyKey) ?? 0);
+  const ayUzunFmt = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" });
+  const buAyLabel = ayUzunFmt.format(new Date(`${buAyKey}-01T00:00:00`));
+  const gecenAyLabel = ayUzunFmt.format(new Date(`${gecenAyKey}-01T00:00:00`));
+  const aylikFark = buAyTutar - gecenAyTutar;
+  const aylikDegisim = gecenAyTutar > 0 ? Math.round((aylikFark / gecenAyTutar) * 100) : null;
+  const kiyasMax = Math.max(1, buAyTutar, gecenAyTutar);
+
   const tableExpenses = filteredExpenses.map((e) => ({
     id:           e.id,
     title:        e.title,
@@ -221,6 +233,50 @@ export default async function GiderlerPage({
           ) : null}
         </form>
       </div>
+
+      {/* Ay karşılaştırması — bu ay vs geçen ay; kartlar tarih aralığını uygular */}
+      {buAyTutar > 0 || gecenAyTutar > 0 ? (
+        <section className="grid gap-3 rounded-[18px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] sm:grid-cols-[1fr_1fr_auto] sm:items-center">
+          {[
+            { label: buAyLabel, sub: "Bu ay", tutar: buAyTutar, preset: presets[0], bar: "bg-brand-600" },
+            { label: gecenAyLabel, sub: "Geçen ay", tutar: gecenAyTutar, preset: presets[1], bar: "bg-brand-300" },
+          ].map((m) => {
+            const aktif = fromF === m.preset.from && toF === m.preset.to;
+            return (
+              <Link
+                key={m.sub}
+                href={href({ from: m.preset.from, to: m.preset.to })}
+                aria-current={aktif ? "page" : undefined}
+                className={`focus-ring press lift group block rounded-[14px] border p-3 transition hover:border-brand-300 ${
+                  aktif ? "border-brand-400 bg-brand-600/5" : "border-line bg-surface"
+                }`}
+              >
+                <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-text-faint">
+                  {m.sub} · {m.label}
+                  <ArrowUpRight className="hover-action h-3 w-3 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                </p>
+                <p className="numeric mt-1 font-display text-xl font-extrabold text-ink-950">{money(m.tutar)}</p>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-canvas">
+                  <div className={`h-full rounded-full ${m.bar}`} style={{ width: `${Math.round((m.tutar / kiyasMax) * 100)}%` }} />
+                </div>
+              </Link>
+            );
+          })}
+          <div className="px-1 text-center sm:px-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-text-faint">Aylık değişim</p>
+            {aylikDegisim !== null ? (
+              <p className={`mt-1 font-display text-xl font-extrabold ${aylikFark > 0 ? "text-danger-500" : "text-mint-600"}`}>
+                {aylikFark > 0 ? "+" : ""}%{Math.abs(aylikDegisim) > 999 ? "999+" : aylikDegisim}
+              </p>
+            ) : (
+              <p className="mt-1 font-display text-xl font-extrabold text-text-faint">—</p>
+            )}
+            <p className="mt-0.5 text-[11px] text-text-muted">
+              {aylikFark === 0 ? "Değişim yok" : `${money(Math.abs(aylikFark))} ${aylikFark > 0 ? "artış" : "azalış"}`}
+            </p>
+          </div>
+        </section>
+      ) : null}
 
       {/* Kategori özet — dağılım + aylık trend + kırılım kartları */}
       {activeCategories.length > 0 || hasTrend ? (

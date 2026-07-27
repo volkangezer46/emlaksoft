@@ -8,7 +8,9 @@ import {
   TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { now as nowMs } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
 import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/app/empty-state";
@@ -133,7 +135,7 @@ export default async function CuzdanPage() {
     })
     .filter((x): x is { row: CommissionRow; share: { amount: number; note: string } } => x !== null);
 
-  const now = new Date();
+  const now = new Date(nowMs());
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const yearStart = new Date(now.getFullYear(), 0, 1);
 
@@ -176,6 +178,20 @@ export default async function CuzdanPage() {
 
   const listed = mine.slice(0, LIST_LIMIT);
 
+  // Hareket zaman çizelgesi — kayıtlar (created_at desc) ay bazında gruplanır
+  const ayBaslikFmt = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" });
+  const timelineGroups: { key: string; label: string; items: typeof listed; toplam: number }[] = [];
+  for (const item of listed) {
+    const key = String(item.row.created_at).slice(0, 7);
+    let g = timelineGroups[timelineGroups.length - 1];
+    if (!g || g.key !== key) {
+      g = { key, label: ayBaslikFmt.format(new Date(item.row.created_at)), items: [], toplam: 0 };
+      timelineGroups.push(g);
+    }
+    g.items.push(item);
+    g.toplam += item.share.amount;
+  }
+
   return (
     <div className="space-y-6">
       <section className="no-print theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
@@ -188,6 +204,43 @@ export default async function CuzdanPage() {
             <p className="mt-1 text-sm text-white/60">Kapanan anlaşmalardan payına düşen hakediş, tahsilat ve bekleyen tutarlar tek ekranda.</p>
           </div>
           <PrintButton />
+        </div>
+        {/* Bakiye hero'su — bekleyen bakiye büyük, yanında dönem metrikleri.
+            Kartlar komisyon defterinin okuduğu ?durum= filtresine gider. */}
+        <div className="relative mt-6 grid gap-3 sm:grid-cols-[1.4fr_1fr_1fr]">
+          <Link
+            href="/app/komisyon?durum=bekleyen"
+            className="focus-ring press lift group block rounded-[16px] border border-mint-400/25 bg-white/8 p-4 backdrop-blur transition hover:border-mint-400/50"
+          >
+            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-mint-300">
+              Bekleyen bakiye
+              <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
+            </p>
+            <p className="numeric mt-1.5 font-display text-3xl font-extrabold text-white md:text-4xl">{money(pending)}</p>
+            <p className="mt-1 text-[11px] text-white/50">Tahsil edilmemiş hakediş toplamın</p>
+          </Link>
+          <Link
+            href="/app/komisyon"
+            className="focus-ring press lift group block rounded-[16px] border border-white/12 bg-white/8 p-4 backdrop-blur transition hover:border-white/30"
+          >
+            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-white/50">
+              Bu ay hakediş
+              <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
+            </p>
+            <p className="numeric mt-1.5 font-display text-2xl font-extrabold text-white">{money(thisMonth)}</p>
+            <p className="mt-1 text-[11px] text-white/50">{donem} dönemi</p>
+          </Link>
+          <Link
+            href="/app/komisyon?durum=tahsil"
+            className="focus-ring press lift group block rounded-[16px] border border-white/12 bg-white/8 p-4 backdrop-blur transition hover:border-white/30"
+          >
+            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-white/50">
+              Bu yıl tahsil
+              <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
+            </p>
+            <p className="numeric mt-1.5 font-display text-2xl font-extrabold text-white">{money(paidThisYear)}</p>
+            <p className="mt-1 text-[11px] text-white/50">Ödemesi tamamlanan pay</p>
+          </Link>
         </div>
       </section>
 
@@ -343,7 +396,7 @@ export default async function CuzdanPage() {
       ) : (
         <section className="no-print overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
-            <div><p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><ReceiptText className="h-4 w-4" /> Hakediş kayıtları</p><h2 className="mt-1 font-display font-bold text-ink-950">Payına düşen komisyonlar</h2></div>
+            <div><p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><ReceiptText className="h-4 w-4" /> Hakediş kayıtları</p><h2 className="mt-1 font-display font-bold text-ink-950">Hareket zaman çizelgesi</h2></div>
             <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">{listed.length} kayıt</span>
           </div>
           <div className="px-5 pt-3">
@@ -355,39 +408,65 @@ export default async function CuzdanPage() {
               hrefLabel="Komisyon defteri"
             />
           </div>
-          <div className="divide-y divide-line">
-            {listed.map(({ row, share }) => {
-              const deal = dealOf(row.deal);
-              const property = deal ? (Array.isArray(deal.property) ? deal.property[0] : deal.property) : null;
-              return (
-                <article key={row.id} className="group relative grid gap-3 px-5 py-4 transition hover:bg-brand-600/[0.02] md:grid-cols-[1.4fr_.7fr_.7fr_auto] md:items-center">
-                  {/* Örtü link: portföylü kayıt portföye, portföysüz kayıt bağlı anlaşmaya gider */}
-                  {property?.id ? (
-                    <Link href={`/app/portfoyler/${property.id}`} className="absolute inset-0" aria-label={`${property.title ?? property.property_code ?? "Hakediş"} portföyü`} />
-                  ) : row.deal_id ? (
-                    <Link href={`/app/anlasmalar/${row.deal_id}`} className="absolute inset-0" aria-label="Bağlı anlaşmayı aç" />
-                  ) : null}
-                  <div>
-                    <p className="text-sm font-semibold text-ink-950">{property?.title ?? "Komisyon kaydı"}</p>
-                    <p className="mt-0.5 text-xs text-text-muted">{property?.property_code ?? (row.deal_id ? "Portföysüz anlaşma" : "Genel işlem")} · {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(row.created_at))}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-text-faint">Brüt komisyon</p>
-                    <p className="font-display text-sm font-bold text-ink-950">{money(Number(row.gross_amount))}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-text-faint">Danışman payı</p>
-                    <p className="font-display text-sm font-bold text-mint-700">{money(share.amount)}</p>
-                    <p className="mt-0.5 text-[11px] text-text-muted">{share.note}</p>
-                  </div>
-                  <div>
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${isPaid(row.status) ? "bg-mint-500/10 text-mint-600" : "bg-amber-400/15 text-amber-500"}`}>
-                      {isPaid(row.status) ? "Tahsil edildi" : "Bekliyor"}
-                    </span>
-                  </div>
-                </article>
-              );
-            })}
+          {/* Hareket zaman çizelgesi — ay başlıkları + sol ray üzerinde durum noktaları */}
+          <div className="px-5 pb-2">
+            {timelineGroups.map((group) => (
+              <div key={group.key}>
+                <div className="flex items-center justify-between gap-3 pb-2 pt-4">
+                  <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.1em] text-text-faint">
+                    <CalendarDays className="h-3.5 w-3.5 text-brand-600" /> {group.label}
+                  </p>
+                  <span className="numeric rounded-full bg-mint-500/10 px-2.5 py-0.5 text-[11px] font-bold text-mint-700">
+                    {money(group.toplam)}
+                  </span>
+                </div>
+                <div className="relative ml-1.5 space-y-1 border-l-2 border-line pb-2">
+                  {group.items.map(({ row, share }) => {
+                    const deal = dealOf(row.deal);
+                    const property = deal ? (Array.isArray(deal.property) ? deal.property[0] : deal.property) : null;
+                    const paid = isPaid(row.status);
+                    return (
+                      <article
+                        key={row.id}
+                        className="group relative grid gap-2 rounded-[12px] py-3 pl-5 pr-2 transition hover:bg-brand-600/[0.02] md:grid-cols-[1.4fr_.7fr_.7fr_auto] md:items-center"
+                      >
+                        {/* Zaman çizelgesi noktası — durum rengi */}
+                        <span
+                          aria-hidden
+                          className={`absolute -left-[7px] top-[22px] h-3 w-3 rounded-full border-2 border-surface ${
+                            paid ? "bg-mint-500" : "bg-amber-400"
+                          }`}
+                        />
+                        {/* Örtü link: portföylü kayıt portföye, portföysüz kayıt bağlı anlaşmaya gider */}
+                        {property?.id ? (
+                          <Link href={`/app/portfoyler/${property.id}`} className="absolute inset-0" aria-label={`${property.title ?? property.property_code ?? "Hakediş"} portföyü`} />
+                        ) : row.deal_id ? (
+                          <Link href={`/app/anlasmalar/${row.deal_id}`} className="absolute inset-0" aria-label="Bağlı anlaşmayı aç" />
+                        ) : null}
+                        <div>
+                          <p className="text-sm font-semibold text-ink-950">{property?.title ?? "Komisyon kaydı"}</p>
+                          <p className="mt-0.5 text-xs text-text-muted">{property?.property_code ?? (row.deal_id ? "Portföysüz anlaşma" : "Genel işlem")} · {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(row.created_at))}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-text-faint">Brüt komisyon</p>
+                          <p className="font-display text-sm font-bold text-ink-950">{money(Number(row.gross_amount))}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-text-faint">Danışman payı</p>
+                          <p className="font-display text-sm font-bold text-mint-700">{money(share.amount)}</p>
+                          <p className="mt-0.5 text-[11px] text-text-muted">{share.note}</p>
+                        </div>
+                        <div>
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${paid ? "bg-mint-500/10 text-mint-600" : "bg-amber-400/15 text-amber-500"}`}>
+                            {paid ? "Tahsil edildi" : "Bekliyor"}
+                          </span>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
           {/* Metodoloji notu — pay hangi kaynaktan hesaplanıyor? */}
           <div className="flex items-start gap-2 border-t border-line bg-canvas/60 px-5 py-3 text-[11px] text-text-muted">

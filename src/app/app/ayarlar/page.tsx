@@ -135,7 +135,7 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       {/* premium header */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/35 blur-[80px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -204,7 +204,7 @@ export default async function SettingsPage() {
       </section>
 
       {/* Logo + company form */}
-      <section id="marka-kimlik" className="dashboard-panel scroll-mt-24 rounded-[20px] border border-line bg-surface p-6">
+      <section id="marka-kimlik" className="dashboard-panel scroll-mt-24 rounded-[20px] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center gap-3 border-b border-line pb-4">
           <div>
             <h2 className="font-display font-bold text-ink-950">Marka & kimlik</h2>
@@ -218,7 +218,7 @@ export default async function SettingsPage() {
       </section>
 
       {/* Eşleştirme ağırlıkları */}
-      <section id="eslestirme-agirliklari" className="dashboard-panel scroll-mt-24 rounded-[20px] border border-line bg-surface p-6">
+      <section id="eslestirme-agirliklari" className="dashboard-panel scroll-mt-24 rounded-[20px] border border-line bg-surface p-4 md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
           <div className="flex items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-cyan-400/12 text-cyan-500"><Crosshair className="h-5 w-5" /></span>
@@ -238,7 +238,7 @@ export default async function SettingsPage() {
       </section>
 
       {/* Entegrasyonlar */}
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-6">
+      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center gap-3 border-b border-line pb-4">
           <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-cyan-400/12 text-cyan-500"><Plug className="h-5 w-5" /></span>
           <div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ArrowUpRight, Loader2, MessageSquare } from "lucide-react";
+import { ArrowUpRight, BarChart3, CheckCircle2, Loader2, MessageSquare, Send } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
+import { msSince } from "@/lib/clock";
 import { listCampaigns } from "@/app/actions/campaigns";
 import { NewCampaignDialog } from "./new-campaign-dialog";
 import { CampaignActions } from "./campaign-actions";
@@ -53,7 +54,7 @@ function filterHref(durum: string, kanal: string) {
 }
 
 function relativeDate(iso: string) {
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  const d = Math.floor(msSince(iso) / 86_400_000);
   if (d <= 0) return "Bugün";
   if (d === 1) return "Dün";
   if (d < 30) return `${d} gün önce`;
@@ -112,7 +113,29 @@ export default async function KampanyalarPage({
   const total   = campaigns.length;
   const done    = campaigns.filter((c) => c.status === "done").length;
   const sending = campaigns.filter((c) => c.status === "sending").length;
-  const totalSent = campaigns.reduce((s, c) => s + (c.sent_count ?? 0), 0);
+  const failedCampaigns = campaigns.filter((c) => c.status === "failed").length;
+  const totalSent   = campaigns.reduce((s, c) => s + (c.sent_count ?? 0), 0);
+  const totalFailed = campaigns.reduce((s, c) => s + (c.failed_count ?? 0), 0);
+  // Ulaşım oranı — yalnız sonuçlanmış gönderimler üzerinden (sent + failed)
+  const deliveryDen  = totalSent + totalFailed;
+  const deliveryRate = deliveryDen > 0 ? Math.round((totalSent / deliveryDen) * 100) : null;
+
+  // Kanal dağılımı — kampanya adedi + gönderilen mesaj, kanal başına.
+  // Segment renkleri palet doğrulayıcıdan geçirildi (brand→mint→amber sırası).
+  const CHANNELS = [
+    { value: "sms",      label: "SMS",      bar: "bg-brand-600",  dot: "bg-brand-600" },
+    { value: "whatsapp", label: "WhatsApp", bar: "bg-mint-600",   dot: "bg-mint-600" },
+    { value: "email",    label: "E-posta",  bar: "bg-amber-500",  dot: "bg-amber-500" },
+  ] as const;
+  const channelStats = CHANNELS.map((ch) => {
+    const list = campaigns.filter((c) => c.channel === ch.value);
+    return {
+      ...ch,
+      count: list.length,
+      sent: list.reduce((s, c) => s + (c.sent_count ?? 0), 0),
+    };
+  });
+  const channelTotal = channelStats.reduce((s, c) => s + c.count, 0);
 
   return (
     <div className="space-y-6">
@@ -132,10 +155,11 @@ export default async function KampanyalarPage({
               Müşterilerinize toplu SMS veya WhatsApp mesajı gönderin. Netgsm entegrasyonu ile İYS uyumlu.
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:flex">
             {[
               { label: "Toplam", value: total, href: "/app/kampanyalar" },
               { label: "Gönderildi", value: done, href: "/app/kampanyalar?durum=done" },
+              { label: "Başarısız", value: failedCampaigns, href: "/app/kampanyalar?durum=failed" },
               { label: "Gönderilen mesaj", value: totalSent.toLocaleString("tr-TR"), href: "/app/kampanyalar?durum=done" },
             ].map((k) => (
               <Link
@@ -151,6 +175,87 @@ export default async function KampanyalarPage({
           </div>
         </div>
       </section>
+
+      {/* Performans + kanal dağılımı — yalnız gerçek veri; kampanya yoksa çizilmez */}
+      {campaigns.length > 0 ? (
+        <div className="grid gap-4 lg:grid-cols-5">
+          {/* Kanal dağılımı */}
+          <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] lg:col-span-3">
+            <h2 className="flex items-center gap-2 font-display text-sm font-bold text-ink-950">
+              <BarChart3 className="h-4 w-4 text-brand-600" /> Kanal dağılımı
+            </h2>
+            {/* Bar dekoratif — okuma ve tıklama aşağıdaki etiketli satırlarda */}
+            <div aria-hidden className="mt-4 flex h-3 w-full gap-[3px] overflow-hidden rounded-full">
+              {channelStats
+                .filter((c) => c.count > 0)
+                .map((c) => (
+                  <span
+                    key={c.value}
+                    className={`${c.bar} rounded-[3px]`}
+                    style={{ width: `${(c.count / channelTotal) * 100}%` }}
+                  />
+                ))}
+            </div>
+            <ul className="mt-3 divide-y divide-hairline">
+              {channelStats.map((c) => (
+                <li key={c.value}>
+                  <Link
+                    href={filterHref("", c.value)}
+                    className="focus-ring group flex min-h-11 items-center gap-2.5 rounded-[10px] px-2 py-2 transition hover:bg-canvas"
+                  >
+                    <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${c.dot}`} />
+                    <span className="text-sm font-semibold text-ink-950 group-hover:text-brand-600">{c.label}</span>
+                    <span className="numeric ml-auto text-xs text-text-muted">
+                      {c.count} kampanya · {c.sent.toLocaleString("tr-TR")} mesaj
+                    </span>
+                    <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {/* Teslimat performansı */}
+          <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] lg:col-span-2">
+            <h2 className="flex items-center gap-2 font-display text-sm font-bold text-ink-950">
+              <Send className="h-4 w-4 text-mint-600" /> Teslimat performansı
+            </h2>
+            {deliveryRate === null ? (
+              <p className="mt-4 rounded-[12px] border border-dashed border-line-strong bg-canvas/50 px-3 py-6 text-center text-xs text-text-muted">
+                Henüz sonuçlanmış gönderim yok — ilk kampanyanız gönderilince ulaşım oranı burada görünür.
+              </p>
+            ) : (
+              <>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <p className="numeric font-display text-4xl font-extrabold text-ink-950">%{deliveryRate}</p>
+                  <p className="text-xs text-text-muted">ulaşım oranı</p>
+                </div>
+                <div aria-hidden className="mt-2 h-2 w-full overflow-hidden rounded-full bg-canvas">
+                  <span className="block h-full rounded-full bg-mint-600" style={{ width: `${deliveryRate}%` }} />
+                </div>
+                <div className="mt-4 space-y-1">
+                  <Link
+                    href="/app/kampanyalar?durum=done"
+                    className="focus-ring group flex min-h-11 items-center gap-2 rounded-[10px] px-2 py-2 transition hover:bg-canvas"
+                  >
+                    <CheckCircle2 className="h-4 w-4 text-mint-600" />
+                    <span className="text-sm text-text-muted group-hover:text-ink-950">Ulaşan mesaj</span>
+                    <span className="numeric ml-auto text-sm font-bold text-ink-950">{totalSent.toLocaleString("tr-TR")}</span>
+                  </Link>
+                  <Link
+                    href="/app/kampanyalar?durum=failed"
+                    className="focus-ring group flex min-h-11 items-center gap-2 rounded-[10px] px-2 py-2 transition hover:bg-canvas"
+                  >
+                    <MessageSquare className="h-4 w-4 text-danger-500" />
+                    <span className="text-sm text-text-muted group-hover:text-ink-950">Ulaşmayan mesaj</span>
+                    <span className="numeric ml-auto text-sm font-bold text-ink-950">{totalFailed.toLocaleString("tr-TR")}</span>
+                  </Link>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      ) : null}
 
       {/* Üst toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3">

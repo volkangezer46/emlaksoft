@@ -99,7 +99,7 @@ export function EditPropertyDialog({
           title="Portföyü düzenle"
           description={property.title ?? undefined}
         />
-        <form onSubmit={onSubmit} className="p-6">
+        <form onSubmit={onSubmit} className="p-4 md:p-6">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="sm:col-span-2 text-xs font-medium text-text-muted">
                 Başlık

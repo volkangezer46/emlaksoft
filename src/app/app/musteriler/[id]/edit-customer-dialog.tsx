@@ -74,7 +74,7 @@ export function EditCustomerDialog({
           title="Müşteri düzenle"
           description={customer.full_name}
         />
-        <form ref={formRef} action={action} className="grid gap-4 p-6 sm:grid-cols-2">
+        <form ref={formRef} action={action} className="grid gap-4 p-4 sm:grid-cols-2 md:p-6">
               <input type="hidden" name="id" value={customer.id} />
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="edit-full-name">Ad soyad *</label>

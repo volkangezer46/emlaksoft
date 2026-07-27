@@ -45,9 +45,9 @@ function propertyOf(c: Closure) {
   return Array.isArray(p) ? p[0] : p;
 }
 
-function daysSince(value: string | null) {
+function daysSince(value: string | null, ref: number) {
   if (!value) return 999;
-  return Math.floor((Date.now() - new Date(value).getTime()) / 86_400_000);
+  return Math.floor((ref - new Date(value).getTime()) / 86_400_000);
 }
 
 const TIP_FILTERS = ["rakip", "bizim", "islem"] as const;
@@ -106,9 +106,27 @@ export default async function LeakShieldPage({
       .limit(200),
   ]);
 
+  const nowMs = now();
   const rows = (closures ?? []) as Closure[];
   const live = listings ?? [];
-  const overdue = live.filter((r) => daysSince(r.last_confirmed_at) >= 7);
+  const overdue = live.filter((r) => daysSince(r.last_confirmed_at, nowMs) >= 7);
+
+  // ── Teyit SLA şeridi: canlı ilanların son teyit yaşına göre dağılımı ──────
+  // Taze ≤ 3 gün · Yaklaşan 4–6 gün · Gecikmiş ≥ 7 gün (portal teyit SLA'sı).
+  const slaFresh = live.filter((r) => daysSince(r.last_confirmed_at, nowMs) <= 3).length;
+  const slaDue = live.filter((r) => {
+    const d = daysSince(r.last_confirmed_at, nowMs);
+    return d >= 4 && d <= 6;
+  }).length;
+  const slaOverdue = overdue.length;
+  const slaTotal = live.length;
+  const slaHealth = slaTotal > 0 ? Math.round(((slaFresh + slaDue) / slaTotal) * 100) : null;
+
+  // Risk sıralaması: en uzun süredir teyitsiz canlı ilanlar (en riskli önce)
+  const riskRanking = [...overdue]
+    .sort((a, b) => daysSince(b.last_confirmed_at, nowMs) - daysSince(a.last_confirmed_at, nowMs))
+    .slice(0, 8);
+  const maxOverdueDays = Math.max(7, ...riskRanking.map((r) => Math.min(daysSince(r.last_confirmed_at, nowMs), 60)));
 
   const monthRows = rows.filter((r) => new Date(r.created_at) >= monthStart);
   const lostMonth = monthRows.reduce((s, r) => s + Number(r.estimated_lost_commission || 0), 0);
@@ -119,7 +137,6 @@ export default async function LeakShieldPage({
 
   // 8-week lost commission buckets
   const weekMs = 7 * 86_400_000;
-  const nowMs = now();
   const buckets = Array.from({ length: 8 }, () => 0);
   rows.forEach((r) => {
     const idx = 7 - Math.floor((nowMs - new Date(r.created_at).getTime()) / weekMs);
@@ -238,6 +255,59 @@ export default async function LeakShieldPage({
         </div>
       </section>
 
+      {/* ── Teyit SLA durumu şeridi ─────────────────────────────────────────── */}
+      {slaTotal > 0 ? (
+        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
+                <ShieldAlert className="h-4 w-4" /> Teyit SLA durumu
+              </p>
+              <h2 className="mt-1 font-display font-bold text-ink-950">
+                {slaTotal} canlı ilan
+                {slaHealth !== null ? (
+                  <span className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                    slaHealth >= 85 ? "bg-mint-500/12 text-mint-600" : slaHealth >= 60 ? "bg-amber-400/15 text-amber-600" : "bg-danger-500/10 text-danger-500"
+                  }`}>
+                    %{slaHealth} SLA içinde
+                  </span>
+                ) : null}
+              </h2>
+            </div>
+            <p className="text-[11px] text-text-faint">SLA: her ilan en geç 7 günde bir teyit edilir</p>
+          </div>
+
+          {/* Oransal şerit — segmentler tıklanabilir chips ile eşleşir */}
+          <div className="mt-4 flex h-3 w-full gap-0.5 overflow-hidden rounded-full" role="img" aria-label={`Taze ${slaFresh}, yaklaşan ${slaDue}, gecikmiş ${slaOverdue} ilan`}>
+            {slaFresh > 0 ? <div className="bar-live h-full rounded-full bg-mint-500" style={{ width: `${(slaFresh / slaTotal) * 100}%` }} /> : null}
+            {slaDue > 0 ? <div className="bar-live h-full rounded-full bg-amber-400" style={{ width: `${(slaDue / slaTotal) * 100}%`, animationDelay: "0.08s" }} /> : null}
+            {slaOverdue > 0 ? <div className="bar-live h-full rounded-full bg-danger-500" style={{ width: `${(slaOverdue / slaTotal) * 100}%`, animationDelay: "0.16s" }} /> : null}
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {[
+              { label: "Taze · son 3 gün", value: slaFresh, dot: "bg-mint-500", text: "text-mint-600", href: "/app/portallar?durum=live" },
+              { label: "Yaklaşan · 4–6 gün", value: slaDue, dot: "bg-amber-400", text: "text-amber-600", href: "/app/portallar?durum=live" },
+              { label: "Gecikmiş · 7+ gün", value: slaOverdue, dot: "bg-danger-500", text: "text-danger-500", href: "/app/portallar?durum=teyit" },
+            ].map((s) => (
+              <Link
+                key={s.label}
+                href={s.href}
+                className="focus-ring press lift group flex min-h-[44px] items-center justify-between gap-2 rounded-[12px] border border-line bg-canvas/50 px-3.5 py-2.5 hover:border-brand-300"
+              >
+                <span className="flex items-center gap-2 text-xs font-semibold text-text-muted">
+                  <span className={`h-2 w-2 rounded-full ${s.dot}`} /> {s.label}
+                </span>
+                <span className={`flex items-center gap-1 font-display text-lg font-extrabold ${s.text}`}>
+                  {s.value}
+                  <ArrowUpRight className="h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:opacity-100" />
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-xs font-semibold text-danger-500">
@@ -313,41 +383,73 @@ export default async function LeakShieldPage({
         </section>
       </div>
 
-      {overdue.length > 0 ? (
+      {riskRanking.length > 0 ? (
         <section className="rounded-[20px] border border-warn-500/30 bg-warn-500/5 p-5">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-warn-500" />
-              <h2 className="font-display font-bold text-ink-950">Teyit gecikmiş ilanlar</h2>
+              <div>
+                <h2 className="font-display font-bold text-ink-950">Risk sıralaması — teyit gecikmiş ilanlar</h2>
+                <p className="text-xs text-text-muted">
+                  En uzun süredir teyitsiz kalan {riskRanking.length} ilan · teyitsiz her gün kaçak riskini büyütür
+                </p>
+              </div>
             </div>
-            <Link href="/app/portallar" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600">
-              Portal Kontrol <ArrowUpRight className="h-3.5 w-3.5" />
+            <Link href="/app/portallar?durum=teyit" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">
+              Tümü Portal Kontrol&apos;de <ArrowUpRight className="h-3.5 w-3.5" />
             </Link>
           </div>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {overdue.slice(0, 6).map((r) => {
+          <div className="mt-4 space-y-2">
+            {riskRanking.map((r, i) => {
               const prop = Array.isArray(r.property) ? r.property[0] : r.property;
+              const days = daysSince(r.last_confirmed_at, nowMs);
+              const sev = Math.min(days, 60) / maxOverdueDays;
+              const critical = days >= 21;
               const inner = (
-                <>
-                  <p className="flex items-center gap-1 font-semibold text-ink-950">
-                    {r.portal_name} {r.portal_listing_id ? `#${r.portal_listing_id}` : ""}
-                    {prop?.id ? (
-                      <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                    ) : null}
-                  </p>
-                  <p className="text-xs text-text-muted">{prop?.property_code ?? "—"} · {daysSince(r.last_confirmed_at)} gündür teyit yok</p>
-                </>
+                <div className="flex w-full items-center gap-3">
+                  {/* Sıra rozeti */}
+                  <span
+                    className={`grid h-8 w-8 shrink-0 place-items-center rounded-full font-display text-sm font-extrabold ${
+                      i === 0 ? "bg-danger-500 text-white" : critical ? "bg-danger-500/12 text-danger-500" : "bg-warn-500/15 text-warn-600"
+                    }`}
+                  >
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-1 truncate text-sm font-semibold text-ink-950">
+                      {r.portal_name} {r.portal_listing_id ? `#${r.portal_listing_id}` : ""}
+                      {prop?.id ? (
+                        <ArrowUpRight className="hover-action h-3.5 w-3.5 shrink-0 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                      ) : null}
+                    </p>
+                    <p className="truncate text-xs text-text-muted">
+                      {prop?.property_code ?? "—"}{prop?.title ? ` · ${prop.title}` : ""}
+                    </p>
+                    {/* Aciliyet çubuğu — gün sayısı sıralamadaki en yükseğe oranlanır */}
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-canvas">
+                      <div
+                        className={`bar-live h-full rounded-full ${critical ? "bg-danger-500" : "bg-warn-500"}`}
+                        style={{ width: `${Math.max(8, sev * 100)}%`, animationDelay: `${i * 0.06}s` }}
+                      />
+                    </div>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold tabular-nums ${
+                    critical ? "bg-danger-500/10 text-danger-500" : "bg-warn-500/15 text-warn-600"
+                  }`}>
+                    {days >= 999 ? "Hiç teyit yok" : `${days} gün`}
+                  </span>
+                </div>
               );
               return prop?.id ? (
                 <Link
                   key={r.id}
                   href={`/app/portfoyler/${prop.id}`}
-                  className="focus-ring press lift group block rounded-[12px] border border-line bg-surface px-3 py-2.5 text-sm hover:border-brand-300"
+                  className="focus-ring press group flex min-h-[44px] rounded-[14px] border border-line bg-surface px-3.5 py-2.5 transition hover:border-brand-300"
                 >
                   {inner}
                 </Link>
               ) : (
-                <div key={r.id} className="group rounded-[12px] border border-line bg-surface px-3 py-2.5 text-sm">
+                <div key={r.id} className="group flex min-h-[44px] rounded-[14px] border border-line bg-surface px-3.5 py-2.5">
                   {inner}
                 </div>
               );

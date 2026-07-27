@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Building2, Info, LineChart, MapPinned, Trophy, TrendingUp, X } from "lucide-react";
+import { ArrowUpRight, Building2, Info, LineChart, MapPinned, Minus, Sparkles, Trophy, TrendingDown, TrendingUp, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DataTable } from "@/components/ui/data-table";
@@ -187,6 +187,66 @@ export default async function RegionAnalysisPage({
     .filter((r): r is typeof r & { multiplier: number } => r.multiplier != null)
     .sort((a, b) => a.multiplier - b.multiplier)
     .slice(0, 3);
+
+  // ---- İçgörü kartları — tamamı mevcut satırlardan türetilir, sahte yok ----
+  const trendHrefOf = (districtId: string) =>
+    `/app/bolge-analizi?tx=${encodeURIComponent(tx)}&months=${months}&district=${districtId}#trend`;
+  const fastestMarket = rows
+    .filter((r) => r.avg_days_listed != null && r.active_count > 0)
+    .sort((a, b) => (a.avg_days_listed as number) - (b.avg_days_listed as number))[0] ?? null;
+  const hottestMarket = rows
+    .filter((r) => r.price_change_pct != null && (r.price_change_pct as number) > 0)
+    .sort((a, b) => (b.price_change_pct as number) - (a.price_change_pct as number))[0] ?? null;
+  const deepestMarket = rows.filter((r) => r.active_count > 0).sort((a, b) => b.active_count - a.active_count)[0] ?? null;
+  const biggestVolume = rows.filter((r) => r.closed_value > 0).sort((a, b) => b.closed_value - a.closed_value)[0] ?? null;
+  const insightCards = [
+    fastestMarket
+      ? {
+          key: "hiz",
+          badge: "En hızlı pazar",
+          district: fastestMarket.district_name,
+          value: `${Math.round(fastestMarket.avg_days_listed as number)} gün`,
+          note: "ortalama listede kalma",
+          href: trendHrefOf(fastestMarket.district_id),
+        }
+      : null,
+    hottestMarket
+      ? {
+          key: "deger",
+          badge: "En çok değer kazanan",
+          district: hottestMarket.district_name,
+          value: `+%${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(hottestMarket.price_change_pct as number)}`,
+          note: `${months} ayda fiyat değişimi`,
+          href: trendHrefOf(hottestMarket.district_id),
+        }
+      : null,
+    deepestMarket
+      ? {
+          key: "derinlik",
+          badge: "En derin pazar",
+          district: deepestMarket.district_name,
+          value: `${deepestMarket.active_count} aktif`,
+          note: "portföy stoğu en geniş ilçe",
+          href: trendHrefOf(deepestMarket.district_id),
+        }
+      : null,
+    biggestVolume
+      ? {
+          key: "hacim",
+          badge: "En yüksek ciro",
+          district: biggestVolume.district_name,
+          value: money(biggestVolume.closed_value),
+          note: `${biggestVolume.closed_count} kapanan işlem`,
+          href: trendHrefOf(biggestVolume.district_id),
+        }
+      : null,
+  ].filter((c): c is NonNullable<typeof c> => c != null);
+
+  // Trend özeti — fiyat değişimi bilinen ilçelerin yön dağılımı
+  const withTrend = rows.filter((r) => r.price_change_pct != null);
+  const risingCount = withTrend.filter((r) => (r.price_change_pct as number) > 0).length;
+  const fallingCount = withTrend.filter((r) => (r.price_change_pct as number) < 0).length;
+  const flatCount = withTrend.length - risingCount - fallingCount;
 
   return (
     <div className="space-y-6">
@@ -406,6 +466,51 @@ export default async function RegionAnalysisPage({
                   <div className="hairline-t pt-1.5 text-[11px] text-text-muted">Teslim alan · ad, soyad, tarih</div>
                 </div>
               </footer>
+            </section>
+          ) : null}
+
+          {insightCards.length > 0 ? (
+            <section className="no-print rounded-[20px] border border-line bg-surface p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
+                    <Sparkles className="h-4 w-4" /> İçgörüler
+                  </p>
+                  <h2 className="mt-1 font-display font-bold text-ink-950">Bölge içgörü kartları</h2>
+                </div>
+                {withTrend.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+                    <span className="flex items-center gap-1 rounded-full bg-mint-500/10 px-2.5 py-1 text-mint-600">
+                      <TrendingUp className="h-3.5 w-3.5" /> {risingCount} ilçe yükselişte
+                    </span>
+                    <span className="flex items-center gap-1 rounded-full bg-danger-500/10 px-2.5 py-1 text-danger-500">
+                      <TrendingDown className="h-3.5 w-3.5" /> {fallingCount} ilçe düşüşte
+                    </span>
+                    {flatCount > 0 ? (
+                      <span className="flex items-center gap-1 rounded-full bg-ink-950/6 px-2.5 py-1 text-text-muted">
+                        <Minus className="h-3.5 w-3.5" /> {flatCount} yatay
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {insightCards.map((c) => (
+                  <Link
+                    key={c.key}
+                    href={c.href}
+                    className="focus-ring press lift group block rounded-[14px] border border-line bg-canvas/60 p-4 transition hover:border-brand-300"
+                  >
+                    <p className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.08em] text-text-faint">
+                      <span>{c.badge}</span>
+                      <ArrowUpRight className="h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                    </p>
+                    <p className="mt-1 truncate text-sm font-semibold text-ink-950 group-hover:text-brand-600">{c.district}</p>
+                    <p className="numeric mt-2 font-display text-2xl font-extrabold text-ink-950">{c.value}</p>
+                    <p className="text-[11px] text-text-muted">{c.note}</p>
+                  </Link>
+                ))}
+              </div>
             </section>
           ) : null}
 

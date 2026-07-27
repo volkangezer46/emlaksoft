@@ -47,7 +47,7 @@ export default async function DefinitionsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlar
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="relative">
           <span className="flex items-center gap-2 text-xs font-semibold text-cyan-400"><ListTree className="h-4 w-4" /> Tanımlar</span>

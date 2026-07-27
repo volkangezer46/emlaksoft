@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Coins, TrendingUp, AlertTriangle, ArrowUpRight, CalendarRange, X } from "lucide-react";
+import { Coins, TrendingUp, AlertTriangle, ArrowUpRight, CalendarRange, Gauge, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
+import { DAY_MS, isPast, msSince } from "@/lib/clock";
 import { listDues } from "@/app/actions/dues";
 import { DuesClient } from "./dues-client";
 
@@ -63,11 +64,17 @@ export default async function AidatPage({
   const properties = (propData ?? []).map((p) => ({ id: p.id as string, property_code: p.property_code as string, title: p.title as string | null }));
 
   // KPI'lar her zaman tüm kayıtlar üzerinden; ?durum= ve ?donem= yalnızca listeyi süzer
-  const now = new Date();
-  const isOverdue = (d: (typeof dues)[number]) => d.status !== "paid" && d.due_date != null && new Date(d.due_date) < now;
+  const isOverdue = (d: (typeof dues)[number]) => d.status !== "paid" && isPast(d.due_date);
   const total = dues.reduce((s, d) => s + Number(d.amount), 0);
   const unpaid = dues.filter((d) => d.status !== "paid").reduce((s, d) => s + Number(d.amount), 0);
-  const overdue = dues.filter(isOverdue).length;
+  const paidAmount = total - unpaid;
+  // Tahsilat oranı — ödenen tutarın toplam tahakkuka oranı (tutar bazlı)
+  const collectionRate = total > 0 ? Math.round((paidAmount / total) * 100) : 0;
+  const overdueDues = dues
+    .filter(isOverdue)
+    .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)));
+  const overdue = overdueDues.length;
+  const overdueTotal = overdueDues.reduce((s, d) => s + Number(d.amount), 0);
 
   // Dönem (ay) filtresi — period tarih kolonu, YYYY-MM öneki eşleştirilir
   const periodDues = donemF ? dues.filter((d) => String(d.period ?? "").slice(0, 7) === donemF) : dues;
@@ -96,7 +103,25 @@ export default async function AidatPage({
             <p className="mt-1 text-sm text-white/70">Portföy bazlı aidat/ortak gider ve ödeme durumu tek yerde.</p>
           </div>
           {/* KPI kartları ?durum= filtresine bağlı: tıklayınca liste süzülür (dönem korunur) */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid w-full grid-cols-2 gap-3 sm:w-auto sm:grid-cols-4">
+            <Link
+              href={href({ durum: "paid" })}
+              aria-current={durumF === "paid" ? "page" : undefined}
+              className={`focus-ring press lift group block rounded-[14px] border p-3 text-center transition hover:border-white/30 ${
+                durumF === "paid" ? "border-white/35 bg-white/12" : "border-white/12 bg-white/8"
+              }`}
+            >
+              <Gauge className="mx-auto h-4 w-4 text-mint-400" />
+              <p className="mt-1 flex items-center justify-center gap-1 font-display text-lg font-extrabold text-white">
+                %{collectionRate}
+                <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
+              </p>
+              <p className="text-[11px] text-white/60">Tahsilat oranı</p>
+              {/* Mini ilerleme çubuğu — tutar bazlı tahsilat */}
+              <div className="mx-auto mt-1.5 h-1 w-full max-w-[72px] overflow-hidden rounded-full bg-white/15">
+                <div className="h-full rounded-full bg-mint-400" style={{ width: `${collectionRate}%` }} />
+              </div>
+            </Link>
             <Link
               href={href({ durum: null })}
               className={`focus-ring press lift group block rounded-[14px] border p-3 text-center transition hover:border-white/30 ${
@@ -141,6 +166,55 @@ export default async function AidatPage({
           </div>
         </div>
       </section>
+
+      {/* Geciken ödemeler şeridi — vadesi geçmiş kayıtlar, en eski vade önce.
+          Kart portföye (varsa) gider; başlık linki listeyi ?durum=overdue süzer. */}
+      {overdue > 0 ? (
+        <section className="overflow-hidden rounded-[18px] border border-danger-500/25 bg-danger-50/60 shadow-[var(--shadow-xs)]">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-danger-500/15 px-4 py-3">
+            <p className="flex items-center gap-2 text-sm font-bold text-danger-600">
+              <AlertTriangle className="h-4 w-4" /> Geciken ödemeler
+              <span className="rounded-full bg-danger-500/10 px-2 py-0.5 text-[11px] font-bold text-danger-600">
+                {overdue} kayıt · {money(overdueTotal)}
+              </span>
+            </p>
+            <Link
+              href={href({ durum: "overdue" })}
+              className="focus-ring inline-flex items-center gap-1 rounded-[8px] text-xs font-semibold text-danger-600 transition hover:text-danger-700 hover:underline"
+            >
+              Tümünü listede gör <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          <div className="flex gap-3 overflow-x-auto px-4 py-3">
+            {overdueDues.slice(0, 8).map((d) => {
+              const prop = Array.isArray(d.property) ? d.property[0] : d.property;
+              const gecikmeGun = d.due_date ? Math.max(1, Math.floor(msSince(`${d.due_date}T00:00:00`) / DAY_MS)) : 0;
+              const target = prop?.id ? `/app/portfoyler/${prop.id}` : href({ durum: "overdue" });
+              return (
+                <Link
+                  key={d.id}
+                  href={target}
+                  className="focus-ring press lift group block min-w-[210px] shrink-0 rounded-[14px] border border-danger-500/20 bg-surface p-3 transition hover:border-danger-500/40"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="truncate text-sm font-semibold text-ink-950">{d.title}</p>
+                    <ArrowUpRight className="hover-action h-3.5 w-3.5 shrink-0 text-text-faint opacity-0 transition group-hover:text-danger-500 group-hover:opacity-100" />
+                  </div>
+                  <p className="mt-0.5 truncate text-[11px] text-text-muted">
+                    {prop ? (prop.title ?? prop.property_code) : "Portföysüz kayıt"}
+                  </p>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className="numeric font-display text-sm font-extrabold text-ink-950">{money(Number(d.amount))}</span>
+                    <span className="rounded-full bg-danger-500/10 px-2 py-0.5 text-[10px] font-bold text-danger-600">
+                      {gecikmeGun} gün gecikti
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
 
       {/* Dönem (ay) filtresi — GET formu (?donem=YYYY-MM); ?durum= korunur */}
       <form action="/app/aidat" className="flex flex-wrap items-center gap-2 rounded-[16px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">

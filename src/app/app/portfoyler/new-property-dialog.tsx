@@ -93,7 +93,7 @@ export function NewPropertyDialog({
           title="Yeni portföy oluştur"
           description="Temel bilgilerle taslak portföy açın."
         />
-        <form ref={formRef} action={submit} className="grid gap-4 p-6 sm:grid-cols-2">
+        <form ref={formRef} action={submit} className="grid gap-4 p-4 sm:grid-cols-2 md:p-6">
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="property-title">Portföy başlığı *</label>
                 <input id="property-title" name="title" required className={fieldClass} placeholder="Örn. Onikişubat Tekerek 4+1" />

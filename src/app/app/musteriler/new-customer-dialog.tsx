@@ -74,7 +74,7 @@ export function NewCustomerDialog({
           title="Yeni müşteri"
           description="Temel bilgilerle müşteri kaydı açın."
         />
-        <form ref={formRef} action={action} className="grid gap-4 p-6 sm:grid-cols-2">
+        <form ref={formRef} action={action} className="grid gap-4 p-4 sm:grid-cols-2 md:p-6">
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="full_name">
                   Ad soyad *

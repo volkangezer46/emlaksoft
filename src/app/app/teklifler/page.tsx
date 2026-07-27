@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { ArrowUpRight, CalendarRange, Tag } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Banknote, CalendarRange, CheckCircle2, Percent, Tag, Timer } from "lucide-react";
+import { now } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
+import { StatCard } from "@/components/app/stat-card";
 import { createClient } from "@/lib/supabase/server";
 import { exportOffersCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
@@ -84,12 +86,12 @@ export default async function TekliflerPage({
       to: next.to === undefined ? to : next.to,
     })}`;
 
-  // Hızlı tarih çipleri — sunucu saatine göre
-  const now = new Date();
+  // Hızlı tarih çipleri — zaman okuması clock.ts üzerinden (tek kaynak)
+  const nowD = new Date(now());
   const presets = [
-    { label: "Bu ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth(), 1)), to: fmtDate(now) },
-    { label: "Geçen ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth() - 1, 1)), to: fmtDate(new Date(now.getFullYear(), now.getMonth(), 0)) },
-    { label: "Son 3 ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth() - 2, 1)), to: fmtDate(now) },
+    { label: "Bu ay", from: fmtDate(new Date(nowD.getFullYear(), nowD.getMonth(), 1)), to: fmtDate(nowD) },
+    { label: "Geçen ay", from: fmtDate(new Date(nowD.getFullYear(), nowD.getMonth() - 1, 1)), to: fmtDate(new Date(nowD.getFullYear(), nowD.getMonth(), 0)) },
+    { label: "Son 3 ay", from: fmtDate(new Date(nowD.getFullYear(), nowD.getMonth() - 2, 1)), to: fmtDate(nowD) },
   ];
 
   const supabase = await createClient();
@@ -110,8 +112,8 @@ export default async function TekliflerPage({
 
   const [{ data: offerData }, { data: statusData }, { data: propData }, { data: custData }] = await Promise.all([
     offerQuery,
-    // KPI sayıları filtreden bağımsız: hero her zaman tüm kümeyi anlatır
-    supabase.from("offers").select("status").limit(1000),
+    // KPI sayıları/tutarları filtreden bağımsız: hero her zaman tüm kümeyi anlatır
+    supabase.from("offers").select("status, amount, counter_amount").limit(1000),
     supabase
       .from("properties")
       .select("id, property_code, title, list_price")
@@ -154,10 +156,37 @@ export default async function TekliflerPage({
     };
   });
 
-  const statuses = (statusData ?? []).map((r) => r.status as string);
-  const totalCount = statuses.length;
-  const pending = statuses.filter((s) => s === "submitted").length;
-  const accepted = statuses.filter((s) => s === "accepted").length;
+  const allOffers = (statusData ?? []).map((r) => ({
+    status: r.status as string,
+    amount: r.amount != null ? Number(r.amount) : null,
+    counter: r.counter_amount != null ? Number(r.counter_amount) : null,
+  }));
+  const totalCount = allOffers.length;
+  const pending = allOffers.filter((o) => o.status === "submitted").length;
+  const accepted = allOffers.filter((o) => o.status === "accepted").length;
+  const rejected = allOffers.filter((o) => o.status === "rejected").length;
+
+  // Tutar KPI'ları — karşı teklif geldiyse masadaki rakam odur
+  const tableValue = (o: { amount: number | null; counter: number | null }) => o.counter ?? o.amount ?? 0;
+  const openVolume = allOffers
+    .filter((o) => o.status === "submitted" || o.status === "countered")
+    .reduce((s, o) => s + tableValue(o), 0);
+  const acceptedVolume = allOffers
+    .filter((o) => o.status === "accepted")
+    .reduce((s, o) => s + tableValue(o), 0);
+  const resolved = accepted + rejected;
+  const acceptRate = resolved ? Math.round((accepted / resolved) * 100) : null;
+  const amounts = allOffers.map((o) => o.amount).filter((v): v is number => v != null && v > 0);
+  const avgOffer = amounts.length ? amounts.reduce((s, v) => s + v, 0) / amounts.length : 0;
+
+  // Durum akışı: taslak → sunuldu → karşı teklif → kabul; kırmızı/gri uçlar ayrı
+  const FLOW: { key: string; icon: typeof Tag }[] = [
+    { key: "draft", icon: Tag },
+    { key: "submitted", icon: Timer },
+    { key: "countered", icon: ArrowRight },
+    { key: "accepted", icon: CheckCircle2 },
+  ];
+  const countOf = (s: string) => allOffers.filter((o) => o.status === s).length;
 
   return (
     <div className="space-y-6">
@@ -201,6 +230,80 @@ export default async function TekliflerPage({
           </div>
         </div>
       </section>
+
+      {totalCount > 0 ? (
+        <>
+          {/* Tutar KPI'ları — filtreden bağımsız, tıklayınca ilgili durum filtresine iner */}
+          <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="Masadaki hacim" value={money(openVolume)} icon={Banknote} tone="neutral" href={href({ durum: "submitted" })} />
+            <StatCard label="Kabul edilen hacim" value={money(acceptedVolume)} icon={CheckCircle2} tone="success" href={href({ durum: "accepted" })} />
+            <StatCard
+              label="Kabul oranı (sonuçlanan)"
+              value={acceptRate != null ? `%${acceptRate}` : "—"}
+              icon={Percent}
+              tone={acceptRate != null && acceptRate >= 50 ? "success" : "warning"}
+              href={href({ durum: "accepted" })}
+            />
+            <StatCard label="Ortalama teklif" value={money(avgOffer)} icon={Tag} tone="neutral" href={href({ durum: null })} />
+          </section>
+
+          {/* Durum akışı — teklif yolculuğu; her adım o durumun filtresine gider */}
+          <section className="rounded-[20px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="mr-2 font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">
+                Durum akışı
+              </h2>
+              {FLOW.map((f, i) => (
+                <span key={f.key} className="flex items-center gap-2">
+                  {i > 0 ? <ArrowRight className="h-3.5 w-3.5 text-text-faint" aria-hidden /> : null}
+                  <Link
+                    href={href({ durum: f.key })}
+                    className={`focus-ring press flex min-h-[40px] items-center gap-1.5 rounded-[11px] border px-3 py-2 text-xs font-semibold transition hover:border-brand-300 ${
+                      durum === f.key ? "border-brand-400/50 bg-brand-600/10 text-brand-600" : "border-line bg-surface text-ink-950"
+                    }`}
+                  >
+                    <f.icon className="h-3.5 w-3.5 text-text-muted" />
+                    {STATUS_LABELS[f.key]}
+                    <span className="numeric rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-extrabold text-ink-950">
+                      {countOf(f.key)}
+                    </span>
+                  </Link>
+                </span>
+              ))}
+              <span className="mx-1 hidden h-4 w-px bg-line sm:block" aria-hidden />
+              {["rejected", "withdrawn"].map((k) => (
+                <Link
+                  key={k}
+                  href={href({ durum: k })}
+                  className={`focus-ring press flex min-h-[40px] items-center gap-1.5 rounded-[11px] border px-3 py-2 text-xs font-semibold transition ${
+                    durum === k
+                      ? "border-danger-500/40 bg-danger-500/10 text-danger-500"
+                      : "border-line bg-surface text-text-muted hover:border-danger-500/30 hover:text-danger-500"
+                  }`}
+                >
+                  {STATUS_LABELS[k]}
+                  <span className="numeric rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-extrabold text-ink-950">{countOf(k)}</span>
+                </Link>
+              ))}
+            </div>
+            {/* Dağılım şeridi — 2px boşluklu segmentler; metin rozetler kimliği zaten taşıyor */}
+            <div className="mt-3 flex h-2.5 gap-0.5 overflow-hidden rounded-[6px]" aria-hidden>
+              {[
+                { key: "draft", cls: "bg-line-strong" },
+                { key: "submitted", cls: "bg-brand-600" },
+                { key: "countered", cls: "bg-amber-400" },
+                { key: "accepted", cls: "bg-mint-500" },
+                { key: "rejected", cls: "bg-danger-500" },
+                { key: "withdrawn", cls: "bg-line" },
+              ]
+                .filter((s) => countOf(s.key) > 0)
+                .map((s) => (
+                  <div key={s.key} className={`h-full ${s.cls}`} style={{ width: `${Math.max(2, (countOf(s.key) / totalCount) * 100)}%` }} />
+                ))}
+            </div>
+          </section>
+        </>
+      ) : null}
 
       {totalCount === 0 ? (
         <EmptyState

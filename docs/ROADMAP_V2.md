@@ -152,8 +152,8 @@ katmanını yükseltip iyileşmenin kendiliğinden yayılmasını sağlamak.
   - [ ] Kapanan işlemler > aktif ilanlar ağırlığı (gerçekleşen fiyat daha değerli)
 - [ ] **D2** Bölge trendi: ilçe/mahalle bazlı ₺/m² zaman serisi
 - [ ] **D3** Değerleme raporu (PDF): emsaller, düzeltmeler, aralık, imza alanı
-- [ ] **D4** Kira çarpanı / getiri (yield) analizi
-- [ ] **D5** Satış süresi tahmini (kendi kapanma verinizden)
+- [x] **D4** Kira çarpanı / getiri (yield) analizi
+- [x] **D5** Satış süresi tahmini (kendi kapanma verinizden)
 - [ ] **D6** Talep-arz ısı haritası (ilçe bazlı talep/portföy dengesi)
 
 ## 5. Hız (P) — "en iyi seviye"
@@ -210,7 +210,7 @@ Araştırıldı. Bizde **olmayan** ve eklenmesi gerekenler:
 - [ ] **R5** Çok dilli ilan: otomatik çeviri (mevcut OpenAI katmanı üzerine)
 - [ ] **R6** Telefon CRM: gelen aramada arayanı tanıma, çağrı sırasında not
 - [ ] **R7** Uluslararası portal yayını (ListGlobally/Properstar sınıfı)
-- [ ] **R8** Franchise/çok markalı ofis yönetimi (route var, içerik zayıf)
+- [x] **R8** Franchise/çok markalı ofis yönetimi (route var, içerik zayıf)
 - [ ] **R9** Referans ağı: ofisler arası müşteri yönlendirme + komisyon
 - [ ] **R10** Mobil: PWA var → push + offline derinleştirme
 
