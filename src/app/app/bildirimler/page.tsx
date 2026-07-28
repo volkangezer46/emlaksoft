@@ -123,7 +123,9 @@ export default async function BildirimlerPage({
       active: !filtersActive,
     },
     {
-      label: "Okunmamış",
+      // Etiket, aşağıdaki filtre çipiyle aynı olmasın: aynı sayfada iki özdeş
+      // bağlantı adı hem erişilebilirlik (ekran okuyucu) hem test açısından belirsiz.
+      label: "Okunmamış bildirim",
       value: unread,
       icon: BellRing,
       href: buildHref({ durum: "okunmamis", tur: null, sayfa: 1 }),

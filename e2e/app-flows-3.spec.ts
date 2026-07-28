@@ -81,20 +81,31 @@ test.describe("Bildirim arsivi (/app/bildirimler)", () => {
 
     // Filtre kontratı: çip tıklanınca URL ?durum=okunmamis olur, sayfa
     // sunucu filtresiyle yeniden render edilir ve çip aktif işaretlenir.
-    const unreadChip = page.getByRole("link", { name: /^Okunmamış/ });
+    /*
+     * Hero'daki KPI kartları ile filtre çipleri AYNI href'lere gider; ad
+     * bazlı seçici ikisini birden yakalayıp strict-mode ihlali doğurur.
+     * Çözüm: çipleri kapsayan `<nav aria-label="Bildirim filtresi">` ile
+     * kapsamlandırmak (uygulama dosyasında zaten var olan yapı — testid yok).
+     * Çip metinleri sayı taşır ("Tümü (12)", "Okunmamış (3)"), sayı sıfırsa
+     * parantez hiç basılmaz; bu yüzden `^` ile başlangıca çapalanmış regex.
+     */
+    const filterNav = page.getByRole("navigation", { name: "Bildirim filtresi" });
+    const unreadChip = filterNav.getByRole("link", { name: /^Okunmamış/ });
+    const allChip = filterNav.getByRole("link", { name: /^Tümü/ });
+
+    await expect(unreadChip).toBeVisible({ timeout: 30_000 });
     await unreadChip.click();
     await expect(page).toHaveURL(/\/app\/bildirimler\?durum=okunmamis/, { timeout: 30_000 });
-    await expect(page.getByRole("link", { name: /^Okunmamış/ })).toHaveAttribute("aria-current", "page", {
-      timeout: 30_000,
-    });
+    await expect(unreadChip).toHaveAttribute("aria-current", "page", { timeout: 30_000 });
     // İçerik esnek: okunmamış satırlar YA DA filtre boş durumu.
     const emptyFiltered = page.getByText("Filtreye uyan bildirim yok");
     const frame = page.getByText("Gelen kutusu", { exact: true });
     await expect(emptyFiltered.or(frame).first()).toBeVisible({ timeout: 30_000 });
 
-    // "Tümü" çipi filtreyi temizler.
-    await page.getByRole("link", { name: "Tümü", exact: true }).click();
+    // "Tümü" çipi filtreyi temizler (aktif filtre yokken aria-current onda).
+    await allChip.click();
     await expect(page).toHaveURL(/\/app\/bildirimler$/, { timeout: 30_000 });
+    await expect(allChip).toHaveAttribute("aria-current", "page", { timeout: 30_000 });
   });
 });
 
@@ -110,11 +121,22 @@ test.describe("Acik ev QR self check-in", () => {
 
     const detailLink = page.locator('a[href^="/app/acik-ev/"][aria-label$="açık ev detayını aç"]');
 
-    // Etkinlik yoksa UI üzerinden gelecek tarihli bir açık ev oluştur —
-    // migration 098 public_token'ı kolon varsayılanıyla üretir.
-    if ((await detailLink.count()) === 0) {
+    /*
+     * HER KOŞUMDA taze (yarın tarihli) açık ev oluşturuyoruz. Önceden "hiç
+     * etkinlik yoksa oluştur" deniyordu; e2e ofisinde eski bir kayıt kalınca
+     * test onu seçiyor ve public sayfa "etkinlik sona erdi" diyerek formu hiç
+     * basmıyordu — yani test verisi bayatlayınca yanlış kırmızı üretiyordu.
+     * Liste `scheduled_at` azalan sıralı olduğundan yeni kayıt en üstte çıkar.
+     * migration 098 public_token'ı kolon varsayılanıyla üretir.
+     */
+    {
       const newBtn = page.getByRole("button", { name: /Yeni açık ev/ }).first();
-      const dialog = page.getByRole("dialog");
+      /*
+       * Diyalog seçicisi başlığa göre daraltılır: Radix Popover (Combobox
+       * açılır listesi) de `role="dialog"` taşır, çıplak getByRole("dialog")
+       * iki öğeye çözülüp strict-mode ihlali veriyordu.
+       */
+      const dialog = page.getByRole("dialog").filter({ hasText: "Yeni açık ev günü" });
       await clickUntilVisible(newBtn, dialog);
 
       // Combobox: tetikleyici → arama → seçenek (popover portal'da, page'den aranır).
@@ -161,6 +183,12 @@ test.describe("Acik ev QR self check-in", () => {
       await pub.goto(publicUrl!);
 
       await expect(pub.getByRole("heading", { name: "Açık ev kaydı" })).toBeVisible({ timeout: 30_000 });
+      /*
+       * Taze kayıt kanıtı: bitmiş etkinlikte public sayfa formu değil "sona
+       * erdi" kutusunu basar ve başlık yine görünür — bu yüzden ayrıca
+       * doğruluyoruz, yoksa bayat veri sessizce yanlış kırmızıya döner.
+       */
+      await expect(pub.getByText(/Bu açık ev etkinliği sona erdi\./)).toHaveCount(0);
 
       // Form alanları: ad soyad + telefon + KVKK onayı.
       const nameInput = pub.locator("#checkin-name");
