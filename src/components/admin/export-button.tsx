@@ -37,7 +37,10 @@ export function ExportButton({
       type="button"
       onClick={run}
       disabled={pending}
-      className="inline-flex items-center gap-2 rounded-[10px] border border-line bg-surface px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-60"
+      /* Koyu hero şeritleri içinde duruyor (tenants/billing/satis). token'lar
+         (text-muted/surface) .theme-dark'ta beyaza döner → beyaz-üstüne-beyaz.
+         Bu yüzden koyu zemine sabit cam-buton stili: her koşulda okunur. */
+      className="inline-flex items-center gap-2 rounded-[10px] border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white backdrop-blur-sm transition hover:border-white/35 hover:bg-white/15 disabled:opacity-60"
     >
       {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
       {label}
