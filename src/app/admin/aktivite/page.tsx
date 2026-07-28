@@ -293,7 +293,7 @@ export default async function AdminActivityPage({
                   <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-3 transition hover:bg-canvas/60 [&::-webkit-details-marker]:hidden">
                     <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-[10px] ${
                       r.isPlatform
-                        ? "bg-violet-500/12 text-violet-600"
+                        ? "bg-cyan-400/15 text-cyan-600"
                         : r.action.startsWith("ops.")
                           ? "bg-amber-400/15 text-amber-600"
                           : "bg-brand-600/8 text-brand-600"

@@ -321,6 +321,32 @@ aside ::selection {
   color: #fff;
 }
 
+/* ---------------------------------------------------------------------------
+   Native <select> açılır listesi — GÜVENLİK AĞI.
+   Koyu hero/şerit içindeki bir <select>'in tetikleyicisi text-white olur; native
+   <option> popup'ı ise beyaz sistem zemininde açılır ve bu beyaz yazıyı miras
+   alınca "beyaz üstüne beyaz" okunmaz metin çıkar. İşletim sistemi popup'ı
+   Tailwind sınıflarını görmediği için çözüm global: her option/optgroup açık
+   zemin + koyu ink yazı taşısın. Açık zemindeki select'ler zaten böyleydi;
+   bu kural onları bozmaz, yalnızca koyu bağlamdakileri kurtarır. */
+option,
+optgroup {
+  background-color: #fff;
+  color: var(--ink-950);
+}
+
+/* Native tarih/saat/select ikonları ve popup'ı açık şema izlesin — koyu hero
+   içindeki input'larda tarayıcının koyu-şema varsayımıyla oluşan düşük kontrast
+   önlenir. */
+select,
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"] {
+  color-scheme: light;
+}
+
 /* Scrollbar — Firefox dahil; koyu kapsamda açık gri thumb sırıtmasın diye
    track saydam, thumb padding-box ile içeriden boşluklu. */
 * { scrollbar-width: thin; scrollbar-color: #c7d0e0 transparent; }

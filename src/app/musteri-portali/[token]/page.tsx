@@ -68,13 +68,13 @@ export default async function CustomerPortalPage({
 
   if (!data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4">
+      <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
         <div className="max-w-sm text-center">
-          <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-red-50">
-            <UserRound className="h-8 w-8 text-red-400" />
+          <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-danger-500/10">
+            <UserRound className="h-8 w-8 text-danger-500" />
           </div>
-          <h1 className="font-bold text-lg text-zinc-900">Bağlantı geçersiz veya süresi dolmuş</h1>
-          <p className="mt-2 text-sm text-zinc-500">
+          <h1 className="font-display text-lg font-bold text-ink-950">Bağlantı geçersiz veya süresi dolmuş</h1>
+          <p className="mt-2 text-sm text-text-muted">
             Bu portal linki artık geçerli değil. Danışmanınızla iletişime geçin.
           </p>
         </div>
@@ -165,15 +165,15 @@ export default async function CustomerPortalPage({
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50">
+    <div className="min-h-screen bg-canvas">
       {/* Header */}
-      <header className="border-b border-zinc-200 bg-white px-4 py-4">
+      <header className="border-b border-line bg-surface px-4 py-4">
         <div className="mx-auto max-w-3xl flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">{tenant.name}</p>
-            <h1 className="mt-0.5 font-bold text-zinc-900">Müşteri Paneli</h1>
+            <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">{tenant.name}</p>
+            <h1 className="mt-0.5 font-display font-extrabold text-ink-950">Müşteri Paneli</h1>
           </div>
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-bold text-white">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[image:var(--grad-brand)] text-sm font-bold text-white">
             {customer.fullName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}
           </div>
         </div>
@@ -181,43 +181,47 @@ export default async function CustomerPortalPage({
 
       <main className="mx-auto max-w-3xl space-y-6 p-4 py-6">
         {/* Karşılama + danışman iletişimi */}
-        <section className="rounded-2xl bg-zinc-900 p-5 text-white">
-          <p className="text-sm text-zinc-400">Hoş geldiniz,</p>
-          <h2 className="mt-1 text-xl font-bold">{customer.fullName}</h2>
-          <p className="mt-1 text-sm text-zinc-400">
-            {advisor?.full_name
-              ? `Danışmanınız ${advisor.full_name} arayışınızı sizin için takip ediyor.`
-              : `${tenant.name} danışmanınız arayışınızı sizin için takip ediyor.`}
-          </p>
-          {/* Butonlar danışmana gider — müşterinin kendi numarası değil */}
-          {(advisorTel || advisorWhatsApp) && (
-            <div className="mt-4 grid grid-cols-2 gap-2.5">
-              {advisorTel && (
-                <a
-                  href={advisorTel}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-zinc-900 transition hover:bg-zinc-100"
-                >
-                  <Phone className="h-4 w-4" /> Danışmanı Ara
-                </a>
-              )}
-              {advisorWhatsApp && (
-                <a
-                  href={advisorWhatsApp}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-4 py-2.5 text-sm font-bold text-emerald-300 transition hover:bg-emerald-500/25"
-                >
-                  <MessageCircle className="h-4 w-4" /> WhatsApp
-                </a>
-              )}
-            </div>
-          )}
+        <section className="theme-dark relative overflow-hidden rounded-[20px] bg-[image:var(--grad-ink)] p-5 text-white shadow-[var(--shadow-lg)]">
+          <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
+          <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-brand-600/25 blur-[90px]" />
+          <div className="relative">
+            <p className="text-sm text-white/55">Hoş geldiniz,</p>
+            <h2 className="mt-1 font-display text-xl font-extrabold">{customer.fullName}</h2>
+            <p className="mt-1 text-sm text-white/60">
+              {advisor?.full_name
+                ? `Danışmanınız ${advisor.full_name} arayışınızı sizin için takip ediyor.`
+                : `${tenant.name} danışmanınız arayışınızı sizin için takip ediyor.`}
+            </p>
+            {/* Butonlar danışmana gider — müşterinin kendi numarası değil */}
+            {(advisorTel || advisorWhatsApp) && (
+              <div className="mt-4 grid grid-cols-2 gap-2.5">
+                {advisorTel && (
+                  <a
+                    href={advisorTel}
+                    className="btn-shine inline-flex items-center justify-center gap-2 rounded-[12px] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 transition hover:bg-white/90"
+                  >
+                    <Phone className="h-4 w-4" /> Danışmanı Ara
+                  </a>
+                )}
+                {advisorWhatsApp && (
+                  <a
+                    href={advisorWhatsApp}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 rounded-[12px] border border-mint-400/30 bg-mint-500/10 px-4 py-2.5 text-sm font-bold text-mint-300 transition hover:bg-mint-500/20"
+                  >
+                    <MessageCircle className="h-4 w-4" /> WhatsApp
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
         </section>
 
         {/* Eşleşen portföyler */}
         {matches.length > 0 && (
           <section>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-zinc-900">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950">
               <Star className="h-4 w-4 text-amber-500" /> Size Özel Portföyler
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -264,31 +268,31 @@ export default async function CustomerPortalPage({
                         />
                       </div>
                     ) : (
-                      <div className="grid aspect-[16/9] w-full place-items-center bg-zinc-100 text-zinc-300">
+                      <div className="grid aspect-[16/9] w-full place-items-center bg-canvas text-text-faint">
                         <Building2 className="h-8 w-8" />
                       </div>
                     )}
                     <div className="p-4">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="text-sm font-semibold text-zinc-900">{m.property.title ?? m.property.code}</p>
+                          <p className="text-sm font-semibold text-ink-950">{m.property.title ?? m.property.code}</p>
                           {m.property.province && (
-                            <p className="mt-0.5 flex items-center gap-1 text-xs text-zinc-500">
+                            <p className="mt-0.5 flex items-center gap-1 text-xs text-text-muted">
                               <MapPin className="h-3 w-3" /> {m.property.province}
                             </p>
                           )}
                         </div>
                         {m.score && (
-                          <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                          <span className="shrink-0 rounded-full bg-mint-500/12 px-2 py-0.5 text-[11px] font-bold text-mint-700">
                             %{m.score} eşleşme
                           </span>
                         )}
                       </div>
                       {m.property.price && (
-                        <p className="mt-2 text-sm font-bold text-zinc-900">{money(m.property.price)}</p>
+                        <p className="mt-2 text-sm font-bold text-ink-950">{money(m.property.price)}</p>
                       )}
                       {href && (
-                        <p className="mt-1.5 text-[11px] font-semibold text-blue-600">İlan detayını görüntüle →</p>
+                        <p className="mt-1.5 text-[11px] font-semibold text-brand-600">İlan detayını görüntüle →</p>
                       )}
                     </div>
                   </>
@@ -298,10 +302,10 @@ export default async function CustomerPortalPage({
                 return (
                   <div
                     key={m.id}
-                    className={`overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition ${
+                    className={`overflow-hidden rounded-[14px] border border-line bg-surface shadow-[var(--shadow-xs)] transition ${
                       verdict === "disliked"
                         ? "opacity-60 saturate-50"
-                        : "hover:border-blue-300 hover:shadow-md"
+                        : "hover:border-brand-300 hover:shadow-[var(--shadow-sm)]"
                     }`}
                   >
                     {href ? (
@@ -325,27 +329,27 @@ export default async function CustomerPortalPage({
         {/* Aktif talepler */}
         {demands.length > 0 && (
           <section>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-zinc-900">
-              <Search className="h-4 w-4 text-blue-600" /> Arayışlarım
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950">
+              <Search className="h-4 w-4 text-brand-600" /> Arayışlarım
             </h3>
             <div className="space-y-2">
               {demands.map((d) => (
-                <div key={d.id} className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
+                <div key={d.id} className="flex items-center justify-between rounded-[14px] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
                   <div>
-                    <p className="text-sm font-semibold text-zinc-900">
+                    <p className="text-sm font-semibold text-ink-950">
                       {DEMAND_TYPE_LABELS[d.type] ?? d.type}
                       {d.province ? ` — ${d.province}` : ""}
                     </p>
                     {(d.minPrice || d.maxPrice) && (
-                      <p className="mt-0.5 text-xs text-zinc-500">
+                      <p className="mt-0.5 text-xs text-text-muted">
                         {d.minPrice ? money(d.minPrice) : "—"} – {d.maxPrice ? money(d.maxPrice) : "—"}
                       </p>
                     )}
                   </div>
                   <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
                     d.status === "active"
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-zinc-100 text-zinc-500"
+                      ? "bg-mint-500/12 text-mint-700"
+                      : "bg-canvas text-text-muted"
                   }`}>
                     {d.status === "active" ? "Aktif" : d.status}
                   </span>
@@ -358,32 +362,32 @@ export default async function CustomerPortalPage({
         {/* Yaklaşan randevular */}
         {appointments.length > 0 && (
           <section>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-zinc-900">
-              <CalendarDays className="h-4 w-4 text-purple-600" /> Yaklaşan Randevularım
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950">
+              <CalendarDays className="h-4 w-4 text-brand-600" /> Yaklaşan Randevularım
             </h3>
             <div className="space-y-2">
               {appointments.map((a) => (
-                <div key={a.id} className="rounded-xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
+                <div key={a.id} className="rounded-[14px] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
                   <div className="flex items-center gap-3">
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-purple-50 text-purple-600">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-brand-600/10 text-brand-600">
                       <CalendarDays className="h-4 w-4" />
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-zinc-900">{APPT_TYPE_LABELS[a.type] ?? a.type}</p>
-                      <p className="text-xs text-zinc-500">{formatDate(a.scheduledAt)}</p>
+                      <p className="text-sm font-semibold text-ink-950">{APPT_TYPE_LABELS[a.type] ?? a.type}</p>
+                      <p className="text-xs text-text-muted">{formatDate(a.scheduledAt)}</p>
                       {a.location && (
-                        <p className="flex items-center gap-1 text-xs text-zinc-400">
+                        <p className="flex items-center gap-1 text-xs text-text-faint">
                           <MapPin className="h-3 w-3" /> {a.location}
                         </p>
                       )}
                     </div>
                     <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                      a.status === "confirmed" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                      a.status === "confirmed" ? "bg-mint-500/12 text-mint-700" : "bg-amber-400/15 text-amber-700"
                     }`}>
                       {a.status === "confirmed" ? "Onaylandı" : "Teyit Bekliyor"}
                     </span>
                   </div>
-                  <div className="mt-2 flex justify-end border-t border-zinc-100 pt-2">
+                  <div className="mt-2 flex justify-end border-t border-line pt-2">
                     <AddToCalendarButton
                       event={{
                         uid:         a.id,
@@ -402,15 +406,15 @@ export default async function CustomerPortalPage({
 
         {/* Boş durum */}
         {matches.length === 0 && demands.length === 0 && appointments.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-zinc-300 bg-white py-12 text-center">
-            <CheckCircle2 className="mx-auto h-10 w-10 text-zinc-300" />
-            <p className="mt-3 font-semibold text-zinc-600">Henüz kayıt yok</p>
-            <p className="mt-1 text-sm text-zinc-400">Danışmanınız bilgileri güncellediğinde burada görünecek.</p>
+          <div className="rounded-[20px] border border-dashed border-line bg-surface py-12 text-center">
+            <CheckCircle2 className="mx-auto h-10 w-10 text-text-faint" />
+            <p className="mt-3 font-semibold text-text-muted">Henüz kayıt yok</p>
+            <p className="mt-1 text-sm text-text-faint">Danışmanınız bilgileri güncellediğinde burada görünecek.</p>
           </div>
         )}
 
         {/* Footer */}
-        <p className="text-center text-xs text-zinc-400 pb-4">
+        <p className="text-center text-xs text-text-faint pb-4">
           Bu sayfa {tenant.name} tarafından sizin için oluşturulmuştur.
           <br />EmlakSoft ile güçlendirilmiştir.
         </p>

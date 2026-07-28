@@ -599,7 +599,7 @@ export default async function ReportsPage() {
           <p className="text-xs text-text-muted">Talep × portföy skorları</p>
         </Link>
         <Link href="/app/degerleme" className="lift rounded-[16px] border border-line bg-surface p-4 hover:border-brand-400">
-          <Gauge className="h-4 w-4 text-violet-600" />
+          <Gauge className="h-4 w-4 text-cyan-600" />
           <p className="mt-2 font-display font-bold">Değerleme</p>
           <p className="text-xs text-text-muted">Endeksa · Tapusor</p>
         </Link>

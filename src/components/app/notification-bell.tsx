@@ -26,7 +26,7 @@ const KIND_META: Record<string, { icon: LucideIcon; cls: string }> = {
   success: { icon: CheckCircle2, cls: "bg-mint-500/12 text-mint-600" },
   warning: { icon: AlertTriangle, cls: "bg-amber-400/15 text-amber-600" },
   danger: { icon: AlertOctagon, cls: "bg-danger-500/10 text-danger-500" },
-  system: { icon: Settings, cls: "bg-violet-500/12 text-violet-600" },
+  system: { icon: Settings, cls: "bg-cyan-400/12 text-cyan-600" },
   info: { icon: Info, cls: "bg-brand-600/10 text-brand-600" },
 };
 

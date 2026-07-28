@@ -34,7 +34,7 @@ export function OfferActions({
       <div className="flex flex-wrap items-center gap-2">
         <ConfirmDialog
           trigger={
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+            <Button size="sm" className="bg-mint-600 hover:bg-mint-700">
               <Check className="h-3.5 w-3.5" /> Kabul et
             </Button>
           }
@@ -48,7 +48,7 @@ export function OfferActions({
         />
         <ConfirmDialog
           trigger={
-            <Button size="sm" variant="secondary" className="text-red-600 hover:bg-red-50">
+            <Button size="sm" variant="secondary" className="text-danger-600 hover:bg-danger-500/10">
               <X className="h-3.5 w-3.5" /> Reddet
             </Button>
           }
@@ -61,7 +61,7 @@ export function OfferActions({
           hiddenFields={{ token, offer_id: offerId, decision: "rejected" }}
         />
       </div>
-      {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-xs font-semibold text-danger-600">{error}</p>}
     </div>
   );
 }

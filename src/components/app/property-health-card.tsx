@@ -8,8 +8,8 @@ import {
 import type { PropertyHealthScore, ListingQualityScore } from "@/lib/property-health";
 
 const GRADE_STYLES: Record<string, { ring: string; badge: string; label: string }> = {
-  A: { ring: "stroke-emerald-500",  badge: "bg-emerald-50 text-emerald-700",  label: "Mükemmel" },
-  B: { ring: "stroke-brand-500",    badge: "bg-blue-50 text-blue-700",        label: "İyi" },
+  A: { ring: "stroke-mint-500",  badge: "bg-mint-50 text-mint-700",  label: "Mükemmel" },
+  B: { ring: "stroke-brand-500",    badge: "bg-brand-50 text-brand-700",        label: "İyi" },
   C: { ring: "stroke-amber-400",    badge: "bg-amber-50 text-amber-700",      label: "Orta" },
   D: { ring: "stroke-orange-500",   badge: "bg-orange-50 text-orange-700",    label: "Zayıf" },
   F: { ring: "stroke-red-500",      badge: "bg-red-50 text-red-700",          label: "Kritik" },

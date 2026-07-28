@@ -16,9 +16,9 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 /** Tür etiketleri + rozet stilleri — migration'daki check listesiyle birebir. */
 const KIND_META: Record<DealCostKind, { label: string; badge: string }> = {
   kapora: { label: "Kapora", badge: "bg-mint-500/10 text-mint-700 ring-mint-600/20" },
-  tapu_harci: { label: "Tapu harcı", badge: "bg-blue-50 text-blue-700 ring-blue-600/20" },
+  tapu_harci: { label: "Tapu harcı", badge: "bg-brand-50 text-brand-700 ring-brand-600/20" },
   ekspertiz: { label: "Ekspertiz", badge: "bg-amber-50 text-amber-700 ring-amber-600/20" },
-  komisyon_dis: { label: "Dış komisyon", badge: "bg-purple-50 text-purple-700 ring-purple-600/20" },
+  komisyon_dis: { label: "Dış komisyon", badge: "bg-cyan-50 text-cyan-700 ring-cyan-600/20" },
   diger: { label: "Diğer", badge: "bg-zinc-100 text-zinc-600 ring-zinc-500/10" },
 };
 

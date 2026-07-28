@@ -226,7 +226,7 @@ export function TapusorKeyForm({
   return (
     <section className="rounded-[20px] border border-line bg-surface p-5">
       <div className="flex items-center justify-between gap-3">
-        <p className="flex items-center gap-2 text-xs font-semibold text-violet-600">
+        <p className="flex items-center gap-2 text-xs font-semibold text-cyan-600">
           <MapPinned className="h-4 w-4" /> EDİ değerleme &amp; yatırım puanı
         </p>
         <StatusBadge configured={configured} />

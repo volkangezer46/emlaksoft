@@ -254,7 +254,7 @@ export default async function AdminSystemPage() {
             </div>
             <div className="flex items-center justify-between rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5">
               <span className="flex items-center gap-1.5 text-sm font-semibold text-ink-950">
-                <MapPinned className="h-3.5 w-3.5 text-violet-600" /> Tapusor (EDİ + yatırım puanı)
+                <MapPinned className="h-3.5 w-3.5 text-mint-600" /> Tapusor (EDİ + yatırım puanı)
               </span>
               <StatusPill ok={tapusorConfigured} okLabel="Bağlı" badLabel="Bekliyor" />
             </div>

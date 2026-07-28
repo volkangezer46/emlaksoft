@@ -40,14 +40,14 @@ const channelIcon = (channel: string, direction: string) => {
 
 const channelColor = (channel: string) => {
   const map: Record<string, string> = {
-    call:      "bg-blue-50 text-blue-600",
-    whatsapp:  "bg-emerald-50 text-emerald-600",
-    sms:       "bg-cyan-50 text-cyan-600",
-    email:     "bg-amber-50 text-amber-600",
-    meeting:   "bg-purple-50 text-purple-600",
-    note:      "bg-zinc-100 text-zinc-500",
+    call:      "bg-brand-600/10 text-brand-600",
+    whatsapp:  "bg-mint-500/12 text-mint-700",
+    sms:       "bg-cyan-400/12 text-cyan-600",
+    email:     "bg-amber-400/15 text-amber-700",
+    meeting:   "bg-ink-950/[0.07] text-ink-800",
+    note:      "bg-canvas text-text-muted",
   };
-  return map[channel] ?? "bg-zinc-100 text-zinc-500";
+  return map[channel] ?? "bg-canvas text-text-muted";
 };
 
 function authorName(p: CommRow["created_by"]) {
@@ -213,10 +213,10 @@ export function CommunicationTimeline({
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-bold text-ink-950">{channelDef?.label ?? item.channel}</span>
                     {item.direction === "inbound" && (
-                      <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[11px] font-semibold text-blue-600">Gelen</span>
+                      <span className="rounded-full bg-brand-600/10 px-1.5 py-0.5 text-[11px] font-semibold text-brand-600">Gelen</span>
                     )}
                     {outcomeDef && (
-                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">{outcomeDef.label}</span>
+                      <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-medium text-text-muted">{outcomeDef.label}</span>
                     )}
                     {item.duration_sec && (
                       <span className="flex items-center gap-1 text-[11px] text-text-faint">

@@ -333,7 +333,7 @@ export default function PersonelPage() {
       {/* Aktif personel */}
       <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
         <div className="flex items-center gap-2 border-b border-line px-5 py-3.5">
-          <ShieldCheck className="h-4 w-4 text-amber-500" />
+          <ShieldCheck className="h-4 w-4 text-amber-600" />
           <h2 className="font-display font-bold text-ink-950">Aktif personel</h2>
           <span className="ml-auto rounded-full bg-brand-600/10 px-2.5 py-0.5 text-[11px] font-bold text-brand-600">{active.length}</span>
         </div>

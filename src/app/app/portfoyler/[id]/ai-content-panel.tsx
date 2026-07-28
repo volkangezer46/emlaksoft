@@ -41,12 +41,12 @@ export function AiContentPanel({ propertyId }: { propertyId: string }) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
         <div>
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-            <Wand2 className="h-4 w-4 text-violet-600" /> AI içerik motoru
+            <Wand2 className="h-4 w-4 text-cyan-600" /> AI içerik motoru
           </h2>
           <p className="text-xs text-text-muted">İlan, WhatsApp, sosyal medya ve e-posta metnini tek tıkla üret.</p>
         </div>
         {source ? (
-          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${source === "ai" ? "bg-violet-500/12 text-violet-600" : "bg-ink-950/8 text-text-muted"}`}>
+          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${source === "ai" ? "bg-cyan-400/12 text-cyan-600" : "bg-ink-950/8 text-text-muted"}`}>
             {source === "ai" ? "AI üretti" : "Akıllı şablon"}
           </span>
         ) : null}
@@ -61,7 +61,7 @@ export function AiContentPanel({ propertyId }: { propertyId: string }) {
               onClick={() => run(t.key)}
               disabled={pending}
               className={`inline-flex items-center gap-1.5 rounded-[10px] border px-3 py-2 text-xs font-semibold transition disabled:opacity-60 ${
-                tab === t.key ? "border-violet-400/50 bg-violet-500/10 text-violet-700" : "border-line bg-canvas text-ink-950 hover:border-brand-300"
+                tab === t.key ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-700" : "border-line bg-canvas text-ink-950 hover:border-brand-300"
               }`}
             >
               <t.icon className="h-3.5 w-3.5" /> {t.label}
@@ -79,7 +79,7 @@ export function AiContentPanel({ propertyId }: { propertyId: string }) {
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={10}
-              className="w-full rounded-[12px] border border-line bg-canvas p-4 text-sm leading-relaxed text-ink-950 outline-none focus:border-violet-400"
+              className="w-full rounded-[12px] border border-line bg-canvas p-4 text-sm leading-relaxed text-ink-950 outline-none focus:border-cyan-400"
             />
             <button
               type="button"

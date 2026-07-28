@@ -440,7 +440,7 @@ export default async function VitrinPage({
                 Kriterlerinizi paylaşın; {tenant.name} uzman danışmanı size en uygun portföyleri sunsun.
               </p>
             </div>
-            <div className="bg-[#071a38] p-6 sm:p-8">
+            <div className="theme-dark bg-[#071a38] p-6 sm:p-8">
               {tenant.lead_capture_enabled !== false && tenant.lead_capture_token ? (
                 <LeadForm token={tenant.lead_capture_token} provinces={provinces ?? []} vitrinSlug={slug} />
               ) : (

@@ -739,7 +739,7 @@ export default async function CustomersPage({
             type="submit"
             name="sort"
             value={sortF === "hot" ? "" : "hot"}
-            className={`inline-flex items-center gap-1 rounded-[10px] px-3 py-2 text-xs font-semibold transition ${sortF === "hot" ? "bg-rose-500/15 text-rose-600 ring-1 ring-rose-500/25" : "border border-line text-text-muted hover:border-rose-400 hover:text-rose-600"}`}
+            className={`inline-flex items-center gap-1 rounded-[10px] px-3 py-2 text-xs font-semibold transition ${sortF === "hot" ? "bg-danger-500/15 text-danger-500 ring-1 ring-danger-500/25" : "border border-line text-text-muted hover:border-danger-500/50 hover:text-danger-500"}`}
             title="Bu sayfadaki kayıtları lead skoruna göre sırala"
           >
             🔥 Sıcak önce{hotCount > 0 ? ` · ${hotCount}` : ""}

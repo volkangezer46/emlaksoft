@@ -65,7 +65,7 @@ export default async function VitrinFavorilerPage({ params }: { params: Promise<
             </span>
           </Link>
           <h1 className="mt-5 flex items-center gap-2 font-display text-2xl font-extrabold sm:text-3xl">
-            <Heart className="h-6 w-6 fill-red-500 text-red-500" /> Favorilerim
+            <Heart className="h-6 w-6 fill-danger-500 text-danger-500" /> Favorilerim
           </h1>
           <p className="mt-1 max-w-xl text-sm text-white/60">
             Beğendiğiniz portföyler bu cihazda saklanır — hesap gerekmez.

@@ -475,7 +475,7 @@ function RiskCard({ risk }: { risk: Awaited<ReturnType<typeof detectLostSaleRisk
               href={toWhatsAppLink(risk.phone) ?? "#"}
               target="_blank"
               rel="noreferrer"
-              className="grid h-8 w-8 place-items-center rounded-[8px] border border-line bg-surface text-emerald-600 transition hover:bg-emerald-50"
+              className="grid h-8 w-8 place-items-center rounded-[8px] border border-line bg-surface text-mint-600 transition hover:bg-mint-50"
               title="WhatsApp"
               aria-label="WhatsApp"
             >

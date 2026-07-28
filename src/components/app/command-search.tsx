@@ -36,7 +36,7 @@ const kindMeta: Record<SearchHit["kind"], { label: string; icon: typeof Users; t
   customer: { label: "Müşteri", icon: Users, tone: "text-brand-600 bg-brand-600/10" },
   property: { label: "Portföy", icon: Building2, tone: "text-mint-600 bg-mint-500/12" },
   demand: { label: "Talep", icon: Target, tone: "text-cyan-600 bg-cyan-400/12" },
-  deal: { label: "Anlaşma", icon: Handshake, tone: "text-violet-600 bg-violet-500/12" },
+  deal: { label: "Anlaşma", icon: Handshake, tone: "text-cyan-600 bg-cyan-400/12" },
   task: { label: "Görev", icon: ListChecks, tone: "text-amber-600 bg-amber-400/15" },
   ticket: { label: "Destek", icon: LifeBuoy, tone: "text-amber-600 bg-amber-400/15" },
 };

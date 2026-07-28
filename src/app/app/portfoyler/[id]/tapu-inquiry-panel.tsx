@@ -37,7 +37,7 @@ export function TapuInquiryPanel({
   return (
     <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
       <div className="flex items-center gap-2">
-        <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-violet-500/12 text-violet-600">
+        <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-cyan-400/12 text-cyan-600">
           <Landmark className="h-4 w-4" />
         </span>
         <div>
@@ -67,7 +67,7 @@ export function TapuInquiryPanel({
               type="button"
               onClick={run}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 rounded-[10px] bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-[10px] bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Landmark className="h-4 w-4" />}
               Sorgula
@@ -94,7 +94,7 @@ export function TapuInquiryPanel({
               </div>
               <div className="rounded-[12px] border border-line bg-canvas p-3">
                 <p className="flex items-center gap-1 text-[11px] text-text-muted"><TrendingUp className="h-3 w-3" /> Yatırım skoru</p>
-                <p className="font-display text-lg font-extrabold text-violet-600">{result.insight.investmentScore ?? "—"}<span className="text-xs text-text-faint">/100</span></p>
+                <p className="font-display text-lg font-extrabold text-cyan-600">{result.insight.investmentScore ?? "—"}<span className="text-xs text-text-faint">/100</span></p>
               </div>
               <div className="rounded-[12px] border border-line bg-canvas p-3">
                 <p className="text-[11px] text-text-muted">12 aylık fiyat değişimi</p>

@@ -493,7 +493,7 @@ export default async function PropertyDetailPage({
 
       <section className="rounded-[20px] border border-line bg-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="flex items-center gap-2 text-xs font-semibold text-violet-600">
+          <p className="flex items-center gap-2 text-xs font-semibold text-cyan-600">
             <Sparkles className="h-4 w-4" /> Endeksa &amp; Tapusor derin değerleme
           </p>
           <Link
@@ -513,8 +513,8 @@ export default async function PropertyDetailPage({
               <p className="text-[11px] text-text-muted">{endeksaOn ? "Canlı — değerlemede otomatik kullanılır" : "Bağlantı bekliyor (ENDEKSA_CLIENT_ID)"}</p>
             </div>
           </div>
-          <div className={`flex items-center gap-3 rounded-[12px] border px-3 py-2.5 ${tapusorOn ? "border-violet-400/30 bg-violet-400/5" : "border-line bg-canvas/60"}`}>
-            <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-[10px] ${tapusorOn ? "bg-violet-500/15 text-violet-700" : "bg-ink-950/6 text-text-faint"}`}>
+          <div className={`flex items-center gap-3 rounded-[12px] border px-3 py-2.5 ${tapusorOn ? "border-cyan-400/30 bg-cyan-400/5" : "border-line bg-canvas/60"}`}>
+            <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-[10px] ${tapusorOn ? "bg-cyan-400/15 text-cyan-700" : "bg-ink-950/6 text-text-faint"}`}>
               <MapPinned className="h-4 w-4" />
             </span>
             <div className="min-w-0">

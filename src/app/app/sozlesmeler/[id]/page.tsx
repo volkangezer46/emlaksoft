@@ -32,8 +32,8 @@ const TYPE_LABELS: Record<string, string> = {
 
 const STATUS_STYLES: Record<string, { cls: string; icon: React.ReactNode; label: string }> = {
   draft:    { cls: "bg-zinc-100 text-zinc-600", icon: <Clock className="h-3.5 w-3.5" />, label: "Taslak" },
-  sent:     { cls: "bg-blue-50 text-blue-700",  icon: <FileSignature className="h-3.5 w-3.5" />, label: "Gönderildi" },
-  signed:   { cls: "bg-emerald-50 text-emerald-700", icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "İmzalandı" },
+  sent:     { cls: "bg-brand-50 text-brand-700",  icon: <FileSignature className="h-3.5 w-3.5" />, label: "Gönderildi" },
+  signed:   { cls: "bg-mint-50 text-mint-700", icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "İmzalandı" },
   rejected: { cls: "bg-red-50 text-red-700",    icon: <XCircle className="h-3.5 w-3.5" />, label: "Reddedildi" },
   cancelled:{ cls: "bg-zinc-50 text-zinc-500",  icon: <XCircle className="h-3.5 w-3.5" />, label: "İptal" },
 };

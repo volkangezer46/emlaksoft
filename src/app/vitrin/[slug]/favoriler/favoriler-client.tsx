@@ -107,7 +107,7 @@ export function FavorilerClient({ slug }: { slug: string }) {
   return (
     <>
       {unpublished > 0 ? (
-        <p className="mb-5 rounded-[14px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
+        <p className="mb-5 rounded-[14px] border border-amber-300/50 bg-amber-400/12 px-4 py-3 text-xs font-medium text-amber-700">
           {unpublished} favori ilan artık yayında değil — satılmış ya da yayından kaldırılmış olabilir.
         </p>
       ) : null}

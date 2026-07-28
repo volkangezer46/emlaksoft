@@ -48,7 +48,7 @@ export function MatchFeedback({
     "inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold transition disabled:opacity-60";
 
   return (
-    <div className="border-t border-zinc-100 px-4 py-3">
+    <div className="border-t border-line px-4 py-3">
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -57,8 +57,8 @@ export function MatchFeedback({
           onClick={() => send("liked")}
           className={`${base} ${
             verdict === "liked"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-              : "border-zinc-200 bg-white text-zinc-500 hover:border-emerald-200 hover:text-emerald-600"
+              ? "border-mint-500/25 bg-mint-500/12 text-mint-700"
+              : "border-line bg-surface text-text-muted hover:border-mint-400/40 hover:text-mint-600"
           }`}
         >
           {pending && verdict === "liked" ? (
@@ -75,8 +75,8 @@ export function MatchFeedback({
           onClick={() => send("disliked")}
           className={`${base} ${
             verdict === "disliked"
-              ? "border-red-200 bg-red-50 text-red-600"
-              : "border-zinc-200 bg-white text-zinc-500 hover:border-red-200 hover:text-red-500"
+              ? "border-danger-500/25 bg-danger-500/10 text-danger-600"
+              : "border-line bg-surface text-text-muted hover:border-danger-500/30 hover:text-danger-500"
           }`}
         >
           {pending && verdict === "disliked" ? (
@@ -87,7 +87,7 @@ export function MatchFeedback({
           İlgilenmiyorum
         </button>
       </div>
-      {error && <p className="mt-2 text-[11px] font-semibold text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-[11px] font-semibold text-danger-600">{error}</p>}
     </div>
   );
 }

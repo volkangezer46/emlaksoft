@@ -45,9 +45,9 @@ const DEAL_STAGE_LABELS: Record<string, string> = {
 };
 
 const STATUS_STYLE: Record<string, string> = {
-  accepted: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
+  accepted: "bg-mint-50 text-mint-700 ring-mint-600/20",
   rejected: "bg-red-50 text-red-700 ring-red-600/20",
-  submitted: "bg-blue-50 text-blue-700 ring-blue-600/20",
+  submitted: "bg-brand-50 text-brand-700 ring-brand-600/20",
   countered: "bg-amber-50 text-amber-700 ring-amber-600/20",
   draft: "bg-zinc-100 text-zinc-600 ring-zinc-500/10",
   withdrawn: "bg-zinc-50 text-zinc-500 ring-zinc-400/10",
@@ -67,7 +67,7 @@ function diffMoney(n: number) {
 const SIDE_LABELS: Record<string, string> = { buyer: "Alıcı", seller: "Satıcı" };
 
 const SIDE_STYLE: Record<string, string> = {
-  buyer: "bg-blue-50 text-blue-700 ring-blue-600/20",
+  buyer: "bg-brand-50 text-brand-700 ring-brand-600/20",
   seller: "bg-amber-50 text-amber-700 ring-amber-600/20",
 };
 
@@ -328,7 +328,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
                   return (
                     <li key={round.id} className="relative">
                       <span
-                        className={`absolute -left-[26px] top-1.5 h-2.5 w-2.5 rounded-full ${round.side === "buyer" ? "bg-blue-600" : "bg-amber-500"}`}
+                        className={`absolute -left-[26px] top-1.5 h-2.5 w-2.5 rounded-full ${round.side === "buyer" ? "bg-brand-600" : "bg-amber-500"}`}
                         aria-hidden
                       />
                       <div className="flex flex-wrap items-center gap-2">
@@ -420,7 +420,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
               </li>
               {offer.submitted_at ? (
                 <li className="flex items-start gap-2.5">
-                  <Tag className="mt-0.5 h-4 w-4 text-blue-600" />
+                  <Tag className="mt-0.5 h-4 w-4 text-brand-600" />
                   <div><p className="font-medium text-ink-950">Sunuldu</p><p className="text-xs text-text-muted">{dateTime(offer.submitted_at)}</p></div>
                 </li>
               ) : null}
