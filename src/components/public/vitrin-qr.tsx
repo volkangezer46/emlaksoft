@@ -14,7 +14,20 @@ import { Download, Loader2, Printer, QrCode } from "lucide-react";
  * dürüst tercih: goqr.me (api.qrserver.com) harici servisi. Vitrin adresi
  * (zaten herkese açık URL) bu servise iletilir; kişisel veri gönderilmez.
  */
-export function VitrinQr({ vitrinUrl }: { vitrinUrl: string }) {
+export function VitrinQr({
+  vitrinUrl,
+  heading = "Vitrin QR kodu",
+  hint = "Ofis camına, kartvizite veya ilan afişine basın — tarayan herkes vitrin sayfanıza ulaşır.",
+  emptyHint = "QR kodu üretmek için önce ofisinizin vitrin adresi (slug) tanımlı olmalı.",
+  fileName = "vitrin-qr.png",
+}: {
+  vitrinUrl: string;
+  /** Başlık — bileşen danışman kartvizitinde de kullanılıyor (/app/ekip/kartvizitim). */
+  heading?: string;
+  hint?: string;
+  emptyHint?: string;
+  fileName?: string;
+}) {
   const [downloading, setDownloading] = useState(false);
 
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=2&format=png&data=${encodeURIComponent(vitrinUrl)}`;
@@ -30,7 +43,7 @@ export function VitrinQr({ vitrinUrl }: { vitrinUrl: string }) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "vitrin-qr.png";
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -47,10 +60,10 @@ export function VitrinQr({ vitrinUrl }: { vitrinUrl: string }) {
     const w = window.open("", "_blank", "noopener,noreferrer,width=480,height=640");
     if (!w) return;
     w.document.write(`<!doctype html>
-<html lang="tr"><head><meta charset="utf-8"><title>Vitrin QR kodu</title>
+<html lang="tr"><head><meta charset="utf-8"><title>${heading}</title>
 <style>body{font-family:system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;gap:16px}img{width:320px;height:320px}p{font-size:13px;color:#333;max-width:360px;text-align:center;word-break:break-all}</style>
 </head><body>
-<img src="${qrPrintSrc}" alt="Vitrin QR kodu" onload="setTimeout(function(){window.print()},150)">
+<img src="${qrPrintSrc}" alt="${heading}" onload="setTimeout(function(){window.print()},150)">
 <p>${vitrinUrl}</p>
 </body></html>`);
     w.document.close();
@@ -60,11 +73,9 @@ export function VitrinQr({ vitrinUrl }: { vitrinUrl: string }) {
     return (
       <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-          <QrCode className="h-4 w-4 text-brand-600" /> Vitrin QR kodu
+          <QrCode className="h-4 w-4 text-brand-600" /> {heading}
         </h2>
-        <p className="mt-2 text-xs text-text-muted">
-          QR kodu üretmek için önce ofisinizin vitrin adresi (slug) tanımlı olmalı.
-        </p>
+        <p className="mt-2 text-xs text-text-muted">{emptyHint}</p>
       </section>
     );
   }
@@ -74,11 +85,9 @@ export function VitrinQr({ vitrinUrl }: { vitrinUrl: string }) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-            <QrCode className="h-4 w-4 text-brand-600" /> Vitrin QR kodu
+            <QrCode className="h-4 w-4 text-brand-600" /> {heading}
           </h2>
-          <p className="mt-1 max-w-md text-xs text-text-muted">
-            Ofis camına, kartvizite veya ilan afişine basın — tarayan herkes vitrin sayfanıza ulaşır.
-          </p>
+          <p className="mt-1 max-w-md text-xs text-text-muted">{hint}</p>
           <code className="mt-3 block w-fit max-w-full truncate rounded-[10px] border border-line bg-canvas px-3 py-2 text-xs text-ink-950">
             {vitrinUrl}
           </code>
@@ -101,7 +110,7 @@ export function VitrinQr({ vitrinUrl }: { vitrinUrl: string }) {
             </button>
           </div>
           <p className="mt-3 text-[11px] text-text-faint">
-            QR görseli harici bir servisle (goqr.me) üretilir; yalnızca herkese açık vitrin adresiniz iletilir.
+            QR görseli harici bir servisle (goqr.me) üretilir; yalnızca herkese açık bu adres iletilir.
           </p>
         </div>
         <div className="rounded-[14px] border border-line bg-white p-3">

@@ -32,10 +32,16 @@ export async function GET(
     return NextResponse.json({ error: "İndirme başarısız" }, { status: 500 });
   }
 
+  // Belge Merkezi (/app/belgeler) önizlemesi için inline mod: ?onizle=1
+  // Varsayılan davranış (attachment) bilinçli olarak değiştirilmedi —
+  // müşteri detayındaki mevcut "indir" bağlantıları aynı kalsın.
+  const inline = new URL(req.url).searchParams.get("onizle") === "1";
+
   return new NextResponse(blob, {
     headers: {
       "Content-Type": file.file_type,
-      "Content-Disposition": `attachment; filename="${encodeURIComponent(file.file_name)}"`,
+      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.file_name)}`,
+      "Cache-Control": "private, no-store",
     },
   });
 }

@@ -9,7 +9,8 @@ import { SavedSearchBox } from "@/components/public/saved-search-box";
 import { FavChip, FavEmptyNotice, VitrinCardShell } from "@/components/public/vitrin-fav";
 import { FavNavBadge } from "./fav-nav-badge";
 import { CompareBar } from "@/components/public/compare-select";
-import { DAY_MS, msSince } from "@/lib/clock";
+import { DAY_MS, msSince, now } from "@/lib/clock";
+import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 
 /** Son 7 günde yayına giren ilan "Yeni" rozeti alır (published_at gerçek yayın damgası). */
 function isNewListing(publishedAt: string | null): boolean {
@@ -143,7 +144,7 @@ export default async function VitrinPage({
   else query = query.order("created_at", { ascending: false });
 
   // Oda filtresi seçenekleri yayındaki gerçek değerlerden türetilir → ana sorguyla paralel
-  const [{ data: propsData }, { data: roomRows }] = await Promise.all([
+  const [{ data: propsData }, { data: roomRows }, fxRates] = await Promise.all([
     query.limit(60),
     admin
       .from("properties")
@@ -152,7 +153,12 @@ export default async function VitrinPage({
       .eq("status", "live")
       .is("deleted_at", null)
       .limit(200),
+    // Döviz karşılığı sunucuda hesaplanır — ISR (revalidate=120) korunur.
+    fetchLatestRates(admin),
   ]);
+
+  // Kur tarihi ipucu — kartlardaki döviz satırının `title` değeri.
+  const fxTitle = fxRates ? `TCMB ${fxRates.rateDate} satış kuru — ${fxAgeLabel(fxRates.rateDate, now())}` : undefined;
 
   const txFilter = sp.tx === "satilik" ? "sale" : sp.tx === "kiralik" ? "rent" : null;
 
@@ -391,6 +397,11 @@ export default async function VitrinPage({
                     <p className="mt-3 font-display text-xl font-extrabold text-brand-600">
                       {money(p.list_price != null ? Number(p.list_price) : null, p.transaction_type)}
                     </p>
+                    {/* Döviz karşılığı — kur yoksa hiç gösterilmez */}
+                    {(() => {
+                      const line = fxApproxLine(p.list_price != null ? Number(p.list_price) : null, fxRates);
+                      return line ? <p className="mt-0.5 text-[11px] text-text-faint" title={fxTitle}>{line}</p> : null;
+                    })()}
                   </div>
                 </Link>
                 </VitrinCardShell>

@@ -22,7 +22,6 @@ import {
   Sparkles,
   TrendingUp,
   UserCheck,
-  Users,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -33,6 +32,7 @@ import { SavedViews } from "@/components/app/saved-views";
 import { NewCustomerDialog } from "./new-customer-dialog";
 import { getDefinitions } from "@/lib/definitions";
 import { CustomerRowDelete } from "./customer-row-delete";
+import { CustomerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import {
   CustomerBulkBar,
   CustomerBulkProvider,
@@ -49,6 +49,8 @@ import {
   type HeatSegment,
 } from "@/lib/customer-heat";
 import { StatCard } from "@/components/app/stat-card";
+import { EmptyState } from "@/components/app/empty-state";
+import { ICONS } from "@/lib/icons";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { fetchTenantTags } from "./tenant-tags";
 
@@ -550,15 +552,19 @@ export default async function CustomersPage({
           {canCreate ? <NewCustomerDialog provinces={provinceList} branches={branchList} types={customerTypeValues} /> : null}
         </div>
         <div className="relative mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="stagger-grid grid grid-cols-3 gap-3">
             {/* KPI'lar filtre formunun kendi parametreleriyle listeye iner: tip
                 sayımları sabit "Alıcı"/"Mülk sahibi" etiketleriyle yapıldığından
                 linkler de aynı değerleri kullanır. Sayılar head-count
                 sorgularından gelir — sayfa dilimi değil, gerçek toplamlar. */}
             {[
-              { label: "Toplam kayıt", value: totalAll ?? 0, icon: Users, href: "/app/musteriler" },
+              // İkonografi: "müşteri" kavramı her ekranda ICONS.musteri (Users).
+              // "Mülk sahibi" MapPin (konum ikonu) ile çiziliyordu — kavramla
+              // ilgisi yoktu; portföy sahipliğini anlatan ICONS.portfoy ile
+              // değiştirildi.
+              { label: "Toplam kayıt", value: totalAll ?? 0, icon: ICONS.musteri, href: "/app/musteriler" },
               { label: "Aktif alıcı", value: buyerCount ?? 0, icon: UserCheck, href: `/app/musteriler?type=${encodeURIComponent("Alıcı")}` },
-              { label: "Mülk sahibi", value: ownerCount ?? 0, icon: MapPin, href: `/app/musteriler?type=${encodeURIComponent("Mülk sahibi")}` },
+              { label: "Mülk sahibi", value: ownerCount ?? 0, icon: ICONS.portfoy, href: `/app/musteriler?type=${encodeURIComponent("Mülk sahibi")}` },
             ].map((item) => (
               <Link
                 key={item.label}
@@ -810,29 +816,26 @@ export default async function CustomersPage({
       </div>
 
       {(totalAll ?? 0) === 0 ? (
-        <div className="grid place-items-center rounded-[16px] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
-          <div className="grid h-14 w-14 place-items-center rounded-full bg-brand-600/10">
-            <Users className="h-7 w-7 text-brand-600" />
-          </div>
-          <h2 className="mt-4 font-display text-lg font-bold text-ink-950">
-            Henüz müşteri yok
-          </h2>
-          <p className="mt-1 max-w-sm text-sm text-text-muted">
-            İlk müşterinizi ekleyin. Arayan, mülk sahibi ve yatırımcıları tek
-            yerde toplayın; hiçbir talebi kaçırmayın.
-          </p>
-          {canCreate ? (
-            <div className="mt-5">
-              <NewCustomerDialog provinces={provinceList} branches={branchList} types={customerTypeValues} />
-            </div>
-          ) : null}
-        </div>
+        <EmptyState
+          icon={ICONS.musteri}
+          illustration="start"
+          title="Henüz müşteri yok"
+          description="İlk müşterinizi ekleyin. Arayan, mülk sahibi ve yatırımcıları tek yerde toplayın; hiçbir talebi kaçırmayın."
+          action={
+            canCreate
+              ? { node: <NewCustomerDialog provinces={provinceList} branches={branchList} types={customerTypeValues} /> }
+              : undefined
+          }
+          secondary={{ href: "/app/gelen-kutusu", label: "Gelen kutusundan aktar" }}
+        />
       ) : rows.length === 0 ? (
-        <div className="grid place-items-center rounded-[18px] border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
-          <Search className="h-8 w-8 text-text-faint" />
-          <h2 className="mt-3 font-display text-lg font-bold text-ink-950">Eşleşen müşteri bulunamadı</h2>
-          <p className="mt-1 text-sm text-text-muted">Arama ifadenizi değiştirip tekrar deneyin.</p>
-        </div>
+        <EmptyState
+          icon={Search}
+          illustration="search"
+          title="Eşleşen müşteri bulunamadı"
+          description="Arama ifadenizi ya da filtreleri değiştirip tekrar deneyin."
+          secondary={{ href: "/app/musteriler", label: "Filtreleri temizle" }}
+        />
       ) : (
         /* key: sayfa/filtre değişince client seçim state'i sıfırlanır —
            önceki sayfadan kalan bayat id'lerle toplu işlem yapılmasın */
@@ -992,6 +995,16 @@ export default async function CustomersPage({
                     </TD>
                     <TD>
                       <div className="relative z-10 flex items-center justify-end gap-1">
+                        {/* Müşteri portalı linki — createCustomerPortalToken'ın
+                            tek girişi. Action customers.edit istiyor, buton da
+                            aynı kapıyla gösterilir. */}
+                        {canEdit ? (
+                          <CustomerPortalLinkButton
+                            customerId={c.id}
+                            customerName={c.full_name}
+                            phone={c.phone}
+                          />
+                        ) : null}
                         {canDelete ? <CustomerRowDelete customerId={c.id} name={c.full_name} /> : null}
                         <span className="grid h-8 w-8 place-items-center rounded-[9px] text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
                           <ArrowUpRight className="h-4 w-4" />

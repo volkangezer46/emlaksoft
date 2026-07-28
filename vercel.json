@@ -67,6 +67,14 @@
     {
       "path": "/api/cron/vitrin-alarm",
       "schedule": "30 10 * * *"
+    },
+    {
+      "path": "/api/cron/anahtar-gecikme",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/lig-snapshot",
+      "schedule": "0 2 1 * *"
     }
   ]
 }

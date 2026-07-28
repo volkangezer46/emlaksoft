@@ -73,6 +73,9 @@ export async function uploadPropertyMedia(formData: FormData): Promise<MediaResu
       file_size: file.size,
       is_cover: (imageCount ?? 0) === 0,
       sort_order: count ?? 0,
+      // Filigran istemcide (canvas) basılır; bayrak yalnızca izlenebilirlik için
+      // taşınır — sunucu görselin içeriğini değiştirmez.
+      has_watermark: String(formData.get("has_watermark") ?? "") === "1",
       uploaded_by: gate.userId,
     })
     .select("id")
@@ -179,6 +182,154 @@ export async function setCoverPropertyMedia(formData: FormData): Promise<void> {
   await supabase.from("property_media").update({ is_cover: false }).eq("property_id", propertyId).eq("tenant_id", gate.tenantId);
   await supabase.from("property_media").update({ is_cover: true }).eq("id", id).eq("tenant_id", gate.tenantId);
   revalidatePath(`/app/portfoyler/${propertyId}`);
+}
+
+// ---------------------------------------------------------------------------
+// Toplu işlemler: sürükle-bırak sıralama + çoklu silme
+// ---------------------------------------------------------------------------
+
+/** Gelen id listesini tenant'a ait, bu portföye bağlı ve tekil id'lere indirger. */
+async function ownedMediaIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  tenantId: string,
+  propertyId: string,
+  ids: string[],
+): Promise<string[]> {
+  const clean = Array.from(new Set(ids.map((i) => String(i ?? "").trim()).filter(Boolean))).slice(0, 500);
+  if (clean.length === 0) return [];
+  const { data } = await supabase
+    .from("property_media")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("property_id", propertyId)
+    .in("id", clean);
+  const owned = new Set((data ?? []).map((r) => r.id as string));
+  // Sıra korunmalı — gelen dizinin sırası yeni sort_order'dır
+  return clean.filter((id) => owned.has(id));
+}
+
+/**
+ * Galeri sırasını (sürükle-bırak sonucu) toplu günceller.
+ * `orderedIds` yeni sıradır; listede olmayan medya (video/tur bağlantıları)
+ * dokunulmadan kalır. Kapak seçimi bu işlemden etkilenmez.
+ */
+export async function reorderPropertyMedia(
+  propertyId: string,
+  orderedIds: string[],
+): Promise<MediaResult> {
+  const gate = await requirePermission("properties", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const pid = String(propertyId ?? "").trim();
+  if (!pid) return { error: "Portföy bulunamadı." };
+
+  const supabase = await createClient();
+  const ids = await ownedMediaIds(supabase, gate.tenantId, pid, orderedIds ?? []);
+  if (ids.length === 0) return { error: "Sıralanacak görsel bulunamadı." };
+
+  // Supabase JS'te tek sorguda "case when" yok; kayıt sayısı (galeri) küçük
+  // olduğundan paralel update yeterli — hepsi aynı tenant/portföy filtresiyle.
+  const results = await Promise.all(
+    ids.map((id, index) =>
+      supabase
+        .from("property_media")
+        .update({ sort_order: index })
+        .eq("id", id)
+        .eq("tenant_id", gate.tenantId)
+        .eq("property_id", pid),
+    ),
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) {
+    console.error("reorderPropertyMedia", failed.error);
+    return { error: "Sıralama kaydedilemedi." };
+  }
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "property_media.reorder",
+    entityType: "property",
+    entityId: pid,
+    newValue: { count: ids.length },
+  });
+
+  revalidatePath(`/app/portfoyler/${pid}`);
+  return { ok: true };
+}
+
+/**
+ * Seçili görselleri toplu siler (storage + kayıt).
+ * Silinenler arasında kapak varsa, kalan ilk görsel otomatik kapak yapılır —
+ * portföy asla kapaksız kalmaz.
+ */
+export async function bulkDeletePropertyMedia(
+  propertyId: string,
+  ids: string[],
+): Promise<MediaResult & { deleted?: number }> {
+  const gate = await requirePermission("properties", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const pid = String(propertyId ?? "").trim();
+  if (!pid) return { error: "Portföy bulunamadı." };
+
+  const supabase = await createClient();
+  const owned = await ownedMediaIds(supabase, gate.tenantId, pid, ids ?? []);
+  if (owned.length === 0) return { error: "Silinecek görsel seçilmedi." };
+
+  const { data: rows } = await supabase
+    .from("property_media")
+    .select("id, storage_path, is_cover")
+    .eq("tenant_id", gate.tenantId)
+    .in("id", owned);
+
+  const paths = (rows ?? []).map((r) => r.storage_path).filter(Boolean) as string[];
+  if (paths.length > 0) {
+    const admin = createAdminClient();
+    await admin.storage.from("property-media").remove(paths);
+  }
+
+  const { error } = await supabase
+    .from("property_media")
+    .delete()
+    .eq("tenant_id", gate.tenantId)
+    .in("id", owned);
+  if (error) {
+    console.error("bulkDeletePropertyMedia", error);
+    return { error: "Görseller silinemedi." };
+  }
+
+  // Kapak silindiyse kalan ilk görseli kapak yap
+  if ((rows ?? []).some((r) => r.is_cover)) {
+    const { data: next } = await supabase
+      .from("property_media")
+      .select("id")
+      .eq("tenant_id", gate.tenantId)
+      .eq("property_id", pid)
+      .eq("kind", "image")
+      .order("sort_order", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (next?.id) {
+      await supabase
+        .from("property_media")
+        .update({ is_cover: true })
+        .eq("id", next.id)
+        .eq("tenant_id", gate.tenantId);
+    }
+  }
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "property_media.bulk_delete",
+    entityType: "property",
+    entityId: pid,
+    newValue: { count: owned.length },
+  });
+
+  revalidatePath(`/app/portfoyler/${pid}`);
+  return { ok: true, deleted: owned.length };
 }
 
 // ---------------------------------------------------------------------------

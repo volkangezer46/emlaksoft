@@ -17,6 +17,14 @@ import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { AddToCalendarButton } from "@/components/app/add-to-calendar-button";
 import { MatchFeedback } from "./match-feedback";
 import { CompareBar, CompareToggle } from "@/components/public/compare-select";
+import {
+  PortalContactBar,
+  PortalEmpty,
+  PortalFooterNote,
+  PortalInvalidLink,
+  PortalSection,
+  PortalStickySpacer,
+} from "@/components/public/portal-kit";
 import type { MatchFeedbackVerdict } from "@/app/actions/customer-portal-feedback";
 
 export const metadata = {
@@ -68,17 +76,10 @@ export default async function CustomerPortalPage({
 
   if (!data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
-        <div className="max-w-sm text-center">
-          <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-danger-500/10">
-            <UserRound className="h-8 w-8 text-danger-500" />
-          </div>
-          <h1 className="font-display text-lg font-bold text-ink-950">Bağlantı geçersiz veya süresi dolmuş</h1>
-          <p className="mt-2 text-sm text-text-muted">
-            Bu portal linki artık geçerli değil. Danışmanınızla iletişime geçin.
-          </p>
-        </div>
-      </div>
+      <PortalInvalidLink
+        icon={UserRound}
+        description="Bu portal linki artık geçerli değil. Danışmanınızla iletişime geçin."
+      />
     );
   }
 
@@ -166,15 +167,18 @@ export default async function CustomerPortalPage({
 
   return (
     <div className="min-h-screen bg-canvas">
-      {/* Header */}
-      <header className="border-b border-line bg-surface px-4 py-4">
-        <div className="mx-auto max-w-3xl flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">{tenant.name}</p>
-            <h1 className="mt-0.5 font-display font-extrabold text-ink-950">Müşteri Paneli</h1>
+      {/* Header — malik paneliyle aynı kurumsal bant (iki portal tek dil konuşsun) */}
+      <header className="theme-dark border-b border-white/10 bg-[image:var(--grad-ink)] px-4 py-4 text-white">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-semibold uppercase tracking-wider text-mint-400">{tenant.name}</p>
+            <h1 className="mt-0.5 font-display font-extrabold">Müşteri Paneli</h1>
           </div>
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[image:var(--grad-brand)] text-sm font-bold text-white">
-            {customer.fullName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}
+          <div
+            aria-hidden="true"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-sm font-bold text-white"
+          >
+            {customer.fullName.split(" ").map((p) => p[0]).join("").slice(0, 2).toLocaleUpperCase("tr-TR")}
           </div>
         </div>
       </header>
@@ -220,10 +224,7 @@ export default async function CustomerPortalPage({
 
         {/* Eşleşen portföyler */}
         {matches.length > 0 && (
-          <section>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950">
-              <Star className="h-4 w-4 text-amber-500" /> Size Özel Portföyler
-            </h3>
+          <PortalSection id="portfoyler" icon={Star} iconClassName="text-amber-500" title="Size Özel Portföyler">
             <div className="grid gap-3 sm:grid-cols-2">
               {matches.map((m) => {
                 const coverId = coverMap.get(m.id);
@@ -323,15 +324,12 @@ export default async function CustomerPortalPage({
               })}
             </div>
             <CompareBar />
-          </section>
+          </PortalSection>
         )}
 
         {/* Aktif talepler */}
         {demands.length > 0 && (
-          <section>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950">
-              <Search className="h-4 w-4 text-brand-600" /> Arayışlarım
-            </h3>
+          <PortalSection id="arayislar" icon={Search} title="Arayışlarım">
             <div className="space-y-2">
               {demands.map((d) => (
                 <div key={d.id} className="flex items-center justify-between rounded-[14px] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
@@ -356,15 +354,12 @@ export default async function CustomerPortalPage({
                 </div>
               ))}
             </div>
-          </section>
+          </PortalSection>
         )}
 
         {/* Yaklaşan randevular */}
         {appointments.length > 0 && (
-          <section>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950">
-              <CalendarDays className="h-4 w-4 text-brand-600" /> Yaklaşan Randevularım
-            </h3>
+          <PortalSection id="randevular" icon={CalendarDays} title="Yaklaşan Randevularım">
             <div className="space-y-2">
               {appointments.map((a) => (
                 <div key={a.id} className="rounded-[14px] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
@@ -401,24 +396,28 @@ export default async function CustomerPortalPage({
                 </div>
               ))}
             </div>
-          </section>
+          </PortalSection>
         )}
 
         {/* Boş durum */}
         {matches.length === 0 && demands.length === 0 && appointments.length === 0 && (
-          <div className="rounded-[20px] border border-dashed border-line bg-surface py-12 text-center">
-            <CheckCircle2 className="mx-auto h-10 w-10 text-text-faint" />
-            <p className="mt-3 font-semibold text-text-muted">Henüz kayıt yok</p>
-            <p className="mt-1 text-sm text-text-faint">Danışmanınız bilgileri güncellediğinde burada görünecek.</p>
-          </div>
+          <PortalEmpty
+            icon={CheckCircle2}
+            title="Henüz kayıt yok"
+            hint="Danışmanınız arayışınızı, size özel portföyleri ve randevularınızı buraya ekledikçe bu sayfa dolacak."
+          />
         )}
 
-        {/* Footer */}
-        <p className="text-center text-xs text-text-faint pb-4">
-          Bu sayfa {tenant.name} tarafından sizin için oluşturulmuştur.
-          <br />EmlakSoft ile güçlendirilmiştir.
-        </p>
+        <PortalFooterNote office={tenant.name} />
+        <PortalStickySpacer active={Boolean(advisorTel || advisorWhatsApp)} />
       </main>
+
+      {/* Mobilde alta yapışan iletişim çubuğu — uzun sayfada danışman erişimi kaybolmasın */}
+      <PortalContactBar
+        telHref={advisorTel}
+        whatsAppHref={advisorWhatsApp}
+        callLabel={advisor?.full_name ? "Danışmanı Ara" : "Ofisi Ara"}
+      />
     </div>
   );
 }

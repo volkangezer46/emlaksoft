@@ -219,6 +219,10 @@ export async function listComparableDetails(
  */
 export const COMPARABLES_SOURCE_NAME = "__emsal_dokumu";
 
+// `isInternalSource` kuralı lib/valuation-sources.ts'te (bu dosya `server-only`;
+// kural saf ve test edilebilir kalsın diye ayrı tutuldu).
+export { isInternalSource } from "@/lib/valuation-sources";
+
 export type ComparablesSourceEntry = {
   name: typeof COMPARABLES_SOURCE_NAME;
   weight: 0;

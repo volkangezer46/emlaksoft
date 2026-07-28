@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -8,7 +9,9 @@ import {
   CalendarClock,
   Gauge,
   Handshake,
+  HeartHandshake,
   ListChecks,
+  MessageSquareQuote,
   Tag,
   TrendingUp,
   User,
@@ -18,11 +21,20 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { computeDealScore, scoreGap } from "@/lib/deal-score";
-import type { DealCost, DealNote } from "@/app/actions/deals";
-import type { ChecklistItem } from "@/app/actions/deal-checklist";
-import { DealCostsSection } from "./deal-costs-section";
-import { DealNotesSection } from "./deal-notes-section";
-import { DealChecklistSection } from "./deal-checklist-section";
+import {
+  ChecklistLoader,
+  ChecklistSkeleton,
+  CostsLoader,
+  CostsSkeleton,
+  NotesLoader,
+  NotesSkeleton,
+} from "./sections";
+/*
+ * Anket üretme + link kopyalama client bileşenleri memnuniyet raporunda zaten
+ * var; YENİDEN YAZILMADI, aynen import edildi (o dosyaya dokunulmadı). Aksi
+ * halde aynı davranışın iki kopyası ayrışmaya başlar.
+ */
+import { CopySurveyLinkButton, CreateSurveyButton } from "../../raporlar/memnuniyet/survey-actions";
 
 export const metadata = { title: "Anlaşma detayı" };
 
@@ -80,8 +92,14 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   // RLS kiracı dışını zaten göstermiyor; burada yalnızca "yok" durumu.
   if (!deal) notFound();
 
-  const [{ data: property }, { data: customer }, { data: assignee }, { data: commissions }, { data: tasks }] =
-    await Promise.all([
+  const [
+    { data: property },
+    { data: customer },
+    { data: assignee },
+    { data: commissions },
+    { data: tasks },
+    { data: survey },
+  ] = await Promise.all([
       deal.property_id
         ? supabase
             .from("properties")
@@ -112,6 +130,17 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         .eq("deal_id", id)
         .order("due_at", { ascending: true })
         .limit(20),
+      /*
+       * Memnuniyet anketi (surveys — migration 104). Yalnız kazanılan anlaşmada
+       * anlamlı; unique(deal_id) sayesinde en fazla bir satır olur.
+       */
+      deal.stage === "won"
+        ? supabase
+            .from("surveys")
+            .select("id, score, status, comment, public_token, sent_at, answered_at")
+            .eq("deal_id", id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
 
   /*
@@ -157,63 +186,11 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   ]);
 
   /*
-   * İşlem dosyası kalemleri (deal_costs — migration 20260726000069).
-   * Tablo henüz oluşmadıysa sorgu hata döner; data null kalır ve bölüm
-   * boş listeyle render edilir — sayfa asla kırılmaz.
+   * Evrak dosyası, işlem dosyası ve not akışı ARTIK BURADA ÇEKİLMİYOR.
+   * Üçü de künyeden ve birbirinden bağımsızdı ama ardışık üç `await` olarak
+   * duruyor, sayfayı üç ekstra gidiş-dönüş kadar geciktiriyorlardı.
+   * `./sections.tsx` içinde kendi `<Suspense>` sınırlarında akıyorlar.
    */
-  const { data: costRows } = await supabase
-    .from("deal_costs")
-    .select("id, kind, label, amount, paid, paid_at, notes, created_at")
-    .eq("deal_id", id)
-    .order("created_at", { ascending: true });
-  const islemDosyasi = (costRows as DealCost[] | null) ?? [];
-
-  /*
-   * Evrak kontrol listesi (deal_checklist_items — migration 20260727000103).
-   * done_by profil join'i işaretleyenin adı için; tablo yoksa data null kalır
-   * ve bölüm boş listeyle render edilir — sayfa kırılmaz.
-   */
-  const { data: checklistRows } = await supabase
-    .from("deal_checklist_items")
-    .select("id, label, is_required, is_done, done_at, note, sort_order, done_by:profiles(full_name)")
-    .eq("deal_id", id)
-    .order("sort_order", { ascending: true });
-  const evraklar: ChecklistItem[] = (checklistRows ?? []).map((r) => {
-    const doneBy = rel(r.done_by as { full_name?: string } | { full_name?: string }[] | null);
-    return {
-      id: r.id as string,
-      label: r.label as string,
-      is_required: Boolean(r.is_required),
-      is_done: Boolean(r.is_done),
-      done_at: (r.done_at as string | null) ?? null,
-      done_by_name: doneBy?.full_name ?? null,
-      note: (r.note as string | null) ?? null,
-      sort_order: Number(r.sort_order ?? 0),
-    };
-  });
-
-  /*
-   * Not/yorum akışı (deal_notes — migration 20260726000094). Kronolojik
-   * (eski → yeni); yazar adı profiles join'inden. Tablo yoksa data null
-   * kalır ve bölüm boş akışla render edilir — sayfa kırılmaz.
-   */
-  const { data: noteRows } = await supabase
-    .from("deal_notes")
-    .select("id, body, author_id, created_at, author:profiles(full_name)")
-    .eq("deal_id", id)
-    .order("created_at", { ascending: true })
-    .limit(200);
-  const notlar: DealNote[] = (noteRows ?? []).map((n) => {
-    const author = n.author as { full_name?: string } | { full_name?: string }[] | null;
-    const a = rel(author);
-    return {
-      id: n.id as string,
-      body: n.body as string,
-      author_id: (n.author_id as string | null) ?? null,
-      author_name: a?.full_name ?? null,
-      created_at: n.created_at as string,
-    };
-  });
 
   const stageIdx = STAGES.findIndex((s) => s.key === deal.stage);
   const kayip = deal.stage === "lost";
@@ -238,6 +215,35 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
       : null;
 
   const canSeeCommission = (perms.commissions ?? []).includes("view");
+
+  /*
+   * Memnuniyet anketi kutusu — createSurveyForDeal action'ı reports.view VE
+   * commissions.view ister; butonu göstermeden önce aynı çizgiyi burada da
+   * çekiyoruz ki kullanıcı basıp yetki hatası yemesin.
+   */
+  const surveyRow = survey as {
+    id: string;
+    score: number | null;
+    status: string;
+    comment: string | null;
+    public_token: string;
+    sent_at: string;
+    answered_at: string | null;
+  } | null;
+  const canCreateSurvey = (perms.reports ?? []).includes("view") && canSeeCommission;
+  const surveyUrl = surveyRow
+    ? `${(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "")}/anket/${surveyRow.public_token}`
+    : null;
+  const surveyAnswered = Boolean(surveyRow && surveyRow.status === "answered" && surveyRow.score != null);
+  // NPS eşikleri: 9-10 destekleyen, 7-8 pasif, 0-6 kötüleyen (bkz. migration 104)
+  const surveyTone =
+    surveyAnswered && surveyRow
+      ? (surveyRow.score as number) >= 9
+        ? { label: "Destekleyen", cls: "bg-mint-500/12 text-mint-600 ring-mint-500/30" }
+        : (surveyRow.score as number) >= 7
+          ? { label: "Pasif", cls: "bg-amber-400/15 text-amber-600 ring-amber-400/30" }
+          : { label: "Kötüleyen", cls: "bg-danger-500/10 text-danger-500 ring-danger-500/30" }
+      : null;
 
   /*
    * Sistem tahmini (X8). `deals.probability` YALNIZCA asamadan turetiliyordu
@@ -419,6 +425,65 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         </section>
       ) : null}
 
+      {/*
+        Memnuniyet anketi — yalnız kazanılan anlaşmada. Anket kapanışın son
+        halkasıydı ama yalnız rapor sayfasından üretilebiliyordu; danışman
+        anlaşmayı kapattığı yerde tek tıkla üretebilsin.
+      */}
+      {kazanildi ? (
+        <section className="surface-card rounded-[var(--radius-panel)] p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                <HeartHandshake className="h-4 w-4 text-mint-600" /> Memnuniyet anketi
+              </h2>
+              <p className="mt-0.5 text-[11px] text-text-faint">
+                Tek soruluk 0-10 anketi. SMS gönderilmez — linki müşteriye siz iletirsiniz.
+              </p>
+            </div>
+            {surveyRow && surveyUrl ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {surveyAnswered && surveyTone ? (
+                  <>
+                    <span className="numeric font-display text-2xl font-extrabold text-ink-950">
+                      {surveyRow.score}
+                    </span>
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 ring-inset ${surveyTone.cls}`}
+                    >
+                      {surveyTone.label}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-[11px] font-bold text-brand-600">
+                      Yanıt bekliyor
+                    </span>
+                    <CopySurveyLinkButton url={surveyUrl} />
+                  </>
+                )}
+              </div>
+            ) : !deal.customer_id ? (
+              <p className="text-xs font-semibold text-text-muted">
+                Anlaşmaya müşteri bağlı değil — anket gönderilecek kişi belirsiz.
+              </p>
+            ) : canCreateSurvey ? (
+              <CreateSurveyButton dealId={deal.id} />
+            ) : (
+              <p className="text-xs font-semibold text-text-muted">
+                Anket üretmek için rapor yetkisi gerekiyor.
+              </p>
+            )}
+          </div>
+          {surveyRow?.comment ? (
+            <p className="mt-3 flex items-start gap-2 rounded-[12px] border border-line bg-canvas px-4 py-2.5 text-sm italic leading-relaxed text-text-muted">
+              <MessageSquareQuote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-text-faint" />
+              {surveyRow.comment}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Bağlı portföy — tıklanabilir */}
         <section className="surface-card rounded-[var(--radius-panel)] p-5">
@@ -579,27 +644,27 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
       ) : null}
 
       {/* Evrak dosyası — kapanış evrakları kontrol listesi (deal_checklist_items) */}
-      <DealChecklistSection
-        dealId={deal.id}
-        dealType={deal.deal_type}
-        items={evraklar}
-        canEdit={(perms.commissions ?? []).includes("edit")}
-      />
+      <Suspense fallback={<ChecklistSkeleton />}>
+        <ChecklistLoader
+          dealId={deal.id}
+          dealType={deal.deal_type}
+          canEdit={(perms.commissions ?? []).includes("edit")}
+        />
+      </Suspense>
 
       {/* İşlem dosyası — kapora + kapanış masrafları (deal_costs ile GERÇEK bağ) */}
-      <DealCostsSection
-        dealId={deal.id}
-        costs={islemDosyasi}
-        canEdit={(perms.commissions ?? []).includes("edit")}
-      />
+      <Suspense fallback={<CostsSkeleton />}>
+        <CostsLoader dealId={deal.id} canEdit={(perms.commissions ?? []).includes("edit")} />
+      </Suspense>
 
       {/* Notlar — ekip içi yorum akışı + sistem izleri (deal_notes ile GERÇEK bağ) */}
-      <DealNotesSection
-        dealId={deal.id}
-        notes={notlar}
-        canEdit={(perms.commissions ?? []).includes("edit")}
-        currentUserId={userId}
-      />
+      <Suspense fallback={<NotesSkeleton />}>
+        <NotesLoader
+          dealId={deal.id}
+          canEdit={(perms.commissions ?? []).includes("edit")}
+          currentUserId={userId}
+        />
+      </Suspense>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Teklifler ve sözleşmeler: yaklaşık eşleşme, bu açıkça yazılıyor */}

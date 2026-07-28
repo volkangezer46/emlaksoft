@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -7,7 +8,6 @@ import {
   CalendarDays,
   Mail,
   MapPin,
-  MessageCircle,
   PhoneCall,
   Sparkles,
   Target,
@@ -21,11 +21,11 @@ import { fetchTenantTags } from "../tenant-tags";
 import { DeleteCustomerButton } from "./delete-customer-button";
 import { Customer360Tabs } from "./customer-360-tabs";
 import { CustomerTasks, type CustomerTaskRow } from "./customer-tasks";
-import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
+import { formatTurkishPhone, toTelHref } from "@/lib/phone";
+import { WaTemplateMenu } from "@/components/app/wa-template-menu";
 import { computeLeadScore, leadTierCls } from "@/lib/lead-score";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
-import { MatchedPropertiesWidget } from "./matched-properties-widget";
-import { fetchTenantMatchingWeights, type MatchProperty } from "@/lib/matching";
+import { MatchedSection, MatchedSkeleton, SatisfactionSection } from "./sections";
 import type { TimelineItem } from "./customer-timeline-tab";
 import { COMM_CHANNELS } from "@/lib/comm-types";
 import { computeNextBestAction } from "./next-best-action";
@@ -128,7 +128,7 @@ function shortDate(iso: string) {
 }
 
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { perms } = await requireModulePage("customers");
+  const { perms, userId } = await requireModulePage("customers");
   const canEdit = (perms.customers ?? []).includes("edit");
   const canDelete = (perms.customers ?? []).includes("delete");
   const canTaskCreate = (perms.tasks ?? []).includes("create");
@@ -153,8 +153,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     { data: commsData },
     { data: offersData },
     { data: contractsData },
-    { data: propertiesForMatch },
-    matchingWeights,
+    { data: matchCandidateIds },
     tenantTags,
     customerTypeDefs,
     transactionTypeDefs,
@@ -163,7 +162,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   ] = await Promise.all([
     supabase
       .from("customers")
-      .select("id, full_name, phone, email, customer_types, tags, source, notes, blacklist, created_at, province_id, district_id, birth_date, anniversary_date, anniversary_note, province:geo_provinces(name), district:geo_districts(name)")
+      .select("id, full_name, phone, email, customer_types, tags, source, notes, blacklist, created_at, province_id, district_id, birth_date, anniversary_date, anniversary_note, is_foreign, nationality, province:geo_provinces(name), district:geo_districts(name)")
       .eq("id", id)
       .is("deleted_at", null)
       .maybeSingle(),
@@ -233,16 +232,21 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .eq("customer_id", id)
       .order("created_at", { ascending: false })
       .limit(50),
-    // Portföy öneri widget'ı için — sadece aktif portföyler
+    /*
+     * "Sonraki en iyi aksiyon" kartı yalnız aday portföy SAYISINI kullanıyor
+     * ("N aktif portföy taranabilir"). Eskiden bunun için 100 satır, `features`
+     * JSONB'siyle birlikte çekiliyordu — sayfanın en pahalı sorgusu buydu ve
+     * künyeyi bekletiyordu. Artık yalnız id'ler geliyor (aynı filtre, aynı
+     * limit → aynı sayı); satırların tamamını eşleştirme widget'ı kendi
+     * Suspense sınırında çekiyor (bkz. ./sections.tsx).
+     */
     supabase
       .from("properties")
-      .select("id, property_code, title, transaction_type, property_type, status, list_price, province_id, district_id, features")
+      .select("id")
       .is("deleted_at", null)
       .in("status", ["live", "draft", "Yayında"])
       .order("created_at", { ascending: false })
       .limit(100),
-    // Ofise özel eşleştirme ağırlıkları — öneri widget'ı eşleştirme sayfasıyla aynı skoru üretsin
-    fetchTenantMatchingWeights(supabase),
     // Etiket önerileri — tenant'taki mevcut etiketler (chip input'a prop'la iner)
     fetchTenantTags(supabase),
     getDefinitions("customer_type"),
@@ -252,6 +256,12 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   ]);
 
   if (!customer) notFound();
+
+  // WhatsApp şablon değişkenleri — {ofis} ve {danisman} için iki hafif sorgu
+  const [{ data: waTenant }, { data: waAdvisor }] = await Promise.all([
+    supabase.from("tenants").select("name, phone").limit(1).maybeSingle(),
+    supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
+  ]);
 
   const customerTypeOptions = customerTypeDefs.length ? customerTypeDefs.map((d) => d.value) : undefined;
   const transactionTypeOptions = transactionTypeDefs.length ? transactionTypeDefs.map((d) => d.value) : undefined;
@@ -264,6 +274,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const calls = (callsData ?? []) as Call[];
   const appts = (apptsData ?? []) as Appt[];
   const audit = (auditData ?? []) as { id: string; action: string; created_at: string }[];
+
+  // Memnuniyet & Paylaşımlar — public link tabanı sunum/anket sayfalarıyla aynı
+  const publicBase = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
   // Portföy öneri widget'ı için
   const activeDemands = demands
@@ -281,11 +294,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       urgency: d.urgency,
       status: d.status,
     }));
-  const matchProperties = (propertiesForMatch ?? []).map((p) => ({
-    ...p,
-    list_price: p.list_price != null ? Number(p.list_price) : null,
-    features: (p.features ?? {}) as MatchProperty["features"],
-  })) as MatchProperty[];
+  // Yalnız SAYI — satırların tamamını `MatchedSection` çekiyor.
+  const matchCandidateCount = (matchCandidateIds ?? []).length;
 
   // İYS SMS onayı — hero'daki SMS dialogu bu durumla kilitlenir/açılır
   const smsConsentGranted = (consentsData ?? []).some(
@@ -335,7 +345,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           lastActivityAt,
           createdAt: customer.created_at,
           openDemandCount: activeDemands.length,
-          candidatePropertyCount: matchProperties.length,
+          candidatePropertyCount: matchCandidateCount,
           submittedOfferId: submittedOffer?.id ?? null,
           pastAppointmentPending,
         },
@@ -479,6 +489,16 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                     {lead.tier === "hot" ? "🔥" : lead.tier === "warm" ? "🌤️" : "❄️"} {lead.label} · {lead.score}
                   </span>
                 )}
+                {/* Yabancı uyruklu alıcı — evrak akışı farklı (bkz. /app/yabanci-satis) */}
+                {customer.is_foreign ? (
+                  <Link
+                    href="/app/yabanci-satis"
+                    title="Yabancı uyruklu alıcı — zorunlu evraklar ve mevzuat için tıklayın"
+                    className="focus-ring inline-flex items-center gap-1 rounded-full bg-mint-500/20 px-2.5 py-0.5 text-[11px] font-bold text-mint-300 transition hover:bg-mint-500/30"
+                  >
+                    🌍 Yabancı{customer.nationality ? ` · ${customer.nationality}` : ""}
+                  </Link>
+                ) : null}
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {types.length > 0 ? (
@@ -521,14 +541,16 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                   </a>
                 ) : null}
                 {customer.phone ? (
-                  <a
-                    href={toWhatsAppLink(customer.phone) ?? "#"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-                  >
-                    <MessageCircle className="h-4 w-4" /> WhatsApp
-                  </a>
+                  /* Şablonlu WhatsApp — ofis kütüphanesinden metin seçilir, değişkenler dolar */
+                  <WaTemplateMenu
+                    phone={customer.phone}
+                    vars={{
+                      musteri: customer.full_name,
+                      danisman: waAdvisor?.full_name ?? "",
+                      ofis: waTenant?.name ?? "",
+                      telefon: waTenant?.phone ?? "",
+                    }}
+                  />
                 ) : null}
                 {customer.phone && canEdit ? (
                   <SmsDialog
@@ -678,6 +700,12 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         canCreateComm={(perms.customers ?? []).includes("create")}
       />
 
+      {/* Memnuniyet & Paylaşımlar — anket ve sunum yoksa bileşen kendini gizler,
+          bu yüzden Suspense fallback'i de yok (olmayan bölümün iskeleti çizilmez). */}
+      <Suspense fallback={null}>
+        <SatisfactionSection customerId={customer.id} appUrl={publicBase} />
+      </Suspense>
+
       {canTaskView ? (
         <CustomerTasks
           customerId={customer.id}
@@ -688,11 +716,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         />
       ) : null}
 
-      <MatchedPropertiesWidget
-        demands={activeDemands}
-        properties={matchProperties}
-        weights={matchingWeights}
-      />
+      <Suspense fallback={<MatchedSkeleton />}>
+        <MatchedSection demands={activeDemands} />
+      </Suspense>
     </div>
   );
 }

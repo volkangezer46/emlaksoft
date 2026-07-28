@@ -3,6 +3,7 @@ import {
   Activity,
   ArrowUpRight,
   Fingerprint,
+  FolderArchive,
   ScrollText,
   Shield,
   ShieldAlert,
@@ -251,6 +252,17 @@ export default async function AuditPage({
             <p className="mt-2 max-w-lg text-sm text-white/60">
               Yazma işlemlerinin immutable günlüğü. Sahte aktivite yok — yalnızca `logActivity` kayıtları.
             </p>
+            {/* Belge Merkezi girişi — aynı modül kapısı (settings) arkasında.
+                Denetim izi "kim ne yaptı", belge merkezi "hangi dosya nerede"
+                sorusunu cevaplıyor; KVKK incelemesinde ikisi birlikte kullanılır. */}
+            <Link
+              href="/app/belgeler"
+              className="focus-ring press mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-mint-400 transition hover:text-mint-300"
+            >
+              <FolderArchive className="h-4 w-4" />
+              Belge merkezi — müşteri dosyaları, portföy medyası, sözleşmeler ve evraklar tek listede
+              <ArrowUpRight className="h-4 w-4" />
+            </Link>
             <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
                 { label: hasFilter ? "Filtre sonucu" : "Toplam kayıt", value: total, icon: ScrollText, href: "/app/denetim", tone: "text-amber-300" },

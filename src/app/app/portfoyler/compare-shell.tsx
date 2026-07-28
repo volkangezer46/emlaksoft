@@ -20,15 +20,19 @@ import type { CompareItem } from "@/components/public/compare-table";
 export function PropertyCompareShell({
   item,
   children,
+  actions,
 }: {
   item: CompareItem;
   children: ReactNode;
+  /** Kart üstüne bindirilen ek aksiyonlar (ör. malik portalı linki). */
+  actions?: ReactNode;
 }) {
   return (
     <div className="relative">
       {children}
-      <div className="absolute right-3 top-12 z-10">
+      <div className="absolute right-3 top-12 z-10 flex flex-col items-end gap-2">
         <CompareToggle item={item} />
+        {actions}
       </div>
     </div>
   );

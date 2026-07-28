@@ -22,15 +22,27 @@ type CustomerOption = { id: string; full_name: string };
 export function NewOfferDialog({
   properties,
   customers,
+  defaultPropertyId = null,
+  defaultCustomerId = null,
+  autoOpen = false,
 }: {
   properties: PropertyOption[];
   customers: CustomerOption[];
+  /** ?portfoy= — eşleştirme ekranındaki "Teklif al" kısayolunun ön dolgusu. */
+  defaultPropertyId?: string | null;
+  /** ?musteri= — aynı kısayolun müşteri ön dolgusu. */
+  defaultCustomerId?: string | null;
+  /** Ön dolgu geçerliyse diyalog doğrudan açık gelir (çıkmaz sokak olmasın). */
+  autoOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(autoOpen);
   const [state, action, isPending] = useActionState(createOffer, init);
 
   // Auto-fill amount from selected property
-  const [selectedPrice, setSelectedPrice] = useState<number | null>(null);
+  const preselectedProperty = defaultPropertyId
+    ? properties.find((p) => p.id === defaultPropertyId) ?? null
+    : null;
+  const [selectedPrice, setSelectedPrice] = useState<number | null>(preselectedProperty?.list_price ?? null);
 
   function handlePropertyChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const prop = properties.find((p) => p.id === e.target.value);
@@ -71,6 +83,7 @@ export function NewOfferDialog({
                   id="offer-property"
                   name="property_id"
                   required
+                  defaultValue={preselectedProperty?.id ?? ""}
                   onChange={handlePropertyChange}
                   className={`${fieldCls} appearance-none`}
                 >
@@ -92,6 +105,11 @@ export function NewOfferDialog({
                 <select
                   id="offer-customer"
                   name="customer_id"
+                  defaultValue={
+                    defaultCustomerId && customers.some((c) => c.id === defaultCustomerId)
+                      ? defaultCustomerId
+                      : ""
+                  }
                   className={`${fieldCls} appearance-none`}
                 >
                   <option value="">— Müşteri seçin —</option>

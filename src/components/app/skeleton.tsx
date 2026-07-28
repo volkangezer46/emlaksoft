@@ -4,7 +4,11 @@
  */
 
 export function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`shimmer relative overflow-hidden rounded-[10px] bg-canvas ${className}`} />;
+  // v2: `.shimmer` yalnızca saydam bir parlama gradyanıdır ve `background`
+  // kısayolunu ezdiği için `bg-canvas` tabanı sessizce kayboluyordu (iskeletler
+  // görünmezdi). `.skeleton` taban rengi + parlamayı birlikte verir ve
+  // prefers-reduced-motion altında kendini kapatır.
+  return <div aria-hidden="true" className={`skeleton relative overflow-hidden rounded-[10px] ${className}`} />;
 }
 
 export function SkeletonCard() {

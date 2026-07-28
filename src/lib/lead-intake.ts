@@ -3,6 +3,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isValidOptionalTurkishMobile, normalizeTurkishPhone } from "@/lib/phone";
 import { notifyTenant } from "@/lib/notify";
+import { buildLeadCommunication } from "@/lib/lead-message";
 
 export type LeadInput = {
   fullName: string;
@@ -147,6 +148,38 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
     customerId = created.id as string;
   }
 
+  /*
+   * TALEP MESAJINI ASLA KAYBETME (denetim P0).
+   *
+   * Eskiden `input.message` yalnızca YENİ müşteri insert'inde
+   * `customers.notes` alanına yazılıyordu; telefonu eşleşen mevcut müşteride
+   * mesaj hiçbir yere gitmiyordu. Artık her talep `communications` tablosuna
+   * `inbound` satır olarak da düşüyor — müşteri detayındaki iletişim zaman
+   * çizgisinde ve /app/gelen-kutusu'nda görünür. Gerekçe: lib/lead-message.ts.
+   *
+   * Mükerrer olmayan durumda da yazılıyor: notes "profil notu", communications
+   * "zaman çizgisi" — ikisi farklı iş görüyor ve tek bir yol olması davranışı
+   * öngörülebilir kılıyor.
+   *
+   * Best-effort: iletişim kaydı yazılamazsa lead yine de kaydedilmiş sayılır
+   * (asıl kayıt customers satırı), ama sessiz kalmasın diye loglanır.
+   */
+  const commDraft = buildLeadCommunication({
+    customerId,
+    message: input.message,
+    channel,
+    source,
+    duplicate,
+  });
+  if (commDraft) {
+    const { error: commErr } = await admin.from("communications").insert({
+      tenant_id: tenantId,
+      created_by: null, // public form — panel kullanıcısı yok
+      ...commDraft,
+    });
+    if (commErr) console.error("intakeLead communication", commErr);
+  }
+
   // Talep bilgisi verilmişse demand oluştur
   if (input.transactionType) {
     await admin.from("customer_demands").insert({
@@ -171,12 +204,18 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
     new_value: { full_name: fullName, phone, channel, source, assigned_to: assignedTo },
   });
 
-  // Speed-to-lead: atanan danışmana anında bildirim (yoksa ofise geneli)
+  /*
+   * Speed-to-lead: sorumlu danışmana anında bildirim (yoksa ofis geneli).
+   * Mükerrer durumda mesajın ilk satırı gövdeye eklenir — danışman bildirimden
+   * talebin İÇERİĞİNİ de görsün, yalnız "tekrar eden kayıt" demekle kalmasın
+   * (değerleme hunisinde tüm detay mesajın içinde).
+   */
+  const mesajOzeti = (input.message ?? "").trim().replace(/\s+/g, " ").slice(0, 120);
   await notifyTenant({
     tenantId,
     userId: assignedTo,
-    title: duplicate ? "Tekrar eden lead geldi" : "Yeni lead geldi",
-    body: `${fullName}${phone ? ` · ${phone}` : ""} · ${source}`,
+    title: duplicate ? "Mevcut müşteriden yeni talep" : "Yeni talep geldi",
+    body: `${fullName}${phone ? ` · ${phone}` : ""} · ${source}${mesajOzeti ? ` · ${mesajOzeti}` : ""}`,
     href: `/app/musteriler/${customerId}`,
     kind: "success",
   });

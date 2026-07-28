@@ -14,7 +14,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { now as nowMs } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
-import { ChartFrame } from "@/components/ui/chart";
+import { ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { exportCommissionsCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
@@ -109,6 +109,8 @@ export default async function CommissionPage({
 
   const supabase = await createClient();
   const savedViews = await listSavedViews("/app/komisyon");
+  // Onay merkezi rozeti — tek head-count sorgusu (bkz. /app/onaylar).
+  const bekleyenOnay = (await supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("status", "bekliyor")).count ?? 0;
   // Kayıtlı görünümler için aktif filtre paramları (sayfa hariç)
   const savedViewParams: Record<string, string> = {};
   if (durum) savedViewParams.durum = durum;
@@ -229,6 +231,7 @@ export default async function CommissionPage({
           <span className="flex items-center gap-2 text-xs font-semibold text-amber-400"><Banknote className="h-4 w-4" /> Finans merkezi</span>
           <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Komisyon & hakediş</h1>
           <p className="mt-1 text-sm text-white/60">Çok taraflı paylaşım, KDV ve tahsilat görünümü tek defterde.</p>
+          <Link href="/app/onaylar?durum=bekliyor" className="focus-ring press mt-3 inline-flex items-center gap-1.5 rounded-[10px] border border-white/12 bg-white/8 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:border-white/30 hover:text-white">Onaylar{bekleyenOnay > 0 ? <span className="numeric rounded-full bg-amber-400/90 px-1.5 py-0.5 text-[10px] font-bold text-ink-950">{bekleyenOnay}</span> : null}<ArrowUpRight className="h-3.5 w-3.5 opacity-60" /></Link>
         </div>
         <div className="relative mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           {/* KPI kartları defter filtresine bağlı: tıklayınca ?durum= uygulanır (tarih aralığı korunur) */}

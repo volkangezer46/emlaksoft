@@ -76,6 +76,40 @@ function buildPortalUrl(token: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Müşteri portal linkini iptal et
+// ---------------------------------------------------------------------------
+
+/**
+ * Tabloda ayrı bir `revoked_at` kolonu YOK; iptal, geçerlilik damgasını
+ * "şimdi"ye çekerek yapılır. Public taraf (`getCustomerPortalData`) zaten
+ * `expires_at < now()` olan token'ı reddediyor — tek doğruluk kaynağı
+ * expires_at, ikinci bir durum kolonu eklemeye gerek yok.
+ */
+export async function revokeCustomerPortalToken(formData: FormData): Promise<PortalTokenResult> {
+  const gate = await requirePermission("customers", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return { error: "Portal linki bulunamadı." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("customer_portal_tokens")
+    .update({ expires_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId);
+
+  if (error) {
+    console.error("revokeCustomerPortalToken", error);
+    return { error: "Link iptal edilemedi." };
+  }
+
+  revalidatePath("/app/portfoyler/sunumlar");
+  revalidatePath("/app/musteriler");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
 // Portal verilerini token ile getir (public — service role)
 // ---------------------------------------------------------------------------
 

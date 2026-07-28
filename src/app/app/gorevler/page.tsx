@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlarmClock, ArrowUpRight, CalendarClock, CalendarDays, CheckCircle2, ListChecks, Repeat, Sunrise } from "lucide-react";
+import { AlarmClock, ArrowUpRight, CalendarClock, CheckCircle2, Repeat, Sunrise } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DAY_MS, daysFromNowIso, now } from "@/lib/clock";
@@ -8,6 +8,7 @@ import { TaskCard, type TaskRow } from "./task-card";
 import { TaskBulkList } from "./task-bulk-list";
 import { EmptyState } from "@/components/app/empty-state";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
+import { ICONS } from "@/lib/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -142,9 +143,9 @@ export default async function TasksPage({
   const GROUPS = [
     { key: "overdue", label: "Gecikmiş", icon: AlarmClock, cls: "border-danger-500/25 bg-danger-500/8 text-danger-500" },
     { key: "today", label: "Bugün", icon: Sunrise, cls: "border-amber-400/40 bg-amber-400/10 text-amber-600" },
-    { key: "upcoming", label: "Yaklaşan 7 gün", icon: CalendarDays, cls: "border-brand-400/30 bg-brand-600/8 text-brand-600" },
+    { key: "upcoming", label: "Yaklaşan 7 gün", icon: ICONS.randevu, cls: "border-brand-400/30 bg-brand-600/8 text-brand-600" },
     { key: "later", label: "Daha sonra", icon: CalendarClock, cls: "border-line bg-canvas text-text-muted" },
-    { key: "nodate", label: "Tarihsiz", icon: ListChecks, cls: "border-line bg-canvas text-text-muted" },
+    { key: "nodate", label: "Tarihsiz", icon: ICONS.gorev, cls: "border-line bg-canvas text-text-muted" },
   ] as const;
   const nowMs = now();
   const todayEndMs = endOfToday().getTime();
@@ -201,7 +202,7 @@ export default async function TasksPage({
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>
             <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-              <ListChecks className="h-4 w-4" /> Görev & takip otomasyonu
+              <ICONS.gorev className="h-4 w-4" /> Görev & takip otomasyonu
             </span>
             <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">Hiçbir takip unutulmasın</h1>
             <p className="mt-1 max-w-xl text-sm text-white/60">
@@ -210,13 +211,15 @@ export default async function TasksPage({
           </div>
           {canCreate ? <NewTaskDialog members={members ?? []} customers={customers ?? []} /> : null}
         </div>
-        <div className="relative mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="stagger-grid relative mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {/* Sayaçlar mevcut ?filter= parametresiyle ilgili listeye iner. */}
           {[
-            { label: "Açık görev", value: counts.open, icon: CalendarClock, tone: "text-cyan-300", href: taskHref({ filter: "open" }) },
+            // İkonografi: "Açık görev" CalendarClock (randevu/saat ikonu) ile
+            // çiziliyordu; görev kavramının ikonu ICONS.gorev (ListChecks).
+            { label: "Açık görev", value: counts.open, icon: ICONS.gorev, tone: "text-cyan-300", href: taskHref({ filter: "open" }) },
             { label: "Gecikmiş", value: counts.overdue, icon: AlarmClock, tone: "text-danger-300", href: taskHref({ filter: "overdue" }) },
             { label: "Bugün", value: counts.today, icon: Sunrise, tone: "text-amber-300", href: taskHref({ filter: "today" }) },
-            { label: "Yaklaşan 7 gün", value: counts.upcoming, icon: CalendarDays, tone: "text-brand-300", href: taskHref({ filter: "yaklasan" }) },
+            { label: "Yaklaşan 7 gün", value: counts.upcoming, icon: ICONS.randevu, tone: "text-brand-300", href: taskHref({ filter: "yaklasan" }) },
             { label: "Tamamlanan", value: counts.done, icon: CheckCircle2, tone: "text-mint-300", href: taskHref({ filter: "done" }) },
           ].map((s) => (
             <Link
@@ -286,10 +289,16 @@ export default async function TasksPage({
 
       {tasks.length === 0 ? (
         <EmptyState
-          icon={ListChecks}
-          title="Bu filtrede görev yok"
-          description="Yeni görev ekleyerek takip akışınızı başlatın."
+          icon={ICONS.gorev}
+          illustration={filter === "all" ? "start" : "search"}
+          title={filter === "all" ? "Henüz görev yok" : "Bu filtrede görev yok"}
+          description={
+            filter === "all"
+              ? "Yeni görev ekleyerek takip akışınızı başlatın; arama, ziyaret ve evrak işleri tek listede toplanır."
+              : "Seçili filtreye uyan görev yok. Filtreyi genişletip tekrar deneyin."
+          }
           tone="brand"
+          secondary={filter === "all" ? undefined : { href: "/app/gorevler?filter=all", label: "Tüm görevleri göster" }}
         />
       ) : (
         <div className="space-y-2">

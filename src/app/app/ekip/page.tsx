@@ -2,9 +2,12 @@ import Link from "next/link";
 import {
   ArrowUpRight,
   Building2,
+  CalendarRange,
   Crown,
   Fingerprint,
+  IdCard,
   Layers,
+  PalmtreeIcon,
   ShieldCheck,
   UserRound,
   Users,
@@ -18,6 +21,9 @@ import { AddBranchDialog, AddMemberDialog } from "./team-dialogs";
 import { BranchCard } from "./branch-card";
 import { formatTurkishPhone } from "@/lib/phone";
 import { relativeTimeTR } from "@/lib/admin-format";
+import { now } from "@/lib/clock";
+import { TR_OFFSET_MIN } from "@/lib/booking-slots";
+import { isOnLeave, type LeaveLike } from "@/lib/leave-utils";
 import type { CSSProperties } from "react";
 
 const RING_C = 2 * Math.PI * 42;
@@ -33,6 +39,9 @@ type Member = {
   created_at: string;
   branch_id: string | null;
   branch: Rel;
+  /** Yayındaki dijital kartvizit (/danisman/[slug]) — kapalıysa null/false. */
+  public_slug: string | null;
+  is_public: boolean | null;
 };
 
 const roleMeta: Record<string, { label: string; cls: string }> = {
@@ -63,7 +72,7 @@ export default async function TeamPage() {
   const supabase = await createClient();
 
   const [{ data: membersData }, { data: branchesData }, { data: provincesData }, { data: advisorCounts }] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, phone, role, is_active, created_at, branch_id, branch:branches(name)").order("created_at", { ascending: true }).limit(500),
+    supabase.from("profiles").select("id, full_name, phone, role, is_active, created_at, branch_id, public_slug, is_public, branch:branches(name)").order("created_at", { ascending: true }).limit(500),
     supabase.from("branches").select("id, name, is_active, province_id, province:geo_provinces(name)").order("created_at", { ascending: true }).limit(200),
     supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
     // Danışman başına müşteri sayısı — aggregate (10.000 satır yerine ~N satır)
@@ -73,6 +82,18 @@ export default async function TeamPage() {
   ]);
 
   const members = (membersData ?? []) as Member[];
+
+  // Bugün izinli olanlar — listede küçük "İzinde" rozeti için (bkz. /app/ekip/izinler).
+  // TR duvar günü: booking-slots ile aynı sabit ofset kararı (TR'de DST yok).
+  const todayKey = new Date(now() + TR_OFFSET_MIN * 60_000).toISOString().slice(0, 10);
+  const { data: leaveRows } = await supabase
+    .from("staff_leaves")
+    .select("staff_id, starts_on, ends_on, status")
+    .eq("status", "onayli")
+    .lte("starts_on", todayKey)
+    .gte("ends_on", todayKey)
+    .limit(200);
+  const todayLeaves = (leaveRows ?? []) as LeaveLike[];
 
   /*
    * Son giriş bilgisi — login_events'ten üye başına en son başarılı giriş.
@@ -165,6 +186,8 @@ export default async function TeamPage() {
                 <Link href="/app/ayarlar/roller" className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <Fingerprint className="h-4 w-4" /> İzin matrisi
                 </Link>
+                <Link href="/app/ekip/izinler" className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"><CalendarRange className="h-4 w-4" /> İzin takvimi</Link>
+                <Link href="/app/ekip/kartvizitim" className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"><IdCard className="h-4 w-4" /> Kartvizitim</Link>
                 {canManage ? <AddMemberDialog branches={branches.map((b) => ({ id: b.id, name: b.name }))} /> : null}
               </div>
             </div>
@@ -301,6 +324,21 @@ export default async function TeamPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${meta.cls}`}>{meta.label}</span>
                   {!m.is_active ? <span className="rounded-full bg-ink-950/8 px-2 py-0.5 text-[11px] font-semibold text-text-muted">Pasif</span> : null}
+                  {m.is_public && m.public_slug ? (
+                    <a
+                      href={`/danisman/${m.public_slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2 py-0.5 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/20"
+                    >
+                      <IdCard className="h-3 w-3" /> Kartvizit
+                    </a>
+                  ) : null}
+                  {isOnLeave(todayLeaves, m.id, todayKey) ? (
+                    <Link href="/app/ekip/izinler" className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-600 transition hover:bg-amber-400/25">
+                      <PalmtreeIcon className="h-3 w-3" /> İzinde
+                    </Link>
+                  ) : null}
                   {loginDataAvailable ? (
                     lastLoginByUser.has(m.id) ? (
                       <span className="text-[11px] text-text-faint">Son giriş: {relativeTimeTR(lastLoginByUser.get(m.id)!)}</span>

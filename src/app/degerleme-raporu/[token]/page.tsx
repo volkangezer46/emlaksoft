@@ -4,8 +4,8 @@ import { notFound } from "next/navigation";
 import { Building2, Gauge, Info, Scale, ShieldCheck, TrendingUp } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  COMPARABLES_SOURCE_NAME,
   extractStoredComparables,
+  isInternalSource,
   listComparableDetails,
   type ComparableDetail,
 } from "@/lib/comparables";
@@ -85,7 +85,7 @@ export default async function PublicValuationReportPage({
   // Emsal anlık görüntüsü sources jsonb'sinde saklanıyor; listelere sızmasın.
   const storedComparables = extractStoredComparables(valuation.sources);
   const sources = (Array.isArray(valuation.sources) ? valuation.sources : []).filter(
-    (s: ValuationSource) => s.name !== COMPARABLES_SOURCE_NAME,
+    (s: ValuationSource) => !isInternalSource(s.name),
   ) as ValuationSource[];
   const priceSources = sources.filter((s) => s.weight > 0);
   const infoSources = sources.filter((s) => s.weight === 0);

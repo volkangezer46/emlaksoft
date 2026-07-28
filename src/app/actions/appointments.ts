@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
+import { isAppointmentOutcome } from "@/lib/appointment-outcome";
 
 export type AppointmentResult = {
   error?: string;
@@ -178,6 +179,16 @@ export async function regenerateCalendarToken(): Promise<AppointmentResult> {
   return { ok: true };
 }
 
+/**
+ * Randevu durumu güncelleme.
+ *
+ * "Tamamlandı" artık TEK YÖNLÜ değil: `status=confirmed` (ya da pending)
+ * göndererek tamamlanan bir randevu geri alınabilir — yanlışlıkla tamamlanan
+ * randevu kilitli kalmasın. Geri almada sonuç değerlendirmesi de temizlenir.
+ *
+ * Tamamlarken opsiyonel `outcome` (olumlu/kararsiz/olumsuz) + `outcome_note`
+ * yazılır (migration 126). Bu alan eşleştirme geri bildirimiyle ilgisizdir.
+ */
 export async function updateAppointmentStatus(formData: FormData): Promise<AppointmentResult> {
   const gate = await requirePermission("appointments", "edit");
   if (!gate.ok) return { error: gate.error };
@@ -189,6 +200,20 @@ export async function updateAppointmentStatus(formData: FormData): Promise<Appoi
   const patch: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
   if (status === "signature" || status === "completed") {
     patch.signed_at = new Date().toISOString();
+  }
+
+  if (status === "completed") {
+    const outcomeRaw = String(formData.get("outcome") ?? "").trim();
+    const noteRaw = String(formData.get("outcome_note") ?? "").trim();
+    if (outcomeRaw) {
+      if (!isAppointmentOutcome(outcomeRaw)) return { error: "Geçersiz randevu sonucu." };
+      patch.outcome = outcomeRaw;
+    }
+    if (noteRaw) patch.outcome_note = noteRaw.slice(0, 500);
+  } else {
+    // Geri alma / iptal: değerlendirme artık geçerli değil, sıfırlanır.
+    patch.outcome = null;
+    patch.outcome_note = null;
   }
 
   const supabase = await createClient();

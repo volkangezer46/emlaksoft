@@ -1,74 +1,119 @@
+import { cn } from "@/lib/utils";
+
 /**
- * Badge component variants
+ * Badge — durum rozeti.
+ *
+ * v2: renkler artık tek tek Tailwind sınıfı yerine `tone-*` yardımcılarından
+ * gelir (globals.css "TASARIM SİSTEMİ v2"). Kazanç:
+ *  - metin tonları `--*-strong` → beyaz üzerinde WCAG AA (≥4.5:1) garanti,
+ *  - koyu hero (`.theme-dark`) içinde beyaz-üstüne-beyaz üretmezler,
+ *  - yeni bir durum rengi tek yerden değişir.
+ *
+ * Mevcut API korunur: `variant` değerleri ve `size` ölçeği aynen çalışır.
+ * `neutral`, `default`'un okunur takma adıdır.
  */
 
-export type BadgeVariant = "default" | "success" | "warning" | "danger" | "info" | "outline";
+export type BadgeVariant =
+  | "default"
+  | "neutral"
+  | "success"
+  | "warning"
+  | "danger"
+  | "info"
+  | "outline";
 type BadgeSize = "sm" | "md" | "lg";
+
+const VARIANTS: Record<BadgeVariant, string> = {
+  default: "tone-neutral",
+  neutral: "tone-neutral",
+  success: "tone-success",
+  warning: "tone-warning",
+  danger: "tone-danger",
+  info: "tone-info",
+  outline: "bg-transparent text-text-muted shadow-[inset_0_0_0_1px_var(--hairline-strong)]",
+};
+
+/** Nokta göstergesinin dolgu rengi — metin rengiyle aynı aileden, bir ton canlı. */
+const DOTS: Record<BadgeVariant, string> = {
+  default: "bg-text-muted",
+  neutral: "bg-text-muted",
+  success: "bg-mint-500",
+  warning: "bg-amber-500",
+  danger: "bg-danger-500",
+  info: "bg-brand-600",
+  outline: "bg-text-faint",
+};
+
+const SIZES: Record<BadgeSize, string> = {
+  sm: "px-2 py-0.5 text-[11px] gap-1",
+  md: "px-2.5 py-1 text-xs gap-1.5",
+  lg: "px-3 py-1.5 text-sm gap-1.5",
+};
 
 export function Badge({
   children,
   variant = "default",
   size = "md",
+  dot = false,
+  pulse = false,
   className,
 }: {
   children: React.ReactNode;
   variant?: BadgeVariant;
   size?: BadgeSize;
+  /** Sol tarafta durum noktası göster (canlı/aktif durum anlatımı). */
+  dot?: boolean;
+  /** Noktayı yumuşakça nabız attırır — dikkat çekmesi gereken TEK rozet için.
+   *  `prefers-reduced-motion` altında animasyon otomatik kapanır. */
+  pulse?: boolean;
   className?: string;
 }) {
-  // Rozetler `ring-1 ring-inset` kullanıyor: `border` düzeni 1px büyütüp
-  // satır yüksekliğini oynatıyordu. Ayrıca daha koyu metin tonu (mint-700 /
-  // danger-600) beyaz üzerinde AA kontrastı sağlıyor — bu tonlar bu turda
-  // tanımlandı, öncesinde sınıf sessizce düşüyordu.
-  const variants: Record<BadgeVariant, string> = {
-    default: "bg-ink-950/[0.055] text-ink-900 ring-1 ring-inset ring-ink-950/[0.06]",
-    success: "bg-mint-500/[0.12] text-mint-700 ring-1 ring-inset ring-mint-500/25",
-    warning: "bg-amber-400/[0.14] text-amber-700 ring-1 ring-inset ring-amber-400/30",
-    danger: "bg-danger-500/[0.10] text-danger-600 ring-1 ring-inset ring-danger-500/25",
-    info: "bg-brand-600/[0.10] text-brand-700 ring-1 ring-inset ring-brand-600/22",
-    outline: "bg-transparent text-text-muted ring-1 ring-inset ring-hairline-strong",
-  };
-
-  const sizes: Record<BadgeSize, string> = {
-    sm: "px-2 py-0.5 text-[11px]",
-    md: "px-2.5 py-1 text-xs",
-    lg: "px-3 py-1.5 text-sm",
-  };
-
   return (
     <span
-      className={`inline-flex items-center rounded-full font-semibold ${variants[variant]} ${sizes[size]} ${className ?? ""}`}
+      className={cn(
+        "inline-flex items-center rounded-full font-semibold",
+        VARIANTS[variant],
+        SIZES[size],
+        className,
+      )}
     >
+      {dot ? (
+        <span
+          aria-hidden="true"
+          className={cn(
+            "h-1.5 w-1.5 shrink-0 rounded-full",
+            DOTS[variant],
+            pulse && "anim-pulse-soft",
+          )}
+        />
+      ) : null}
       {children}
     </span>
   );
 }
 
 /**
- * Status badge with dot
+ * Status badge with dot — durum sözlüğü olan yerler için hazır varyantlar.
+ * Badge'in `dot` moduna delege eder; renk kaynağı tek.
  */
 export function StatusBadge({
   label,
   variant = "default",
+  size = "md",
 }: {
   label: string;
   variant?: "active" | "inactive" | "pending" | "default";
+  size?: BadgeSize;
 }) {
-  const variantStyles = {
-    active: { bg: "bg-mint-500/10", text: "text-mint-600", dot: "bg-mint-500" },
-    inactive: { bg: "bg-ink-950/5", text: "text-text-muted", dot: "bg-text-muted" },
-    pending: { bg: "bg-amber-400/10", text: "text-amber-600", dot: "bg-amber-400" },
-    default: { bg: "bg-brand-600/10", text: "text-brand-600", dot: "bg-brand-600" },
+  const map: Record<string, BadgeVariant> = {
+    active: "success",
+    inactive: "neutral",
+    pending: "warning",
+    default: "info",
   };
-
-  const style = variantStyles[variant];
-
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${style.bg} ${style.text}`}
-    >
-      <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
+    <Badge variant={map[variant] ?? "neutral"} size={size} dot>
       {label}
-    </span>
+    </Badge>
   );
 }

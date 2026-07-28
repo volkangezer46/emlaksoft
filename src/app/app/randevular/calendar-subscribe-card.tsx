@@ -121,7 +121,8 @@ export function CalendarSubscribeCard({ token }: { token: string }) {
           className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-warn-500 transition hover:border-warn-500/40 disabled:opacity-50"
         >
           <RefreshCw className={`h-3 w-3 ${pending ? "animate-spin" : ""}`} />
-          {pending ? "Yenileniyor…" : "Linki yenile"}
+          {/* Aynı sayfada rezervasyon kartının da yenileme butonu var — isim ayırt edici olmalı */}
+          {pending ? "Yenileniyor…" : "Takvim linkini yenile"}
         </button>
       </div>
     </section>

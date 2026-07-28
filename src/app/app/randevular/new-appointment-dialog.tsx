@@ -39,12 +39,15 @@ export function NewAppointmentDialog({
   properties,
   typeOptions = DEFAULT_TYPE_OPTIONS,
   defaultCustomerId,
+  defaultPropertyId,
 }: {
   customers: Option[];
   properties: Option[];
   typeOptions?: { value: string; label: string }[];
   /** ?customer= ile gelindiğinde (müşteri kartı → "Randevu ver") ön seçim. */
   defaultCustomerId?: string;
+  /** ?property= ile gelindiğinde (eşleştirme → "Randevu ver") ön seçim. */
+  defaultPropertyId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -144,6 +147,7 @@ export function NewAppointmentDialog({
                   searchPlaceholder="Portföy ara…"
                   emptyText="Eşleşen portföy yok"
                   onSearch={searchProperties}
+                  defaultValue={defaultPropertyId}
                   options={properties.map((property) => ({ value: property.id, label: property.label }))}
                 />
               </div>

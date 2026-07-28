@@ -104,3 +104,70 @@ export async function markCommissionsPaidBulk(
   revalidatePath("/app/komisyon");
   return { ok: true, updated: updatedIds.length };
 }
+
+/**
+ * Tahsilatı geri alır: `paid`/`collected` → `calculated`.
+ *
+ * NEDEN (denetim P0): Repoda komisyonu `paid` yapan ÜÇ yol vardı
+ * (workflow.ts `mark_commission_paid`, buradaki toplu işaretleme ve ödeme
+ * linki webhook'u) ama `paid` durumundan GERİ DÖNDÜREN hiçbir update yoktu.
+ * Tek yanlış tıklama cüzdan/hakediş rakamlarını kalıcı bozuyor, düzeltmek
+ * için DB'ye elle girmek gerekiyordu.
+ *
+ * Hedef durum `calculated`: komisyonun ilk yazıldığı durum (deals.ts ve
+ * workflow.ts insert'lerinde `status: "calculated"`), yani "hesaplandı ama
+ * tahsil edilmedi". Tutar/paylaşım alanlarına DOKUNULMAZ — yalnız tahsilat
+ * bayrağı geri alınır.
+ */
+export async function revertCommissionPayment(commissionId: string): Promise<CommissionResult> {
+  const gate = await requirePermission("commissions", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const id = String(commissionId ?? "").trim();
+  if (!id) return { error: "Komisyon kaydı bulunamadı." };
+
+  const supabase = await createClient();
+  const { data: commission } = await supabase
+    .from("commissions")
+    .select("id, status")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+
+  if (!commission) return { error: "Komisyon kaydı bulunamadı." };
+
+  const paid = commission.status === "paid" || commission.status === "collected";
+  // Sessiz no-op yerine anlamlı hata: kullanıcı neden bir şey olmadığını görsün.
+  if (!paid) return { error: "Bu komisyon zaten tahsil edilmiş görünmüyor." };
+
+  const { data: updated, error } = await supabase
+    .from("commissions")
+    .update({ status: "calculated" })
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .in("status", ["paid", "collected"]) // yarış koşulu: bu arada değiştiyse dokunma
+    .select("id");
+
+  if (error) {
+    console.error("revertCommissionPayment", error);
+    return { error: "Tahsilat geri alınamadı." };
+  }
+  if (!updated || updated.length === 0) {
+    return { error: "Kayıt bu sırada değişti. Sayfayı yenileyip tekrar deneyin." };
+  }
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "commission.payment_reverted",
+    entityType: "commission",
+    entityId: id,
+    oldValue: { status: commission.status },
+    newValue: { status: "calculated" },
+  });
+
+  revalidatePath("/app/komisyon");
+  revalidatePath("/app/raporlar");
+  revalidatePath("/app");
+  return { ok: true };
+}

@@ -29,7 +29,9 @@ export async function createPresentation(formData: FormData): Promise<Presentati
   if (!gate.ok) return { error: gate.error };
 
   const title = String(formData.get("title") ?? "").trim();
-  const customerName = String(formData.get("customer_name") ?? "").trim();
+  let customerName = String(formData.get("customer_name") ?? "").trim();
+  // Müşteri seçimi OPSİYONEL: boş bırakılırsa eski serbest-metin davranışı aynen sürer.
+  const customerIdRaw = String(formData.get("customer_id") ?? "").trim();
   const note = String(formData.get("note") ?? "").trim();
   const rawIds = formData
     .getAll("property_ids")
@@ -43,8 +45,29 @@ export async function createPresentation(formData: FormData): Promise<Presentati
   if (ids.length > MAX_PRESENTATION_PROPERTIES)
     return { error: `En fazla ${MAX_PRESENTATION_PROPERTIES} portföy seçilebilir.` };
   if (ids.some((id) => !UUID_RE.test(id))) return { error: "Geçersiz portföy seçimi." };
+  if (customerIdRaw && !UUID_RE.test(customerIdRaw)) return { error: "Geçersiz müşteri seçimi." };
 
   const supabase = await createClient();
+
+  /*
+   * Müşteri bağı: id geldiyse tenant'a ait ve silinmemiş olmalı (RLS zaten
+   * kiracıyı daraltıyor, burada "silinmiş/yok" durumunu yakalıyoruz). Serbest
+   * metin boşsa müşterinin adıyla doldurulur — sunum kapağı isimsiz kalmasın.
+   */
+  let customerId: string | null = null;
+  if (customerIdRaw) {
+    const { data: cust } = await supabase
+      .from("customers")
+      .select("id, full_name")
+      .eq("id", customerIdRaw)
+      .eq("tenant_id", gate.tenantId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!cust) return { error: "Seçilen müşteri bulunamadı." };
+    customerId = cust.id as string;
+    if (!customerName) customerName = (cust.full_name as string | null) ?? "";
+  }
+
   const { data: owned } = await supabase
     .from("properties")
     .select("id, status")
@@ -63,6 +86,7 @@ export async function createPresentation(formData: FormData): Promise<Presentati
       tenant_id: gate.tenantId,
       title,
       customer_name: customerName || null,
+      customer_id: customerId,
       property_ids: ids,
       note: note || null,
       created_by: gate.userId,
@@ -81,10 +105,12 @@ export async function createPresentation(formData: FormData): Promise<Presentati
     action: "presentation.create",
     entityType: "presentation",
     entityId: data.id,
-    newValue: { title, property_count: ids.length },
+    newValue: { title, property_count: ids.length, customer_id: customerId },
   });
 
   revalidatePath("/app/portfoyler/sunumlar");
+  // Müşteri 360'taki "Memnuniyet & Paylaşımlar" bölümü sunumu hemen görsün.
+  if (customerId) revalidatePath(`/app/musteriler/${customerId}`);
   return { ok: true, id: data.id, url: `${appUrl()}/sunum/${data.public_token}` };
 }
 

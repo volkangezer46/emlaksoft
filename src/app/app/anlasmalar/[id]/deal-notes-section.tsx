@@ -34,7 +34,8 @@ export function DealNotesSection({
   dealId: string;
   notes: DealNote[];
   canEdit: boolean;
-  currentUserId: string;
+  /** Oturum çözülemezse null olabilir — bu durumda hiçbir not "benim" sayılmaz. */
+  currentUserId: string | null;
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -74,7 +75,9 @@ export function DealNotesSection({
       ) : (
         <ul className="mt-3 space-y-2">
           {notes.map((n) => {
-            const mine = n.author_id === currentUserId;
+            // currentUserId null iken author_id de null olan notlar "benim"
+            // sayılmamalı — silme/düzenleme yetkisi yanlışlıkla açılmasın.
+            const mine = currentUserId !== null && n.author_id === currentUserId;
             const yazar = n.author_name ?? "Ayrılmış kullanıcı";
             return (
               <li

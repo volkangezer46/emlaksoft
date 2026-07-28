@@ -3,7 +3,7 @@ import { ArrowUpRight, Building2, Info, LineChart, MapPinned, Minus, Sparkles, T
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DataTable } from "@/components/ui/data-table";
-import { ChartFrame, BarCompare, AreaTrend } from "@/components/ui/chart";
+import { ChartFrame, BarCompare, AreaTrend } from "@/app/app/_ui/lazy-chart";
 import { compareTr } from "@/lib/tr-text";
 import { now } from "@/lib/clock";
 import { PrintReportButton } from "./print-report-button";

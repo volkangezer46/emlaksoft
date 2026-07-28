@@ -2,8 +2,11 @@ import Link from "next/link";
 import {
   ArrowUpRight,
   Building2,
+  CalendarPlus,
   Crosshair,
+  Presentation,
   Sparkles,
+  Tag,
   Target,
   Users,
 } from "lucide-react";
@@ -487,6 +490,35 @@ export default async function MatchingPage({
                           {r.label}
                         </span>
                       ))}
+                    </div>
+                    {/* Eşleşmeden ileri akış: sunum / randevu / teklif.
+                        Önceki halde tek çıkış "Portföyü aç"tı — eşleşme
+                        ekranı çıkmaz sokaktı. Üç kısayol da müşteri VE
+                        portföyü ön dolgulu taşır (param kontratları:
+                        sunumlar ?portfoy=&musteri=, randevular
+                        ?customer=&property=, teklifler ?musteri=&portfoy=). */}
+                    <div className="flex flex-wrap items-center gap-1.5 lg:justify-end">
+                      <Link
+                        href={`/app/portfoyler/sunumlar?portfoy=${pair.property.id}${customer ? `&musteri=${customer.id}` : ""}`}
+                        className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
+                        title="Bu portföyle müşteriye özel sunum linki hazırla"
+                      >
+                        <Presentation className="h-3 w-3" /> Sunum hazırla
+                      </Link>
+                      <Link
+                        href={`/app/randevular?property=${pair.property.id}${customer ? `&customer=${customer.id}` : ""}`}
+                        className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
+                        title="Bu portföy için yer gösterme randevusu planla"
+                      >
+                        <CalendarPlus className="h-3 w-3" /> Randevu ver
+                      </Link>
+                      <Link
+                        href={`/app/teklifler?portfoy=${pair.property.id}${customer ? `&musteri=${customer.id}` : ""}`}
+                        className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
+                        title="Müşterinin teklifini ön dolgulu kaydet"
+                      >
+                        <Tag className="h-3 w-3" /> Teklif al
+                      </Link>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                       <SaveMatchButton demandId={pair.demand.id} propertyId={pair.property.id} />

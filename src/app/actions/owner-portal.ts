@@ -74,6 +74,38 @@ function buildOwnerPortalUrl(token: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Malik portal linkini iptal et
+// ---------------------------------------------------------------------------
+
+/**
+ * `revoked_at` kolonu yok — iptal, expires_at'i "şimdi"ye çekmektir.
+ * `getOwnerPortalData` süresi geçmiş token'ı zaten reddediyor.
+ */
+export async function revokeOwnerPortalToken(formData: FormData): Promise<OwnerPortalResult> {
+  const gate = await requirePermission("properties", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return { error: "Portal linki bulunamadı." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("owner_portal_tokens")
+    .update({ expires_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId);
+
+  if (error) {
+    console.error("revokeOwnerPortalToken", error);
+    return { error: "Link iptal edilemedi." };
+  }
+
+  revalidatePath("/app/portfoyler/sunumlar");
+  revalidatePath("/app/portfoyler");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
 // Malik portal verilerini token ile getir (public — service role)
 // ---------------------------------------------------------------------------
 

@@ -70,10 +70,20 @@ function nextAnniversaryOf(startDate: string, today: string): string | null {
 export default async function KiralamaPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; ariza?: string; evre?: string }>;
+  searchParams?: Promise<{ durum?: string; ariza?: string; evre?: string; portfoy?: string; musteri?: string; tutar?: string }>;
 }) {
   const { perms } = await requireModulePage("rentals");
   const params = (await searchParams) ?? {};
+  /*
+   * Kazanılan KİRA anlaşmasının köprüsü: kazanma sihirbazı
+   * /app/kiralama?portfoy=&musteri=&tutar= ile gelir. Bunlar liste filtresi
+   * değil, "yeni kira kaydı" diyaloğunun ön dolgusudur — diyalog açık gelir.
+   */
+  const prefillPropertyId = (params.portfoy ?? "").trim() || null;
+  const prefillCustomerId = (params.musteri ?? "").trim() || null;
+  const prefillRentParsed = Number(params.tutar ?? "");
+  const prefillRent =
+    Number.isFinite(prefillRentParsed) && prefillRentParsed > 0 ? Math.round(prefillRentParsed) : null;
   const durumF = DURUM_FILTERS.includes(params.durum as DurumFilter) ? (params.durum as DurumFilter) : "";
   const arizaF = params.ariza === "acik";
   const evreF = EVRELER.includes(params.evre as Evre) ? (params.evre as Evre) : "";
@@ -112,6 +122,36 @@ export default async function KiralamaPage({
   const rentals = rentalData ?? [];
   const charges = chargeData ?? [];
   const maints = maintData ?? [];
+
+  /*
+   * Seçici havuzları "son eklenen 100" kısayolu. Ön dolgu havuz dışında
+   * kalırsa sessizce düşerdi — eksik kayıtlar tek sorguyla listeye eklenir.
+   */
+  const dialogProperties = [...(propData ?? [])];
+  const dialogCustomers = [...(custData ?? [])];
+  if (prefillPropertyId && !dialogProperties.some((p) => p.id === prefillPropertyId)) {
+    const { data: extra } = await supabase
+      .from("properties")
+      .select("id, property_code, title")
+      .eq("id", prefillPropertyId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (extra) dialogProperties.unshift(extra);
+  }
+  if (prefillCustomerId && !dialogCustomers.some((c) => c.id === prefillCustomerId)) {
+    const { data: extra } = await supabase
+      .from("customers")
+      .select("id, full_name, phone")
+      .eq("id", prefillCustomerId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (extra) dialogCustomers.unshift(extra);
+  }
+  const validPrefillProperty =
+    prefillPropertyId && dialogProperties.some((p) => p.id === prefillPropertyId) ? prefillPropertyId : null;
+  const validPrefillCustomer =
+    prefillCustomerId && dialogCustomers.some((c) => c.id === prefillCustomerId) ? prefillCustomerId : null;
+  const autoOpenRentalDialog = canCreate && Boolean(validPrefillProperty || validPrefillCustomer);
 
   const today = daysAgoIso(0).slice(0, 10);
   const curMonth = today.slice(0, 7);
@@ -211,7 +251,15 @@ export default async function KiralamaPage({
             >
               Kira artış hesaplayıcı
             </Link>
-            {canCreate ? <NewRentalDialog properties={propData ?? []} customers={custData ?? []} /> : null}
+            {canCreate ? <NewRentalDialog
+                /* Kazanılan kira anlaşması köprüsü: ?portfoy=&musteri=&tutar= */
+                properties={dialogProperties}
+                customers={dialogCustomers}
+                defaultPropertyId={validPrefillProperty}
+                defaultCustomerId={validPrefillCustomer}
+                defaultMonthlyRent={prefillRent}
+                autoOpen={autoOpenRentalDialog}
+              /> : null}
           </div>
         </div>
       </section>
@@ -391,7 +439,19 @@ export default async function KiralamaPage({
             rentals.length > 0
               ? { href: "/app/kiralama", label: "Filtreyi temizle" }
               : canCreate
-                ? { node: <NewRentalDialog properties={propData ?? []} customers={custData ?? []} /> }
+                ? {
+                    node: (
+                      /* autoOpen YOK: üstteki örnek zaten ön dolgulu açılıyor,
+                         ikisi birden açılırsa iki modal üst üste gelir. */
+                      <NewRentalDialog
+                        properties={dialogProperties}
+                        customers={dialogCustomers}
+                        defaultPropertyId={validPrefillProperty}
+                        defaultCustomerId={validPrefillCustomer}
+                        defaultMonthlyRent={prefillRent}
+                      />
+                    ),
+                  }
                 : undefined
           }
         />

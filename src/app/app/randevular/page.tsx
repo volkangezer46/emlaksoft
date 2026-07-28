@@ -1,7 +1,7 @@
 import {
+  AlertTriangle,
   ArrowUpRight,
   CalendarClock,
-  CalendarDays,
   CheckCircle2,
   XCircle,
   Clock3,
@@ -10,12 +10,14 @@ import {
   MapPinned,
   Navigation,
   Radio,
-  UserRound,
+  Undo2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { setAppointmentStatus } from "@/app/actions/appointments";
 import { NewAppointmentDialog } from "./new-appointment-dialog";
+import { CompleteAppointmentDialog } from "./complete-appointment-dialog";
+import { APPOINTMENT_OUTCOME_META, isAppointmentOutcome } from "@/lib/appointment-outcome";
 import { getDefinitions } from "@/lib/definitions";
 import { AddToCalendarButton } from "@/components/app/add-to-calendar-button";
 import { AppointmentCalendar } from "./appointment-calendar";
@@ -27,9 +29,13 @@ import { AppointmentEditDialog } from "./appointment-edit-dialog";
 import { ExportIcsButton } from "./export-ics-button";
 import { CopyConfirmLink } from "./copy-confirm-link";
 import { CalendarSubscribeCard } from "./calendar-subscribe-card";
+import { BookingLinkCard } from "./booking-link-card";
 import Link from "next/link";
 import { EmptyState } from "@/components/app/empty-state";
+import { TR_OFFSET_MIN } from "@/lib/booking-slots";
+import { isOnLeave, type LeaveLike } from "@/lib/leave-utils";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
+import { ICONS } from "@/lib/icons";
 
 type RelRow = { id?: string; full_name?: string; title?: string; property_code?: string; lat?: number | null; lng?: number | null };
 type Rel = RelRow | RelRow[] | null;
@@ -44,6 +50,11 @@ type AppointmentRow = {
   notes: string | null;
   confirm_token: string | null;
   customer_response: string | null;
+  /** İzin ipucu için gerekli — randevunun danışmanı. */
+  assigned_to: string | null;
+  /** Danışmanın randevu değerlendirmesi (migration 126) — eşleştirme geri bildirimi DEĞİL. */
+  outcome: string | null;
+  outcome_note: string | null;
   customer: Rel;
   property: Rel;
 };
@@ -90,7 +101,7 @@ const FILTERABLE_STATUSES = ["pending", "confirmed", "signature", "completed"];
 export default async function AppointmentsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ tip?: string; durum?: string; customer?: string; gorunum?: string; tarih?: string; gun?: string; danisman?: string }>;
+  searchParams?: Promise<{ tip?: string; durum?: string; customer?: string; property?: string; gorunum?: string; tarih?: string; gun?: string; danisman?: string }>;
 }) {
   const gate = await requireModulePage("appointments");
   const supabase = await createClient();
@@ -98,6 +109,9 @@ export default async function AppointmentsPage({
   const tipF = sp.tip && typeLabel[sp.tip] ? sp.tip : "";
   const durumF = sp.durum && FILTERABLE_STATUSES.includes(sp.durum) ? sp.durum : "";
   const customerF = sp.customer ?? "";
+  // ?property= — eşleştirme ekranındaki "Randevu ver" kısayolu portföyü de
+  // taşır: liste o portföye süzülür ve yeni randevu diyaloğu ön seçili gelir.
+  const propertyF = sp.property ?? "";
 
   // ?gorunum=ay|hafta|gun|rota — ay: mevcut takvim, hafta: 7 kolonlu saat ızgarası,
   // gün: tek kolon detay, rota: günün durak listesi + harita. ?tarih=YYYY-MM-DD
@@ -130,15 +144,16 @@ export default async function AppointmentsPage({
     // count: liste 100 randevuyla sınırlı; yoğun bir ofiste bu kolayca
     // aşılır ve kullanıcı eksik takvim görüp bunu tam sanar.
     .select(
-      "id, appointment_type, scheduled_at, duration_min, location, status, notes, confirm_token, customer_response, customer:customers(id, full_name), property:properties(id, title, property_code, lat, lng)",
+      "id, appointment_type, scheduled_at, duration_min, location, status, notes, confirm_token, customer_response, assigned_to, outcome, outcome_note, customer:customers(id, full_name), property:properties(id, title, property_code, lat, lng)",
       { count: "exact" },
     )
     .neq("status", "cancelled");
   if (tipF) apptQuery = apptQuery.eq("appointment_type", tipF);
   if (durumF) apptQuery = apptQuery.eq("status", durumF);
   if (customerF) apptQuery = apptQuery.eq("customer_id", customerF);
+  if (propertyF) apptQuery = apptQuery.eq("property_id", propertyF);
 
-  const [{ data: appts, count: apptTotal }, { data: customers }, { data: properties }, apptTypeDefs, { data: filteredCustomer }] = await Promise.all([
+  const [{ data: appts, count: apptTotal }, { data: customers }, { data: properties }, apptTypeDefs, { data: filteredCustomer }, { data: filteredProperty }] = await Promise.all([
     apptQuery.order("scheduled_at", { ascending: true }).limit(100),
     // Bu iki sorgu SINIRSIZDI: sayfa her acildiginda ofisin TUM musteri ve
     // portfoy kayitlari cekiliyordu. Secici artik sunucu tarafinda arama
@@ -152,6 +167,11 @@ export default async function AppointmentsPage({
     customerF
       ? supabase.from("customers").select("id, full_name").eq("id", customerF).maybeSingle()
       : Promise.resolve({ data: null }),
+    // ?property= ile gelindiğinde (eşleştirme → "Randevu ver") çipte ad
+    // gösterebilmek ve diyalogda portföyü önceden seçmek için tek kayıt.
+    propertyF
+      ? supabase.from("properties").select("id, title, property_code").eq("id", propertyF).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   // Takvim aboneliği (ICS) linki — kullanıcının kendi profilindeki gizli token.
@@ -164,17 +184,42 @@ export default async function AppointmentsPage({
   const appointmentTypeOptions = apptTypeDefs.length > 0 ? apptTypeDefs.map((t) => ({ value: t.value, label: t.label })) : undefined;
 
   const rows = (appts ?? []) as AppointmentRow[];
+
+  /*
+   * "Danışman izinde" ipucu — randevunun düştüğü günde atanan danışman
+   * ONAYLI izinliyse satırda amber uyarı çıkar (izin kaynağı: staff_leaves,
+   * bkz. /app/ekip/izinler). Online randevu linki izinli günü zaten kapatır;
+   * bu ipucu ELLE girilmiş / izin sonradan yazılmış randevuları yakalar.
+   * Tek sorgu: listedeki randevuların kapsadığı gün aralığı.
+   */
+  let leaveRows: LeaveLike[] = [];
+  if (rows.length > 0) {
+    const dayKeys = rows.map((r) => new Date(Date.parse(r.scheduled_at) + TR_OFFSET_MIN * 60_000).toISOString().slice(0, 10));
+    const { data: leaves } = await supabase
+      .from("staff_leaves")
+      .select("staff_id, starts_on, ends_on, status")
+      .eq("status", "onayli")
+      .lte("starts_on", dayKeys.reduce((a, d) => (d > a ? d : a), dayKeys[0]!))
+      .gte("ends_on", dayKeys.reduce((a, d) => (d < a ? d : a), dayKeys[0]!))
+      .limit(500);
+    leaveRows = (leaves ?? []) as LeaveLike[];
+  }
+
   const customerOptions = (customers ?? []).map((c) => ({ id: c.id, label: c.full_name }));
   if (filteredCustomer && !customerOptions.some((c) => c.id === filteredCustomer.id)) {
     customerOptions.unshift({ id: filteredCustomer.id, label: filteredCustomer.full_name });
   }
   const propertyOptions = (properties ?? []).map((p) => ({ id: p.id, label: p.title || p.property_code }));
+  if (filteredProperty && !propertyOptions.some((p) => p.id === filteredProperty.id)) {
+    propertyOptions.unshift({ id: filteredProperty.id, label: filteredProperty.title || filteredProperty.property_code });
+  }
 
   // Filtre linkleri diğer parametreleri korur (görünüm/tarih dahil).
-  const apptHref = (patch: { tip?: string; durum?: string; customer?: string; gorunum?: string; tarih?: string; gun?: string; danisman?: string }) => {
+  const apptHref = (patch: { tip?: string; durum?: string; customer?: string; property?: string; gorunum?: string; tarih?: string; gun?: string; danisman?: string }) => {
     const tip = patch.tip !== undefined ? patch.tip : tipF;
     const durum = patch.durum !== undefined ? patch.durum : durumF;
     const cust = patch.customer !== undefined ? patch.customer : customerF;
+    const prop = patch.property !== undefined ? patch.property : propertyF;
     const view = patch.gorunum !== undefined ? patch.gorunum : gorunum;
     const tarih = patch.tarih !== undefined ? patch.tarih : (sp.tarih ?? "");
     const gun = patch.gun !== undefined ? patch.gun : rotaGun;
@@ -183,6 +228,7 @@ export default async function AppointmentsPage({
     if (tip) q.set("tip", tip);
     if (durum) q.set("durum", durum);
     if (cust) q.set("customer", cust);
+    if (prop) q.set("property", prop);
     if (view && view !== "ay") q.set("gorunum", view);
     if (tarih && (view === "hafta" || view === "gun")) q.set("tarih", tarih);
     if (view === "rota") {
@@ -396,16 +442,16 @@ export default async function AppointmentsPage({
                 };
               })}
             />
-            <NewAppointmentDialog customers={customerOptions} properties={propertyOptions} typeOptions={appointmentTypeOptions} defaultCustomerId={filteredCustomer?.id} />
+            <NewAppointmentDialog customers={customerOptions} properties={propertyOptions} typeOptions={appointmentTypeOptions} defaultCustomerId={filteredCustomer?.id} defaultPropertyId={filteredProperty?.id} />
           </div>
         </div>
         <div className="relative mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="stagger-grid grid grid-cols-3 gap-3">
             {/* Bugünkü sayaç takvime (bugün seçili açılır), diğerleri tip/durum filtresine iner. */}
             {[
-              { label: "Bugünkü randevu", value: todayRows.length, icon: CalendarDays, tone: "text-cyan-400", href: "#takvim" },
-              { label: "Yer gösterme", value: showings, icon: MapPinned, tone: "text-mint-400", href: apptHref({ tip: tipF === "showing" ? "" : "showing" }) },
-              { label: "İmza eksik", value: pendingSign, icon: FileSignature, tone: "text-danger-500", href: apptHref({ durum: durumF === "signature" ? "" : "signature" }) },
+              { label: "Bugünkü randevu", value: todayRows.length, icon: ICONS.randevu, tone: "text-cyan-400", href: "#takvim" },
+              { label: "Yer gösterme", value: showings, icon: ICONS.bolge, tone: "text-mint-400", href: apptHref({ tip: tipF === "showing" ? "" : "showing" }) },
+              { label: "İmza eksik", value: pendingSign, icon: ICONS.sozlesme, tone: "text-danger-500", href: apptHref({ durum: durumF === "signature" ? "" : "signature" }) },
             ].map((item) => (
               <Link
                 key={item.label}
@@ -498,6 +544,15 @@ export default async function AppointmentsPage({
             Müşteri: {filteredCustomer.full_name} ✕
           </Link>
         ) : null}
+        {filteredProperty ? (
+          <Link
+            href={apptHref({ property: "" })}
+            className="rounded-full bg-mint-500/15 px-3.5 py-1.5 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/25"
+            title="Portföy filtresini kaldır"
+          >
+            Portföy: {filteredProperty.title || filteredProperty.property_code} ✕
+          </Link>
+        ) : null}
       </div>
 
       {/* Takvim görünümü — #takvim: hero "Bugünkü randevu" sayacının hedefi.
@@ -549,6 +604,7 @@ export default async function AppointmentsPage({
                 properties={propertyOptions}
                 typeOptions={appointmentTypeOptions}
                 defaultCustomerId={filteredCustomer?.id}
+                defaultPropertyId={filteredProperty?.id}
               />
             }
           />
@@ -577,10 +633,12 @@ export default async function AppointmentsPage({
         {/* timeline */}
         {rows.length === 0 ? (
           <EmptyState
-            icon={CalendarDays}
+            icon={ICONS.randevu}
+            illustration="start"
             title="Henüz randevu yok"
             description="İlk yer gösterme veya görüşmenizi planladığınızda tur planı burada oluşacak."
             tone="mint"
+            secondary={{ href: "/app/musteriler", label: "Müşteri seç" }}
           />
         ) : (
           <section className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
@@ -643,6 +701,15 @@ export default async function AppointmentsPage({
                       <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-text-faint">
                         {appt.location ? <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {appt.location}</span> : null}
                         {appt.duration_min ? <span className="flex items-center gap-1"><Clock3 className="h-3 w-3" /> {appt.duration_min} dk</span> : null}
+                        {appt.assigned_to && isOnLeave(leaveRows, appt.assigned_to, new Date(date.getTime() + TR_OFFSET_MIN * 60_000).toISOString().slice(0, 10)) ? (
+                          <Link
+                            href="/app/ekip/izinler"
+                            className="relative z-10 inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 font-bold text-amber-600 transition hover:bg-amber-400/25"
+                            title="Randevunun danışmanı o gün izinli — devretmeyi düşünün"
+                          >
+                            <AlertTriangle className="h-3 w-3" /> Danışman izinde
+                          </Link>
+                        ) : null}
                       </div>
                     </div>
                     <div className="relative z-10 flex items-center gap-2 md:flex-col md:items-end">
@@ -651,6 +718,16 @@ export default async function AppointmentsPage({
                         {appt.customer_response && responseMeta[appt.customer_response] ? (
                           <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${responseMeta[appt.customer_response].cls}`}>
                             {responseMeta[appt.customer_response].label}
+                          </span>
+                        ) : null}
+                        {/* Randevu sonucu — danışman değerlendirmesi (outcome) */}
+                        {appt.outcome && isAppointmentOutcome(appt.outcome) ? (
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${APPOINTMENT_OUTCOME_META[appt.outcome].cls}`}
+                            title={appt.outcome_note ?? "Randevu sonucu"}
+                          >
+                            {APPOINTMENT_OUTCOME_META[appt.outcome].emoji}{" "}
+                            {APPOINTMENT_OUTCOME_META[appt.outcome].label}
                           </span>
                         ) : null}
                       </span>
@@ -662,13 +739,26 @@ export default async function AppointmentsPage({
                             <button type="submit" className="inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-mint-600 transition hover:border-mint-500/40"><CheckCircle2 className="h-3 w-3" /> Onayla</button>
                           </form>
                         ) : null}
+                        {/* Tamamlama artık sonuç soran diyalogdan geçer
+                            (olumlu/kararsız/olumsuz + not → appointments.outcome). */}
                         {appt.status !== "completed" ? (
+                          <CompleteAppointmentDialog appointmentId={appt.id} customerName={customerName} />
+                        ) : (
+                          /* Yanlış tamamlanan randevu artık kilitli değil:
+                             server action zaten geri dönüşe izin veriyordu,
+                             UI'da düğmesi yoktu. Geri alma sonuç notunu da siler. */
                           <form action={setAppointmentStatus}>
                             <input type="hidden" name="id" value={appt.id} />
-                            <input type="hidden" name="status" value="completed" />
-                            <button type="submit" className="inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-brand-600 transition hover:border-brand-300"><CheckCircle2 className="h-3 w-3" /> Tamamlandı</button>
+                            <input type="hidden" name="status" value="confirmed" />
+                            <button
+                              type="submit"
+                              title="Randevuyu tamamlanmamışa çevir (sonuç notu silinir)"
+                              className="inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-text-muted transition hover:border-amber-400 hover:text-amber-600"
+                            >
+                              <Undo2 className="h-3 w-3" /> Geri al
+                            </button>
                           </form>
-                        ) : null}
+                        )}
                         {appt.status !== "completed" ? (
                           <AppointmentEditDialog
                             appointment={{ id: appt.id, appointment_type: appt.appointment_type, scheduled_at: appt.scheduled_at, duration_min: appt.duration_min, location: appt.location, notes: appt.notes }}
@@ -720,6 +810,9 @@ export default async function AppointmentsPage({
           {/* Kişisel ICS abonelik linki — Google/Apple/Outlook otomatik senkron */}
           {calendarToken ? <CalendarSubscribeCard token={calendarToken} /> : null}
 
+          {/* Müşterinin kendi randevusunu aldığı public link (/randevu-al/[token]) */}
+          <BookingLinkCard userId={gate.userId} />
+
           <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
             <div className="flex items-center gap-2">
               <span className="grid h-9 w-9 place-items-center rounded-[11px] bg-mint-500/12 text-mint-600"><FileSignature className="h-4 w-4" /></span>
@@ -763,7 +856,9 @@ export default async function AppointmentsPage({
 
           <section className="rounded-[20px] border border-line bg-surface p-5">
             <div className="flex items-center gap-2">
-              <UserRound className="h-4 w-4 text-brand-600" />
+              {/* İkonografi: burada UserRound (kişi ikonu) vardı; panel randevu
+                  türlerini anlatıyor — kavramın ikonu ICONS.randevu. */}
+              <ICONS.randevu className="h-4 w-4 text-brand-600" />
               <h2 className="font-display font-bold text-ink-950">Randevu türleri</h2>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">

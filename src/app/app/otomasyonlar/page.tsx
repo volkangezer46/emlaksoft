@@ -165,8 +165,11 @@ export default async function OtomasyonlarPage({
 
       {/* Hazır şablonlar */}
       <section className="rounded-[20px] border border-dashed border-brand-300/40 bg-brand-600/[0.02] p-5">
-        <h2 className="mb-3 flex items-center gap-2 font-display font-bold text-ink-950">
+        <h2 className="mb-3 flex flex-wrap items-center gap-2 font-display font-bold text-ink-950">
           <Zap className="h-4 w-4 text-brand-600" /> Hızlı başlangıç şablonları
+          <Link href="/app/ayarlar/is-akislari" className="focus-ring ml-auto rounded-[8px] text-xs font-semibold text-brand-600 hover:underline">
+            Çok adımlı görev paketi mi lazım? İş akışları →
+          </Link>
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[

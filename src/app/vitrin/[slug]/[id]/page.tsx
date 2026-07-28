@@ -22,7 +22,10 @@ import { FavButton } from "@/components/public/fav-button";
 import { VitrinCardShell } from "@/components/public/vitrin-fav";
 import { FavNavBadge } from "../fav-nav-badge";
 import { PriceAlertForm } from "./price-alert-form";
-import { DAY_MS, msSince } from "@/lib/clock";
+import { PurchaseCalculator } from "./purchase-calculator";
+import { InvestmentPanel } from "./investment-panel";
+import { DAY_MS, msSince, now } from "@/lib/clock";
+import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 
 // Lightbox etkileşimli client komponenti — dynamic import ile ayrı chunk'a
 // alınır, galeri alanı yüklenene dek en-boy oranını koruyan iskelet görünür.
@@ -195,9 +198,12 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
   if (price != null && price > 0) {
     similarQuery = similarQuery.gte("list_price", Math.round(price * 0.7)).lte("list_price", Math.round(price * 1.3));
   }
-  const [description, { data: similarData }] = await Promise.all([
+  const [description, { data: similarData }, fxRates] = await Promise.all([
     fetchDescription(admin, id, property.features),
     similarQuery,
+    // Döviz karşılığı sunucuda hesaplanır — ISR (revalidate=120) korunur,
+    // client'ta kur çekme/hesap YOK. Kur yoksa null → satır hiç basılmaz.
+    fetchLatestRates(admin),
     // Günlük görüntülenme sayacı (listing_views): atomik upsert +1.
     // NOT: Sayfa ISR ile 120 sn CDN önbellekli — sayaç yalnızca yeniden
     // doğrulama render'larında artar, yani YAKLAŞIK sayımdır (trend göstergesi).
@@ -209,6 +215,10 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
       }),
   ]);
   const similar = similarData ?? [];
+
+  // Kur tarihi ipucu — fiyatın altındaki döviz satırının `title` değeri.
+  const fxTitle = fxRates ? `TCMB ${fxRates.rateDate} satış kuru — ${fxAgeLabel(fxRates.rateDate, now())}` : undefined;
+  const fxLine = fxApproxLine(price, fxRates);
 
   const similarCoverMap = new Map<string, string>();
   if (similar.length) {
@@ -243,6 +253,10 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
     feat.baths ? { icon: Bath, label: `${feat.baths} banyo` } : null,
     feat.sqm ? { icon: Ruler, label: `${feat.sqm} m²` } : null,
   ].filter(Boolean) as { icon: typeof BedDouble; label: string }[];
+
+  // Kiralık ilanda peşinat/kredi hesabı anlamsız — hesaplayıcı yalnız satılıkta.
+  const txRaw = (property.transaction_type ?? "").toLowerCase();
+  const isSale = !(txRaw === "rent" || txRaw.includes("kira"));
 
   const officeTel = toTelHref(tenant.phone);
   const officeWhatsApp = toWhatsAppLink(
@@ -374,6 +388,12 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
               <p className="mt-4 font-display text-3xl font-extrabold text-brand-600">
                 {money(price, property.transaction_type)}
               </p>
+              {/* Döviz karşılığı — kur yoksa hiç gösterilmez */}
+              {fxLine ? (
+                <p className="mt-1 text-xs text-text-faint" title={fxTitle}>
+                  {fxLine}
+                </p>
+              ) : null}
               <p className="mt-1 text-xs text-text-muted">{property.property_type}</p>
 
               {specs.length > 0 ? (
@@ -393,10 +413,23 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                 <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-text-muted">{description}</p>
               </div>
             ) : null}
+
+            {/* Alım maliyeti & kredi hesaplayıcısı — yalnız fiyatlı SATILIK ilanda
+                (kiralıkta peşinat/taksit kavramı yok). Tamamen client hesap:
+                sayfanın ISR önbelleği bozulmaz. */}
+            {isSale && price != null && price > 0 ? (
+              <PurchaseCalculator price={price} sqm={feat.sqm ?? null} leadAnchorId="talep-formu" />
+            ) : null}
+
+            {/* Yatırım getirisi — aynı koşullar (fiyatlı satılık) ve aynı gerekçe:
+                %100 client hesap, ISR önbelleği bozulmaz. */}
+            {isSale && price != null && price > 0 ? (
+              <InvestmentPanel price={price} leadAnchorId="talep-formu" />
+            ) : null}
           </div>
 
-          {/* Lead form */}
-          <div className="lg:sticky lg:top-6 lg:self-start">
+          {/* Lead form — id: hesaplayıcının "bize ulaşın" düğmesi buraya kaydırır */}
+          <div id="talep-formu" className="scroll-mt-6 lg:sticky lg:top-6 lg:self-start">
             <div className="overflow-hidden rounded-[18px] border border-line">
               <div className="theme-dark bg-[#071a38] p-6">
                 <Link
@@ -508,6 +541,10 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                       <p className="mt-3 font-display text-lg font-extrabold text-brand-600">
                         {money(p.list_price != null ? Number(p.list_price) : null, p.transaction_type)}
                       </p>
+                      {(() => {
+                        const line = fxApproxLine(p.list_price != null ? Number(p.list_price) : null, fxRates);
+                        return line ? <p className="mt-0.5 text-[11px] text-text-faint" title={fxTitle}>{line}</p> : null;
+                      })()}
                     </div>
                   </Link>
                   </VitrinCardShell>

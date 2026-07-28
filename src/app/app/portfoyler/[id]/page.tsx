@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -15,8 +16,6 @@ import {
   RadioTower,
   Siren,
   Sparkles,
-  Timer,
-  TrendingUp,
   UserRound,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -30,23 +29,35 @@ import { confirmPortalListing } from "@/app/actions/portal-listings";
 import { PropertyWorkflow } from "./property-workflow";
 import { EditPropertyDialog } from "./edit-property-dialog";
 import { DeletePropertyButton, ReassignProperty } from "./property-admin-actions";
-import { PropertyMediaManager, type MediaItem } from "./property-media-manager";
 import { AiContentPanel } from "./ai-content-panel";
-import { PropertyStatusHistory, PropertyAuthorizationPanel, PublishToPortalsPanel } from "./property-extras";
-import { PropertyPriceHistory } from "./property-price-history";
-import { PropertyHealthCard, ListingQualityCard } from "@/components/app/property-health-card";
+import { PropertyAuthorizationPanel } from "./property-extras";
 import { RelatedPropertiesWidget } from "./related-properties-widget";
 import { TapuInquiryPanel } from "./tapu-inquiry-panel";
 import { PropertyMap } from "@/components/app/property-map";
-import { computePropertyHealth, computeListingQuality } from "@/lib/property-health";
 import { computePriceHealth } from "@/lib/price-health";
 import { isEndeksaConfigured } from "@/lib/integrations/endeksa";
 import { isTapusorConfigured } from "@/lib/integrations/tapusor";
-import { getConfiguredPortals } from "@/app/actions/portal-publish";
-import { getPropertyStatusHistory } from "@/app/actions/property-management";
-import { getPropertyPriceHistory } from "@/app/actions/property-price-history";
-import { getPropertyTimeline } from "@/app/actions/property-timeline";
-import { PropertyTimeline } from "./property-timeline";
+import { msSince, now } from "@/lib/clock";
+import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
+import {
+  ClosuresSection,
+  HealthSection,
+  HealthSkeleton,
+  InvestmentSection,
+  KeysSection,
+  KeysSkeleton,
+  MediaSection,
+  MediaSkeleton,
+  PriceHistorySection,
+  PriceHistorySkeleton,
+  PublishSection,
+  PublishSkeleton,
+  RelatedSkeleton,
+  StatusHistorySection,
+  StatusHistorySkeleton,
+  TimelineSection,
+  TimelineSkeleton,
+} from "./sections";
 import type { CSSProperties } from "react";
 
 const RING_C = 2 * Math.PI * 42;
@@ -64,16 +75,6 @@ type Portal = {
   removal_reason: string | null;
 };
 
-type Closure = {
-  id: string;
-  reason: string;
-  estimated_lost_commission: number | null;
-  competitor_closed: boolean | null;
-  closed_by_us: boolean | null;
-  created_at: string;
-  portal_listing_id: string;
-};
-
 function relName(value: Rel, key: "name" | "full_name" = "name") {
   if (!value) return null;
   const row = Array.isArray(value) ? value[0] : value;
@@ -82,7 +83,7 @@ function relName(value: Rel, key: "name" | "full_name" = "name") {
 
 function daysSince(value: string | null) {
   if (!value) return 999;
-  return Math.floor((Date.now() - new Date(value).getTime()) / 86_400_000);
+  return Math.floor(msSince(value) / 86_400_000);
 }
 
 function formatPrice(value: number | null, transaction: string) {
@@ -99,6 +100,14 @@ const statusOptions = [
   { value: "archived", label: "Arşiv" },
 ];
 
+/**
+ * Portföy detayı — künye (hero) BLOKLAR, geri kalan her şey AKAR.
+ *
+ * Eskiden tek gövdede ~20 sorgu vardı ve en yavaşı (bölge `region_stats`
+ * RPC'leri, zaman tüneli) ilk boyamayı rehin alıyordu. Artık yalnız künyenin
+ * gerçekten ihtiyaç duyduğu sorgular bekleniyor; ağır/ikincil bölümler
+ * `./sections.tsx` içinde kendi `<Suspense>` sınırlarında akarak geliyor.
+ */
 export default async function PropertyDetailPage({
   params,
 }: {
@@ -110,8 +119,18 @@ export default async function PropertyDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  // 1. tur — hepsi yalnızca `id`'ye bağlı, tam paralel
-  const [{ data: property }, { data: portalsData }, { data: dealsData }, statusHistory, priceHistory, timeline, configuredPortals, propertyTypeDefs, transactionTypeDefs] = await Promise.all([
+  // KÜNYE BATCH'İ — yalnız hero + üst kartların ihtiyacı. Hepsi `id`'ye bağlı,
+  // tam paralel. Zaman tüneli / fiyat geçmişi / bölge RPC'leri artık BURADA DEĞİL.
+  const [
+    { data: property },
+    { data: portalsData },
+    { data: dealsData },
+    { data: provinces },
+    { data: teamMembers },
+    propertyTypeDefs,
+    transactionTypeDefs,
+    fxRates,
+  ] = await Promise.all([
     supabase
       .from("properties")
       .select(
@@ -132,15 +151,24 @@ export default async function PropertyDetailPage({
       .eq("property_id", id)
       .order("updated_at", { ascending: false })
       .limit(20),
-    getPropertyStatusHistory(id),
-    getPropertyPriceHistory(id),
-    getPropertyTimeline(id),
-    getConfiguredPortals(),
+    supabase.from("geo_provinces").select("id, name").order("name"),
+    supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
     getDefinitions("property_type"),
     getDefinitions("transaction_type"),
+    // TCMB kuru — yoksa null döner ve döviz satırı hiç basılmaz
+    fetchLatestRates(supabase),
   ]);
 
   if (!property) notFound();
+
+  // Atanan danışman adı — `property.assigned_to` bilinmeden sorulamıyor.
+  const { data: assigneeProfile } = property.assigned_to
+    ? await supabase.from("profiles").select("full_name").eq("id", property.assigned_to).maybeSingle()
+    : { data: null };
+
+  // Fiyatın altındaki "≈ $X · €Y" satırı; kur tarihi title ipucunda.
+  const fxLine = fxApproxLine(property.list_price != null ? Number(property.list_price) : null, fxRates);
+  const fxTitle = fxRates ? `TCMB ${fxRates.rateDate} satış kuru — ${fxAgeLabel(fxRates.rateDate, now())}` : undefined;
 
   const propertyTypeOptions = propertyTypeDefs.length ? propertyTypeDefs.map((d) => d.value) : undefined;
   const transactionTypeOptions = transactionTypeDefs.length ? transactionTypeDefs.map((d) => d.value) : undefined;
@@ -148,43 +176,11 @@ export default async function PropertyDetailPage({
   const portals = (portalsData ?? []) as Portal[];
   const portalIds = portals.map((p) => p.id);
 
-  // Yatırım görünümü için bölge medyanları — ilçe yoksa hiç sorgulanmaz
-  const regionStatsFor = (txType: string) =>
-    property.district_id && tenantId
-      ? supabase.rpc("region_stats", { p_tenant_id: tenantId, p_transaction_type: txType, p_months_back: 12 })
-      : Promise.resolve({ data: null });
-
-  const [{ data: closuresData }, { data: assigneeProfile }, { data: provinces }, { data: teamMembers }, { data: mediaData }, regionSaleRes, regionRentRes] = await Promise.all([
-    portalIds.length
-      ? supabase
-          .from("listing_closures")
-          .select("id, reason, estimated_lost_commission, competitor_closed, closed_by_us, created_at, portal_listing_id")
-          .in("portal_listing_id", portalIds)
-          .order("created_at", { ascending: false })
-      : Promise.resolve({ data: [] as Closure[] }),
-    property.assigned_to
-      ? supabase.from("profiles").select("full_name").eq("id", property.assigned_to).maybeSingle()
-      : Promise.resolve({ data: null }),
-    supabase.from("geo_provinces").select("id, name").order("name"),
-    supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
-    supabase
-      .from("property_media")
-      .select("id, kind, storage_path, external_url, is_cover")
-      .eq("property_id", id)
-      .order("is_cover", { ascending: false })
-      .order("sort_order", { ascending: true }),
-    regionStatsFor("Satılık"),
-    regionStatsFor("Kiralık"),
-  ]);
-
-  const closures = (closuresData ?? []) as Closure[];
-  const media = (mediaData ?? []) as MediaItem[];
   const dealRows = (dealsData ?? []) as { id: string; stage: string }[];
   const relatedDeal = dealRows.find((d) => d.stage !== "won" && d.stage !== "lost") ?? dealRows[0] ?? null;
   const pipelineHref = relatedDeal ? `/app/anlasmalar/${relatedDeal.id}` : "/app/anlasmalar";
   const livePortals = portals.filter((p) => p.status === "live");
   const overdue = livePortals.filter((p) => daysSince(p.last_confirmed_at) >= 7);
-  const lostTotal = closures.reduce((s, c) => s + Number(c.estimated_lost_commission || 0), 0);
 
   const features = (property.features ?? {}) as { rooms?: string | null; sqm?: number | null };
   const province = relName(property.province as Rel);
@@ -211,86 +207,12 @@ export default async function PropertyDetailPage({
     districtHint: district ?? province,
   });
 
-  // ---- Yatırım görünümü (bölge kira çarpanı + tahmini satış süresi) --------
-  // Kaynak: yalnızca ofisin kendi verisinden hesaplanan region_stats medyanları.
-  type RegionStatLite = { district_id: string; median_sqm_price: number | string | null; avg_days_listed: number | string | null };
-  const findRegionRow = (res: { data: unknown } | null) =>
-    ((res?.data ?? []) as RegionStatLite[]).find((r) => r.district_id === property.district_id) ?? null;
-  const saleRegion = findRegionRow(regionSaleRes);
-  const rentRegion = findRegionRow(regionRentRes);
-  const saleMedianSqm = saleRegion?.median_sqm_price != null && Number(saleRegion.median_sqm_price) > 0 ? Number(saleRegion.median_sqm_price) : null;
-  const rentMedianSqm = rentRegion?.median_sqm_price != null && Number(rentRegion.median_sqm_price) > 0 ? Number(rentRegion.median_sqm_price) : null;
-
   const isRentListing =
     property.transaction_type === "rent" || property.transaction_type === "Kiralık" || property.transaction_type === "kiralik";
-  const sqmNum = features.sqm != null && Number(features.sqm) > 0 ? Number(features.sqm) : null;
-  const listPriceNum = property.list_price != null && Number(property.list_price) > 0 ? Number(property.list_price) : null;
 
-  // Bölge kira çarpanı: satılık medyan ₺/m² ÷ (kiralık medyan aylık ₺/m² × 12)
-  const regionMultiplier = saleMedianSqm != null && rentMedianSqm != null ? saleMedianSqm / (rentMedianSqm * 12) : null;
-
-  // Portföye özgü amortisman: kendi fiyatı + karşı tipin bölge medyanı.
-  // m² veya fiyat yoksa bölge çarpanına düşülür; o da yoksa hesap yapılmaz.
-  let amortYears: number | null = null;
-  if (isRentListing) {
-    amortYears =
-      listPriceNum != null && sqmNum != null && saleMedianSqm != null
-        ? (saleMedianSqm * sqmNum) / (listPriceNum * 12)
-        : regionMultiplier;
-  } else {
-    amortYears =
-      listPriceNum != null && sqmNum != null && rentMedianSqm != null
-        ? listPriceNum / (rentMedianSqm * sqmNum * 12)
-        : regionMultiplier;
-  }
-  if (amortYears != null && (!Number.isFinite(amortYears) || amortYears <= 0)) amortYears = null;
-  const grossYieldPct = amortYears != null ? 100 / amortYears : null;
-
-  // Tahmini satış/kiralama süresi: bölge ort. listede kalma × fiyat sağlığı
-  // düzeltmesi (yeşil −%25'e kadar hızlı, kırmızı +%25'e kadar yavaş).
-  const regionDaysRaw = (isRentListing ? rentRegion : saleRegion)?.avg_days_listed;
-  const baseDays = regionDaysRaw != null && Number(regionDaysRaw) > 0 ? Number(regionDaysRaw) : null;
-  let daysRange: [number, number] | null = null;
-  if (baseDays != null) {
-    const [lo, hi] =
-      priceSignal.health === "green" ? [0.75, 1] : priceSignal.health === "red" ? [1, 1.25] : [0.85, 1.15];
-    daysRange = [Math.max(1, Math.round(baseDays * lo)), Math.max(1, Math.round(baseDays * hi))];
-  }
-
-  // Veri yetersizse kart tamamen gizli
-  const showInvestmentCard = Boolean(property.district_id) && (amortYears != null || daysRange != null);
-  const oneDecimal = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 });
-
-  // Portföy sağlık skoru
-  const propertyHealth = computePropertyHealth({
-    title:              property.title,
-    property_type:      property.property_type,
-    transaction_type:   property.transaction_type,
-    list_price:         property.list_price != null ? Number(property.list_price) : null,
-    address_line:       property.address_line,
-    province_id:        property.province_id,
-    parcel_block:       property.parcel_block,
-    parcel_lot:         property.parcel_lot,
-    commission_rate:    property.commission_rate != null ? Number(property.commission_rate) : null,
-    features:           property.features as Record<string, unknown> | null,
-    authorization_start: (property as unknown as Record<string, string | null>).authorization_start,
-    authorization_end:   (property as unknown as Record<string, string | null>).authorization_end,
-    authorization_type:  (property as unknown as Record<string, string | null>).authorization_type,
-    mediaCount:         (mediaData ?? []).length,
-    hasActivePortal:    livePortals.length > 0,
-  });
-
-  // İlan kalite puanı (ilk aktif portal için)
-  const firstPortal = portals[0];
-  const listingQuality = firstPortal ? computeListingQuality({
-    title:       property.title,
-    description: (property as unknown as Record<string, string | null>).description ?? null,
-    mediaCount:  (mediaData ?? []).length,
-    hasPortalId: Boolean(firstPortal.portal_listing_id),
-    hasPortalUrl: Boolean(firstPortal.portal_url),
-    priceSet:    Boolean(property.list_price),
-    locationSet: Boolean(property.province_id && property.address_line),
-  }) : null;
+  // Kayıp toplamı kapanış kayıtlarından gelir; o bölüm akarak geldiği için
+  // künyedeki rozet de kendi sınırında bekler.
+  const propertyRaw = property as unknown as Record<string, string | null>;
 
   return (
     <div className="space-y-6">
@@ -303,6 +225,7 @@ export default async function PropertyDetailPage({
           {([
             ["#medya", "Medya"],
             ["#fiyat", "Fiyat"],
+            ["#anahtarlar", "Anahtar"],
             ["#portallar", "Portallar"],
             ["#saglik", "Sağlık"],
             ["#harita", "Harita"],
@@ -361,6 +284,12 @@ export default async function PropertyDetailPage({
             <p className="mt-4 font-display text-3xl font-extrabold text-white">
               {formatPrice(property.list_price != null ? Number(property.list_price) : null, property.transaction_type)}
             </p>
+            {/* Döviz karşılığı — kur yoksa satır hiç çizilmez (uydurma kur yok) */}
+            {fxLine ? (
+              <p className="mt-1 text-xs text-white/45" title={fxTitle}>
+                {fxLine}
+              </p>
+            ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
               <Link href={`/app/portallar?property=${property.id}`} className="btn-shine inline-flex items-center gap-1.5 rounded-[10px] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950">
                 <RadioTower className="h-4 w-4" /> Portal bağla
@@ -450,7 +379,12 @@ export default async function PropertyDetailPage({
             <div className="space-y-2 text-xs text-white/70">
               <div className="flex items-center gap-2"><Building2 className="h-3.5 w-3.5 text-mint-400" /> {livePortals.length} canlı portal</div>
               <div className="flex items-center gap-2"><FileCheck2 className="h-3.5 w-3.5 text-amber-300" /> {overdue.length} teyit gecikmiş</div>
-              <div className="flex items-center gap-2"><Siren className="h-3.5 w-3.5 text-danger-400" /> {moneyTry(lostTotal)} kayıp</div>
+              <div className="flex items-center gap-2">
+                <Siren className="h-3.5 w-3.5 text-danger-400" />
+                <Suspense fallback={<span className="inline-block h-3 w-20 animate-pulse rounded bg-white/15" />}>
+                  <LostTotal portalIds={portalIds} />
+                </Suspense>
+              </div>
               {canEdit ? (
                 <ReassignProperty propertyId={property.id} currentAssignee={property.assigned_to} members={teamMembers ?? []} />
               ) : (
@@ -471,7 +405,9 @@ export default async function PropertyDetailPage({
       </section>
 
       <div id="medya" className="scroll-mt-24">
-        <PropertyMediaManager propertyId={property.id} media={media} canEdit={canEdit} />
+        <Suspense fallback={<MediaSkeleton />}>
+          <MediaSection propertyId={property.id} tenantId={tenantId} canEdit={canEdit} />
+        </Suspense>
       </div>
 
       <AiContentPanel propertyId={property.id} />
@@ -484,11 +420,9 @@ export default async function PropertyDetailPage({
 
       {/* Fiyat geçmişi — trigger ile otomatik biriken tarihçe */}
       <div id="fiyat" className="scroll-mt-24">
-        <PropertyPriceHistory
-          propertyId={property.id}
-          initialHistory={priceHistory}
-          isRent={property.transaction_type === "rent" || property.transaction_type === "Kiralık" || property.transaction_type === "kiralik"}
-        />
+        <Suspense fallback={<PriceHistorySkeleton />}>
+          <PriceHistorySection propertyId={property.id} isRent={isRentListing} />
+        </Suspense>
       </div>
 
       <section className="rounded-[20px] border border-line bg-surface p-5">
@@ -530,69 +464,19 @@ export default async function PropertyDetailPage({
       </section>
 
       {/* Yatırım görünümü — bölge medyanlarından getiri + satış süresi tahmini.
-          Veri yetersizse (ilçe yok / bölge medyanı yok) kart hiç görünmez. */}
-      {showInvestmentCard ? (
-        <section className="rounded-[20px] border border-line bg-surface p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
-                <TrendingUp className="h-4 w-4" /> Yatırım görünümü
-              </p>
-              <h2 className="mt-1 font-display font-bold text-ink-950">Bölge verisine göre tahmin</h2>
-            </div>
-            <Link href={`/app/bolge-analizi?district=${property.district_id}#trend`} className="text-xs font-semibold text-brand-600">
-              Bölge analizi
-            </Link>
-          </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            {grossYieldPct != null ? (
-              <div
-                className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5"
-                title={
-                  isRentListing
-                    ? "Yıllık kira (liste fiyatı × 12) ÷ tahmini değer (bölge satılık medyan ₺/m² × m²). m² veya fiyat yoksa bölge kira çarpanı kullanılır."
-                    : "Tahmini yıllık kira (bölge kiralık medyan ₺/m² × m² × 12) ÷ liste fiyatı. m² veya fiyat yoksa bölge kira çarpanı kullanılır."
-                }
-              >
-                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">
-                  <Percent className="h-3.5 w-3.5 text-mint-600" /> Tahmini yıllık getiri
-                </p>
-                <p className="mt-1 font-display text-2xl font-extrabold text-ink-950">~%{oneDecimal.format(grossYieldPct)}</p>
-                <p className="text-[11px] text-text-muted">brüt kira getirisi</p>
-              </div>
-            ) : null}
-            {amortYears != null ? (
-              <div
-                className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5"
-                title="Amortisman = satılık değerin kaç yıllık kira geliriyle karşılandığı (bölge kira çarpanı esaslı)."
-              >
-                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">
-                  <Landmark className="h-3.5 w-3.5 text-brand-600" /> Amortisman
-                </p>
-                <p className="mt-1 font-display text-2xl font-extrabold text-ink-950">{oneDecimal.format(amortYears)} yıl</p>
-                <p className="text-[11px] text-text-muted">kira ile geri dönüş süresi</p>
-              </div>
-            ) : null}
-            {daysRange ? (
-              <div
-                className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5"
-                title={`Bölgedeki ${isRentListing ? "kiralık" : "satılık"} portföylerin ortalama listede kalma süresi (${Math.round(baseDays ?? 0)} gün), fiyat sağlığına göre ±%25 düzeltilir: yeşil fiyat hızlandırır, kırmızı yavaşlatır.`}
-              >
-                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">
-                  <Timer className="h-3.5 w-3.5 text-amber-600" /> Tahmini {isRentListing ? "kiralama" : "satış"} süresi
-                </p>
-                <p className="mt-1 font-display text-2xl font-extrabold text-ink-950">
-                  ~{daysRange[0]}–{daysRange[1]} gün
-                </p>
-                <p className="text-[11px] text-text-muted">bölge ortalaması + fiyat sağlığı</p>
-              </div>
-            ) : null}
-          </div>
-          <p className="mt-3 text-[11px] leading-relaxed text-text-muted">
-            Tahminler yalnızca ofisinizin kendi bölge verisinden (ilçe medyanları) üretilir; dış piyasa endeksi değildir.
-          </p>
-        </section>
-      ) : null}
+          İki `region_stats` RPC'si sayfanın en pahalı sorgusuydu; artık akıyor.
+          Veri yetersizse (ilçe yok / bölge medyanı yok) kart hiç görünmez —
+          bu yüzden fallback'i de yok (var olmayan kartın iskeleti çizilmemeli). */}
+      <Suspense fallback={null}>
+        <InvestmentSection
+          tenantId={tenantId}
+          districtId={property.district_id}
+          isRentListing={isRentListing}
+          listPrice={property.list_price != null ? Number(property.list_price) : null}
+          sqm={features.sqm != null ? Number(features.sqm) : null}
+          priceHealth={priceSignal.health}
+        />
+      </Suspense>
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_.9fr]">
         <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
@@ -658,6 +542,11 @@ export default async function PropertyDetailPage({
         </section>
       </div>
 
+      {/* Anahtar & emanet takibi — "anahtar kimde?" */}
+      <Suspense fallback={<KeysSkeleton />}>
+        <KeysSection propertyId={property.id} canEdit={canEdit} canDelete={canDelete} />
+      </Suspense>
+
       <section id="portallar" className="scroll-mt-24 overflow-hidden rounded-[20px] border border-line bg-surface">
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
@@ -721,79 +610,67 @@ export default async function PropertyDetailPage({
         )}
       </section>
 
-      {closures.length > 0 ? (
-        <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
-          <div className="flex items-center justify-between border-b border-line px-5 py-4">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-              <Siren className="h-4 w-4 text-danger-500" /> Kapanış / kayıp kayıtları
-            </h2>
-            <Link href="/app/kayip-kacak" className="text-xs font-semibold text-brand-600">Kayıp-kaçak panosu</Link>
-          </div>
-          <div className="divide-y divide-line">
-            {closures.map((c) => (
-              // Satır kayıp-kaçak panosuna gider; ?neden= değeri listing_closures.reason kolonunun ham hali
-              <Link
-                key={c.id}
-                href={`/app/kayip-kacak?neden=${encodeURIComponent(c.reason)}#kapanislar`}
-                className="group flex flex-wrap items-center justify-between gap-2 px-5 py-3 transition hover:bg-canvas/60"
-              >
-                <div>
-                  <p className="text-sm font-semibold text-ink-950">{c.reason}</p>
-                  <p className="text-xs text-text-muted">
-                    {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(c.created_at))}
-                    {c.competitor_closed ? " · Rakip" : ""}
-                    {c.closed_by_us ? " · Bizim" : ""}
-                  </p>
-                </div>
-                <span className="flex items-center gap-2">
-                  <span className={`font-display text-sm font-extrabold ${Number(c.estimated_lost_commission || 0) > 0 ? "text-danger-500" : "text-mint-600"}`}>
-                    {Number(c.estimated_lost_commission || 0) > 0
-                      ? `−${moneyTry(Number(c.estimated_lost_commission))}`
-                      : "Kayıp yok"}
-                  </span>
-                  <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ) : null}
+      {/* Kapanış / kayıp kayıtları — kayıt yoksa bölüm hiç çizilmez, fallback de yok */}
+      <Suspense fallback={null}>
+        <ClosuresSection portalIds={portalIds} />
+      </Suspense>
 
       {/* Portföy sağlık skoru + ilan kalite puanı */}
       <div id="saglik" className="grid scroll-mt-24 gap-4 lg:grid-cols-2">
-        <PropertyHealthCard health={propertyHealth} />
-        {listingQuality && <ListingQualityCard quality={listingQuality} />}
+        <Suspense fallback={<HealthSkeleton />}>
+          <HealthSection
+            propertyId={property.id}
+            hasActivePortal={livePortals.length > 0}
+            firstPortal={portals[0] ?? null}
+            input={{
+              title: property.title,
+              description: propertyRaw.description ?? null,
+              property_type: property.property_type,
+              transaction_type: property.transaction_type,
+              list_price: property.list_price != null ? Number(property.list_price) : null,
+              address_line: property.address_line,
+              province_id: property.province_id,
+              parcel_block: property.parcel_block,
+              parcel_lot: property.parcel_lot,
+              commission_rate: property.commission_rate != null ? Number(property.commission_rate) : null,
+              features: property.features as Record<string, unknown> | null,
+              authorization_start: propertyRaw.authorization_start ?? null,
+              authorization_end: propertyRaw.authorization_end ?? null,
+              authorization_type: propertyRaw.authorization_type ?? null,
+            }}
+          />
+        </Suspense>
       </div>
 
       {/* Yetki belgesi */}
       <PropertyAuthorizationPanel
         propertyId={id}
         initial={{
-          authStart: (property as unknown as Record<string, string | null>).authorization_start ?? null,
-          authEnd:   (property as unknown as Record<string, string | null>).authorization_end   ?? null,
-          authType:  (property as unknown as Record<string, string | null>).authorization_type  ?? null,
-          authNotes: (property as unknown as Record<string, string | null>).authorization_notes ?? null,
+          authStart: propertyRaw.authorization_start ?? null,
+          authEnd:   propertyRaw.authorization_end   ?? null,
+          authType:  propertyRaw.authorization_type  ?? null,
+          authNotes: propertyRaw.authorization_notes ?? null,
         }}
       />
 
       {/* Portale yayınla */}
-      <PublishToPortalsPanel
-        propertyId={id}
-        configuredPortals={configuredPortals}
-      />
+      <Suspense fallback={<PublishSkeleton />}>
+        <PublishSection propertyId={id} />
+      </Suspense>
 
       {/* Zaman tuneli: fiyat ve durum gecmisi ayri ayri dogruydu ama HIKAYEYI
           anlatmiyorlardi. Portal yayini, teklif, randevu ve acik ev ise
           hicbir kronolojide gorunmuyordu. */}
       <div id="gecmis" className="scroll-mt-24">
-        <PropertyTimeline events={timeline} simdi={new Date().getTime()} />
+        <Suspense fallback={<TimelineSkeleton />}>
+          <TimelineSection propertyId={id} />
+        </Suspense>
       </div>
 
       {/* Durum geçmişi */}
-      <PropertyStatusHistory
-        propertyId={id}
-        initialHistory={statusHistory as Parameters<typeof PropertyStatusHistory>[0]["initialHistory"]}
-      />
+      <Suspense fallback={<StatusHistorySkeleton />}>
+        <StatusHistorySection propertyId={id} />
+      </Suspense>
 
       {/* Konum haritası (OpenStreetMap) */}
       <section id="harita" className="scroll-mt-24">
@@ -815,12 +692,29 @@ export default async function PropertyDetailPage({
       />
 
       {/* Benzer portföyler */}
-      <RelatedPropertiesWidget
-        currentId={id}
-        transactionType={property.transaction_type}
-        propertyType={property.property_type}
-        provinceId={property.province_id}
-      />
+      <Suspense fallback={<RelatedSkeleton />}>
+        <RelatedPropertiesWidget
+          currentId={id}
+          transactionType={property.transaction_type}
+          propertyType={property.property_type}
+          provinceId={property.province_id}
+        />
+      </Suspense>
     </div>
   );
+}
+
+/**
+ * Künyedeki "kayıp" rozeti — kapanış kayıtlarının toplamı. Tek başına
+ * `listing_closures` sorgusu gerektirdiği için hero'yu bekletmiyor.
+ */
+async function LostTotal({ portalIds }: { portalIds: string[] }) {
+  if (portalIds.length === 0) return <>{moneyTry(0)} kayıp</>;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("listing_closures")
+    .select("estimated_lost_commission")
+    .in("portal_listing_id", portalIds);
+  const total = (data ?? []).reduce((s, c) => s + Number(c.estimated_lost_commission || 0), 0);
+  return <>{moneyTry(total)} kayıp</>;
 }

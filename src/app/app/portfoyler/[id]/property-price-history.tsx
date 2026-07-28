@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, LineChart, Table2, TrendingDown } from "lucide-react";
-import { AreaTrend } from "@/components/ui/chart";
+import { AreaTrend } from "@/app/app/_ui/lazy-chart";
 import { getPropertyPriceHistory } from "@/app/actions/property-price-history";
 import {
   CURRENCY_LABEL,

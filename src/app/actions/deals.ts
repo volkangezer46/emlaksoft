@@ -5,9 +5,11 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
+import { triggerPlaybooks } from "@/lib/playbook-trigger";
 import { checkAuthorityShield } from "@/lib/authority-shield";
 import { notifyTenant } from "@/lib/notify";
 import { buildSplits, calculateCommission } from "@/lib/commission";
+import { wonDealPropertyStatus } from "@/lib/deal-outcome";
 
 export type DealResult = { error?: string; ok?: boolean; dealId?: string };
 
@@ -139,7 +141,14 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
       .maybeSingle();
 
     if (!existingComm) {
-      await ensureCommissionForDeal(gate.tenantId, gate.userId, id, existing.property_id, existing.deal_value);
+      await ensureCommissionForDeal(
+        gate.tenantId,
+        gate.userId,
+        id,
+        existing.property_id,
+        existing.deal_value,
+        existing.deal_type,
+      );
     }
 
     await notifyTenant({
@@ -164,6 +173,22 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
     } catch (e) {
       console.error("automation deal_won", e);
     }
+
+    // İş akışı (playbook) tetikle — kapanış sonrası görev paketi
+    await triggerPlaybooks({
+      tenantId: gate.tenantId,
+      event: "anlasma_kazanildi",
+      actorId: gate.userId,
+      entity: {
+        type: "deal",
+        id,
+        ownerId: gate.userId,
+        dealId: id,
+        customerId: existing.customer_id,
+        propertyId: existing.property_id,
+        fields: { deal_type: existing.deal_type },
+      },
+    });
   }
 
   revalidatePath("/app/anlasmalar");
@@ -473,6 +498,7 @@ async function ensureCommissionForDeal(
   dealId: string,
   propertyId: string,
   dealValue: number | null,
+  dealType: string | null,
 ) {
   const supabase = await createClient();
   const { data: property } = await supabase
@@ -485,6 +511,18 @@ async function ensureCommissionForDeal(
   const value = dealValue != null && Number.isFinite(Number(dealValue)) ? Number(dealValue) : Number(property.list_price) || 0;
   // KDV orani ve paylasim burada SABIT yazilmisti (0.2 ve 50/50); ayni sabitler
   // workflow.ts'te de vardi. Tek kaynaga tasindi (lib/commission.ts).
+  //
+  // KİRA KOMİSYONU — BİLİNÇLİ OLARAK DEĞİŞTİRİLMEDİ (denetim notu):
+  // Türkiye pratiğinde kirada komisyon genelde "1 aylık kira + KDV"dir; burada
+  // ise satışla aynı `deal_value × commission_rate` formülü çalışıyor. Formülü
+  // "1 aylık kira"ya çevirmek ancak `deal_value`nin AYLIK kira olduğu kesinse
+  // doğru olur. Kodda ve formda böyle bir ayrım YOK: alan tek ve etiketi
+  // "Anlaşma değeri (₺)" / "Tutar (₺)" (placeholder "örn. 4.500.000"), portföy
+  // boş bırakılınca `properties.list_price`a düşülüyor ve `list_price` kiralık
+  // portföyde aylık kira, satılıkta toplam bedel anlamına geliyor. Yani girdi
+  // anlamı belirsiz. Belirsiz varsayımla para hesabını değiştirmek yanlış
+  // fatura üretir; mevcut davranış korundu. Doğru çözüm ayrı bir ölçü birimi
+  // alanı (aylık/toplam) eklemek — ürün kararı gerektirir.
   const calc = calculateCommission({
     amount: value,
     rate: Number(property.commission_rate) || undefined,
@@ -500,9 +538,11 @@ async function ensureCommissionForDeal(
     splits,
   });
 
+  // Kira anlaşmasında portföy SATILDI olamaz — 'rented' (Kiralandı) yazılır.
+  const nextStatus = wonDealPropertyStatus(dealType);
   await supabase
     .from("properties")
-    .update({ status: "sold", updated_at: new Date().toISOString() })
+    .update({ status: nextStatus, updated_at: new Date().toISOString() })
     .eq("id", propertyId);
 
   await logActivity({
@@ -511,6 +551,12 @@ async function ensureCommissionForDeal(
     action: "commission.from_pipeline",
     entityType: "deal",
     entityId: dealId,
-    newValue: { gross: calc.net, vat: calc.vat, property_code: property.property_code },
+    newValue: {
+      gross: calc.net,
+      vat: calc.vat,
+      property_code: property.property_code,
+      deal_type: dealType,
+      property_status: nextStatus,
+    },
   });
 }

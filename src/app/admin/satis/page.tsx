@@ -1,11 +1,14 @@
 import Link from "next/link";
-import { ArrowUpRight, Handshake, Search, Sparkles, Target, TrendingUp, Users } from "lucide-react";
+import { Handshake, Search, Sparkles, Target, TrendingUp, Users } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { orIlike } from "@/lib/pgrst";
-import { CountUp } from "@/components/admin/count-up";
 import { ExportButton } from "@/components/admin/export-button";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card";
+import { AdminEmpty } from "@/components/admin/admin-table";
 import { Input } from "@/components/ui/input";
+import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { exportDemoRequestsCsv } from "@/app/actions/platform-export";
 import { DemoCard, type DemoRow } from "./demo-card";
 
@@ -21,53 +24,63 @@ const FILTERS: { key: string; label: string }[] = [
 const DEMO_SELECT =
   "id, full_name, phone, email, company, city, team_size, message, status, assigned_to, notes, converted_tenant_id, created_at";
 
+/** Filtre + arama + sayfa numarasını tek yerde birleştirir. */
+function salesHref(p: { durum?: string; q?: string; sayfa?: number }) {
+  const params = new URLSearchParams();
+  if (p.durum && p.durum !== "all") params.set("durum", p.durum);
+  if (p.q) params.set("q", p.q);
+  if (p.sayfa && p.sayfa > 1) params.set("sayfa", String(p.sayfa));
+  const qs = params.toString();
+  return qs ? `/admin/satis?${qs}` : "/admin/satis";
+}
+
 export default async function AdminSalesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ durum?: string; q?: string }>;
+  searchParams: Promise<{ durum?: string; q?: string; sayfa?: string }>;
 }) {
   await requirePlatformModule("sales");
   const sp = await searchParams;
   const filter = sp.durum && FILTERS.some((f) => f.key === sp.durum) ? sp.durum : "all";
   const q = (sp.q ?? "").trim();
+  const page = parsePage(sp.sayfa);
 
   const admin = createAdminClient();
-  const [{ data: all }, { data: staff }, searchRes] = await Promise.all([
-    admin.from("demo_requests").select(DEMO_SELECT).order("created_at", { ascending: false }).limit(300),
+
+  /*
+   * ÖNCEDEN: 300 kayıt çekilip durum filtresi ve sayfalama bellekte yapılıyordu —
+   * 300. kayıttan sonrası hiç görünmüyordu ve "Kaybedildi" gibi eski durumlar
+   * listede eksik kalıyordu. Artık filtre de sayfalama da sorguda.
+   * Huni/KPI sayıları filtreden bağımsız: kova sayıları her zaman tüm hunidir.
+   */
+  let listQuery = admin
+    .from("demo_requests")
+    .select(DEMO_SELECT, { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(...pageRange(page));
+  if (filter !== "all") listQuery = listQuery.eq("status", filter);
+  if (q) listQuery = listQuery.or(orIlike(["full_name", "phone", "company"], q));
+
+  const [{ data: list, count: listTotal }, { data: staff }, { data: statRows }] = await Promise.all([
+    listQuery,
     admin.from("platform_staff").select("id, full_name").eq("is_active", true),
-    // Arama sunucu tarafında ilike ile daraltılır; KPI/huni sayıları tüm kayıtlardan gelmeye devam eder
-    q
-      ? admin
-          .from("demo_requests")
-          .select(DEMO_SELECT)
-          .or(orIlike(["full_name", "phone", "company"], q))
-          .order("created_at", { ascending: false })
-          .limit(300)
-      : Promise.resolve(null),
+    admin.from("demo_requests").select("status, created_at").limit(5000),
   ]);
 
-  const rows = (all ?? []) as DemoRow[];
-  const listRows = q ? ((searchRes?.data ?? []) as DemoRow[]) : rows;
+  const visible = (list ?? []) as DemoRow[];
+  const stats = statRows ?? [];
   const staffList = staff ?? [];
 
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
-  const newCount = rows.filter((r) => r.status === "new").length;
-  const contacted = rows.filter((r) => r.status === "contacted").length;
-  const qualified = rows.filter((r) => r.status === "qualified").length;
-  const wonMonth = rows.filter((r) => r.status === "won" && new Date(r.created_at).getTime() >= monthStart).length;
-  const wonTotal = rows.filter((r) => r.status === "won").length;
-  const conversion = rows.length ? Math.round((wonTotal / rows.length) * 100) : 0;
+  const newCount = stats.filter((r) => r.status === "new").length;
+  const contacted = stats.filter((r) => r.status === "contacted").length;
+  const qualified = stats.filter((r) => r.status === "qualified").length;
+  const wonMonth = stats.filter((r) => r.status === "won" && new Date(r.created_at).getTime() >= monthStart).length;
+  const wonTotal = stats.filter((r) => r.status === "won").length;
+  const conversion = stats.length ? Math.round((wonTotal / stats.length) * 100) : 0;
+  const hasData = stats.length > 0;
 
-  const visible = filter === "all" ? listRows : listRows.filter((r) => r.status === filter);
-
-  // Filtre bağlantıları aktif aramayı korur
-  const filterHref = (key: string) => {
-    const params = new URLSearchParams();
-    if (key !== "all") params.set("durum", key);
-    if (q) params.set("q", q);
-    const qs = params.toString();
-    return qs ? `/admin/satis?${qs}` : "/admin/satis";
-  };
+  const filterHref = (key: string) => salesHref({ durum: key, q });
 
   // pipeline funnel
   const funnel = [
@@ -78,43 +91,40 @@ export default async function AdminSalesPage({
   ];
   const funnelMax = Math.max(1, ...funnel.map((f) => f.value));
 
-  const kpis = [
-    { label: "Yeni talep", href: "/admin/satis?durum=new", value: newCount, icon: Sparkles, tone: "text-brand-400" },
-    { label: "Nitelikli", href: "/admin/satis?durum=qualified", value: qualified, icon: Target, tone: "text-amber-400" },
-    { label: "Bu ay kazanılan", href: "/admin/satis?durum=won", value: wonMonth, icon: Handshake, tone: "text-mint-400" },
-    { label: "Dönüşüm", href: "/admin/satis?durum=won", value: conversion, suffix: "%", icon: TrendingUp, tone: "text-cyan-400" },
+  const kpis: { label: string; href: string; value: number | null; suffix?: string; icon: typeof Sparkles; accent: string; hint?: string }[] = [
+    { label: "Yeni talep", href: salesHref({ durum: "new" }), value: hasData ? newCount : null, icon: Sparkles, accent: "text-brand-300", hint: "yanıt bekliyor" },
+    { label: "Nitelikli", href: salesHref({ durum: "qualified" }), value: hasData ? qualified : null, icon: Target, accent: "text-amber-300", hint: "teklif aşamasında" },
+    { label: "Bu ay kazanılan", href: salesHref({ durum: "won" }), value: hasData ? wonMonth : null, icon: Handshake, accent: "text-mint-400", hint: `toplam ${wonTotal}` },
+    { label: "Dönüşüm", href: salesHref({ durum: "won" }), value: hasData ? conversion : null, suffix: "%", icon: TrendingUp, accent: "text-cyan-300", hint: "kazanılan / tüm talep" },
   ];
 
   return (
     <div className="space-y-5">
-      <section className="theme-dark relative overflow-hidden rounded-[20px] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-14 h-52 w-52 rounded-full bg-mint-500/20 blur-[90px]" />
-        <div className="relative">
-          <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-            <Handshake className="h-4 w-4" /> EmlakSoft · Satış hunisi
-          </span>
-          <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Demo talepleri & aday yönetimi</h1>
-          <p className="mt-1 max-w-lg text-sm text-white/75">
-            Tanıtım formundan gelen talepleri niteleyin, atayın ve aboneliğe dönüştürün.
-          </p>
-          <div className="mt-4">
-            <ExportButton action={exportDemoRequestsCsv} label="Excel'e aktar" />
-          </div>
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {kpis.map((k) => (
-              <Link key={k.label} href={k.href} className="focus-ring group relative block rounded-[14px] border border-white/12 bg-white/8 p-3 backdrop-blur transition hover:border-white/25 hover:bg-white/12">
-                <k.icon className={`h-4 w-4 ${k.tone}`} />
-                <p className="mt-2 font-display text-xl font-extrabold text-white">
-                  <CountUp value={k.value} suffix={k.suffix} />
-                </p>
-                <p className="text-[11px] text-white/70">{k.label}</p>
-                <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:opacity-100" />
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+      <AdminPageHeader
+        eyebrow="EmlakSoft · Satış hunisi"
+        icon={Handshake}
+        title="Demo talepleri & aday yönetimi"
+        description="Tanıtım formundan gelen talepleri niteleyin, atayın ve aboneliğe dönüştürün."
+        glow="mint"
+        actions={<ExportButton action={exportDemoRequestsCsv} label="Excel'e aktar" />}
+      >
+        <AdminStatGrid className="mt-6">
+          {kpis.map((k) => (
+            <AdminStatCard
+              key={k.label}
+              tone="dark"
+              label={k.label}
+              value={k.value}
+              href={hasData ? k.href : undefined}
+              icon={k.icon}
+              accent={k.accent}
+              suffix={k.suffix}
+              hint={k.hint}
+              emptyHint="Henüz demo talebi yok"
+            />
+          ))}
+        </AdminStatGrid>
+      </AdminPageHeader>
 
       {/* pipeline */}
       <section className="dashboard-panel rounded-[18px] border border-line bg-surface p-5">
@@ -138,8 +148,8 @@ export default async function AdminSalesPage({
       <div className="flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => {
           const active = f.key === filter;
-          const count =
-            f.key === "all" ? listRows.length : listRows.filter((r) => r.status === f.key).length;
+          // Sayaçlar tüm huniden gelir; sayfa dilimine göre değişmez.
+          const count = f.key === "all" ? stats.length : stats.filter((r) => r.status === f.key).length;
           return (
             <Link
               key={f.key}
@@ -162,10 +172,28 @@ export default async function AdminSalesPage({
 
       {/* list */}
       {visible.length === 0 ? (
-        <div className="dashboard-panel rounded-[18px] border border-line bg-surface py-16 text-center">
-          <Users className="mx-auto h-8 w-8 text-text-faint" />
-          <p className="mt-3 text-sm font-semibold text-ink-950">{q ? "Aramayla eşleşen talep yok" : "Bu filtrede talep yok"}</p>
-          <p className="mt-1 text-xs text-text-muted">{q ? "Arama terimini değiştirip tekrar deneyin." : "Yeni demo talepleri buraya otomatik düşer."}</p>
+        <div className="dashboard-panel rounded-[18px] border border-line bg-surface">
+          <AdminEmpty
+            icon={Users}
+            title={q ? "Aramayla eşleşen talep yok" : filter === "all" ? "Henüz demo talebi yok" : "Bu filtrede talep yok"}
+            description={
+              q
+                ? "Arama terimini değiştirip tekrar deneyin — ad, telefon ve şirket alanları taranır."
+                : filter === "all"
+                  ? "Tanıtım sayfasındaki formdan gelen talepler buraya otomatik düşer."
+                  : "Başka bir durum sekmesine geçip hunideki diğer adaylara bakabilirsiniz."
+            }
+            action={
+              q || filter !== "all" ? (
+                <Link
+                  href="/admin/satis"
+                  className="focus-ring press inline-flex rounded-[10px] border border-line px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-400"
+                >
+                  Filtreleri temizle
+                </Link>
+              ) : null
+            }
+          />
         </div>
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">
@@ -174,6 +202,8 @@ export default async function AdminSalesPage({
           ))}
         </div>
       )}
+
+      <Pagination page={page} total={listTotal ?? 0} hrefFor={(p) => salesHref({ durum: filter, q, sayfa: p })} />
     </div>
   );
 }

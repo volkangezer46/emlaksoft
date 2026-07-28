@@ -6,24 +6,21 @@ import {
   ArrowUpRight,
   BarChart3,
   Bell,
-  Building2,
   CalendarDays,
-  FileCheck,
   Gauge,
+  KeyRound,
+  Layers,
   MessageCircle,
   Phone,
   PhoneIncoming,
   PieChart,
   Plus,
   Radar,
-  Siren,
   Sparkles,
   TrendingDown,
   TrendingUp,
   Trophy,
   Tv,
-  Users,
-  Wallet,
   Zap,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -34,6 +31,8 @@ import { DAY_MS, daysAgoIso, msUntil, msSince } from "@/lib/clock";
 import { buildDailyBriefing, type BriefingItem } from "@/lib/briefing";
 import { generateBriefingSummary } from "@/lib/ai/briefing-summary";
 import { computeLeadScore } from "@/lib/lead-score";
+import { sparklineGeometry } from "@/lib/sparkline";
+import { ICONS } from "@/lib/icons";
 import { clearSampleDataForm } from "@/app/actions/sample-data";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { OdometerNumber } from "./odometer-number";
@@ -77,17 +76,9 @@ function calcTrend(current: number, previous: number, invert = false): TrendInfo
 }
 
 function Sparkline({ data, color, id }: { data: number[]; color: string; id: string }) {
-  const safe = data.length ? data : [0, 0];
-  const max = Math.max(...safe, 1);
-  const min = Math.min(...safe);
-  const range = max - min || 1;
-  const coords = safe.map((d, i) => ({
-    x: safe.length === 1 ? 50 : (i / (safe.length - 1)) * 100,
-    y: 28 - ((d - min) / range) * 24 - 2,
-  }));
-  const line = coords.map((c) => `${c.x},${c.y}`).join(" ");
-  const area = `0,28 ${line} 100,28`;
-  const last = coords[coords.length - 1]!;
+  // Geometri artık `src/lib/sparkline.ts` (saf, vitest kapsamında) — aynı
+  // hesap StatCard'ın sparkline prop'unda da kullanılıyor, iki kopya kalmadı.
+  const { points: line, area, last } = sparklineGeometry(data, { width: 100, height: 28, padding: 2 });
   return (
     <svg viewBox="0 0 100 28" className="h-8 w-full overflow-visible" preserveAspectRatio="none">
       <defs>
@@ -203,7 +194,10 @@ export default async function AppHomePage({
   const { tv = "" } = (await searchParams) ?? {};
   const tvMode = tv === "1";
 
-  const { tenantId } = await requireModulePage("dashboard");
+  const { tenantId, perms } = await requireModulePage("dashboard");
+  // Kiralama/proje şeridi yalnız modülü görebilene sorulur (veri de yoksa hiç render edilmez).
+  const canSeeRentals = (perms.rentals ?? []).includes("view");
+  const canSeeProjects = (perms.projects ?? []).includes("view");
   const supabase = await createClient();
   const {
     data: { user },
@@ -269,6 +263,9 @@ export default async function AppHomePage({
     { data: openTasks },
     { data: tenantRow },
     { data: officeTarget },
+    { count: activeRentals },
+    { data: rentCharges },
+    { data: projectRows },
   ] = await Promise.all([
     supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
     supabase
@@ -393,6 +390,26 @@ export default async function AppHomePage({
       .eq("period_start", monthStartKey)
       .is("profile_id", null)
       .maybeSingle(),
+    /*
+     * Kiralama & projeler şeridi — bu iki modülün verisi panelde HİÇ temsil
+     * edilmiyordu. Üç dar sorgu mevcut batch'e katıldı (ardışık istek yok);
+     * modül yetkisi yoksa sorgu bile atılmaz.
+     */
+    canSeeRentals
+      ? supabase.from("rentals").select("id", { count: "exact", head: true }).eq("status", "active")
+      : Promise.resolve({ count: 0 }),
+    // Bu ayın tahakkukları + (hangi aya ait olursa olsun) gecikmişler — tek sorgu
+    canSeeRentals
+      ? supabase
+          .from("rent_charges")
+          .select("amount, status, period")
+          .or(`period.eq.${monthStartKey},status.eq.overdue`)
+          .limit(1000)
+      : Promise.resolve({ data: null }),
+    // Proje + birim durumları tek gidiş-dönüşte (bkz. actions/projects.ts listProjects)
+    canSeeProjects
+      ? supabase.from("projects").select("id, status, units:project_units(status)").limit(200)
+      : Promise.resolve({ data: null }),
   ]);
 
   const customerCount = count ?? 0;
@@ -582,11 +599,32 @@ export default async function AppHomePage({
   const targetExceeded = targetRevenue > 0 && targetRevenuePct >= 100;
   const showTargetCard = Boolean(officeTarget) && (targetRevenue > 0 || targetDeals > 0);
 
+  /*
+   * Kiralama & projeler şeridi — sayılar /app/kiralama ve /app/projeler
+   * sayfalarının OKUDUĞU filtre adlarıyla linklenir (kiralama: durum=pending |
+   * overdue, projeler: durum=aktif). Veri yoksa kart hiç render edilmez.
+   */
+  const chargeRows = (rentCharges ?? []) as { amount: number | string | null; status: string; period: string }[];
+  const rentPendingThisMonth = chargeRows
+    .filter((c) => (c.period ?? "").slice(0, 10) === monthStartKey && c.status === "pending")
+    .reduce((s, c) => s + Number(c.amount ?? 0), 0);
+  const rentOverdueRows = chargeRows.filter((c) => c.status === "overdue");
+  const rentOverdueSum = rentOverdueRows.reduce((s, c) => s + Number(c.amount ?? 0), 0);
+  const activeRentalCount = activeRentals ?? 0;
+  const showRentalCard = canSeeRentals && (activeRentalCount > 0 || chargeRows.length > 0);
+
+  const projectList = (projectRows ?? []) as { id: string; status: string; units: { status: string }[] | null }[];
+  const activeProjectCount = projectList.filter((p) => p.status !== "delivered").length;
+  const allProjectUnits = projectList.flatMap((p) => p.units ?? []);
+  const soldUnitCount = allProjectUnits.filter((u) => u.status === "sold").length;
+  const remainingUnitCount = Math.max(0, allProjectUnits.length - soldUnitCount);
+  const showProjectCard = canSeeProjects && projectList.length > 0;
+
   const kpis: Kpi[] = [
     {
       label: "Toplam müşteri",
       value: String(customerCount),
-      icon: Users,
+      icon: ICONS.musteri,
       trendData: customerTrend,
       tone: "brand",
       spark: custSpark,
@@ -604,7 +642,7 @@ export default async function AppHomePage({
     {
       label: "Aktif portföy",
       value: String(propertyCount ?? 0),
-      icon: Building2,
+      icon: ICONS.portfoy,
       trend: "canlı",
       tone: "brand",
       spark: [0, 0, 0, 0, 0, 0, propertyCount ?? 0],
@@ -613,7 +651,9 @@ export default async function AppHomePage({
     {
       label: "Teyitsiz ilan",
       value: String(overdueListings.length),
-      icon: FileCheck,
+      // İkonografi: aynı metrik raporlar ekranında Building2, burada FileCheck
+      // ile çiziliyordu; portal teyidi kavramı tek ikon → ICONS.portal.
+      icon: ICONS.portal,
       trend: overdueListings.length ? "dikkat" : "temiz",
       tone: overdueListings.length ? "warn" : "mint",
       spark: [0, 0, 0, 0, 0, 0, overdueListings.length],
@@ -622,7 +662,7 @@ export default async function AppHomePage({
     {
       label: "Bekleyen komisyon",
       value: moneyTry(pendingCommission),
-      icon: Wallet,
+      icon: ICONS.komisyon,
       trendData: commissionTrend,
       tone: "amber",
       spark: commSpark,
@@ -631,7 +671,7 @@ export default async function AppHomePage({
     {
       label: "Tahmini kayıp (ay)",
       value: moneyTry(lostMonth),
-      icon: Siren,
+      icon: ICONS.alarm,
       trendData: lostTrend,
       tone: "danger",
       spark: [0, 0, 0, 0, 0, 0, Math.max(0, Math.round(lostMonth / 1000))],
@@ -1072,6 +1112,105 @@ export default async function AppHomePage({
         ))}
       </div>
 
+      {/* Kiralama & projeler — modül verisi olmayan ofiste hiç görünmez */}
+      {(showRentalCard || showProjectCard) && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {showRentalCard && (
+            <section className="surface-card rounded-[18px] p-5">
+              <div className="flex items-center justify-between">
+                <p className="flex items-center gap-2 text-xs font-semibold text-cyan-600">
+                  <KeyRound className="h-4 w-4" /> Kiralama
+                </p>
+                <Link href="/app/kiralama" className="text-xs font-semibold text-brand-600 hover:underline">
+                  Kira merkezi →
+                </Link>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <Link
+                  href="/app/kiralama"
+                  className="focus-ring group block rounded-[12px] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
+                >
+                  <p className="font-display text-xl font-extrabold tabular-nums text-ink-950">
+                    {activeRentalCount}
+                  </p>
+                  <p className="text-[11px] text-text-muted">Aktif sözleşme</p>
+                </Link>
+                <Link
+                  href="/app/kiralama?durum=pending"
+                  className="focus-ring group block rounded-[12px] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
+                >
+                  <p className="font-display text-xl font-extrabold tabular-nums text-ink-950">
+                    {moneyTry(rentPendingThisMonth)}
+                  </p>
+                  <p className="text-[11px] text-text-muted">Bu ay tahsil edilecek</p>
+                </Link>
+                <Link
+                  href="/app/kiralama?durum=overdue"
+                  className={`focus-ring group block rounded-[12px] border px-3 py-2.5 transition hover:border-brand-300 ${
+                    rentOverdueRows.length > 0
+                      ? "border-danger-500/30 bg-danger-500/5"
+                      : "border-line bg-canvas hover:bg-surface"
+                  }`}
+                >
+                  <p
+                    className={`font-display text-xl font-extrabold tabular-nums ${
+                      rentOverdueRows.length > 0 ? "text-danger-500" : "text-ink-950"
+                    }`}
+                  >
+                    {moneyTry(rentOverdueSum)}
+                  </p>
+                  <p className="text-[11px] text-text-muted">
+                    Gecikmiş{rentOverdueRows.length > 0 ? ` · ${rentOverdueRows.length} tahakkuk` : ""}
+                  </p>
+                </Link>
+              </div>
+            </section>
+          )}
+
+          {showProjectCard && (
+            <section className="surface-card rounded-[18px] p-5">
+              <div className="flex items-center justify-between">
+                <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
+                  <Layers className="h-4 w-4" /> Projeler
+                </p>
+                <Link href="/app/projeler" className="text-xs font-semibold text-brand-600 hover:underline">
+                  Proje merkezi →
+                </Link>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <Link
+                  href="/app/projeler?durum=aktif"
+                  className="focus-ring group block rounded-[12px] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
+                >
+                  <p className="font-display text-xl font-extrabold tabular-nums text-ink-950">
+                    {activeProjectCount}
+                  </p>
+                  <p className="text-[11px] text-text-muted">Aktif proje</p>
+                </Link>
+                <Link
+                  href="/app/projeler?durum=aktif"
+                  className="focus-ring group block rounded-[12px] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
+                >
+                  <p className="font-display text-xl font-extrabold tabular-nums text-mint-600">
+                    {soldUnitCount}
+                  </p>
+                  <p className="text-[11px] text-text-muted">Satılan birim</p>
+                </Link>
+                <Link
+                  href="/app/projeler?durum=selling"
+                  className="focus-ring group block rounded-[12px] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
+                >
+                  <p className="font-display text-xl font-extrabold tabular-nums text-ink-950">
+                    {remainingUnitCount}
+                  </p>
+                  <p className="text-[11px] text-text-muted">Kalan birim</p>
+                </Link>
+              </div>
+            </section>
+          )}
+        </div>
+      )}
+
       <div className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
         <Widget id="komisyon" className="h-full">
         <section className="dashboard-panel surface-card relative h-full overflow-hidden rounded-[20px] p-5 md:p-6">
@@ -1388,7 +1527,7 @@ export default async function AppHomePage({
                 className="group flex flex-col items-center gap-2 rounded-[12px] border border-line bg-canvas px-3 py-4 transition hover:border-brand-300 hover:bg-surface"
               >
                 <div className="grid h-10 w-10 place-items-center rounded-[10px] bg-brand-600/10 text-brand-600 transition group-hover:bg-brand-600 group-hover:text-white">
-                  <Users className="h-5 w-5" />
+                  <ICONS.musteri className="h-5 w-5" />
                 </div>
                 <span className="text-xs font-semibold text-ink-950">Müşteri</span>
               </Link>
@@ -1397,7 +1536,7 @@ export default async function AppHomePage({
                 className="group flex flex-col items-center gap-2 rounded-[12px] border border-line bg-canvas px-3 py-4 transition hover:border-brand-300 hover:bg-surface"
               >
                 <div className="grid h-10 w-10 place-items-center rounded-[10px] bg-mint-500/10 text-mint-600 transition group-hover:bg-mint-500 group-hover:text-white">
-                  <Building2 className="h-5 w-5" />
+                  <ICONS.portfoy className="h-5 w-5" />
                 </div>
                 <span className="text-xs font-semibold text-ink-950">Portföy</span>
               </Link>

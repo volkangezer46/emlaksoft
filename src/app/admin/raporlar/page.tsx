@@ -2,7 +2,10 @@ import Link from "next/link";
 import { ArrowUpRight, BarChart3, Building2, LayoutGrid, LineChart, PieChart, TrendingUp, Users } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
-import { CountUp } from "@/components/admin/count-up";
+import { exportPlatformReportCsv } from "@/app/actions/platform-export";
+import { ExportButton } from "@/components/admin/export-button";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card";
 import { moneyTRY } from "@/lib/admin-format";
 import { daysAgoIso } from "@/lib/clock";
 import { CORE_MODULES, moduleForAction } from "@/app/admin/tenants/[id]/module-map";
@@ -142,19 +145,55 @@ export default async function AdminReportsPage({
     ? Math.round((ticketRows.filter((t) => ["resolved", "closed"].includes(t.status)).length / ticketRows.length) * 100)
     : 0;
 
-  const kpis = [
-    { label: "Aylık yinelenen gelir", href: "/admin/billing", value: mrr, money: true, icon: TrendingUp, tone: "text-mint-600" },
-    { label: "Yıllık yinelenen gelir", href: "/admin/billing", value: mrr * 12, money: true, icon: LineChart, tone: "text-brand-600" },
-    { label: "Ofis başına gelir", href: "/admin/tenants?durum=active", value: arpa, money: true, icon: Users, tone: "text-amber-600" },
-    { label: "Müşteri kaybı oranı", href: "/admin/tenants?durum=cancelled", value: churnRate, suffix: "%", icon: BarChart3, tone: "text-danger-500" },
+  /*
+   * Hiç ofis yoksa "%0 churn" / "₺0 ARPA" gibi sayılar bilgi değil gürültüdür —
+   * kartlar boş duruma düşer (sahte sıfır basmak yasak).
+   */
+  const hasData = list.length > 0;
+  const kpis: {
+    label: string;
+    href: string;
+    value: number | null;
+    money?: boolean;
+    suffix?: string;
+    icon: typeof TrendingUp;
+    accent: string;
+    hint?: string;
+  }[] = [
+    { label: "Aylık yinelenen gelir", href: "/admin/billing", value: hasData ? mrr : null, money: true, icon: TrendingUp, accent: "text-mint-400", hint: `${active} aktif ofis` },
+    { label: "Yıllık yinelenen gelir", href: "/admin/billing", value: hasData ? mrr * 12 : null, money: true, icon: LineChart, accent: "text-brand-300", hint: "MRR × 12" },
+    { label: "Ofis başına gelir", href: "/admin/tenants?durum=active", value: active ? arpa : null, money: true, icon: Users, accent: "text-amber-300", hint: "aktif ofis ortalaması" },
+    { label: "Müşteri kaybı oranı", href: "/admin/tenants?durum=cancelled", value: hasData ? churnRate : null, suffix: "%", icon: BarChart3, accent: "text-danger-300", hint: `${cancelled} iptal` },
   ];
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="font-display text-xl font-extrabold text-ink-950 md:text-2xl">Platform raporları</h1>
-        <p className="mt-0.5 text-sm text-text-muted">Gelir, büyüme, paket ve destek performansı.</p>
-      </div>
+      <AdminPageHeader
+        eyebrow="Platform analizi"
+        icon={BarChart3}
+        title="Platform raporları"
+        description="Gelir, büyüme, paket dağılımı ve destek performansı — tüm ofislerin toplu görünümü."
+        glow="mint"
+        actions={<ExportButton action={exportPlatformReportCsv} label="Raporu indir" />}
+      >
+        <AdminStatGrid className="mt-6">
+          {kpis.map((k) => (
+            <AdminStatCard
+              key={k.label}
+              tone="dark"
+              label={k.label}
+              value={k.value}
+              href={k.href}
+              icon={k.icon}
+              accent={k.accent}
+              money={k.money}
+              suffix={k.suffix}
+              hint={k.hint}
+              emptyHint="Henüz ofis kaydı yok"
+            />
+          ))}
+        </AdminStatGrid>
+      </AdminPageHeader>
 
       {/* Tarih aralığı — metrikler seçili aralıktaki kayıtlardan hesaplanır */}
       <form action="/admin/raporlar" className="flex flex-wrap items-end gap-3 rounded-[16px] border border-line bg-surface p-3">
@@ -190,19 +229,6 @@ export default async function AdminReportsPage({
           <p className="ml-auto text-[11px] text-text-faint">Aralık seçilmezse tüm veri raporlanır.</p>
         )}
       </form>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {kpis.map((k) => (
-          <Link key={k.label} href={k.href} className="dashboard-panel focus-ring press lift group relative block rounded-[18px] border border-line bg-surface p-4 transition hover:border-brand-300">
-            <span className={`grid h-9 w-9 place-items-center rounded-[11px] bg-canvas ${k.tone}`}><k.icon className="h-4.5 w-4.5" /></span>
-            <p className="mt-3 font-display text-2xl font-extrabold tabular-nums text-ink-950">
-              <CountUp value={k.value} money={k.money} suffix={k.suffix} />
-            </p>
-            <p className="text-xs text-text-muted">{k.label}</p>
-            <ArrowUpRight className="hover-action absolute right-4 top-4 h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-          </Link>
-        ))}
-      </div>
 
       <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
         <div className="flex items-center justify-between">

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
+import { triggerPlaybooks } from "@/lib/playbook-trigger";
 
 export type DemandResult = { error?: string; ok?: boolean; id?: string };
 
@@ -107,6 +108,20 @@ export async function createDemand(
   } catch (e) {
     console.error("automation new_demand", e);
   }
+
+  // İş akışı (playbook) tetikle — çok adımlı görev paketi; hata ana işlemi bozmaz
+  await triggerPlaybooks({
+    tenantId: gate.tenantId,
+    event: "talep_olusturuldu",
+    actorId: gate.userId,
+    entity: {
+      type: "demand",
+      id: data.id,
+      ownerId: gate.userId,
+      customerId,
+      fields: { transaction_type: transactionType, property_type: propertyType || null },
+    },
+  });
 
   revalidateDemandPaths(customerId);
   return { ok: true, id: data.id };

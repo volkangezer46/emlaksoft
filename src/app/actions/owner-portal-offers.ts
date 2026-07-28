@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logActivity } from "@/lib/activity";
+import { notifyTenant } from "@/lib/notify";
 
 export type OwnerOfferResponseResult = { ok?: boolean; error?: string };
 
@@ -52,7 +53,7 @@ export async function respondToOfferByToken(
   // Teklif bu portföye/kiracıya ait ve hâlâ değerlendirmede mi?
   const { data: offer } = await admin
     .from("offers")
-    .select("id, status, amount")
+    .select("id, status, amount, created_by")
     .eq("id", offerId)
     .eq("property_id", portalToken.property_id)
     .eq("tenant_id", portalToken.tenant_id)
@@ -85,6 +86,36 @@ export async function respondToOfferByToken(
       source:     "owner_portal",
       owner_name: portalToken.owner_name,
     },
+  });
+
+  /*
+   * BİLDİRİM (denetim P0): Buraya kadar yalnız `logActivity` vardı. Malik
+   * portaldan teklifi kabul/ret ediyor ama sorumlu danışmanın haberi olmuyordu
+   * — kabul edilmiş teklif, biri denetim kaydına bakana kadar bekliyordu.
+   *
+   * Hedef: portföyün sorumlu danışmanı; yoksa teklifi giren kullanıcı; o da
+   * yoksa ofis geneli (userId null). `prefKey: "portal"` — token'lı public
+   * portallardan gelen bildirim türü.
+   */
+  const { data: property } = await admin
+    .from("properties")
+    .select("assigned_to, property_code, title")
+    .eq("id", portalToken.property_id)
+    .maybeSingle();
+
+  const hedefKullanici =
+    (property?.assigned_to as string | null) ?? (offer.created_by as string | null) ?? null;
+  const portfoyAdi = property?.title ?? property?.property_code ?? "Portföy";
+  const tutar = Number(offer.amount).toLocaleString("tr-TR");
+
+  await notifyTenant({
+    tenantId: portalToken.tenant_id,
+    userId: hedefKullanici,
+    title: decision === "accepted" ? "Malik teklifi KABUL etti" : "Malik teklifi reddetti",
+    body: `${portfoyAdi} · ${tutar} ₺${portalToken.owner_name ? ` · ${portalToken.owner_name}` : ""}`,
+    href: `/app/teklifler/${offerId}`,
+    kind: decision === "accepted" ? "success" : "warning",
+    prefKey: "portal",
   });
 
   revalidatePath(`/malik-portali/${token}`);

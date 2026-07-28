@@ -1584,3 +1584,204 @@ p {
   .hover-action { opacity: 1 !important; }
   .hover-action-hide { opacity: 0 !important; }
 }
+
+/* ============================================================================
+   TASARIM SİSTEMİ v2 — renk katmanları · easing · mikro animasyon
+   ----------------------------------------------------------------------------
+   Bu blok yalnızca EKLER. Yukarıdaki hiçbir token/sınıf değiştirilmedi;
+   mevcut ekranlar birebir aynı görünür. Yeni bileşenler (Badge/Skeleton/
+   ProgressRing/Timeline/StatCard v2) buradaki isimleri kullanır.
+   ========================================================================== */
+
+:root {
+  /* ---- 1) Yüzey katmanları -------------------------------------------------
+     --surface-raised / --surface-sunken yukarıda tanımlıydı; eksik olan
+     "vurgulu ama yumuşak" zemin (seçili satır, aktif çip, KPI arka planı). */
+  --surface-accent-soft: color-mix(in srgb, var(--accent) 7%, #ffffff);
+  --surface-overlay: rgba(255, 255, 255, 0.86);
+
+  /* ---- 2) Durum renkleri: -soft (zemin) / -strong (metin) -------------------
+     KURAL: `-strong` tonlari BEYAZ uzerinde WCAG AA (>=4.5:1) saglar; olculen
+     kontrast oranlari (sRGB relative luminance, WCAG 2.1 formulu):
+
+       --success-strong  #0b8172 (mint-700)   -> 4.84:1  AA
+       --warning-strong  #8f6a24 (amber-700)  -> 4.98:1  AA
+       --danger-strong   #a92a2e (danger-700) -> 6.83:1  AA
+       --info-strong     #0b4fd6 (brand-700)  -> 6.77:1  AA
+       --neutral-strong  #172033 (text)       -> 14.8:1  AAA
+
+     Neden 600 degil 700: mint-600 (#0e9f8c) beyaz uzerinde 3.30:1, warn-600
+     (#d98c12) 2.72:1 — ikisi de normal metin icin AA'yi GECMIYOR. 600 tonlari
+     yalnizca ikon/cizgi (grafik ogesi, 3:1 esigi) olarak kullanilmali.
+
+     `-soft` zeminler %9-16 opaklikta beyaza karisir; uzerine gelen `-strong`
+     metnin kontrasti beyaz zemindekinden yalnizca ~%3 duser (soft zemin
+     luminansi 0.93+ kalir), yani AA korunur. */
+  --success-soft: color-mix(in srgb, var(--mint-500) 12%, #ffffff);
+  --success-strong: var(--mint-700);
+  --success-line: color-mix(in srgb, var(--mint-500) 28%, transparent);
+
+  --warning-soft: color-mix(in srgb, var(--amber-400) 16%, #ffffff);
+  --warning-strong: var(--amber-700);
+  --warning-line: color-mix(in srgb, var(--amber-400) 34%, transparent);
+
+  --danger-soft: color-mix(in srgb, var(--danger-500) 10%, #ffffff);
+  --danger-strong: var(--danger-700);
+  --danger-line: color-mix(in srgb, var(--danger-500) 26%, transparent);
+
+  --info-soft: color-mix(in srgb, var(--brand-600) 9%, #ffffff);
+  --info-strong: var(--brand-700);
+  --info-line: color-mix(in srgb, var(--brand-600) 24%, transparent);
+
+  --neutral-soft: color-mix(in srgb, var(--ink-950) 5%, #ffffff);
+  --neutral-strong: var(--text);
+  --neutral-line: var(--hairline-strong);
+
+  /* ---- 3) Easing token'lari ------------------------------------------------
+     Tum yeni animasyonlar bu ucunu kullanir; kod tabaninda dagimik duran
+     cubic-bezier(0.16, 1, 0.3, 1) tekrarinin adi --ease-out-expo'dur. */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* Sure olcegi — 120-320ms bandi. Daha uzunu "yavas yazilim" hissi verir. */
+  --dur-1: 120ms;
+  --dur-2: 180ms;
+  --dur-3: 240ms;
+  --dur-4: 320ms;
+}
+
+@theme inline {
+  --color-surface-accent-soft: var(--surface-accent-soft);
+
+  --color-success-soft: var(--success-soft);
+  --color-success-strong: var(--success-strong);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-strong: var(--warning-strong);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-strong: var(--danger-strong);
+  --color-info-soft: var(--info-soft);
+  --color-info-strong: var(--info-strong);
+  --color-neutral-soft: var(--neutral-soft);
+  --color-neutral-strong: var(--neutral-strong);
+
+  /* Easing token'lari BILEREK @theme'e girmedi: Tailwind'in `--ease-*`
+     namespace'i ile ayni ada sahip :root degiskenleri dairesel referans
+     uretir. CSS'te dogrudan var(--ease-out-expo) ile kullanilirlar. */
+}
+
+/* ---- 4) Ton yardimcilari --------------------------------------------------
+   Zemin + metin + kenar uclusunu tek sinifta verir. Renkleri DOGRUDAN
+   yazarlar (--ink-950 gibi tema token'i uzerinden degil) — bu yuzden koyu
+   hero (.theme-dark) icinde de okunur kalirlar: beyaz-ustune-beyaz uretmezler. */
+.tone-success { background: var(--success-soft); color: var(--success-strong); box-shadow: inset 0 0 0 1px var(--success-line); }
+.tone-warning { background: var(--warning-soft); color: var(--warning-strong); box-shadow: inset 0 0 0 1px var(--warning-line); }
+.tone-danger  { background: var(--danger-soft);  color: var(--danger-strong);  box-shadow: inset 0 0 0 1px var(--danger-line); }
+.tone-info    { background: var(--info-soft);    color: var(--info-strong);    box-shadow: inset 0 0 0 1px var(--info-line); }
+.tone-neutral { background: var(--neutral-soft); color: var(--neutral-strong); box-shadow: inset 0 0 0 1px var(--neutral-line); }
+
+/* KURTARMA: koyu bolum icinde acik zeminli her yeni yuzey — ink/text
+   token'lari .theme-dark icinde beyaza dondugu icin burada geri koyulasir.
+   (Mevcut `.theme-dark :is(.bg-white, .bg-amber-400)` kuralinin devami.) */
+.theme-dark :is(.tone-success, .tone-warning, .tone-danger, .tone-info, .tone-neutral, .glass-card, .surface-mesh, .skeleton) {
+  --ink-950: #071a38;
+  --ink-900: #0a2147;
+  --text: #172033;
+  --text-muted: #667085;
+  --text-faint: #98a2b3;
+  --line: #e6eaf2;
+}
+
+/* ---- 5) Gradient / doku katmani ------------------------------------------- */
+
+/* Cok hafif mesh degrade — panel/hero zeminleri. Okunabilirligi bozmasin diye
+   toplam renk yuku %6'nin altinda tutuldu. */
+.surface-mesh {
+  background-color: var(--surface);
+  background-image:
+    radial-gradient(60% 55% at 8% 0%, color-mix(in srgb, var(--brand-600) 6%, transparent), transparent 62%),
+    radial-gradient(55% 50% at 98% 8%, color-mix(in srgb, var(--cyan-400) 5%, transparent), transparent 58%),
+    radial-gradient(70% 60% at 50% 100%, color-mix(in srgb, var(--mint-500) 4%, transparent), transparent 60%);
+}
+/* Koyu baglamda ayni doku — beyaz zemin bastirmadan */
+.surface-mesh-dark {
+  background-color: #071a38;
+  background-image:
+    radial-gradient(60% 55% at 8% 0%, rgba(20, 99, 255, 0.22), transparent 62%),
+    radial-gradient(55% 50% at 98% 8%, rgba(34, 211, 238, 0.16), transparent 58%),
+    radial-gradient(70% 60% at 50% 100%, rgba(16, 185, 163, 0.14), transparent 60%);
+}
+
+/* Cam kart — blur + ince kenar + ust isik. `.glass`ten farki: kart
+   yaricapina oturan elevation ve sac teli kenar (panel ici kullanim). */
+.glass-card {
+  background: var(--surface-overlay);
+  -webkit-backdrop-filter: saturate(150%) blur(12px);
+  backdrop-filter: saturate(150%) blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: var(--inner-top), var(--elev-3);
+}
+
+/* Renkli halka parillitisi — vurgulanmak istenen TEK kart icin. */
+.ring-glow-brand { box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-600) 22%, transparent), 0 10px 34px -18px color-mix(in srgb, var(--brand-600) 70%, transparent); }
+.ring-glow-mint  { box-shadow: 0 0 0 1px color-mix(in srgb, var(--mint-500) 26%, transparent), 0 10px 34px -18px color-mix(in srgb, var(--mint-500) 66%, transparent); }
+.ring-glow-amber { box-shadow: 0 0 0 1px color-mix(in srgb, var(--amber-400) 30%, transparent), 0 10px 34px -18px color-mix(in srgb, var(--amber-500) 62%, transparent); }
+
+/* ---- 6) Mikro animasyonlar ------------------------------------------------
+   Hepsi 120-320ms. `both` fill mode: giris oncesi gorunmez, sonrasi sabit. */
+@keyframes anim-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes anim-pop {
+  0% { opacity: 0; transform: scale(0.94); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes anim-pulse-soft {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 34%, transparent); }
+  55% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+
+.anim-rise { animation: anim-rise var(--dur-3) var(--ease-out-expo) both; }
+.anim-pop { animation: anim-pop var(--dur-2) var(--ease-spring) both; }
+/* Dikkat cekilmesi gereken TEK oge icin (or. onay bekleyen sayac). Surekli
+   dongu oldugu icin sayfada birden fazla kullanilmamali. */
+.anim-pulse-soft { animation: anim-pulse-soft 2s var(--ease-out-quart) infinite; }
+
+/* Gecikme yardimcilari — .stagger-grid'in tekil karsiligi (liste disi ogeler). */
+.anim-d1 { animation-delay: 40ms; }
+.anim-d2 { animation-delay: 80ms; }
+.anim-d3 { animation-delay: 120ms; }
+.anim-d4 { animation-delay: 160ms; }
+
+/* Iskelet yuzeyi — mevcut `.shimmer` saydam bir parlama katmanidir ve kendi
+   taban rengi yoktur; `.skeleton` tabani + parlamayi birlikte verir. */
+@keyframes skeleton-sweep {
+  0% { background-position: -180% 0; }
+  100% { background-position: 180% 0; }
+}
+.skeleton {
+  background-color: color-mix(in srgb, var(--ink-950) 7%, #ffffff);
+  background-image: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.72) 50%, transparent 100%);
+  background-size: 180% 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-sweep 1.4s linear infinite;
+}
+
+/* ---- 7) REDUCED MOTION — v2 katmaninin tamami kapanir --------------------
+   Global `*` kurali sureleri 0.01ms'e cekiyor; burada ayrica animasyonlari
+   tamamen kaldirip bitis durumunu (opaklik/konum) sabitliyoruz ki
+   `both` fill mode yuzunden icerik gorunmez kalmasin. */
+@media (prefers-reduced-motion: reduce) {
+  .anim-rise,
+  .anim-pop,
+  .anim-pulse-soft,
+  .skeleton {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .anim-pulse-soft { box-shadow: none !important; }
+  .skeleton { background-image: none; }
+  .anim-d1, .anim-d2, .anim-d3, .anim-d4 { animation-delay: 0ms !important; }
+}

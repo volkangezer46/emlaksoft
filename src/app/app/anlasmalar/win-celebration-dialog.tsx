@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Check, FileText, Info, PartyPopper, X } from "lucide-react";
+import { useState, useTransition } from "react";
+import { ArrowRight, Check, Copy, FileText, Info, KeyRound, PartyPopper, Star, X } from "lucide-react";
 import { SmsDialog } from "@/app/app/gelen-kutusu/sms-dialog";
+import { createSurveyForDeal } from "@/app/actions/surveys";
 import type { BoardDeal } from "./deal-board";
 
 /**
@@ -30,6 +32,88 @@ const CONFETTI: { left: string; delay: string; color: string; height: string }[]
   { left: "94%", delay: "75ms", color: "var(--amber-500)", height: "10px" },
 ];
 
+/**
+ * Memnuniyet anketi adımı — mevcut `createSurveyForDeal` action'ı yeniden
+ * kullanılır (yeni action yazılmadı). Action SMS GÖNDERMEZ (İYS kapsam dışı):
+ * link burada üretilip kopyalanır, danışmana bildirim düşer. unique(deal_id)
+ * ihlali "zaten oluşturulmuş" mesajıyla döner.
+ */
+function SurveyStep({ dealId }: { dealId: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  const create = () => {
+    setError(null);
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("deal_id", dealId);
+      const res = await createSurveyForDeal(fd);
+      if (res.error || !res.url) setError(res.error ?? "Anket oluşturulamadı.");
+      else setUrl(res.url);
+    });
+  };
+
+  if (url) {
+    return (
+      <div className="rounded-[12px] border border-amber-400/40 bg-amber-400/5 px-3 py-2.5">
+        <p className="flex items-center gap-2 text-sm font-semibold text-ink-950">
+          <Star className="h-4 w-4 text-amber-500" /> Anket linki hazır
+        </p>
+        <p className="numeric mt-1.5 select-all break-all rounded-[8px] border border-line bg-canvas px-2 py-1.5 text-[11px] text-ink-950">
+          {url}
+        </p>
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(url);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              } catch {
+                setError("Panoya kopyalanamadı — linki elle seçip kopyalayın.");
+              }
+            }}
+            className="focus-ring press inline-flex items-center gap-1.5 rounded-[8px] border border-line bg-surface px-2.5 py-1.5 text-[11px] font-semibold text-ink-950 hover:bg-canvas"
+          >
+            {copied ? <Check className="h-3 w-3 text-mint-600" /> : <Copy className="h-3 w-3" />}
+            {copied ? "Kopyalandı" : "Linki kopyala"}
+          </button>
+          <Link href="/app/raporlar/memnuniyet" className="text-[11px] font-semibold text-brand-600 hover:underline">
+            Anketler →
+          </Link>
+        </div>
+        {error ? <p className="mt-2 text-[11px] font-semibold text-danger-500">{error}</p> : null}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={create}
+        disabled={pending}
+        className="focus-ring group flex w-full items-center gap-3 rounded-[12px] border border-line bg-canvas px-3 py-2.5 text-left transition hover:border-amber-400/50 hover:bg-surface disabled:opacity-60"
+      >
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-amber-400/15 text-amber-600">
+          <Star className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-ink-950">
+            {pending ? "Anket oluşturuluyor…" : "Memnuniyet anketi gönder"}
+          </span>
+          <span className="block text-[11px] text-text-muted">Link üretilir, müşteriye siz iletirsiniz</span>
+        </span>
+        <ArrowRight className="h-4 w-4 shrink-0 text-text-faint transition group-hover:text-amber-600" />
+      </button>
+      {error ? <p className="px-1 text-[11px] font-semibold text-danger-500">{error}</p> : null}
+    </>
+  );
+}
+
 export function WinCelebrationDialog({
   deal,
   onClose,
@@ -38,7 +122,22 @@ export function WinCelebrationDialog({
   onClose: () => void;
 }) {
   const title = deal.property_title ?? deal.property_code ?? "Anlaşma";
-  const contractHref = `/app/sozlesmeler?customer=${deal.customer_id ?? ""}&property=${deal.property_id ?? ""}&tur=${deal.deal_type === "rent" ? "kira" : "satis"}`;
+  const isRent = deal.deal_type === "rent";
+  const contractHref = `/app/sozlesmeler?customer=${deal.customer_id ?? ""}&property=${deal.property_id ?? ""}&tur=${isRent ? "kira" : "satis"}`;
+  /*
+   * Kira anlaşmasında sözleşme taslağı YETMEZ: kira takibi (aylık tahakkuk,
+   * vade, artış, bakım) /app/kiralama kaydına bağlıdır ve o kayıt sıfırdan
+   * portföy/kiracı/kira/vade istiyordu. Köprü: kazanılan anlaşmanın portföyü,
+   * müşterisi ve değeri ön dolgu olarak taşınır.
+   */
+  const rentalHref = (() => {
+    const q = new URLSearchParams();
+    if (deal.property_id) q.set("portfoy", deal.property_id);
+    if (deal.customer_id) q.set("musteri", deal.customer_id);
+    if (deal.deal_value != null && deal.deal_value > 0) q.set("tutar", String(Math.round(deal.deal_value)));
+    const s = q.toString();
+    return s ? `/app/kiralama?${s}` : "/app/kiralama";
+  })();
   const smsText = `Sayın ${deal.customer_name ?? "müşterimiz"}, ${title} için anlaşmanız tamamlandı. Hayırlı olsun! 🎉 Sürecin kalanında yanınızdayız.`;
 
   return (
@@ -141,6 +240,25 @@ export function WinCelebrationDialog({
             <ArrowRight className="h-4 w-4 shrink-0 text-text-faint transition group-hover:text-brand-600" />
           </Link>
 
+          {/* b2) Kira anlaşmasıysa kira kaydı — tahakkuk/vade/artış takibi buradan başlar */}
+          {isRent ? (
+            <Link
+              href={rentalHref}
+              className="focus-ring group flex items-center gap-3 rounded-[12px] border border-cyan-400/35 bg-cyan-400/5 px-3 py-2.5 transition hover:border-cyan-400/60"
+            >
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-cyan-400/15 text-cyan-600">
+                <KeyRound className="h-4 w-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-ink-950">Kira sözleşmesi oluştur</span>
+                <span className="block text-[11px] text-text-muted">
+                  Portföy, kiracı ve kira tutarı ön dolgulu gelir — vade gününü seçin
+                </span>
+              </span>
+              <ArrowRight className="h-4 w-4 shrink-0 text-text-faint transition group-hover:text-cyan-600" />
+            </Link>
+          ) : null}
+
           {/* c) Tebrik SMS'i — yalnız telefonu olan müşteride; İYS kapısı SmsDialog içinde */}
           {deal.customer_id && deal.customer_phone ? (
             <SmsDialog
@@ -163,7 +281,11 @@ export function WinCelebrationDialog({
             />
           ) : null}
 
-          {/* d) Kapat */}
+          {/* d) Memnuniyet anketi — yalnız müşterisi bağlı anlaşmada
+                 (createSurveyForDeal müşterisiz anlaşmayı reddeder) */}
+          {deal.customer_id ? <SurveyStep dealId={deal.id} /> : null}
+
+          {/* e) Kapat */}
           <div className="flex justify-end pt-2">
             <button
               type="button"

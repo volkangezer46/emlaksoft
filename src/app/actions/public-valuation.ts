@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { estimateMultiSourceValue } from "@/lib/valuation";
 import { intakeLead } from "@/lib/lead-intake";
 import { compareTr } from "@/lib/tr-text";
+import { publicValuationSourceEntry } from "@/lib/public-valuation-source";
 
 /**
  * "Evim ne kadar eder?" — /vitrin/[slug]/degerleme public satıcı hunisi.
@@ -229,5 +230,57 @@ export async function submitValuationLead(
   });
 
   if (!result.ok) return { ok: false, error: result.error };
+
+  /*
+   * DEĞERLEME KAYDI (denetim P0): hesaplanan aralık eskiden yalnızca yukarıdaki
+   * serbest metne gömülüyordu; `valuations` tablosuna satır atılmıyor, m²/ilçe
+   * yapısal saklanmıyordu. Artık lead ile birlikte gerçek bir değerleme kaydı
+   * açılıyor — danışman /app/degerleme'den açıp kriterleri elle girmeden rapor
+   * üretebiliyor.
+   *
+   * Aralık üretilememiş olsa bile (bölge verisi yetersiz) kayıt AÇILIR: asıl
+   * değer kriterlerin yapısal saklanması; tahmin alanları null kalır ve
+   * `confidence` 0 yazılır (dürüst sinyal).
+   *
+   * `created_by` null + `property_id` null → vitrin kaynağı mevcut kolonlarla
+   * ayırt edilebilir; kriter dökümü `sources` içinde (lib/public-valuation-source.ts).
+   *
+   * Best-effort: burada bir hata olursa lead ZATEN kaydedildi; talebi kaybetmemek
+   * için hata yutulur, ama loglanır.
+   */
+  const provinceName = relName((district?.province ?? null) as Rel);
+  const baslikYeri = loc || provinceName || "Konum belirtilmedi";
+  const { error: valErr } = await admin.from("valuations").insert({
+    tenant_id: tenant.id,
+    property_id: null,
+    title: `Vitrin değerleme talebi · ${baslikYeri} · ${propertyType}`,
+    estimated_low: input.low != null && input.low > 0 ? input.low : null,
+    estimated_mid:
+      input.low != null && input.high != null && input.low > 0 ? Math.round((input.low + input.high) / 2) : null,
+    estimated_high: input.high != null && input.high > 0 ? input.high : null,
+    // Public huni bağımsız kaynak sayısını dışarı vermiyor; ön tahmin varsa
+    // düşük güven (0.3), yoksa 0. Danışman raporu bunu ezecek.
+    confidence: input.low != null && input.high != null && input.low > 0 ? 0.3 : 0,
+    sources: [
+      publicValuationSourceEntry({
+        origin: "vitrin",
+        slug,
+        customer_id: result.customerId,
+        province_id: input.provinceId || null,
+        district_id: input.districtId || null,
+        district_name: district?.name ?? null,
+        province_name: provinceName,
+        property_type: propertyType,
+        sqm: Number.isFinite(sqm) && sqm > 0 ? sqm : null,
+        rooms: input.rooms ? String(input.rooms).slice(0, 20) : null,
+        building_age: input.buildingAge ? String(input.buildingAge).slice(0, 20) : null,
+        transaction_type: "Satılık",
+      }),
+    ],
+    notes: `${message} Kaynak: vitrin değerleme formu. İnsan onayı gerekir.`,
+    created_by: null,
+  });
+  if (valErr) console.error("submitValuationLead valuation insert", valErr);
+
   return { ok: true };
 }

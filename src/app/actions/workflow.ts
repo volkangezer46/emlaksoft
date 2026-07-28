@@ -7,6 +7,7 @@ import { logActivity } from "@/lib/activity";
 import { checkAuthorityShield } from "@/lib/authority-shield";
 import { notifyTenant } from "@/lib/notify";
 import { buildSplits, calculateCommission } from "@/lib/commission";
+import { wonDealPropertyStatus } from "@/lib/deal-outcome";
 
 export type WorkflowResult = { error?: string; ok?: boolean; dealId?: string; commissionId?: string };
 
@@ -111,11 +112,16 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
       return { error: "Komisyon kaydı oluşturulamadı." };
     }
 
+    // Kira anlaşmasında portföy SATILDI olamaz (denetim P0) — bkz. lib/deal-outcome.ts
+    const nextStatus = wonDealPropertyStatus(dealType);
+    const kapanisBasligi =
+      dealType === "rent" ? "Kiralama kapandı · komisyon hesaplandı" : "Satış kapandı · komisyon hesaplandı";
+
     // property update + logActivity + notifyTenant birbirinden bağımsız → paralel
     await Promise.all([
       supabase
         .from("properties")
-        .update({ status: "sold", updated_at: new Date().toISOString() })
+        .update({ status: nextStatus, updated_at: new Date().toISOString() })
         .eq("id", propertyId),
       logActivity({
         tenantId: gate.tenantId,
@@ -123,11 +129,11 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
         action: "workflow.deal_won",
         entityType: "deal",
         entityId: deal.id,
-        newValue: { property_id: propertyId, gross, splits },
+        newValue: { property_id: propertyId, gross, splits, deal_type: dealType, property_status: nextStatus },
       }),
       notifyTenant({
         tenantId: gate.tenantId,
-        title: "Satış kapandı · komisyon hesaplandı",
+        title: kapanisBasligi,
         body: `${property.property_code}: ${gross.toLocaleString("tr-TR")} ₺ brüt`,
         href: "/app/komisyon",
         kind: "success",

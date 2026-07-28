@@ -7,9 +7,9 @@ import { listExpenses, listExpenseMonthlyTrend } from "@/app/actions/expenses";
 import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 import { getDefinitions } from "@/lib/definitions";
 import { EmptyState } from "@/components/app/empty-state";
-import { ChartFrame } from "@/components/ui/chart";
+import { ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { InteractiveChart } from "@/components/app/interactive-chart";
-import { CategoryDonut } from "./category-donut";
+import { CategoryDonut } from "./category-donut-lazy";
 import { ExpensesTable } from "./expenses-table";
 
 // Inline server action wrappers — void return için form action uyumlu

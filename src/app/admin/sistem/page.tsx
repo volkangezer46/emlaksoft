@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { ArrowUpRight, Bug, CheckCircle2, Clock3, Database, HeartPulse, KeyRound, Landmark, MapPin, MapPinned, Radar, XCircle } from "lucide-react";
+import { ArrowUpRight, Bug, CheckCircle2, Clock3, Database, HeartPulse, KeyRound, Landmark, Layers, MapPin, MapPinned, Radar, XCircle } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card";
+import { probeSchema } from "./schema-checks";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { getPlatformSetting } from "@/lib/platform-settings";
@@ -57,6 +60,8 @@ export default async function AdminSystemPage() {
     dbSahibindenKey, dbHepsiemlakKey, dbZingatKey,
     { count: provinces }, { count: districts }, { count: neighborhoods },
     { data: heartbeatRows },
+    schemaRows,
+    { count: openErrors },
   ] = await Promise.all([
     getPlatformSetting("openai_api_key"),
     getPlatformSetting("endeksa_client_id"),
@@ -69,10 +74,19 @@ export default async function AdminSystemPage() {
     admin.from("geo_districts").select("id", { count: "exact", head: true }),
     admin.from("geo_neighborhoods").select("id", { count: "exact", head: true }),
     admin.from("cron_heartbeats").select("job, last_run_at, last_status, last_detail"),
+    probeSchema(),
+    admin.from("error_logs").select("id", { count: "exact", head: true }).is("resolved_at", null),
   ]);
 
   const heartbeats = new Map<string, Heartbeat>();
   for (const h of (heartbeatRows ?? []) as Heartbeat[]) heartbeats.set(h.job, h);
+
+  // Cron sağlığı özeti — hero kartlarında gösterilir
+  const cronHealthy = CRON_JOBS.filter(({ job }) => {
+    const hb = heartbeats.get(job);
+    return hb && hb.last_status !== "error" && msSince(hb.last_run_at) <= DAY_MS;
+  }).length;
+  const schemaMissing = schemaRows.filter((r) => !r.ok);
 
   // OpenAI
   const envKey = process.env.OPENAI_API_KEY?.trim() || null;
@@ -109,18 +123,49 @@ export default async function AdminSystemPage() {
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="relative">
-          <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-amber-300">
-            <Radar className="h-3.5 w-3.5" /> Sistem sağlığı
-          </p>
-          <h1 className="mt-2 font-display text-3xl font-extrabold">Altyapı &amp; entegrasyon durumu</h1>
-          <p className="mt-2 max-w-xl text-sm text-white/60">
-            Geo kapsama, cron güvenliği ve opsiyonel entegrasyonların (iyzico, Endeksa, Tapusor, yapay zeka) canlı yapılandırma durumu.
-          </p>
-        </div>
-      </section>
+      <AdminPageHeader
+        eyebrow="Sistem sağlığı"
+        icon={Radar}
+        title="Altyapı & entegrasyon durumu"
+        description="Geo kapsama, cron güvenliği, şema sürümü ve opsiyonel entegrasyonların (iyzico, Endeksa, Tapusor, yapay zeka) canlı yapılandırma durumu."
+      >
+        <AdminStatGrid className="mt-6">
+          <AdminStatCard
+            tone="dark"
+            label="Sağlıklı cron"
+            value={`${cronHealthy}/${CRON_JOBS.length}`}
+            icon={HeartPulse}
+            accent={cronHealthy === CRON_JOBS.length ? "text-mint-400" : "text-amber-300"}
+            hint="son 24 saatte hatasız çalıştı"
+          />
+          <AdminStatCard
+            tone="dark"
+            label="Şema durumu"
+            value={schemaMissing.length === 0 ? "Güncel" : `${schemaMissing.length} eksik`}
+            icon={Layers}
+            accent={schemaMissing.length === 0 ? "text-mint-400" : "text-danger-300"}
+            hint={`${schemaRows.length} kontrol noktası`}
+          />
+          <AdminStatCard
+            tone="dark"
+            label="Açık hata türü"
+            value={openErrors ?? 0}
+            href="/admin/hatalar"
+            icon={Bug}
+            accent={(openErrors ?? 0) > 0 ? "text-danger-300" : "text-mint-400"}
+            hint="tekilleştirilmiş üretim hatası"
+          />
+          <AdminStatCard
+            tone="dark"
+            label="Geo kapsama"
+            value={`%${provinceCoverage}`}
+            href="/admin/geo"
+            icon={MapPin}
+            accent="text-cyan-300"
+            hint={`${provinces ?? 0}/${TOTAL_PROVINCES} il`}
+          />
+        </AdminStatGrid>
+      </AdminPageHeader>
 
       {/* Geo + ortam değişkenleri */}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -265,6 +310,64 @@ export default async function AdminSystemPage() {
           </code>
         </section>
       </div>
+
+      {/* Şema / migration durumu — salt okunur yoklama, hiçbir şey yazmaz */}
+      <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3.5">
+          <div>
+            <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
+              <Layers className="h-4 w-4" /> Şema &amp; migration
+            </p>
+            <h2 className="mt-1 font-display font-bold text-ink-950">Bu ortama uygulanmış migration&apos;lar</h2>
+          </div>
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+              schemaMissing.length === 0 ? "bg-mint-500/12 text-mint-600" : "bg-danger-500/10 text-danger-500"
+            }`}
+          >
+            {schemaMissing.length === 0 ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+            {schemaMissing.length === 0 ? "Tümü uygulanmış" : `${schemaMissing.length} eksik`}
+          </span>
+        </div>
+
+        {schemaMissing.length > 0 ? (
+          <div className="border-b border-line bg-danger-500/[0.04] px-5 py-4">
+            <p className="text-sm font-semibold text-ink-950">Eksik migration&apos;ları sırayla uygulayın:</p>
+            <code className="mt-2 block overflow-x-auto whitespace-pre rounded-[10px] bg-ink-950 px-3 py-2 text-[11px] leading-relaxed text-mint-300">
+              {schemaMissing.map((m) => `npx tsx scripts/apply-one.ts supabase/migrations/${m.migration}`).join("\n")}
+            </code>
+          </div>
+        ) : null}
+
+        <div className="overflow-x-auto">
+          <div className="min-w-[520px] divide-y divide-line">
+            {schemaRows.map((r) => (
+              <div key={`${r.table}.${r.column ?? ""}`} className="flex items-center justify-between gap-3 px-5 py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-ink-950">{r.label}</p>
+                  <p className="numeric truncate text-[11px] text-text-faint">
+                    {r.column ? `${r.table}.${r.column}` : r.table} · {r.migration}
+                  </p>
+                </div>
+                {r.ok ? (
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-mint-500/12 px-2.5 py-1 text-[11px] font-bold text-mint-600">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Uygulanmış
+                  </span>
+                ) : (
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-danger-500/10 px-2.5 py-1 text-[11px] font-bold text-danger-500">
+                    <XCircle className="h-3.5 w-3.5" /> {r.detail ?? "Eksik"}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="border-t border-line px-5 py-3 text-[11px] leading-relaxed text-text-faint">
+          Bu panel şemayı <strong>yalnızca okur</strong>: her satır için tek bir başlık sorgusu (head request) atılıp
+          hata kodu değerlendirilir — veri taşınmaz, hiçbir şey değiştirilmez. Tam denetim için{" "}
+          <code className="rounded bg-canvas px-1">npx tsx scripts/check-schema.ts</code>.
+        </p>
+      </section>
 
       {/* Yapay zeka anahtarı */}
       <OpenAiKeyForm

@@ -1,14 +1,16 @@
 "use client";
 
-import { useTransition, useState, useRef, useEffect, useCallback } from "react";
+import { useTransition, useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   ChevronDown,
   Loader2,
   Plus,
+  Search,
   ShieldCheck,
   UserMinus,
   UserPlus,
+  Users,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
@@ -282,9 +284,35 @@ function StaffTable({ rows, onDone }: { rows: StaffRow[]; onDone: () => void }) 
 // ---------------------------------------------------------------------------
 // Page — client component, veriyi /api/admin/personel üzerinden çeker
 // ---------------------------------------------------------------------------
+/** Yükleme iskeleti — "Yükleniyor…" metni yerine tablonun kendi ritmi. */
+function StaffSkeleton() {
+  return (
+    <div className="animate-pulse space-y-2 px-5 py-4" aria-hidden>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3">
+          <div className="h-9 flex-1 rounded-[10px] bg-ink-950/8" />
+          <div className="h-9 w-28 rounded-[10px] bg-ink-950/8" />
+          <div className="h-9 w-20 rounded-[10px] bg-ink-950/8" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Türkçe duyarsız arama: "sisli" → "Şişli", "OZGUR" → "Özgür". */
+function normalizeTr(v: string) {
+  return v
+    .toLocaleLowerCase("tr")
+    .replace(/ı/g, "i")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
 export default function PersonelPage() {
   const [staff, setStaff] = useState<StaffRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<PlatformRole | "all">("all");
 
   const load = useCallback(() => {
     // Durum güncellemeleri bilinçli olarak `.then()` içinde: `async/await`
@@ -303,32 +331,106 @@ export default function PersonelPage() {
     void load();
   }, [load]);
 
-  const active = staff.filter((s) => s.is_active);
-  const passive = staff.filter((s) => !s.is_active);
+  // Rol dağılımı arama/filtreden bağımsız: özet her zaman tüm kadroyu anlatır.
+  const roleCounts = useMemo(
+    () =>
+      (Object.keys(PLATFORM_ROLE_LABELS) as PlatformRole[]).map((r) => ({
+        role: r,
+        label: PLATFORM_ROLE_LABELS[r],
+        count: staff.filter((s) => s.is_active && s.role === r).length,
+      })),
+    [staff],
+  );
+
+  const filtered = useMemo(() => {
+    const needle = normalizeTr(query.trim());
+    return staff.filter((s) => {
+      if (roleFilter !== "all" && s.role !== roleFilter) return false;
+      if (!needle) return true;
+      return normalizeTr(`${s.full_name} ${s.email}`).includes(needle);
+    });
+  }, [staff, query, roleFilter]);
+
+  const active = filtered.filter((s) => s.is_active);
+  const passive = filtered.filter((s) => !s.is_active);
+  const totalActive = staff.filter((s) => s.is_active).length;
+  const searching = Boolean(query.trim()) || roleFilter !== "all";
 
   return (
     <div className="space-y-6">
       {/* Hero */}
       <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-amber-400/20 blur-[90px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-amber-300">
-              <ShieldCheck className="h-3.5 w-3.5" /> Platform personeli
-            </p>
-            <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">Personel yönetimi</h1>
-            <p className="mt-1.5 text-sm text-white/60">EmlakSoft çalışanları · rol ve erişim yönetimi</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="rounded-[14px] border border-white/10 bg-white/5 px-4 py-3 text-center">
-              <p className="font-display text-2xl font-extrabold">{active.length}</p>
-              <p className="text-[11px] text-white/50">Aktif</p>
+        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-amber-400/20 blur-[90px]" />
+        <div className="relative">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="min-w-0">
+              <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-amber-300">
+                <ShieldCheck className="h-3.5 w-3.5" /> Platform personeli
+              </p>
+              <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">Personel yönetimi</h1>
+              <p className="mt-1.5 max-w-2xl text-sm text-white/65">
+                EmlakSoft çalışanları · departman rolü, erişim ve durum yönetimi.
+              </p>
             </div>
             <AddStaffDialog onDone={load} />
           </div>
+
+          {/* Rol dağılımı — her kart o rolü filtreler */}
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {roleCounts.map((r) => {
+              const isActive = roleFilter === r.role;
+              return (
+                <button
+                  key={r.role}
+                  type="button"
+                  onClick={() => setRoleFilter(isActive ? "all" : r.role)}
+                  aria-pressed={isActive}
+                  title={isActive ? "Rol filtresini kaldır" : `Yalnızca ${r.label} rolünü göster`}
+                  className={`focus-ring press group relative block rounded-[14px] border p-3.5 text-left transition ${
+                    isActive
+                      ? "border-amber-300/50 bg-white/15"
+                      : "border-white/12 bg-white/8 backdrop-blur hover:border-white/25 hover:bg-white/12"
+                  }`}
+                >
+                  <Users className="h-4 w-4 text-amber-300" />
+                  <p className="numeric mt-2 font-display text-xl font-extrabold tabular-nums text-white">
+                    {loading ? "—" : r.count}
+                  </p>
+                  <p className="text-[11px] text-white/70">{r.label}</p>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
+
+      {/* Arama + filtre çubuğu */}
+      <div className="flex flex-wrap items-center gap-3 rounded-[16px] border border-line bg-surface p-3">
+        <div className="relative w-full max-w-xs">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-faint" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Ad soyad veya e-posta ara…"
+            aria-label="Personel ara"
+            className="focus-ring w-full rounded-[10px] border border-line bg-canvas px-8 py-2 text-sm outline-none transition focus:border-brand-400"
+          />
+        </div>
+        {searching ? (
+          <button
+            type="button"
+            onClick={() => { setQuery(""); setRoleFilter("all"); }}
+            className="focus-ring press inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
+          >
+            Filtreleri temizle
+          </button>
+        ) : null}
+        <p className="ml-auto text-[11px] text-text-faint">
+          {loading ? "Kadro yükleniyor…" : `${totalActive} aktif personel · ${staff.length} kayıt`}
+        </p>
+      </div>
 
       {/* Aktif personel */}
       <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
@@ -338,9 +440,18 @@ export default function PersonelPage() {
           <span className="ml-auto rounded-full bg-brand-600/10 px-2.5 py-0.5 text-[11px] font-bold text-brand-600">{active.length}</span>
         </div>
         {loading ? (
-          <div className="px-5 py-10 text-center text-sm text-text-muted">Yükleniyor…</div>
+          <StaffSkeleton />
         ) : active.length === 0 ? (
-          <div className="px-5 py-10 text-center text-sm text-text-muted">Aktif personel yok.</div>
+          <div className="px-5 py-12 text-center">
+            <p className="text-sm font-semibold text-ink-950">
+              {searching ? "Filtreyle eşleşen personel yok" : "Aktif personel yok"}
+            </p>
+            <p className="mt-1 text-xs text-text-muted">
+              {searching
+                ? "Arama terimini değiştirin ya da rol filtresini kaldırın."
+                : "Sağ üstteki “Personel ekle” ile ilk EmlakSoft çalışanını davet edin."}
+            </p>
+          </div>
         ) : (
           <StaffTable rows={active} onDone={load} />
         )}

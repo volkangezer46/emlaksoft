@@ -25,6 +25,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { SmsDialog } from "./sms-dialog";
+import { WaTemplateMenu } from "@/components/app/wa-template-menu";
 import { RowQuickActions } from "./row-actions";
 
 /**
@@ -119,8 +120,13 @@ export default async function InboxPage({
     sayfa?: string;
   }>;
 }) {
-  await requireModulePage("calls");
+  const { userId } = await requireModulePage("calls");
   const supabase = await createClient();
+  // WhatsApp şablon değişkenleri — {ofis} ve {danisman} satır menüsüne prop'lanır
+  const [{ data: waTenant }, { data: waAdvisor }] = await Promise.all([
+    supabase.from("tenants").select("name, phone").limit(1).maybeSingle(),
+    supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
+  ]);
   const savedViews = await listSavedViews("/app/gelen-kutusu");
   const sp = await searchParams;
 
@@ -516,15 +522,17 @@ export default async function InboxPage({
                     </a>
                   ) : null}
                   {waHref ? (
-                    <a
-                      href={waHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="relative z-10 grid h-8 w-8 place-items-center rounded-[9px] text-text-faint transition hover:bg-mint-500/10 hover:text-mint-600"
-                      aria-label="WhatsApp'tan yaz"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                    </a>
+                    /* Şablonlu WhatsApp — ofis kütüphanesinden metin seçilir, değişkenler dolar */
+                    <WaTemplateMenu
+                      variant="row"
+                      phone={item.phone}
+                      vars={{
+                        musteri: item.customerName ?? "",
+                        danisman: waAdvisor?.full_name ?? "",
+                        ofis: waTenant?.name ?? "",
+                        telefon: waTenant?.phone ?? "",
+                      }}
+                    />
                   ) : null}
                   <span className="whitespace-nowrap text-xs text-text-faint" title={new Date(item.at).toLocaleString("tr-TR")}>
                     {relativeTime(item.at)}

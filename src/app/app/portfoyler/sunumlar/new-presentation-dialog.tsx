@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Check, Copy, ExternalLink, Plus, Presentation, Search } from "lucide-react";
+import { Check, Copy, ExternalLink, Plus, Presentation, Search, UserRound, X } from "lucide-react";
 import {
   Dialog,
   DialogBody,
@@ -23,8 +23,16 @@ export type SelectableProperty = {
   district: string | null;
 };
 
+export type SelectableCustomer = {
+  id: string;
+  name: string;
+  phone: string | null;
+};
+
 // Action tarafındaki MAX_PRESENTATION_PROPERTIES ile aynı — sunum 5 slaytı geçmesin.
 const MAX_SELECT = 5;
+// Müşteri arama önerisi: liste değil, kısa vurgu — 6 satır ekranı boğmaz.
+const CUSTOMER_SUGGESTIONS = 6;
 
 function money(n: number | null, tx: string) {
   if (n == null) return "Fiyat girilmedi";
@@ -51,16 +59,33 @@ function fold(s: string) {
  */
 export function NewPresentationDialog({
   properties,
+  customers = [],
   preselectedId,
+  preselectedCustomerId,
 }: {
   properties: SelectableProperty[];
+  customers?: SelectableCustomer[];
   preselectedId?: string | null;
+  /** ?musteri= — eşleştirme ekranındaki "Sunum hazırla" müşteriyi de taşır. */
+  preselectedCustomerId?: string | null;
 }) {
   // Ön seçim yalnız gerçekten seçilebilir (yayında) bir portföyse uygulanır.
   const validPreselect = preselectedId && properties.some((p) => p.id === preselectedId) ? [preselectedId] : [];
+  // Müşteri ön seçimi: yalnız listede gerçekten bulunan kayıt bağlanır.
+  const presetCustomer = preselectedCustomerId
+    ? customers.find((c) => c.id === preselectedCustomerId) ?? null
+    : null;
   const [open, setOpen] = useState(Boolean(validPreselect.length));
   const [selected, setSelected] = useState<string[]>(validPreselect);
   const [query, setQuery] = useState("");
+  /*
+   * Müşteri alanı TEK input: yazılan metin hem serbest `customer_name` hem de
+   * kayıtlı müşteri araması. Bir öneri seçilirse `pickedCustomer` dolar ve
+   * gizli `customer_id` gönderilir; seçilmezse alan eskisi gibi düz metindir.
+   */
+  const [customerQuery, setCustomerQuery] = useState(presetCustomer?.name ?? "");
+  const [pickedCustomer, setPickedCustomer] = useState<SelectableCustomer | null>(presetCustomer);
+  const [customerFocused, setCustomerFocused] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -74,6 +99,18 @@ export function NewPresentationDialog({
     );
   }, [properties, query]);
 
+  const customerMatches = useMemo(() => {
+    const needle = fold(customerQuery.trim());
+    if (!needle || customers.length === 0) return [];
+    return customers
+      .filter((c) => fold(`${c.name} ${c.phone ?? ""}`).includes(needle))
+      .slice(0, CUSTOMER_SUGGESTIONS);
+  }, [customers, customerQuery]);
+
+  // Seçili müşterinin adı elle değiştirilirse bağ kopar — yanlış kişiye bağlamayalım.
+  const showSuggestions =
+    customerFocused && !pickedCustomer && customerMatches.length > 0;
+
   const toggle = (id: string) => {
     setError(null);
     setSelected((prev) => {
@@ -86,6 +123,9 @@ export function NewPresentationDialog({
   const reset = () => {
     setSelected(validPreselect);
     setQuery("");
+    setCustomerQuery(presetCustomer?.name ?? "");
+    setPickedCustomer(presetCustomer);
+    setCustomerFocused(false);
     setError(null);
     setCreatedUrl(null);
     setCopied(false);
@@ -186,15 +226,85 @@ export function NewPresentationDialog({
                     className="mt-1 w-full rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
                   />
                 </label>
-                <label className="block">
-                  <span className="text-xs font-semibold text-text-muted">Müşteri adı</span>
-                  <input
-                    name="customer_name"
-                    maxLength={120}
-                    placeholder="Örn. Ayşe Yılmaz"
-                    className="mt-1 w-full rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
-                  />
-                </label>
+                {/*
+                  Müşteri alanı: yazarken kayıtlı müşteriler önerilir. Öneri
+                  seçilirse sunum Müşteri 360'ta görünür (customer_id); hiç
+                  seçilmezse alan eskisi gibi yalnız serbest metindir.
+                */}
+                <div className="relative">
+                  <label className="block">
+                    <span className="text-xs font-semibold text-text-muted">
+                      Müşteri adı{" "}
+                      <span className="font-medium text-text-faint">(kayıtlıysa seçin)</span>
+                    </span>
+                    <input
+                      name="customer_name"
+                      autoComplete="off"
+                      value={customerQuery}
+                      onChange={(e) => {
+                        setCustomerQuery(e.target.value);
+                        // Ad elle değiştirildiyse bağ düşer — sessiz yanlış eşleşme olmasın.
+                        if (pickedCustomer && e.target.value !== pickedCustomer.name) {
+                          setPickedCustomer(null);
+                        }
+                      }}
+                      onFocus={() => setCustomerFocused(true)}
+                      // blur'da hemen kapatmak öneriye tıklamayı yutar → küçük gecikme
+                      onBlur={() => setTimeout(() => setCustomerFocused(false), 150)}
+                      maxLength={120}
+                      placeholder="Örn. Ayşe Yılmaz"
+                      className={`mt-1 w-full rounded-[11px] border bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface ${
+                        pickedCustomer ? "border-mint-500/50 pr-9" : "border-line"
+                      }`}
+                    />
+                  </label>
+                  {pickedCustomer ? (
+                    <>
+                      <input type="hidden" name="customer_id" value={pickedCustomer.id} />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPickedCustomer(null);
+                          setCustomerQuery("");
+                        }}
+                        title="Müşteri bağını kaldır"
+                        aria-label="Müşteri bağını kaldır"
+                        className="focus-ring absolute right-2 top-[30px] grid h-7 w-7 place-items-center rounded-[8px] text-text-faint transition hover:bg-canvas hover:text-ink-950"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                      <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-mint-600">
+                        <Check className="h-3 w-3" /> Müşteri kartına bağlanacak
+                      </p>
+                    </>
+                  ) : null}
+                  {showSuggestions ? (
+                    <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-[12px] border border-line bg-surface shadow-[var(--shadow-lg)]">
+                      {customerMatches.map((c) => (
+                        <li key={c.id}>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              setPickedCustomer(c);
+                              setCustomerQuery(c.name);
+                              setCustomerFocused(false);
+                            }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-canvas"
+                          >
+                            <UserRound className="h-3.5 w-3.5 shrink-0 text-brand-600" />
+                            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-950">
+                              {c.name}
+                            </span>
+                            {c.phone ? (
+                              <span className="numeric shrink-0 text-[11px] text-text-faint">{c.phone}</span>
+                            ) : null}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
               </div>
               <label className="block">
                 <span className="text-xs font-semibold text-text-muted">Not (sunumun kapağında görünür)</span>

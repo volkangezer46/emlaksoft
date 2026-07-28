@@ -11,6 +11,7 @@ import { notifyMatchingDemandsForProperty } from "@/lib/match-notify";
 import { notifyTenant } from "@/lib/notify";
 import { fetchTenantMatchingWeights, scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
+import { triggerPlaybooks } from "@/lib/playbook-trigger";
 
 export type PropertyResult = { error?: string; ok?: boolean; matchedDemands?: number };
 
@@ -280,6 +281,21 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   } catch (e) {
     console.error("automation new_property", e);
   }
+
+  // İş akışı (playbook) tetikle — çok adımlı görev paketi; hata ana işlemi bozmaz
+  await triggerPlaybooks({
+    tenantId: gate.tenantId,
+    event: "yeni_portfoy",
+    actorId: gate.userId,
+    entity: {
+      type: "property",
+      id: data.id,
+      label: [propertyCode, title].filter(Boolean).join(" · "),
+      ownerId: gate.userId,
+      propertyId: data.id,
+      fields: { transaction_type: transactionType, property_type: propertyType },
+    },
+  });
 
   revalidatePath("/app/portfoyler");
   revalidatePath(`/app/portfoyler/${data.id}`);

@@ -3,116 +3,82 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import {
-  BarChart3,
-  Building2,
-  CalendarDays,
-  ChevronRight,
-  Coins,
-  CreditCard,
-  Crosshair,
-  DoorOpen,
-  FileSignature,
-  KeyRound,
-  Layers,
-  Gauge,
-  Handshake,
-  Inbox,
-  LayoutDashboard,
-  LifeBuoy,
-  ListChecks,
-  MapPinned,
-  Menu,
-  MessageSquare,
-  Network,
-  Percent,
-  Phone,
-  PiggyBank,
-  RadioTower,
-  Receipt,
-  ScrollText,
-  Settings,
-  ShieldCheck,
-  Siren,
-  Sparkles,
-  Tag,
-  Target,
-  TrendingDown,
-  TrendingUp,
-  Trophy,
-  Users,
-  UsersRound,
-  Wallet,
-  X,
-  Zap,
-} from "lucide-react";
+// Doğrudan lucide import'u yalnızca KAVRAMSAL OLMAYAN öğeler için kalır
+// (hesap makinesi, chevron, hamburger, kapat, kıvılcım süsü).
+import { Calculator, ChevronRight, LayoutDashboard, Menu, Sparkles, X } from "lucide-react";
+// İkonografi tek kaynaktan: kavramsal ikonlar (müşteri, portföy, randevu…)
+// `src/lib/icons.ts` sözlüğünden gelir; sidebar bu sözlüğün referans
+// uygulamasıdır — bir kavramın ikonu değişirse tek yerden değişir.
+import { ICONS } from "@/lib/icons";
 import type { AppModule } from "@/lib/permissions";
 
 type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; module: AppModule };
 
-const anaEkran: NavItem = { href: "/app", label: "Ana ekran", icon: LayoutDashboard, module: "dashboard" };
-const aiAsistan: NavItem = { href: "/app/asistan", label: "AI Asistan", icon: Sparkles, module: "dashboard" };
+const anaEkran: NavItem = { href: "/app", label: "Ana ekran", icon: ICONS.dashboard, module: "dashboard" };
+const aiAsistan: NavItem = { href: "/app/asistan", label: "AI Asistan", icon: ICONS.ai, module: "dashboard" };
 
 const navGroups: { title: string; items: NavItem[] }[] = [
   {
     title: "Satış",
     items: [
-      { href: "/app/musteriler",   label: "Müşteriler",    icon: Users,         module: "customers" },
-      { href: "/app/talepler",     label: "Talepler",      icon: Target,        module: "demands" },
-      { href: "/app/eslestirme",   label: "Eşleştirme",    icon: Crosshair,     module: "matching" },
-      { href: "/app/anlasmalar",   label: "Anlaşmalar",    icon: Handshake,     module: "commissions" },
-      { href: "/app/teklifler",    label: "Teklifler",     icon: Tag,           module: "offers" },
-      { href: "/app/sozlesmeler",  label: "Sözleşmeler",   icon: FileSignature, module: "contracts" },
-      { href: "/app/gelen-kutusu", label: "Gelen Kutusu",  icon: Inbox,         module: "calls" },
-      { href: "/app/arama",        label: "Akıllı Arama",  icon: Phone,         module: "calls" },
-      { href: "/app/randevular",   label: "Randevular",    icon: CalendarDays,  module: "appointments" },
-      { href: "/app/gorevler",     label: "Görevler",      icon: ListChecks,    module: "tasks" },
+      { href: "/app/musteriler",   label: "Müşteriler",    icon: ICONS.musteri,     module: "customers" },
+      { href: "/app/tavsiyeler",   label: "Tavsiyeler",    icon: ICONS.tavsiye,     module: "customers" },
+      { href: "/app/talepler",     label: "Talepler",      icon: ICONS.talep,       module: "demands" },
+      { href: "/app/eslestirme",   label: "Eşleştirme",    icon: ICONS.eslestirme,  module: "matching" },
+      { href: "/app/anlasmalar",   label: "Anlaşmalar",    icon: ICONS.anlasma,     module: "commissions" },
+      { href: "/app/teklifler",    label: "Teklifler",     icon: ICONS.teklif,      module: "offers" },
+      { href: "/app/sozlesmeler",  label: "Sözleşmeler",   icon: ICONS.sozlesme,    module: "contracts" },
+      { href: "/app/gelen-kutusu", label: "Gelen Kutusu",  icon: ICONS.gelenKutusu, module: "calls" },
+      { href: "/app/arama",        label: "Akıllı Arama",  icon: ICONS.telefon,     module: "calls" },
+      { href: "/app/randevular",   label: "Randevular",    icon: ICONS.randevu,     module: "appointments" },
+      { href: "/app/gorevler",     label: "Görevler",      icon: ICONS.gorev,       module: "tasks" },
     ],
   },
   {
     title: "Portföy",
     items: [
-      { href: "/app/portfoyler",   label: "Portföyler",    icon: Building2,     module: "properties" },
-      { href: "/app/portallar",    label: "Portal Kontrol",icon: RadioTower,    module: "portals" },
-      { href: "/app/acik-ev",      label: "Açık Ev",       icon: DoorOpen,      module: "open_house" },
-      { href: "/app/kiralama",     label: "Kiralama",      icon: KeyRound,      module: "rentals" },
-      { href: "/app/ag",           label: "Ofisler Arası Ağ", icon: Network,    module: "network" },
-      { href: "/app/projeler",     label: "Projeler",      icon: Layers,        module: "projects" },
-      { href: "/app/degerleme",    label: "Değerleme",     icon: Gauge,         module: "valuation" },
+      { href: "/app/portfoyler",   label: "Portföyler",    icon: ICONS.portfoy,     module: "properties" },
+      { href: "/app/portallar",    label: "Portal Kontrol",icon: ICONS.portal,      module: "portals" },
+      { href: "/app/acik-ev",      label: "Açık Ev",       icon: ICONS.acikEv,      module: "open_house" },
+      { href: "/app/kiralama",     label: "Kiralama",      icon: ICONS.anahtar,     module: "rentals" },
+      { href: "/app/ag",           label: "Ofisler Arası Ağ", icon: ICONS.ag,       module: "network" },
+      { href: "/app/projeler",     label: "Projeler",      icon: ICONS.proje,       module: "projects" },
+      { href: "/app/degerleme",    label: "Değerleme",     icon: ICONS.skor,        module: "valuation" },
+      { href: "/app/hesaplayici",  label: "Hesaplayıcı",   icon: Calculator,    module: "valuation" },
     ],
   },
   {
     title: "Finans",
     items: [
-      { href: "/app/komisyon",     label: "Komisyon",      icon: Wallet,        module: "commissions" },
-      { href: "/app/cuzdan",       label: "Cüzdanım",      icon: PiggyBank,     module: "commissions" },
-      { href: "/app/giderler",     label: "Giderler",      icon: Receipt,       module: "expenses" },
-      { href: "/app/aidat",        label: "Aidat",         icon: Coins,         module: "expenses" },
-      { href: "/app/kira-artis",   label: "Kira Artışı",   icon: Percent,       module: "valuation" },
-      { href: "/app/abonelik",     label: "Abonelik",      icon: CreditCard,    module: "billing" },
+      { href: "/app/komisyon",     label: "Komisyon",      icon: ICONS.komisyon,    module: "commissions" },
+      { href: "/app/cuzdan",       label: "Cüzdanım",      icon: ICONS.cuzdan,      module: "commissions" },
+      { href: "/app/giderler",     label: "Giderler",      icon: ICONS.gider,       module: "expenses" },
+      { href: "/app/aidat",        label: "Aidat",         icon: ICONS.aidat,       module: "expenses" },
+      { href: "/app/kira-artis",   label: "Kira Artışı",   icon: ICONS.oran,        module: "valuation" },
+      { href: "/app/abonelik",     label: "Abonelik",      icon: ICONS.abonelik,    module: "billing" },
     ],
   },
   {
     title: "Analiz",
     items: [
-      { href: "/app/raporlar",     label: "Raporlar",      icon: BarChart3,     module: "reports" },
-      { href: "/app/danisman-kpi", label: "Danışman KPI",  icon: Trophy,        module: "reports" },
-      { href: "/app/hedefler",     label: "Hedefler",      icon: TrendingUp,    module: "targets" },
-      { href: "/app/bolge-analizi",label: "Bölge Analizi", icon: MapPinned,     module: "reports" },
-      { href: "/app/kayip-kacak",  label: "Kayıp-kaçak",   icon: Siren,         module: "leak" },
-      { href: "/app/kayip-satis",  label: "Kayıp Satış",   icon: TrendingDown,  module: "customers" },
+      { href: "/app/raporlar",     label: "Raporlar",      icon: ICONS.rapor,       module: "reports" },
+      { href: "/app/danisman-kpi", label: "Danışman KPI",  icon: ICONS.kpi,         module: "reports" },
+      { href: "/app/hedefler",     label: "Hedefler",      icon: ICONS.hedef,       module: "targets" },
+      { href: "/app/bolge-analizi",label: "Bölge Analizi", icon: ICONS.bolge,       module: "reports" },
+      { href: "/app/kayip-kacak",  label: "Kayıp-kaçak",   icon: ICONS.alarm,       module: "leak" },
+      { href: "/app/kayip-satis",  label: "Kayıp Satış",   icon: ICONS.dusus,       module: "customers" },
     ],
   },
   {
     title: "Yönetim",
     items: [
-      { href: "/app/ekip",         label: "Ekip",          icon: UsersRound,    module: "team" },
-      { href: "/app/otomasyonlar", label: "Otomasyonlar",  icon: Zap,           module: "settings" },
-      { href: "/app/kampanyalar",  label: "Kampanyalar",   icon: MessageSquare, module: "campaigns" },
-      { href: "/app/uyum",         label: "Uyum",          icon: ShieldCheck,   module: "compliance" },
-      { href: "/app/denetim",      label: "Denetim",       icon: ScrollText,    module: "settings" },
-      { href: "/app/destek",       label: "Destek",        icon: LifeBuoy,      module: "support" },
-      { href: "/app/ayarlar",      label: "Ayarlar",       icon: Settings,      module: "settings" },
+      { href: "/app/ekip",         label: "Ekip",          icon: ICONS.ekip,        module: "team" },
+      { href: "/app/otomasyonlar", label: "Otomasyonlar",  icon: ICONS.otomasyon,   module: "settings" },
+      { href: "/app/kampanyalar",  label: "Kampanyalar",   icon: ICONS.mesaj,       module: "campaigns" },
+      { href: "/app/uyum",         label: "Uyum",          icon: ICONS.uyum,        module: "compliance" },
+      { href: "/app/denetim",      label: "Denetim",       icon: ICONS.denetim,     module: "settings" },
+      { href: "/app/destek",       label: "Destek",        icon: ICONS.destek,      module: "support" },
+      { href: "/app/ayarlar",      label: "Ayarlar",       icon: ICONS.ayar,        module: "settings" },
     ],
   },
 ];
@@ -210,10 +176,10 @@ export function AppSidebar({
   // Mobil alt gezinme: en sık kullanılan dört rota + menü çekmecesi.
   // İzin filtresi sidebar ile aynı kaynaktan (accessibleModules) beslenir.
   const tabItems = [
-    { href: "/app", label: "Ana ekran", icon: LayoutDashboard, module: "dashboard" as AppModule },
-    { href: "/app/musteriler", label: "Müşteri", icon: Users, module: "customers" as AppModule },
-    { href: "/app/portfoyler", label: "Portföy", icon: Building2, module: "properties" as AppModule },
-    { href: "/app/randevular", label: "Randevu", icon: CalendarDays, module: "appointments" as AppModule },
+    { href: "/app", label: "Ana ekran", icon: ICONS.dashboard, module: "dashboard" as AppModule },
+    { href: "/app/musteriler", label: "Müşteri", icon: ICONS.musteri, module: "customers" as AppModule },
+    { href: "/app/portfoyler", label: "Portföy", icon: ICONS.portfoy, module: "properties" as AppModule },
+    { href: "/app/randevular", label: "Randevu", icon: ICONS.randevu, module: "appointments" as AppModule },
   ].filter((t) => accessibleModules.includes(t.module));
 
   return (

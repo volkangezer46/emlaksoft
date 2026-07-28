@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { computeLegalIncrease } from "@/lib/tufe";
+import { triggerPlaybooks } from "@/lib/playbook-trigger";
 
 /**
  * Mülk Yönetimi (kiralama) server action'ları.
@@ -96,6 +97,21 @@ export async function createRental(_prev: RentalResult, fd: FormData): Promise<R
   } catch (e) {
     console.error("createRental kiracı etiketi", e);
   }
+
+  // İş akışı (playbook) tetikle — sözleşme/depozito/anahtar teslim paketi
+  await triggerPlaybooks({
+    tenantId: gate.tenantId,
+    event: "kira_sozlesmesi",
+    actorId: gate.userId,
+    entity: {
+      type: "contract",
+      id: data.id,
+      ownerId: gate.userId,
+      customerId: renterId,
+      propertyId,
+      fields: {},
+    },
+  });
 
   revalidatePath("/app/kiralama");
   return { ok: true, id: data.id };

@@ -3,25 +3,20 @@ import {
   ArrowRight,
   ArrowUpRight,
   BarChart3,
-  Building2,
-  Crosshair,
   Gauge,
   Map as MapIcon,
   PieChart,
-  Siren,
   Smile,
-  Target,
   TrendingDown,
   TrendingUp,
   Trophy,
-  Users,
-  Wallet,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { computeOfficeScore, loadOfficeScoreInputs } from "@/lib/office-score";
 import { DAY_MS, msSince } from "@/lib/clock";
+import { ICONS } from "@/lib/icons";
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
@@ -297,14 +292,16 @@ export default async function ReportsPage() {
             </div>
           </details>
         </div>
-        <div className="relative mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="stagger-grid relative mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { label: "Aylık komisyon", value: money(commissionTotal), icon: Wallet, tone: "text-amber-300", href: "/app/komisyon", trend: commissionMoM, trendTitle: "Geçen aya göre" },
-            { label: "Tahmini kayıp", value: money(lost), icon: Siren, tone: "text-danger-400", href: "/app/kayip-kacak", trend: lostMoM, trendTitle: "Geçen aya göre" },
+            { label: "Aylık komisyon", value: money(commissionTotal), icon: ICONS.komisyon, tone: "text-amber-300", href: "/app/komisyon", trend: commissionMoM, trendTitle: "Geçen aya göre" },
+            { label: "Tahmini kayıp", value: money(lost), icon: ICONS.alarm, tone: "text-danger-400", href: "/app/kayip-kacak", trend: lostMoM, trendTitle: "Geçen aya göre" },
             // Gecikmiş teyit anlık (stok) bir metrik; geçmiş anlık görüntüsü
             // tutulmadığından dürüst bir dönem kıyası üretilemiyor — rozetsiz.
-            { label: "Gecikmiş teyit", value: String(overdue), icon: Building2, tone: "text-warn-400", href: "/app/portallar?durum=teyit", trend: undefined as TrendInfo | undefined, trendTitle: "" },
-            { label: "Açık talep", value: String(demands ?? 0), icon: Target, tone: "text-mint-300", href: "/app/talepler", trend: demandFlowMoM, trendTitle: "Yeni talep akışı, geçen aya göre" },
+            // İkonografi: "Gecikmiş teyit" /app/portallar'a gidiyor ama Building2
+            // (portföy ikonu) ile çiziliyordu — portal kavramı ICONS.portal.
+            { label: "Gecikmiş teyit", value: String(overdue), icon: ICONS.portal, tone: "text-warn-400", href: "/app/portallar?durum=teyit", trend: undefined as TrendInfo | undefined, trendTitle: "" },
+            { label: "Açık talep", value: String(demands ?? 0), icon: ICONS.talep, tone: "text-mint-300", href: "/app/talepler", trend: demandFlowMoM, trendTitle: "Yeni talep akışı, geçen aya göre" },
           ].map((k) => (
             <Link
               key={k.label}
@@ -352,7 +349,7 @@ export default async function ReportsPage() {
 
       <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center gap-2">
-          <Wallet className="h-4 w-4 text-brand-600" />
+          <ICONS.komisyon className="h-4 w-4 text-brand-600" />
           <h2 className="font-display font-bold text-ink-950">Gelir & gider · son 6 ay</h2>
           <div className="ml-auto flex items-center gap-4 text-xs">
             <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px] bg-mint-500" /> Gelir</span>
@@ -379,7 +376,7 @@ export default async function ReportsPage() {
               </Link>
               <Link href="/app/komisyon" className="focus-ring press lift group block rounded-[12px] border border-line bg-canvas p-3 hover:border-brand-300">
                 <p className="flex items-center gap-1.5 text-[11px] font-semibold text-text-muted">
-                  <Wallet className="h-3.5 w-3.5 text-brand-600" /> Net
+                  <ICONS.komisyon className="h-3.5 w-3.5 text-brand-600" /> Net
                   <ArrowUpRight className="hover-action ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                 </p>
                 <p className={`mt-1 font-display text-lg font-extrabold ${trendNet >= 0 ? "text-mint-600" : "text-danger-500"}`}>{money(trendNet)}</p>
@@ -589,12 +586,12 @@ export default async function ReportsPage() {
           <p className="text-xs text-text-muted">Kapanış sonrası anket skoru</p>
         </Link>
         <Link href="/app/kayip-kacak" className="lift rounded-[16px] border border-line bg-surface p-4 hover:border-brand-400">
-          <Siren className="h-4 w-4 text-danger-500" />
+          <ICONS.alarm className="h-4 w-4 text-danger-500" />
           <p className="mt-2 font-display font-bold">Kayıp-kaçak</p>
           <p className="text-xs text-text-muted">Teyit ve kapanış analizi</p>
         </Link>
         <Link href="/app/eslestirme" className="lift rounded-[16px] border border-line bg-surface p-4 hover:border-brand-400">
-          <Crosshair className="h-4 w-4 text-brand-600" />
+          <ICONS.eslestirme className="h-4 w-4 text-brand-600" />
           <p className="mt-2 font-display font-bold">Eşleştirme</p>
           <p className="text-xs text-text-muted">Talep × portföy skorları</p>
         </Link>
@@ -604,12 +601,14 @@ export default async function ReportsPage() {
           <p className="text-xs text-text-muted">Endeksa · Tapusor</p>
         </Link>
         <Link href="/app/musteriler" className="lift rounded-[16px] border border-line bg-surface p-4 hover:border-brand-400">
-          <Users className="h-4 w-4 text-mint-600" />
+          <ICONS.musteri className="h-4 w-4 text-mint-600" />
           <p className="mt-2 font-display font-bold">Müşteri merkezi</p>
           <p className="text-xs text-text-muted">360 görünüm</p>
         </Link>
         <Link href="/app/franchise" className="lift rounded-[16px] border border-line bg-surface p-4 hover:border-brand-400">
-          <Building2 className="h-4 w-4 text-amber-500" />
+          {/* İkonografi: şube/franchise, portföy binası (Building2) ile aynı
+              ikonu paylaşıyordu; ayrı kavram → ICONS.sube. */}
+          <ICONS.sube className="h-4 w-4 text-amber-500" />
           <p className="mt-2 font-display font-bold">Şube analitiği</p>
           <p className="text-xs text-text-muted">Şube bazlı konsolide</p>
         </Link>

@@ -68,11 +68,18 @@ function qs(params: Record<string, string | null | undefined>) {
 export default async function TekliflerPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; from?: string; to?: string }>;
+  searchParams?: Promise<{ durum?: string; from?: string; to?: string; musteri?: string; portfoy?: string }>;
 }) {
   const { perms } = await requireModulePage("offers");
   const canCreate = perms.offers?.includes("create") ?? perms.commissions?.includes("create") ?? false;
   const params = (await searchParams) ?? {};
+  /*
+   * Eşleştirme ekranındaki "Teklif al" kısayolu ?musteri=&portfoy= ile gelir:
+   * diyalog müşteri/portföy ön dolgulu ve AÇIK gelir. Bu paramlar liste
+   * filtresi DEĞİL — sayfa açılış niyetidir; listeyi daraltmazlar.
+   */
+  const prefillCustomerId = (params.musteri ?? "").trim() || null;
+  const prefillPropertyId = (params.portfoy ?? "").trim() || null;
   // Filtre değerleri DB'deki gerçek durum enum'ları (draft/submitted/…)
   const durum = params.durum && STATUS_LABELS[params.durum] ? params.durum : null;
   const from = ISO_DATE.test(params.from ?? "") ? params.from! : null;
@@ -139,6 +146,43 @@ export default async function TekliflerPage({
     id: c.id,
     full_name: c.full_name as string,
   }));
+
+  /*
+   * Seçici havuzları sınırlı (200 portföy / 300 müşteri). ?portfoy= ya da
+   * ?musteri= havuzun dışında kalırsa ön dolgu sessizce düşerdi — eksik
+   * kaydı tek sorguyla listeye ekliyoruz.
+   */
+  if (prefillPropertyId && !properties.some((p) => p.id === prefillPropertyId)) {
+    const { data: extra } = await supabase
+      .from("properties")
+      .select("id, property_code, title, list_price")
+      .eq("id", prefillPropertyId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (extra) {
+      properties.unshift({
+        id: extra.id,
+        property_code: extra.property_code as string,
+        title: extra.title as string | null,
+        list_price: extra.list_price as number | null,
+      });
+    }
+  }
+  if (prefillCustomerId && !customers.some((c) => c.id === prefillCustomerId)) {
+    const { data: extra } = await supabase
+      .from("customers")
+      .select("id, full_name")
+      .eq("id", prefillCustomerId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (extra) customers.unshift({ id: extra.id, full_name: extra.full_name as string });
+  }
+
+  // Ön dolgu yalnız gerçekten seçilebilir kayıtlar için uygulanır.
+  const openWithPrefill =
+    canCreate &&
+    ((prefillPropertyId != null && properties.some((p) => p.id === prefillPropertyId)) ||
+      (prefillCustomerId != null && customers.some((c) => c.id === prefillCustomerId)));
 
   const offers = (offerData ?? []).map((o) => {
     const p = one(o.property as { id: string; property_code: string; title: string | null } | { id: string; property_code: string; title: string | null }[] | null);
@@ -226,7 +270,15 @@ export default async function TekliflerPage({
               label="Dışa aktar"
               className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
             />
-            {canCreate ? <NewOfferDialog properties={properties} customers={customers} /> : null}
+            {canCreate ? (
+              <NewOfferDialog
+                properties={properties}
+                customers={customers}
+                defaultPropertyId={prefillPropertyId}
+                defaultCustomerId={prefillCustomerId}
+                autoOpen={openWithPrefill}
+              />
+            ) : null}
           </div>
         </div>
       </section>

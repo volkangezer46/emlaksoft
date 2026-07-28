@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Link2, Loader2 } from "lucide-react";
+import { CheckCircle2, Link2, Loader2, Undo2 } from "lucide-react";
 import { convertWorkflow } from "@/app/actions/workflow";
+import { revertCommissionPayment } from "@/app/actions/commissions";
 import { createPaymentLink } from "@/app/actions/payment-links";
 import { useToast } from "@/components/app/toast-provider";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export function CommissionActions({
   commissionId,
@@ -18,7 +20,7 @@ export function CommissionActions({
 }) {
   const { push } = useToast();
   const router = useRouter();
-  const [busy, setBusy] = useState<"paid" | "link" | null>(null);
+  const [busy, setBusy] = useState<"paid" | "link" | "revert" | null>(null);
   const [linkUrl, setLinkUrl] = useState<string | null>(null);
 
   async function markPaid() {
@@ -31,6 +33,18 @@ export function CommissionActions({
     if (res.error) push(res.error, "err");
     else {
       push("Komisyon tahsil edildi olarak işaretlendi", "ok");
+      router.refresh();
+    }
+  }
+
+  // Yanlış tıklamayla tahsil edilen komisyonu geri alır (denetim P0: geri dönüş yoktu).
+  async function revertPaid() {
+    setBusy("revert");
+    const res = await revertCommissionPayment(commissionId);
+    setBusy(null);
+    if (res.error) push(res.error, "err");
+    else {
+      push("Tahsilat geri alındı · kayıt yeniden “Hesaplandı”", "ok");
       router.refresh();
     }
   }
@@ -71,7 +85,25 @@ export function CommissionActions({
             {busy === "paid" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
             Tahsil et
           </button>
-        ) : null}
+        ) : (
+          <ConfirmDialog
+            trigger={
+              <button
+                type="button"
+                disabled={busy !== null}
+                className="inline-flex items-center gap-1 rounded-[9px] border border-line px-2.5 py-1.5 text-[11px] font-bold text-text-muted transition hover:border-amber-400 hover:text-amber-600 disabled:opacity-50"
+              >
+                {busy === "revert" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Undo2 className="h-3.5 w-3.5" />}
+                Tahsilatı geri al
+              </button>
+            }
+            title="Tahsilatı geri al"
+            description="Komisyon “Hesaplandı” durumuna döner ve tahsil edilen tutarlardan düşer. Hakediş ve rapor rakamları buna göre güncellenir."
+            confirmLabel="Geri al"
+            tone="danger"
+            onConfirm={revertPaid}
+          />
+        )}
         <button
           type="button"
           onClick={makeLink}

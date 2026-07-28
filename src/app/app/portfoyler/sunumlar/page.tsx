@@ -3,14 +3,21 @@ import { ArrowLeft, Eye, MonitorPlay, Presentation, UserRound } from "lucide-rea
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { NewPresentationDialog, type SelectableProperty } from "./new-presentation-dialog";
+import {
+  NewPresentationDialog,
+  type SelectableCustomer,
+  type SelectableProperty,
+} from "./new-presentation-dialog";
 import { CopyLinkButton, DeletePresentationButton } from "./presentation-actions";
+import { SharedPortals, type SharedPortalRow } from "./shared-portals";
+import { now } from "@/lib/clock";
 
 type PresentationRow = {
   id: string;
   public_token: string;
   title: string;
   customer_name: string | null;
+  customer_id: string | null;
   property_ids: string[];
   view_count: number;
   last_viewed_at: string | null;
@@ -34,19 +41,26 @@ function appUrl() {
 export default async function PresentationsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ portfoy?: string }>;
+  searchParams?: Promise<{ portfoy?: string; musteri?: string }>;
 }) {
   const { perms } = await requireModulePage("properties");
   const canDelete = (perms.properties ?? []).includes("edit");
+  // Müşteri seçici yalnız müşteri görebilenlere; göremeyene liste sızmasın.
+  const canSeeCustomers = (perms.customers ?? []).includes("view");
   const params = (await searchParams) ?? {};
   // Portföy detayındaki "Sunum oluştur" girişi ?portfoy= ile gelir → dialog ön seçili açılır.
   const preselectedId = (params.portfoy ?? "").trim() || null;
+  // Eşleştirme ekranındaki "Sunum hazırla" ?portfoy=&musteri= ile gelir —
+  // müşteri de ön seçili olsun ki danışman adı elle yazmasın.
+  const preselectedCustomerId = (params.musteri ?? "").trim() || null;
 
   const supabase = await createClient();
-  const [{ data: presentationData }, { data: liveData }] = await Promise.all([
+  const [{ data: presentationData }, { data: liveData }, { data: customerData }] = await Promise.all([
     supabase
       .from("presentations")
-      .select("id, public_token, title, customer_name, property_ids, view_count, last_viewed_at, created_at")
+      .select(
+        "id, public_token, title, customer_name, customer_id, property_ids, view_count, last_viewed_at, created_at",
+      )
       .order("created_at", { ascending: false })
       .limit(100),
     // Dialog seçim havuzu: yalnız yayındaki portföyler (action da aynı kuralı zorlar).
@@ -57,9 +71,23 @@ export default async function PresentationsPage({
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(300),
+    // Dialog müşteri seçici havuzu — arama client'ta, ek gidiş-dönüş yok.
+    canSeeCustomers
+      ? supabase
+          .from("customers")
+          .select("id, full_name, phone")
+          .is("deleted_at", null)
+          .order("full_name", { ascending: true })
+          .limit(500)
+      : Promise.resolve({ data: null }),
   ]);
 
   const presentations = (presentationData ?? []) as PresentationRow[];
+  const customerOptions: SelectableCustomer[] = (customerData ?? []).map((c) => ({
+    id: c.id as string,
+    name: c.full_name as string,
+    phone: (c.phone as string | null) ?? null,
+  }));
   const liveProperties: SelectableProperty[] = (liveData ?? []).map((p) => {
     const rel = p.district as { name?: string } | { name?: string }[] | null;
     return {
@@ -74,6 +102,63 @@ export default async function PresentationsPage({
 
   const base = appUrl();
   const totalViews = presentations.reduce((sum, p) => sum + (p.view_count ?? 0), 0);
+
+  // ---- Paylaşılan portallar ------------------------------------------------
+  // Müşteri portalı token'ları müşteri adı taşıdığı için yalnız müşteri
+  // görebilenlere gösterilir (sunum müşteri seçicisiyle aynı kapı).
+  const [{ data: ownerTokenData }, { data: customerTokenData }] = await Promise.all([
+    supabase
+      .from("owner_portal_tokens")
+      .select("id, token, owner_name, property_id, expires_at, created_at, last_seen_at, property:properties(property_code, title)")
+      .order("created_at", { ascending: false })
+      .limit(100),
+    canSeeCustomers
+      ? supabase
+          .from("customer_portal_tokens")
+          .select("id, token, customer_id, expires_at, created_at, last_seen_at, customer:customers(full_name)")
+          .order("created_at", { ascending: false })
+          .limit(100)
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const nowMs = now();
+  const relOne = <T,>(v: T | T[] | null | undefined): T | null =>
+    v == null ? null : Array.isArray(v) ? (v[0] ?? null) : v;
+
+  const sharedPortals: SharedPortalRow[] = [
+    ...((customerTokenData ?? []) as Record<string, unknown>[]).map((t) => {
+      const c = relOne(t.customer as { full_name?: string } | { full_name?: string }[] | null);
+      return {
+        id: String(t.id),
+        kind: "customer" as const,
+        subject: c?.full_name ?? "Müşteri",
+        href: t.customer_id ? `/app/musteriler/${String(t.customer_id)}` : null,
+        context: null,
+        url: `${base}/musteri-portali/${String(t.token)}`,
+        createdAt: String(t.created_at),
+        expiresAt: String(t.expires_at),
+        lastSeenAt: (t.last_seen_at as string | null) ?? null,
+        expired: new Date(String(t.expires_at)).getTime() <= nowMs,
+      };
+    }),
+    ...((ownerTokenData ?? []) as Record<string, unknown>[]).map((t) => {
+      const p = relOne(
+        t.property as { property_code?: string; title?: string | null } | { property_code?: string; title?: string | null }[] | null,
+      );
+      return {
+        id: String(t.id),
+        kind: "owner" as const,
+        subject: String(t.owner_name ?? "Malik"),
+        href: t.property_id ? `/app/portfoyler/${String(t.property_id)}` : null,
+        context: p?.title ?? p?.property_code ?? null,
+        url: `${base}/malik-portali/${String(t.token)}`,
+        createdAt: String(t.created_at),
+        expiresAt: String(t.expires_at),
+        lastSeenAt: (t.last_seen_at as string | null) ?? null,
+        expired: new Date(String(t.expires_at)).getTime() <= nowMs,
+      };
+    }),
+  ].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
   return (
     <div className="space-y-6">
@@ -92,6 +177,7 @@ export default async function PresentationsPage({
             </h1>
             <p className="mt-1 text-sm text-white/60">
               Müşteriye özel seçki hazırlayın; link telefonda sunum, yazıcıda A4 dosya olur.
+              Paylaştığınız müşteri/malik portalı linkleri de aşağıda listelenir.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -103,7 +189,12 @@ export default async function PresentationsPage({
               <p className="font-display text-xl font-extrabold text-mint-400">{totalViews}</p>
               <p className="text-[11px] text-white/50">Görüntülenme</p>
             </div>
-            <NewPresentationDialog properties={liveProperties} preselectedId={preselectedId} />
+            <NewPresentationDialog
+              properties={liveProperties}
+              customers={customerOptions}
+              preselectedId={preselectedId}
+              preselectedCustomerId={preselectedCustomerId}
+            />
           </div>
         </div>
       </section>
@@ -120,7 +211,11 @@ export default async function PresentationsPage({
           </p>
           <div className="mt-5">
             {/* preselectedId yalnız üstteki örneğe verilir — iki dialog birden otomatik açılmasın */}
-            <NewPresentationDialog properties={liveProperties} preselectedId={null} />
+            <NewPresentationDialog
+              properties={liveProperties}
+              customers={customerOptions}
+              preselectedId={null}
+            />
           </div>
         </div>
       ) : (
@@ -154,7 +249,16 @@ export default async function PresentationsPage({
                       </a>
                     </TD>
                     <TD>
-                      {p.customer_name ? (
+                      {/* Bağlı müşteri varsa satır kartına gider (sıfır çıkmaz metrik) */}
+                      {p.customer_id && canSeeCustomers ? (
+                        <Link
+                          href={`/app/musteriler/${p.customer_id}`}
+                          className="inline-flex items-center gap-1.5 font-semibold text-ink-950 underline-offset-2 transition hover:text-brand-600 hover:underline"
+                        >
+                          <UserRound className="h-3.5 w-3.5 text-brand-600" />
+                          {p.customer_name ?? "Müşteri kartı"}
+                        </Link>
+                      ) : p.customer_name ? (
                         <span className="inline-flex items-center gap-1.5 text-text-muted">
                           <UserRound className="h-3.5 w-3.5 text-brand-600" /> {p.customer_name}
                         </span>
@@ -183,6 +287,9 @@ export default async function PresentationsPage({
           </Table>
         </TableFrame>
       )}
+
+      {/* Paylaşılan portallar — üretilmiş müşteri/malik portal linkleri */}
+      <SharedPortals rows={sharedPortals} />
     </div>
   );
 }

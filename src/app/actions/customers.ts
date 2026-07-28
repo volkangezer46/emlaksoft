@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
+import { triggerPlaybooks } from "@/lib/playbook-trigger";
 import { isValidOptionalTurkishMobile, normalizeTurkishPhone, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
 import { daysFromNowIso } from "@/lib/clock";
 
@@ -99,6 +100,21 @@ export async function createCustomer(
   } catch (e) {
     console.error("automation new_customer", e);
   }
+
+  // İş akışı (playbook) tetikle — çok adımlı görev paketi; hata ana işlemi bozmaz
+  await triggerPlaybooks({
+    tenantId,
+    event: "yeni_musteri",
+    actorId: user.id,
+    entity: {
+      type: "customer",
+      id: data.id,
+      label: fullName,
+      ownerId: user.id,
+      customerId: data.id,
+      fields: { customer_type: type || null },
+    },
+  });
 
   revalidatePath("/app/musteriler");
   return { ok: true, id: data.id };

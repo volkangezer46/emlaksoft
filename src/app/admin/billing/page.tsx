@@ -2,8 +2,11 @@ import Link from "next/link";
 import { Activity, ArrowUpRight, CreditCard, FileText, TrendingUp, X } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
-import { exportSubscriptionsCsv } from "@/app/actions/platform-export";
+import { orIlike } from "@/lib/pgrst";
+import { exportInvoicesCsv, exportSubscriptionsCsv } from "@/app/actions/platform-export";
 import { ExportButton } from "@/components/admin/export-button";
+import { AdminEmpty, AdminFilterChip, AdminSearchForm } from "@/components/admin/admin-table";
+import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import type { CSSProperties } from "react";
 
 const RING_C = 2 * Math.PI * 42;
@@ -59,11 +62,14 @@ function parseDateParam(raw: string | undefined): string | undefined {
   return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined;
 }
 
-function billingHref(p: { durum?: string; from?: string; to?: string }) {
+function billingHref(p: { durum?: string; from?: string; to?: string; q?: string; sayfa?: number; fsayfa?: number }) {
   const sp = new URLSearchParams();
   if (p.durum) sp.set("durum", p.durum);
   if (p.from) sp.set("from", p.from);
   if (p.to) sp.set("to", p.to);
+  if (p.q) sp.set("q", p.q);
+  if (p.sayfa && p.sayfa > 1) sp.set("sayfa", String(p.sayfa));
+  if (p.fsayfa && p.fsayfa > 1) sp.set("fsayfa", String(p.fsayfa));
   const s = sp.toString();
   return s ? `/admin/billing?${s}` : "/admin/billing";
 }
@@ -71,42 +77,64 @@ function billingHref(p: { durum?: string; from?: string; to?: string }) {
 export default async function AdminBillingPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; from?: string; to?: string }>;
+  searchParams?: Promise<{ durum?: string; from?: string; to?: string; q?: string; sayfa?: string; fsayfa?: string }>;
 }) {
   await requirePlatformModule("billing");
   const sp = (await searchParams) ?? {};
   const durum = sp.durum && subStatus[sp.durum] ? sp.durum : undefined;
   const from = parseDateParam(sp.from);
   const to = parseDateParam(sp.to);
+  const query = (sp.q ?? "").trim();
+  const subPage = parsePage(sp.sayfa);
+  const invPage = parsePage(sp.fsayfa);
   const dateFiltered = Boolean(from || to);
 
   const admin = createAdminClient();
 
+  /*
+   * Ofis adıyla arama: `subscriptions`/`invoices` üzerinde gömülü `tenants(name)`
+   * alanına doğrudan filtre uygulamak `!inner` join gerektirir ve sayım (count)
+   * davranışını bozar. Bunun yerine önce eşleşen tenant id'leri çözülür; eşleşme
+   * yoksa liste bilinçli olarak boş kalır (yanlışlıkla tüm kayıtları göstermez).
+   */
+  const matchedTenantIds = query
+    ? ((await admin.from("tenants").select("id").or(orIlike(["name", "slug"], query)).limit(500)).data ?? []).map(
+        (t) => t.id as string,
+      )
+    : null;
+
   let subsQuery = admin
     .from("subscriptions")
-    .select("id, plan, status, billing_cycle, amount_try, trial_ends_at, current_period_end, created_at, tenant:tenants(id, name)")
+    .select("id, plan, status, billing_cycle, amount_try, trial_ends_at, current_period_end, created_at, tenant:tenants(id, name)", {
+      count: "exact",
+    })
     .order("created_at", { ascending: false })
-    .limit(500);
+    .range(...pageRange(subPage));
   if (durum) subsQuery = subsQuery.eq("status", durum);
   if (from) subsQuery = subsQuery.gte("created_at", from);
   if (to) subsQuery = subsQuery.lte("created_at", `${to}T23:59:59.999`);
+  if (matchedTenantIds) subsQuery = subsQuery.in("tenant_id", matchedTenantIds.length ? matchedTenantIds : [""]);
 
   let invQuery = admin
     .from("invoices")
-    .select("id, invoice_no, status, total_try, due_at, paid_at, created_at, reminder_count, last_reminder_at, tenant:tenants(id, name)")
+    .select("id, invoice_no, status, total_try, due_at, paid_at, created_at, reminder_count, last_reminder_at, tenant:tenants(id, name)", {
+      count: "exact",
+    })
     .order("created_at", { ascending: false })
-    .limit(100);
+    .range(...pageRange(invPage));
   if (from) invQuery = invQuery.gte("created_at", from);
   if (to) invQuery = invQuery.lte("created_at", `${to}T23:59:59.999`);
+  if (matchedTenantIds) invQuery = invQuery.in("tenant_id", matchedTenantIds.length ? matchedTenantIds : [""]);
 
   // Halka, trend ve hero sayıları filtreden bağımsız — liste sorguları ayrı daralır
-  const [{ data: subs }, { data: statRows }, { data: invoices }] = await Promise.all([
+  const [{ data: subs, count: subCount }, { data: statRows }, { data: invoices, count: invCount }] = await Promise.all([
     subsQuery,
     admin.from("subscriptions").select("status, amount_try, created_at").limit(1000),
     invQuery,
   ]);
 
   const listRows = subs ?? [];
+  const listFiltered = Boolean(durum || dateFiltered || query);
   const subRows = statRows ?? [];
   const invRows = invoices ?? [];
   const mrr = subRows.filter((s) => s.status === "active").reduce((sum, s) => sum + Number(s.amount_try || 0), 0);
@@ -191,7 +219,7 @@ export default async function AdminBillingPage({
                 return (
                   <Link
                     key={k.key}
-                    href={billingHref({ durum: active ? undefined : k.key, from, to })}
+                    href={billingHref({ durum: active ? undefined : k.key, from, to, q: query })}
                     aria-current={active ? "page" : undefined}
                     className={`focus-ring press group relative block rounded-[14px] border p-3 transition ${
                       active
@@ -258,6 +286,7 @@ export default async function AdminBillingPage({
         className="flex flex-wrap items-end gap-3 rounded-[16px] border border-line bg-surface p-3"
       >
         {durum ? <input type="hidden" name="durum" value={durum} /> : null}
+        {query ? <input type="hidden" name="q" value={query} /> : null}
         <label className="text-xs font-semibold text-text-muted">
           Başlangıç
           <input
@@ -284,7 +313,7 @@ export default async function AdminBillingPage({
         </button>
         {dateFiltered ? (
           <Link
-            href={billingHref({ durum })}
+            href={billingHref({ durum, q: query })}
             className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
           >
             Tarih: {from ?? "…"} → {to ?? "…"} <X className="h-3 w-3" />
@@ -294,6 +323,24 @@ export default async function AdminBillingPage({
           Aralık, abonelik ve fatura listelerine uygulanır; özet kartlar tüm veriyi gösterir.
         </p>
       </form>
+
+      {/* Ofis araması — abonelik ve fatura listelerinin ikisini birden daraltır */}
+      <div className="flex flex-wrap items-center gap-3 rounded-[16px] border border-line bg-surface p-3">
+        <AdminSearchForm
+          action="/admin/billing"
+          defaultValue={query}
+          placeholder="Ofis adı veya kısa adı ara…"
+          hidden={{ durum, from, to }}
+        />
+        {query ? (
+          <AdminFilterChip href={billingHref({ durum, from, to })}>
+            Ofis araması: {query} <X className="h-3 w-3" />
+          </AdminFilterChip>
+        ) : null}
+        <p className="ml-auto text-[11px] text-text-faint">
+          Arama ofis adına göre çalışır; eşleşen ofislerin abonelik ve faturaları listelenir.
+        </p>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
@@ -334,7 +381,7 @@ export default async function AdminBillingPage({
                 return (
                   <Link
                     key={s.key}
-                    href={billingHref({ durum: active ? undefined : s.key, from, to })}
+                    href={billingHref({ durum: active ? undefined : s.key, from, to, q: query })}
                     aria-current={active ? "page" : undefined}
                     title={active ? "Durum filtresini kaldır" : `Yalnızca "${s.label}" abonelikleri listele`}
                     className={`focus-ring flex items-center gap-2 rounded-[7px] px-1.5 py-0.5 transition ${
@@ -358,7 +405,7 @@ export default async function AdminBillingPage({
             </h2>
             {durum ? (
               <Link
-                href={billingHref({ from, to })}
+                href={billingHref({ from, to, q: query })}
                 className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
               >
                 Durum: {subStatus[durum]} <X className="h-3 w-3" />
@@ -383,26 +430,47 @@ export default async function AdminBillingPage({
               );
             })}
             {listRows.length === 0 ? (
-              <p className="px-5 py-10 text-center text-sm text-text-muted">
-                {durum || dateFiltered ? "Filtreyle eşleşen abonelik yok." : "Abonelik kaydı yok."}
-              </p>
+              <AdminEmpty
+                icon={CreditCard}
+                title={listFiltered ? "Filtreyle eşleşen abonelik yok" : "Abonelik kaydı yok"}
+                description={
+                  listFiltered
+                    ? "Durum, tarih aralığı ya da ofis aramasını gevşetip tekrar deneyin."
+                    : "Ofisler paket seçtiğinde abonelik kayıtları burada listelenir."
+                }
+              />
             ) : null}
+          </div>
+          <div className="px-5 pb-4">
+            <Pagination
+              page={subPage}
+              total={subCount ?? 0}
+              hrefFor={(p) => billingHref({ durum, from, to, q: query, sayfa: p, fsayfa: invPage })}
+            />
           </div>
         </section>
       </div>
 
       <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
-        <div className="border-b border-line px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <FileText className="h-4 w-4 text-brand-600" /> Faturalar
+            <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-[11px] font-bold text-brand-600">
+              {invCount ?? 0}
+            </span>
           </h2>
+          <ExportButton action={exportInvoicesCsv} label="Faturaları indir" variant="light" />
         </div>
         {invRows.length === 0 ? (
-          <p className="px-5 py-10 text-center text-sm text-text-muted">
-            {dateFiltered
-              ? "Seçili tarih aralığında fatura yok."
-              : "Henüz fatura yok. iyzico bağlandığında otomatik oluşacak; şimdilik abonelik iskeleti üzerinden takip edebilirsiniz."}
-          </p>
+          <AdminEmpty
+            icon={FileText}
+            title={listFiltered ? "Filtreyle eşleşen fatura yok" : "Henüz fatura yok"}
+            description={
+              listFiltered
+                ? "Seçili tarih aralığı veya ofis aramasında fatura bulunamadı."
+                : "iyzico bağlandığında faturalar otomatik oluşacak; şimdilik abonelik iskeleti üzerinden takip edebilirsiniz."
+            }
+          />
         ) : (
           <div className="divide-y divide-line">
             {invRows.map((inv) => {
@@ -443,6 +511,13 @@ export default async function AdminBillingPage({
             })}
           </div>
         )}
+        <div className="px-5 py-4">
+          <Pagination
+            page={invPage}
+            total={invCount ?? 0}
+            hrefFor={(p) => billingHref({ durum, from, to, q: query, sayfa: subPage, fsayfa: p })}
+          />
+        </div>
       </section>
     </div>
   );

@@ -22,10 +22,28 @@ const init: RentalResult = {};
  * Kiracı için yeni kişi tablosu yok: mevcut müşteri kaydı seçilir, action
  * tarafında 'Kiracı' tip etiketi eklenir.
  */
-export function NewRentalDialog({ properties, customers }: { properties: Property[]; customers: Customer[] }) {
+export function NewRentalDialog({
+  properties,
+  customers,
+  defaultPropertyId = null,
+  defaultCustomerId = null,
+  defaultMonthlyRent = null,
+  autoOpen = false,
+}: {
+  properties: Property[];
+  customers: Customer[];
+  /** ?portfoy= — kazanılan kira anlaşmasından gelen portföy ön dolgusu. */
+  defaultPropertyId?: string | null;
+  /** ?musteri= — anlaşmanın müşterisi kiracı olarak ön seçilir. */
+  defaultCustomerId?: string | null;
+  /** ?tutar= — anlaşma değeri aylık kira alanına ön dolgu düşer. */
+  defaultMonthlyRent?: number | null;
+  /** Ön dolgu geçerliyse diyalog doğrudan açık gelir. */
+  autoOpen?: boolean;
+}) {
   const router = useRouter();
   const { push } = useToast();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(autoOpen);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -69,6 +87,7 @@ export function NewRentalDialog({ properties, customers }: { properties: Propert
                 searchPlaceholder="Kod ya da başlık ara…"
                 emptyText="Eşleşen portföy yok"
                 onSearch={searchProperties}
+                defaultValue={defaultPropertyId ?? undefined}
                 options={properties.map((p) => ({
                   value: p.id,
                   label: p.title ?? p.property_code,
@@ -86,6 +105,7 @@ export function NewRentalDialog({ properties, customers }: { properties: Propert
                 searchPlaceholder="Ad ya da telefon ara…"
                 emptyText="Eşleşen müşteri yok"
                 onSearch={searchCustomers}
+                defaultValue={defaultCustomerId ?? undefined}
                 options={customers.map((c) => ({
                   value: c.id,
                   label: c.full_name ?? "İsimsiz",
@@ -94,7 +114,7 @@ export function NewRentalDialog({ properties, customers }: { properties: Propert
               />
             </FormField>
             <FormField label="Aylık kira (₺)" required htmlFor="rental-monthly-rent">
-              <Input id="rental-monthly-rent" name="monthly_rent" type="number" min="1" step="0.01" required placeholder="ör. 25.000" />
+              <Input id="rental-monthly-rent" name="monthly_rent" type="number" min="1" step="0.01" required defaultValue={defaultMonthlyRent ?? undefined} placeholder="ör. 25.000" />
             </FormField>
             <FormField label="Vade günü" required htmlFor="rental-due-day" hint="Ayın kaçında ödenir (1-28).">
               <Input id="rental-due-day" name="due_day" type="number" min="1" max="28" step="1" required defaultValue={1} />

@@ -17,7 +17,7 @@ import { computeOfficeScore, loadOfficeScoreInputs } from "@/lib/office-score";
 import { moneyTry } from "@/lib/leak-shield";
 import { daysAgoIso } from "@/lib/clock";
 import { StatCard } from "@/components/app/stat-card";
-import { ChartFrame, BarCompare } from "@/components/ui/chart";
+import { ChartFrame, BarCompare } from "@/app/app/_ui/lazy-chart";
 import { Table, TableFrame, TBody, TD, TFoot, TH, THead, TR } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 

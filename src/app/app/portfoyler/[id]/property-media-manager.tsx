@@ -3,17 +3,22 @@
 import { useRef, useState, useTransition } from "react";
 import { useActionState } from "react";
 import Image from "next/image";
-import { AlertCircle, Camera, Check, Copy, Film, ImagePlus, Link2, Loader2, RefreshCw, ScanText, Sparkles, Star, Trash2, Upload, View, X } from "lucide-react";
+import { AlertCircle, Camera, Check, Copy, Droplets, Film, GripVertical, ImagePlus, Link2, Loader2, RefreshCw, ScanText, Sparkles, Star, Trash2, Upload, View, X } from "lucide-react";
 import {
   addPropertyMediaUrl,
   applyDocFieldsToProperty,
+  bulkDeletePropertyMedia,
   deletePropertyMedia,
   ocrPropertyMediaDocument,
+  reorderPropertyMedia,
   setCoverPropertyMedia,
   uploadPropertyMedia,
   type MediaResult,
   type PropertyDocFields,
 } from "@/app/actions/property-media";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DEFAULT_WATERMARK, type WatermarkSettings } from "@/lib/watermark";
+import { applyWatermarkToFile, loadWatermarkLogo } from "@/lib/watermark-canvas";
 
 export type MediaItem = {
   id: string;
@@ -21,6 +26,8 @@ export type MediaItem = {
   storage_path: string | null;
   external_url: string | null;
   is_cover: boolean;
+  has_watermark?: boolean | null;
+  sort_order?: number | null;
 };
 
 /** OCR sonuç dialogundaki düzenlenebilir alanlar (C8). */
@@ -46,7 +53,7 @@ const GUVEN_STYLE: Record<string, string> = {
 // Yükleme kuyruğu + istemci tarafı yeniden boyutlandırma (saha çekimi deneyimi)
 // ---------------------------------------------------------------------------
 
-type UploadStatus = "queued" | "uploading" | "done" | "error";
+type UploadStatus = "queued" | "stamping" | "uploading" | "done" | "error";
 
 type QueueItem = {
   key: string;
@@ -105,6 +112,7 @@ async function resizeImageForUpload(original: File): Promise<File> {
 
 const STATUS_LABEL: Record<UploadStatus, string> = {
   queued: "Kuyrukta",
+  stamping: "Filigran basılıyor…",
   uploading: "Yükleniyor…",
   done: "Yüklendi",
   error: "Hata",
@@ -114,10 +122,17 @@ export function PropertyMediaManager({
   propertyId,
   media,
   canEdit,
+  watermark = DEFAULT_WATERMARK,
+  officeName = "",
+  logoUrl = null,
 }: {
   propertyId: string;
   media: MediaItem[];
   canEdit: boolean;
+  /** Ofis filigran ayarı (Ayarlar › Fotoğraf filigranı) */
+  watermark?: WatermarkSettings;
+  officeName?: string;
+  logoUrl?: string | null;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -127,20 +142,46 @@ export function PropertyMediaManager({
   const [lastFromCamera, setLastFromCamera] = useState(false);
   const [, startTransition] = useTransition();
 
-  const uploading = queue.some((q) => q.status === "queued" || q.status === "uploading");
+  // Filigran logosu bir kez yüklenip önbelleğe alınır (20 fotoğrafta 20 istek olmasın).
+  // Promise saklanır: art arda yüklemelerde ikinci çağrı aynı sonucu bekler.
+  const logoPromiseRef = useRef<Promise<HTMLImageElement | null> | null>(null);
+  function getLogo() {
+    if (!logoPromiseRef.current) logoPromiseRef.current = loadWatermarkLogo(logoUrl);
+    return logoPromiseRef.current;
+  }
+
+  const uploading = queue.some(
+    (q) => q.status === "queued" || q.status === "uploading" || q.status === "stamping",
+  );
 
   function patchQueue(key: string, patch: Partial<QueueItem>) {
     setQueue((prev) => prev.map((q) => (q.key === key ? { ...q, ...patch } : q)));
   }
 
-  /** Tek dosyayı (gerekirse küçülterek) yükler; kuyruğa durumunu işler. */
+  /** Tek dosyayı (gerekirse küçülterek + filigranlayarak) yükler; kuyruğa durumunu işler. */
   async function uploadOne(item: QueueItem) {
     patchQueue(item.key, { status: "uploading", error: undefined });
     try {
-      const file = await resizeImageForUpload(item.file);
+      const resized = await resizeImageForUpload(item.file);
+      // Filigran boyutlandırmadan SONRA basılır: damga son çözünürlüğe göre
+      // ölçeklenir, küçültme damgayı bulanıklaştırmaz.
+      let file = resized;
+      let stamped = false;
+      if (watermark.enabled) {
+        patchQueue(item.key, { status: "stamping" });
+        const logo = watermark.mode === "text" ? null : await getLogo();
+        const res = await applyWatermarkToFile(resized, watermark, {
+          logo,
+          text: (watermark.text || officeName || "").trim(),
+        });
+        file = res.file;
+        stamped = res.applied;
+        patchQueue(item.key, { status: "uploading" });
+      }
       const fd = new FormData();
       fd.set("property_id", propertyId);
       fd.set("file", file);
+      fd.set("has_watermark", stamped ? "1" : "0");
       const r = await uploadPropertyMedia(fd);
       if (r.error) {
         patchQueue(item.key, { status: "error", error: r.error });
@@ -163,7 +204,10 @@ export function PropertyMediaManager({
       status: "queued",
     }));
     // Önceki partinin biten satırları temizlenir, hatalılar yeniden dene için kalır
-    setQueue((prev) => [...prev.filter((q) => q.status === "error" || q.status === "uploading"), ...items]);
+    setQueue((prev) => [
+      ...prev.filter((q) => q.status === "error" || q.status === "uploading" || q.status === "stamping"),
+      ...items,
+    ]);
     for (const item of items) {
       await uploadOne(item);
     }
@@ -264,8 +308,107 @@ export function PropertyMediaManager({
     }
   }
 
-  const images = media.filter((m) => m.kind === "image");
+  const serverImages = media.filter((m) => m.kind === "image");
   const links = media.filter((m) => m.kind !== "image");
+  const imageKey = serverImages.map((m) => m.id).join(",");
+
+  // ---------------------------------------------------------------------
+  // Sürükle-bırak sıralama (anlaşma tahtasıyla AYNI teknik: HTML5 native
+  // draggable + dataTransfer; ek paket yok). `order` yalnızca kullanıcı
+  // sürüklediğinde dolar; sunucu listesi değişince (kaydedildi/silindi)
+  // sıfırlanır ve tek doğruluk kaynağı yine sunucu olur.
+  // ---------------------------------------------------------------------
+  const [order, setOrder] = useState<string[] | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [savingOrder, setSavingOrder] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
+
+  const byId = new Map(serverImages.map((m) => [m.id, m]));
+  const images = order
+    ? [
+        ...order.map((id) => byId.get(id)).filter((m): m is MediaItem => Boolean(m)),
+        ...serverImages.filter((m) => !order.includes(m.id)),
+      ]
+    : serverImages;
+
+  /** Sürüklenen görseli hedefin yerine taşır (canlı önizleme). */
+  function moveOver(targetId: string) {
+    if (!dragId || dragId === targetId) return;
+    const current = images.map((m) => m.id);
+    const from = current.indexOf(dragId);
+    const to = current.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    const next = [...current];
+    const [moved] = next.splice(from, 1);
+    // Çıkarma sonrası hedefin indeksi kayabilir → yeniden bulunur.
+    // Aşağı sürüklerken hedefin ARDINA, yukarı sürüklerken ÖNÜNE bırakılır.
+    const t = next.indexOf(targetId);
+    next.splice(from < to ? t + 1 : t, 0, moved);
+    setOrder(next);
+  }
+
+  /** Bırakınca sırayı kalıcı yazar (video/tur bağlantıları listenin sonuna alınır). */
+  function commitOrder() {
+    // onDrop + onDragEnd arka arkaya tetiklenir; ikinci çağrı sessizce düşer.
+    if (!dragId) return;
+    const ids = images.map((m) => m.id);
+    const same = ids.every((id, i) => serverImages[i]?.id === id);
+    setDragId(null);
+    if (same) return;
+    setSavingOrder(true);
+    setOrderError(null);
+    startTransition(async () => {
+      const r = await reorderPropertyMedia(propertyId, [...ids, ...links.map((l) => l.id)]);
+      setSavingOrder(false);
+      if (r.error) {
+        setOrderError(r.error);
+        setOrder(null); // başarısızsa sunucu sırasına geri dön
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Çoklu seçim + toplu işlemler
+  // ---------------------------------------------------------------------
+  const [selected, setSelected] = useState<string[]>([]);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+
+  // Sunucu listesi değişince (yükleme/silme/sıra kaydı) yerel sıra ve seçim
+  // sıfırlanır. useEffect DEĞİL, render sırasında ayarlama: React'in önerdiği
+  // "prop değişince state türet" deseni (fazladan render turu yok).
+  const [syncedKey, setSyncedKey] = useState(imageKey);
+  if (syncedKey !== imageKey) {
+    setSyncedKey(imageKey);
+    setOrder(null);
+    const alive = new Set(serverImages.map((m) => m.id));
+    setSelected((prev) => prev.filter((id) => alive.has(id)));
+  }
+
+  const selectedSet = new Set(selected);
+  const allSelected = images.length > 0 && selected.length === images.length;
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function bulkDelete() {
+    const ids = [...selected];
+    setBulkError(null);
+    startTransition(async () => {
+      const r = await bulkDeletePropertyMedia(propertyId, ids);
+      if (r.error) setBulkError(r.error);
+      else setSelected([]);
+    });
+  }
+
+  function makeCover(id: string) {
+    const fd = new FormData();
+    fd.set("id", id);
+    fd.set("property_id", propertyId);
+    startTransition(() => setCoverPropertyMedia(fd));
+  }
+
+  const unstamped = images.filter((m) => !m.has_watermark).length;
 
   const [urlState, urlAction, urlPending] = useActionState<MediaResult, FormData>(
     addPropertyMediaUrl,
@@ -279,8 +422,22 @@ export function PropertyMediaManager({
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <ImagePlus className="h-4 w-4 text-brand-600" /> Medya galerisi
           </h2>
-          <p className="text-xs text-text-muted">
+          <p className="flex flex-wrap items-center gap-1.5 text-xs text-text-muted">
             {images.length} fotoğraf · {links.length} video/tur — paylaşım sayfasında gösterilir
+            {canEdit ? (
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                  watermark.enabled ? "bg-mint-500/15 text-mint-700" : "bg-ink-950/6 text-text-muted"
+                }`}
+                title={
+                  watermark.enabled
+                    ? "Yüklenen fotoğraflara ofis filigranı basılır (Ayarlar › Fotoğraf filigranı)."
+                    : "Filigran kapalı — Ayarlar › Fotoğraf filigranı bölümünden açabilirsiniz."
+                }
+              >
+                <Droplets className="h-3 w-3" /> Filigran {watermark.enabled ? "açık" : "kapalı"}
+              </span>
+            ) : null}
           </p>
         </div>
         {canEdit ? (
@@ -333,7 +490,7 @@ export function PropertyMediaManager({
                 className="flex items-center gap-2 rounded-[10px] border border-line bg-canvas px-3 py-2 text-xs"
               >
                 <span className="grid h-5 w-5 shrink-0 place-items-center">
-                  {q.status === "uploading" ? (
+                  {q.status === "uploading" || q.status === "stamping" ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-brand-600" />
                   ) : q.status === "done" ? (
                     <Check className="h-3.5 w-3.5 text-mint-600" />
@@ -396,10 +553,89 @@ export function PropertyMediaManager({
           </p>
         ) : null}
 
+        {images.length > 0 && canEdit ? (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-[12px] border border-line bg-canvas px-3 py-2">
+            <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-ink-950">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={() => setSelected(allSelected ? [] : images.map((m) => m.id))}
+                className="h-4 w-4 accent-[var(--brand-600)]"
+              />
+              Tümünü seç
+            </label>
+            <span className="text-xs text-text-muted">
+              {selected.length > 0 ? `${selected.length} görsel seçili` : "Sıralamak için sürükleyip bırakın"}
+            </span>
+            <span className="flex-1" />
+            {selected.length === 1 && !byId.get(selected[0])?.is_cover ? (
+              <button
+                type="button"
+                onClick={() => makeCover(selected[0])}
+                className="inline-flex items-center gap-1.5 rounded-[9px] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 hover:border-brand-300"
+              >
+                <Star className="h-3.5 w-3.5 text-amber-500" /> Kapak yap
+              </button>
+            ) : null}
+            {selected.length > 0 ? (
+              <ConfirmDialog
+                trigger={
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-[9px] border border-danger-500/30 bg-danger-500/10 px-3 py-1.5 text-xs font-semibold text-danger-500 hover:bg-danger-500/15"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Seçilenleri sil ({selected.length})
+                  </button>
+                }
+                title="Seçili görseller silinsin mi?"
+                description={`${selected.length} görsel kalıcı olarak silinir. Kapak silinirse kalan ilk görsel otomatik kapak olur.`}
+                confirmLabel="Kalıcı sil"
+                onConfirm={bulkDelete}
+              />
+            ) : null}
+            {savingOrder ? (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sıra kaydediliyor…
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {orderError || bulkError ? (
+          <p className="mb-3 text-sm font-medium text-danger-500">{orderError ?? bulkError}</p>
+        ) : null}
+
         {images.length > 0 ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {images.map((m) => (
-              <div key={m.id} className="group relative aspect-[4/3] overflow-hidden rounded-[14px] border border-line bg-canvas">
+            {images.map((m, i) => (
+              <div
+                key={m.id}
+                draggable={canEdit}
+                onDragStart={(e) => {
+                  if (!canEdit) return;
+                  e.dataTransfer.setData("text/plain", m.id);
+                  e.dataTransfer.effectAllowed = "move";
+                  setDragId(m.id);
+                }}
+                onDragOver={(e) => {
+                  if (!dragId) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  moveOver(m.id);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  commitOrder();
+                }}
+                onDragEnd={commitOrder}
+                className={`group relative aspect-[4/3] overflow-hidden rounded-[14px] border bg-canvas transition ${
+                  dragId === m.id
+                    ? "border-brand-300 opacity-40"
+                    : selectedSet.has(m.id)
+                      ? "border-brand-400 ring-2 ring-brand-400/35"
+                      : "border-line"
+                } ${canEdit ? "cursor-grab active:cursor-grabbing" : ""}`}
+              >
                 <Image
                   src={`/api/property-media/${m.id}`}
                   alt="Portföy görseli"
@@ -407,12 +643,43 @@ export function PropertyMediaManager({
                   sizes="(max-width: 640px) 50vw, 25vw"
                   className="object-cover"
                   unoptimized
+                  draggable={false}
                 />
-                {m.is_cover ? (
-                  <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-ink-950/80 px-2 py-0.5 text-[11px] font-bold text-white">
-                    <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> Kapak
-                  </span>
+                {canEdit ? (
+                  <>
+                    <label className="absolute left-2 top-2 z-10 grid h-7 w-7 cursor-pointer place-items-center rounded-[8px] bg-ink-950/55 backdrop-blur-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedSet.has(m.id)}
+                        onChange={() => toggleSelect(m.id)}
+                        aria-label="Görseli seç"
+                        className="h-4 w-4 accent-[var(--brand-600)]"
+                      />
+                    </label>
+                    <span className="hover-action absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-[8px] bg-ink-950/55 text-white opacity-0 backdrop-blur-sm transition group-hover:opacity-100">
+                      <GripVertical className="h-3.5 w-3.5" />
+                    </span>
+                  </>
                 ) : null}
+                {/* Sıra numarası — sürükleyerek değiştirilen düzen görünür olsun */}
+                <span className="absolute bottom-2 left-2 z-10 rounded-full bg-ink-950/60 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur-sm">
+                  {i + 1}
+                </span>
+                <div className="absolute left-1/2 top-2 z-10 flex -translate-x-1/2 flex-wrap justify-center gap-1">
+                  {m.is_cover ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-ink-950/80 px-2 py-0.5 text-[11px] font-bold text-white">
+                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> Kapak
+                    </span>
+                  ) : null}
+                  {canEdit && !m.has_watermark ? (
+                    <span
+                      title="Bu görsel filigransız yüklendi. Ayar değişse bile eski görseller yeniden damgalanmaz — yeniden yükleyerek damgalayabilirsiniz."
+                      className="inline-flex items-center gap-1 rounded-full bg-amber-400/85 px-2 py-0.5 text-[11px] font-bold text-ink-950"
+                    >
+                      <Droplets className="h-3 w-3" /> Filigran yok
+                    </span>
+                  ) : null}
+                </div>
                 {canEdit ? (
                   <div className="hover-action absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-ink-950/80 to-transparent p-2 opacity-0 transition group-hover:opacity-100">
                     <button
@@ -428,36 +695,40 @@ export function PropertyMediaManager({
                       <button
                         type="button"
                         title="Kapak yap"
-                        onClick={() => {
-                          const fd = new FormData();
-                          fd.set("id", m.id);
-                          fd.set("property_id", propertyId);
-                          startTransition(() => setCoverPropertyMedia(fd));
-                        }}
+                        onClick={() => makeCover(m.id)}
                         className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] bg-white/90 text-ink-950 hover:bg-white"
                       >
                         <Star className="h-3.5 w-3.5" />
                       </button>
                     ) : null}
-                    <button
-                      type="button"
-                      title="Sil"
-                      onClick={() => {
-                        if (!confirm("Görsel silinsin mi?")) return;
-                        const fd = new FormData();
-                        fd.set("id", m.id);
-                        fd.set("property_id", propertyId);
-                        startTransition(() => deletePropertyMedia(fd));
-                      }}
-                      className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] bg-danger-500 text-white hover:bg-danger-600"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    <ConfirmDialog
+                      trigger={
+                        <button
+                          type="button"
+                          title="Sil"
+                          className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] bg-danger-500 text-white hover:bg-danger-600"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      }
+                      title="Görsel silinsin mi?"
+                      description="Bu görsel kalıcı olarak silinir."
+                      confirmLabel="Sil"
+                      formAction={deletePropertyMedia}
+                      hiddenFields={{ id: m.id, property_id: propertyId }}
+                    />
                   </div>
                 ) : null}
               </div>
             ))}
           </div>
+        ) : null}
+
+        {canEdit && images.length > 0 && unstamped > 0 && watermark.enabled ? (
+          <p className="mt-2 text-[11px] text-text-faint">
+            {unstamped} görsel filigransız. Filigran yükleme anında basıldığı için eski görseller
+            geriye dönük damgalanmaz — istersen o fotoğrafları silip yeniden yükleyebilirsin.
+          </p>
         ) : null}
 
         {links.length > 0 ? (

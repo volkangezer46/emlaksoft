@@ -72,7 +72,7 @@ test.describe("Takvim aboneligi (ICS feed)", () => {
     // "Takvime abone ol" kartı (calendar_token migration 099'da not null default —
     // her kullanıcıda olmalı).
     await expect(page.getByRole("heading", { name: "Takvime abone ol" })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole("button", { name: /Linki yenile/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Takvim linkini yenile/ })).toBeVisible();
     await expect(page.getByRole("link", { name: /Google Takvim/ })).toBeVisible();
 
     // ICS URL'i DOM'dan oku — origin client'ta çözülür (useSyncExternalStore),

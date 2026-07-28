@@ -5,7 +5,6 @@ import { inFilter, orIlike, safeLike } from "@/lib/pgrst";
 import {
   ArrowUpRight,
   Building2,
-  CircleCheck,
   FileCheck2,
   Gauge,
   LayoutGrid,
@@ -13,7 +12,6 @@ import {
   MapPin,
   Radio,
   Search,
-  Siren,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/server";
@@ -29,8 +27,12 @@ import type { CompareItem } from "@/components/public/compare-table";
 import { NewPropertyDialog } from "./new-property-dialog";
 import { PropertyCompareShell } from "./compare-shell";
 import { PropertyBulkActions } from "./property-bulk-actions";
+import { OwnerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
-import { DAY_MS, msSince } from "@/lib/clock";
+import { EmptyState } from "@/components/app/empty-state";
+import { ICONS } from "@/lib/icons";
+import { DAY_MS, msSince, now } from "@/lib/clock";
+import { fetchLatestRates, formatFx, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 
 // Harita ağır bir client komponenti ve yalnız ?gorunum=harita'da görünür —
 // dynamic import ile liste görünümünün ilk yükünden çıkarılır (ayrı chunk).
@@ -122,6 +124,7 @@ export default async function PropertiesPage({
 }) {
   const { perms } = await requireModulePage("properties");
   const canCreate = (perms.properties ?? []).includes("create");
+  const canEditProperty = (perms.properties ?? []).includes("edit");
   const params = (await searchParams) ?? {};
   const q = (params.q ?? "").trim();
   const statusFilter = params.status ?? "all";
@@ -175,14 +178,22 @@ export default async function PropertiesPage({
     query = query.or(clauses.join(","));
   }
 
-  const [{ data, count: propertyTotal }, provinces, { data: branches }, propertyTypeDefs, transactionTypeDefs] = await Promise.all([
+  const [{ data, count: propertyTotal }, provinces, { data: branches }, propertyTypeDefs, transactionTypeDefs, fxRates] = await Promise.all([
     query,
     // İl listesi 81 satırlık sabit referans verisi — istekler arası cache'li (src/lib/geo.ts)
     getProvincesCached(),
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
     getDefinitions("property_type"),
     getDefinitions("transaction_type"),
+    // TCMB kuru — yoksa null döner ve döviz satırı hiç basılmaz (uydurma kur yok).
+    fetchLatestRates(supabase),
   ]);
+
+  // Toplam portföy değeri + döviz karşılığı. Türk emlak piyasası fiilen
+  // dolarize; ofis sahibi "kaç dolarlık portföyüm var" sorusunu soruyor.
+  const totalValueTry = (data ?? []).reduce((sum, p) => sum + Number((p as PropertyRow).list_price ?? 0), 0);
+  const totalValueFx = fxApproxLine(totalValueTry, fxRates);
+  const fxTitle = fxRates ? `TCMB ${fxRates.rateDate} satış kuru — ${fxAgeLabel(fxRates.rateDate, now())}` : undefined;
 
   const allProperties = (data ?? []) as PropertyRow[];
 
@@ -309,7 +320,9 @@ export default async function PropertiesPage({
                 </Link>
               ))}
             </div>
-            <Link href="/app/portfoyler/sunumlar" className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white">Sunumlar</Link>
+            <Link href="/app/yabanci-satis" className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white">Yabancıya satış</Link>
+            <Link href="/app/portfoyler/sunumlar" className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white">Sunumlar &amp; portallar</Link>
+            <Link href="/app/portfoyler/anahtarlar" className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white">Anahtarlar</Link>
             <ExportCsvButton
               action={exportPropertiesCsv}
               label="Dışa aktar"
@@ -318,12 +331,21 @@ export default async function PropertiesPage({
             {canCreate ? <NewPropertyDialog provinces={provinceList} branches={branchList} propertyTypes={propertyTypeOptions} transactionTypes={transactionTypeOptions} /> : null}
           </div>
         </div>
-        <div className="relative mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
-          <div className="grid grid-cols-3 gap-3">
+        {/* Toplam portföy değeri + döviz karşılığı — kur yoksa satır hiç çizilmez */}
+        <p className="relative mt-5 text-sm text-white/70" title={fxTitle}>
+          Toplam portföy değeri{" "}
+          <span className="font-display font-extrabold text-white">{formatFx(totalValueTry, "TRY")}</span>
+          {totalValueFx ? <span className="ml-2 text-xs text-white/45">{totalValueFx}</span> : null}
+        </p>
+        <div className="relative mt-4 grid gap-4 lg:grid-cols-[1fr_1fr]">
+          <div className="stagger-grid grid grid-cols-3 gap-3">
             {[
-              { label: "Aktif portföy", value: liveCount, icon: Building2, href: q ? `/app/portfoyler?q=${encodeURIComponent(q)}&status=live` : "/app/portfoyler?status=live" },
-              { label: "Canlı portal", value: portalCount, icon: CircleCheck, href: "/app/portallar?durum=live" },
-              { label: "Fiyat uyarısı", value: warningCount, icon: Siren, href: saglikHref("riskli") },
+              // İkonografi: "canlı portal" CircleCheck ile çiziliyordu; portal
+              // kavramının tek ikonu ICONS.portal (RadioTower) — sidebar ve
+              // raporlar ekranıyla aynı.
+              { label: "Aktif portföy", value: liveCount, icon: ICONS.portfoy, href: q ? `/app/portfoyler?q=${encodeURIComponent(q)}&status=live` : "/app/portfoyler?status=live" },
+              { label: "Canlı portal", value: portalCount, icon: ICONS.portal, href: "/app/portallar?durum=live" },
+              { label: "Fiyat uyarısı", value: warningCount, icon: ICONS.alarm, href: saglikHref("riskli") },
             ].map((item) => (
               <Link
                 key={item.label}
@@ -412,26 +434,33 @@ export default async function PropertiesPage({
       )}
 
       {allProperties.length === 0 ? (
-        <div className="grid place-items-center overflow-hidden rounded-[20px] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
-          <div className="relative">
-            <span className="grid h-16 w-16 place-items-center rounded-[18px] bg-brand-600/10 text-brand-600"><Building2 className="h-8 w-8" /></span>
-            <span className="status-pulse absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-mint-500" />
-          </div>
-          <h2 className="mt-5 font-display text-xl font-bold text-ink-950">Portföy merkezinizi kurun</h2>
-          <p className="mt-2 max-w-md text-sm leading-relaxed text-text-muted">İlk portföyünüzü ekleyin; fiyat sağlığı, portal teyidi ve yetki süresi otomatik izlenmeye başlasın.</p>
-          {canCreate ? (
-            <div className="mt-5 [&>button]:bg-brand-600 [&>button]:text-white">
-              <NewPropertyDialog provinces={provinceList} branches={branchList} propertyTypes={propertyTypeOptions} transactionTypes={transactionTypeOptions} />
-            </div>
-          ) : null}
-        </div>
+        <EmptyState
+          icon={ICONS.portfoy}
+          illustration="start"
+          title="Portföy merkezinizi kurun"
+          description="İlk portföyünüzü ekleyin; fiyat sağlığı, portal teyidi ve yetki süresi otomatik izlenmeye başlasın."
+          action={
+            canCreate
+              ? {
+                  node: (
+                    <div className="[&>button]:bg-brand-600 [&>button]:text-white">
+                      <NewPropertyDialog provinces={provinceList} branches={branchList} propertyTypes={propertyTypeOptions} transactionTypes={transactionTypeOptions} />
+                    </div>
+                  ),
+                }
+              : undefined
+          }
+          secondary={{ href: "/app/degerleme", label: "Önce değerleme yap" }}
+        />
       ) : properties.length === 0 ? (
-        <div className="grid place-items-center rounded-[20px] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
-          <span className="grid h-16 w-16 place-items-center rounded-[18px] bg-canvas text-text-faint"><Search className="h-8 w-8" /></span>
-          <h2 className="mt-5 font-display text-xl font-bold text-ink-950">Sonuç bulunamadı</h2>
-          <p className="mt-2 max-w-md text-sm leading-relaxed text-text-muted">Arama veya filtre kriterlerinize uyan portföy yok. Filtreyi temizleyip tekrar deneyin.</p>
-          <Link href="/app/portfoyler" className="mt-5 rounded-[10px] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white">Filtreyi temizle</Link>
-        </div>
+        <EmptyState
+          icon={Search}
+          illustration="search"
+          title="Sonuç bulunamadı"
+          description="Arama veya filtre kriterlerinize uyan portföy yok. Filtreyi temizleyip tekrar deneyin."
+          action={{ href: "/app/portfoyler", label: "Filtreyi temizle" }}
+          secondary={{ href: "/app/talepler", label: "Talep havuzuna bak" }}
+        />
       ) : view === "harita" ? (
         <>
           <ListLimitNotice shown={allProperties.length} total={propertyTotal} />
@@ -489,7 +518,20 @@ export default async function PropertiesPage({
               district: relName(property.district),
             };
             return (
-              <PropertyCompareShell key={property.id} item={compareItem}>
+              <PropertyCompareShell
+                key={property.id}
+                item={compareItem}
+                actions={
+                  /* Malik portalı linki — createOwnerPortalToken'ın tek girişi.
+                     Action properties.edit istiyor, buton da aynı kapıda. */
+                  canEditProperty ? (
+                    <OwnerPortalLinkButton
+                      propertyId={property.id}
+                      propertyLabel={property.title ?? property.property_code}
+                    />
+                  ) : null
+                }
+              >
               <Link
                 href={`/app/portfoyler/${property.id}`}
                 className="group overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)] transition hover:-translate-y-1 hover:border-brand-300 hover:shadow-[var(--shadow-card)]"

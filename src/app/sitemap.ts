@@ -40,6 +40,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
       });
     }
+
+    // Danışman dijital kartvizitleri (/danisman/[slug]) — yalnız yayına alınmış
+    // ve aktif profiller. Bu sayfalar bilerek indekslenebilir (bkz. sayfa başlığı
+    // yorumu): danışmanın adıyla bulunabilirliği ürünün amacı.
+    const { data: agents } = await admin
+      .from("profiles")
+      .select("public_slug")
+      .eq("is_public", true)
+      .eq("is_active", true)
+      .not("public_slug", "is", null)
+      .limit(5000);
+
+    for (const a of agents ?? []) {
+      if (!a.public_slug) continue;
+      entries.push({
+        url: `${BASE_URL}/danisman/${a.public_slug}`,
+        lastModified: new Date(),
+        changeFrequency: "weekly",
+        priority: 0.6,
+      });
+    }
   } catch {
     // env yoksa sessizce statik kısımla devam
   }

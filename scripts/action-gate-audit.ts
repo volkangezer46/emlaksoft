@@ -68,6 +68,31 @@ const MUAF: Record<string, string> = {
   // --- Halka acik form ---
   "demo.ts::requestDemo": "Pazarlama sitesindeki demo talep formu; oturum gerektirmez.",
 
+  // --- Token'li public sayfalarin action'lari (oturum YOK, olmamali) ---
+  // Ortak koruma deseni: UUID regex on eleme + admin client + checkRateLimit + honeypot;
+  // yazma islemleri token'in cozdugu tek kayda sabit, kullanicidan tenant_id alinmaz.
+  "appointments-confirm.ts::respondToAppointmentByToken": "Randevu teyit baglantisi token ile acilir.",
+  "booking-public.ts::createPublicBooking": "Online randevu rezervasyonu; token danismanin booking_settings kaydini cozer.",
+  "open-house-public.ts::registerOpenHouseVisitorByToken": "Acik ev QR self check-in; token etkinlige sabit.",
+  "owner-portal-offers.ts::respondToOfferByToken": "Malik portalinda teklif onay/ret; token ile.",
+  "customer-portal-feedback.ts::submitMatchFeedbackByToken": "Musteri portali begen/gec geri bildirimi; token ile.",
+  "survey-public.ts::submitSurveyByToken": "NPS memnuniyet anketi; token ankete sabit.",
+  "referral-public.ts::submitReferralByToken": "Tavsiye formu; token referral_links kaydina sabit.",
+  "vitrin-alerts.ts::createVitrinPriceAlert": "Vitrin fiyat alarmi; yayindaki ilana sabit, ofis ici bildirim uretir.",
+  "vitrin.ts::createVitrinSavedSearch": "Vitrin kayitli arama; ziyaretci oturum acmaz.",
+  "vitrin.ts::likePublicShare": "Paylasim baglantisinda begeni sayaci.",
+
+  // --- Halka acik huniler (pazarlama/vitrin) ---
+  "public-valuation.ts::listPublicDistricts": "Salt okunur geo listesi; kiraciya ozel veri icermez.",
+  "public-valuation.ts::estimatePublicValuation": "Vitrin degerleme hesabi; rate limit'li, kayit yazmaz.",
+  "public-valuation.ts::submitValuationLead": "Satici basvuru formu; rate limit + KVKK onayi ile.",
+  "password-reset.ts::requestPasswordReset": "Sifre sifirlama talebi; dogasi geregi oturumsuz, kullanici varligini sizdirmaz.",
+
+  // --- OTP ve webhook: kendi sirriyla korunanlar ---
+  "contracts.ts::requestSignatureOtp": "E-imza OTP talebi; imza token'i uzerinden, kod SMS ile dogrulanir.",
+  "contracts.ts::verifySignatureOtp": "OTP dogrulama; deneme sayaci ve sure siniri kendi icinde.",
+  "communications.ts::ingestInboundSms": "Netgsm gelen SMS webhook'u; NETGSM_WEBHOOK_SECRET ile dogrulanir (communications.ts:268).",
+
   // --- Acik referans verisi (kiraciya ozel deger icermez) ---
   "geo.ts::listDistricts": "Turkiye idari bolunusu; geo_* tablolari RLS'te herkese acik okunur.",
   "geo.ts::listNeighborhoods": "Ayni.",
@@ -115,9 +140,14 @@ function collect(dir: string): Map<string, Fn> {
   return out;
 }
 
+/*
+ * Derinlik 3: gercek zincirler dort kademeye cikabiliyor —
+ * ornek: approveLeaveForm -> approveLeave -> setLeaveStatus -> leaveGate(requirePermission)
+ * (staff-leaves.ts). Sinir 2'yken bu zincir "kapisiz" gorunuyordu.
+ */
 function korumali(key: string, all: Map<string, Fn>, derinlik = 0): boolean {
   const fn = all.get(key);
-  if (!fn || derinlik > 2) return false;
+  if (!fn || derinlik > 3) return false;
   if (GATE_RE.test(fn.body)) return true;
 
   // Delegasyon: aynı dosyadaki başka bir fonksiyonu çağırıyorsa onun kapısı geçerli.

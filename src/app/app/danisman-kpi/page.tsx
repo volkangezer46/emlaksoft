@@ -6,7 +6,7 @@ import {
 import { StatCard } from "@/components/app/stat-card";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { ChartFrame } from "@/components/ui/chart";
+import { ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { buildCoachActions, type CoachAction } from "@/lib/advisor-coach";
 import dynamic from "next/dynamic";
@@ -462,8 +462,10 @@ export default async function DanismanKpiPage({
                 </Link>
               ) : null}
             </div>
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <PrintButton />
+              {/* Karne parayı ölçer, lig davranışı — puan/rozet/seri için /app/lig */}
+              <Link href={`/app/lig?donem=${ayParam(monthStart)}`} className="focus-ring inline-flex items-center gap-1.5 rounded-[9px] border border-white/15 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"><Trophy className="h-3.5 w-3.5" /> Lig tablosu</Link>
             </div>
           </div>
           <div className="flex gap-3">
