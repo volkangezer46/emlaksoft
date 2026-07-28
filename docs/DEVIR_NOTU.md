@@ -115,7 +115,74 @@ Yeni oturumun "chat hafızası" budur — kullanıcının verdiği her ana talim
     effect'e taşındı (bellek cache'i korunarak). (e) Doğrulama: tsc/lint/188 test/build/check:links/E2E
     (21 geçti, 0 kaldı) + 390px'te 12+ ekran Playwright taraması (taşma 0, sayfa hatası 0).
 
-## 7) Bilinen davranışlar / tuzaklar
+## 7) 2026-07-29 durumu — Dalga S/T/V sonrası
+
+**CANLI ve güncel:** https://emlaksoft.vercel.app · commit `9a6e055` · migration **126**'ya kadar dev DB'de uygulı.
+Ölçek: ~140 rota · 19 cron · **396 birim test** · 40+ E2E. Doğrulama kapıları: `tsc`, `lint`, `npm test`,
+`check:links`, `check-schema`, `db:rls-audit`, `audit:actions`, `build` — hepsi yeşil.
+
+**Bu dalgada eklenenler:** tasarım sistemi v2 (`src/lib/icons.ts` ikon sözlüğü, `Badge/Skeleton/Tooltip/
+ProgressRing`, mikro animasyon katmanı) · danışman dijital kartviziti (`/danisman/[slug]` + vCard + QR) ·
+fotoğraf filigranı + toplu medya işlemleri (DnD sıralama, çoklu seçim) · ekip ligi & 12 rozet (`/app/lig`) ·
+yatırımcı getiri paketi (`/app/yatirim`, 10 yıllık projeksiyon + IRR) · belge merkezi (`/app/belgeler`) ·
+onay akışları (`/app/onaylar`) · alım maliyeti & kredi hesaplayıcı (`/app/hesaplayici`) · tavsiye programı ·
+anahtar takibi · online randevu rezervasyonu · izin takvimi · WhatsApp şablonları · iş akışı (playbook)
+motoru · döviz + yabancıya satış paketi · public yüzün ve admin panelinin premium yükseltmesi.
+
+**Düzeltilen gerçek hatalar (P0):** kira anlaşması kazanılınca portföyün "Satıldı" olması (2 ayrı kod
+yolu; artık "Kiralandı") · komisyon tahsilatının geri alınamaması · tekrar eden talebin mesajının
+kaybolması (artık `communications` kaydı + bildirim) · vitrin değerleme talebinin `valuations` kaydına
+dönüşmemesi · malik teklif kararında bildirim gitmemesi · dahili hesap dökümünün müşteri raporuna
+sızabilmesi · anlaşma notlarında oturum çözülemeyince yetkinin yanlış açılması.
+
+**Hayata bağlanan ölü özellikler:** müşteri/malik portalı link üretimi (ikisi de sıfır çağıranlıydı;
+eşleştirmenin öğrenme döngüsü buna bağlıydı) · eşleştirmeden sunum/randevu/teklif köprüleri ·
+kazanılan kira anlaşmasından kira sözleşmesine ön dolgu · randevu tamamlamanın geri alınması + sonuç
+kaydı · kazanım sihirbazında memnuniyet anketi adımı.
+
+## 8) SIRADAKİ İŞLER (denetimlerle kanıtlanmış, öncelik sırasıyla)
+
+**A. Sabit tanımları DB'ye taşıma + 5 gerçek hata** (envanter: bu belgede değil, sohbet kaydında;
+yeniden çıkarmak için `src/lib/definitions.ts` + `getDefinitions` çağrılarını tara):
+1. `appointment_type`: `definitions` tablosu `signing`/`other` seed'liyor ama `appointments` CHECK'i
+   kabul etmiyor → ayarlardan bu türü seçen kullanıcı **insert hatası** alır.
+2. `expense_category`: ayarlar ekranı yönetiyormuş gibi görünüyor ama kolon **enum** → yeni kategori eklenemez.
+3. `customer_source` çifte tanım: DB'de 7 değer, `src/lib/lead-sources.ts`'de 10 farklı değer →
+   portal kaynaklı talepler `lead-score.ts`'de "diğer" sayılıp düşük puan alıyor.
+4. `DEFAULT_COMMISSION_RATE` çelişkisi: `src/lib/commission.ts` = 3, `src/lib/leak-shield.ts` = 2.
+5. Taşınacaklar: oranlar (`purchase-costs.ts DEFAULT_RATES`, `investment.ts`, `gamification.ts SCORE_RULES`,
+   `approvals.ts SLA_HOURS`), şablonlar (evrak/mesaj/kampanya/playbook), periyodik veri
+   (`price-health.ts PROVINCE_SQM_PRICE`, `tufe.ts` — 2026 verisi YOK, güncellenmeli).
+   Taşınamazlar (yalnız etiket/renk özelleştirilebilir): DB CHECK/ENUM'a veya `if (x === '…')`
+   dallanmasına bağlı olanlar — `deals stage`, `permissions.ts` matrisi, güvenlik parametreleri.
+
+**B. Ekran standart yetenek eksikleri** (82 ekran denetlendi):
+- **Sessiz veri kaybı**: ~28 ekran filtreyi bellekte uygulayıp sorguyu `limit(N)` ile kesiyor →
+  kullanıcı "sonuç yok" görüyor, oysa kayıt tavanın üstünde. **En yüksek öncelik.**
+- Gerçek sayfalama yalnız 8/82 ekranda (`range()` + `count:"exact"`); 5 ekranda `?sayfa=` var ama
+  bellekte `slice()` ile sahte.
+- Kullanıcı seçmeli sıralama yalnız `musteriler/page.tsx`'te (referans uygulama).
+- Segment düzeyi `error.tsx` yok (tüm panelde tek kök hata sınırı) · `loading.tsx` 21 rotada eksik ·
+  CSV ~25 listede yok · `EmptyState` 55 sayfada yok, olanların yarısında yönlendirici aksiyon yok.
+
+**C. Akış kopuklukları** (uçtan uca denetim, kalanlar):
+- Proje birim satışı `deals`/`commissions`'a bağlanmıyor → ciro/komisyon/lig raporlarında görünmüyor.
+- Ofisler arası ağda `commission_share_pct` kabul edilse de komisyon paylaşımına yazılmıyor.
+- Kira sözleşmesi başlayınca/bitince portföy durumu yönetilmiyor; depozito iadesi yok.
+- Kayıp-kaçak ekranı salt okunur (kurtarma aksiyonu yok; kayıp-satışta var).
+- Ekip çıkışında portföy devri yok (müşteri devri var).
+- Silinen kayıtlar için geri yükleme ekranı yok; `won/lost` anlaşma ve müşteri birleştirme geri alınamaz.
+
+**D. Ölü veri denetimi yarım kaldı** — yazılıp okunmayan tablo/kolonlar, hiçbir yerden linklenmeyen
+ekranlar, çağrılmayan action'lar, cron çıktısının ekranda görünmediği yerler. Yeniden koşulmalı.
+
+**E. Sidebar'da görünmeyen yeni sayfalar** (doğrudan URL veya ilgili sayfadan erişiliyor):
+`/app/lig` · `/app/yatirim` · `/app/belgeler` · `/app/onaylar` · `/app/ekip/kartvizitim` ·
+`/app/ekip/izinler` · `/app/portfoyler/anahtarlar` · `/app/portfoyler/sunumlar` · `/app/yabanci-satis` ·
+`/app/ayarlar/{filigran,mesaj-sablonlari,is-akislari,duyurular}`. Menüye eklenmeleri değerlendirilmeli
+(sidebar zaten uzun — belki gruplama/arama gerekir).
+
+## 9) Bilinen davranışlar / tuzaklar
 
 - E2E'de 2-3 test hidrasyon yarışıyla flaky olabilir → `retries: 1` tasarımı bunu karşılar; build ile
   aynı anda E2E koşturma (CPU çekişmesi kırmızı yaratır).
