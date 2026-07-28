@@ -331,8 +331,13 @@ aside ::selection {
    bu kural onları bozmaz, yalnızca koyu bağlamdakileri kurtarır. */
 option,
 optgroup {
-  background-color: #fff;
-  color: var(--ink-950);
+  /* SABİT koyu hex — var(--ink-950) KULLANMA: koyu hero `.theme-dark` kapsamında
+     --ink-950 #fff'e döner (koyu zeminde "ink metin" beyaz olsun diye). Native
+     option popup'ı DAİMA beyaz sistem zemininde açıldığından yazı her zaman koyu
+     kalmalı; değişkeni kullanmak koyu hero içindeki select'te beyaz-üstüne-beyaz
+     üretiyordu. */
+  background-color: #ffffff;
+  color: #071a38;
 }
 
 /* Native tarih/saat/select ikonları ve popup'ı açık şema izlesin — koyu hero
