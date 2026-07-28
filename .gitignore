@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# kullanıcı kararı (2026-07-27): geliştirme aşamasında .env.local repo'da tutulur
+!.env.local
 
 # vercel
 .vercel
