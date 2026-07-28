@@ -159,7 +159,10 @@ katmanını yükseltip iyileşmenin kendiliğinden yayılmasını sağlamak.
 ## 5. Hız (P) — "en iyi seviye"
 
 - [ ] **P1** Ölçüm önce: bundle analizi, en ağır rotalar, First Load JS tablosu
-- [ ] **P2** N+1 sorgu avı — server action'larda döngü içi sorgu taraması
+- [x] **P2** N+1 sorgu avı — server action'larda döngü içi sorgu taraması
+  - Tarama: baskın desen zaten batch-sorgu + bellekte toplama (`.in()` + Map). Kalan
+    sıralı döngüler kasıtlı (WhatsApp rate-limit, cron düşük hacim). Tek gerçek offender
+    düzeltildi: `abonelik-kontrol` cron'u satır başına 3 yazma → küme başına 3 toplu yazma.
 - [ ] **P3** Index kapsamı: her sık filtre/sıralama için index doğrulaması
   - [ ] `explain analyze` ile en yavaş 10 sorgu
 - [ ] **P4** Streaming/Suspense: ağır panelleri kabuk sonrası akıt

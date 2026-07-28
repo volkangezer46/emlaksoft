@@ -21,20 +21,29 @@ export async function GET(req: NextRequest) {
     .lt("trial_ends_at", now)
     .limit(100);
 
-  let updated = 0;
-  for (const s of trials ?? []) {
-    await admin.from("subscriptions").update({ status: "past_due", updated_at: now }).eq("id", s.id);
-    await admin.from("tenants").update({ status: "past_due", updated_at: now }).eq("id", s.tenant_id);
-    await admin.from("notifications").insert({
-      tenant_id: s.tenant_id,
-      title: "Deneme süresi doldu",
-      body: "Aboneliğinizi yenilemek için Paket & ödeme sayfasına gidin.",
-      href: "/app/abonelik",
-      kind: "warning",
-    });
-    updated += 1;
+  // N+1 freni: satır başına 3 yazma yerine küme başına 3 toplu yazma.
+  // 100 deneme için ~300 gidiş-dönüş → 3'e iner.
+  const rows = trials ?? [];
+  const subIds = rows.map((s) => s.id);
+  const tenantIds = [...new Set(rows.map((s) => s.tenant_id))];
+
+  if (subIds.length > 0) {
+    await Promise.all([
+      admin.from("subscriptions").update({ status: "past_due", updated_at: now }).in("id", subIds),
+      admin.from("tenants").update({ status: "past_due", updated_at: now }).in("id", tenantIds),
+      admin.from("notifications").insert(
+        tenantIds.map((tenantId) => ({
+          tenant_id: tenantId,
+          title: "Deneme süresi doldu",
+          body: "Aboneliğinizi yenilemek için Paket & ödeme sayfasına gidin.",
+          href: "/app/abonelik",
+          kind: "warning",
+        })),
+      ),
+    ]);
   }
 
+  const updated = subIds.length;
   await recordHeartbeat("abonelik-kontrol", "ok", `${updated} abonelik güncellendi`);
 
   return NextResponse.json({ ok: true, updated });
