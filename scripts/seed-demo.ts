@@ -1087,6 +1087,30 @@ async function main() {
     return (await insertRows("announcements", rows)).length;
   });
 
+  // ---------------- İYS izinleri (uyum merkezi) ----------------
+  await section("İYS izinleri", "iys_consents", tenantId, 18, async () => {
+    const channels = ["sms", "whatsapp"] as const;
+    const rows: Dict[] = [];
+    customers.slice(0, 12).forEach((c, i) => {
+      channels.forEach((ch, j) => {
+        // Durum dağılımı: çoğu izinli, bir kısmı ret/bekleyen → kanal risk rozetleri
+        // ve uyum zaman çizelgesi anlamlı görünsün.
+        const mod = (i + j) % 5;
+        const status = mod === 0 ? "denied" : mod === 1 ? "pending" : "granted";
+        rows.push({
+          tenant_id: tenantId,
+          customer_id: c.id,
+          channel: ch,
+          status,
+          source: status === "granted" ? "form" : status === "denied" ? "iys_sorgu" : "panel",
+          granted_at: status === "granted" ? iso(daysFromNow(-(10 + i), 10)) : null,
+          revoked_at: status === "denied" ? iso(daysFromNow(-(3 + i), 14)) : null,
+        });
+      });
+    });
+    return (await insertRows("iys_consents", rows)).length;
+  });
+
   // ---------------- Bildirimler ----------------
   await section("Bildirimler", "notifications", tenantId, 3, async () => {
     const rows = [
