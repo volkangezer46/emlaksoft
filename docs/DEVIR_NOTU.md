@@ -182,7 +182,13 @@ yeniden çıkarmak için `src/lib/definitions.ts` + `getDefinitions` çağrılar
   üretiyor (property'siz, deal_value=list_price, ofis varsayılan komisyonu, deal notunda proje/daire).
   `sellUnit` → `recordProjectSaleDeal`. DB rollback testiyle insert'ler doğrulandı. Ciro/komisyon/lig'de görünür.
 - Ofisler arası ağda `commission_share_pct` kabul edilse de komisyon paylaşımına yazılmıyor.
-- Kira sözleşmesi başlayınca/bitince portföy durumu yönetilmiyor; depozito iadesi yok.
+- ✅ **DÜZELTİLDİ (2026-07-29, mig 129):** Kira yaşam döngüsü. `createRental` portföyü **'rented'**
+  yapar (önceki durumu `prev_property_status`'a saklar), `endRental` portföyü geri yükler (saklanan
+  durum, yoksa 'active'; yalnız hâlâ 'rented' ise). Depozito iadesi: `deposit_returned`/`_at` +
+  `markDepositReturned` action + kira detayında iade kontrolü (client). DB rollback + UI render doğrulandı.
+- ⏳ **ERTELENDİ (C.2):** Ofisler-arası ağda `commission_share_pct` kabul ediliyor ama komisyona
+  yazılmıyor. Doğru çözüm ÇAPRAZ-TENANT uzlaşma (yeni settlement tablosu + iki tarafa komisyon yazımı +
+  "iş birliği satışa döndü" adımı) → kendi dalgası + ürün kararı gerektirir; para-hassas, aceleye getirilmedi.
 - ✅ **DÜZELTİLDİ (2026-07-29):** Kayıp-kaçak risk sıralamasına **"Teyit et"** kurtarma aksiyonu
   eklendi (mevcut `confirmPortalListing` action'ı; `portals:edit` olana görünür). İlan teyitlenip
   gecikmiş listeden düşer. Demo veride 3 buton render doğrulandı.

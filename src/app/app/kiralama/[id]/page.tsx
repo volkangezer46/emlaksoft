@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Building2, CalendarClock, KeyRound, TrendingUp, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { DepositReturnControl } from "./deposit-return";
 import { Badge } from "@/components/ui/badge";
 import { ChargesPanel } from "./charges-panel";
 import { MaintenancePanel } from "./maintenance-panel";
@@ -33,7 +34,7 @@ export default async function KiraDetayPage({ params }: { params: Promise<{ id: 
   const { data: rental } = await supabase
     .from("rentals")
     .select(
-      "id, monthly_rent, due_day, start_date, end_date, deposit, status, notes, created_at, property:properties(id, property_code, title), renter:customers(id, full_name, phone), charges:rent_charges(id, period, amount, status, paid_at), maintenance:maintenance_requests(id, title, description, status, cost, created_at)",
+      "id, monthly_rent, due_day, start_date, end_date, deposit, deposit_returned, deposit_returned_at, status, notes, created_at, property:properties(id, property_code, title), renter:customers(id, full_name, phone), charges:rent_charges(id, period, amount, status, paid_at), maintenance:maintenance_requests(id, title, description, status, cost, created_at)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -119,9 +120,14 @@ export default async function KiraDetayPage({ params }: { params: Promise<{ id: 
             <span className="text-white/50">· her ayın {rental.due_day}. günü</span>
           </div>
           {rental.deposit != null ? (
-            <div className="flex items-center gap-2 rounded-[12px] border border-white/10 bg-white/5 px-3 py-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-white/10 bg-white/5 px-3 py-2 text-sm">
               <span className="text-white/80">Depozito:</span>
               <span className="numeric font-semibold text-white">{money(Number(rental.deposit))}</span>
+              <DepositReturnControl
+                rentalId={rental.id}
+                returned={Boolean(rental.deposit_returned)}
+                returnedAt={rental.deposit_returned_at ?? null}
+              />
             </div>
           ) : null}
         </div>

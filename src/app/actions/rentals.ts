@@ -50,7 +50,7 @@ export async function createRental(_prev: RentalResult, fd: FormData): Promise<R
   // Tenant izolasyonu: FK tek başına başka ofisin portföy/müşteri id'sine
   // referansı engellemez — ikisi de bu ofise ait olmalı.
   const [{ data: prop }, { data: renter }] = await Promise.all([
-    supabase.from("properties").select("id").eq("id", propertyId).eq("tenant_id", gate.tenantId).maybeSingle(),
+    supabase.from("properties").select("id, status").eq("id", propertyId).eq("tenant_id", gate.tenantId).maybeSingle(),
     supabase.from("customers").select("id").eq("id", renterId).eq("tenant_id", gate.tenantId).maybeSingle(),
   ]);
   if (!prop) return { error: "Portföy bulunamadı." };
@@ -70,6 +70,8 @@ export async function createRental(_prev: RentalResult, fd: FormData): Promise<R
       deposit,
       notes,
       status: "active",
+      // Kira bitince aynı duruma dönebilmek için mevcut durumu sakla (C.3)
+      prev_property_status: prop.status ?? null,
     })
     .select("id")
     .single();
@@ -77,6 +79,16 @@ export async function createRental(_prev: RentalResult, fd: FormData): Promise<R
   if (error || !data) {
     console.error("createRental", error);
     return { error: "Kira kaydı oluşturulamadı." };
+  }
+
+  // Portföyü "Kiralandı" durumuna al — kira başladı (C.3). Zaten satılık/kiralanmış
+  // değilse; 'sold' bir portföy yanlışlıkla kiralanmışsa dokunma (belirsiz).
+  if (prop.status !== "rented" && prop.status !== "sold") {
+    await supabase
+      .from("properties")
+      .update({ status: "rented", updated_at: new Date().toISOString() })
+      .eq("id", propertyId)
+      .eq("tenant_id", gate.tenantId);
   }
 
   // Kiracıyı tip etiketiyle işaretle — best effort: başarısızlığı kira
@@ -125,7 +137,7 @@ export async function endRental(id: string): Promise<RentalResult> {
   const supabase = await createClient();
   const { data: rental } = await supabase
     .from("rentals")
-    .select("id, end_date")
+    .select("id, end_date, property_id, prev_property_status")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
@@ -137,6 +149,54 @@ export async function endRental(id: string): Promise<RentalResult> {
     .eq("id", id)
     .eq("tenant_id", gate.tenantId);
   if (error) return { error: "Kira sonlandırılamadı." };
+
+  // Portföyü tekrar müsait duruma döndür (C.3): kira başlarken saklanan önceki
+  // durum, yoksa 'active' (Aktif). Yalnız hâlâ 'rented' ise dokun — arada satılmış
+  // veya elle değiştirilmişse geçersiz kılma.
+  if (rental.property_id) {
+    const { data: p } = await supabase
+      .from("properties")
+      .select("status")
+      .eq("id", rental.property_id)
+      .eq("tenant_id", gate.tenantId)
+      .maybeSingle();
+    if (p?.status === "rented") {
+      const restore = rental.prev_property_status && rental.prev_property_status !== "rented"
+        ? rental.prev_property_status
+        : "active";
+      await supabase
+        .from("properties")
+        .update({ status: restore, updated_at: new Date().toISOString() })
+        .eq("id", rental.property_id)
+        .eq("tenant_id", gate.tenantId);
+    }
+  }
+
+  revalidatePath("/app/kiralama");
+  revalidatePath(`/app/kiralama/${id}`);
+  revalidatePath("/app/portfoyler");
+  return { ok: true };
+}
+
+/** Depozito iadesi işaretle (C.3) — kira bitince depozitonun kiracıya iade
+ *  edildiğini kaydeder. Geri almak için `returned=false` gönderilebilir. */
+export async function markDepositReturned(id: string, returned = true): Promise<RentalResult> {
+  const gate = await requirePermission("rentals", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("rentals")
+    .update({
+      deposit_returned: returned,
+      deposit_returned_at: returned ? new Date().toISOString() : null,
+    })
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId);
+  if (error) {
+    console.error("markDepositReturned", error);
+    return { error: "Depozito durumu güncellenemedi." };
+  }
 
   revalidatePath("/app/kiralama");
   revalidatePath(`/app/kiralama/${id}`);
