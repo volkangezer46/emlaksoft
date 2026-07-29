@@ -24,7 +24,23 @@ export type LeadScore = {
   factors: { label: string; points: number }[];
 };
 
+// Kaynak ağırlıkları — anahtarlar `src/lib/lead-sources.ts`'teki GERÇEK saklanan
+// değerlerle birebir olmalı. Önceden yalnız eski kısa anahtarlar (portal/web/…)
+// vardı; müşteri formu `portal_sahibinden` gibi değerler yazdığından portal
+// talepleri eşleşmeyip "diğer" (6) puan alıyordu. Artık her ikisi de tanınır.
 const SOURCE_WEIGHT: Record<string, number> = {
+  // lead-sources.ts değerleri (güncel form)
+  portal_sahibinden: 15,
+  portal_hepsiemlak: 15,
+  portal_zingat: 15,
+  portal_emlakjet: 15,
+  tavsiye: 18,
+  sosyal_medya: 10,
+  web_sitesi: 12,
+  telefon: 12,
+  ofis_ziyareti: 10,
+  diger: 6,
+  // Eski/kısa anahtarlar (geçmiş kayıtlar) — geriye dönük uyum
   referral: 18,
   portal: 15,
   web: 12,
@@ -33,6 +49,14 @@ const SOURCE_WEIGHT: Record<string, number> = {
   walk_in: 10,
   other: 6,
 };
+
+/** Kaynak ağırlığı: tam eşleşme → portal* öneki (yeni portal eklenirse) → varsayılan. */
+function sourceWeight(source: string | null): number {
+  const key = (source ?? "other").toLowerCase();
+  if (key in SOURCE_WEIGHT) return SOURCE_WEIGHT[key];
+  if (key.startsWith("portal")) return 15;
+  return 6;
+}
 
 function daysSince(iso: string | null): number | null {
   if (!iso) return null;
@@ -54,7 +78,7 @@ export function computeLeadScore(s: LeadSignals): LeadScore {
   if (s.hasEmail) { score += 6; factors.push({ label: "E-posta var", points: 6 }); }
 
   // Kaynak kalitesi
-  const sw = SOURCE_WEIGHT[(s.source ?? "other").toLowerCase()] ?? 6;
+  const sw = sourceWeight(s.source);
   score += sw;
   factors.push({ label: "Kaynak kalitesi", points: sw });
 

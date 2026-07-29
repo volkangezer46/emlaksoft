@@ -144,13 +144,15 @@ kaydı · kazanım sihirbazında memnuniyet anketi adımı.
 
 **A. Sabit tanımları DB'ye taşıma + 5 gerçek hata** (envanter: bu belgede değil, sohbet kaydında;
 yeniden çıkarmak için `src/lib/definitions.ts` + `getDefinitions` çağrılarını tara):
-1. `appointment_type`: `definitions` tablosu `signing`/`other` seed'liyor ama `appointments` CHECK'i
-   kabul etmiyor → ayarlardan bu türü seçen kullanıcı **insert hatası** alır.
-2. `expense_category`: ayarlar ekranı yönetiyormuş gibi görünüyor ama kolon **enum** → yeni kategori eklenemez.
-3. `customer_source` çifte tanım: DB'de 7 değer, `src/lib/lead-sources.ts`'de 10 farklı değer →
-   portal kaynaklı talepler `lead-score.ts`'de "diğer" sayılıp düşük puan alıyor.
-4. `DEFAULT_COMMISSION_RATE` çelişkisi: `src/lib/commission.ts` = 3, `src/lib/leak-shield.ts` = 2.
-5. Taşınacaklar: oranlar (`purchase-costs.ts DEFAULT_RATES`, `investment.ts`, `gamification.ts SCORE_RULES`,
+1. ✅ **DÜZELTİLDİ (2026-07-29, mig 127):** `appointment_type` CHECK'e `signing`+`other` eklendi
+   (contract korundu). Artık ayarlardaki tüm türler insert edilebilir. DB'de doğrulandı.
+2. ✅ **DÜZELTİLDİ (2026-07-29, mig 128):** `expense_category` ENUM → `text`. Definitions'tan yeni
+   gider kategorisi artık expenses'e yazılabilir. DB'de doğrulandı (data_type=text).
+3. ✅ **DÜZELTİLDİ (2026-07-29):** `lead-score.ts` `SOURCE_WEIGHT` `lead-sources.ts` değerleriyle
+   hizalandı (portal_sahibinden vb. → 15) + `portal*` öneki fallback. Portal talepleri artık doğru puan alır.
+4. ✅ **DÜZELTİLDİ (2026-07-29):** `DEFAULT_COMMISSION_RATE` tek kaynağa çekildi — `leak-shield.ts`
+   artık `commission.ts`'ten import ediyor (ikisi de 3). Kayıp-kaçak tahmini komisyon defteriyle tutarlı.
+5. Taşınacaklar (HÂLÂ AÇIK): oranlar (`purchase-costs.ts DEFAULT_RATES`, `investment.ts`, `gamification.ts SCORE_RULES`,
    `approvals.ts SLA_HOURS`), şablonlar (evrak/mesaj/kampanya/playbook), periyodik veri
    (`price-health.ts PROVINCE_SQM_PRICE`, `tufe.ts` — 2026 verisi YOK, güncellenmeli).
    Taşınamazlar (yalnız etiket/renk özelleştirilebilir): DB CHECK/ENUM'a veya `if (x === '…')`

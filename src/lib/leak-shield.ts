@@ -1,5 +1,11 @@
-/** Ofis komisyon oranı bilinmiyorsa varsayılan (yüzde). */
-export const DEFAULT_COMMISSION_RATE = 2;
+/**
+ * Ofis komisyon oranı bilinmiyorsa varsayılan (yüzde) — TEK KAYNAK: commission.ts.
+ * Önceden burada 2, komisyon hesaplayıcıda 3 yazıyordu (çelişki); kayıp-kaçak
+ * tahmini ile komisyon defteri farklı oran kullanıyordu. Artık ikisi de aynı.
+ * Dosya içinde kullanıldığı için hem import edilir hem yeniden dışa verilir.
+ */
+import { DEFAULT_COMMISSION_RATE } from "@/lib/commission";
+export { DEFAULT_COMMISSION_RATE };
 
 export type LeakCalcInput = {
   reason: string;
