@@ -1111,6 +1111,29 @@ async function main() {
     return (await insertRows("iys_consents", rows)).length;
   });
 
+  // ---------------- Değerlemeler (emsal motoru geçmişi) ----------------
+  await section("Değerlemeler", "valuations", tenantId, 3, async () => {
+    const specs = [
+      { prop: "DEMO-001", title: "Kadıköy Moda 3+1 değerleme", mid: 12_400_000, conf: 0.86 },
+      { prop: "DEMO-006", title: "Maltepe 2+1 değerleme", mid: 5_050_000, conf: 0.78 },
+      { prop: "DEMO-003", title: "Levent ofis değerleme", mid: 18_600_000, conf: 0.72 },
+    ];
+    const rows = specs.map((s, i) => ({
+      tenant_id: tenantId,
+      property_id: propByCode(s.prop),
+      title: s.title,
+      estimated_low: Math.round(s.mid * 0.92),
+      estimated_mid: s.mid,
+      estimated_high: Math.round(s.mid * 1.08),
+      confidence: s.conf,
+      sources: ["ofis_listesi", "emsal_m2", "endeksa"],
+      notes: "Emsal + bölge endeksi harmanı; insan onaylı.",
+      created_by: advisorId,
+      created_at: iso(daysFromNow(-(3 + i * 4), 11)),
+    }));
+    return (await insertRows("valuations", rows)).length;
+  });
+
   // ---------------- Bildirimler ----------------
   await section("Bildirimler", "notifications", tenantId, 3, async () => {
     const rows = [
