@@ -54,7 +54,7 @@ export default async function AdminGeoPage({
               TurkiyeAPI kaynaklı tam kapsama — admin panelden düzenlenebilir, eklenebilir, pasifleştirilebilir.
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <div className="rounded-[14px] border border-white/10 bg-white/[0.04] px-4 py-3 text-center">
               <p className="font-display text-xl font-extrabold text-white">{rows.length}/81</p>
               <p className="text-[11px] text-white/50">İl</p>

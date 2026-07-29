@@ -65,7 +65,8 @@ export async function BillingHome({ staffName }: { staffName: string }) {
   const pastDue = subRows.filter((s) => s.status === "past_due").length;
 
   const nowMs = now();
-  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+  const nowDate = new Date(nowMs);
+  const monthStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1).getTime();
   const collectedThisMonth = invRows
     .filter((i) => i.status === "paid" && i.paid_at && new Date(i.paid_at).getTime() >= monthStart)
     .reduce((sum, i) => sum + Number(i.total_try || 0), 0);

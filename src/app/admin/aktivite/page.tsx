@@ -250,7 +250,7 @@ export default async function AdminActivityPage({
               Tüm kritik işlemler, personel hareketleri ve operasyon kayıtları kronolojik sırayla.
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             {counters.map((c) => (
               <Link
                 key={c.label}

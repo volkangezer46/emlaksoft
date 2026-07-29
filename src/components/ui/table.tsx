@@ -33,14 +33,17 @@ export function TableFrame({
   return (
     <div
       className={cn(
-        // min-w-0 + max-w-full: flex/grid içinde tablo, min-content genişliğine
-        // büyüyüp mobilde layout viewport'unu (ICB) şişiremez — kaydırma yalnız
-        // içteki overflow-x-auto kabında olur (iOS Safari dahil her tarayıcıda).
-        "surface-card min-w-0 max-w-full overflow-hidden rounded-[var(--radius-panel)]",
+        // min-w-0 + max-w-full + contain:inline-size: iç tablo min-content
+        // genişliğine büyüyüp mobilde layout viewport'unu (ICB) şişiremez.
+        // `contain:inline-size`, kabın kendi genişliğinin içeriğe bağlı olmadığını
+        // tarayıcıya söyler → iç overflow-x-auto belgeyi yatay kaydırılabilir
+        // yapmaz (WebKit/iOS Safari dahil; `overflow:clip` orada belge-kaydırmasını
+        // durdurmuyordu).
+        "surface-card min-w-0 max-w-full [contain:inline-size] overflow-hidden rounded-[var(--radius-panel)]",
         className,
       )}
     >
-      <div className="max-w-full overflow-x-auto">
+      <div className="w-full max-w-full [contain:inline-size] overflow-x-auto">
         <div style={minWidth ? { minWidth } : undefined}>{children}</div>
       </div>
     </div>

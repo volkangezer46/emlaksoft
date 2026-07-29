@@ -214,7 +214,7 @@ export default async function GiderlerPage({
             type="date"
             defaultValue={fromF ?? ""}
             aria-label="Başlangıç tarihi"
-            className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
+            className="min-w-0 max-w-[140px] flex-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs outline-none focus:border-brand-400 sm:flex-none"
           />
           <span className="text-xs text-text-faint">—</span>
           <input
@@ -222,7 +222,7 @@ export default async function GiderlerPage({
             type="date"
             defaultValue={toF ?? ""}
             aria-label="Bitiş tarihi"
-            className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
+            className="min-w-0 max-w-[140px] flex-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs outline-none focus:border-brand-400 sm:flex-none"
           />
           <button type="submit" className="rounded-[9px] bg-brand-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-brand-700">
             Filtrele

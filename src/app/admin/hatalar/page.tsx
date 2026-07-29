@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
+import { now } from "@/lib/clock";
 import { ResolveErrorButton } from "./resolve-button";
 
 export const metadata = { title: "Üretim hataları" };
@@ -83,7 +84,7 @@ export default async function ErrorLogsPage({
   const cozulmusGoster = params.durum === "cozulmus";
   const sonBirSaat = params.son === "1saat";
   const sayfa = parsePage(params.sayfa);
-  const simdi = new Date().getTime();
+  const simdi = now();
 
   const admin = createAdminClient();
   let q = admin

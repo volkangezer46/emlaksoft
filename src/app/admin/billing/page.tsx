@@ -7,6 +7,7 @@ import { exportInvoicesCsv, exportSubscriptionsCsv } from "@/app/actions/platfor
 import { ExportButton } from "@/components/admin/export-button";
 import { AdminEmpty, AdminFilterChip, AdminSearchForm } from "@/components/admin/admin-table";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
+import { now as clockNow } from "@/lib/clock";
 import type { CSSProperties } from "react";
 
 const RING_C = 2 * Math.PI * 42;
@@ -142,7 +143,7 @@ export default async function AdminBillingPage({
   const pastDue = subRows.filter((s) => s.status === "past_due").length;
 
   // Synthetic MRR trend from subscription created_at buckets (8 months)
-  const now = new Date();
+  const now = new Date(clockNow());
   const months = Array.from({ length: 8 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (7 - i), 1);
     return { key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString("tr-TR", { month: "short" }), value: 0 };

@@ -111,7 +111,7 @@ function SessionSidebar({
   loading: boolean;
 }) {
   return (
-    <aside className="flex w-[220px] shrink-0 flex-col border-r border-line bg-canvas/40">
+    <aside className="hidden w-[220px] shrink-0 flex-col border-r border-line bg-canvas/40 md:flex">
       <div className="flex items-center justify-between border-b border-line px-3 py-2.5">
         <p className="text-xs font-semibold text-text-muted">Geçmiş sohbetler</p>
         <button
@@ -429,6 +429,15 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
             Yapay zeka iş danışmanı
           </p>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={newChat}
+              title="Yeni sohbet başlat"
+              aria-label="Yeni sohbet başlat"
+              className="focus-ring press grid h-8 w-8 shrink-0 place-items-center rounded-[8px] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-600 md:hidden"
+            >
+              <MessageSquarePlus className="h-4 w-4" />
+            </button>
             <span
               className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${
                 aiEnabled ? "bg-mint-500/12 text-mint-600" : "bg-amber-400/15 text-amber-600"

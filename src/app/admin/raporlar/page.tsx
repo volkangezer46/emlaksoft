@@ -7,7 +7,7 @@ import { ExportButton } from "@/components/admin/export-button";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card";
 import { moneyTRY } from "@/lib/admin-format";
-import { daysAgoIso } from "@/lib/clock";
+import { daysAgoIso, now as clockNow } from "@/lib/clock";
 import { CORE_MODULES, moduleForAction } from "@/app/admin/tenants/[id]/module-map";
 import type { CSSProperties } from "react";
 
@@ -81,7 +81,7 @@ export default async function AdminReportsPage({
   const churnRate = list.length ? Math.round((cancelled / list.length) * 100) : 0;
 
   // MRR trend — 12 ay kümülatif aktif abonelik geliri
-  const now = new Date();
+  const now = new Date(clockNow());
   const months = Array.from({ length: 12 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
     return { label: d.toLocaleDateString("tr-TR", { month: "short" }), cutoff: new Date(d.getFullYear(), d.getMonth() + 1, 0) };

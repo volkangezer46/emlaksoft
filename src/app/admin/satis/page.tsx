@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Handshake, Search, Sparkles, Target, TrendingUp, Users } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
+import { now } from "@/lib/clock";
 import { orIlike } from "@/lib/pgrst";
 import { ExportButton } from "@/components/admin/export-button";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -71,7 +72,8 @@ export default async function AdminSalesPage({
   const stats = statRows ?? [];
   const staffList = staff ?? [];
 
-  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+  const nowDate = new Date(now());
+  const monthStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1).getTime();
   const newCount = stats.filter((r) => r.status === "new").length;
   const contacted = stats.filter((r) => r.status === "contacted").length;
   const qualified = stats.filter((r) => r.status === "qualified").length;

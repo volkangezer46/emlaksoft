@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight, Clock, Inbox, LifeBuoy, Siren, Users } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CountUp } from "@/components/admin/count-up";
+import { now } from "@/lib/clock";
 
 const statusLabel: Record<string, string> = {
   open: "Açık",
@@ -47,7 +48,8 @@ export async function SupportHome({ staffName }: { staffName: string }) {
   const waiting = rows.filter((t) => t.status === "waiting").length;
   const urgent = openRows.filter((t) => t.priority === "urgent").length;
 
-  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+  const nowDate = new Date(now());
+  const monthStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1).getTime();
   const resolvedThisMonth = rows.filter(
     (t) => ["resolved", "closed"].includes(t.status) && new Date(t.created_at).getTime() >= monthStart,
   ).length;
