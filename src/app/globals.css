@@ -263,6 +263,12 @@ html {
   scroll-behavior: auto;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* Mobil: içerik device-width'i aşınca tarayıcı layout viewport'u (ICB)
+     genişletip sayfayı yatay kaydırılabilir/uzaklaştırılmış yapıyordu — bu da
+     `position:fixed` alt gezinme ve hamburger'ı ekran dışına itiyordu. `clip`
+     ICB'yi viewport'a sabitler; `hidden`ın aksine scroll-container yaratmaz,
+     sticky başlığı bozmaz. body'de de overflow-x:hidden var (çift güvence). */
+  overflow-x: clip;
 }
 
 body {

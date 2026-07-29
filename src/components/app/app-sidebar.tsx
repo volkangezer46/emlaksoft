@@ -189,7 +189,7 @@ export function AppSidebar({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="fixed left-3 top-3 z-40 grid h-10 w-10 place-items-center rounded-[11px] bg-ink-950 text-white shadow-[var(--shadow-card)] md:hidden" aria-label="Panel menüsünü aç">
+      <button type="button" onClick={() => setOpen(true)} className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-10 w-10 place-items-center rounded-[11px] bg-ink-950 text-white shadow-[var(--shadow-card)] md:hidden" aria-label="Panel menüsünü aç">
         <Menu className="h-5 w-5" />
       </button>
       <aside className="hidden w-[260px] shrink-0 flex-col bg-[linear-gradient(180deg,#071a38_0%,#041127_100%)] md:flex">
@@ -208,7 +208,7 @@ export function AppSidebar({
         aria-label="Mobil hızlı gezinme"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-line/70 bg-surface/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
       >
-        <div className="mx-auto grid w-full max-w-md" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}>
+        <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}>
           {tabItems.map((tab) => {
             const active = tab.href === "/app" ? pathname === "/app" : pathname.startsWith(tab.href);
             return (
