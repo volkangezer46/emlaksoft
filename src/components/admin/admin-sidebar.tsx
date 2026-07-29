@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Activity,
   BarChart3,
@@ -96,6 +96,7 @@ export function AdminSidebar({
   badges?: { tickets?: number; risk?: number; trial?: number; sales?: number };
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const allowed = platformModulesFor(role);
 
   const sections = SECTIONS.map((s) => ({
@@ -132,6 +133,9 @@ export function AdminSidebar({
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch
+                    onMouseEnter={() => router.prefetch(item.href)}
+                    onFocus={() => router.prefetch(item.href)}
                     className={`group relative flex items-center gap-3 overflow-hidden rounded-[12px] px-3 py-2.5 text-sm transition ${
                       active
                         ? "bg-white/12 font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
