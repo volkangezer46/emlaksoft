@@ -4,6 +4,8 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { msSince, now, DAY_MS } from "@/lib/clock";
 import { DuesClient } from "./dues-client";
+import { ExportCsvButton } from "@/components/app/export-csv-button";
+import { exportDuesCsv } from "@/app/actions/export";
 
 export const metadata = { title: "Aidat & Ortak Gider" };
 
@@ -320,6 +322,11 @@ export default async function AidatPage({
         </div>
       ) : null}
 
+      {filteredDues.length > 0 ? (
+        <div className="flex items-center justify-end">
+          <ExportCsvButton action={exportDuesCsv} label="Dışa aktar" />
+        </div>
+      ) : null}
       <DuesClient dues={filteredDues as Parameters<typeof DuesClient>[0]["dues"]} properties={properties} canCreate={canCreate} canBulk={canEdit} />
 
       {/* Sayfalama — filtre parametreleri linklerde korunur */}

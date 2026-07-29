@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { listContractTemplates } from "@/app/actions/contracts";
 import { NewContractDialog } from "./new-contract-dialog";
 import { EmptyState } from "@/components/app/empty-state";
+import { ExportCsvButton } from "@/components/app/export-csv-button";
+import { exportContractsCsv } from "@/app/actions/export";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
@@ -303,7 +305,10 @@ export default async function SozlesmelerPage({
       {/* Üst toolbar */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-text-muted">{total} sözleşme</p>
-        {canCreate && <NewContractDialog contractTypes={contractTypeOptions} templates={templates} />}
+        <div className="flex items-center gap-2">
+          {total > 0 ? <ExportCsvButton action={exportContractsCsv} label="Dışa aktar" /> : null}
+          {canCreate && <NewContractDialog contractTypes={contractTypeOptions} templates={templates} />}
+        </div>
       </div>
 
       {/* Liste */}

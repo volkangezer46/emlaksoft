@@ -503,3 +503,60 @@ export async function exportRentalsCsv(filters: RentalExportFilters = {}): Promi
   });
   return { csv: toCsv(rows), filename: `kiralama-${today10()}.csv` };
 }
+
+export async function exportDuesCsv(): Promise<ExportResult> {
+  const gate = await requirePermission("expenses", "view");
+  if (!gate.ok) return { error: gate.error };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("property_dues")
+    .select("title, amount, period, due_date, status, paid_at, property:properties(property_code, title)")
+    .order("period", { ascending: false })
+    .limit(2000);
+  if (error) {
+    console.error("exportDuesCsv", error);
+    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+  }
+  const rows = (data ?? []).map((d) => {
+    const prop = relOne(d.property);
+    return {
+      baslik: d.title,
+      portfoy: prop?.title ?? prop?.property_code ?? "",
+      tutar: d.amount,
+      donem: d.period,
+      son_odeme: d.due_date ?? "",
+      durum: d.status === "paid" ? "Ödendi" : "Ödenmedi",
+      odendi_tarih: d.paid_at ?? "",
+    };
+  });
+  return { csv: toCsv(rows), filename: `aidatlar-${today10()}.csv` };
+}
+
+export async function exportContractsCsv(): Promise<ExportResult> {
+  const gate = await requirePermission("contracts", "view");
+  if (!gate.ok) return { error: gate.error };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("contracts")
+    .select("title, contract_type, status, created_at, signed_at, expires_at, property:properties(property_code, title), customer:customers(full_name)")
+    .order("created_at", { ascending: false })
+    .limit(2000);
+  if (error) {
+    console.error("exportContractsCsv", error);
+    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+  }
+  const rows = (data ?? []).map((k) => {
+    const prop = relOne(k.property);
+    return {
+      baslik: k.title,
+      tur: k.contract_type,
+      durum: k.status,
+      musteri: relOne(k.customer)?.full_name ?? "",
+      portfoy: prop?.title ?? prop?.property_code ?? "",
+      olusturuldu: k.created_at,
+      imzalandi: k.signed_at ?? "",
+      bitis: k.expires_at ?? "",
+    };
+  });
+  return { csv: toCsv(rows), filename: `sozlesmeler-${today10()}.csv` };
+}
