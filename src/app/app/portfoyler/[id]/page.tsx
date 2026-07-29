@@ -40,6 +40,8 @@ import { RelatedPropertiesWidget } from "./related-properties-widget";
 import { TapuInquiryPanel } from "./tapu-inquiry-panel";
 import { PropertyMap } from "@/components/app/property-map";
 import { computePriceHealth } from "@/lib/price-health";
+import { diagnoseSaleBlockers, isDiagnosable } from "@/lib/sale-diagnostics";
+import { SaleDiagnosticsCard } from "@/components/app/sale-diagnostics-card";
 import { isEndeksaConfigured } from "@/lib/integrations/endeksa";
 import { isTapusorConfigured } from "@/lib/integrations/tapusor";
 import { daysAgoIso, msSince, now } from "@/lib/clock";
@@ -138,11 +140,12 @@ export default async function PropertyDetailPage({
     { data: viewRows },
     { data: tenantRow },
     configuredPortals,
+    { count: mediaCount },
   ] = await Promise.all([
     supabase
       .from("properties")
       .select(
-        "id, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, district_id, neighborhood_id, parcel_block, parcel_lot, lat, lng, features, price_health, created_at, updated_at, assigned_to, province:geo_provinces(name), district:geo_districts(name)",
+        "id, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, district_id, neighborhood_id, parcel_block, parcel_lot, lat, lng, features, price_health, published_at, created_at, updated_at, assigned_to, province:geo_provinces(name), district:geo_districts(name)",
       )
       .eq("id", id)
       .is("deleted_at", null)
@@ -171,6 +174,8 @@ export default async function PropertyDetailPage({
     supabase.from("tenants").select("slug").eq("id", tenantId).maybeSingle(),
     // API yayın adaptörü tanımlı + anahtarı girili portallar (kaldır/güncelle için)
     getConfiguredPortals(),
+    // Satış teşhisi için fotoğraf/medya sayısı
+    supabase.from("property_media").select("id", { count: "exact", head: true }).eq("property_id", id),
   ]);
 
   if (!property) notFound();
@@ -244,6 +249,22 @@ export default async function PropertyDetailPage({
 
   const isRentListing =
     property.transaction_type === "rent" || property.transaction_type === "Kiralık" || property.transaction_type === "kiralik";
+
+  // "Neden satmıyor?" teşhisi — yalnızca aktif pazarlamadaki ilanlar için.
+  const daysOnMarket = daysSince(property.published_at ?? property.created_at);
+  const saleDiagnosis = isDiagnosable(property.status)
+    ? diagnoseSaleBlockers({
+        status: property.status,
+        daysOnMarket,
+        priceHealth: priceSignal.health,
+        priceDeltaPct: priceSignal.deltaPct,
+        totalViews,
+        views7d,
+        livePortals: livePortals.length,
+        mediaCount: mediaCount ?? 0,
+        transactionType: property.transaction_type,
+      })
+    : null;
 
   // Kayıp toplamı kapanış kayıtlarından gelir; o bölüm akarak geldiği için
   // künyedeki rozet de kendi sınırında bekler.
@@ -438,6 +459,8 @@ export default async function PropertyDetailPage({
           </div>
         </div>
       </section>
+
+      {saleDiagnosis ? <SaleDiagnosticsCard diagnosis={saleDiagnosis} /> : null}
 
       <div id="medya" className="scroll-mt-24">
         <Suspense fallback={<MediaSkeleton />}>
