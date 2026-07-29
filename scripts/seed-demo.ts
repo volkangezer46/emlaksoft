@@ -886,6 +886,103 @@ async function main() {
     console.log(`✓ Bölge istatistikleri: ${rows.length} kayıt (upsert, son 6 ay × 2 ilçe)`);
   }
 
+  // ---------------- Destek talepleri ----------------
+  await section("Destek talepleri", "support_tickets", tenantId, 4, async () => {
+    const rows = [
+      { subject: "Fatura PDF'i inmiyor", body: "Abonelik faturasının PDF indirme butonu hata veriyor.", category: "billing", priority: "high", status: "open", created_by: ownerId, resolved_at: null as string | null },
+      { subject: "Portal ilanı Sahibinden'e gitmedi", body: "DEMO-003 ilanını yayınladım ama Sahibinden'de görünmüyor.", category: "bug", priority: "urgent", status: "in_progress", created_by: advisorId, resolved_at: null as string | null },
+      { subject: "WhatsApp şablonu önerisi", body: "Randevu hatırlatma için hazır bir şablon eklenebilir mi?", category: "feature", priority: "normal", status: "waiting", created_by: advisorId, resolved_at: null as string | null },
+      { subject: "KVKK aydınlatma metni güncellemesi", body: "Yeni mevzuata göre metni güncellemek istiyoruz.", category: "compliance", priority: "normal", status: "resolved", created_by: ownerId, resolved_at: iso(daysFromNow(-2, 15)) },
+    ].map((t) => ({ tenant_id: tenantId, ...t }));
+    return (await insertRows("support_tickets", rows)).length;
+  });
+
+  // ---------------- Kampanyalar (SMS/WhatsApp) ----------------
+  await section("Kampanyalar", "campaigns", tenantId, 3, async () => {
+    const specs: Array<{
+      title: string; channel: "sms" | "whatsapp"; message: string; status: string;
+      sent?: number; failed?: number; sentDaysAgo?: number; scheduledDaysAhead?: number;
+    }> = [
+      { title: "Bahar fırsat portföyleri", channel: "sms", message: "Kadıköy'de yeni satılık daireler yayında! Detay için bize dönün.", status: "done", sent: 24, failed: 1, sentDaysAgo: 6 },
+      { title: "Kiralık stok duyurusu", channel: "whatsapp", message: "Yeni kiralık portföylerimiz hazır. Bilgi için yanıtlayın.", status: "scheduled", scheduledDaysAhead: 2 },
+      { title: "Yatırımcı bülteni", channel: "sms", message: "Ataşehir arsa yatırım fırsatı — sınırlı sayıda.", status: "draft" },
+    ];
+    let n = 0;
+    for (const s of specs) {
+      const total = s.sent != null ? s.sent + (s.failed ?? 0) : 0;
+      const [camp] = await insertRows("campaigns", [{
+        tenant_id: tenantId, created_by: ownerId, title: s.title, channel: s.channel, message: s.message,
+        status: s.status, total_count: total, sent_count: s.sent ?? 0, failed_count: s.failed ?? 0,
+        scheduled_at: s.scheduledDaysAhead != null ? iso(daysFromNow(s.scheduledDaysAhead, 10)) : null,
+        sent_at: s.sentDaysAgo != null ? iso(daysFromNow(-s.sentDaysAgo, 11)) : null,
+      }]);
+      n++;
+      if (s.status === "done" && camp) {
+        const recips = customers.slice(0, 4).map((c, i) => ({
+          campaign_id: camp.id, customer_id: c.id, phone: c.phone ?? "05320000000", full_name: c.full_name,
+          status: i === 0 ? "failed" : "sent", sent_at: iso(daysFromNow(-(s.sentDaysAgo ?? 6), 11)),
+        }));
+        await insertRows("campaign_recipients", recips);
+      }
+    }
+    return n;
+  });
+
+  // ---------------- Otomasyonlar ----------------
+  await section("Otomasyonlar", "automations", tenantId, 3, async () => {
+    const specs: Array<{
+      name: string; description: string; trigger_type: string; status: string;
+      trigger_config?: Dict; run_count?: number; lastRunDaysAgo?: number;
+    }> = [
+      { name: "Yeni talebe 5 dk'da dokunuş", description: "Yeni talep gelince danışmana görev + müşteriye karşılama mesajı.", trigger_type: "new_demand", status: "active", run_count: 18, lastRunDaysAgo: 0 },
+      { name: "14 gün sessiz müşteriyi hatırlat", description: "14 gündür iletişim olmayan sıcak müşteriler için takip görevi aç.", trigger_type: "no_contact_days", trigger_config: { days: 14 }, status: "active", run_count: 7, lastRunDaysAgo: 1 },
+      { name: "Yetki bitişine 30 gün kala uyar", description: "Portföy yetki belgesi dolmadan danışmanı uyar.", trigger_type: "auth_expiring", trigger_config: { days: 30 }, status: "draft", run_count: 0 },
+    ];
+    let n = 0;
+    for (const s of specs) {
+      const [auto] = await insertRows("automations", [{
+        tenant_id: tenantId, created_by: ownerId, name: s.name, description: s.description,
+        trigger_type: s.trigger_type, trigger_config: s.trigger_config ?? {}, conditions: [], actions: [{ type: "create_task" }],
+        status: s.status, run_count: s.run_count ?? 0,
+        last_run_at: s.lastRunDaysAgo != null ? iso(daysFromNow(-s.lastRunDaysAgo, 9)) : null,
+      }]);
+      n++;
+      if ((s.run_count ?? 0) > 0 && auto) {
+        await insertRows("automation_logs", [{
+          automation_id: auto.id, tenant_id: tenantId, entity_type: "customer", result: "ok",
+          actions_taken: [{ type: "create_task", ok: true }],
+        }]);
+      }
+    }
+    return n;
+  });
+
+  // ---------------- Açık ev günleri ----------------
+  await section("Açık ev günleri", "open_houses", tenantId, 3, async () => {
+    const specs: Array<{ prop: string; daysAhead: number; hour: number; loc: string; max: number; status: string; visitors: string[] }> = [
+      { prop: "DEMO-001", daysAhead: 2, hour: 13, loc: "Kadıköy Moda", max: 20, status: "planned", visitors: [] },
+      { prop: "DEMO-006", daysAhead: -3, hour: 14, loc: "Maltepe", max: 15, status: "completed", visitors: ["Emine Arslan", "Ali Koç", "Zeynep Aydın"] },
+      { prop: "DEMO-003", daysAhead: 0, hour: 16, loc: "Levent", max: 25, status: "active", visitors: ["Mehmet Demir"] },
+    ];
+    let n = 0;
+    for (const s of specs) {
+      const [oh] = await insertRows("open_houses", [{
+        tenant_id: tenantId, property_id: propByCode(s.prop), created_by: advisorId,
+        scheduled_at: iso(daysFromNow(s.daysAhead, s.hour)), duration_min: 120, location: s.loc,
+        notes: "Kapıda kimlik ile giriş.", max_visitors: s.max, visitor_count: s.visitors.length, status: s.status,
+      }]);
+      n++;
+      if (s.visitors.length && oh) {
+        const vis = s.visitors.map((name) => {
+          const c = customers.find((x) => x.full_name === name);
+          return { open_house_id: oh.id, full_name: name, phone: c?.phone ?? null, notes: "Ziyaret etti", created_customer_id: c?.id ?? null, registered_at: iso(daysFromNow(s.daysAhead, s.hour + 1)) };
+        });
+        await insertRows("open_house_visitors", vis);
+      }
+    }
+    return n;
+  });
+
   // ---------------- Bildirimler ----------------
   await section("Bildirimler", "notifications", tenantId, 3, async () => {
     const rows = [
