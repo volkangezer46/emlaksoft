@@ -204,11 +204,11 @@ export function DuesClient({
               <TR>
                 {canBulk ? <TH><span className="sr-only">Seç</span></TH> : null}
                 <TH>Başlık</TH>
-                <TH>Portföy</TH>
-                <TH>Dönem</TH>
+                <TH className="hidden sm:table-cell">Portföy</TH>
+                <TH className="hidden sm:table-cell">Dönem</TH>
                 <TH align="right">Tutar</TH>
                 <TH>Durum</TH>
-                <TH align="right"><span className="sr-only">İşlem</span></TH>
+                <TH align="right" className="hidden sm:table-cell"><span className="sr-only">İşlem</span></TH>
               </TR>
             </THead>
             <TBody>
@@ -238,26 +238,35 @@ export function DuesClient({
                         </TD>
                       ) : null}
                       <TD className="font-semibold text-ink-950">
+                        {/* Overlay yalnız sm+ (mobilde abs katman iOS'ta tabloyu belge
+                            scroll'una promote edip sayfayı yana kaydırıyor). Mobilde
+                            tıklama için başlık Link. */}
                         {prop ? (
-                          <Link
-                            href={`/app/portfoyler/${prop.id}`}
-                            className="absolute inset-0"
-                            aria-label={`${d.title} — ${prop.title ?? prop.property_code} portföyünü aç`}
-                          />
-                        ) : null}
-                        {d.title}
+                          <>
+                            <Link
+                              href={`/app/portfoyler/${prop.id}`}
+                              className="absolute inset-0 hidden sm:block"
+                              aria-label={`${d.title} — ${prop.title ?? prop.property_code} portföyünü aç`}
+                            />
+                            <Link href={`/app/portfoyler/${prop.id}`} className="sm:pointer-events-none">
+                              {d.title}
+                            </Link>
+                          </>
+                        ) : (
+                          d.title
+                        )}
                       </TD>
-                      <TD className="text-text-muted">
+                      <TD className="hidden text-text-muted sm:table-cell">
                         {prop ? (prop.title ?? prop.property_code) : "—"}
                       </TD>
-                      <TD className="text-text-muted">{monthLabel(d.period)}</TD>
+                      <TD className="hidden text-text-muted sm:table-cell">{monthLabel(d.period)}</TD>
                       <TD align="right" className="font-bold text-ink-950">{money(Number(d.amount))}</TD>
                       <TD>
                         <Badge variant={paid ? "success" : overdue ? "danger" : "warning"} size="sm">
                           {paid ? "Ödendi" : overdue ? "Gecikti" : "Bekliyor"}
                         </Badge>
                       </TD>
-                      <TD align="right">
+                      <TD align="right" className="hidden sm:table-cell">
                         {/* relative + z-10: satır linkinin üstünde kalsın */}
                         <div className="relative z-10 flex items-center justify-end gap-1.5">
                           <button type="button" onClick={() => toggle(d.id, !paid)} disabled={busy === d.id}

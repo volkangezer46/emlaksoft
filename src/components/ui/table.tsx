@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps, CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -44,7 +44,18 @@ export function TableFrame({
       )}
     >
       <div className="w-full max-w-full [contain:inline-size] overflow-x-auto">
-        <div style={minWidth ? { minWidth } : undefined}>{children}</div>
+        {/* İç kap `w-max` (width:max-content) — tablonun DOĞAL genişliğine büyür,
+            böylece overflow-x-auto kabının düzgün "oversized" çocuğu olur ve tablo
+            İÇTE kaydırılır. Önceki `min-w-full` div'i viewport'ta (356px) kalıyor,
+            tablo onu `overflow:visible` ile taşırıp iOS'ta ICB'yi şişiriyor ve TÜM
+            sayfayı yatay kaydırılabilir yapıyordu (fixed alt-nav sabit kalsa da
+            sayfa yana kayıyordu). sm+ okunabilirlik için min-width tabanı korunur. */}
+        <div
+          className={minWidth ? "w-max min-w-full sm:[min-width:var(--tbl-mw)]" : "w-max min-w-full"}
+          style={minWidth ? ({ ["--tbl-mw"]: `${minWidth}px` } as CSSProperties) : undefined}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -117,7 +128,9 @@ export function TH({
       scope="col"
       {...props}
       className={cn(
-        "px-4 py-2.5 whitespace-nowrap",
+        // Mobilde başlık sarar (dar viewport'ta kolon genişliğini zorlamasın),
+        // sm+ tek satır. Böylece mobilde tablo yatay kaydırmayı minimuma indirir.
+        "whitespace-normal px-4 py-2.5 sm:whitespace-nowrap",
         alignClass[align],
         // Sağa hizalı başlık = sayısal kolon; rakam hizalamasını burada da aç
         align === "right" && "numeric",

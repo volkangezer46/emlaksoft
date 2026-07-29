@@ -254,10 +254,15 @@ export default async function AppLayout({
               </form>
             </div>
           </header>
-          {/* min-w-0 + overflow-x-clip: geniş tablolar (musteriler vb.) kendi
-              içlerinde kaydırılır; içerik layout viewport'unu (ICB) şişirip
-              mobilde fixed alt-gezinme/hamburger'ı kaydıramaz. */}
-          <main id="main-content" className="min-w-0 max-w-full flex-1 overflow-x-clip p-4 pb-28 md:p-6 lg:p-8">
+          {/* grid + minmax(0,1fr): her doğrudan çocuk (LiveOfficeStrip + sayfa)
+              tam olarak kullanılabilir genişliğe sabitlenir; içteki geniş tablonun
+              overflow-x-auto kabı düzgün kaydırılır ve belgeyi (ICB'yi) şişiremez.
+              iOS Safari `overflow:clip`'i viewport'a propagate etmiyor (sayfa yana
+              kayıyordu) — minmax(0,1fr) track bunu kökten keser. */}
+          <main
+            id="main-content"
+            className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1fr)] content-start overflow-x-clip p-4 pb-28 md:p-6 lg:p-8"
+          >
             <LiveOfficeStrip tenantId={tenantId} />
             {children}
           </main>

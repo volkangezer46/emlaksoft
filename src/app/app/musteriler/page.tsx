@@ -862,10 +862,11 @@ export default async function CustomersPage({
                       label="Müşteri"
                     />
                   </TH>
-                  <TH>Tür</TH>
-                  <TH>İletişim</TH>
-                  <TH>Konum</TH>
+                  <TH className="hidden sm:table-cell">Tür</TH>
+                  <TH className="hidden sm:table-cell">İletişim</TH>
+                  <TH className="hidden sm:table-cell">Konum</TH>
                   <TH
+                    className="hidden sm:table-cell"
                     aria-sort={columnSortActive && sortKey === "tarih" ? (sortDir === "asc" ? "ascending" : "descending") : undefined}
                   >
                     <SortHeaderLink
@@ -875,7 +876,7 @@ export default async function CustomersPage({
                       label="Kayıt tarihi"
                     />
                   </TH>
-                  <TH align="right"><span className="sr-only">İşlemler</span></TH>
+                  <TH align="right" className="hidden sm:table-cell"><span className="sr-only">İşlemler</span></TH>
                 </TR>
               </THead>
               <TBody>
@@ -891,8 +892,14 @@ export default async function CustomersPage({
                       </TD>
                     ) : null}
                     <TD>
-                      <Link href={`/app/musteriler/${c.id}`} className="absolute inset-0" aria-label={`${c.full_name} detayları`} />
-                      <div className="flex items-center gap-3">
+                      {/* Satır overlay'i YALNIZ sm+ (masaüstü/tablet). Mobilde
+                          `absolute` overlay tablo genişliğinde bir katman yaratıp iOS
+                          Safari'de tüm yatay-kaydırılabilir tablo içeriğini BELGE scroll
+                          katmanına promote ediyor (overlay'in varlığı yeter, genişliği
+                          değil) → sayfa yana kayıyordu. Mobilde tıklama için isim bloğu
+                          Link (aşağıda); tablo kendi kabında güvenle kaydırılır. */}
+                      <Link href={`/app/musteriler/${c.id}`} className="absolute inset-0 hidden sm:block" aria-label={`${c.full_name} detayları`} />
+                      <Link href={`/app/musteriler/${c.id}`} className="flex items-center gap-3 sm:pointer-events-none">
                         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[image:var(--grad-brand)] text-xs font-bold text-white shadow-[var(--shadow-xs)]">
                           {c.full_name.split(/\s+/).map((part) => part[0] ?? "").join("").slice(0, 2).toUpperCase()}
                         </span>
@@ -927,9 +934,9 @@ export default async function CustomersPage({
                             <p className="mt-0.5 flex items-center gap-1 text-[11px] text-text-faint"><Clock3 className="h-3 w-3" /> {relativeAdded(c.created_at)}</p>
                           )}
                         </div>
-                      </div>
+                      </Link>
                     </TD>
-                    <TD>
+                    <TD className="hidden sm:table-cell">
                       {c.customer_types && c.customer_types.length > 0 ? (
                         <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-medium text-brand-600">
                           {c.customer_types[0]}
@@ -953,7 +960,7 @@ export default async function CustomersPage({
                         </span>
                       ) : null}
                     </TD>
-                    <TD>
+                    <TD className="hidden sm:table-cell">
                       {/* tel/wa/mailto linkleri satır overlay'inin üstünde kalmalı → relative z-10 */}
                       {c.phone ? (
                         <span className="relative z-10 flex items-center gap-1.5">
@@ -987,13 +994,13 @@ export default async function CustomersPage({
                         </a>
                       ) : null}
                     </TD>
-                    <TD className="text-text-muted">
+                    <TD className="hidden text-text-muted sm:table-cell">
                       <span className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-text-faint" />{provinceName(c.province)}</span>
                     </TD>
-                    <TD className="text-text-muted">
+                    <TD className="hidden text-text-muted sm:table-cell">
                       <span className="flex items-center gap-2"><Clock3 className="h-3.5 w-3.5 text-text-faint" />{formatDate(c.created_at)}</span>
                     </TD>
-                    <TD>
+                    <TD className="hidden sm:table-cell">
                       <div className="relative z-10 flex items-center justify-end gap-1">
                         {/* Müşteri portalı linki — createCustomerPortalToken'ın
                             tek girişi. Action customers.edit istiyor, buton da

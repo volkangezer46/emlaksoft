@@ -90,11 +90,11 @@ export function ExpensesTable({
           <THead>
             <TR>
               <TH>Başlık</TH>
-              <TH>Kategori</TH>
+              <TH className="hidden sm:table-cell">Kategori</TH>
               <TH align="right">Tutar</TH>
-              <TH align="right">Tarih</TH>
+              <TH align="right" className="hidden sm:table-cell">Tarih</TH>
               {hasActions ? (
-                <TH align="right" className="w-px">
+                <TH align="right" className="hidden w-px sm:table-cell">
                   <span className="sr-only">İşlemler</span>
                 </TH>
               ) : null}
@@ -116,25 +116,36 @@ export function ExpensesTable({
                 <TR key={e.id} interactive={canEdit}>
                   <TD className="font-semibold text-ink-950">
                     {canEdit ? (
-                      // Satırı kaplayan görünmez buton: tıklama düzenleme diyaloğunu açar
-                      // (DataTable'daki absolute-inset Link deseninin buton karşılığı)
+                      // Satırı kaplayan görünmez buton — YALNIZ sm+. Mobilde abs katman
+                      // iOS Safari'de yatay-kaydırılabilir tabloyu belge scroll'una
+                      // promote edip sayfayı yana kaydırıyor; mobilde başlık tıklanır.
                       <button
                         type="button"
                         onClick={() => setEditing(e)}
-                        className="absolute inset-0"
+                        className="absolute inset-0 hidden sm:block"
                         aria-label={`${e.title} giderini düzenle`}
                       />
                     ) : null}
-                    {e.title}
+                    {canEdit ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditing(e)}
+                        className="text-left sm:pointer-events-none"
+                      >
+                        {e.title}
+                      </button>
+                    ) : (
+                      e.title
+                    )}
                     {e.notes ? (
                       <span className="mt-0.5 block text-[11px] font-normal text-text-faint">{e.notes}</span>
                     ) : null}
                   </TD>
-                  <TD>{catLabel(e.category)}</TD>
+                  <TD className="hidden sm:table-cell">{catLabel(e.category)}</TD>
                   <TD align="right">{tryFormatter.format(Number(e.amount))}</TD>
-                  <TD align="right">{formatDate(e.expense_date)}</TD>
+                  <TD align="right" className="hidden sm:table-cell">{formatDate(e.expense_date)}</TD>
                   {hasActions ? (
-                    <TD align="right" className="whitespace-nowrap">
+                    <TD align="right" className="hidden whitespace-nowrap sm:table-cell">
                       <span className="relative z-10 inline-flex items-center gap-1">
                         <ConfirmDialog
                           title="Gideri sil"
@@ -163,10 +174,10 @@ export function ExpensesTable({
             <TFoot>
               <TR>
                 <TD>Toplam</TD>
-                <TD />
+                <TD className="hidden sm:table-cell" />
                 <TD align="right">{tryFormatter.format(total)}</TD>
-                <TD />
-                {hasActions ? <TD /> : null}
+                <TD className="hidden sm:table-cell" />
+                {hasActions ? <TD className="hidden sm:table-cell" /> : null}
               </TR>
             </TFoot>
           ) : null}

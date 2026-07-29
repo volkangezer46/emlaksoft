@@ -18,8 +18,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <AdminSidebar staffName={staff.full_name} role={staff.role} roleLabel={roleLabel} badges={badges} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopbar roleLabel={roleLabel} modules={modules} />
-        {/* pb-24 (mobil alt-nav) + overflow-x-clip (geniş tablolar ICB'yi şişirmesin) */}
-        <main id="main-content" className="min-w-0 max-w-full flex-1 overflow-x-clip p-4 pb-24 md:p-6 md:pb-6">{children}</main>
+        {/* grid + minmax(0,1fr): geniş tablolar kendi kaplarında kaydırılır,
+            belgeyi şişirmez (iOS `overflow:clip` viewport'a propagate etmiyor). */}
+        <main
+          id="main-content"
+          className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1fr)] content-start overflow-x-clip p-4 pb-24 md:p-6 md:pb-6"
+        >
+          {children}
+        </main>
       </div>
     </div>
   );
