@@ -28,6 +28,8 @@ import { RotaView, type RotaAdvisor, type RotaDurak } from "./rota-view";
 import { buildRoutePlan, type RoutePlanStop } from "@/lib/route-plan";
 import { AppointmentEditDialog } from "./appointment-edit-dialog";
 import { ExportIcsButton } from "./export-ics-button";
+import { ExportCsvButton } from "@/components/app/export-csv-button";
+import { exportAppointmentsCsv } from "@/app/actions/export";
 import { CopyConfirmLink } from "./copy-confirm-link";
 import { CalendarSubscribeCard } from "./calendar-subscribe-card";
 import { BookingLinkCard } from "./booking-link-card";
@@ -513,6 +515,11 @@ export default async function AppointmentsPage({
                   durationMin: r.duration_min,
                 };
               })}
+            />
+            <ExportCsvButton
+              label="CSV"
+              action={exportAppointmentsCsv.bind(null, { tip: tipF, durum: durumF, customer: customerF, property: propertyF })}
+              className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
             />
             <NewAppointmentDialog customers={customerOptions} properties={propertyOptions} typeOptions={appointmentTypeOptions} defaultCustomerId={filteredCustomer?.id} defaultPropertyId={filteredProperty?.id} />
           </div>

@@ -115,6 +115,28 @@ Yeni oturumun "chat hafızası" budur — kullanıcının verdiği her ana talim
     effect'e taşındı (bellek cache'i korunarak). (e) Doğrulama: tsc/lint/188 test/build/check:links/E2E
     (21 geçti, 0 kaldı) + 390px'te 12+ ekran Playwright taraması (taşma 0, sayfa hatası 0).
 
+## 6.5) 2026-07-29 (2. oturum) — Dalga W: akış kopuklukları + denetim + perf
+
+Migration **130**'a kadar dev DB'de uygulı (127 appointment CHECK · 128 expense enum→text ·
+129 kira yaşam döngüsü · 130 aidat_kpi RPC). Bu oturumda kapatılanlar:
+- **A.1–A.4**: appointment_type CHECK, expense_category enum→text, lead-score kaynak hizalama,
+  DEFAULT_COMMISSION_RATE tek kaynak.
+- **B**: 8 çekirdek liste ekranı gerçek sayfalama; aidat KPI tam SUM (RPC).
+- **C akış kopuklukları (5/6)**: proje satışı→deal+commission · kayıp-kaçak "Teyit et" kurtarma ·
+  ekip iş yükü devri (müşteri+portföy) · kira portföy durumu+depozito · anlaşma won/lost geri alma.
+  **C.2** (çapraz-ofis komisyon uzlaşma) bilinçli ertelendi.
+- **Perf**: Vercel `fra1` bölgesi (Supabase eu-central komşusu) + admin sidebar prefetch + admin
+  layout/dashboard `unstable_cache`. Tema: koyu-hero select popup + mor temizliği + admin export butonu.
+- **E**: 5 gizli premium sayfa sidebar'a.
+- **Tam denetim (4 ajan)**: tüm ekranlar işlev+hız tarandı — franchise konsolide toplam hatası,
+  5 sıralı-await→paralel, ~13 clock-saflığı düzeltildi. projeler StatCard href.
+- **Keşif (ölü veri + yeni liste)**: 7 ölü-yazım kolonu/tablo, 23 çağrılmayan action, 14 maddelik
+  geliştirme listesi çıkarıldı → **Dalga W2** ile en yüksek etkililer uygulanıyor (ölü-yazım hayata
+  bağlama, CSV export, portal kaldır/güncelle, yetki süresi, vitrin görüntülenme, lig tarihçesi).
+
+**Kalan ağır (dedike dalga):** C.2 çapraz-tenant komisyon · A.5 sabit tanımları DB'ye (+TÜFE 2026
+verisi) · müşteri birleştirme geri alma · kayıp-kaçak aggregate RPC · dead-action temizliği (~15).
+
 ## 7) 2026-07-29 durumu — Dalga S/T/V sonrası
 
 **CANLI ve güncel:** https://emlaksoft.vercel.app · commit `9a6e055` · migration **126**'ya kadar dev DB'de uygulı.

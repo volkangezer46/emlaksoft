@@ -125,23 +125,32 @@ export default async function RegionAnalysisPage({
   // ---- Seçili ilçenin 12 aylık medyan ₺/m² trendi (aylık snapshot'lardan) ----
   const selected = districtParam ? rows.find((r) => r.district_id === districtParam) ?? null : null;
   let trendData: Array<{ ay: string; sqm: number }> = [];
+  // Piyasa zekâsı serileri: stok (aktif ilan), satış hızı (ort. listede kalma),
+  // kapanan işlem — snapshot kolonları yazılıyordu ama okunmuyordu.
+  let marketTrend: Array<{ ay: string; stok: number; gun: number; kapanis: number }> = [];
   if (selected && tenantId) {
     const { data: hist } = await supabase
       .from("region_stats_history")
-      .select("period, median_sqm_price")
+      .select("period, median_sqm_price, active_count, avg_days_listed, closed_count")
       .eq("tenant_id", tenantId)
       .eq("district_id", selected.district_id)
       .eq("tx_type", tx || "Tümü")
       .order("period", { ascending: false })
       .limit(12);
     const monthLabel = new Intl.DateTimeFormat("tr-TR", { month: "short", year: "2-digit" });
-    trendData = (hist ?? [])
+    const histAsc = [...(hist ?? [])].reverse(); // eskiden yeniye
+    trendData = histAsc
       .filter((h) => h.median_sqm_price != null)
-      .reverse()
       .map((h) => ({
         ay: monthLabel.format(new Date(String(h.period))),
         sqm: Number(h.median_sqm_price),
       }));
+    marketTrend = histAsc.map((h) => ({
+      ay: monthLabel.format(new Date(String(h.period))),
+      stok: Number(h.active_count ?? 0),
+      gun: h.avg_days_listed != null ? Math.round(Number(h.avg_days_listed)) : 0,
+      kapanis: Number(h.closed_count ?? 0),
+    }));
   }
 
   const totalActive = rows.reduce((s, r) => s + r.active_count, 0);
@@ -442,6 +451,48 @@ export default async function RegionAnalysisPage({
                   </div>
                 )}
               </ChartFrame>
+
+              {/* ---- PİYASA ZEKÂSI: stok / satış hızı / kapanış zaman serisi ---- */}
+              {marketTrend.length >= 2 ? (
+                <div className="no-print grid gap-4 lg:grid-cols-3">
+                  <ChartFrame
+                    title="Stok trendi"
+                    subtitle="Aktif portföy sayısı · aylık"
+                    height={180}
+                  >
+                    <AreaTrend
+                      data={marketTrend}
+                      xKey="ay"
+                      format="number"
+                      series={[{ key: "stok", label: "Aktif portföy", color: "var(--brand-500)" }]}
+                    />
+                  </ChartFrame>
+                  <ChartFrame
+                    title="Satış hızı"
+                    subtitle="Ort. listede kalma (gün) · düşüş = hızlanma"
+                    height={180}
+                  >
+                    <AreaTrend
+                      data={marketTrend}
+                      xKey="ay"
+                      format="number"
+                      series={[{ key: "gun", label: "Ort. gün", color: "var(--amber-500)" }]}
+                    />
+                  </ChartFrame>
+                  <ChartFrame
+                    title="Kapanış trendi"
+                    subtitle="Kapanan işlem sayısı · aylık"
+                    height={180}
+                  >
+                    <AreaTrend
+                      data={marketTrend}
+                      xKey="ay"
+                      format="number"
+                      series={[{ key: "kapanis", label: "Kapanan işlem", color: "var(--mint-500)" }]}
+                    />
+                  </ChartFrame>
+                </div>
+              ) : null}
 
               {/* ---- CEP RAPORU ALT BLOĞU (yalnız çıktıda) ---- */}
               <footer className="print-only">

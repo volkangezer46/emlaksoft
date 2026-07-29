@@ -1,7 +1,8 @@
 import Link from "next/link";
 import {
   Award, Building2, CalendarCheck2, CalendarClock, ChevronLeft, ChevronRight, Crown, Flame,
-  Handshake, HelpCircle, Medal, Rocket, Star, Target, Trophy, Tv, Users, Zap,
+  Handshake, HelpCircle, Medal, Minus, Rocket, Star, Target, TrendingDown, TrendingUp, Trophy,
+  Tv, Users, Zap,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -17,7 +18,7 @@ import {
   evaluateBadges,
   type AgentStats,
 } from "@/lib/gamification";
-import { loadLeagueData, periodOf, periodRange } from "@/lib/gamification-query";
+import { loadLeagueData, periodOf, periodRange, previousPeriod } from "@/lib/gamification-query";
 
 /**
  * /app/lig — ofis motivasyon ekranı.
@@ -71,6 +72,41 @@ function Cell({ href, value, label }: { href: string; value: number; label: stri
         {value}
       </Link>
     </TD>
+  );
+}
+
+/**
+ * Sıra değişim rozeti — geçen dönemin mühürlü sırasına (snapshot) göre.
+ * Pozitif delta = yükseliş (mint), negatif = geriye düşüş (danger).
+ */
+function RankTrend({ current, previous }: { current: number; previous: number | undefined }) {
+  if (previous === undefined) {
+    return (
+      <span
+        title="Geçen ay ligde mühürlü kaydı yok — ilk kez sıralandı"
+        className="inline-flex items-center rounded-full bg-brand-600/10 px-1.5 py-0.5 text-[9px] font-bold text-brand-700"
+      >
+        yeni
+      </span>
+    );
+  }
+  const delta = previous - current; // pozitif = yukarı çıktı
+  if (delta === 0) {
+    return (
+      <span title="Geçen aya göre sıra değişmedi" className="inline-flex text-text-faint">
+        <Minus className="h-3 w-3" />
+      </span>
+    );
+  }
+  const up = delta > 0;
+  return (
+    <span
+      title={`Geçen aya göre ${Math.abs(delta)} sıra ${up ? "yükseldi" : "geriledi"}`}
+      className={`inline-flex items-center gap-0.5 text-[10px] font-bold tabular-nums ${up ? "text-mint-600" : "text-danger-500"}`}
+    >
+      {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+      {Math.abs(delta)}
+    </span>
   );
 }
 
@@ -133,6 +169,24 @@ export default async function LigPage({
     m.set(String(r.badge_code), String(r.earned_at));
     earnedDb.set(sid, m);
   }
+
+  // ── Geçen aya göre sıra değişimi ───────────────────────────────────────
+  // `agent_score_snapshots` her ayın 1'inde mühürlenir (cron lig-snapshot).
+  // Bir önceki dönemin MÜHÜRLÜ sırasıyla kıyaslayıp "↑2 sıra" gösteririz.
+  // Snapshot ofis geneli yazıldığı için şube kapsamı seçiliyken kıyas
+  // yapılmaz (dürüstlük: farklı evrenin sırasını karşılaştırmayız).
+  const prevRankByStaff = new Map<string, number>();
+  if (branchId === null && !tvMode) {
+    const { data: prevSnaps } = await supabase
+      .from("agent_score_snapshots")
+      .select("staff_id, rank")
+      .eq("tenant_id", tenantId)
+      .eq("period", previousPeriod(period));
+    for (const s of prevSnaps ?? []) {
+      if (s.rank != null) prevRankByStaff.set(String(s.staff_id), Number(s.rank));
+    }
+  }
+  const hasPrevSnapshot = prevRankByStaff.size > 0;
 
   const agentById = new Map(league.agents.map((a) => [a.id, a]));
 
@@ -439,13 +493,19 @@ export default async function LigPage({
                   return (
                     <TR key={r.staffId} interactive className={ben ? "bg-brand-600/[0.06]" : undefined}>
                       <TD>
-                        <span
-                          className={`numeric font-display font-bold ${
-                            r.rank === 1 ? "text-amber-500" : r.rank === 2 ? "text-text-muted" : r.rank === 3 ? "text-amber-700" : "text-text-faint"
-                          }`}
-                        >
-                          {r.rank}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`numeric font-display font-bold ${
+                              r.rank === 1 ? "text-amber-500" : r.rank === 2 ? "text-text-muted" : r.rank === 3 ? "text-amber-700" : "text-text-faint"
+                            }`}
+                          >
+                            {r.rank}
+                          </span>
+                          {/* Geçen aya göre sıra değişimi — mühürlü snapshot'tan */}
+                          {hasPrevSnapshot ? (
+                            <RankTrend current={r.rank} previous={prevRankByStaff.get(r.staffId)} />
+                          ) : null}
+                        </div>
                       </TD>
                       <TD>
                         <Link

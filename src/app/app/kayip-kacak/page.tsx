@@ -26,6 +26,7 @@ type Closure = {
   closed_by_us: boolean | null;
   competitor_closed: boolean | null;
   estimated_lost_commission: number | null;
+  leak_severity: "low" | "medium" | "high" | "critical" | null;
   created_at: string;
   portal_listing: {
     portal_name: string;
@@ -61,11 +62,26 @@ const TIP_LABELS: Record<TipFilter, string> = {
   islem: "İşlem var",
 };
 
+/**
+ * Kayıp ciddiyeti — leak-sla cron'u `estimated_lost_commission`/`deal_amount` ve
+ * gecikme gününe göre yazıyor (bkz. api/cron/leak-sla). Yüksek tutar + uzun
+ * gecikme → kritik. Renk tonları palet danger/amber ekseninde artan şiddet.
+ */
+const SEV_FILTERS = ["critical", "high", "medium", "low"] as const;
+type SevFilter = (typeof SEV_FILTERS)[number];
+
+const SEV_META: Record<SevFilter, { label: string; badge: string; dot: string }> = {
+  critical: { label: "Kritik", badge: "bg-danger-500 text-white", dot: "bg-danger-500" },
+  high: { label: "Yüksek", badge: "bg-danger-500/12 text-danger-500", dot: "bg-danger-500" },
+  medium: { label: "Orta", badge: "bg-amber-400/18 text-amber-700", dot: "bg-amber-500" },
+  low: { label: "Düşük", badge: "bg-ink-950/6 text-text-muted", dot: "bg-text-faint" },
+};
+
 const PAGE_SIZE = 50;
 
 /** Kapanış kaydı select'i — hem aggregate havuzda hem sayfalı listede aynı kolonlar. */
 const CLOSURE_SELECT =
-  "id, reason, deal_happened, deal_amount, closed_by_us, competitor_closed, estimated_lost_commission, created_at, portal_listing:portal_listings(portal_name, portal_listing_id, property:properties(id, property_code, title))";
+  "id, reason, deal_happened, deal_amount, closed_by_us, competitor_closed, estimated_lost_commission, leak_severity, created_at, portal_listing:portal_listings(portal_name, portal_listing_id, property:properties(id, property_code, title))";
 
 /** YYYY-MM-DD biçimindeyse döndür, aksi halde boş — sorguya ham girdi gitmesin. */
 function safeDate(value: string | undefined) {
@@ -76,7 +92,7 @@ function safeDate(value: string | undefined) {
 export default async function LeakShieldPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ neden?: string; tip?: string; from?: string; to?: string; sayfa?: string }>;
+  searchParams?: Promise<{ neden?: string; tip?: string; siddet?: string; from?: string; to?: string; sayfa?: string }>;
 }) {
   const { perms } = await requireModulePage("leak");
   // Kurtarma aksiyonu (teyit) yalnız portal düzenleme yetkisi olana gösterilir;
@@ -85,6 +101,7 @@ export default async function LeakShieldPage({
   const params = (await searchParams) ?? {};
   const nedenF = (params.neden ?? "").trim();
   const tipF = TIP_FILTERS.includes(params.tip as TipFilter) ? (params.tip as TipFilter) : "";
+  const sevF = SEV_FILTERS.includes(params.siddet as SevFilter) ? (params.siddet as SevFilter) : "";
   const fromF = safeDate(params.from);
   const toF = safeDate(params.to);
   const rangeActive = Boolean(fromF || toF);
@@ -120,6 +137,7 @@ export default async function LeakShieldPage({
   if (tipF === "rakip") listQuery = listQuery.eq("competitor_closed", true);
   else if (tipF === "bizim") listQuery = listQuery.eq("closed_by_us", true);
   else if (tipF === "islem") listQuery = listQuery.eq("deal_happened", true);
+  if (sevF) listQuery = listQuery.eq("leak_severity", sevF);
 
   // Tarih aralığındaki toplam kapanış (neden/tip'ten bağımsız) — "X / Y" başlığı.
   let totalQuery = supabase.from("listing_closures").select("id", { count: "exact", head: true });
@@ -200,7 +218,16 @@ export default async function LeakShieldPage({
 
   const leakShare = rows.length ? leakRows.length / rows.length : 0;
 
-  const hasFilter = Boolean(nedenF || tipF || rangeActive);
+  const hasFilter = Boolean(nedenF || tipF || sevF || rangeActive);
+
+  // Ciddiyet dağılımı — aggregate havuzdan (filtre üstü sabit rozet sayacı).
+  const sevCounts = rows.reduce(
+    (acc, r) => {
+      if (r.leak_severity) acc[r.leak_severity] = (acc[r.leak_severity] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
 
   // ?sayfa= — kapanış listesi sunucuda 50'şer sayfalanır (count:"exact"); filtre
   // linkleri sayfayı sıfırlar. pageRows/listCount yukarıdaki sorgudan gelir.
@@ -208,14 +235,16 @@ export default async function LeakShieldPage({
   const page = Math.min(pageParam, totalPages);
 
   /** Mevcut filtreyi koruyarak tek parametreyi değiştiren link üretici (sayfa sıfırlanır). */
-  const filterHref = (over: { neden?: string | null; tip?: string | null; from?: string | null; to?: string | null; sayfa?: number }) => {
+  const filterHref = (over: { neden?: string | null; tip?: string | null; siddet?: string | null; from?: string | null; to?: string | null; sayfa?: number }) => {
     const sp = new URLSearchParams();
     const neden = over.neden === undefined ? nedenF : (over.neden ?? "");
     const tip = over.tip === undefined ? tipF : (over.tip ?? "");
+    const siddet = over.siddet === undefined ? sevF : (over.siddet ?? "");
     const from = over.from === undefined ? fromF : (over.from ?? "");
     const to = over.to === undefined ? toF : (over.to ?? "");
     if (neden) sp.set("neden", neden);
     if (tip) sp.set("tip", tip);
+    if (siddet) sp.set("siddet", siddet);
     if (from) sp.set("from", from);
     if (to) sp.set("to", to);
     if (over.sayfa && over.sayfa > 1) sp.set("sayfa", String(over.sayfa));
@@ -532,6 +561,14 @@ export default async function LeakShieldPage({
                 </Link>
               </span>
             ) : null}
+            {sevF ? (
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold ${SEV_META[sevF].badge}`}>
+                {SEV_META[sevF].label} ciddiyet
+                <Link href={filterHref({ siddet: null })} aria-label="Ciddiyet filtresini temizle" className="focus-ring rounded-full hover:opacity-80">
+                  ×
+                </Link>
+              </span>
+            ) : null}
             <Link href="/app/portallar" className="text-xs font-semibold text-brand-600">Portal Kontrol</Link>
           </div>
         </div>
@@ -539,6 +576,7 @@ export default async function LeakShieldPage({
         <form method="get" action="/app/kayip-kacak" className="flex flex-wrap items-center gap-2 border-b border-line bg-canvas/50 px-5 py-3">
           {nedenF ? <input type="hidden" name="neden" value={nedenF} /> : null}
           {tipF ? <input type="hidden" name="tip" value={tipF} /> : null}
+          {sevF ? <input type="hidden" name="siddet" value={sevF} /> : null}
           <span className="text-xs font-medium text-text-muted">Kapanış tarihi:</span>
           <input
             name="from"
@@ -564,6 +602,32 @@ export default async function LeakShieldPage({
             </Link>
           ) : null}
         </form>
+        {/* Ciddiyet filtresi — leak-sla cron'unun yazdığı leak_severity. Havuzdaki
+            sayaçlarla; tıklayınca listeyi o ciddiyete süzer. */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-line bg-canvas/30 px-5 py-3">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-text-muted">
+            <ShieldAlert className="h-3.5 w-3.5 text-danger-500" /> Kayıp ciddiyeti:
+          </span>
+          {SEV_FILTERS.map((s) => {
+            const active = sevF === s;
+            const count = sevCounts[s] ?? 0;
+            return (
+              <Link
+                key={s}
+                href={filterHref({ siddet: active ? null : s })}
+                aria-current={active ? "page" : undefined}
+                className={`focus-ring press inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold transition ${
+                  active ? SEV_META[s].badge : "border border-line text-text-muted hover:border-brand-300"
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${SEV_META[s].dot}`} />
+                {SEV_META[s].label}
+                <span className="tabular-nums opacity-70">{count}</span>
+              </Link>
+            );
+          })}
+          <span className="text-[11px] text-text-faint">7+ gün sonuçsuz kapanışlarda otomatik atanır</span>
+        </div>
         {totalClosuresCount === 0 ? (
           <p className="px-5 py-12 text-center text-sm text-text-muted">
             Henüz kapanış yok. Yayından kalkan ilanı “Kapat” ile kaydedin — kayıp-kaçak burada oluşur.
@@ -596,6 +660,16 @@ export default async function LeakShieldPage({
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
+                    {/* Ciddiyet rozeti — leak_severity; tıklayınca o ciddiyete süzer */}
+                    {r.leak_severity ? (
+                      <Link
+                        href={filterHref({ siddet: sevF === r.leak_severity ? null : r.leak_severity })}
+                        title={`${SEV_META[r.leak_severity].label} ciddiyet — kayıp ciddiyetine göre süz`}
+                        className={`focus-ring press relative z-10 rounded-full px-2.5 py-1 text-[11px] font-bold transition hover:opacity-80 ${SEV_META[r.leak_severity].badge}`}
+                      >
+                        {SEV_META[r.leak_severity].label}
+                      </Link>
+                    ) : null}
                     {/* Rozetler filtre linki — relative z-10: satır overlay linkinin üstünde */}
                     {r.competitor_closed ? (
                       <Link

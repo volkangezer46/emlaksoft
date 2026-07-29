@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { daysAgoIso, msSince, DAY_MS } from "@/lib/clock";
+import { daysAgoIso, msSince, msUntil, DAY_MS } from "@/lib/clock";
 import {
   AlertTriangle,
   ArrowUpRight,
   CheckCircle2,
   Clock3,
   ExternalLink,
+  FileCheck2,
   RadioTower,
   ShieldCheck,
   Siren,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { getExpiringAuthorizations } from "@/app/actions/property-management";
 import { exportPortalListingsCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { ClosePortalDialog, NewPortalDialog } from "./portal-dialogs";
@@ -137,6 +139,7 @@ export default async function PortalsPage({
     { count: removedTotal },
     { data: distRows },
     { data: properties },
+    expiringAuths,
   ] = await Promise.all([
     buildFilteredQuery(LIST_COLS, { count: "exact" })
       .order("created_at", { ascending: false })
@@ -153,6 +156,8 @@ export default async function PortalsPage({
       .select("id, property_code, title")
       .is("deleted_at", null)
       .order("created_at", { ascending: false }),
+    // Yetki süresi 15 gün içinde dolan portföyler — uyarı şeridi
+    getExpiringAuthorizations(15),
   ]);
 
   const pageRows = (listings ?? []) as unknown as PortalRow[];
@@ -181,6 +186,12 @@ export default async function PortalsPage({
     .slice(0, 5);
   const maxCount = Math.max(1, ...portalStats.map((p) => p.count));
   const activeFilter = Boolean(durum || portal || propertyF);
+
+  // Yetki süresi 15 gün içinde dolan portföyler — en acil olan başta
+  type ExpiringAuth = { id: string; property_code: string; title: string | null; authorization_end: string | null; status: string };
+  const expiring = ((expiringAuths ?? []) as ExpiringAuth[])
+    .map((a) => ({ ...a, daysLeft: a.authorization_end ? Math.floor(msUntil(a.authorization_end) / DAY_MS) : null }))
+    .slice(0, 8);
 
   return (
     <div className="space-y-6">
@@ -226,6 +237,44 @@ export default async function PortalsPage({
           ))}
         </div>
       </section>
+
+      {expiring.length > 0 ? (
+        <section className="overflow-hidden rounded-[20px] border border-amber-400/30 bg-amber-400/[0.06] shadow-[var(--shadow-xs)]">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-400/20 px-5 py-3.5">
+            <p className="flex items-center gap-2 text-sm font-bold text-ink-950">
+              <FileCheck2 className="h-4 w-4 text-amber-600" /> Yetki süresi dolmak üzere
+              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-700">{expiring.length}</span>
+            </p>
+            <span className="text-xs text-text-muted">15 gün içinde dolan yetkiler — süre bitince ilan rakibe açılır</span>
+          </div>
+          <div className="divide-y divide-amber-400/15">
+            {expiring.map((a) => {
+              const overdue = a.daysLeft !== null && a.daysLeft < 0;
+              return (
+                <Link
+                  key={a.id}
+                  href={`/app/portfoyler/${a.id}`}
+                  className="group flex flex-wrap items-center justify-between gap-2 px-5 py-3 transition hover:bg-amber-400/[0.05]"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink-950 transition group-hover:text-amber-700">
+                      {a.title ?? "İsimsiz portföy"}
+                      <ArrowUpRight className="ml-1 inline h-3 w-3 text-text-faint opacity-0 transition group-hover:text-amber-700 group-hover:opacity-100" />
+                    </p>
+                    <p className="mt-0.5 text-xs text-text-muted">
+                      {a.property_code}
+                      {a.authorization_end ? ` · bitiş ${new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(a.authorization_end))}` : ""}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${overdue ? "bg-danger-500/12 text-danger-500" : a.daysLeft !== null && a.daysLeft <= 7 ? "bg-amber-500/15 text-amber-700" : "bg-ink-950/6 text-text-muted"}`}>
+                    {a.daysLeft === null ? "—" : overdue ? "Süresi doldu" : a.daysLeft === 0 ? "Bugün doluyor" : `${a.daysLeft} gün kaldı`}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
 
       {totalCount > 0 ? (
         <section className="grid items-center gap-5 rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] md:grid-cols-[auto_1fr]">

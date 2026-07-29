@@ -22,6 +22,8 @@ import {
   type MatchProperty,
 } from "@/lib/matching";
 import { NewDemandListDialog } from "./new-demand-list-dialog";
+import { ExportCsvButton } from "@/components/app/export-csv-button";
+import { exportDemandsCsv } from "@/app/actions/export";
 
 type Rel = { id?: string; full_name?: string; name?: string } | { id?: string; full_name?: string; name?: string }[] | null;
 
@@ -464,6 +466,16 @@ export default async function DemandsPage({
           >
             <Crosshair className="h-3.5 w-3.5 text-brand-600" /> Eşleştirme motoru
           </Link>
+          <ExportCsvButton
+            label="Dışa aktar"
+            action={exportDemandsCsv.bind(null, {
+              status: sp.status ?? "",
+              aciliyet: aciliyetF,
+              il: ilF,
+              butce: butceF,
+              yas: yasF ? String(AGING_DAYS) : "",
+            })}
+          />
           {canCreate ? (
             <NewDemandListDialog customers={dialogCustomers} provinces={dialogProvinces} />
           ) : null}

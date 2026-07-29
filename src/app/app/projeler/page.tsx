@@ -18,6 +18,8 @@ import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/app/empty-state";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { NewProjectDialog } from "./new-project-dialog";
+import { ExportCsvButton } from "@/components/app/export-csv-button";
+import { exportProjectsCsv } from "@/app/actions/export";
 
 export const metadata = { title: "Projeler" };
 
@@ -101,6 +103,11 @@ export default async function ProjelerPage({
                 </div>
               </div>
             ) : null}
+            <ExportCsvButton
+              label="Dışa aktar"
+              action={exportProjectsCsv.bind(null, { durum: durum ?? "" })}
+              className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
+            />
             {canCreate ? <NewProjectDialog /> : null}
           </div>
         </div>

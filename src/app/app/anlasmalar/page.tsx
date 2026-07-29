@@ -6,6 +6,8 @@ import { DAY_MS, msSince } from "@/lib/clock";
 import { DealBoard, type BoardDeal } from "./deal-board";
 import { NewDealDialog } from "./new-deal-dialog";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
+import { ExportCsvButton } from "@/components/app/export-csv-button";
+import { exportDealsCsv } from "@/app/actions/export";
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
@@ -165,7 +167,14 @@ export default async function DealsPage() {
               Yeni → nitelikli → müzakere → kazan/kayıp. Kazanıldığında komisyon otomatik üretilir.
             </p>
           </div>
-          {canCreate ? <NewDealDialog properties={properties ?? []} customers={customers ?? []} /> : null}
+          <div className="flex flex-wrap items-center gap-2">
+            <ExportCsvButton
+              label="Dışa aktar"
+              action={exportDealsCsv}
+              className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
+            />
+            {canCreate ? <NewDealDialog properties={properties ?? []} customers={customers ?? []} /> : null}
+          </div>
         </div>
         <div className="relative mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {/* KPI'lar tahtaya çapa: açık metrikler tahtanın başına, kazanılanlar

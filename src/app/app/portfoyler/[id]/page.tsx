@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowUpRight,
   Building2,
+  Eye,
   ExternalLink,
   FileCheck2,
   Gauge,
@@ -16,6 +17,7 @@ import {
   RadioTower,
   Siren,
   Sparkles,
+  TrendingUp,
   UserRound,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -26,6 +28,9 @@ import { moneyTry } from "@/lib/leak-shield";
 import { setPropertyStatus } from "@/app/actions/properties";
 import { ClosePortalDialog } from "@/app/app/portallar/portal-dialogs";
 import { confirmPortalListing } from "@/app/actions/portal-listings";
+import { getConfiguredPortals } from "@/app/actions/portal-publish";
+import type { PortalName } from "@/lib/integrations/portals";
+import { PortalListingActions } from "./portal-listing-actions";
 import { PropertyWorkflow } from "./property-workflow";
 import { EditPropertyDialog } from "./edit-property-dialog";
 import { DeletePropertyButton, ReassignProperty } from "./property-admin-actions";
@@ -37,7 +42,7 @@ import { PropertyMap } from "@/components/app/property-map";
 import { computePriceHealth } from "@/lib/price-health";
 import { isEndeksaConfigured } from "@/lib/integrations/endeksa";
 import { isTapusorConfigured } from "@/lib/integrations/tapusor";
-import { msSince, now } from "@/lib/clock";
+import { daysAgoIso, msSince, now } from "@/lib/clock";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import {
   ClosuresSection,
@@ -130,6 +135,9 @@ export default async function PropertyDetailPage({
     propertyTypeDefs,
     transactionTypeDefs,
     fxRates,
+    { data: viewRows },
+    { data: tenantRow },
+    configuredPortals,
   ] = await Promise.all([
     supabase
       .from("properties")
@@ -157,6 +165,12 @@ export default async function PropertyDetailPage({
     getDefinitions("transaction_type"),
     // TCMB kuru — yoksa null döner ve döviz satırı hiç basılmaz
     fetchLatestRates(supabase),
+    // Vitrin görüntülenme sayacı — RLS tenant'a kısıtlar; gün bazlı satırlar toplanır
+    supabase.from("listing_views").select("count, day").eq("property_id", id),
+    // Vitrin public URL'i için tenant slug'ı
+    supabase.from("tenants").select("slug").eq("id", tenantId).maybeSingle(),
+    // API yayın adaptörü tanımlı + anahtarı girili portallar (kaldır/güncelle için)
+    getConfiguredPortals(),
   ]);
 
   if (!property) notFound();
@@ -181,6 +195,27 @@ export default async function PropertyDetailPage({
   const pipelineHref = relatedDeal ? `/app/anlasmalar/${relatedDeal.id}` : "/app/anlasmalar";
   const livePortals = portals.filter((p) => p.status === "live");
   const overdue = livePortals.filter((p) => daysSince(p.last_confirmed_at) >= 7);
+
+  // Vitrin görüntülenme: gün bazlı sayaç satırları toplanır (yaklaşık — ISR).
+  const viewCounts = (viewRows ?? []) as { count: number | null; day: string }[];
+  const totalViews = viewCounts.reduce((s, r) => s + Number(r.count ?? 0), 0);
+  const sevenDayCut = daysAgoIso(7).slice(0, 10);
+  const views7d = viewCounts
+    .filter((r) => r.day >= sevenDayCut)
+    .reduce((s, r) => s + Number(r.count ?? 0), 0);
+  const vitrinSlug = (tenantRow as { slug?: string | null } | null)?.slug ?? null;
+  const isLiveListing = property.status === "live";
+  const vitrinHref = vitrinSlug && isLiveListing ? `/vitrin/${vitrinSlug}/${property.id}` : null;
+
+  // Kapanmış (satılan/kiralanan/arşiv) portföyde hâlâ canlı portal ilanı var mı?
+  const isClosedStatus = ["sold", "rented", "archived"].includes(property.status);
+
+  // Stored `portal_name` (ör. "Sahibinden") → yapılandırılmış PortalName eşlemesi.
+  const configuredSet = new Set(configuredPortals);
+  const portalKeyOf = (name: string): PortalName | null => {
+    const key = name.trim().toLowerCase() as PortalName;
+    return configuredSet.has(key) ? key : null;
+  };
 
   const features = (property.features ?? {}) as { rooms?: string | null; sqm?: number | null };
   const province = relName(property.province as Rel);
@@ -557,6 +592,19 @@ export default async function PropertyDetailPage({
           </div>
           <Link href="/app/portallar" className="text-xs font-semibold text-brand-600">Portal Kontrol</Link>
         </div>
+        {isClosedStatus && livePortals.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-3 border-b border-danger-500/20 bg-danger-500/[0.06] px-5 py-3.5">
+            <Siren className="h-5 w-5 shrink-0 text-danger-500" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-ink-950">
+                Portföy {statusOptions.find((o) => o.value === property.status)?.label?.toLocaleLowerCase("tr-TR") ?? property.status} ama {livePortals.length} portalda hâlâ yayında
+              </p>
+              <p className="mt-0.5 text-xs text-text-muted">
+                Yanlış aramaları ve kayıp-kaçak riskini önlemek için ilanı portallardan kaldırın ya da kapanış formunu doldurun.
+              </p>
+            </div>
+          </div>
+        ) : null}
         {portals.length === 0 ? (
           <p className="px-5 py-10 text-center text-sm text-text-muted">
             Bu portföye henüz portal bağlanmamış. Portal Kontrol’den ilan no veya link ekleyin.
@@ -566,6 +614,8 @@ export default async function PropertyDetailPage({
             {portals.map((p) => {
               const overdueDays = daysSince(p.last_confirmed_at);
               const isLive = p.status === "live";
+              const portalKey = portalKeyOf(p.portal_name);
+              const canApi = isLive && canEdit && portalKey !== null && Boolean(p.portal_listing_id);
               return (
                 <article key={p.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[1.3fr_1fr_auto] lg:items-center">
                   <div>
@@ -600,6 +650,15 @@ export default async function PropertyDetailPage({
                           </button>
                         </form>
                         <ClosePortalDialog listingId={p.id} label={`${p.portal_name} · ${property.property_code}`} />
+                        {canApi ? (
+                          <PortalListingActions
+                            propertyId={property.id}
+                            listingId={p.id}
+                            portalKey={portalKey!}
+                            externalId={p.portal_listing_id!}
+                            portalLabel={p.portal_name}
+                          />
+                        ) : null}
                       </>
                     ) : null}
                   </div>
@@ -608,6 +667,69 @@ export default async function PropertyDetailPage({
             })}
           </div>
         )}
+      </section>
+
+      {/* Vitrin görüntülenme — listing_views gün bazlı sayacın toplamı (yaklaşık, ISR) */}
+      <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
+          <div>
+            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+              <Eye className="h-4 w-4 text-brand-600" /> Vitrin görüntülenme
+            </h2>
+            <p className="text-xs text-text-muted">Halka açık ilan sayfasının izlenme sayacı (yaklaşık — vitrin 2 dk önbellekli)</p>
+          </div>
+          {vitrinHref ? (
+            <a href={vitrinHref} target="_blank" rel="noreferrer" className="focus-ring inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">
+              Vitrindeki ilanı aç <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          ) : null}
+        </div>
+        <div className="grid gap-4 p-5 sm:grid-cols-[auto_1fr] sm:items-center">
+          <div className="flex items-center gap-4">
+            {vitrinHref ? (
+              <a href={vitrinHref} target="_blank" rel="noreferrer" className="focus-ring press group rounded-[16px] border border-line bg-canvas/60 px-5 py-3 text-center transition hover:border-brand-300">
+                <p className="font-display text-3xl font-extrabold tabular-nums text-ink-950 transition group-hover:text-brand-600">{totalViews.toLocaleString("tr-TR")}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">toplam görüntülenme</p>
+              </a>
+            ) : (
+              <div className="rounded-[16px] border border-line bg-canvas/60 px-5 py-3 text-center">
+                <p className="font-display text-3xl font-extrabold tabular-nums text-ink-950">{totalViews.toLocaleString("tr-TR")}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">toplam görüntülenme</p>
+              </div>
+            )}
+            <div className="rounded-[16px] border border-line bg-canvas/60 px-5 py-3 text-center">
+              <p className="flex items-center justify-center gap-1 font-display text-3xl font-extrabold tabular-nums text-ink-950">
+                <TrendingUp className="h-4 w-4 text-mint-600" />{views7d.toLocaleString("tr-TR")}
+              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">son 7 gün</p>
+            </div>
+          </div>
+          {isLiveListing && totalViews === 0 ? (
+            <div className="flex items-start gap-3 rounded-[14px] border border-amber-400/30 bg-amber-400/[0.07] px-4 py-3">
+              <Siren className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <div>
+                <p className="text-sm font-semibold text-ink-950">Yayında ama henüz hiç görüntülenmemiş</p>
+                <p className="mt-0.5 text-xs text-text-muted">
+                  Vitrinde canlı olmasına rağmen izlenme yok. Kapak fotoğrafı, başlık ve fiyatı gözden geçirip ilanı portallarda paylaşın.
+                </p>
+              </div>
+            </div>
+          ) : !isLiveListing ? (
+            <div className="flex items-start gap-3 rounded-[14px] border border-line bg-canvas/50 px-4 py-3">
+              <Eye className="mt-0.5 h-4 w-4 shrink-0 text-text-faint" />
+              <p className="text-xs text-text-muted">
+                Portföy vitrinde yayında değil (durum: {statusOptions.find((o) => o.value === property.status)?.label ?? property.status}). Sayaç, ilan tekrar yayına alındığında işlemeye devam eder.
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-start gap-3 rounded-[14px] border border-mint-500/25 bg-mint-500/[0.06] px-4 py-3">
+              <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-mint-600" />
+              <p className="text-xs text-text-muted">
+                Vitrin ilanı canlı ve izleniyor. Son 7 günde <span className="font-semibold text-ink-950">{views7d.toLocaleString("tr-TR")}</span> görüntülenme aldı.
+              </p>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* Kapanış / kayıp kayıtları — kayıt yoksa bölüm hiç çizilmez, fallback de yok */}

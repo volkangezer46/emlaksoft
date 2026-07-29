@@ -463,9 +463,12 @@ export default async function SupportPage({
             </span>
             <p className="relative mt-3 font-display font-bold text-ink-950">Henüz talep yok</p>
             <p className="relative mt-1 max-w-sm text-sm text-text-muted">
-              Fatura, kurulum veya teknik bir konuda yardıma mı ihtiyacınız var? Yukarıdaki &quot;Yeni talep&quot;
-              düğmesiyle ilk destek talebinizi oluşturun.
+              Fatura, kurulum veya teknik bir konuda yardıma mı ihtiyacınız var? Aşağıdaki düğmeyle
+              ilk destek talebinizi oluşturun; ekibimiz en geç 1 iş günü içinde döner.
             </p>
+            <div className="relative mt-5">
+              <NewTicketDialog categoryOptions={categoryOptions} />
+            </div>
           </div>
         ) : pageRows.length === 0 ? (
           <div className="grid place-items-center px-6 py-14 text-center">

@@ -162,7 +162,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   ] = await Promise.all([
     supabase
       .from("customers")
-      .select("id, full_name, phone, email, customer_types, tags, source, notes, blacklist, created_at, province_id, district_id, birth_date, anniversary_date, anniversary_note, is_foreign, nationality, province:geo_provinces(name), district:geo_districts(name)")
+      .select("id, full_name, phone, email, customer_types, tags, source, lead_source, lead_source_detail, notes, blacklist, created_at, province_id, district_id, birth_date, anniversary_date, anniversary_note, is_foreign, nationality, province:geo_provinces(name), district:geo_districts(name)")
       .eq("id", id)
       .is("deleted_at", null)
       .maybeSingle(),
@@ -685,6 +685,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         tags={tags}
         notes={customer.notes}
         source={customer.source}
+        sourceDetail={customer.lead_source_detail}
         createdAt={customer.created_at}
         audit={audit}
         deals={(dealsData ?? []).map((d) => ({

@@ -142,6 +142,7 @@ export function Customer360Tabs({
   tags,
   notes,
   source,
+  sourceDetail = null,
   createdAt,
   audit,
   deals = [],
@@ -163,6 +164,7 @@ export function Customer360Tabs({
   tags: string[];
   notes: string | null;
   source: string | null;
+  sourceDetail?: string | null;
   createdAt: string;
   audit: { id: string; action: string; created_at: string }[];
   deals?: DealRow[];
@@ -437,7 +439,14 @@ export function Customer360Tabs({
             </h2>
             <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-text-muted">{notes || "Not eklenmedi."}</p>
             <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4 text-xs text-text-faint">
-              <span>Kaynak: {source || "belirtilmedi"}</span>
+              <span>
+                Kaynak: {source || "belirtilmedi"}
+                {sourceDetail ? (
+                  <span className="ml-1 rounded-full bg-brand-600/10 px-1.5 py-0.5 font-semibold text-brand-700">
+                    {sourceDetail}
+                  </span>
+                ) : null}
+              </span>
               <span>·</span>
               <span>Kayıt: {dateTime(createdAt)}</span>
             </div>

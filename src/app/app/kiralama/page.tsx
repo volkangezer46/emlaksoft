@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { ApplyIncreaseDialog } from "./apply-increase-dialog";
 import { NewRentalDialog } from "./new-rental-dialog";
+import { ExportCsvButton } from "@/components/app/export-csv-button";
+import { exportRentalsCsv } from "@/app/actions/export";
 
 export const metadata = { title: "Kiralama" };
 
@@ -251,6 +253,11 @@ export default async function KiralamaPage({
             >
               Kira artış hesaplayıcı
             </Link>
+            <ExportCsvButton
+              label="Dışa aktar"
+              action={exportRentalsCsv.bind(null, { durum: durumF, ariza: arizaF ? "acik" : "", evre: evreF })}
+              className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
+            />
             {canCreate ? <NewRentalDialog
                 /* Kazanılan kira anlaşması köprüsü: ?portfoy=&musteri=&tutar= */
                 properties={dialogProperties}
