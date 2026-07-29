@@ -77,7 +77,7 @@ export function AdminTopbar({
   const quickItems = QUICK.filter((q) => modules.includes(q.module));
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-line/80 bg-surface/85 px-4 backdrop-blur-xl md:px-6">
+    <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-line/80 bg-surface/85 pl-16 pr-4 backdrop-blur-xl md:px-6">
       {/* Sol: logo + başlık — sabit genişlik */}
       <div className="flex w-52 shrink-0 items-center gap-3">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-amber-400/15 text-amber-600">

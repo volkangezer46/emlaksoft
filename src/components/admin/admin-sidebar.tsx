@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import {
   Activity,
   BarChart3,
@@ -12,11 +13,13 @@ import {
   LifeBuoy,
   MapPin,
   Megaphone,
+  Menu,
   Radar,
   Shield,
   ShieldCheck,
   Sparkles,
   Users,
+  X,
 } from "lucide-react";
 import {
   platformModulesFor,
@@ -97,6 +100,7 @@ export function AdminSidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [open, setOpen] = useState(false);
   const allowed = platformModulesFor(role);
 
   const sections = SECTIONS.map((s) => ({
@@ -104,8 +108,11 @@ export function AdminSidebar({
     items: s.items.filter((i) => allowed.includes(i.module)),
   })).filter((s) => s.items.length > 0);
 
-  return (
-    <aside className="hidden w-[264px] shrink-0 flex-col border-r border-white/6 bg-[linear-gradient(180deg,#0a1224_0%,#050b16_55%,#07101f_100%)] md:flex">
+  // Mobil alt gezinme: erişilebilir ilk dört rota + menü çekmecesi.
+  const tabItems = sections.flatMap((s) => s.items).slice(0, 4);
+
+  const content = (
+    <aside className="flex h-full w-full flex-col bg-[linear-gradient(180deg,#0a1224_0%,#050b16_55%,#07101f_100%)]">
       <div className="relative flex h-14 items-center gap-3 overflow-hidden border-b border-white/8 px-5">
         <div className="pointer-events-none absolute -right-6 -top-8 h-24 w-24 rounded-full bg-amber-400/15 blur-2xl" />
         <span className="relative grid h-10 w-10 place-items-center rounded-[12px] bg-amber-400 shadow-[0_0_24px_-4px_rgba(251,191,36,0.65)]">
@@ -134,6 +141,7 @@ export function AdminSidebar({
                     key={item.href}
                     href={item.href}
                     prefetch
+                    onClick={() => setOpen(false)}
                     onMouseEnter={() => router.prefetch(item.href)}
                     onFocus={() => router.prefetch(item.href)}
                     className={`group relative flex items-center gap-3 overflow-hidden rounded-[12px] px-3 py-2.5 text-sm transition ${
@@ -185,10 +193,71 @@ export function AdminSidebar({
             <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-400" /> Operasyon oturumu açık
           </div>
         </div>
-        <Link href="/app" className="mt-3 block text-[11px] font-semibold text-white/70 transition hover:text-white">
+        <Link href="/app" onClick={() => setOpen(false)} className="mt-3 block text-[11px] font-semibold text-white/70 transition hover:text-white">
           ← Ofis paneline dön
         </Link>
       </div>
     </aside>
+  );
+
+  return (
+    <>
+      {/* Mobil: hamburger (amber, admin teması) — masaüstünde gizli */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Admin menüsünü aç"
+        className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-10 w-10 place-items-center rounded-[11px] bg-amber-400 text-ink-950 shadow-[0_0_24px_-6px_rgba(251,191,36,0.7)] md:hidden"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+
+      {/* Masaüstü sabit sidebar */}
+      <div className="hidden w-[264px] shrink-0 border-r border-white/6 md:block">{content}</div>
+
+      {/* Mobil çekmece */}
+      {open ? (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <button type="button" aria-label="Menüyü kapat" onClick={() => setOpen(false)} className="absolute inset-0 bg-ink-950/60 backdrop-blur-sm" />
+          <div className="relative h-full w-[280px] shadow-[var(--shadow-lg)]">
+            <button type="button" onClick={() => setOpen(false)} className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-[10px] bg-white/8 text-white/70" aria-label="Kapat"><X className="h-5 w-5" /></button>
+            {content}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Mobil alt gezinme */}
+      <nav
+        aria-label="Admin hızlı gezinme"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/8 bg-[#0a1224]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
+      >
+        <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}>
+          {tabItems.map((tab) => {
+            const active = tab.href === "/admin" ? pathname === "/admin" : pathname.startsWith(tab.href);
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                onClick={() => setOpen(false)}
+                className={`flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold transition ${active ? "text-amber-300" : "text-white/55 hover:text-white"}`}
+              >
+                <span className={`grid h-7 w-11 place-items-center rounded-full transition ${active ? "bg-amber-400/15" : ""}`}>
+                  <tab.icon className="h-[18px] w-[18px]" />
+                </span>
+                <span className="max-w-full truncate px-0.5">{tab.label}</span>
+              </Link>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold text-white/55 transition hover:text-white"
+          >
+            <span className="grid h-7 w-11 place-items-center rounded-full"><Menu className="h-[18px] w-[18px]" /></span>
+            Menü
+          </button>
+        </div>
+      </nav>
+    </>
   );
 }
