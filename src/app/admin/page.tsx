@@ -15,6 +15,7 @@ import {
   Users,
   Zap,
 } from "lucide-react";
+import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformStaff } from "@/lib/platform";
 import { CountUp } from "@/components/admin/count-up";
@@ -34,6 +35,37 @@ import { msUntil } from "@/lib/clock";
 
 const RING_C = 2 * Math.PI * 42;
 
+/**
+ * Kontrol paneli ağır okumaları (tenants≤2000, subs≤5000, ticket/audit/count) —
+ * platform geneli, saniye-taze olması gerekmez. 60 sn `unstable_cache`: art arda
+ * gezinmelerde bu 6 sorgu tekrar koşmaz, panel önbellekten anında gelir. Zaman
+ * bağımlı hesaplar (msUntil, weekBuckets) sayfada per-request çalışmaya devam eder.
+ */
+const getAdminDashboardData = unstable_cache(
+  async () => {
+    const admin = createAdminClient();
+    const [{ data: tenants }, { count: memberCount }, { data: tickets }, { data: subs }, { data: audit }, { count: newDemos }] =
+      await Promise.all([
+        admin.from("tenants").select("id, name, plan, status, created_at, trial_ends_at").order("created_at", { ascending: false }).limit(2000),
+        admin.from("profiles").select("id", { count: "exact", head: true }),
+        admin.from("support_tickets").select("id, status, priority, created_at").order("created_at", { ascending: false }).limit(80),
+        admin.from("subscriptions").select("status, amount_try, plan, created_at").limit(5000),
+        admin.from("audit_logs").select("action, entity_type, actor_id, tenant_id, created_at, tenant:tenants(name)").order("created_at", { ascending: false }).limit(10),
+        admin.from("demo_requests").select("id", { count: "exact", head: true }).eq("status", "new"),
+      ]);
+    return {
+      tenants: tenants ?? [],
+      memberCount: memberCount ?? 0,
+      tickets: tickets ?? [],
+      subs: subs ?? [],
+      audit: audit ?? [],
+      newDemos: newDemos ?? 0,
+    };
+  },
+  ["admin-dashboard-v1"],
+  { revalidate: 60, tags: ["admin-dashboard"] },
+);
+
 const planPrice: Record<string, number> = { advisor: 990, office: 2490, professional: 5990, enterprise: 12900 };
 const planLabel: Record<string, string> = { advisor: "Danışman", office: "Ofis", professional: "Profesyonel", enterprise: "Kurumsal" };
 const statusLabel: Record<string, string> = { trial: "Deneme", active: "Aktif", past_due: "Gecikmiş", suspended: "Askıda", cancelled: "İptal" };
@@ -45,22 +77,12 @@ export default async function AdminHomePage() {
   if (staff.role === "billing") return <BillingHome staffName={staff.full_name} />;
   if (staff.role === "support") return <SupportHome staffName={staff.full_name} />;
 
-  const admin = createAdminClient();
+  const { tenants, memberCount, tickets, subs, audit, newDemos } = await getAdminDashboardData();
 
-  const [{ data: tenants }, { count: memberCount }, { data: tickets }, { data: subs }, { data: audit }, { count: newDemos }] =
-    await Promise.all([
-      admin.from("tenants").select("id, name, plan, status, created_at, trial_ends_at").order("created_at", { ascending: false }).limit(2000),
-      admin.from("profiles").select("id", { count: "exact", head: true }),
-      admin.from("support_tickets").select("id, status, priority, created_at").order("created_at", { ascending: false }).limit(80),
-      admin.from("subscriptions").select("status, amount_try, plan, created_at").limit(5000),
-      admin.from("audit_logs").select("action, entity_type, actor_id, tenant_id, created_at, tenant:tenants(name)").order("created_at", { ascending: false }).limit(10),
-      admin.from("demo_requests").select("id", { count: "exact", head: true }).eq("status", "new"),
-    ]);
-
-  const list = tenants ?? [];
-  const ticketRows = tickets ?? [];
-  const subRows = subs ?? [];
-  const auditRows = audit ?? [];
+  const list = tenants;
+  const ticketRows = tickets;
+  const subRows = subs;
+  const auditRows = audit;
 
   const active = list.filter((t) => t.status === "active").length;
   const trial = list.filter((t) => t.status === "trial").length;
