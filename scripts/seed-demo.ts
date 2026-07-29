@@ -493,6 +493,41 @@ async function main() {
     return (await insertRows("deals", rows)).length;
   });
 
+  // Kayıp Satış Dedektörü demosu için ek kayıp anlaşmalar (çeşitli gerekçeler).
+  // section() kullanmıyoruz (deals tablosu paylaşımlı); idempotency loss_reason
+  // marker'ıyla: aynı gerekçe zaten varsa atlanır.
+  {
+    const { data: existingLost } = await admin
+      .from("deals")
+      .select("loss_reason")
+      .eq("tenant_id", tenantId)
+      .eq("stage", "lost");
+    const seenReasons = new Set((existingLost ?? []).map((d) => d.loss_reason));
+    const extra = [
+      { prop: "DEMO-004", cust: "Zeynep Aydın", value: 8200000, daysAgo: 12, loss: "Finansman/kredi onaylanmadı" },
+      { prop: "DEMO-007", cust: "Mustafa Çelik", value: 15500000, daysAgo: 21, loss: "Fiyat anlaşmazlığı — bütçe yetersiz" },
+      { prop: "DEMO-008", cust: "Hatice Yıldız", value: 4300000, daysAgo: 30, loss: "Müşteri karardan vazgeçti" },
+    ].filter((d) => !seenReasons.has(d.loss));
+    if (extra.length) {
+      const rows = extra.map((d) => ({
+        tenant_id: tenantId,
+        property_id: propByCode(d.prop),
+        customer_id: custByName(d.cust),
+        deal_type: "sale",
+        stage: "lost",
+        deal_value: d.value,
+        probability: 0,
+        loss_reason: d.loss,
+        assigned_to: advisorId,
+        created_at: iso(daysFromNow(-d.daysAgo, 11)),
+      }));
+      const n = (await insertRows("deals", rows)).length;
+      console.log(`✓ Ek kayıp anlaşmalar: ${n} kayıt üretildi`);
+    } else {
+      console.log("✓ Ek kayıp anlaşmalar: mevcut (atlandı)");
+    }
+  }
+
   const { data: dealsData } = await admin
     .from("deals")
     .select("id, stage, deal_value, deal_type, property_id")
