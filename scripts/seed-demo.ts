@@ -1004,6 +1004,54 @@ async function main() {
     return (await insertRows("referrals", rows)).length;
   });
 
+  // ---------------- Onay talepleri ----------------
+  await section("Onay talepleri", "approval_requests", tenantId, 4, async () => {
+    const specs: Array<{
+      kind: string; title: string; description: string; amount?: number;
+      current?: number; requested?: number; status: string; daysAgo: number; note?: string;
+    }> = [
+      { kind: "komisyon_indirimi", title: "DEMO-001 komisyon indirimi", description: "Müşteri sadakati için komisyon %3 → %2.5 talebi.", current: 3, requested: 2.5, status: "bekliyor", daysAgo: 1 },
+      { kind: "gider", title: "Vitrin reklam bütçesi", description: "Sahibinden vitrin paketi için ek bütçe.", amount: 4500, status: "bekliyor", daysAgo: 2 },
+      { kind: "fiyat_degisikligi", title: "DEMO-006 fiyat güncellemesi", description: "Piyasa geri bildirimiyle liste fiyatı düşürülsün.", current: 5200000, requested: 4950000, status: "onaylandi", daysAgo: 6, note: "Piyasa uygun, onaylandı." },
+      { kind: "ozel_izin", title: "Hafta sonu ek gösterim izni", description: "Cumartesi 3 ek gösterim için mesai onayı.", status: "bekliyor", daysAgo: 0 },
+    ];
+    const rows = specs.map((s) => ({
+      tenant_id: tenantId,
+      kind: s.kind,
+      title: s.title,
+      description: s.description,
+      amount: s.amount ?? null,
+      current_value: s.current ?? null,
+      requested_value: s.requested ?? null,
+      status: s.status,
+      requested_by: advisorId,
+      decided_by: s.status === "onaylandi" ? ownerId : null,
+      decided_at: s.status === "onaylandi" ? iso(daysFromNow(-s.daysAgo + 1, 12)) : null,
+      decision_note: s.note ?? null,
+      created_at: iso(daysFromNow(-s.daysAgo, 9)),
+    }));
+    return (await insertRows("approval_requests", rows)).length;
+  });
+
+  // ---------------- Duyurular ----------------
+  await section("Duyurular", "announcements", tenantId, 3, async () => {
+    const rows = [
+      { level: "success", title: "Temmuz rekoru!", body: "Bu ay 6 satış kapattık — geçen ayın 2 katı. Herkese teşekkürler 🎉", pinned: true, daysAgo: 1 },
+      { level: "info", title: "Yeni portal entegrasyonu", body: "Artık ilanlarınızı tek tıkla Sahibinden ve Hepsiemlak'a gönderebilirsiniz.", pinned: false, daysAgo: 4 },
+      { level: "warning", title: "İYS izin kontrolü", body: "Toplu mesaj öncesi müşteri İYS izinlerini kontrol edin; izinsiz gönderim yasal risk.", pinned: false, daysAgo: 8 },
+    ].map((a) => ({
+      tenant_id: tenantId,
+      title: a.title,
+      body: a.body,
+      level: a.level,
+      pinned: a.pinned,
+      starts_at: iso(daysFromNow(-a.daysAgo, 9)),
+      created_by: ownerId,
+      created_at: iso(daysFromNow(-a.daysAgo, 9)),
+    }));
+    return (await insertRows("announcements", rows)).length;
+  });
+
   // ---------------- Bildirimler ----------------
   await section("Bildirimler", "notifications", tenantId, 3, async () => {
     const rows = [
