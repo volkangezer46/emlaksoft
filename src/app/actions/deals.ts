@@ -93,6 +93,29 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
 
   if (!existing) return { error: "Anlaşma bulunamadı." };
 
+  // C.6 — "Won"dan geri alma (yanlış kazanıldı işareti). Otomatik üretilen
+  // komisyon henüz tahsil edilmişse aşama düşürülemez (hayalet/çelişik kayıt
+  // olmasın); tahsil edilmemişse aşağıda temizlenir.
+  const leavingWon = existing.stage === "won" && stage !== "won";
+  let autoCommissionId: string | null = null;
+  if (leavingWon) {
+    const { data: comm } = await supabase
+      .from("commissions")
+      .select("id, status")
+      .eq("deal_id", id)
+      .eq("tenant_id", gate.tenantId)
+      .maybeSingle();
+    if (comm) {
+      if (comm.status === "paid" || comm.status === "collected") {
+        return {
+          error:
+            "Bu anlaşmanın komisyonu tahsil edilmiş. Aşamayı düşürmeden önce Komisyon ekranından tahsilatı geri alın.",
+        };
+      }
+      autoCommissionId = comm.id; // 'calculated' → geri almada silinir
+    }
+  }
+
   const { error } = await supabase
     .from("deals")
     .update({
@@ -114,6 +137,43 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
     oldValue: { stage: existing.stage },
     newValue: { stage, loss_reason: lossReason },
   });
+
+  // C.6 — "Won"dan çıkış temizliği: tahsil edilmemiş otomatik komisyonu sil ve
+  // bu anlaşmanın win'iyle 'sold'/'rented' olmuş portföyü (başka kazanılmış
+  // anlaşması yoksa) 'active'e geri döndür.
+  if (leavingWon) {
+    if (autoCommissionId) {
+      await supabase.from("commissions").delete().eq("id", autoCommissionId).eq("tenant_id", gate.tenantId);
+    }
+    if (existing.property_id) {
+      const { data: otherWon } = await supabase
+        .from("deals")
+        .select("id")
+        .eq("tenant_id", gate.tenantId)
+        .eq("property_id", existing.property_id)
+        .eq("stage", "won")
+        .neq("id", id)
+        .limit(1)
+        .maybeSingle();
+      if (!otherWon) {
+        const { data: p } = await supabase
+          .from("properties")
+          .select("status")
+          .eq("id", existing.property_id)
+          .eq("tenant_id", gate.tenantId)
+          .maybeSingle();
+        if (p && (p.status === "sold" || p.status === "rented")) {
+          await supabase
+            .from("properties")
+            .update({ status: "active", updated_at: new Date().toISOString() })
+            .eq("id", existing.property_id)
+            .eq("tenant_id", gate.tenantId);
+        }
+      }
+    }
+    revalidatePath("/app/komisyon");
+    revalidatePath("/app/portfoyler");
+  }
 
   // Otomasyon tetikle — hata ana işlemi asla bozmasın
   if (stage === "lost" && existing.stage !== "lost") {

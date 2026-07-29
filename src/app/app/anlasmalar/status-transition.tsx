@@ -13,6 +13,12 @@ const FLOW: { from: DealStage; to: DealStage; label: string; tone: string }[] = 
   { from: "negotiation", to: "lost", label: "Kaybedildi", tone: "bg-danger-500" },
   { from: "qualified", to: "lost", label: "Kaybedildi", tone: "bg-danger-500" },
   { from: "new", to: "lost", label: "Kaybedildi", tone: "bg-danger-500" },
+  // Geri alma (C.6) — yanlış işaretlenen kazanma/kayıp müzakereye döndürülür.
+  // Kazanmayı geri alınca tahsil edilmemiş otomatik komisyon silinir ve portföy
+  // durumu 'active'e döner (bkz. actions/deals.ts updateDealStage). Tahsil edilmiş
+  // komisyon varsa action engeller.
+  { from: "won", to: "negotiation", label: "Kazanmayı geri al", tone: "bg-amber-500" },
+  { from: "lost", to: "negotiation", label: "Yeniden aç", tone: "bg-amber-500" },
 ];
 
 /** Tahta DnD'si de aynı kuralları izlesin diye tek kaynak: butonlarda hangi

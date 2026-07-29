@@ -195,7 +195,13 @@ yeniden çıkarmak için `src/lib/definitions.ts` + `getDefinitions` çağrılar
 - ✅ **DÜZELTİLDİ (2026-07-29):** Ekip üyesi sayfasına **"İş yükünü devret"** paneli — üyenin TÜM
   aktif müşteri + portföyünü başka danışmana tek işlemde aktarır (`handoffMemberWorkload`, iki toplu
   update + denetim kaydı; `team:edit` olana). Onay adımlı client bileşen. Demo veride panel+select render doğrulandı.
-- Silinen kayıtlar için geri yükleme ekranı yok; `won/lost` anlaşma ve müşteri birleştirme geri alınamaz.
+- ~~Silinen kayıtlar için geri yükleme ekranı yok~~ → **ZATEN VAR** (`ayarlar/cop-kutusu`: silinen
+  müşteri/portföy 90 gün geri yüklenebilir; `restoreCustomer`/`restoreProperty`).
+- ✅ **DÜZELTİLDİ (2026-07-29):** `won/lost` anlaşma **geri alınabilir**. FLOW'a "Kazanmayı geri al" /
+  "Yeniden aç" (won/lost → negotiation) geçişleri eklendi; `updateDealStage` won'dan çıkışta tahsil
+  edilmemiş otomatik komisyonu siler + portföyü 'active'e döndürür (başka won yoksa). Tahsil edilmiş
+  komisyon varsa engeller. DB rollback + UI (won kartında seçenek) doğrulandı.
+- ⏳ Müşteri **birleştirme** geri alma hâlâ yok (merge öncesi snapshot gerektirir — ayrı iş).
 
 **D. Ölü veri denetimi yarım kaldı** — yazılıp okunmayan tablo/kolonlar, hiçbir yerden linklenmeyen
 ekranlar, çağrılmayan action'lar, cron çıktısının ekranda görünmediği yerler. Yeniden koşulmalı.
