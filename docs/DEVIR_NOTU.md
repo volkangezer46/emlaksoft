@@ -178,7 +178,9 @@ yeniden çıkarmak için `src/lib/definitions.ts` + `getDefinitions` çağrılar
   CSV ~25 listede yok · `EmptyState` 55 sayfada yok, olanların yarısında yönlendirici aksiyon yok.
 
 **C. Akış kopuklukları** (uçtan uca denetim, kalanlar):
-- Proje birim satışı `deals`/`commissions`'a bağlanmıyor → ciro/komisyon/lig raporlarında görünmüyor.
+- ✅ **DÜZELTİLDİ (2026-07-29):** Proje birim satışı artık `deals`(won/sale) + `commissions`
+  üretiyor (property'siz, deal_value=list_price, ofis varsayılan komisyonu, deal notunda proje/daire).
+  `sellUnit` → `recordProjectSaleDeal`. DB rollback testiyle insert'ler doğrulandı. Ciro/komisyon/lig'de görünür.
 - Ofisler arası ağda `commission_share_pct` kabul edilse de komisyon paylaşımına yazılmıyor.
 - Kira sözleşmesi başlayınca/bitince portföy durumu yönetilmiyor; depozito iadesi yok.
 - Kayıp-kaçak ekranı salt okunur (kurtarma aksiyonu yok; kayıp-satışta var).
