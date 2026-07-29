@@ -13,6 +13,8 @@ import {
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { formatTurkishPhone } from "@/lib/phone";
+import { MemberHandoff } from "./member-handoff";
+import { ArrowLeftRight } from "lucide-react";
 
 const ROLE_LABELS: Record<string, string> = {
   owner: "Ofis sahibi",
@@ -36,7 +38,8 @@ function initials(name: string) {
 }
 
 export default async function TeamMemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireModulePage("team");
+  const { perms } = await requireModulePage("team");
+  const canHandoff = (perms.team ?? []).includes("edit");
   const { id } = await params;
   const supabase = await createClient();
 
@@ -53,6 +56,7 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
     { data: commissions },
     { count: apptCount },
     { count: callCount },
+    { data: advisorRows },
   ] = await Promise.all([
     supabase.from("profiles").select("id, full_name, phone, role, is_active, created_at, branch:branches(name)").eq("id", id).maybeSingle(),
     supabase.from("customers").select("id", { count: "exact", head: true }).eq("assigned_to", id).is("deleted_at", null),
@@ -62,9 +66,12 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
     supabase.from("commissions").select("gross_amount, status, deal:deals(assigned_to)").gte("created_at", monthStart.toISOString()).limit(500),
     supabase.from("appointments").select("id", { count: "exact", head: true }).eq("assigned_to", id).gte("scheduled_at", monthStart.toISOString()),
     supabase.from("calls").select("id", { count: "exact", head: true }).eq("handled_by", id).gte("started_at", monthStart.toISOString()),
+    // Devralabilecek aktif danışmanlar (bu üye hariç) — iş yükü devri paneli için
+    supabase.from("profiles").select("id, full_name").eq("is_active", true).neq("id", id).order("full_name"),
   ]);
 
   if (!member) notFound();
+  const advisors = (advisorRows ?? []) as { id: string; full_name: string }[];
 
   // Bu danışmana ait komisyonlar (deal.assigned_to eşleşmesi)
   const myCommission = (commissions ?? []).reduce((sum, c) => {
@@ -141,6 +148,26 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
           </Link>
         ))}
       </div>
+
+      {/* İş yükü devri — ayrılan/pasife alınan danışmanın müşteri + portföyünü aktar (C.5) */}
+      {canHandoff ? (
+        <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+            <ArrowLeftRight className="h-4 w-4 text-brand-600" /> İş yükünü devret
+          </h2>
+          <p className="mt-1 mb-3 text-xs text-text-muted">
+            {member.full_name} ekipten ayrılıyorsa müşteri ve portföylerini başka bir danışmana aktarın —
+            hiçbir kayıt sahipsiz kalmasın.
+          </p>
+          <MemberHandoff
+            fromId={id}
+            fromName={member.full_name}
+            advisors={advisors}
+            customerCount={customerCount ?? 0}
+            propertyCount={propertyCount ?? 0}
+          />
+        </section>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Müşteriler */}

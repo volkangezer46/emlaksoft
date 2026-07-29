@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+import { logActivity } from "@/lib/activity";
 import { isValidOptionalTurkishMobile, normalizeTurkishPhone, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
 
 export type TeamResult = { error?: string; ok?: boolean };
@@ -227,4 +228,66 @@ export async function setBranchAction(formData: FormData): Promise<void> {
 
 export async function deleteBranchAction(formData: FormData): Promise<void> {
   await deleteBranch(formData);
+}
+
+/**
+ * İş yükü devri — bir danışmanın (ör. ekipten ayrılan) TÜM aktif müşteri VE
+ * portföylerini başka bir danışmana tek işlemde aktarır. Önceden yalnız müşteri
+ * toplu ataması vardı (bulkAssignCustomers); portföy devri hiç yoktu → ayrılan
+ * kişinin portföyleri sahipsiz kalıyordu. İki toplu update + tek denetim kaydı.
+ */
+export async function handoffMemberWorkload(formData: FormData): Promise<TeamResult> {
+  const gate = await requirePermission("team", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const from = String(formData.get("from") ?? "").trim();
+  const to = String(formData.get("to") ?? "").trim();
+  if (!from || !to) return { error: "Devreden ve devralan danışman seçilmelidir." };
+  if (from === to) return { error: "İş yükü aynı danışmana devredilemez." };
+
+  const supabase = await createClient();
+
+  // Devralan aynı ofiste ve aktif mi? (RLS zaten tenant'ı kısıtlar; yine de doğrula)
+  const { data: target } = await supabase
+    .from("profiles")
+    .select("id, is_active, full_name")
+    .eq("id", to)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!target) return { error: "Devralan danışman bulunamadı." };
+  if (!target.is_active) return { error: "Devralan danışman pasif — önce aktifleştirin." };
+
+  const [{ error: cErr, count: cCount }, { error: pErr, count: pCount }] = await Promise.all([
+    supabase
+      .from("customers")
+      .update({ assigned_to: to }, { count: "exact" })
+      .eq("tenant_id", gate.tenantId)
+      .eq("assigned_to", from)
+      .is("deleted_at", null),
+    supabase
+      .from("properties")
+      .update({ assigned_to: to, updated_at: new Date().toISOString() }, { count: "exact" })
+      .eq("tenant_id", gate.tenantId)
+      .eq("assigned_to", from)
+      .is("deleted_at", null),
+  ]);
+  if (cErr || pErr) {
+    console.error("handoffMemberWorkload", cErr ?? pErr);
+    return { error: "Devir sırasında hata oluştu." };
+  }
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "team.handoff",
+    entityType: "profile",
+    entityId: from,
+    newValue: { to, to_name: target.full_name, customers: cCount ?? 0, properties: pCount ?? 0 },
+  });
+
+  revalidatePath("/app/musteriler");
+  revalidatePath("/app/portfoyler");
+  revalidatePath(`/app/ekip/${from}`);
+  revalidatePath(`/app/ekip/${to}`);
+  return { ok: true };
 }

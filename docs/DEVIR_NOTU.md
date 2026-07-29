@@ -186,7 +186,9 @@ yeniden çıkarmak için `src/lib/definitions.ts` + `getDefinitions` çağrılar
 - ✅ **DÜZELTİLDİ (2026-07-29):** Kayıp-kaçak risk sıralamasına **"Teyit et"** kurtarma aksiyonu
   eklendi (mevcut `confirmPortalListing` action'ı; `portals:edit` olana görünür). İlan teyitlenip
   gecikmiş listeden düşer. Demo veride 3 buton render doğrulandı.
-- Ekip çıkışında portföy devri yok (müşteri devri var).
+- ✅ **DÜZELTİLDİ (2026-07-29):** Ekip üyesi sayfasına **"İş yükünü devret"** paneli — üyenin TÜM
+  aktif müşteri + portföyünü başka danışmana tek işlemde aktarır (`handoffMemberWorkload`, iki toplu
+  update + denetim kaydı; `team:edit` olana). Onay adımlı client bileşen. Demo veride panel+select render doğrulandı.
 - Silinen kayıtlar için geri yükleme ekranı yok; `won/lost` anlaşma ve müşteri birleştirme geri alınamaz.
 
 **D. Ölü veri denetimi yarım kaldı** — yazılıp okunmayan tablo/kolonlar, hiçbir yerden linklenmeyen
