@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   AlertTriangle,
   ArrowUpRight,
+  CheckCircle2,
   Radar,
   ShieldAlert,
   Siren,
@@ -9,6 +10,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { confirmPortalListing } from "@/app/actions/portal-listings";
 import { moneyTry } from "@/lib/leak-shield";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import type { CSSProperties } from "react";
@@ -76,7 +78,10 @@ export default async function LeakShieldPage({
 }: {
   searchParams?: Promise<{ neden?: string; tip?: string; from?: string; to?: string; sayfa?: string }>;
 }) {
-  await requireModulePage("leak");
+  const { perms } = await requireModulePage("leak");
+  // Kurtarma aksiyonu (teyit) yalnız portal düzenleme yetkisi olana gösterilir;
+  // action zaten kendi kapısını da kontrol eder (portals:edit).
+  const canConfirm = (perms.portals ?? []).includes("edit");
   const params = (await searchParams) ?? {};
   const nedenF = (params.neden ?? "").trim();
   const tipF = TIP_FILTERS.includes(params.tip as TipFilter) ? (params.tip as TipFilter) : "";
@@ -467,17 +472,31 @@ export default async function LeakShieldPage({
                   </span>
                 </div>
               );
-              return prop?.id ? (
-                <Link
-                  key={r.id}
-                  href={`/app/portfoyler/${prop.id}`}
-                  className="focus-ring press group flex min-h-[44px] rounded-[14px] border border-line bg-surface px-3.5 py-2.5 transition hover:border-brand-300"
-                >
-                  {inner}
-                </Link>
-              ) : (
-                <div key={r.id} className="group flex min-h-[44px] rounded-[14px] border border-line bg-surface px-3.5 py-2.5">
-                  {inner}
+              // Kurtarma: "Teyit et" ilanı yeniden canlı/teyitli yapar → gecikmiş
+              // listeden düşer. Butonu Link'e İÇ İÇE koymayız (geçersiz HTML +
+              // tık çakışması); satır flex kap, bilgi bloğu Link, buton kardeş.
+              const confirmBtn = canConfirm ? (
+                <form action={confirmPortalListing} className="shrink-0">
+                  <input type="hidden" name="id" value={r.id} />
+                  <button
+                    type="submit"
+                    title="İlanı şimdi teyit et — gecikmiş listeden düşer"
+                    className="focus-ring press inline-flex min-h-[36px] items-center gap-1 rounded-[10px] border border-mint-500/25 bg-mint-500/10 px-2.5 text-[11px] font-bold text-mint-700 transition hover:border-mint-500/45 hover:bg-mint-500/15"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Teyit et
+                  </button>
+                </form>
+              ) : null;
+              return (
+                <div key={r.id} className="group flex min-h-[44px] items-center gap-2 rounded-[14px] border border-line bg-surface px-3.5 py-2.5 transition hover:border-brand-300">
+                  {prop?.id ? (
+                    <Link href={`/app/portfoyler/${prop.id}`} className="focus-ring press flex min-w-0 flex-1">
+                      {inner}
+                    </Link>
+                  ) : (
+                    <div className="flex min-w-0 flex-1">{inner}</div>
+                  )}
+                  {confirmBtn}
                 </div>
               );
             })}

@@ -183,7 +183,9 @@ yeniden çıkarmak için `src/lib/definitions.ts` + `getDefinitions` çağrılar
   `sellUnit` → `recordProjectSaleDeal`. DB rollback testiyle insert'ler doğrulandı. Ciro/komisyon/lig'de görünür.
 - Ofisler arası ağda `commission_share_pct` kabul edilse de komisyon paylaşımına yazılmıyor.
 - Kira sözleşmesi başlayınca/bitince portföy durumu yönetilmiyor; depozito iadesi yok.
-- Kayıp-kaçak ekranı salt okunur (kurtarma aksiyonu yok; kayıp-satışta var).
+- ✅ **DÜZELTİLDİ (2026-07-29):** Kayıp-kaçak risk sıralamasına **"Teyit et"** kurtarma aksiyonu
+  eklendi (mevcut `confirmPortalListing` action'ı; `portals:edit` olana görünür). İlan teyitlenip
+  gecikmiş listeden düşer. Demo veride 3 buton render doğrulandı.
 - Ekip çıkışında portföy devri yok (müşteri devri var).
 - Silinen kayıtlar için geri yükleme ekranı yok; `won/lost` anlaşma ve müşteri birleştirme geri alınamaz.
 
