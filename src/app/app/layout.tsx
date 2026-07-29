@@ -257,7 +257,7 @@ export default async function AppLayout({
           {/* min-w-0 + overflow-x-clip: geniş tablolar (musteriler vb.) kendi
               içlerinde kaydırılır; içerik layout viewport'unu (ICB) şişirip
               mobilde fixed alt-gezinme/hamburger'ı kaydıramaz. */}
-          <main id="main-content" className="min-w-0 flex-1 overflow-x-clip p-4 pb-28 md:p-6 lg:p-8">
+          <main id="main-content" className="min-w-0 max-w-full flex-1 overflow-x-clip p-4 pb-28 md:p-6 lg:p-8">
             <LiveOfficeStrip tenantId={tenantId} />
             {children}
           </main>

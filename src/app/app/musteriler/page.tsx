@@ -716,21 +716,21 @@ export default async function CustomersPage({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {/* Tarih aralığı */}
-          <div className="flex items-center gap-2 text-sm text-text-muted">
+          {/* Tarih aralığı — mobilde sarar, native date input'lar viewport'u taşırmaz */}
+          <div className="flex flex-wrap items-center gap-2 text-sm text-text-muted">
             <span className="text-xs font-medium">Eklenme:</span>
             <input
               name="from"
               type="date"
               defaultValue={fromF}
-              className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+              className="min-w-0 max-w-[150px] flex-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 sm:flex-none"
             />
             <span>—</span>
             <input
               name="to"
               type="date"
               defaultValue={toF}
-              className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+              className="min-w-0 max-w-[150px] flex-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 sm:flex-none"
             />
           </div>
           <button type="submit" className="rounded-[10px] bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700">

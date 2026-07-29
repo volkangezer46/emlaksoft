@@ -85,6 +85,9 @@ export const viewport: Viewport = {
   themeColor: "#071a38",
   width: "device-width",
   initialScale: 1,
+  // iOS: safe-area env() değerlerinin dolu gelmesi ve çentik/home-indicator
+  // altındaki fixed menü/hamburger'ın doğru konumlanması için şart.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

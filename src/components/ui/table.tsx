@@ -33,11 +33,14 @@ export function TableFrame({
   return (
     <div
       className={cn(
-        "surface-card overflow-hidden rounded-[var(--radius-panel)]",
+        // min-w-0 + max-w-full: flex/grid içinde tablo, min-content genişliğine
+        // büyüyüp mobilde layout viewport'unu (ICB) şişiremez — kaydırma yalnız
+        // içteki overflow-x-auto kabında olur (iOS Safari dahil her tarayıcıda).
+        "surface-card min-w-0 max-w-full overflow-hidden rounded-[var(--radius-panel)]",
         className,
       )}
     >
-      <div className="overflow-x-auto">
+      <div className="max-w-full overflow-x-auto">
         <div style={minWidth ? { minWidth } : undefined}>{children}</div>
       </div>
     </div>
