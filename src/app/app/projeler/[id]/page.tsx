@@ -87,10 +87,11 @@ export default async function ProjeDetayPage({ params }: { params: Promise<{ id:
       </section>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <StatCard label="Müsait" value={musait} icon={Grid3x3} tone="success" />
-        <StatCard label="Rezerve" value={rezerve} icon={Clock3} tone="warning" />
-        <StatCard label="Kapora" value={kapora} icon={KeyRound} />
-        <StatCard label="Satılan" value={satilan} icon={BadgeCheck} />
+        {/* Durum kartları daire ızgarasına iner (orada durum çipiyle süzülür) — sıfır çıkmaz metrik */}
+        <StatCard label="Müsait" value={musait} icon={Grid3x3} tone="success" href="#daireler" />
+        <StatCard label="Rezerve" value={rezerve} icon={Clock3} tone="warning" href="#daireler" />
+        <StatCard label="Kapora" value={kapora} icon={KeyRound} href="#daireler" />
+        <StatCard label="Satılan" value={satilan} icon={BadgeCheck} href="#daireler" />
         {/* Ödeme planı KPI'ları — daire dialoglarındaki planlardan; kart daire ızgarasına iner */}
         <StatCard
           label="Bu ay beklenen tahsilat"
