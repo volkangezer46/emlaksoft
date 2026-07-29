@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlarmClock, ArrowUpRight, CalendarRange, FileSignature, PenLine } from "lucide-react";
+import { AlarmClock, ArrowUpRight, CalendarRange, ChevronLeft, ChevronRight, FileSignature, PenLine } from "lucide-react";
 import { DAY_MS, daysFromNowIso, msSince, msUntil, now } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getDefinitions } from "@/lib/definitions";
@@ -68,6 +68,14 @@ function one<T>(v: T | T[] | null | undefined): T | null {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Sayfa başına kayıt — gerçek sayfalama, 100'lük sessiz dilim yerine. */
+const PAGE_SIZE = 50;
+
+const PAGER_BTN =
+  "focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+const PAGER_BTN_DISABLED =
+  "inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
+
 function fmtDate(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -90,7 +98,7 @@ function qs(params: Record<string, string | null | undefined>) {
 export default async function SozlesmelerPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; customer?: string; property?: string; from?: string; to?: string; yenileme?: string }>;
+  searchParams?: Promise<{ durum?: string; customer?: string; property?: string; from?: string; to?: string; yenileme?: string; sayfa?: string }>;
 }) {
   const { perms } = await requireModulePage("contracts");
   const params = (await searchParams) ?? {};
@@ -101,13 +109,27 @@ export default async function SozlesmelerPage({
   // ?yenileme=1 → yalnız süresi 30 gün içinde dolacak sözleşmeler
   const yenileme = params.yenileme === "1";
 
-  // Mevcut filtreleri koruyan link üretici
+  const page = Math.max(1, Number.parseInt(params.sayfa ?? "", 10) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
+
+  // Mevcut filtreleri koruyan link üretici. Filtre değişince sayfa 1'e döner:
+  // href sayfa parametresini taşımaz.
   const href = (next: { durum?: string | null; from?: string | null; to?: string | null; yenileme?: boolean }) =>
     `/app/sozlesmeler${qs({
       durum: next.durum === undefined ? durum : next.durum,
       from: next.from === undefined ? from : next.from,
       to: next.to === undefined ? to : next.to,
       yenileme: (next.yenileme === undefined ? yenileme : next.yenileme) ? "1" : null,
+    })}`;
+
+  // Sayfalama linki — aktif filtreleri korur, yalnız sayfayı değiştirir.
+  const pageHref = (n: number) =>
+    `/app/sozlesmeler${qs({
+      durum,
+      from,
+      to,
+      yenileme: yenileme ? "1" : null,
+      sayfa: n > 1 ? String(n) : null,
     })}`;
 
   // Hızlı tarih çipleri — zaman okuması clock.ts üzerinden (tek kaynak)
@@ -124,10 +146,11 @@ export default async function SozlesmelerPage({
   // listContracts ID döndürmediği için sorgu burada.
   let contractQuery = supabase
     .from("contracts")
+    // count: "exact" — sayfalama ("X-Y / Toplam Z") gerçek toplamı ister.
     .select(
       "id, title, contract_type, status, created_at, signed_at, expires_at, property:properties(id, property_code, title), customer:customers(id, full_name)",
-    )
-    .limit(100);
+      { count: "exact" },
+    );
   if (durum) contractQuery = contractQuery.eq("status", durum);
   // ?from=&to= sunucu filtresi — created_at aralığı, uç gün dahil
   if (from) contractQuery = contractQuery.gte("created_at", from);
@@ -144,8 +167,10 @@ export default async function SozlesmelerPage({
   } else {
     contractQuery = contractQuery.order("created_at", { ascending: false });
   }
+  // Gerçek sayfalama — 100'lük sessiz dilim yerine sayfa dilimi.
+  contractQuery = contractQuery.range(offset, offset + PAGE_SIZE - 1);
 
-  const [{ data: contractData }, { data: statusData }, contractTypeDefs, templates] = await Promise.all([
+  const [{ data: contractData, count: contractTotal }, { data: statusData }, contractTypeDefs, templates] = await Promise.all([
     contractQuery,
     // KPI sayıları filtreden bağımsız — süre sonu şeridi için expires_at da gelir
     supabase.from("contracts").select("status, expires_at").limit(1000),
@@ -176,6 +201,12 @@ export default async function SozlesmelerPage({
       customer_name: cu?.full_name ?? null,
     };
   });
+
+  // Sayfalama — filtrelenmiş gerçek toplam (KPI'lardan bağımsız)
+  const totalFiltered = contractTotal ?? contracts.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
+  const rangeStart = totalFiltered === 0 ? 0 : offset + 1;
+  const rangeEnd = Math.min(offset + contracts.length, totalFiltered);
 
   const allContracts = (statusData ?? []).map((r) => ({
     status: r.status as string,
@@ -322,7 +353,7 @@ export default async function SozlesmelerPage({
               <AlarmClock className="h-3.5 w-3.5" /> Süresi yaklaşan
             </Link>
             <span className="numeric ml-auto text-[11px] font-medium tracking-wide text-text-faint">
-              {contracts.length} kayıt
+              {totalFiltered.toLocaleString("tr-TR")} kayıt
             </span>
           </div>
 
@@ -369,6 +400,7 @@ export default async function SozlesmelerPage({
               </Link>
             </div>
           ) : (
+            <>
             <TableFrame minWidth={760}>
               <Table>
                 <THead>
@@ -447,6 +479,40 @@ export default async function SozlesmelerPage({
                 </TBody>
               </Table>
             </TableFrame>
+
+            {/* Sayfalama — filtreler linklerde korunur */}
+            {totalFiltered > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                <p className="numeric text-text-muted">
+                  {rangeStart.toLocaleString("tr-TR")}–{rangeEnd.toLocaleString("tr-TR")} / Toplam{" "}
+                  {totalFiltered.toLocaleString("tr-TR")}
+                </p>
+                <div className="flex items-center gap-1.5">
+                  {page > 1 ? (
+                    <Link href={pageHref(page - 1)} className={PAGER_BTN}>
+                      <ChevronLeft className="h-4 w-4" /> Önceki
+                    </Link>
+                  ) : (
+                    <span className={PAGER_BTN_DISABLED} aria-disabled="true">
+                      <ChevronLeft className="h-4 w-4" /> Önceki
+                    </span>
+                  )}
+                  <span className="numeric px-1 text-text-faint">
+                    {Math.min(page, totalPages)} / {totalPages}
+                  </span>
+                  {page < totalPages ? (
+                    <Link href={pageHref(page + 1)} className={PAGER_BTN}>
+                      Sonraki <ChevronRight className="h-4 w-4" />
+                    </Link>
+                  ) : (
+                    <span className={PAGER_BTN_DISABLED} aria-disabled="true">
+                      Sonraki <ChevronRight className="h-4 w-4" />
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : null}
+            </>
           )}
         </>
       )}

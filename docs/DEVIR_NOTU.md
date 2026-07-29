@@ -159,6 +159,16 @@ yeniden çıkarmak için `src/lib/definitions.ts` + `getDefinitions` çağrılar
 **B. Ekran standart yetenek eksikleri** (82 ekran denetlendi):
 - **Sessiz veri kaybı**: ~28 ekran filtreyi bellekte uygulayıp sorguyu `limit(N)` ile kesiyor →
   kullanıcı "sonuç yok" görüyor, oysa kayıt tavanın üstünde. **En yüksek öncelik.**
+  - **2026-07-29 dalgası — 8 çekirdek ekran DÜZELTİLDİ** (referans `musteriler` deseni:
+    sunucu filtresi + `range()` + `count:"exact"` + `?sayfa=` gerçek pager, KPI'lar head-count'tan):
+    `portfoyler` · `portallar` · `talepler` · `randevular` (tarih pencereli, takvim korundu) ·
+    `gorevler` · `aidat` (liste) · `destek` · `kayip-kacak` (kapanış listesi). `teklifler`/`sozlesmeler`
+    zaten sunucu-filtreliydi, yalnız gerçek pager eklendi. `belgeler` zaten doğruydu.
+    Runtime duman testi: 10 ekran 200, hata sınırı yok, `?sayfa=2` çalışıyor.
+  - **Ertelenenler (RPC/migration gerektirir — bu dalgada migration yasaktı):** `kiralama` filtreleri
+    (durum/arıza/evre `rent_charges`+`maintenance_requests`'ten türetiliyor, `rentals`'ta `.eq` yok) ·
+    `aidat` KPI tutar SUM'ları (havuz 2000'e çıkarıldı, tam çözüm için RPC) · `kayip-kacak` para
+    toplamları/trend (agregat havuz). Kalan liste ekranları da benzer taramayla sürdürülmeli.
 - Gerçek sayfalama yalnız 8/82 ekranda (`range()` + `count:"exact"`); 5 ekranda `?sayfa=` var ama
   bellekte `slice()` ile sahte.
 - Kullanıcı seçmeli sıralama yalnız `musteriler/page.tsx`'te (referans uygulama).

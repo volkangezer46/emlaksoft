@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { now } from "@/lib/clock";
 import { setAppointmentStatus } from "@/app/actions/appointments";
 import { NewAppointmentDialog } from "./new-appointment-dialog";
 import { CompleteAppointmentDialog } from "./complete-appointment-dialog";
@@ -125,7 +126,7 @@ export default async function AppointmentsPage({
   const danismanF = isYonetici ? ((sp.danisman ?? "").trim() || "") : "";
   const tarihMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(sp.tarih ?? "");
   const todayStart = (() => {
-    const n = new Date();
+    const n = new Date(now());
     return new Date(n.getFullYear(), n.getMonth(), n.getDate());
   })();
   const selectedDate = tarihMatch
@@ -139,22 +140,73 @@ export default async function AppointmentsPage({
     return n;
   };
 
+  // ---- Görünüme göre takvim penceresi ------------------------------------
+  // Eskiden .limit(100) scheduled_at'e göre EN ESKİ 100 randevuyu çekiyordu;
+  // dolu bir ofiste bunlar hep geçmişte kalıyor, bugünkü/yaklaşan randevular
+  // takvimde GÖRÜNMÜYORDU. Artık ana sorgu görünümün tarih penceresine (gte/lt)
+  // daraltılır — pencere içindeki TÜM randevular gelir (sayfalama takvime
+  // uygulanmaz; hafta/gün gezinmesi zaten sunucuya ?tarih= ile döner).
+  const monthStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
+  let windowStart: Date;
+  let windowEnd: Date;
+  if (gorunum === "hafta") {
+    const ws = new Date(selectedDate);
+    ws.setDate(selectedDate.getDate() - ((selectedDate.getDay() + 6) % 7));
+    windowStart = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate());
+    windowEnd = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + 7);
+  } else if (gorunum === "gun") {
+    windowStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+    windowEnd = new Date(windowStart.getFullYear(), windowStart.getMonth(), windowStart.getDate() + 1);
+  } else if (gorunum === "rota") {
+    windowStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + (rotaGun === "yarin" ? 1 : 0));
+    windowEnd = new Date(windowStart.getFullYear(), windowStart.getMonth(), windowStart.getDate() + 1);
+  } else {
+    // ay: aylık takvim istemci tarafında gezinir; sunucu makul bir pencere verir
+    // (2 ay öncesi – 3 ay sonrası). Küçük ofisin yakın verisi tam kapsanır,
+    // dolu ofis "en eski 100" yerine bugünün çevresini görür.
+    windowStart = new Date(monthStart.getFullYear(), monthStart.getMonth() - 2, 1);
+    windowEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 3, 1);
+  }
+
   let apptQuery = supabase
     .from("appointments")
-    // count: liste 100 randevuyla sınırlı; yoğun bir ofiste bu kolayca
-    // aşılır ve kullanıcı eksik takvim görüp bunu tam sanar.
+    // count: pencere içindeki gerçek toplam — 500'ü aşarsa ListLimitNotice uyarır.
     .select(
       "id, appointment_type, scheduled_at, duration_min, location, status, notes, confirm_token, customer_response, assigned_to, outcome, outcome_note, customer:customers(id, full_name), property:properties(id, title, property_code, lat, lng)",
       { count: "exact" },
     )
-    .neq("status", "cancelled");
+    .neq("status", "cancelled")
+    .gte("scheduled_at", windowStart.toISOString())
+    .lt("scheduled_at", windowEnd.toISOString());
   if (tipF) apptQuery = apptQuery.eq("appointment_type", tipF);
   if (durumF) apptQuery = apptQuery.eq("status", durumF);
   if (customerF) apptQuery = apptQuery.eq("customer_id", customerF);
   if (propertyF) apptQuery = apptQuery.eq("property_id", propertyF);
 
-  const [{ data: appts, count: apptTotal }, { data: customers }, { data: properties }, apptTypeDefs, { data: filteredCustomer }, { data: filteredProperty }] = await Promise.all([
-    apptQuery.order("scheduled_at", { ascending: true }).limit(100),
+  // Durum/tür sayaçları — pencereden bağımsız gerçek toplamlar (head-count);
+  // iptaller hariç. Hero/panel çipleri bu sayıları filtreye çevirir.
+  const countBase = () =>
+    supabase.from("appointments").select("id", { count: "exact", head: true }).neq("status", "cancelled");
+  const todayEndIso = new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + 1).toISOString();
+  const weekAheadIso = new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + 7).toISOString();
+
+  const [
+    { data: appts, count: apptTotal },
+    { data: customers },
+    { data: properties },
+    apptTypeDefs,
+    { data: filteredCustomer },
+    { data: filteredProperty },
+    { count: todayCount },
+    { count: signatureCount },
+    { count: completedCount },
+    { count: showingCount },
+    { count: officeCount },
+    { count: valuationCount },
+    { count: contractCount },
+    { data: weekBarRows },
+  ] = await Promise.all([
+    apptQuery.order("scheduled_at", { ascending: true }).limit(500),
     // Bu iki sorgu SINIRSIZDI: sayfa her acildiginda ofisin TUM musteri ve
     // portfoy kayitlari cekiliyordu. Secici artik sunucu tarafinda arama
     // yaptigi icin buradaki liste yalnizca "son eklenenler" kisayolu —
@@ -172,7 +224,30 @@ export default async function AppointmentsPage({
     propertyF
       ? supabase.from("properties").select("id, title, property_code").eq("id", propertyF).maybeSingle()
       : Promise.resolve({ data: null }),
+    countBase().gte("scheduled_at", todayStart.toISOString()).lt("scheduled_at", todayEndIso),
+    countBase().eq("status", "signature"),
+    countBase().eq("status", "completed"),
+    countBase().eq("appointment_type", "showing"),
+    countBase().eq("appointment_type", "office"),
+    countBase().eq("appointment_type", "valuation"),
+    countBase().eq("appointment_type", "contract"),
+    // Haftalık yoğunluk şeridi — önümüzdeki 7 gün, görünümden bağımsız pencere.
+    supabase
+      .from("appointments")
+      .select("scheduled_at")
+      .neq("status", "cancelled")
+      .gte("scheduled_at", todayStart.toISOString())
+      .lt("scheduled_at", weekAheadIso)
+      .limit(1000),
   ]);
+
+  // Tür başına gerçek toplam (hero + "Randevu türleri" paneli + rozetler).
+  const typeCounts: Record<string, number> = {
+    showing: showingCount ?? 0,
+    office: officeCount ?? 0,
+    valuation: valuationCount ?? 0,
+    contract: contractCount ?? 0,
+  };
 
   // Takvim aboneliği (ICS) linki — kullanıcının kendi profilindeki gizli token.
   const { data: ownProfile } = await supabase
@@ -239,21 +314,18 @@ export default async function AppointmentsPage({
     return s ? `/app/randevular?${s}` : "/app/randevular";
   };
 
-  const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endOfDay = new Date(startOfDay.getTime() + 86400000);
-  const todayRows = rows.filter((r) => {
-    const d = new Date(r.scheduled_at);
-    return d >= startOfDay && d < endOfDay;
-  });
-  const showings = rows.filter((r) => r.appointment_type === "showing").length;
-  const pendingSign = rows.filter((r) => r.status === "signature").length;
+  // Sayaçlar artık head-count sorgularından (pencereden bağımsız gerçek toplam).
+  const startOfDay = todayStart;
+  const todayTotal = todayCount ?? 0;
+  const showings = typeCounts.showing;
+  const pendingSign = signatureCount ?? 0;
+  const completedTotal = completedCount ?? 0;
 
+  // Haftalık yoğunluk — ayrı "önümüzdeki 7 gün" penceresinden (görünümden bağımsız).
   const week = Array.from({ length: 7 }).map((_, i) => {
-    const d = new Date(startOfDay);
-    d.setDate(startOfDay.getDate() + i);
-    const next = new Date(d.getTime() + 86_400_000);
-    const count = rows.filter((r) => {
+    const d = new Date(startOfDay.getFullYear(), startOfDay.getMonth(), startOfDay.getDate() + i);
+    const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+    const count = ((weekBarRows ?? []) as { scheduled_at: string }[]).filter((r) => {
       const t = new Date(r.scheduled_at);
       return t >= d && t < next;
     }).length;
@@ -449,7 +521,7 @@ export default async function AppointmentsPage({
           <div className="stagger-grid grid grid-cols-3 gap-3">
             {/* Bugünkü sayaç takvime (bugün seçili açılır), diğerleri tip/durum filtresine iner. */}
             {[
-              { label: "Bugünkü randevu", value: todayRows.length, icon: ICONS.randevu, tone: "text-cyan-400", href: "#takvim" },
+              { label: "Bugünkü randevu", value: todayTotal, icon: ICONS.randevu, tone: "text-cyan-400", href: "#takvim" },
               { label: "Yer gösterme", value: showings, icon: ICONS.bolge, tone: "text-mint-400", href: apptHref({ tip: tipF === "showing" ? "" : "showing" }) },
               { label: "İmza eksik", value: pendingSign, icon: ICONS.sozlesme, tone: "text-danger-500", href: apptHref({ durum: durumF === "signature" ? "" : "signature" }) },
             ].map((item) => (
@@ -826,7 +898,7 @@ export default async function AppointmentsPage({
             </p>
             <div className="mt-4 space-y-2">
               {[
-                { label: "Tamamlanan", value: `${rows.filter((r) => r.status === "completed").length} randevu`, icon: CheckCircle2, tone: "text-mint-600", href: apptHref({ durum: "completed" }) },
+                { label: "Tamamlanan", value: `${completedTotal} randevu`, icon: CheckCircle2, tone: "text-mint-600", href: apptHref({ durum: "completed" }) },
                 { label: "Bekleyen", value: `${pendingSign} randevu`, icon: Clock3, tone: "text-warn-500", href: apptHref({ durum: "signature" }) },
                 { label: "Yer gösterme", value: `${showings} adet`, icon: MapPinned, tone: "text-brand-600", href: apptHref({ tip: "showing" }) },
               ].map((row) => (
@@ -847,7 +919,7 @@ export default async function AppointmentsPage({
               <p className="flex items-center gap-2 text-xs font-semibold text-mint-400"><MapPinned className="h-4 w-4" /> Günlük tur planı</p>
               <span className="rounded-full bg-mint-400/12 px-2.5 py-1 text-[11px] font-bold text-mint-400">PLAN</span>
             </div>
-            <p className="relative mt-3 text-sm text-white/70">Bugün <span className="font-bold text-white">{todayRows.length}</span> randevu planlı. Randevuları saatine göre sıralayıp turunuzu düzenleyin.</p>
+            <p className="relative mt-3 text-sm text-white/70">Bugün <span className="font-bold text-white">{todayTotal}</span> randevu planlı. Randevuları saatine göre sıralayıp turunuzu düzenleyin.</p>
             <div className="relative mt-4 flex items-center justify-between rounded-[12px] border border-white/10 bg-white/5 px-4 py-3">
               <div><p className="text-[11px] text-white/45">Yaklaşan yer gösterme</p><p className="font-display text-xl font-extrabold text-mint-400">{showings}</p></div>
               <Navigation className="h-5 w-5 text-white/40" />
@@ -863,7 +935,7 @@ export default async function AppointmentsPage({
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
               {Object.entries(typeLabel).map(([key, label]) => {
-                const count = rows.filter((r) => r.appointment_type === key).length;
+                const count = typeCounts[key] ?? 0;
                 const active = tipF === key;
                 return (
                   <Link

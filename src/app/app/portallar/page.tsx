@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { daysAgoIso } from "@/lib/clock";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -18,7 +19,6 @@ import { ClosePortalDialog, NewPortalDialog } from "./portal-dialogs";
 import { ConfirmListingButton } from "./confirm-listing-button";
 import { BulkConfirmForm } from "./bulk-confirm-form";
 import { EmptyState } from "@/components/app/empty-state";
-import { ListLimitNotice } from "@/components/app/list-limit-notice";
 
 type PortalRow = {
   id: string;
@@ -53,6 +53,8 @@ const DURUM_FILTERS = [
   { label: "Kapanan", value: "kapali" },
 ] as const;
 
+const DURUM_VALUES = ["live", "teyit", "kapali"] as const;
+
 function propertyOf(value: PortalRow["property"]) {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -70,13 +72,6 @@ function relativeConfirm(value: string | null) {
   return `${days} gün önce teyit edildi`;
 }
 
-function matchesDurum(row: PortalRow, durum: string) {
-  if (durum === "live") return row.status === "live";
-  if (durum === "teyit") return row.status === "live" && daysSince(row.last_confirmed_at) >= 7;
-  if (durum === "kapali") return row.status === "removed";
-  return true;
-}
-
 // Filtre linkleri sayfa numarasını sıfırlar (sayfa parametresi yalnızca
 // sayfalama linklerinde taşınır) — filtre değişince 1. sayfadan başlanır.
 function portalHref(durum: string, portal: string, sayfa?: number, property?: string) {
@@ -90,6 +85,8 @@ function portalHref(durum: string, portal: string, sayfa?: number, property?: st
 }
 
 const PAGE_SIZE = 50;
+/** Portal dağılımı barları için taranan azami kayıt (tek kolon, hafif). */
+const DIST_LIMIT = 2000;
 
 export default async function PortalsPage({
   searchParams,
@@ -97,14 +94,60 @@ export default async function PortalsPage({
   searchParams?: Promise<{ durum?: string; portal?: string; sayfa?: string; property?: string }>;
 }) {
   await requireModulePage("portals");
-  const { durum = "", portal = "", sayfa = "", property: propertyF = "" } = (await searchParams) ?? {};
+  const sp = (await searchParams) ?? {};
+  const durum = (DURUM_VALUES as readonly string[]).includes(sp.durum ?? "") ? sp.durum! : "";
+  const portal = sp.portal ?? "";
+  const propertyF = sp.property ?? "";
   const supabase = await createClient();
-  const [{ data: listings, count: listingTotal }, { data: properties }] = await Promise.all([
-    supabase
-      .from("portal_listings")
-      .select("id, portal_name, portal_listing_id, portal_url, status, last_confirmed_at, published_at, removed_at, removal_reason, property:properties(id,property_code,title,list_price)", { count: "exact" })
+
+  const page = Math.max(1, Number.parseInt(sp.sayfa ?? "", 10) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
+
+  /*
+   * BULUNAN HATA (sessiz veri kaybı): eskiden 500 kayıt çekilip durum/portal/
+   * portföy BELLEKTE (array.filter) eleniyor, sayfalama da bellekte dilimleniyordu.
+   * 500'ü aşan ofiste filtre yalnız ilk 500 kayıtta çalışıp kullanıcıya
+   * yanlışlıkla "eşleşen yok" diyordu; ötesi hiç görünmüyordu.
+   *
+   * ÇÖZÜM: tüm filtreler Supabase sorgusunda + gerçek sayfalama (range + count).
+   * "Teyit bekleyen" = canlı ve 7+ gündür teyitsiz; eşiği clock.ts'ten iso.
+   */
+  const overdueCutoff = daysAgoIso(7);
+  const OVERDUE_OR = `last_confirmed_at.is.null,last_confirmed_at.lt."${overdueCutoff}"`;
+
+  const LIST_COLS =
+    "id, portal_name, portal_listing_id, portal_url, status, last_confirmed_at, published_at, removed_at, removal_reason, property:properties(id,property_code,title,list_price)";
+
+  // Aynı filtre seti hem sayfalı listeye hem gerçek-toplam sayımına uygulanır.
+  const buildFilteredQuery = (select: string, opts?: { count: "exact"; head?: boolean }) => {
+    let query = supabase.from("portal_listings").select(select, opts);
+    if (durum === "live") query = query.eq("status", "live");
+    else if (durum === "teyit") query = query.eq("status", "live").or(OVERDUE_OR);
+    else if (durum === "kapali") query = query.eq("status", "removed");
+    if (portal) query = query.eq("portal_name", portal);
+    if (propertyF) query = query.eq("property_id", propertyF);
+    return query;
+  };
+
+  const [
+    { data: listings, count: visibleTotal },
+    { count: total },
+    { count: liveTotal },
+    { count: overdueTotal },
+    { count: removedTotal },
+    { data: distRows },
+    { data: properties },
+  ] = await Promise.all([
+    buildFilteredQuery(LIST_COLS, { count: "exact" })
       .order("created_at", { ascending: false })
-      .limit(500),
+      .range(offset, offset + PAGE_SIZE - 1),
+    // KPI/dağılım — liste artık sayfalı olduğundan head-count'larla gerçek toplamlar.
+    supabase.from("portal_listings").select("id", { count: "exact", head: true }),
+    supabase.from("portal_listings").select("id", { count: "exact", head: true }).eq("status", "live"),
+    supabase.from("portal_listings").select("id", { count: "exact", head: true }).eq("status", "live").or(OVERDUE_OR),
+    supabase.from("portal_listings").select("id", { count: "exact", head: true }).eq("status", "removed"),
+    // Portal dağılımı — hafif tek kolon (portal_name); bellekte tally edilir.
+    supabase.from("portal_listings").select("portal_name").limit(DIST_LIMIT),
     supabase
       .from("properties")
       .select("id, property_code, title")
@@ -112,40 +155,32 @@ export default async function PortalsPage({
       .order("created_at", { ascending: false }),
   ]);
 
-  const rows = (listings ?? []) as PortalRow[];
+  const pageRows = (listings ?? []) as unknown as PortalRow[];
   const propertyOptions = properties ?? [];
-  const live = rows.filter((row) => row.status === "live");
-  const overdue = live.filter((row) => daysSince(row.last_confirmed_at) >= 7);
-  const removed = rows.filter((row) => row.status === "removed");
 
-  // KPI ve dağılım TÜM kayıtlardan; liste ?durum= & ?portal= & ?property= ile daralır.
-  // ?property= — portföy detayındaki "Portal ilanları" kısayolu: tek portföyün
-  // yayın kayıtlarını gösterir.
-  const visible = rows.filter(
-    (row) =>
-      matchesDurum(row, durum) &&
-      (!portal || row.portal_name === portal) &&
-      (!propertyF || propertyOf(row.property)?.id === propertyF),
-  );
-  const propertyChip = propertyF
-    ? propertyOptions.find((p) => p.id === propertyF) ?? null
-    : null;
+  const totalCount = total ?? 0;
+  const live = liveTotal ?? 0;
+  const overdue = overdueTotal ?? 0;
+  const removed = removedTotal ?? 0;
 
-  // ?sayfa= — bellekten sayfalama (50/sayfa); filtre linkleri sayfayı sıfırlar.
-  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
-  const page = Math.min(Math.max(1, Number.parseInt(sayfa, 10) || 1), totalPages);
-  const pageRows = visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalFiltered = visibleTotal ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
   const liveOnPage = pageRows.filter((row) => row.status === "live").length;
 
-  const onTime = live.filter((row) => daysSince(row.last_confirmed_at) < 7).length;
-  const healthRate = live.length ? onTime / live.length : 0;
+  const propertyChip = propertyF ? propertyOptions.find((p) => p.id === propertyF) ?? null : null;
+
+  const onTime = Math.max(0, live - overdue);
+  const healthRate = live ? onTime / live : 0;
   const portalCounts = new Map<string, number>();
-  rows.forEach((row) => portalCounts.set(row.portal_name, (portalCounts.get(row.portal_name) ?? 0) + 1));
+  ((distRows ?? []) as { portal_name: string }[]).forEach((row) =>
+    portalCounts.set(row.portal_name, (portalCounts.get(row.portal_name) ?? 0) + 1),
+  );
   const portalStats = [...portalCounts.entries()]
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
   const maxCount = Math.max(1, ...portalStats.map((p) => p.count));
+  const activeFilter = Boolean(durum || portal || propertyF);
 
   return (
     <div className="space-y-6">
@@ -172,9 +207,9 @@ export default async function PortalsPage({
         </div>
         <div className="relative mt-6 grid grid-cols-3 gap-3">
           {[
-            { label: "Canlı ilan", value: live.length, icon: RadioTower, tone: "text-mint-400", durum: "live" },
-            { label: "Teyit bekleyen", value: overdue.length, icon: Clock3, tone: "text-amber-400", durum: "teyit" },
-            { label: "Kapanan", value: removed.length, icon: Siren, tone: "text-danger-500", durum: "kapali" },
+            { label: "Canlı ilan", value: live, icon: RadioTower, tone: "text-mint-400", durum: "live" },
+            { label: "Teyit bekleyen", value: overdue, icon: Clock3, tone: "text-amber-400", durum: "teyit" },
+            { label: "Kapanan", value: removed, icon: Siren, tone: "text-danger-500", durum: "kapali" },
           ].map((item) => (
             <Link
               key={item.label}
@@ -192,7 +227,7 @@ export default async function PortalsPage({
         </div>
       </section>
 
-      {rows.length > 0 ? (
+      {totalCount > 0 ? (
         <section className="grid items-center gap-5 rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] md:grid-cols-[auto_1fr]">
           <div className="flex items-center gap-4 md:border-r md:border-line md:pr-6">
             <div className="relative grid h-24 w-24 place-items-center">
@@ -217,12 +252,12 @@ export default async function PortalsPage({
             </div>
             <div>
               <p className="flex items-center gap-1.5 text-sm font-bold text-ink-950"><ShieldCheck className="h-4 w-4 text-mint-600" /> Teyit sağlığı</p>
-              <p className="mt-0.5 text-xs text-text-muted">{onTime}/{live.length} ilan zamanında teyitli</p>
+              <p className="mt-0.5 text-xs text-text-muted">{onTime}/{live} ilan zamanında teyitli</p>
               <Link
                 href={portalHref("teyit", portal, undefined, propertyF)}
                 className="focus-ring mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600 hover:underline"
               >
-                {overdue.length} ilan 7+ gündür teyit bekliyor <ArrowUpRight className="h-3 w-3" />
+                {overdue} ilan 7+ gündür teyit bekliyor <ArrowUpRight className="h-3 w-3" />
               </Link>
             </div>
           </div>
@@ -264,7 +299,7 @@ export default async function PortalsPage({
         </div>
       ) : null}
 
-      {rows.length === 0 ? (
+      {totalCount === 0 ? (
         <EmptyState
           icon={RadioTower}
           title="Yayın ağınızı bağlayın"
@@ -282,8 +317,8 @@ export default async function PortalsPage({
             <div>
               <h2 className="font-display font-bold text-ink-950">Bağlı portal ilanları</h2>
               <p className="text-xs text-text-muted">
-                {visible.length} yayın kaydı{visible.length !== rows.length ? ` · ${rows.length} içinden` : ""}
-                {totalPages > 1 ? ` · sayfa ${page}/${totalPages}` : ""}
+                {totalFiltered.toLocaleString("tr-TR")} yayın kaydı{activeFilter ? ` · ${totalCount.toLocaleString("tr-TR")} içinden` : ""}
+                {totalPages > 1 ? ` · sayfa ${Math.min(page, totalPages)}/${totalPages}` : ""}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
@@ -320,7 +355,7 @@ export default async function PortalsPage({
               ) : null}
             </div>
           </div>
-          {visible.length === 0 ? (
+          {totalFiltered === 0 ? (
             <div className="grid place-items-center px-6 py-14 text-center">
               <RadioTower className="h-8 w-8 text-text-faint" />
               <p className="mt-3 text-sm font-semibold text-ink-950">Bu filtreyle eşleşen yayın kaydı yok</p>
@@ -401,7 +436,7 @@ export default async function PortalsPage({
               ) : (
                 <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">← Önceki</span>
               )}
-              <span className="text-xs tabular-nums text-text-muted">Sayfa {page} / {totalPages}</span>
+              <span className="text-xs tabular-nums text-text-muted">Sayfa {Math.min(page, totalPages)} / {totalPages}</span>
               {page < totalPages ? (
                 <Link href={portalHref(durum, portal, page + 1, propertyF)} className="focus-ring press rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
                   Sonraki →
@@ -410,11 +445,6 @@ export default async function PortalsPage({
                 <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">Sonraki →</span>
               )}
             </nav>
-          ) : null}
-          {listingTotal != null && listingTotal > rows.length ? (
-            <div className="border-t border-line px-5 py-2">
-              <ListLimitNotice shown={rows.length} total={listingTotal} hint="Daha eski kayıtlar için dışa aktarım kullanın." />
-            </div>
           ) : null}
         </div>
       )}

@@ -61,6 +61,10 @@ const TIP_LABELS: Record<TipFilter, string> = {
 
 const PAGE_SIZE = 50;
 
+/** Kapanış kaydı select'i — hem aggregate havuzda hem sayfalı listede aynı kolonlar. */
+const CLOSURE_SELECT =
+  "id, reason, deal_happened, deal_amount, closed_by_us, competitor_closed, estimated_lost_commission, created_at, portal_listing:portal_listings(portal_name, portal_listing_id, property:properties(id, property_code, title))";
+
 /** YYYY-MM-DD biçimindeyse döndür, aksi halde boş — sorguya ham girdi gitmesin. */
 function safeDate(value: string | undefined) {
   const v = (value ?? "").trim();
@@ -84,19 +88,45 @@ export default async function LeakShieldPage({
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
-  // ?from=&to= sunucu tarafında uygulanır — KPI'lar ve grafikler de dahil
-  // her şey seçili aralıktan hesaplanır.
+  const pageParam = Math.max(1, Number.parseInt(params.sayfa ?? "1", 10) || 1);
+  const offset = (pageParam - 1) * PAGE_SIZE;
+
+  // ?from=&to= sunucu tarafında uygulanır. AGGREGATE HAVUZ: KPI, 8-hafta trendi,
+  // neden dağılımı ve kaçak oranı bu 500'lük pencereden hesaplanır (para
+  // toplamları PostgREST'te head-count edilemez; RPC eklenmedi).
   let closuresQuery = supabase
     .from("listing_closures")
-    .select(
-      "id, reason, deal_happened, deal_amount, closed_by_us, competitor_closed, estimated_lost_commission, created_at, portal_listing:portal_listings(portal_name, portal_listing_id, property:properties(id, property_code, title))",
-    )
+    .select(CLOSURE_SELECT)
     .order("created_at", { ascending: false })
     .limit(500);
   if (fromF) closuresQuery = closuresQuery.gte("created_at", fromF);
   if (toF) closuresQuery = closuresQuery.lte("created_at", `${toF}T23:59:59.999`);
 
-  const [{ data: closures }, { data: listings }] = await Promise.all([
+  // KAPANIŞ LİSTESİ: neden/tip/tarih filtreleri SORGUYA iner + gerçek .range()
+  // sayfalama + count:"exact". Eskiden 500'lük havuz bellekte süzülüp
+  // dilimleniyordu → 500'ü aşan ofiste filtre sessizce eksik sonuç veriyordu.
+  let listQuery = supabase
+    .from("listing_closures")
+    .select(CLOSURE_SELECT, { count: "exact" })
+    .order("created_at", { ascending: false });
+  if (fromF) listQuery = listQuery.gte("created_at", fromF);
+  if (toF) listQuery = listQuery.lte("created_at", `${toF}T23:59:59.999`);
+  if (nedenF) listQuery = listQuery.eq("reason", nedenF);
+  if (tipF === "rakip") listQuery = listQuery.eq("competitor_closed", true);
+  else if (tipF === "bizim") listQuery = listQuery.eq("closed_by_us", true);
+  else if (tipF === "islem") listQuery = listQuery.eq("deal_happened", true);
+
+  // Tarih aralığındaki toplam kapanış (neden/tip'ten bağımsız) — "X / Y" başlığı.
+  let totalQuery = supabase.from("listing_closures").select("id", { count: "exact", head: true });
+  if (fromF) totalQuery = totalQuery.gte("created_at", fromF);
+  if (toF) totalQuery = totalQuery.lte("created_at", `${toF}T23:59:59.999`);
+
+  const [
+    { data: closures },
+    { data: listings },
+    { data: listData, count: listTotal },
+    { count: totalClosures },
+  ] = await Promise.all([
     closuresQuery,
     supabase
       .from("portal_listings")
@@ -104,7 +134,13 @@ export default async function LeakShieldPage({
       .select("id, portal_name, portal_listing_id, status, last_confirmed_at, property:properties(id, property_code, title)")
       .eq("status", "live")
       .limit(200),
+    listQuery.range(offset, offset + PAGE_SIZE - 1),
+    totalQuery,
   ]);
+
+  const pageRows = (listData ?? []) as Closure[];
+  const listCount = listTotal ?? 0;
+  const totalClosuresCount = totalClosures ?? 0;
 
   const nowMs = now();
   const rows = (closures ?? []) as Closure[];
@@ -159,21 +195,12 @@ export default async function LeakShieldPage({
 
   const leakShare = rows.length ? leakRows.length / rows.length : 0;
 
-  // ?neden= & ?tip= — KPI'lar tüm kayıtlardan, yalnızca kapanış listesi süzülür.
-  // Veri zaten 100 kayıtla sınırlı çekildiği için bellek filtresi yeterli.
-  const listRows = rows.filter((r) => {
-    if (nedenF && r.reason !== nedenF) return false;
-    if (tipF === "rakip" && !r.competitor_closed) return false;
-    if (tipF === "bizim" && !r.closed_by_us) return false;
-    if (tipF === "islem" && !r.deal_happened) return false;
-    return true;
-  });
   const hasFilter = Boolean(nedenF || tipF || rangeActive);
 
-  // ?sayfa= — kapanış listesi 50'şer sayfalanır; filtre linkleri sayfayı sıfırlar.
-  const totalPages = Math.max(1, Math.ceil(listRows.length / PAGE_SIZE));
-  const page = Math.min(Math.max(1, Number.parseInt(params.sayfa ?? "1", 10) || 1), totalPages);
-  const pageRows = listRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // ?sayfa= — kapanış listesi sunucuda 50'şer sayfalanır (count:"exact"); filtre
+  // linkleri sayfayı sıfırlar. pageRows/listCount yukarıdaki sorgudan gelir.
+  const totalPages = Math.max(1, Math.ceil(listCount / PAGE_SIZE));
+  const page = Math.min(pageParam, totalPages);
 
   /** Mevcut filtreyi koruyarak tek parametreyi değiştiren link üretici (sayfa sıfırlanır). */
   const filterHref = (over: { neden?: string | null; tip?: string | null; from?: string | null; to?: string | null; sayfa?: number }) => {
@@ -212,7 +239,7 @@ export default async function LeakShieldPage({
                   ? { label: "Aralıkta kayıp", value: moneyTry(lostAll), tone: "text-danger-400", href: filterHref({}) }
                   : { label: "Bu ay kayıp", value: moneyTry(lostMonth), tone: "text-danger-400", href: "/app/kayip-kacak#kapanislar" },
                 rangeActive
-                  ? { label: "Aralıkta kapanış", value: String(rows.length), tone: "", href: filterHref({}) }
+                  ? { label: "Aralıkta kapanış", value: String(totalClosuresCount), tone: "", href: filterHref({}) }
                   : { label: "Toplam kayıp", value: moneyTry(lostAll), tone: "", href: "/app/kayip-kacak#kapanislar" },
                 { label: "Rakip kapanış", value: String(competitor), tone: "text-amber-300", href: filterHref({ tip: "rakip" }) },
                 { label: "Teyit gecikmiş", value: String(overdue.length), tone: "text-warn-500", href: "/app/portallar?durum=teyit" },
@@ -465,7 +492,7 @@ export default async function LeakShieldPage({
               <Radar className="h-4 w-4 text-danger-500" /> Kapanış kayıtları
             </h2>
             <p className="text-xs text-text-muted">
-              {hasFilter ? `${listRows.length} / ${rows.length} kayıt` : `${rows.length} kayıt`}
+              {hasFilter ? `${listCount} / ${totalClosuresCount} kayıt` : `${totalClosuresCount} kayıt`}
               {totalPages > 1 ? ` · sayfa ${page}/${totalPages}` : ""} · tahmini kayıp otomatik hesaplanır
             </p>
           </div>
@@ -518,11 +545,11 @@ export default async function LeakShieldPage({
             </Link>
           ) : null}
         </form>
-        {rows.length === 0 ? (
+        {totalClosuresCount === 0 ? (
           <p className="px-5 py-12 text-center text-sm text-text-muted">
             Henüz kapanış yok. Yayından kalkan ilanı “Kapat” ile kaydedin — kayıp-kaçak burada oluşur.
           </p>
-        ) : listRows.length === 0 ? (
+        ) : listCount === 0 ? (
           <p className="px-5 py-12 text-center text-sm text-text-muted">
             Filtreye uyan kapanış yok.{" "}
             <Link href="/app/kayip-kacak#kapanislar" className="font-semibold text-brand-600 hover:underline">

@@ -1,10 +1,11 @@
 import Link from "next/link";
 import Image from "next/image";
-import { foldTr } from "@/lib/tr-text";
 import { inFilter, orIlike, safeLike } from "@/lib/pgrst";
 import {
   ArrowUpRight,
   Building2,
+  ChevronLeft,
+  ChevronRight,
   FileCheck2,
   Gauge,
   LayoutGrid,
@@ -61,6 +62,16 @@ type PropertyRow = {
   portal_listings: { portal_name: string; status: string; last_confirmed_at: string | null }[] | null;
 };
 
+type MapRow = {
+  id: string;
+  property_code: string;
+  title: string | null;
+  transaction_type: string;
+  list_price: number | null;
+  lat: number | null;
+  lng: number | null;
+};
+
 /** supabase-js gomulu iliskiyi dizi olarak tipler; iki bicimi de karsila. */
 function relName(value: { name: string } | { name: string }[] | null): string | null {
   if (!value) return null;
@@ -79,6 +90,14 @@ function formatPrice(value: number | null, transaction: string) {
   return `${price} ₺${transaction === "rent" || transaction === "Kiralık" ? "/ay" : ""}`;
 }
 
+/** Sayfa başına kayıt — gerçek sunucu sayfalaması (200'lük dilim yerine). */
+const PAGE_SIZE = 50;
+/** Harita görünümü tek seferde en çok bu kadar konumlu portföy çizer. */
+const MAP_LIMIT = 1000;
+/** Toplam portföy değeri hesabında taranan azami kayıt (tek kolon, hafif). */
+const VALUE_SUM_LIMIT = 2000;
+
+/** ?status= kontratı — değerler properties.status kolonuyla (İngilizce + Türkçe eşleri) eşlenir. */
 const STATUS_FILTERS = [
   { label: "Tümü", value: "all" },
   { label: "Yayında", value: "live" },
@@ -86,14 +105,11 @@ const STATUS_FILTERS = [
   { label: "Taslak", value: "draft" },
 ] as const;
 
-function matchesStatusFilter(status: string, filter: string) {
-  if (filter === "all") return true;
-  const normalized = status.toLowerCase();
-  if (filter === "live") return normalized === "live" || normalized === "yayında";
-  if (filter === "pending") return normalized === "pending" || normalized === "teyit" || normalized === "confirming";
-  if (filter === "draft") return normalized === "draft" || normalized === "taslak";
-  return true;
-}
+const STATUS_DB_VALUES: Record<string, string[]> = {
+  live: ["live", "Yayında"],
+  pending: ["pending", "teyit", "confirming"],
+  draft: ["draft", "taslak"],
+};
 
 /** ?saglik= kontratı — değerler properties.price_health kolonuyla (green/yellow/red ve Türkçe eşleri) eşlenir. */
 const SAGLIK_FILTERS = [
@@ -103,6 +119,12 @@ const SAGLIK_FILTERS = [
 ] as const;
 type SaglikValue = (typeof SAGLIK_FILTERS)[number]["value"];
 
+const SAGLIK_DB_VALUES: Record<SaglikValue, string[]> = {
+  iyi: ["green", "Yeşil"],
+  izle: ["yellow", "Sarı"],
+  riskli: ["red", "Kırmızı"],
+};
+
 /** price_health kolonunu rozet etiketine çevirir (green/Yeşil → İyi vb.). */
 function healthLabel(health: string | null): string {
   if (health === "green" || health === "Yeşil") return "İyi";
@@ -111,25 +133,26 @@ function healthLabel(health: string | null): string {
   return "Bekliyor";
 }
 
-function matchesSaglikFilter(health: string | null, filter: SaglikValue) {
-  if (filter === "iyi") return health === "green" || health === "Yeşil";
-  if (filter === "izle") return health === "yellow" || health === "Sarı";
-  return health === "red" || health === "Kırmızı";
-}
+const PAGER_BTN =
+  "focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+const PAGER_BTN_DISABLED =
+  "inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
 export default async function PropertiesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string; status?: string; saglik?: string; gorunum?: string }>;
+  searchParams?: Promise<{ q?: string; status?: string; saglik?: string; gorunum?: string; sayfa?: string }>;
 }) {
   const { perms } = await requireModulePage("properties");
   const canCreate = (perms.properties ?? []).includes("create");
   const canEditProperty = (perms.properties ?? []).includes("edit");
   const params = (await searchParams) ?? {};
   const q = (params.q ?? "").trim();
-  const statusFilter = params.status ?? "all";
+  const statusFilter = STATUS_FILTERS.some((f) => f.value === params.status) ? params.status! : "all";
   const saglikFilter = SAGLIK_FILTERS.some((f) => f.value === params.saglik) ? (params.saglik as SaglikValue) : null;
   const view = params.gorunum === "harita" ? "harita" : "liste";
+  const page = Math.max(1, Number.parseInt(params.sayfa ?? "", 10) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
   const supabase = await createClient();
   const savedViews = await listSavedViews("/app/portfoyler");
   // Kayıtlı görünümler için aktif filtre paramları (varsayılanlar hariç)
@@ -139,47 +162,100 @@ export default async function PropertiesPage({
   if (saglikFilter) savedViewParams.saglik = saglikFilter;
   if (view === "harita") savedViewParams.gorunum = "harita";
 
-  // Sunucu tarafı arama — q varsa ilike ile filtrele, yoksa tam listeyi çek
-  let query = supabase
-    .from("properties")
-    // count: liste 200 ile sinirli; kullaniciya kacinin disarida kaldigini
-    // soyleyebilmek icin gercek toplam gerekiyor (ek sorgu yok, ayni yanitta).
-    .select(
-      "id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, published_at, province_id, district_id, lat, lng, province:geo_provinces(name), district:geo_districts(name), portal_listings(portal_name,status,last_confirmed_at)",
-      { count: "exact" },
-    )
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(200);
-
   /*
-   * BULUNAN HATA: Arama kutusu "Kod, baslik, portal veya konum ara" diyordu
-   * ama sunucu filtresi YALNIZCA property_code ve title'a bakiyordu. Konum ya
-   * da portal adi yazan kullanici SIFIR sonuc aliyordu — asagidaki istemci
-   * tarafi filtre il adini da tariyordu ama sunucu o satirlari zaten
-   * elemisti, yani hicbir zaman devreye giremiyordu.
+   * BULUNAN HATA (sessiz veri kaybı): eskiden 200 kayıt çekilip status/sağlık
+   * BELLEKTE (array.filter) eleniyor, portal adı araması da bellekte augment
+   * ediliyordu. 200'ü aşan ofiste filtre yalnız ilk 200 kayıtta çalışıp
+   * kullanıcıya yanlışlıkla "sonuç yok" diyordu; ötesi hiç görünmüyordu.
+   * Gerçek sayfalama da yoktu.
    *
-   * Ikinci sorun: `q` dogrudan or() dizgesine gomuluyordu. Virgul, nokta ya
-   * da parantez iceren bir arama PostgREST gramerini bozuyordu.
-   *
-   * Cozum: konum adlarini once geo tablolarinda ara (name uzerinde trigram
-   * indeksi var, ucuz), bulunan id'leri or() kosuluna ekle.
+   * ÇÖZÜM: bütün kullanıcı filtreleri (durum, sağlık, arama + konum/portal)
+   * Supabase sorgusuna itildi; liste gerçek sayfalama ile (range + count)
+   * geliyor. Konum ve portal adı önce ilgili tablolarda aranıp bulunan id'ler
+   * or() koşuluna ekleniyor (name üzerinde trigram indeksi var, ucuz).
    */
+  let qOrClause: string | null = null;
   if (q) {
-    const [{ data: provHits }, { data: distHits }] = await Promise.all([
+    const [{ data: provHits }, { data: distHits }, { data: portalHits }] = await Promise.all([
       supabase.from("geo_provinces").select("id").ilike("name", safeLike(q)).limit(20),
       supabase.from("geo_districts").select("id").ilike("name", safeLike(q)).limit(50),
+      // Portal adıyla arama artık DB tarafında: eşleşen ilanların property_id'leri
+      // ana sorgunun or() koşuluna eklenir (bellekte augment yerine).
+      supabase.from("portal_listings").select("property_id").ilike("portal_name", safeLike(q)).limit(500),
     ]);
     const clauses = [orIlike(["property_code", "title", "address_line"], q)];
     const provClause = inFilter("province_id", (provHits ?? []).map((r) => r.id));
     const distClause = inFilter("district_id", (distHits ?? []).map((r) => r.id));
+    const portalIds = [
+      ...new Set((portalHits ?? []).map((r) => r.property_id as string | null).filter((v): v is string => Boolean(v))),
+    ];
+    const portalClause = inFilter("id", portalIds);
     if (provClause) clauses.push(provClause);
     if (distClause) clauses.push(distClause);
-    query = query.or(clauses.join(","));
+    if (portalClause) clauses.push(portalClause);
+    qOrClause = clauses.join(",");
   }
 
-  const [{ data, count: propertyTotal }, provinces, { data: branches }, propertyTypeDefs, transactionTypeDefs, fxRates] = await Promise.all([
-    query,
+  const statusValues = statusFilter !== "all" ? STATUS_DB_VALUES[statusFilter] : undefined;
+  const saglikValues = saglikFilter ? SAGLIK_DB_VALUES[saglikFilter] : undefined;
+
+  // Ortak filtre kurucu — deleted_at + durum + arama. Sağlık HARİÇ: sağlık
+  // dağılımı çipleri her sağlık değeri için ayrı sayıldığından temel sorguda
+  // sağlık filtresi olmaz (aksi halde çip sayıları kendi filtresini yer).
+  const buildBaseQuery = (select: string, opts?: { count: "exact"; head?: boolean }) => {
+    let query = supabase.from("properties").select(select, opts).is("deleted_at", null);
+    if (statusValues) query = query.in("status", statusValues);
+    if (qOrClause) query = query.or(qOrClause);
+    return query;
+  };
+  const buildFilteredQuery = (select: string, opts?: { count: "exact"; head?: boolean }) => {
+    let query = buildBaseQuery(select, opts);
+    if (saglikValues) query = query.in("price_health", saglikValues);
+    return query;
+  };
+
+  const LIST_COLS =
+    "id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, published_at, province_id, district_id, lat, lng, province:geo_provinces(name), district:geo_districts(name), portal_listings(portal_name,status,last_confirmed_at)";
+  const MAP_COLS = "id, property_code, title, transaction_type, list_price, lat, lng";
+
+  // Liste görünümü sunucu-sayfalı; harita görünümü tüm konumlu sonuçları (cap) çeker.
+  const listQuery =
+    view === "liste"
+      ? buildFilteredQuery(LIST_COLS)
+          .order("created_at", { ascending: false })
+          .range(offset, offset + PAGE_SIZE - 1)
+      : Promise.resolve({ data: null });
+  const mapQuery =
+    view === "harita"
+      ? buildFilteredQuery(MAP_COLS, { count: "exact" })
+          .not("lat", "is", null)
+          .not("lng", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(MAP_LIMIT)
+      : Promise.resolve({ data: null, count: null });
+
+  const [
+    { data },
+    { data: mapData, count: mapLocatedTotal },
+    { count: filteredTotal },
+    provinces,
+    { data: branches },
+    propertyTypeDefs,
+    transactionTypeDefs,
+    fxRates,
+    { count: totalCount },
+    { count: liveCount },
+    { count: portalCount },
+    { count: greenCount },
+    { count: yellowCount },
+    { count: redCount },
+    { data: valueRows },
+  ] = await Promise.all([
+    listQuery,
+    mapQuery,
+    // Filtrelenmiş gerçek toplam — hem sayfalama ("X-Y / Toplam Z") hem de
+    // harita görünümünde konumsuz portföy sayısı için tek doğruluk kaynağı.
+    buildFilteredQuery("id", { count: "exact", head: true }),
     // İl listesi 81 satırlık sabit referans verisi — istekler arası cache'li (src/lib/geo.ts)
     getProvincesCached(),
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
@@ -187,24 +263,42 @@ export default async function PropertiesPage({
     getDefinitions("transaction_type"),
     // TCMB kuru — yoksa null döner ve döviz satırı hiç basılmaz (uydurma kur yok).
     fetchLatestRates(supabase),
+    // KPI sayıları — liste artık sayfalı olduğundan head-count sorgularıyla
+    // gerçek toplamlar çekilir (satır taşımaz, yalnızca sayım döner).
+    supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null),
+    supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null).in("status", STATUS_DB_VALUES.live),
+    supabase.from("portal_listings").select("id", { count: "exact", head: true }).eq("status", "live"),
+    // Sağlık dağılımı — aktif q+durum bağlamında (sağlık HARİÇ) gerçek sayımlar
+    buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.iyi),
+    buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.izle),
+    buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.riskli),
+    // Toplam portföy değeri — hafif tek kolon; sayfa dilimi değil (makul üst sınırla).
+    supabase.from("properties").select("list_price").is("deleted_at", null).limit(VALUE_SUM_LIMIT),
   ]);
+
+  const rows = (data ?? []) as unknown as PropertyRow[];
+  const totalFilteredCount = filteredTotal ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalFilteredCount / PAGE_SIZE));
+  const rangeStart = totalFilteredCount === 0 ? 0 : offset + 1;
+  const rangeEnd = Math.min(offset + rows.length, totalFilteredCount);
 
   // Toplam portföy değeri + döviz karşılığı. Türk emlak piyasası fiilen
   // dolarize; ofis sahibi "kaç dolarlık portföyüm var" sorusunu soruyor.
-  const totalValueTry = (data ?? []).reduce((sum, p) => sum + Number((p as PropertyRow).list_price ?? 0), 0);
+  const totalValueTry = (valueRows ?? []).reduce(
+    (sum, p) => sum + Number((p as { list_price: number | null }).list_price ?? 0),
+    0,
+  );
   const totalValueFx = fxApproxLine(totalValueTry, fxRates);
   const fxTitle = fxRates ? `TCMB ${fxRates.rateDate} satış kuru — ${fxAgeLabel(fxRates.rateDate, now())}` : undefined;
-
-  const allProperties = (data ?? []) as PropertyRow[];
 
   // Kapak görselleri — tek ek sorgu; property_id -> media id eşlemesi.
   // Görsel /api/property-media/[id] üzerinden servis edilir (medya yöneticisiyle aynı yol).
   const coverByProperty = new Map<string, string>();
-  if (allProperties.length > 0) {
+  if (rows.length > 0) {
     const { data: covers } = await supabase
       .from("property_media")
       .select("id, property_id")
-      .in("property_id", allProperties.map((p) => p.id))
+      .in("property_id", rows.map((p) => p.id))
       .eq("kind", "image")
       .eq("is_cover", true);
     for (const cover of (covers ?? []) as { id: string; property_id: string }[]) {
@@ -217,41 +311,17 @@ export default async function PropertiesPage({
   const propertyTypeOptions = propertyTypeDefs.length ? propertyTypeDefs.map((d) => d.value) : undefined;
   const transactionTypeOptions = transactionTypeDefs.length ? transactionTypeDefs.map((d) => d.value) : undefined;
 
-  let properties = allProperties;
-
-  // Istemci tarafi ikinci elemeyi KALDIRDIK. Sunucu artik kod/baslik/adres/il/ilce
-   // uzerinden dogru filtreliyor; ayni suzgeci burada tekrar uygulamak konum
-   // eslesmelerini geri eliyordu (haystack'te ilce adi yoktu). Portal adiyla
-   // arama ise ayri bir kosul olarak asagida ekleniyor.
-  if (q) {
-    const needle = foldTr(q);
-    const portalOnly = allProperties.filter((property) =>
-      (property.portal_listings ?? []).some((p) => foldTr(p.portal_name).includes(needle)),
-    );
-    // Sunucu sonucuyla birlestir, id'ye gore tekille.
-    const seen = new Set(properties.map((p) => p.id));
-    for (const p of portalOnly) if (!seen.has(p.id)) { properties = [...properties, p]; seen.add(p.id); }
-  }
-
-  if (statusFilter !== "all") {
-    properties = properties.filter((property) => matchesStatusFilter(property.status, statusFilter));
-  }
-  // Fiyat sağlığı bellek filtresi — sayaçlar da aynı price_health kolonundan türediği için katman tutarlı.
-  if (saglikFilter) {
-    properties = properties.filter((property) => matchesSaglikFilter(property.price_health, saglikFilter));
-  }
-  const liveCount = allProperties.filter((property) => property.status === "live" || property.status === "Yayında").length;
-  const portalCount = allProperties.reduce((total, property) => total + (property.portal_listings?.filter((portal) => portal.status === "live").length ?? 0), 0);
-  const warningCount = allProperties.filter((property) => property.price_health === "yellow" || property.price_health === "red" || property.price_health === "Sarı").length;
-
-  const greenCount = allProperties.filter((p) => p.price_health === "green" || p.price_health === "Yeşil").length;
-  const yellowCount = allProperties.filter((p) => p.price_health === "yellow" || p.price_health === "Sarı").length;
-  const redCount = allProperties.filter((p) => p.price_health === "red" || p.price_health === "Kırmızı").length;
-  const healthTotal = Math.max(1, greenCount + yellowCount + redCount);
+  // Fiyat sağlığı dağılımı — head-count sorgularından (gerçek toplamlar).
+  const greenN = greenCount ?? 0;
+  const yellowN = yellowCount ?? 0;
+  const redN = redCount ?? 0;
+  const warningCount = yellowN + redN;
+  const healthKnownTotal = greenN + yellowN + redN;
+  const healthTotal = Math.max(1, healthKnownTotal);
   const healthSegments: { label: string; param: SaglikValue; count: number; bar: string; dot: string; text: string; delay: string }[] = [
-    { label: "İyi", param: "iyi", count: greenCount, bar: "bg-mint-500", dot: "bg-mint-400", text: "text-mint-400", delay: "0s" },
-    { label: "İzle", param: "izle", count: yellowCount, bar: "bg-amber-400", dot: "bg-amber-400", text: "text-amber-300", delay: "0.12s" },
-    { label: "Riskli", param: "riskli", count: redCount, bar: "bg-danger-500", dot: "bg-danger-500", text: "text-danger-400", delay: "0.24s" },
+    { label: "İyi", param: "iyi", count: greenN, bar: "bg-mint-500", dot: "bg-mint-400", text: "text-mint-400", delay: "0s" },
+    { label: "İzle", param: "izle", count: yellowN, bar: "bg-amber-400", dot: "bg-amber-400", text: "text-amber-300", delay: "0.12s" },
+    { label: "Riskli", param: "riskli", count: redN, bar: "bg-danger-500", dot: "bg-danger-500", text: "text-danger-400", delay: "0.24s" },
   ];
 
   // Mevcut q/status bağlamını koruyarak ?saglik= linki üret (kayip-kacak filterHref deseni).
@@ -275,18 +345,27 @@ export default async function PropertiesPage({
     return qs ? `/app/portfoyler?${qs}` : "/app/portfoyler";
   };
 
-  // Harita görünümü verisi — filtrelenmiş sonuç üzerinden; koordinatsızlar sayılıp bildirilir.
-  const locatedProperties = properties.filter(
-    (p) => typeof p.lat === "number" && typeof p.lng === "number" && !Number.isNaN(p.lat) && !Number.isNaN(p.lng),
-  );
-  const missingCoordCount = properties.length - locatedProperties.length;
-  const mapProperties = locatedProperties.map((p) => ({
+  // Sayfalama linki — aktif filtreleri koruyarak yalnız ?sayfa= değiştirir.
+  const pageHref = (target: number) => {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    if (statusFilter !== "all") sp.set("status", statusFilter);
+    if (saglikFilter) sp.set("saglik", saglikFilter);
+    if (target > 1) sp.set("sayfa", String(target));
+    const qs = sp.toString();
+    return qs ? `/app/portfoyler?${qs}` : "/app/portfoyler";
+  };
+
+  // Harita görünümü verisi — konumlu sonuçlar (cap); konumsuz portföy sayısı bildirilir.
+  const mapRows = (mapData ?? []) as unknown as MapRow[];
+  const mapProperties = mapRows.map((p) => ({
     id: p.id,
     title: p.title ?? p.property_code,
     price: formatPrice(p.list_price, p.transaction_type),
     lat: Number(p.lat),
     lng: Number(p.lng),
   }));
+  const missingCoordCount = Math.max(0, totalFilteredCount - (mapLocatedTotal ?? 0));
 
   return (
     <div className="space-y-6">
@@ -343,8 +422,8 @@ export default async function PropertiesPage({
               // İkonografi: "canlı portal" CircleCheck ile çiziliyordu; portal
               // kavramının tek ikonu ICONS.portal (RadioTower) — sidebar ve
               // raporlar ekranıyla aynı.
-              { label: "Aktif portföy", value: liveCount, icon: ICONS.portfoy, href: q ? `/app/portfoyler?q=${encodeURIComponent(q)}&status=live` : "/app/portfoyler?status=live" },
-              { label: "Canlı portal", value: portalCount, icon: ICONS.portal, href: "/app/portallar?durum=live" },
+              { label: "Aktif portföy", value: liveCount ?? 0, icon: ICONS.portfoy, href: q ? `/app/portfoyler?q=${encodeURIComponent(q)}&status=live` : "/app/portfoyler?status=live" },
+              { label: "Canlı portal", value: portalCount ?? 0, icon: ICONS.portal, href: "/app/portallar?durum=live" },
               { label: "Fiyat uyarısı", value: warningCount, icon: ICONS.alarm, href: saglikHref("riskli") },
             ].map((item) => (
               <Link
@@ -364,7 +443,7 @@ export default async function PropertiesPage({
           <div className="rounded-[16px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="flex items-center justify-between">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-white/75"><Gauge className="h-3.5 w-3.5 text-mint-400" /> Fiyat sağlığı dağılımı</p>
-              <span className="text-[11px] text-white/45">{allProperties.length} portföy</span>
+              <span className="text-[11px] text-white/45">{healthKnownTotal} portföy</span>
             </div>
             <div className="mt-4 flex h-3 gap-0.5 overflow-hidden rounded-full bg-white/10">
               {healthSegments.map((s) => (
@@ -426,14 +505,14 @@ export default async function PropertiesPage({
 
       {(q || statusFilter !== "all" || saglikFilter) && (
         <p className="flex items-center gap-2 text-xs text-text-muted">
-          <span className="rounded-full bg-brand-600/10 px-2.5 py-1 font-semibold text-brand-600">{properties.length} sonuç</span>
+          <span className="rounded-full bg-brand-600/10 px-2.5 py-1 font-semibold text-brand-600">{totalFilteredCount.toLocaleString("tr-TR")} sonuç</span>
           {q && <span>“{q}” için filtrelendi</span>}
           {saglikFilter && <span>Fiyat sağlığı: {SAGLIK_FILTERS.find((f) => f.value === saglikFilter)?.label}</span>}
           <Link href="/app/portfoyler" className="font-semibold text-brand-600 hover:underline">Filtreyi temizle</Link>
         </p>
       )}
 
-      {allProperties.length === 0 ? (
+      {(totalCount ?? 0) === 0 ? (
         <EmptyState
           icon={ICONS.portfoy}
           illustration="start"
@@ -452,7 +531,7 @@ export default async function PropertiesPage({
           }
           secondary={{ href: "/app/degerleme", label: "Önce değerleme yap" }}
         />
-      ) : properties.length === 0 ? (
+      ) : totalFilteredCount === 0 ? (
         <EmptyState
           icon={Search}
           illustration="search"
@@ -463,7 +542,7 @@ export default async function PropertiesPage({
         />
       ) : view === "harita" ? (
         <>
-          <ListLimitNotice shown={allProperties.length} total={propertyTotal} />
+          <ListLimitNotice shown={mapRows.length} total={mapLocatedTotal} hint="Haritada en fazla bu kadar konum çizilir; listeyi filtreyle daraltın." />
           <MapView properties={mapProperties} missingCount={missingCoordCount} />
         </>
       ) : (
@@ -472,12 +551,12 @@ export default async function PropertiesPage({
         <details className="group rounded-[16px] border border-line bg-surface">
           <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-text-muted transition hover:text-ink-950 [&::-webkit-details-marker]:hidden">
             <span>Toplu durum güncelle</span>
-            <span className="rounded-full bg-canvas px-2 py-0.5 text-xs text-text-faint group-open:hidden">{properties.length} portföy</span>
+            <span className="rounded-full bg-canvas px-2 py-0.5 text-xs text-text-faint group-open:hidden">{rows.length} portföy</span>
             <span className="hidden rounded-full bg-brand-600/10 px-2 py-0.5 text-xs text-brand-600 group-open:block">Kapat</span>
           </summary>
           <div className="border-t border-line px-4 pb-4 pt-3">
             <PropertyBulkActions
-              properties={properties.map((p) => ({
+              properties={rows.map((p) => ({
                 id: p.id,
                 property_code: p.property_code,
                 title: p.title,
@@ -487,10 +566,8 @@ export default async function PropertiesPage({
           </div>
         </details>
 
-        <ListLimitNotice shown={allProperties.length} total={propertyTotal} />
-
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {properties.map((property) => {
+          {rows.map((property) => {
             const portals = property.portal_listings ?? [];
             const healthGood = property.price_health === "green" || property.price_health === "Yeşil";
             const coverId = coverByProperty.get(property.id);
@@ -583,6 +660,39 @@ export default async function PropertiesPage({
             );
           })}
         </div>
+
+        {/* Sayfalama — filtre parametreleri linklerde korunur */}
+        {totalFilteredCount > 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <p className="numeric text-text-muted">
+              {rangeStart.toLocaleString("tr-TR")}–{rangeEnd.toLocaleString("tr-TR")} / Toplam{" "}
+              {totalFilteredCount.toLocaleString("tr-TR")}
+            </p>
+            <div className="flex items-center gap-1.5">
+              {page > 1 ? (
+                <Link href={pageHref(page - 1)} className={PAGER_BTN}>
+                  <ChevronLeft className="h-4 w-4" /> Önceki
+                </Link>
+              ) : (
+                <span className={PAGER_BTN_DISABLED} aria-disabled="true">
+                  <ChevronLeft className="h-4 w-4" /> Önceki
+                </span>
+              )}
+              <span className="numeric px-1 text-text-faint">
+                {Math.min(page, totalPages)} / {totalPages}
+              </span>
+              {page < totalPages ? (
+                <Link href={pageHref(page + 1)} className={PAGER_BTN}>
+                  Sonraki <ChevronRight className="h-4 w-4" />
+                </Link>
+              ) : (
+                <span className={PAGER_BTN_DISABLED} aria-disabled="true">
+                  Sonraki <ChevronRight className="h-4 w-4" />
+                </span>
+              )}
+            </div>
+          </div>
+        ) : null}
 
         {/* Karşılaştırma alt çubuğu + tam ekran tablo — seçim varken görünür (oturumluk) */}
         <CompareBar />

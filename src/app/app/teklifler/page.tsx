@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, Banknote, CalendarRange, CheckCircle2, Percent, Tag, Timer } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Banknote, CalendarRange, CheckCircle2, ChevronLeft, ChevronRight, Percent, Tag, Timer } from "lucide-react";
 import { now } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
 import { StatCard } from "@/components/app/stat-card";
@@ -46,6 +46,14 @@ function one<T>(v: T | T[] | null | undefined): T | null {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Sayfa başına kayıt — gerçek sayfalama, 100'lük sessiz dilim yerine. */
+const PAGE_SIZE = 50;
+
+const PAGER_BTN =
+  "focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+const PAGER_BTN_DISABLED =
+  "inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
+
 function fmtDate(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -68,7 +76,7 @@ function qs(params: Record<string, string | null | undefined>) {
 export default async function TekliflerPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; from?: string; to?: string; musteri?: string; portfoy?: string }>;
+  searchParams?: Promise<{ durum?: string; from?: string; to?: string; musteri?: string; portfoy?: string; sayfa?: string }>;
 }) {
   const { perms } = await requireModulePage("offers");
   const canCreate = perms.offers?.includes("create") ?? perms.commissions?.includes("create") ?? false;
@@ -85,13 +93,21 @@ export default async function TekliflerPage({
   const from = ISO_DATE.test(params.from ?? "") ? params.from! : null;
   const to = ISO_DATE.test(params.to ?? "") ? params.to! : null;
 
-  // Mevcut filtreleri koruyan link üretici
+  const page = Math.max(1, Number.parseInt(params.sayfa ?? "", 10) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
+
+  // Mevcut filtreleri koruyan link üretici. Filtre değişince sayfa 1'e döner:
+  // href sayfa parametresini taşımaz.
   const href = (next: { durum?: string | null; from?: string | null; to?: string | null }) =>
     `/app/teklifler${qs({
       durum: next.durum === undefined ? durum : next.durum,
       from: next.from === undefined ? from : next.from,
       to: next.to === undefined ? to : next.to,
     })}`;
+
+  // Sayfalama linki — aktif filtreleri korur, yalnız sayfayı değiştirir.
+  const pageHref = (n: number) =>
+    `/app/teklifler${qs({ durum, from, to, sayfa: n > 1 ? String(n) : null })}`;
 
   // Hızlı tarih çipleri — zaman okuması clock.ts üzerinden (tek kaynak)
   const nowD = new Date(now());
@@ -107,17 +123,20 @@ export default async function TekliflerPage({
   // listOffers ID döndürmediği için sorgu burada.
   let offerQuery = supabase
     .from("offers")
+    // count: "exact" — sayfalama ("X-Y / Toplam Z") gerçek toplamı ister;
+    // sayı aynı yanıtta gelir, ek gidiş-dönüş yok.
     .select(
       "id, amount, counter_amount, status, created_at, property_id, customer_id, property:properties(id, property_code, title), customer:customers(id, full_name)",
+      { count: "exact" },
     )
     .order("created_at", { ascending: false })
-    .limit(100);
+    .range(offset, offset + PAGE_SIZE - 1);
   if (durum) offerQuery = offerQuery.eq("status", durum);
   // ?from=&to= sunucu filtresi — created_at aralığı, uç gün dahil
   if (from) offerQuery = offerQuery.gte("created_at", from);
   if (to) offerQuery = offerQuery.lt("created_at", nextDay(to));
 
-  const [{ data: offerData }, { data: statusData }, { data: propData }, { data: custData }] = await Promise.all([
+  const [{ data: offerData, count: offerTotal }, { data: statusData }, { data: propData }, { data: custData }] = await Promise.all([
     offerQuery,
     // KPI sayıları/tutarları filtreden bağımsız: hero her zaman tüm kümeyi anlatır
     supabase.from("offers").select("status, amount, counter_amount").limit(1000),
@@ -199,6 +218,12 @@ export default async function TekliflerPage({
       customer_name: c?.full_name ?? null,
     };
   });
+
+  // Sayfalama — filtrelenmiş gerçek toplam (KPI'lardan bağımsız)
+  const totalFiltered = offerTotal ?? offers.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
+  const rangeStart = totalFiltered === 0 ? 0 : offset + 1;
+  const rangeEnd = Math.min(offset + offers.length, totalFiltered);
 
   const allOffers = (statusData ?? []).map((r) => ({
     status: r.status as string,
@@ -391,7 +416,7 @@ export default async function TekliflerPage({
               </Link>
             ))}
             <span className="numeric ml-auto text-[11px] font-medium tracking-wide text-text-faint">
-              {offers.length} kayıt
+              {totalFiltered.toLocaleString("tr-TR")} kayıt
             </span>
           </div>
 
@@ -438,6 +463,7 @@ export default async function TekliflerPage({
               </Link>
             </div>
           ) : (
+            <>
             <TableFrame minWidth={720}>
               <Table>
                 <THead>
@@ -497,6 +523,40 @@ export default async function TekliflerPage({
                 </TBody>
               </Table>
             </TableFrame>
+
+            {/* Sayfalama — filtreler linklerde korunur */}
+            {totalFiltered > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                <p className="numeric text-text-muted">
+                  {rangeStart.toLocaleString("tr-TR")}–{rangeEnd.toLocaleString("tr-TR")} / Toplam{" "}
+                  {totalFiltered.toLocaleString("tr-TR")}
+                </p>
+                <div className="flex items-center gap-1.5">
+                  {page > 1 ? (
+                    <Link href={pageHref(page - 1)} className={PAGER_BTN}>
+                      <ChevronLeft className="h-4 w-4" /> Önceki
+                    </Link>
+                  ) : (
+                    <span className={PAGER_BTN_DISABLED} aria-disabled="true">
+                      <ChevronLeft className="h-4 w-4" /> Önceki
+                    </span>
+                  )}
+                  <span className="numeric px-1 text-text-faint">
+                    {Math.min(page, totalPages)} / {totalPages}
+                  </span>
+                  {page < totalPages ? (
+                    <Link href={pageHref(page + 1)} className={PAGER_BTN}>
+                      Sonraki <ChevronRight className="h-4 w-4" />
+                    </Link>
+                  ) : (
+                    <span className={PAGER_BTN_DISABLED} aria-disabled="true">
+                      Sonraki <ChevronRight className="h-4 w-4" />
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : null}
+            </>
           )}
         </>
       )}

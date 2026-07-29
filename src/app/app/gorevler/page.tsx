@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlarmClock, ArrowUpRight, CalendarClock, CheckCircle2, Repeat, Sunrise } from "lucide-react";
+import { AlarmClock, ArrowUpRight, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Repeat, Sunrise } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DAY_MS, daysFromNowIso, now } from "@/lib/clock";
@@ -7,10 +7,17 @@ import { NewTaskDialog } from "./new-task-dialog";
 import { TaskCard, type TaskRow } from "./task-card";
 import { TaskBulkList } from "./task-bulk-list";
 import { EmptyState } from "@/components/app/empty-state";
-import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { ICONS } from "@/lib/icons";
 
 export const dynamic = "force-dynamic";
+
+/** Sayfa başına görev — gerçek sayfalama (blind .limit yerine). */
+const PAGE_SIZE = 50;
+
+const PAGER_BTN =
+  "focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+const PAGER_BTN_DISABLED =
+  "inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
 const FILTERS = [
   { key: "open", label: "Açık" },
@@ -44,7 +51,7 @@ function endOfToday() {
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ filter?: string; mine?: string; tur?: string; tekrar?: string }>;
+  searchParams?: Promise<{ filter?: string; mine?: string; tur?: string; tekrar?: string; sayfa?: string }>;
 }) {
   const ctx = await requireModulePage("tasks");
   const canEdit = (ctx.perms.tasks ?? []).includes("edit");
@@ -55,8 +62,11 @@ export default async function TasksPage({
   const mine = params.mine === "1";
   const tur = KIND_FILTERS.some((k) => k.key === params.tur) ? params.tur! : "";
   const tekrar = params.tekrar === "1";
+  const page = Math.max(1, Number.parseInt(params.sayfa ?? "", 10) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
 
   // Filtre linkleri diğer parametreleri korur (filter ⇄ mine ⇄ tur ⇄ tekrar bağımsız).
+  // sayfa taşınmaz — çip değişince liste 1. sayfaya döner (filtre kontratı).
   const taskHref = (patch: { filter?: string; mine?: boolean; tur?: string; tekrar?: boolean }) => {
     const f = patch.filter !== undefined ? patch.filter : filter;
     const m = patch.mine !== undefined ? patch.mine : mine;
@@ -67,6 +77,17 @@ export default async function TasksPage({
     if (m) q.set("mine", "1");
     if (t) q.set("tur", t);
     if (r) q.set("tekrar", "1");
+    return `/app/gorevler?${q.toString()}`;
+  };
+
+  // Sayfalama linki — mevcut filtreleri korur, yalnız ?sayfa değişir.
+  const pageHref = (n: number) => {
+    const q = new URLSearchParams();
+    q.set("filter", filter);
+    if (mine) q.set("mine", "1");
+    if (tur) q.set("tur", tur);
+    if (tekrar) q.set("tekrar", "1");
+    if (n > 1) q.set("sayfa", String(n));
     return `/app/gorevler?${q.toString()}`;
   };
 
@@ -86,8 +107,11 @@ export default async function TasksPage({
   if (tur) query = query.eq("kind", tur);
   if (tekrar) query = query.not("recurrence", "is", null);
 
+  // Eskiden her dal sabit .limit(100/200) ile kırpıyordu; 200'ü aşan ofiste
+  // "Daha sonra"/"Tarihsiz" görevler sessizce düşüyordu. Artık gerçek sayfalama:
+  // dal yalnız sıralamayı belirler, .range() aşağıda tek yerde uygulanır.
   if (filter === "done") {
-    query = query.eq("status", "done").order("completed_at", { ascending: false }).limit(100);
+    query = query.eq("status", "done").order("completed_at", { ascending: false });
   } else if (filter === "overdue") {
     query = query.eq("status", "open").lt("due_at", new Date(now()).toISOString()).order("due_at", { ascending: true });
   } else if (filter === "yaklasan") {
@@ -96,8 +120,7 @@ export default async function TasksPage({
       .eq("status", "open")
       .gte("due_at", new Date(now()).toISOString())
       .lte("due_at", daysFromNowIso(7))
-      .order("due_at", { ascending: true })
-      .limit(200);
+      .order("due_at", { ascending: true });
   } else if (filter === "today") {
     query = query
       .eq("status", "open")
@@ -105,10 +128,11 @@ export default async function TasksPage({
       .lte("due_at", endOfToday().toISOString())
       .order("due_at", { ascending: true });
   } else if (filter === "all") {
-    query = query.order("created_at", { ascending: false }).limit(200);
+    query = query.order("created_at", { ascending: false });
   } else {
-    query = query.eq("status", "open").order("due_at", { ascending: true, nullsFirst: false }).limit(200);
+    query = query.eq("status", "open").order("due_at", { ascending: true, nullsFirst: false });
   }
+  query = query.range(offset, offset + PAGE_SIZE - 1);
 
   const [{ data: tasksData, count: taskTotal }, { data: members }, { data: customers }, counts] = await Promise.all([
     query,
@@ -135,6 +159,12 @@ export default async function TasksPage({
   ]);
 
   const tasks = (tasksData ?? []) as unknown as TaskRow[];
+
+  // Sayfalama toplamları — count filtreye (mine/tür/tekrar) duyarlı gerçek toplam.
+  const totalFiltered = taskTotal ?? tasks.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
+  const rangeStart = totalFiltered === 0 ? 0 : offset + 1;
+  const rangeEnd = Math.min(offset + tasks.length, totalFiltered);
 
   // "Açık" görünümünde görevler zaman şeritlerine ayrılır:
   // Gecikmiş → Bugün → Yaklaşan (7 gün) → Daha sonra → Tarihsiz.
@@ -302,12 +332,45 @@ export default async function TasksPage({
         />
       ) : (
         <div className="space-y-2">
-          <ListLimitNotice shown={tasks.length} total={taskTotal} hint="Filtre uygulayarak daraltın." />
           {/* Toplu tamamlama: checkbox seçimi + tek .in() UPDATE (completeTasksBulk).
-              Açık görünümde kartlar zaman şeritleriyle gruplanır. */}
+              Açık görünümde kartlar zaman şeritleriyle gruplanır (şeritler sayfa
+              dilimi içinde çalışır — sayfalama gruplamayı/toplu işlemi bozmaz). */}
           <TaskBulkList items={bulkItems} />
         </div>
       )}
+
+      {/* Sayfalama — filtre parametreleri linklerde korunur */}
+      {totalFiltered > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <p className="numeric text-text-muted">
+            {rangeStart.toLocaleString("tr-TR")}–{rangeEnd.toLocaleString("tr-TR")} / Toplam{" "}
+            {totalFiltered.toLocaleString("tr-TR")}
+          </p>
+          <div className="flex items-center gap-1.5">
+            {page > 1 ? (
+              <Link href={pageHref(page - 1)} className={PAGER_BTN}>
+                <ChevronLeft className="h-4 w-4" /> Önceki
+              </Link>
+            ) : (
+              <span className={PAGER_BTN_DISABLED} aria-disabled="true">
+                <ChevronLeft className="h-4 w-4" /> Önceki
+              </span>
+            )}
+            <span className="numeric px-1 text-text-faint">
+              {Math.min(page, totalPages)} / {totalPages}
+            </span>
+            {page < totalPages ? (
+              <Link href={pageHref(page + 1)} className={PAGER_BTN}>
+                Sonraki <ChevronRight className="h-4 w-4" />
+              </Link>
+            ) : (
+              <span className={PAGER_BTN_DISABLED} aria-disabled="true">
+                Sonraki <ChevronRight className="h-4 w-4" />
+              </span>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

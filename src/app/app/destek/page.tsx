@@ -2,6 +2,8 @@ import Link from "next/link";
 import {
   ArrowUpRight,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Hourglass,
   LifeBuoy,
@@ -12,12 +14,19 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getDefinitions } from "@/lib/definitions";
-import { DAY_MS, msSince } from "@/lib/clock";
+import { safeLike } from "@/lib/pgrst";
+import { DAY_MS, daysAgoIso, msSince } from "@/lib/clock";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { NewTicketDialog } from "./new-ticket-dialog";
 import type { CSSProperties } from "react";
 
 const RING_C = 2 * Math.PI * 42;
+
+/** Sayfa başına kayıt — gerçek sayfalama, 100'lük dilim + bellek filtresi yerine. */
+const PAGE_SIZE = 50;
+
+/** "Açık / bekleyen" bileşimi — tek doğruluk kaynağı (KPI, ring, liste sorgusu). */
+const ACIK_STATUSES = ["open", "in_progress", "waiting"] as const;
 
 const statusLabel: Record<string, string> = {
   open: "Açık",
@@ -67,51 +76,116 @@ const priorityCls: Record<string, string> = {
   urgent: "bg-danger-500/10 text-danger-500",
 };
 
-/*
- * URL kontratı — üç bağımsız filtre, hepsi bu sayfada okunur:
- *  ?durum=   ham durum değerleri + "acik" bileşimi (open+in_progress+waiting)
- *  ?kategori= talep kategorisi (general|billing|bug|...)
- *  ?ara=     konu içinde serbest metin (tr-küçük harf karşılaştırma)
- */
-function matchesDurum(status: string, durum: string) {
-  if (!durum) return true;
-  if (durum === "acik") return status === "open" || status === "in_progress" || status === "waiting";
-  return status === durum;
-}
+const PAGER_BTN =
+  "focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600";
+const PAGER_BTN_DISABLED =
+  "inline-flex items-center gap-1 rounded-[9px] border border-line px-2.5 py-1.5 text-xs font-semibold text-text-faint opacity-50";
+
+const statusKeys = ["open", "in_progress", "waiting", "resolved", "closed"] as const;
 
 export default async function SupportPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; kategori?: string; ara?: string }>;
+  searchParams?: Promise<{ durum?: string; kategori?: string; ara?: string; sayfa?: string }>;
 }) {
   await requireModulePage("support");
   const sp = (await searchParams) ?? {};
   const durum = sp.durum ?? "";
   const kategori = sp.kategori ?? "";
   const ara = (sp.ara ?? "").trim();
+  const pageParam = Math.max(1, Number.parseInt(sp.sayfa ?? "1", 10) || 1);
+  const offset = (pageParam - 1) * PAGE_SIZE;
 
   const supabase = await createClient();
-  const [{ data: tickets }, categoryDefs] = await Promise.all([
-    supabase
-      .from("support_tickets")
-      .select("id, subject, category, priority, status, created_at, updated_at")
-      .order("created_at", { ascending: false })
-      .limit(100),
-    getDefinitions("ticket_category"),
-  ]);
 
+  // Kategori tanımlarını önce çekiyoruz: dağılım sayaçları tanım listesinden
+  // türeyen aday kategoriler üzerinden (head-count) hesaplanır.
+  const categoryDefs = await getDefinitions("ticket_category");
   const categoryOptions = categoryDefs.length
     ? categoryDefs.map((d) => ({ value: d.value, label: d.label }))
     : undefined;
   const catName = (v: string) =>
     categoryOptions?.find((c) => c.value === v)?.label ?? catLabel[v] ?? v;
+  const candidateCategories = Array.from(
+    new Set([...categoryDefs.map((d) => d.value), ...Object.keys(catLabel)]),
+  );
 
-  const rows = tickets ?? [];
-  const openCount = rows.filter((t) => t.status === "open" || t.status === "in_progress" || t.status === "waiting").length;
-  const resolved = rows.filter((t) => t.status === "resolved").length;
-  const waitingCount = rows.filter((t) => t.status === "waiting").length;
+  // ── Sunucu tarafı filtreleme + gerçek sayfalama ───────────────────────────
+  // Eskiden 100 kayıt çekilip bellekte (durum/kategori/arama) süzülüyordu;
+  // 100'ü aşan ofiste filtre sessizce "sonuç yok" diyordu. Artık tüm filtreler
+  // sorguda, liste .range() ile sayfalanır, sayaçlar ayrı head-count'lardan.
+  let listQuery = supabase
+    .from("support_tickets")
+    .select("id, subject, category, priority, status, created_at, updated_at", { count: "exact" })
+    .order("created_at", { ascending: false });
+  if (durum === "acik") listQuery = listQuery.in("status", ACIK_STATUSES as unknown as string[]);
+  else if (durum) listQuery = listQuery.eq("status", durum);
+  if (kategori) listQuery = listQuery.eq("category", kategori);
+  if (ara) listQuery = listQuery.ilike("subject", safeLike(ara));
 
-  /** Aktif filtreleri koruyarak href üretir — çipler URL'i iki yönlü günceller. */
+  const headCount = (patch: (b: ReturnType<typeof baseCount>) => ReturnType<typeof baseCount>) =>
+    patch(baseCount());
+  function baseCount() {
+    return supabase.from("support_tickets").select("id", { count: "exact", head: true });
+  }
+
+  const weekAgoIso = daysAgoIso(7);
+
+  const [
+    { data: pageData, count: listCount },
+    { count: totalCount },
+    statusCountResults,
+    { count: weekCount },
+    { data: oldestOpenRows },
+    { data: lastUpdatedRows },
+    categoryCountResults,
+  ] = await Promise.all([
+    listQuery.range(offset, offset + PAGE_SIZE - 1),
+    headCount((b) => b),
+    Promise.all(
+      statusKeys.map(async (k) => {
+        const { count } = await headCount((b) => b.eq("status", k));
+        return [k, count ?? 0] as const;
+      }),
+    ),
+    headCount((b) => b.gte("created_at", weekAgoIso)),
+    // En eski açık talep — ayrı dar sorgu (en eskiden yeniye, ilk kayıt).
+    supabase
+      .from("support_tickets")
+      .select("id, subject, created_at")
+      .in("status", ACIK_STATUSES as unknown as string[])
+      .order("created_at", { ascending: true })
+      .limit(1),
+    // Son hareket — en yeni güncelleme.
+    supabase
+      .from("support_tickets")
+      .select("id, subject, created_at, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(1),
+    Promise.all(
+      candidateCategories.map(async (cat) => {
+        const { count } = await headCount((b) => b.eq("category", cat));
+        return [cat, count ?? 0] as const;
+      }),
+    ),
+  ]);
+
+  const pageRows = pageData ?? [];
+  const filteredCount = listCount ?? 0;
+  const grandTotal = totalCount ?? 0;
+
+  const statusCountMap = new Map(statusCountResults);
+  const countOf = (k: string) => statusCountMap.get(k as (typeof statusKeys)[number]) ?? 0;
+  const openCount = ACIK_STATUSES.reduce((s, k) => s + countOf(k), 0);
+  const resolved = countOf("resolved");
+  const waitingCount = countOf("waiting");
+  const week = weekCount ?? 0;
+
+  const oldestOpen = oldestOpenRows?.[0] ?? null;
+  const oldestOpenDays = oldestOpen ? Math.floor(msSince(oldestOpen.created_at) / DAY_MS) : null;
+  const lastUpdated = lastUpdatedRows?.[0] ?? null;
+
+  /** Aktif filtreleri koruyarak href üretir — filtre değişince sayfa 1'e döner. */
   const buildHref = (patch: { durum?: string | null; kategori?: string | null; ara?: string | null }) => {
     const params = new URLSearchParams();
     const d = patch.durum === undefined ? durum : patch.durum ?? "";
@@ -124,46 +198,41 @@ export default async function SupportPage({
     return qs ? `/app/destek?${qs}` : "/app/destek";
   };
 
-  // KPI/halka tüm kayıtlardan; liste durum + kategori + arama ile daralır.
-  const araLower = ara.toLocaleLowerCase("tr-TR");
-  const visible = rows.filter(
-    (t) =>
-      matchesDurum(t.status, durum) &&
-      (!kategori || t.category === kategori) &&
-      (!araLower || (t.subject ?? "").toLocaleLowerCase("tr-TR").includes(araLower)),
-  );
+  /** Sayfalama linki — aktif filtreler korunur, yalnız sayfa değişir. */
+  const pageHref = (n: number) => {
+    const params = new URLSearchParams();
+    if (durum) params.set("durum", durum);
+    if (kategori) params.set("kategori", kategori);
+    if (ara) params.set("ara", ara);
+    if (n > 1) params.set("sayfa", String(n));
+    const qs = params.toString();
+    return qs ? `/app/destek?${qs}` : "/app/destek";
+  };
 
-  const statusKeys = ["open", "in_progress", "waiting", "resolved", "closed"] as const;
+  const ringTotal = Math.max(1, grandTotal);
   const statusCounts = statusKeys.map((k) => ({
     key: k,
     label: statusLabel[k],
-    count: rows.filter((t) => t.status === k).length,
+    count: countOf(k),
     color: statusColor[k],
   }));
-  const total = Math.max(1, rows.length);
-  let offset = 0;
+  let arcOffset = 0;
   const arcs = statusCounts.map((s) => {
-    const len = (s.count / total) * RING_C;
-    const item = { ...s, dash: len, offset };
-    offset += len;
+    const len = (s.count / ringTotal) * RING_C;
+    const item = { ...s, dash: len, offset: arcOffset };
+    arcOffset += len;
     return item;
   });
-  const resolveRate = rows.length ? resolved / rows.length : 0;
+  const resolveRate = grandTotal ? resolved / grandTotal : 0;
 
-  // Kategori dağılımı — çipler ?kategori= ile listeyi süzer.
-  const categoryCounts = new Map<string, number>();
-  for (const t of rows) categoryCounts.set(t.category, (categoryCounts.get(t.category) ?? 0) + 1);
-  const categoryChips = [...categoryCounts.entries()].sort((a, b) => b[1] - a[1]);
+  // Kategori dağılımı — çipler ?kategori= ile listeyi süzer (gerçek sayımlar).
+  const categoryChips = categoryCountResults
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1]);
 
-  // İçgörüler — tamamı gerçek kayıtlardan türetilir.
-  const week = rows.filter((t) => msSince(t.created_at) <= 7 * DAY_MS).length;
-  const oldestOpen = [...rows]
-    .filter((t) => t.status === "open" || t.status === "in_progress" || t.status === "waiting")
-    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0];
-  const oldestOpenDays = oldestOpen ? Math.floor(msSince(oldestOpen.created_at) / DAY_MS) : null;
-  const lastUpdated = [...rows].sort(
-    (a, b) => new Date(b.updated_at ?? b.created_at).getTime() - new Date(a.updated_at ?? a.created_at).getTime(),
-  )[0];
+  const totalPages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
+  const rangeStart = filteredCount === 0 ? 0 : offset + 1;
+  const rangeEnd = Math.min(offset + pageRows.length, filteredCount);
 
   const filtersActive = Boolean(durum || kategori || ara);
 
@@ -187,7 +256,7 @@ export default async function SupportPage({
             {/* KPI kartları listeyi ?durum= parametresiyle süzer */}
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
-                { label: "Toplam talep", value: rows.length, cls: "text-white", durum: "" },
+                { label: "Toplam talep", value: grandTotal, cls: "text-white", durum: "" },
                 { label: "Açık / bekleyen", value: openCount, cls: "text-amber-300", durum: "acik" },
                 { label: "Yanıt bekleyen", value: waitingCount, cls: "text-cyan-400", durum: "waiting" },
                 { label: "Çözülen", value: resolved, cls: "text-mint-400", durum: "resolved" },
@@ -215,7 +284,7 @@ export default async function SupportPage({
               />
               <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
                 <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
-                {rows.length === 0 ? (
+                {grandTotal === 0 ? (
                   <circle
                     cx="50"
                     cy="50"
@@ -270,7 +339,7 @@ export default async function SupportPage({
       </section>
 
       {/* İçgörü kartları — tümü gerçek kayıtlardan */}
-      {rows.length > 0 ? (
+      {grandTotal > 0 ? (
         <section className="grid gap-3 sm:grid-cols-3">
           <Link
             href={buildHref({ durum: null, kategori: null, ara: null })}
@@ -334,11 +403,11 @@ export default async function SupportPage({
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <Clock3 className="h-4 w-4 text-brand-600" /> Talep geçmişi
               <span className="text-xs font-semibold text-text-faint">
-                {visible.length}/{rows.length}
+                {filteredCount.toLocaleString("tr-TR")}/{grandTotal.toLocaleString("tr-TR")}
               </span>
             </h2>
-            {rows.length > 0 ? (
-              /* Konu içinde arama — GET formu, ?ara= bu sayfada okunur */
+            {grandTotal > 0 ? (
+              /* Konu içinde arama — GET formu, ?ara= sorguya iner; sayfa sıfırlanır */
               <form action="/app/destek" className="relative">
                 {durum ? <input type="hidden" name="durum" value={durum} /> : null}
                 {kategori ? <input type="hidden" name="kategori" value={kategori} /> : null}
@@ -354,7 +423,7 @@ export default async function SupportPage({
               </form>
             ) : null}
           </div>
-          {rows.length > 0 ? (
+          {grandTotal > 0 ? (
             <div className="flex flex-wrap items-center gap-1.5">
               {[{ label: "Tümü", value: "" }, ...statusKeys.map((k) => ({ label: statusLabel[k], value: k as string }))].map((f) => (
                 <Link
@@ -386,7 +455,7 @@ export default async function SupportPage({
             </div>
           ) : null}
         </div>
-        {rows.length === 0 ? (
+        {grandTotal === 0 ? (
           <div className="relative grid place-items-center overflow-hidden px-6 py-16 text-center">
             <div className="pointer-events-none absolute left-1/2 top-6 h-32 w-32 -translate-x-1/2 rounded-full bg-mint-500/15 blur-[60px]" />
             <span className="relative grid h-14 w-14 place-items-center rounded-[16px] bg-mint-500/12 text-mint-600">
@@ -398,7 +467,7 @@ export default async function SupportPage({
               düğmesiyle ilk destek talebinizi oluşturun.
             </p>
           </div>
-        ) : visible.length === 0 ? (
+        ) : pageRows.length === 0 ? (
           <div className="grid place-items-center px-6 py-14 text-center">
             <LifeBuoy className="h-8 w-8 text-text-faint" />
             <p className="mt-3 font-display font-bold text-ink-950">
@@ -410,7 +479,7 @@ export default async function SupportPage({
           </div>
         ) : (
           <div className="divide-y divide-line">
-            {visible.map((t) => (
+            {pageRows.map((t) => (
               <Link
                 key={t.id}
                 href={`/app/destek/${t.id}`}
@@ -452,9 +521,41 @@ export default async function SupportPage({
             ))}
           </div>
         )}
+        {/* Sayfalama — filtreler linklerde korunur */}
+        {filteredCount > 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3 text-sm">
+            <p className="numeric text-xs text-text-muted">
+              {rangeStart.toLocaleString("tr-TR")}–{rangeEnd.toLocaleString("tr-TR")} / Toplam{" "}
+              {filteredCount.toLocaleString("tr-TR")}
+            </p>
+            <div className="flex items-center gap-1.5">
+              {pageParam > 1 ? (
+                <Link href={pageHref(pageParam - 1)} className={PAGER_BTN}>
+                  <ChevronLeft className="h-4 w-4" /> Önceki
+                </Link>
+              ) : (
+                <span className={PAGER_BTN_DISABLED} aria-disabled="true">
+                  <ChevronLeft className="h-4 w-4" /> Önceki
+                </span>
+              )}
+              <span className="numeric px-1 text-xs text-text-faint">
+                {Math.min(pageParam, totalPages)} / {totalPages}
+              </span>
+              {pageParam < totalPages ? (
+                <Link href={pageHref(pageParam + 1)} className={PAGER_BTN}>
+                  Sonraki <ChevronRight className="h-4 w-4" />
+                </Link>
+              ) : (
+                <span className={PAGER_BTN_DISABLED} aria-disabled="true">
+                  Sonraki <ChevronRight className="h-4 w-4" />
+                </span>
+              )}
+            </div>
+          </div>
+        ) : null}
       </section>
 
-      {filtersActive && rows.length > 0 ? (
+      {filtersActive && grandTotal > 0 ? (
         <p className="px-1 text-xs text-text-muted">
           Aktif filtre:{" "}
           {[

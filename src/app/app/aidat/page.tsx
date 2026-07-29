@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { Coins, TrendingUp, AlertTriangle, ArrowUpRight, CalendarRange, Gauge, X } from "lucide-react";
+import { Coins, TrendingUp, AlertTriangle, ArrowUpRight, CalendarRange, ChevronLeft, ChevronRight, Gauge, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
-import { DAY_MS, isPast, msSince } from "@/lib/clock";
-import { listDues } from "@/app/actions/dues";
+import { isPast, msSince, now, DAY_MS } from "@/lib/clock";
 import { DuesClient } from "./dues-client";
 
 export const metadata = { title: "Aidat & Ortak Gider" };
@@ -23,6 +22,24 @@ const DURUM_LABELS: Record<DurumFilter, string> = {
 
 const DONEM_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
+/** Sayfa başına aidat — gerçek sayfalama (300'lük dilim + bellek filtresi yerine). */
+const PAGE_SIZE = 50;
+/** KPI/şerit toplamları için aggregate havuzu üst sınırı (SUM için RPC yok). */
+const KPI_POOL_LIMIT = 2000;
+
+const PAGER_BTN =
+  "focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+const PAGER_BTN_DISABLED =
+  "inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
+
+/** ?donem=YYYY-MM için sonraki ayın ilk gününü döndürür (period aralığı için). */
+function nextMonthFirst(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  const ny = m === 12 ? y + 1 : y;
+  const nm = m === 12 ? 1 : m + 1;
+  return `${ny}-${String(nm).padStart(2, "0")}-01`;
+}
+
 /** Boş olmayan paramlardan query string üretir — mevcut filtreler korunur. */
 function qs(params: Record<string, string | null | undefined>) {
   const sp = new URLSearchParams();
@@ -31,28 +48,72 @@ function qs(params: Record<string, string | null | undefined>) {
   return s ? `?${s}` : "";
 }
 
+type DueLite = {
+  id: string;
+  title: string;
+  amount: number;
+  period: string;
+  due_date: string | null;
+  status: string;
+  notes: string | null;
+  property: { id: string; property_code: string; title: string | null } | { id: string; property_code: string; title: string | null }[] | null;
+};
+
 export default async function AidatPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; donem?: string }>;
+  searchParams?: Promise<{ durum?: string; donem?: string; sayfa?: string }>;
 }) {
-  const { perms } = await requireModulePage("expenses");
+  const { perms, tenantId } = await requireModulePage("expenses");
   const params = (await searchParams) ?? {};
   const durumF = DURUM_FILTERS.includes(params.durum as DurumFilter) ? (params.durum as DurumFilter) : "";
   const donemF = DONEM_RE.test(params.donem ?? "") ? params.donem! : "";
   const canCreate = perms.expenses?.includes("create") ?? false;
   const canEdit = perms.expenses?.includes("edit") ?? false;
+  const page = Math.max(1, Number.parseInt(params.sayfa ?? "", 10) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
 
-  // Mevcut filtreleri koruyan link üretici
+  // Mevcut filtreleri koruyan link üretici (sayfa taşınmaz — filtre değişince 1. sayfaya döner)
   const href = (next: { durum?: string | null; donem?: string | null }) =>
     `/app/aidat${qs({
       durum: next.durum === undefined ? durumF || null : next.durum,
       donem: next.donem === undefined ? donemF || null : next.donem,
     })}`;
 
+  // Sayfalama linki — mevcut filtreleri korur, yalnız ?sayfa değişir.
+  const pageHref = (n: number) =>
+    `/app/aidat${qs({ durum: durumF || null, donem: donemF || null, sayfa: n > 1 ? String(n) : null })}`;
+
   const supabase = await createClient();
-  const [dues, { data: propData }] = await Promise.all([
-    listDues(),
+  // Overdue = ödenmemiş + vadesi bugün ya da öncesi (isPast(due_date) semantiği).
+  const todayStr = new Date(now()).toISOString().slice(0, 10);
+
+  // ---- Sayfalanan liste: filtreler DB sorgusuna iner (eskiden 300 dilim +
+  //      bellek filtresi → 300'ü aşan ofiste ?durum/?donem "kayıt yok" diyordu).
+  let listQuery = supabase
+    .from("property_dues")
+    .select("id, title, amount, period, due_date, status, notes, property:properties(id, property_code, title)", { count: "exact" });
+  if (tenantId) listQuery = listQuery.eq("tenant_id", tenantId);
+  if (donemF) listQuery = listQuery.gte("period", `${donemF}-01`).lt("period", nextMonthFirst(donemF));
+  if (durumF === "paid") listQuery = listQuery.eq("status", "paid");
+  else if (durumF === "unpaid") listQuery = listQuery.neq("status", "paid");
+  else if (durumF === "overdue") listQuery = listQuery.neq("status", "paid").lte("due_date", todayStr);
+  listQuery = listQuery
+    .order("period", { ascending: false })
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .range(offset, offset + PAGE_SIZE - 1);
+
+  // ---- KPI/şerit havuzu: tüm kayıtlar (filtresiz) — tahsilat oranı, toplamlar,
+  //      geciken şeridi türetilmiş. SUM için RPC yok → hafif kolonlarla havuz çekilir.
+  let kpiQuery = supabase
+    .from("property_dues")
+    .select("id, title, amount, period, due_date, status, property:properties(id, property_code, title)");
+  if (tenantId) kpiQuery = kpiQuery.eq("tenant_id", tenantId);
+  kpiQuery = kpiQuery.order("period", { ascending: false }).limit(KPI_POOL_LIMIT);
+
+  const [{ data: listData, count: listCount }, { data: kpiData }, { data: propData }] = await Promise.all([
+    listQuery,
+    kpiQuery,
     supabase
       .from("properties")
       .select("id, property_code, title")
@@ -61,31 +122,28 @@ export default async function AidatPage({
       .limit(300),
   ]);
 
+  const filteredDues = (listData ?? []) as unknown as DueLite[];
+  const kpiDues = (kpiData ?? []) as unknown as DueLite[];
   const properties = (propData ?? []).map((p) => ({ id: p.id as string, property_code: p.property_code as string, title: p.title as string | null }));
 
-  // KPI'lar her zaman tüm kayıtlar üzerinden; ?durum= ve ?donem= yalnızca listeyi süzer
-  const isOverdue = (d: (typeof dues)[number]) => d.status !== "paid" && isPast(d.due_date);
-  const total = dues.reduce((s, d) => s + Number(d.amount), 0);
-  const unpaid = dues.filter((d) => d.status !== "paid").reduce((s, d) => s + Number(d.amount), 0);
+  // KPI'lar her zaman tüm kayıtlar (havuz) üzerinden; ?durum= ve ?donem= yalnızca listeyi süzer
+  const isOverdue = (d: DueLite) => d.status !== "paid" && isPast(d.due_date);
+  const total = kpiDues.reduce((s, d) => s + Number(d.amount), 0);
+  const unpaid = kpiDues.filter((d) => d.status !== "paid").reduce((s, d) => s + Number(d.amount), 0);
   const paidAmount = total - unpaid;
   // Tahsilat oranı — ödenen tutarın toplam tahakkuka oranı (tutar bazlı)
   const collectionRate = total > 0 ? Math.round((paidAmount / total) * 100) : 0;
-  const overdueDues = dues
+  const overdueDues = kpiDues
     .filter(isOverdue)
     .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)));
   const overdue = overdueDues.length;
   const overdueTotal = overdueDues.reduce((s, d) => s + Number(d.amount), 0);
 
-  // Dönem (ay) filtresi — period tarih kolonu, YYYY-MM öneki eşleştirilir
-  const periodDues = donemF ? dues.filter((d) => String(d.period ?? "").slice(0, 7) === donemF) : dues;
-  const filteredDues =
-    durumF === "paid"
-      ? periodDues.filter((d) => d.status === "paid")
-      : durumF === "unpaid"
-        ? periodDues.filter((d) => d.status !== "paid")
-        : durumF === "overdue"
-          ? periodDues.filter(isOverdue)
-          : periodDues;
+  // Sayfalama toplamları — count filtreye (durum/dönem) duyarlı gerçek toplam.
+  const totalFiltered = listCount ?? filteredDues.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
+  const rangeStart = totalFiltered === 0 ? 0 : offset + 1;
+  const rangeEnd = Math.min(offset + filteredDues.length, totalFiltered);
 
   const donemLabel = donemF
     ? new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(new Date(`${donemF}-01T00:00:00`))
@@ -257,11 +315,44 @@ export default async function AidatPage({
               </Link>
             </span>
           ) : null}
-          <span className="numeric text-xs text-text-faint">{filteredDues.length} kayıt</span>
+          <span className="numeric text-xs text-text-faint">{totalFiltered.toLocaleString("tr-TR")} kayıt</span>
         </div>
       ) : null}
 
       <DuesClient dues={filteredDues as Parameters<typeof DuesClient>[0]["dues"]} properties={properties} canCreate={canCreate} canBulk={canEdit} />
+
+      {/* Sayfalama — filtre parametreleri linklerde korunur */}
+      {totalFiltered > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <p className="numeric text-text-muted">
+            {rangeStart.toLocaleString("tr-TR")}–{rangeEnd.toLocaleString("tr-TR")} / Toplam{" "}
+            {totalFiltered.toLocaleString("tr-TR")}
+          </p>
+          <div className="flex items-center gap-1.5">
+            {page > 1 ? (
+              <Link href={pageHref(page - 1)} className={PAGER_BTN}>
+                <ChevronLeft className="h-4 w-4" /> Önceki
+              </Link>
+            ) : (
+              <span className={PAGER_BTN_DISABLED} aria-disabled="true">
+                <ChevronLeft className="h-4 w-4" /> Önceki
+              </span>
+            )}
+            <span className="numeric px-1 text-text-faint">
+              {Math.min(page, totalPages)} / {totalPages}
+            </span>
+            {page < totalPages ? (
+              <Link href={pageHref(page + 1)} className={PAGER_BTN}>
+                Sonraki <ChevronRight className="h-4 w-4" />
+              </Link>
+            ) : (
+              <span className={PAGER_BTN_DISABLED} aria-disabled="true">
+                Sonraki <ChevronRight className="h-4 w-4" />
+              </span>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

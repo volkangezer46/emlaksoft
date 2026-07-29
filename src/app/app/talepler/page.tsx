@@ -2,6 +2,8 @@ import Link from "next/link";
 import {
   AlarmClock,
   ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Crosshair,
   MapPin,
@@ -12,14 +14,13 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { msSince } from "@/lib/clock";
+import { daysAgoIso, msSince } from "@/lib/clock";
 import {
   fetchTenantMatchingWeights,
   scoreDemandProperty,
   type MatchDemand,
   type MatchProperty,
 } from "@/lib/matching";
-import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { NewDemandListDialog } from "./new-demand-list-dialog";
 
 type Rel = { id?: string; full_name?: string; name?: string } | { id?: string; full_name?: string; name?: string }[] | null;
@@ -100,7 +101,7 @@ const BUDGET_BANDS = [
 ] as const;
 type BandKey = (typeof BUDGET_BANDS)[number]["key"];
 
-function bandOf(d: DemandRow): BandKey | null {
+function bandOf(d: { budget_min: number | null; budget_max: number | null }): BandKey | null {
   const v = d.budget_max ?? d.budget_min;
   if (v == null) return null;
   const n = Number(v);
@@ -108,10 +109,40 @@ function bandOf(d: DemandRow): BandKey | null {
   return band?.key ?? null;
 }
 
+/**
+ * Bütçe bandını Supabase `.or()` filtresine çevirir — segment bellekte değil
+ * sunucuda kesilsin (200'ü aşan ofiste band filtresi doğru çalışsın).
+ * Karar değeri: `coalesce(budget_max, budget_min)`; band aralığı (min, max].
+ */
+function budgetOrFilter(key: BandKey): string {
+  const band = BUDGET_BANDS.find((b) => b.key === key)!;
+  // İlk bant (min=0) 0 değerini de kapsar (bandOf'taki n===0 kuralı) → gte.
+  const lo = band.min === 0 ? "gte" : "gt";
+  const hiMax = Number.isFinite(band.max) ? `,budget_max.lte.${band.max}` : "";
+  const hiMin = Number.isFinite(band.max) ? `,budget_min.lte.${band.max}` : "";
+  return `and(budget_max.${lo}.${band.min}${hiMax}),and(budget_max.is.null,budget_min.${lo}.${band.min}${hiMin})`;
+}
+
+/** Sayfa başına kayıt — gerçek sayfalama, 200'lük sessiz dilim yerine. */
+const PAGE_SIZE = 50;
+
+/**
+ * Segmentasyon şeridi (bütçe bantları + en yoğun iller) havuz sınırı: bantlar
+ * TS'te (bandOf) türetildiğinden şerit sayıları filtrelenmiş listenin ilk
+ * POOL_LIMIT kaydından hesaplanır. Liste FİLTRESİ ise (il/bütçe/yaş) sunucuda
+ * çalışır — bu yüzden yalnız şerit "yaklaşık", liste her ofis boyutunda doğru.
+ */
+const POOL_LIMIT = 500;
+
+const PAGER_BTN =
+  "focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+const PAGER_BTN_DISABLED =
+  "inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
+
 export default async function DemandsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; aciliyet?: string; yas?: string; il?: string; butce?: string }>;
+  searchParams: Promise<{ status?: string; aciliyet?: string; yas?: string; il?: string; butce?: string; sayfa?: string }>;
 }) {
   const { perms } = await requireModulePage("demands");
   const canCreate = (perms.demands ?? []).includes("create");
@@ -126,59 +157,93 @@ export default async function DemandsPage({
     .filter((v) => URGENCY_VALUES.includes(v));
   const aciliyetF = aciliyetValues.join(",");
 
-  let query = supabase
-    .from("customer_demands")
-    // `count: "exact"`: liste 200 ile sınırlı, kullanıcıya kaç kaydın
-    // dışarıda kaldığını söyleyebilmek için gerçek toplam lazım.
-    .select(
-      "id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, province_id, district_id, customer:customers(id, full_name), province:geo_provinces(name)",
-      { count: "exact" },
-    )
-    .order("created_at", { ascending: false })
-    .limit(200);
+  // ── Liste-kesen kullanıcı filtreleri: ?il= (province_id) ?butce= ?yas= ──────
+  // Eskiden .limit(200) sonrası bellekte (array.filter) uygulanıyordu; 200'ü
+  // aşan ofiste filtre yalnız ilk 200 kayıtta çalışıp yanlış "sonuç yok"
+  // veriyordu. Artık üçü de Supabase sorgusuna itiliyor.
+  const ilF = (sp.il ?? "").trim();
+  const butceF = BUDGET_BANDS.some((b) => b.key === sp.butce) ? (sp.butce as BandKey) : "";
+  const yasF = sp.yas === String(AGING_DAYS);
 
-  if (sp.status && sp.status !== "all") {
-    query = query.eq("status", sp.status);
-  } else if (!sp.status) {
-    query = query.in("status", ["new", "active", "matched"]);
-  }
-  if (aciliyetValues.length > 0) {
-    query = query.in("urgency", aciliyetValues);
-  }
+  const page = Math.max(1, Number.parseInt(sp.sayfa ?? "", 10) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
+
+  // Ana sorgunun kolonları — hem sayfa dilimi hem segment havuzu bu setten çeker.
+  const LIST_COLS =
+    "id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, province_id, district_id, customer:customers(id, full_name), province:geo_provinces(name)";
+
+  // Temel filtreler (status + aciliyet) — hem listeye hem segment şeridi havuzuna.
+  const buildBase = (select: string, opts?: { count: "exact"; head?: boolean }) => {
+    let q = supabase.from("customer_demands").select(select, opts);
+    if (sp.status && sp.status !== "all") q = q.eq("status", sp.status);
+    else if (!sp.status) q = q.in("status", ["new", "active", "matched"]);
+    if (aciliyetValues.length > 0) q = q.in("urgency", aciliyetValues);
+    return q;
+  };
+
+  // Liste sorgusu = temel filtreler + il/bütçe/yaş (liste-kesen kullanıcı filtreleri).
+  const buildList = (select: string, opts?: { count: "exact"; head?: boolean }) => {
+    let q = buildBase(select, opts);
+    if (ilF) q = q.eq("province_id", ilF);
+    if (butceF) q = q.or(budgetOrFilter(butceF));
+    // Yaşlanan: 30+ gündür açık; kapalılar sayılmaz (orijinal bellek filtresiyle aynı).
+    if (yasF) q = q.lte("created_at", daysAgoIso(AGING_DAYS)).neq("status", "closed");
+    return q;
+  };
+
+  const listQuery = buildList(LIST_COLS, { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + PAGE_SIZE - 1);
 
   // "Yeni talep" dialogu için müşteri + il listesi — yalnız create yetkisi varken çekilir.
   // Eşleşme potansiyeli rozetleri için yayındaki portföyler + ofis ağırlıkları
   // aynı turda çekilir (eşleştirme motorunun aday havuzu deseni, dar select).
-  const [{ data, count: demandTotal }, { data: customersData }, { data: provincesData }, { data: propsData }, weights] =
-    await Promise.all([
-      query,
-      canCreate
-        ? supabase
-            .from("customers")
-            .select("id, full_name")
-            .is("deleted_at", null)
-            .order("created_at", { ascending: false })
-            .limit(300)
-        : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
-      canCreate
-        ? supabase.from("geo_provinces").select("id, name").order("name", { ascending: true })
-        : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-      supabase
-        .from("properties")
-        .select("id, property_code, title, transaction_type, property_type, status, list_price, province_id, district_id, features")
-        .is("deleted_at", null)
-        .in("status", ["live", "draft", "reserved", "Yayında"])
-        .order("created_at", { ascending: false })
-        .limit(300),
-      fetchTenantMatchingWeights(supabase),
-    ]);
-  const rows = (data ?? []) as DemandRow[];
+  const [
+    { data, count: demandTotal },
+    { count: urgentTotal },
+    { count: agingTotal },
+    { data: poolData },
+    { data: customersData },
+    { data: provincesData },
+    { data: propsData },
+    weights,
+  ] = await Promise.all([
+    listQuery,
+    // Hero "Acil / yüksek" — filtrelenmiş kümedeki gerçek toplam (sayfa dilimi değil).
+    buildList("id", { count: "exact", head: true }).in("urgency", ["urgent", "high"]),
+    // Yaşlanan uyarı şeridi — temel filtreler + 30+ gün açık (yaş filtresinden bağımsız).
+    buildBase("id", { count: "exact", head: true })
+      .lte("created_at", daysAgoIso(AGING_DAYS))
+      .neq("status", "closed"),
+    // Segment şeridi havuzu (bütçe bantları + en yoğun iller) — türetilmiş, ilk POOL_LIMIT.
+    buildBase("id, status, budget_min, budget_max, province_id, province:geo_provinces(name)").limit(POOL_LIMIT),
+    canCreate
+      ? supabase
+          .from("customers")
+          .select("id, full_name")
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false })
+          .limit(300)
+      : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+    canCreate
+      ? supabase.from("geo_provinces").select("id, name").order("name", { ascending: true })
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    supabase
+      .from("properties")
+      .select("id, property_code, title, transaction_type, property_type, status, list_price, province_id, district_id, features")
+      .is("deleted_at", null)
+      .in("status", ["live", "draft", "reserved", "Yayında"])
+      .order("created_at", { ascending: false })
+      .limit(300),
+    fetchTenantMatchingWeights(supabase),
+  ]);
+  const rows = (data ?? []) as unknown as DemandRow[];
   const dialogCustomers = customersData ?? [];
   const dialogProvinces = provincesData ?? [];
 
-  // ── Eşleşme potansiyeli: her açık talep, portföy havuzuna karşı skorlanır ──
-  // Gerçek eşleştirme motorundaki formül (lib/matching, ofis ağırlıklarıyla);
-  // güçlü ≥ 75 · iyi 55–74. Kapalı talepler skorlanmaz.
+  // ── Eşleşme potansiyeli: görünen sayfadaki her açık talep portföy havuzuna
+  // karşı skorlanır. Gerçek eşleştirme motorundaki formül (lib/matching,
+  // ofis ağırlıklarıyla); güçlü ≥ 75 · iyi 55–74. Kapalı talepler skorlanmaz.
   const matchProps = (propsData ?? []).map((p) => ({
     ...p,
     list_price: p.list_price != null ? Number(p.list_price) : null,
@@ -199,35 +264,41 @@ export default async function DemandsPage({
     matchByDemand.set(d.id, { strong, good, best });
   }
 
-  // ── Bellek filtreleri: ?il= ?butce= ?yas= (DB filtresi status/aciliyet üstüne) ──
-  const ilF = (sp.il ?? "").trim();
-  const butceF = BUDGET_BANDS.some((b) => b.key === sp.butce) ? (sp.butce as BandKey) : "";
-  const yasF = sp.yas === String(AGING_DAYS);
-  let view = rows;
-  if (ilF) view = view.filter((d) => relOne<{ name: string }>(d.province)?.name === ilF);
-  if (butceF) view = view.filter((d) => bandOf(d) === butceF);
-  if (yasF) view = view.filter((d) => d.status !== "closed" && ageDays(d.created_at) >= AGING_DAYS);
+  // ── Sayfalama + hero KPI'ları (gerçek toplamlar) ──────────────────────────
+  const totalFiltered = demandTotal ?? rows.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
+  const rangeStart = totalFiltered === 0 ? 0 : offset + 1;
+  const rangeEnd = Math.min(offset + rows.length, totalFiltered);
+  // Hero: "Listelenen" = filtrelenmiş toplam, "Acil/yüksek" = ayrı sayaç.
+  // "Eşleşme hazır" türetilmiş (skor motoru) → görünen sayfadan hesaplanır.
+  const openCount = totalFiltered;
+  const urgentCount = urgentTotal ?? 0;
+  const matchReadyCount = rows.filter((r) => (matchByDemand.get(r.id)?.strong ?? 0) > 0).length;
+  const agingCount = agingTotal ?? 0;
 
-  const openCount = view.filter((r) => r.status !== "closed").length;
-  const urgentCount = view.filter((r) => r.urgency === "urgent" || r.urgency === "high").length;
-  const matchReadyCount = view.filter((r) => (matchByDemand.get(r.id)?.strong ?? 0) > 0).length;
-
-  // Yaşlanan talepler: tüm listelenen kayıtlar üzerinden (filtre öncesi) uyarı.
-  const agingCount = rows.filter((d) => d.status !== "closed" && ageDays(d.created_at) >= AGING_DAYS).length;
-
-  // ── Segmentasyon şeridi verisi: bütçe bantları + en yoğun 5 il ────────────
+  // ── Segmentasyon şeridi: bütçe bantları + en yoğun 5 il (havuzdan, türetilmiş) ──
+  type PoolRow = { status: string; budget_min: number | null; budget_max: number | null; province_id: string | null; province: Rel };
+  const poolRows = (poolData ?? []) as unknown as PoolRow[];
   const bandCounts = new Map<BandKey, number>();
-  const provinceCounts = new Map<string, number>();
-  for (const d of rows) {
+  // İl sayaçları province_id ile tutulur (ad değil) — ?il= sunucuda .eq ile kesilsin.
+  const provinceCounts = new Map<string, { name: string; count: number }>();
+  for (const d of poolRows) {
     if (d.status === "closed") continue;
     const b = bandOf(d);
     if (b) bandCounts.set(b, (bandCounts.get(b) ?? 0) + 1);
+    const pid = d.province_id;
     const pn = relOne<{ name: string }>(d.province)?.name;
-    if (pn) provinceCounts.set(pn, (provinceCounts.get(pn) ?? 0) + 1);
+    if (pid && pn) {
+      const e = provinceCounts.get(pid) ?? { name: pn, count: 0 };
+      e.count += 1;
+      provinceCounts.set(pid, e);
+    }
   }
-  const topProvinces = [...provinceCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const topProvinces = [...provinceCounts.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 5);
+  const poolLimited = poolRows.length >= POOL_LIMIT;
 
   // Filtre linkleri diğer parametreleri korur (status ⇄ aciliyet ⇄ il ⇄ bütçe ⇄ yaş).
+  // Filtre değişince sayfa 1'e döner: demandHref sayfa parametresini taşımaz.
   const demandHref = (patch: { status?: string; aciliyet?: string; il?: string; butce?: string; yas?: string }) => {
     const status = patch.status !== undefined ? patch.status : (sp.status ?? "");
     const aciliyet = patch.aciliyet !== undefined ? patch.aciliyet : aciliyetF;
@@ -242,6 +313,13 @@ export default async function DemandsPage({
     if (yas) q.set("yas", yas);
     const s = q.toString();
     return s ? `/app/talepler?${s}` : "/app/talepler";
+  };
+
+  // Sayfalama linki — aktif filtreleri korur, yalnız sayfayı değiştirir.
+  const pageHref = (n: number) => {
+    const base = demandHref({});
+    if (n <= 1) return base;
+    return base + (base.includes("?") ? "&" : "?") + `sayfa=${n}`;
   };
 
   const filters = [
@@ -428,12 +506,12 @@ export default async function DemandsPage({
                 <span className="mr-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
                   <MapPin className="h-3.5 w-3.5 text-mint-600" /> Bölge
                 </span>
-                {topProvinces.map(([name, count]) => {
-                  const active = ilF === name;
+                {topProvinces.map(([id, { name, count }]) => {
+                  const active = ilF === id;
                   return (
                     <Link
-                      key={name}
-                      href={demandHref({ il: active ? "" : name })}
+                      key={id}
+                      href={demandHref({ il: active ? "" : id })}
                       aria-current={active ? "page" : undefined}
                       className={`focus-ring press inline-flex min-h-[32px] items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                         active
@@ -451,10 +529,16 @@ export default async function DemandsPage({
               </div>
             ) : null}
           </div>
+          {poolLimited ? (
+            <p className="mt-2 text-[11px] text-text-faint">
+              Segment sayıları filtrelenmiş listenin ilk {POOL_LIMIT.toLocaleString("tr-TR")} kaydından hesaplanır
+              (yaklaşık). Filtre uygulandığında liste tamamı sunucuda doğru daraltılır.
+            </p>
+          ) : null}
         </section>
       ) : null}
 
-      {view.length === 0 ? (
+      {rows.length === 0 ? (
         <div className="rounded-[20px] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
           <Target className="mx-auto h-8 w-8 text-text-faint" />
           <p className="mt-3 font-display text-lg font-bold text-ink-950">Bu filtrede talep yok</p>
@@ -470,8 +554,7 @@ export default async function DemandsPage({
         </div>
       ) : (
         <div className="grid gap-3">
-          <ListLimitNotice shown={rows.length} total={demandTotal} />
-          {view.map((d) => {
+          {rows.map((d) => {
             const customer = relOne<{ id: string; full_name: string }>(d.customer);
             const province = relOne<{ name: string }>(d.province);
             const match = d.status !== "closed" ? matchByDemand.get(d.id) : undefined;
@@ -557,6 +640,39 @@ export default async function DemandsPage({
           })}
         </div>
       )}
+
+      {/* Sayfalama — filtreler linklerde korunur */}
+      {totalFiltered > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <p className="numeric text-text-muted">
+            {rangeStart.toLocaleString("tr-TR")}–{rangeEnd.toLocaleString("tr-TR")} / Toplam{" "}
+            {totalFiltered.toLocaleString("tr-TR")}
+          </p>
+          <div className="flex items-center gap-1.5">
+            {page > 1 ? (
+              <Link href={pageHref(page - 1)} className={PAGER_BTN}>
+                <ChevronLeft className="h-4 w-4" /> Önceki
+              </Link>
+            ) : (
+              <span className={PAGER_BTN_DISABLED} aria-disabled="true">
+                <ChevronLeft className="h-4 w-4" /> Önceki
+              </span>
+            )}
+            <span className="numeric px-1 text-text-faint">
+              {Math.min(page, totalPages)} / {totalPages}
+            </span>
+            {page < totalPages ? (
+              <Link href={pageHref(page + 1)} className={PAGER_BTN}>
+                Sonraki <ChevronRight className="h-4 w-4" />
+              </Link>
+            ) : (
+              <span className={PAGER_BTN_DISABLED} aria-disabled="true">
+                Sonraki <ChevronRight className="h-4 w-4" />
+              </span>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
