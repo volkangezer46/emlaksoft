@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ArrowRight, Calculator, Info, TrendingUp } from "lucide-react";
-import { computeRentIncrease, TUFE_12M_AVG, tufeRateForMonth } from "@/lib/tufe";
+import { computeRentIncrease, TUFE_12M_AVG, hasOfficialTufe, tufeRateForMonth } from "@/lib/tufe";
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -21,17 +21,25 @@ export function RentCalculator({ months, latestMonth }: { months: string[]; late
   const [manualRate, setManualRate] = useState<string>("");
   const [useManual, setUseManual] = useState(false);
 
+  // 2026 gibi resmi 12 aylık ort. TÜFE'si henüz açıklanmamış aylarda otomatik oran
+  // UYGULAMAYIZ (Aralık 2025'e düşen fallback 2026 yenilemesi için yanlış yasal
+  // tavan olurdu). Bu aylarda manuel giriş zorunlu; yasal tavan da bilinmediğinden
+  // uygulanmaz — kullanıcı güncel resmi oranı girer.
+  const official = hasOfficialTufe(month);
   const tufe = tufeRateForMonth(month);
-  const legalCap = tufe.rate;
-  const appliedRate = useManual && manualRate ? Number(manualRate) : legalCap;
+  const legalCap = official ? tufe.rate : null;
+  const forceManual = !official;
+  const manualActive = useManual || forceManual;
+  const appliedRate = manualActive ? Number(manualRate || 0) : (legalCap ?? 0);
 
   // Not: burada useMemo yok — computeRentIncrease dört aritmetik işlem yapıyor,
   // manuel memoization hem gereksiz hem de React Compiler'ın kendi
   // memoization'ını uygulamasını engelliyordu (preserve-manual-memoization).
   const rentNum = Number(rent);
+  const hasRateInput = manualActive ? Number(manualRate) > 0 : legalCap != null;
   const result =
-    rentNum > 0
-      ? computeRentIncrease(rentNum, appliedRate, useManual ? legalCap : undefined)
+    rentNum > 0 && hasRateInput
+      ? computeRentIncrease(rentNum, appliedRate, manualActive ? (legalCap ?? undefined) : undefined)
       : null;
 
   return (
@@ -67,22 +75,35 @@ export function RentCalculator({ months, latestMonth }: { months: string[]; late
               className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
             >
               {months.map((m) => (
-                <option key={m} value={m}>{monthLabel(m)} — 12 aylık ort. TÜFE %{TUFE_12M_AVG[m]?.toFixed(2)}</option>
+                <option key={m} value={m}>
+                  {monthLabel(m)}
+                  {hasOfficialTufe(m)
+                    ? ` — 12 aylık ort. TÜFE %${TUFE_12M_AVG[m]?.toFixed(2)}`
+                    : " — resmi oran bekleniyor"}
+                </option>
               ))}
             </select>
-            {!tufe.exact ? (
-              <p className="mt-1 text-xs text-amber-600">Seçilen ay için veri yok; en güncel ay ({monthLabel(tufe.sourceMonth)}) kullanıldı.</p>
+            {forceManual ? (
+              <p className="mt-1 text-xs text-amber-600">
+                Bu yenileme ayı için resmi TÜİK 12 aylık ortalama TÜFE henüz tabloda yok. Güncel resmi oranı aşağıya girin.
+              </p>
             ) : null}
           </div>
 
-          <label className="flex items-center gap-2 rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm">
-            <input type="checkbox" checked={useManual} onChange={(e) => setUseManual(e.target.checked)} className="h-4 w-4 accent-brand-600" />
-            <span>Kendi oranımı gir (yasal tavan yine uygulanır)</span>
-          </label>
+          {/* Resmi oranı olan aylarda opsiyonel manuel giriş; olmayan (2026) aylarda
+              manuel zorunlu, o yüzden onay kutusu gizlenir. */}
+          {!forceManual ? (
+            <label className="flex items-center gap-2 rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm">
+              <input type="checkbox" checked={useManual} onChange={(e) => setUseManual(e.target.checked)} className="h-4 w-4 accent-brand-600" />
+              <span>Kendi oranımı gir (yasal tavan yine uygulanır)</span>
+            </label>
+          ) : null}
 
-          {useManual ? (
+          {manualActive ? (
             <div>
-              <label className="mb-1.5 block text-sm text-text-muted" htmlFor="rate">İstenen artış oranı (%)</label>
+              <label className="mb-1.5 block text-sm text-text-muted" htmlFor="rate">
+                {forceManual ? "Resmi 12 aylık ort. TÜFE oranı (%)" : "İstenen artış oranı (%)"}
+              </label>
               <input
                 id="rate"
                 type="number"
@@ -90,7 +111,7 @@ export function RentCalculator({ months, latestMonth }: { months: string[]; late
                 step="0.5"
                 value={manualRate}
                 onChange={(e) => setManualRate(e.target.value)}
-                placeholder={`Örn. ${legalCap.toFixed(0)}`}
+                placeholder={legalCap != null ? `Örn. ${legalCap.toFixed(0)}` : "TÜİK'in açıkladığı oran"}
                 className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
               />
             </div>

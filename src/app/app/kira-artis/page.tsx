@@ -1,13 +1,15 @@
 import { Percent, ShieldCheck, Scale } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
-import { TUFE_12M_AVG, latestTufeMonth } from "@/lib/tufe";
+import { TUFE_12M_AVG, TUFE_PENDING_MONTHS, latestTufeMonth } from "@/lib/tufe";
 import { RentCalculator } from "./rent-calculator";
 
 export const metadata = { title: "Kira Artış Hesaplama" };
 
 export default async function KiraArtisPage() {
   await requireModulePage("valuation");
-  const months = Object.keys(TUFE_12M_AVG).sort().reverse();
+  // Resmi verili aylar + resmi oranı henüz açıklanmamış (2026) aylar birlikte;
+  // en yeni ay üstte. 2026 ayları seçilince hesaplayıcı manuel giriş ister.
+  const months = [...Object.keys(TUFE_12M_AVG), ...TUFE_PENDING_MONTHS].sort().reverse();
   const latest = latestTufeMonth();
 
   return (

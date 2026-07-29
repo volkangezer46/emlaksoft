@@ -38,6 +38,22 @@ export const TUFE_12M_AVG: Record<string, number> = {
   "2025-12": 32.50,
 };
 
+/**
+ * Resmi TÜİK 12 aylık ort. TÜFE'si HENÜZ tabloya işlenmemiş yenileme ayları.
+ * Dropdown'da seçilebilir ama otomatik oran UYGULANMAZ — kullanıcı güncel resmi
+ * oranı elle girer. Yasal tavan hukuki sonuç doğurduğundan tahmini/uydurma oran
+ * yazmıyoruz; resmi rakam açıklandıkça ilgili ay TUFE_12M_AVG'ye TAŞINMALI (ve
+ * buradan çıkarılmalı). 2026 ayları eklendi (2025-12'den sonrası).
+ */
+export const TUFE_PENDING_MONTHS: readonly string[] = [
+  "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07",
+];
+
+/** Bir yenileme ayının resmi 12 aylık ort. TÜFE'si tabloda var mı. */
+export function hasOfficialTufe(month: string): boolean {
+  return TUFE_12M_AVG[month] !== undefined;
+}
+
 /** Tablodaki en güncel ay anahtarı (fallback için). */
 export function latestTufeMonth(): string {
   return Object.keys(TUFE_12M_AVG).sort().at(-1) ?? "";
