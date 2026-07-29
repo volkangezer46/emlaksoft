@@ -560,3 +560,29 @@ export async function exportContractsCsv(): Promise<ExportResult> {
   });
   return { csv: toCsv(rows), filename: `sozlesmeler-${today10()}.csv` };
 }
+
+export async function exportReferralsCsv(): Promise<ExportResult> {
+  const gate = await requirePermission("customers", "view");
+  if (!gate.ok) return { error: gate.error };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("referrals")
+    .select("referred_name, referred_phone, referred_note, staff_note, status, created_at, referrer:customers!referrer_customer_id(full_name)")
+    .order("created_at", { ascending: false })
+    .limit(2000);
+  if (error) {
+    console.error("exportReferralsCsv", error);
+    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+  }
+  const durum: Record<string, string> = { yeni: "Yeni", iletisim: "İletişimde", musteri: "Müşteri oldu", kazanildi: "Kazanıldı", kayip: "Kayıp" };
+  const rows = (data ?? []).map((r) => ({
+    tavsiye_edilen: r.referred_name,
+    telefon: r.referred_phone,
+    tavsiye_eden: relOne(r.referrer)?.full_name ?? "",
+    durum: durum[r.status as string] ?? r.status,
+    not: r.referred_note ?? "",
+    ofis_notu: r.staff_note ?? "",
+    tarih: r.created_at,
+  }));
+  return { csv: toCsv(rows), filename: `tavsiyeler-${today10()}.csv` };
+}

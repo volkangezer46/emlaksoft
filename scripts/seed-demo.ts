@@ -983,6 +983,27 @@ async function main() {
     return n;
   });
 
+  // ---------------- Tavsiyeler (referral) ----------------
+  await section("Tavsiyeler", "referrals", tenantId, 4, async () => {
+    const specs: Array<{ name: string; phone: string; by: string; status: string; note?: string; daysAgo: number }> = [
+      { name: "Selin Aksoy", phone: "05330001122", by: "Ahmet Yılmaz", status: "yeni", note: "Kadıköy'de 2+1 kiralık arıyor.", daysAgo: 1 },
+      { name: "Burak Şahin", phone: "05340002233", by: "Ayşe Kaya", status: "iletisim", note: "Yatırımlık daire.", daysAgo: 4 },
+      { name: "Deniz Yalçın", phone: "05350003344", by: "Emine Arslan", status: "musteri", note: "Ofisten arandı, müşteri kaydı açıldı.", daysAgo: 9 },
+      { name: "Onur Kılıç", phone: "05360004455", by: "Ahmet Yılmaz", status: "kazanildi", note: "Maltepe 3+1 satışıyla sonuçlandı.", daysAgo: 18 },
+    ];
+    const rows = specs.map((s) => ({
+      tenant_id: tenantId,
+      referrer_customer_id: customers.find((c) => c.full_name === s.by)?.id ?? null,
+      referred_name: s.name,
+      referred_phone: s.phone,
+      referred_note: s.note ?? null,
+      status: s.status,
+      handled_by: advisorId,
+      created_at: iso(daysFromNow(-s.daysAgo, 10)),
+    }));
+    return (await insertRows("referrals", rows)).length;
+  });
+
   // ---------------- Bildirimler ----------------
   await section("Bildirimler", "notifications", tenantId, 3, async () => {
     const rows = [
