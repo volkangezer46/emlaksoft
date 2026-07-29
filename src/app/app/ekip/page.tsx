@@ -71,7 +71,44 @@ export default async function TeamPage() {
   const canManage = (perms.team ?? []).includes("create");
   const supabase = await createClient();
 
-  const [{ data: membersData }, { data: branchesData }, { data: provincesData }, { data: advisorCounts }] = await Promise.all([
+  // Bugün izinli olanlar — listede küçük "İzinde" rozeti için (bkz. /app/ekip/izinler).
+  // TR duvar günü: booking-slots ile aynı sabit ofset kararı (TR'de DST yok).
+  const todayKey = new Date(now() + TR_OFFSET_MIN * 60_000).toISOString().slice(0, 10);
+
+  /*
+   * Son giriş bilgisi — login_events'ten üye başına en son başarılı giriş.
+   * Tablo henüz yoksa / şema farklıysa sorgu hata döner: loginDataAvailable=false
+   * olur ve giriş rozetleri hiç gösterilmez (yanlış "hiç girmedi" iddiasındansa sessizlik).
+   * Admin client: login_events RLS politikasından bağımsız, tenant_id ile daraltılmış okuma.
+   * Ana veri sorgularıyla birlikte tek turda paralel çalışır (şelale yok).
+   */
+  const loginPromise: Promise<{ user_id: string | null; created_at: string }[] | null> = tenantId
+    ? (async () => {
+        try {
+          const admin = createAdminClient();
+          const { data, error } = await admin
+            .from("login_events")
+            .select("user_id, created_at")
+            .eq("tenant_id", tenantId)
+            .eq("result", "success")
+            .order("created_at", { ascending: false })
+            .limit(2000);
+          return error ? null : ((data ?? []) as { user_id: string | null; created_at: string }[]);
+        } catch (e) {
+          console.error("ekip login_events", e);
+          return null;
+        }
+      })()
+    : Promise.resolve(null);
+
+  const [
+    { data: membersData },
+    { data: branchesData },
+    { data: provincesData },
+    { data: advisorCounts },
+    { data: leaveRows },
+    loginRows,
+  ] = await Promise.all([
     supabase.from("profiles").select("id, full_name, phone, role, is_active, created_at, branch_id, public_slug, is_public, branch:branches(name)").order("created_at", { ascending: true }).limit(500),
     supabase.from("branches").select("id, name, is_active, province_id, province:geo_provinces(name)").order("created_at", { ascending: true }).limit(200),
     supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
@@ -79,48 +116,24 @@ export default async function TeamPage() {
     tenantId
       ? supabase.rpc("customer_counts_by_advisor", { p_tenant_id: tenantId })
       : Promise.resolve({ data: [] as { assigned_to: string; cnt: number }[] }),
+    supabase
+      .from("staff_leaves")
+      .select("staff_id, starts_on, ends_on, status")
+      .eq("status", "onayli")
+      .lte("starts_on", todayKey)
+      .gte("ends_on", todayKey)
+      .limit(200),
+    loginPromise,
   ]);
 
   const members = (membersData ?? []) as Member[];
-
-  // Bugün izinli olanlar — listede küçük "İzinde" rozeti için (bkz. /app/ekip/izinler).
-  // TR duvar günü: booking-slots ile aynı sabit ofset kararı (TR'de DST yok).
-  const todayKey = new Date(now() + TR_OFFSET_MIN * 60_000).toISOString().slice(0, 10);
-  const { data: leaveRows } = await supabase
-    .from("staff_leaves")
-    .select("staff_id, starts_on, ends_on, status")
-    .eq("status", "onayli")
-    .lte("starts_on", todayKey)
-    .gte("ends_on", todayKey)
-    .limit(200);
   const todayLeaves = (leaveRows ?? []) as LeaveLike[];
 
-  /*
-   * Son giriş bilgisi — login_events'ten üye başına en son başarılı giriş.
-   * Tablo henüz yoksa / şema farklıysa sorgu hata döner: loginDataAvailable=false
-   * olur ve giriş rozetleri hiç gösterilmez (yanlış "hiç girmedi" iddiasındansa sessizlik).
-   * Admin client: login_events RLS politikasından bağımsız, tenant_id ile daraltılmış okuma.
-   */
   const lastLoginByUser = new Map<string, string>();
-  let loginDataAvailable = false;
-  if (tenantId) {
-    try {
-      const admin = createAdminClient();
-      const { data: loginRows, error: loginError } = await admin
-        .from("login_events")
-        .select("user_id, created_at")
-        .eq("tenant_id", tenantId)
-        .eq("result", "success")
-        .order("created_at", { ascending: false })
-        .limit(2000);
-      if (!loginError && loginRows) {
-        loginDataAvailable = true;
-        for (const row of loginRows as { user_id: string | null; created_at: string }[]) {
-          if (row.user_id && !lastLoginByUser.has(row.user_id)) lastLoginByUser.set(row.user_id, row.created_at);
-        }
-      }
-    } catch (e) {
-      console.error("ekip login_events", e);
+  const loginDataAvailable = loginRows !== null;
+  if (loginRows) {
+    for (const row of loginRows) {
+      if (row.user_id && !lastLoginByUser.has(row.user_id)) lastLoginByUser.set(row.user_id, row.created_at);
     }
   }
   const branches = (branchesData ?? []) as { id: string; name: string; is_active: boolean; province_id: string | null; province: Rel }[];

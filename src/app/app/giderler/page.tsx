@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, CalendarRange, Receipt, Plus, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
+import { now as nowMs } from "@/lib/clock";
 import { exportExpensesCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { listExpenses, listExpenseMonthlyTrend } from "@/app/actions/expenses";
@@ -86,7 +87,7 @@ export default async function GiderlerPage({
     })}`;
 
   // Hızlı tarih çipleri — sunucu saatine göre
-  const now = new Date();
+  const now = new Date(nowMs());
   const presets = [
     { label: "Bu ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth(), 1)), to: fmtDate(now) },
     { label: "Geçen ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth() - 1, 1)), to: fmtDate(new Date(now.getFullYear(), now.getMonth(), 0)) },
@@ -338,7 +339,7 @@ export default async function GiderlerPage({
             <select name="category" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300">
               {categories.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
-            <input name="expense_date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
+            <input name="expense_date" type="date" defaultValue={new Date(nowMs()).toISOString().slice(0, 10)} className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
             <input name="notes" placeholder="Not (opsiyonel)" className="sm:col-span-2 rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
             <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 sm:col-span-2">
               <Plus className="h-4 w-4" /> Kaydet

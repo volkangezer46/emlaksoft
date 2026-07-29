@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { now } from "@/lib/clock";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { computeDealScore, scoreGap } from "@/lib/deal-score";
@@ -255,7 +256,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
    * duruyor. Asil deger ikisinin farkinda: danisman %80 diyorsa ve sistem
    * %35 diyorsa sebebini gormek gerekir.
    */
-  const simdi = new Date().getTime();
+  const simdi = now();
   const skor = computeDealScore(
     {
       stage: deal.stage,

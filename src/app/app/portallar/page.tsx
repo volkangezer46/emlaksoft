@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { daysAgoIso } from "@/lib/clock";
+import { daysAgoIso, msSince, DAY_MS } from "@/lib/clock";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -61,7 +61,7 @@ function propertyOf(value: PortalRow["property"]) {
 
 function daysSince(value: string | null) {
   if (!value) return 999;
-  return Math.floor((Date.now() - new Date(value).getTime()) / 86_400_000);
+  return Math.floor(msSince(value) / DAY_MS);
 }
 
 function relativeConfirm(value: string | null) {

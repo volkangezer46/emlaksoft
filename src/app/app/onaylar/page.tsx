@@ -156,6 +156,10 @@ export default async function OnaylarPage({
     { count: redAy },
     { data: kararRows },
     { data: turRows },
+    // Yeni talep dialogu için "ilgili kayıt" havuzu (anlaşma + gider) — mevcut
+    // listeden BAĞIMSIZ, bu yüzden ayrı round-trip yerine ilk batch'te.
+    { data: deals },
+    { data: expenses },
   ] = await Promise.all([
     listQuery,
     // Gecikme vurgusu için bekleyenlerin yaş+türü (sayfa dışı da dahil).
@@ -165,6 +169,12 @@ export default async function OnaylarPage({
     supabase.from("approval_requests").select("created_at, decided_at").not("decided_at", "is", null).gte("decided_at", ayBasi).limit(500),
     // Tür çipi sayaçları — mevcut durum sekmesi içinde.
     supabase.from("approval_requests").select("kind").eq("status", durum).limit(1000),
+    supabase
+      .from("deals")
+      .select("id, deal_value, stage, deal_type, property:properties(property_code, title)")
+      .order("created_at", { ascending: false })
+      .limit(50),
+    supabase.from("expenses").select("id, title, amount, expense_date").order("expense_date", { ascending: false }).limit(50),
   ]);
 
   const list = (rows ?? []) as Row[];
@@ -212,16 +222,8 @@ export default async function OnaylarPage({
     commentsByRequest.set(c.request_id, arr as typeof comments);
   }
 
-  // Yeni talep dialogu için "ilgili kayıt" havuzu (anlaşma + gider, aramalı).
-  const [{ data: deals }, { data: expenses }] = await Promise.all([
-    supabase
-      .from("deals")
-      .select("id, deal_value, stage, deal_type, property:properties(property_code, title)")
-      .order("created_at", { ascending: false })
-      .limit(50),
-    supabase.from("expenses").select("id, title, amount, expense_date").order("expense_date", { ascending: false }).limit(50),
-  ]);
-
+  // Yeni talep dialogu için "ilgili kayıt" havuzu (anlaşma + gider, aramalı) —
+  // `deals` ve `expenses` yukarıdaki ilk batch'te çekildi (ek round-trip yok).
   const entityOptions: ComboboxOption[] = [
     ...(deals ?? []).map((dl) => {
       const prop = Array.isArray(dl.property) ? dl.property[0] : dl.property;

@@ -134,7 +134,12 @@ export default async function FranchiseBiPage({
   const totalLost = [...rollup.values(), unassigned].reduce((s, r) => s + r.lost, 0);
   const maxLost = Math.max(1, ...[...rollup.values(), unassigned].map((r) => r.lost));
 
-  const rows = [...rollup.values(), ...(unassigned.properties || unassigned.customers || unassigned.advisors ? [unassigned] : [])]
+  // Şubesiz satırı, envanter (portföy/müşteri/danışman) VEYA işlem akışı
+  // (kazanılan/kayıp) varsa listelenir — pasif danışmanın kazandığı anlaşma
+  // buraya düşebilir; won/lost'u atlarsak konsolide toplam eksik sayardı.
+  const unassignedHasData =
+    unassigned.properties || unassigned.customers || unassigned.advisors || unassigned.won || unassigned.lost;
+  const rows = [...rollup.values(), ...(unassignedHasData ? [unassigned] : [])]
     .sort((a, b) => b.wonValue - a.wonValue);
   const isMultiBranch = branchList.length > 1;
 

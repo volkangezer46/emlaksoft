@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { now } from "@/lib/clock";
 import { CallConsole } from "./call-console";
 import { CallAiSummary } from "./call-ai-summary";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
@@ -166,7 +167,7 @@ export default async function PhoneOsPage({
     return qs ? `/app/arama?${qs}` : "/app/arama";
   };
 
-  const today = new Date();
+  const today = new Date(now());
   const volume = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date(today);
     d.setDate(today.getDate() - (6 - i));

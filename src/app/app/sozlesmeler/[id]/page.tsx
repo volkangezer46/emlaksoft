@@ -19,6 +19,7 @@ import { CopySignLink } from "./copy-sign-link";
 import { FillFieldsDialog } from "./fill-fields-dialog";
 import { VersionHistory } from "./version-history";
 import { riskSummary, scanContract } from "@/lib/contract-risk";
+import { now } from "@/lib/clock";
 
 const TYPE_LABELS: Record<string, string> = {
   satis:        "Satış",
@@ -262,7 +263,7 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
                     priceText:       propertyRel?.list_price != null
                       ? `${new Intl.NumberFormat("tr-TR").format(Number(propertyRel.list_price))} TL`
                       : null,
-                    todayText: new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date()),
+                    todayText: new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date(now())),
                   }}
                 />
                 <Link

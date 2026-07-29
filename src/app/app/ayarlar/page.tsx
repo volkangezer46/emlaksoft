@@ -69,11 +69,9 @@ const cards: SettingCard[] = [
 export default async function SettingsPage() {
   await requireModulePage("settings");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
-  const [{ data: tenantRow }, notifPrefs, { count: consentCount }, { count: activeConsentCount }, { count: auditCount }, { data: netgsmRow }, netgsmPlatformConfigured] = await Promise.all([
+  const [{ data: { user } }, { data: tenantRow }, notifPrefs, { count: consentCount }, { count: activeConsentCount }, { count: auditCount }, { data: netgsmRow }, netgsmPlatformConfigured] = await Promise.all([
+    supabase.auth.getUser(),
     supabase
       .from("tenants")
       .select("name, plan, tax_office, tax_number, license_no, brand_color, iban, phone, address_line, city, logo_url, website, sample_seeded_at, matching_weights")

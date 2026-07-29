@@ -50,9 +50,9 @@ export default async function CompliancePage({
   // icin `customers.delete` izni isteniyor; bir danismanin kendi basina
   // yapabilecegi bir sey olmamali.
   const canErase = (perms.customers ?? []).includes("delete");
-  const erasureLog = await listErasureLog(50);
 
-  const [{ data: consents }, { data: customers }] = await Promise.all([
+  const [erasureLog, { data: consents }, { data: customers }] = await Promise.all([
+    listErasureLog(50),
     supabase
       .from("iys_consents")
       .select("id, channel, status, granted_at, created_at, customer:customers(id, full_name)")

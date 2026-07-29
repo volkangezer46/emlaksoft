@@ -10,7 +10,7 @@ import {
 } from "@/app/actions/property-management";
 import { publishPropertyToPortal } from "@/app/actions/portal-publish";
 import type { PortalName } from "@/lib/integrations/portals";
-import { DAY_MS, msUntil } from "@/lib/clock";
+import { DAY_MS, msSince, msUntil } from "@/lib/clock";
 
 // ---------------------------------------------------------------------------
 // Durum geçmişi paneli
@@ -31,7 +31,7 @@ function authorName(p: HistoryRow["changed_by"]) {
 }
 
 function relTime(iso: string) {
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  const d = Math.floor(msSince(iso) / DAY_MS);
   if (d <= 0) return "Bugün";
   if (d === 1) return "Dün";
   return `${d} gün önce`;

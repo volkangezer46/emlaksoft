@@ -344,6 +344,7 @@ export default async function DocumentsPage({
     monthCheckRes,
     usageRes,
     healthRes,
+    { data: missingRaw },
   ] = await Promise.all([
     fetchRows("musteri", wantSource("musteri")),
     fetchRows("portfoy", wantSource("portfoy")),
@@ -366,6 +367,14 @@ export default async function DocumentsPage({
     // migration 122'deki RPC file_size'ları DB içinde toplar (bkz. rapor).
     supabase.rpc("document_storage_usage"),
     supabase.rpc("document_health_counts"),
+    // Belge sağlığı: eksik zorunlu evrakı olan açık anlaşmalar — filtrelerden
+    // BAĞIMSIZ olduğu için ayrı round-trip yerine bu batch'te toplanır.
+    supabase
+      .from("deal_checklist_items")
+      .select("deal_id, label, deal:deals(id, stage, customer:customers(id, full_name), property:properties(id, property_code, title))")
+      .eq("is_required", true)
+      .eq("is_done", false)
+      .limit(500),
   ]);
 
   const sourceCounts: Record<DocSource, number> = {
@@ -572,13 +581,7 @@ export default async function DocumentsPage({
       | { id: string; stage: string; customer: CustomerRef; property: PropertyRef }[]
       | null;
   };
-  const { data: missingRaw } = await supabase
-    .from("deal_checklist_items")
-    .select("deal_id, label, deal:deals(id, stage, customer:customers(id, full_name), property:properties(id, property_code, title))")
-    .eq("is_required", true)
-    .eq("is_done", false)
-    .limit(500);
-
+  // `missingRaw` yukarıdaki ana batch'te çekildi (ek round-trip yok).
   const missingByDeal = new Map<string, { dealId: string; label: string; count: number; missing: string[] }>();
   for (const r of (missingRaw ?? []) as unknown as MissingRow[]) {
     const deal = one(r.deal);

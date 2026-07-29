@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
+import { isPast } from "@/lib/clock";
 import { getOpenHouse, listOpenHouseVisitors } from "@/app/actions/targets-openhouse-sources";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -72,7 +73,7 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
       | null,
   );
   const date = new Date(event.scheduled_at);
-  const gecmis = date < new Date();
+  const gecmis = isPast(event.scheduled_at);
 
   // Self check-in public linki — kapıya asılan QR bu sayfayı açar.
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");

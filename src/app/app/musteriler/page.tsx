@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { daysAgoIso, now } from "@/lib/clock";
+import { daysAgoIso, msSince, now } from "@/lib/clock";
 import {
   ArrowDown,
   ArrowUp,
@@ -157,7 +157,7 @@ function SortHeaderLink({
 }
 
 function relativeAdded(iso: string) {
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  const days = Math.floor(msSince(iso) / 86_400_000);
   if (days <= 0) return "Bugün eklendi";
   if (days === 1) return "Dün eklendi";
   if (days < 30) return `${days} gün önce eklendi`;
@@ -170,8 +170,8 @@ function daysUntilAnnual(iso: string | null): number | null {
   if (!iso) return null;
   const src = new Date(iso);
   if (Number.isNaN(src.getTime())) return null;
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const nowD = new Date(now());
+  const today = new Date(nowD.getFullYear(), nowD.getMonth(), nowD.getDate());
   let next = new Date(today.getFullYear(), src.getMonth(), src.getDate());
   if (next < today) next = new Date(today.getFullYear() + 1, src.getMonth(), src.getDate());
   return Math.round((next.getTime() - today.getTime()) / 86_400_000);

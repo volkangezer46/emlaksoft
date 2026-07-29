@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Coins, TrendingUp, AlertTriangle, ArrowUpRight, CalendarRange, ChevronLeft, ChevronRight, Gauge, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
-import { isPast, msSince, now, DAY_MS } from "@/lib/clock";
+import { msSince, now, DAY_MS } from "@/lib/clock";
 import { DuesClient } from "./dues-client";
 
 export const metadata = { title: "Aidat & Ortak Gider" };
@@ -24,8 +24,6 @@ const DONEM_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 /** Sayfa başına aidat — gerçek sayfalama (300'lük dilim + bellek filtresi yerine). */
 const PAGE_SIZE = 50;
-/** KPI/şerit toplamları için aggregate havuzu üst sınırı (SUM için RPC yok). */
-const KPI_POOL_LIMIT = 2000;
 
 const PAGER_BTN =
   "focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
@@ -103,17 +101,21 @@ export default async function AidatPage({
     .order("due_date", { ascending: true, nullsFirst: false })
     .range(offset, offset + PAGE_SIZE - 1);
 
-  // ---- KPI/şerit havuzu: tüm kayıtlar (filtresiz) — tahsilat oranı, toplamlar,
-  //      geciken şeridi türetilmiş. SUM için RPC yok → hafif kolonlarla havuz çekilir.
-  let kpiQuery = supabase
+  // ---- KPI toplamları: DB'de TAM SUM (aidat_kpi RPC) — önceki 2000-satır havuz
+  //      yaklaşıktı ve büyük ofiste eksik sayardı. Geciken ŞERİDİ için ayrı odaklı
+  //      sorgu (en yakın vadeli ilk 20 geciken); tüm havuzu çekmeye gerek yok.
+  const overdueStripQuery = supabase
     .from("property_dues")
-    .select("id, title, amount, period, due_date, status, property:properties(id, property_code, title)");
-  if (tenantId) kpiQuery = kpiQuery.eq("tenant_id", tenantId);
-  kpiQuery = kpiQuery.order("period", { ascending: false }).limit(KPI_POOL_LIMIT);
+    .select("id, title, amount, period, due_date, status, property:properties(id, property_code, title)")
+    .neq("status", "paid")
+    .lte("due_date", todayStr)
+    .order("due_date", { ascending: true })
+    .limit(20);
 
-  const [{ data: listData, count: listCount }, { data: kpiData }, { data: propData }] = await Promise.all([
+  const [{ data: listData, count: listCount }, kpiRes, { data: overdueStripData }, { data: propData }] = await Promise.all([
     listQuery,
-    kpiQuery,
+    supabase.rpc("aidat_kpi"),
+    overdueStripQuery,
     supabase
       .from("properties")
       .select("id, property_code, title")
@@ -123,21 +125,20 @@ export default async function AidatPage({
   ]);
 
   const filteredDues = (listData ?? []) as unknown as DueLite[];
-  const kpiDues = (kpiData ?? []) as unknown as DueLite[];
   const properties = (propData ?? []).map((p) => ({ id: p.id as string, property_code: p.property_code as string, title: p.title as string | null }));
 
-  // KPI'lar her zaman tüm kayıtlar (havuz) üzerinden; ?durum= ve ?donem= yalnızca listeyi süzer
-  const isOverdue = (d: DueLite) => d.status !== "paid" && isPast(d.due_date);
-  const total = kpiDues.reduce((s, d) => s + Number(d.amount), 0);
-  const unpaid = kpiDues.filter((d) => d.status !== "paid").reduce((s, d) => s + Number(d.amount), 0);
+  // KPI'lar tüm kayıtlar üzerinden (RPC, filtreden bağımsız); ?durum=/?donem= listeyi süzer.
+  const kpi = ((Array.isArray(kpiRes.data) ? kpiRes.data[0] : kpiRes.data) ?? {}) as {
+    total?: number; unpaid?: number; overdue_count?: number; overdue_total?: number;
+  };
+  const total = Number(kpi.total ?? 0);
+  const unpaid = Number(kpi.unpaid ?? 0);
   const paidAmount = total - unpaid;
   // Tahsilat oranı — ödenen tutarın toplam tahakkuka oranı (tutar bazlı)
   const collectionRate = total > 0 ? Math.round((paidAmount / total) * 100) : 0;
-  const overdueDues = kpiDues
-    .filter(isOverdue)
-    .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)));
-  const overdue = overdueDues.length;
-  const overdueTotal = overdueDues.reduce((s, d) => s + Number(d.amount), 0);
+  const overdue = Number(kpi.overdue_count ?? 0);
+  const overdueTotal = Number(kpi.overdue_total ?? 0);
+  const overdueDues = (overdueStripData ?? []) as unknown as DueLite[];
 
   // Sayfalama toplamları — count filtreye (durum/dönem) duyarlı gerçek toplam.
   const totalFiltered = listCount ?? filteredDues.length;
