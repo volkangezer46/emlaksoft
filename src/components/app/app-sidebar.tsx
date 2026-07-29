@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 // Doğrudan lucide import'u yalnızca KAVRAMSAL OLMAYAN öğeler için kalır
 // (hesap makinesi, chevron, hamburger, kapat, kıvılcım süsü).
-import { Calculator, ChevronRight, LayoutDashboard, Menu, Sparkles, X } from "lucide-react";
+import { BadgeCheck, Calculator, ChevronRight, Globe, LayoutDashboard, LineChart, Menu, Sparkles, Trophy, X } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar (müşteri, portföy, randevu…)
 // `src/lib/icons.ts` sözlüğünden gelir; sidebar bu sözlüğün referans
 // uygulamasıdır — bir kavramın ikonu değişirse tek yerden değişir.
@@ -44,7 +44,9 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { href: "/app/ag",           label: "Ofisler Arası Ağ", icon: ICONS.ag,       module: "network" },
       { href: "/app/projeler",     label: "Projeler",      icon: ICONS.proje,       module: "projects" },
       { href: "/app/degerleme",    label: "Değerleme",     icon: ICONS.skor,        module: "valuation" },
-      { href: "/app/hesaplayici",  label: "Hesaplayıcı",   icon: Calculator,    module: "valuation" },
+      { href: "/app/hesaplayici",  label: "Hesaplayıcı",   icon: Calculator,        module: "valuation" },
+      { href: "/app/yatirim",      label: "Yatırım Getirisi", icon: LineChart,      module: "valuation" },
+      { href: "/app/yabanci-satis",label: "Yabancıya Satış", icon: Globe,           module: "properties" },
     ],
   },
   {
@@ -63,6 +65,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/app/raporlar",     label: "Raporlar",      icon: ICONS.rapor,       module: "reports" },
       { href: "/app/danisman-kpi", label: "Danışman KPI",  icon: ICONS.kpi,         module: "reports" },
+      { href: "/app/lig",          label: "Ekip Ligi",     icon: Trophy,            module: "reports" },
       { href: "/app/hedefler",     label: "Hedefler",      icon: ICONS.hedef,       module: "targets" },
       { href: "/app/bolge-analizi",label: "Bölge Analizi", icon: ICONS.bolge,       module: "reports" },
       { href: "/app/kayip-kacak",  label: "Kayıp-kaçak",   icon: ICONS.alarm,       module: "leak" },
@@ -76,6 +79,8 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { href: "/app/otomasyonlar", label: "Otomasyonlar",  icon: ICONS.otomasyon,   module: "settings" },
       { href: "/app/kampanyalar",  label: "Kampanyalar",   icon: ICONS.mesaj,       module: "campaigns" },
       { href: "/app/uyum",         label: "Uyum",          icon: ICONS.uyum,        module: "compliance" },
+      { href: "/app/onaylar",      label: "Onaylar",       icon: BadgeCheck,        module: "commissions" },
+      { href: "/app/belgeler",     label: "Belge Merkezi", icon: ICONS.belge,       module: "settings" },
       { href: "/app/denetim",      label: "Denetim",       icon: ICONS.denetim,     module: "settings" },
       { href: "/app/destek",       label: "Destek",        icon: ICONS.destek,      module: "support" },
       { href: "/app/ayarlar",      label: "Ayarlar",       icon: ICONS.ayar,        module: "settings" },
