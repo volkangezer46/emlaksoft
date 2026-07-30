@@ -1020,10 +1020,11 @@ async function main() {
   // ---------------- Destek talepleri ----------------
   await section("Destek talepleri", "support_tickets", tenantId, 4, async () => {
     const rows = [
-      { subject: "Fatura PDF'i inmiyor", body: "Abonelik faturasının PDF indirme butonu hata veriyor.", category: "billing", priority: "high", status: "open", created_by: ownerId, resolved_at: null as string | null },
-      { subject: "Portal ilanı Sahibinden'e gitmedi", body: "DEMO-003 ilanını yayınladım ama Sahibinden'de görünmüyor.", category: "bug", priority: "urgent", status: "in_progress", created_by: advisorId, resolved_at: null as string | null },
-      { subject: "WhatsApp şablonu önerisi", body: "Randevu hatırlatma için hazır bir şablon eklenebilir mi?", category: "feature", priority: "normal", status: "waiting", created_by: advisorId, resolved_at: null as string | null },
-      { subject: "KVKK aydınlatma metni güncellemesi", body: "Yeni mevzuata göre metni güncellemek istiyoruz.", category: "compliance", priority: "normal", status: "resolved", created_by: ownerId, resolved_at: iso(daysFromNow(-2, 15)) },
+      { subject: "Fatura PDF'i inmiyor", body: "Abonelik faturasının PDF indirme butonu hata veriyor.", category: "billing", priority: "high", status: "open", created_by: ownerId, created_at: iso(daysFromNow(-1, 10)), resolved_at: null as string | null },
+      { subject: "Portal ilanı Sahibinden'e gitmedi", body: "DEMO-003 ilanını yayınladım ama Sahibinden'de görünmüyor.", category: "bug", priority: "urgent", status: "in_progress", created_by: advisorId, created_at: iso(daysFromNow(-4, 9)), resolved_at: null as string | null },
+      { subject: "WhatsApp şablonu önerisi", body: "Randevu hatırlatma için hazır bir şablon eklenebilir mi?", category: "feature", priority: "normal", status: "waiting", created_by: advisorId, created_at: iso(daysFromNow(-9, 14)), resolved_at: null as string | null },
+      // resolved: created_at (6g önce) < resolved_at (2g önce) → ~4 gün çözüm süresi
+      { subject: "KVKK aydınlatma metni güncellemesi", body: "Yeni mevzuata göre metni güncellemek istiyoruz.", category: "compliance", priority: "normal", status: "resolved", created_by: ownerId, created_at: iso(daysFromNow(-6, 11)), resolved_at: iso(daysFromNow(-2, 15)) },
     ].map((t) => ({ tenant_id: tenantId, ...t }));
     return (await insertRows("support_tickets", rows)).length;
   });

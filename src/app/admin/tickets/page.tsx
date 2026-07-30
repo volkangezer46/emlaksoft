@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, LifeBuoy, Siren, UserCheck, X } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CheckCircle2, Clock, LifeBuoy, Siren, TrendingUp, UserCheck, X } from "lucide-react";
 import { setTicketStatus } from "@/app/actions/tickets";
 import { assignTicketStaffAction } from "@/app/actions/admin-ticket-ops";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
+import { daysAgoIso } from "@/lib/clock";
+import { InteractiveChart } from "@/components/app/interactive-chart";
 import { slaSortRank, slaStateOf } from "./sla";
 import { SlaBadge } from "./sla-badge";
 import type { CSSProperties } from "react";
@@ -109,7 +111,7 @@ export default async function AdminTicketsPage({
   // Halka/barlar her zaman tüm kuyruğu gösterir — filtre yalnızca listeyi daraltır
   const [{ data, count: listCount }, { data: statRows }, tenantRes, { data: staffList }] = await Promise.all([
     listQuery,
-    admin.from("support_tickets").select("status, priority").limit(2000),
+    admin.from("support_tickets").select("status, priority, created_at, resolved_at").order("created_at", { ascending: false }).limit(2000),
     tenantId
       ? admin.from("tenants").select("id, name").eq("id", tenantId).maybeSingle()
       : Promise.resolve({ data: null as { id: string; name: string } | null }),
@@ -167,6 +169,37 @@ export default async function AdminTicketsPage({
     color: priorityColor[k],
   }));
   const maxPri = Math.max(1, ...priorityCounts.map((p) => p.count));
+
+  // --- Ultra-premium: çözüm oranı, ort. çözüm süresi, 14 günlük zaman serisi ---
+  const totalReal = stats.length;
+  const resolvedCount = stats.filter((t) => t.status === "resolved" || t.status === "closed").length;
+  const resolutionRate = totalReal > 0 ? Math.round((resolvedCount / totalReal) * 100) : 0;
+  const resolvedWithTime = stats.filter(
+    (t) => (t.status === "resolved" || t.status === "closed") && t.resolved_at && t.created_at,
+  );
+  const avgResolveHours =
+    resolvedWithTime.length > 0
+      ? Math.round(
+          resolvedWithTime.reduce(
+            (s, t) =>
+              s + Math.max(0, new Date(t.resolved_at as string).getTime() - new Date(t.created_at as string).getTime()) / 3_600_000,
+            0,
+          ) / resolvedWithTime.length,
+        )
+      : null;
+  const avgResolveLabel =
+    avgResolveHours == null ? "—" : avgResolveHours >= 48 ? `${Math.round(avgResolveHours / 24)} gün` : `${avgResolveHours} sa`;
+
+  // Son 14 gün · günlük yeni talep. clock kuralı: bileşende Date.now() yok →
+  // gün anahtarları daysAgoIso ile üretilir, created_at YYYY-MM-DD ile eşlenir.
+  const dayKeys = Array.from({ length: 14 }, (_, i) => daysAgoIso(13 - i).slice(0, 10)); // eskiden yeniye
+  const dailyMap = new Map<string, number>(dayKeys.map((k) => [k, 0]));
+  for (const t of stats) {
+    const k = String(t.created_at).slice(0, 10);
+    if (dailyMap.has(k)) dailyMap.set(k, (dailyMap.get(k) ?? 0) + 1);
+  }
+  const dailyNew = dayKeys.map((k) => ({ label: `${k.slice(8, 10)}.${k.slice(5, 7)}`, value: dailyMap.get(k) ?? 0 }));
+  const newLast14 = dailyNew.reduce((s, d) => s + d.value, 0);
 
   return (
     <div className="space-y-6">
@@ -301,6 +334,50 @@ export default async function AdminTicketsPage({
                 })}
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Talep akışı + performans — zaman serisi ve çözüm metrikleri */}
+      <section className="grid gap-4 lg:grid-cols-[1.7fr_1fr]">
+        <div className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
+                <TrendingUp className="h-4 w-4" /> Talep akışı
+              </p>
+              <h2 className="mt-0.5 font-display text-base font-bold text-ink-950">Son 14 gün · yeni destek talebi</h2>
+            </div>
+            <p className="numeric font-display text-2xl font-extrabold tabular-nums text-brand-600">{newLast14}</p>
+          </div>
+          <InteractiveChart
+            data={dailyNew}
+            color="var(--brand-600)"
+            name="Yeni talep"
+            format="number"
+            height={180}
+            labelEvery={2}
+            className="mt-4"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-1">
+          <div className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+            <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
+              <CheckCircle2 className="h-4 w-4" /> Çözüm oranı
+            </p>
+            <p className="mt-2 font-display text-4xl font-extrabold leading-none text-ink-950">%{resolutionRate}</p>
+            <p className="mt-1 text-xs text-text-muted">{resolvedCount}/{totalReal} talep çözüldü/kapandı</p>
+            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-canvas">
+              <div className="h-full rounded-full bg-mint-500 transition-all" style={{ width: `${resolutionRate}%` }} />
+            </div>
+          </div>
+          <div className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+            <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
+              <Clock className="h-4 w-4" /> Ort. çözüm süresi
+            </p>
+            <p className="mt-2 font-display text-4xl font-extrabold leading-none text-ink-950">{avgResolveLabel}</p>
+            <p className="mt-1 text-xs text-text-muted">açılıştan çözüme, çözülen taleplerde</p>
           </div>
         </div>
       </section>
