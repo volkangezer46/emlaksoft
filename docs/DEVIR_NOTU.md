@@ -193,13 +193,22 @@ yeniden çıkarmak için `src/lib/definitions.ts` + `getDefinitions` çağrılar
     (durum/arıza/evre `rent_charges`+`maintenance_requests`'ten türetiliyor, `rentals`'ta `.eq` yok) ·
     `aidat` KPI tutar SUM'ları (havuz 2000'e çıkarıldı, tam çözüm için RPC) · `kayip-kacak` para
     toplamları/trend (agregat havuz). Kalan liste ekranları da benzer taramayla sürdürülmeli.
-- Gerçek sayfalama yalnız 8/82 ekranda (`range()` + `count:"exact"`); 5 ekranda `?sayfa=` var ama
-  bellekte `slice()` ile sahte.
+- ✅ **DÜZELTİLDİ (2026-07-30):** Gerçek sayfalama taraması yeniden koşuldu — "5 sahte pager"
+  rakamı eskimiş; 3 ekran (aktivite/gelen-kutusu/belgeler) zaten doğru çok-kaynak deseni, tek gerçek
+  sahte `portfoyler/anahtarlar` idi → sunucu `.range()` + `count:"exact"` + durum SQL filtresi + ayrı
+  head-count sayaçlar (`destek` deseni). `eslestirme` hesaplama motoru (kartezyen skor) — sayfalama
+  hatası değil, ayrı performans notu.
 - Kullanıcı seçmeli sıralama yalnız `musteriler/page.tsx`'te (referans uygulama).
-- Segment düzeyi `error.tsx` yok (tüm panelde tek kök hata sınırı) · `loading.tsx` 21 rotada eksik ·
-  CSV ~25 listede yok · `EmptyState` 55 sayfada yok, olanların yarısında yönlendirici aksiyon yok.
+- Segment düzeyi `error.tsx` yok (tüm panelde tek kök hata sınırı — kabul edilebilir).
+  ✅ **DÜZELTİLDİ (2026-07-30):** `loading.tsx` eksik 15 `/app` segmentine eklendi (envanter yeniden
+  koşuldu; admin tarafı zaten tam). Kalan: CSV ~25 listede yok · `EmptyState` bazı sayfalarda yok.
 
 **C. Akış kopuklukları** (uçtan uca denetim, kalanlar):
+- ✅ **DÜZELTİLDİ (2026-07-30):** Sözleşme "İptal" (cancelled) durumu UI'da gösteriliyordu ama hiçbir
+  buton `cancelContract`'a bağlı değildi → sözleşme detayına onaylı **"İptal et"** eklendi
+  (draft/sent/rejected'te görünür; `ConfirmDialog` + `router.refresh()`; action detay+liste revalidate).
+- ✅ **DÜZELTİLDİ (2026-07-30):** admin/tickets'e **"CSV indir"** butonu (`exportTicketsCsv` action vardı,
+  UI bağı yoktu). Ölü-uç metrik & cron görünürlük denetimi TEMİZ çıktı (66 StatCard'ın hepsi href'li).
 - ✅ **DÜZELTİLDİ (2026-07-29):** Proje birim satışı artık `deals`(won/sale) + `commissions`
   üretiyor (property'siz, deal_value=list_price, ofis varsayılan komisyonu, deal notunda proje/daire).
   `sellUnit` → `recordProjectSaleDeal`. DB rollback testiyle insert'ler doğrulandı. Ciro/komisyon/lig'de görünür.
