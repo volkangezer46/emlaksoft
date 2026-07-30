@@ -57,7 +57,7 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
 
   const { data } = await supabase
     .from("contracts")
-    .select("id, title, contract_type, body, status, signed_at, expires_at, created_at, updated_at, property:properties(id,property_code,title,commission_rate,address_line,list_price), customer:customers(id,full_name,phone,email), signers:contract_signers(id,full_name,email,phone,status,signed_at,token,verified_at)")
+    .select("id, title, contract_type, body, status, signed_at, expires_at, created_at, updated_at, property:properties(id,property_code,title,commission_rate,address_line,list_price), customer:customers(id,full_name,phone,email), signers:contract_signers(id,full_name,email,phone,status,signed_at,token,verified_at,ip_address)")
     .eq("id", id)
     .maybeSingle();
 
@@ -316,6 +316,15 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
                       <p className="text-[11px] text-text-faint">
                         {s.email as string | null ?? s.phone as string | null ?? "—"}
                       </p>
+                      {/* İmza denetim izi: imzalayan IP + zaman — e-imzanın hukuki
+                          kanıtı. Yazılıyordu ama gösterilmiyordu. */}
+                      {s.status === "signed" && (s.ip_address || s.signed_at) ? (
+                        <p className="mt-0.5 text-[10px] tabular-nums text-text-faint">
+                          {s.ip_address ? `IP ${String(s.ip_address)}` : ""}
+                          {s.ip_address && s.signed_at ? " · " : ""}
+                          {s.signed_at ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(new Date(s.signed_at as string)) : ""}
+                        </p>
+                      ) : null}
                     </div>
                     {/* SMS ulaşmadıysa imza linki elle iletilebilsin — token
                         gönderimde DB tarafında üretiliyor, /imza/{token} */}
