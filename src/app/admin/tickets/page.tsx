@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { daysAgoIso } from "@/lib/clock";
-import { Sparkline } from "@/components/admin/sparkline";
+import { InteractiveChart } from "@/components/app/interactive-chart";
 import { ExportButton } from "@/components/admin/export-button";
 import { exportTicketsCsv } from "@/app/actions/platform-export";
 import { slaSortRank, slaStateOf } from "./sla";
@@ -17,6 +17,14 @@ const statusLabel: Record<string, string> = {
   waiting: "Yanıt bekliyor",
   resolved: "Çözüldü",
   closed: "Kapalı",
+};
+
+const statusColor: Record<string, string> = {
+  open: "var(--brand-500)",
+  in_progress: "var(--cyan-400)",
+  waiting: "var(--amber-400)",
+  resolved: "var(--mint-500)",
+  closed: "rgba(10,18,36,0.28)",
 };
 
 const priorityCls: Record<string, string> = {
@@ -205,8 +213,8 @@ export default async function AdminTicketsPage({
     const k = String(t.created_at).slice(0, 10);
     if (dailyMap.has(k)) dailyMap.set(k, (dailyMap.get(k) ?? 0) + 1);
   }
-  const trend = dayKeys.map((k) => dailyMap.get(k) ?? 0);
-  const newLast14 = trend.reduce((s, n) => s + n, 0);
+  const dailyNew = dayKeys.map((k) => ({ label: `${k.slice(8, 10)}.${k.slice(5, 7)}`, value: dailyMap.get(k) ?? 0 }));
+  const newLast14 = dailyNew.reduce((s, d) => s + d.value, 0);
 
   const statusOptions = Object.entries(statusLabel).map(([value, label]) => ({ value, label }));
   const resolvedHref = buildHref({ durum: durum === "resolved" ? undefined : "resolved", oncelik, tenant: tenantId });
@@ -240,18 +248,66 @@ export default async function AdminTicketsPage({
             active={oncelik === "urgent"}
             href={buildHref({ oncelik: oncelik === "urgent" ? undefined : "urgent", durum, tenant: tenantId })}
           />
-          <MetricTile label="Çözüm" value={`%${resolutionRate}`} tone="mint" active={durum === "resolved"} href={resolvedHref} />
-          <MetricTile label="Ort. süre" value={avgResolveLabel} href={resolvedHref} />
-          <span
-            className="hidden items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-semibold text-text-muted 2xl:inline-flex"
-            title={`Son 14 gün · ${newLast14} yeni talep`}
-          >
-            <Sparkline data={trend} height={22} width={72} stroke="var(--brand-500)" />
-            14g · {newLast14}
-          </span>
           <ExportButton action={exportTicketsCsv} label="CSV" variant="light" />
         </div>
       </header>
+
+      {/* Profesyonel insights şeridi — durum dağılımı · 14 günlük akış · çözüm performansı */}
+      <section className="grid gap-4 rounded-xl border border-line bg-surface p-4 lg:grid-cols-[1.4fr_1.5fr_1fr]">
+        {/* Durum dağılımı — yatay yığılı bar + tıklanabilir açıklama */}
+        <div className="min-w-0">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-text-faint">Durum dağılımı</p>
+          <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-canvas ring-1 ring-inset ring-line">
+            {statusKeys.map((k) => {
+              const c = statusCount(k);
+              if (c === 0) return null;
+              return <div key={k} style={{ width: `${(c / Math.max(1, stats.length)) * 100}%`, background: statusColor[k] }} title={`${statusLabel[k]}: ${c}`} />;
+            })}
+          </div>
+          <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1">
+            {statusKeys.map((k) => {
+              const active = durum === k;
+              return (
+                <Link
+                  key={k}
+                  href={buildHref({ durum: active ? undefined : k, oncelik, tenant: tenantId })}
+                  className={`focus-ring inline-flex items-center gap-1.5 rounded px-1 text-[11px] transition hover:text-ink-950 ${active ? "font-bold text-ink-950" : "text-text-muted"}`}
+                >
+                  <span className="h-2 w-2 rounded-full" style={{ background: statusColor[k] }} />
+                  {statusLabel[k]}
+                  <span className="font-bold tabular-nums text-ink-950">{statusCount(k)}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 14 günlük akış — kompakt interaktif alan grafiği */}
+        <div className="min-w-0 border-t border-line pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+          <div className="mb-1 flex items-baseline justify-between">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-text-faint">Son 14 gün · yeni talep</p>
+            <span className="font-display text-sm font-extrabold tabular-nums text-brand-600">{newLast14}</span>
+          </div>
+          <InteractiveChart data={dailyNew} color="var(--brand-600)" name="Yeni talep" format="number" height={72} labelEvery={3} />
+        </div>
+
+        {/* Çözüm performansı */}
+        <div className="min-w-0 border-t border-line pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-text-faint">Çözüm performansı</p>
+          <div className="flex items-baseline gap-2">
+            <Link href={resolvedHref} className="focus-ring font-display text-2xl font-extrabold leading-none text-mint-600 transition hover:opacity-80">
+              %{resolutionRate}
+            </Link>
+            <span className="text-[11px] text-text-muted">{resolvedCount}/{totalReal} çözüldü</span>
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-canvas ring-1 ring-inset ring-line">
+            <div className="h-full rounded-full bg-mint-500" style={{ width: `${resolutionRate}%` }} />
+          </div>
+          <p className="mt-2 flex items-baseline gap-1.5 text-[11px] text-text-muted">
+            Ort. çözüm süresi <span className="font-display text-sm font-bold text-ink-950">{avgResolveLabel}</span>
+          </p>
+        </div>
+      </section>
 
       {/* TEK dilde segment filtre çubuğu — durum + öncelik, sayaçlı */}
       <nav aria-label="Talep filtreleri" className="flex flex-wrap items-center gap-1 rounded-xl border border-line bg-canvas/50 p-1.5">
