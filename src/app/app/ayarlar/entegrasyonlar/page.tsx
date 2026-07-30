@@ -102,7 +102,7 @@ export default async function EntegrasyonlarPage() {
       <p className="rounded-[14px] border border-line bg-canvas/60 px-4 py-3 text-xs text-text-muted">
         Adaptör iskeleleri hazır (<code className="rounded bg-surface px-1">src/lib/integrations/</code>). Bir entegrasyonu
         açmak için ilgili API anahtarını ortam değişkeni olarak girin; kod tarafında ek geliştirme gerekmeden durum
-        "Bağlı"ya döner ve ilgili özellik canlıya geçer.
+        &quot;Bağlı&quot;ya döner ve ilgili özellik canlıya geçer.
       </p>
     </div>
   );

@@ -47,7 +47,7 @@ export function TvLive({ intervalSec = 45 }: { intervalSec?: number }) {
         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-mint-400" /> {clock}
       </span>
       <span className="hidden items-center gap-1.5 text-xs text-white/40 sm:inline-flex">
-        <RefreshCw className="h-3.5 w-3.5" /> {intervalSec}sn'de bir yenilenir
+        <RefreshCw className="h-3.5 w-3.5" /> {intervalSec}sn&apos;de bir yenilenir
       </span>
       <button
         type="button"
