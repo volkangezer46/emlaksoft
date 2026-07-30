@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { verifyImageFile } from "@/lib/file-validation";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
@@ -159,16 +160,18 @@ export async function uploadAgentPhoto(fd: FormData): Promise<AgentProfileResult
 
   const file = fd.get("photo") as File | null;
   if (!file || file.size === 0) return { error: "Dosya seçilmedi." };
-  if (!PHOTO_ALLOWED.includes(file.type)) return { error: "Desteklenen formatlar: JPEG, PNG, WebP" };
   if (file.size > PHOTO_MAX_SIZE) return { error: "Maksimum dosya boyutu 3MB." };
+  // İçerik imzası doğrulaması — bildirilen MIME'a güvenmez.
+  const verified = await verifyImageFile(file, PHOTO_ALLOWED);
+  if (!verified.ok) return { error: verified.error };
 
-  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const ext = verified.type === "image/png" ? "png" : verified.type === "image/webp" ? "webp" : "jpg";
   const path = `${gate.tenantId}/${gate.targetId}.${ext}`;
 
   const admin = createAdminClient();
   const { error: upErr } = await admin.storage
     .from(PHOTO_BUCKET)
-    .upload(path, await file.arrayBuffer(), { contentType: file.type, upsert: true });
+    .upload(path, await file.arrayBuffer(), { contentType: verified.type, upsert: true });
 
   if (upErr) {
     console.error("uploadAgentPhoto storage", upErr);

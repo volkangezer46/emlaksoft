@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+import { getBaseUrl } from "@/lib/base-url";
+const BASE_URL = getBaseUrl();
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const routes = [

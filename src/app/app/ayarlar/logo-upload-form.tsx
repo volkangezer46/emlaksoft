@@ -71,7 +71,7 @@ export function LogoUploadForm({
       {/* Aksiyonlar */}
       <div className="flex flex-col gap-2">
         <p className="text-sm font-semibold text-ink-950">Ofis logosu</p>
-        <p className="text-xs text-text-muted">PNG, JPG, WebP veya SVG · maks. 2 MB</p>
+        <p className="text-xs text-text-muted">PNG, JPG veya WebP · maks. 2 MB</p>
 
         <div className="flex flex-wrap gap-2">
           <button
@@ -109,7 +109,7 @@ export function LogoUploadForm({
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/svg+xml"
+        accept="image/jpeg,image/png,image/webp"
         className="sr-only"
         onChange={handleFile}
         aria-label="Logo yükle"

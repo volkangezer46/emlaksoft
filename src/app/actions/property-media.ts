@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { verifyImageFile } from "@/lib/file-validation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
@@ -23,7 +24,9 @@ export async function uploadPropertyMedia(formData: FormData): Promise<MediaResu
   if (!propertyId) return { error: "Portföy bulunamadı." };
   if (!file) return { error: "Dosya seçilmedi." };
   if (file.size > MAX_FILE_SIZE) return { error: "Dosya çok büyük (max 15 MB)." };
-  if (!ALLOWED_IMAGE.includes(file.type)) return { error: "Desteklenmeyen görsel tipi." };
+  // İçerik imzası doğrulaması — bildirilen MIME'a güvenmez (spoof + SVG-XSS engeli).
+  const verifiedMedia = await verifyImageFile(file, ALLOWED_IMAGE);
+  if (!verifiedMedia.ok) return { error: verifiedMedia.error };
 
   const supabase = await createClient();
   // Portföy tenant'a ait mi?

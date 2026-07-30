@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter, Manrope } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/app/sw-register";
+import { getBaseUrl } from "@/lib/base-url";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -41,9 +42,7 @@ export const metadata: Metadata = {
   },
   description: SITE_DESC,
   applicationName: SITE_NAME,
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-  ),
+  metadataBase: new URL(getBaseUrl()),
   manifest: "/manifest.webmanifest",
   keywords: [
     "emlak CRM", "emlak yazılımı", "emlak ofis yönetimi", "portföy yönetimi",

@@ -10,7 +10,14 @@ function toCsv(rows: Record<string, unknown>[]) {
   if (rows.length === 0) return "";
   const keys = Object.keys(rows[0]!);
   const esc = (v: unknown) => {
-    const s = v == null ? "" : String(v);
+    let s = v == null ? "" : String(v);
+    // CSV formül enjeksiyonu: Excel/Sheets, = @ + - (ve tab/CR) ile başlayan
+    // hücreyi FORMÜL sanır (ör. =HYPERLINK, =cmd|…, @SUM). Ad/not gibi kullanıcı
+    // verisi export'a girdiğinden, tehlikeli önekli hücrenin başına ' eklenir.
+    // Saf sayılar (negatif tutar dâhil) bozulmasın diye +/- yalnız sayı-olmayan
+    // değerlerde korunur.
+    const dangerous = /^[=@\t\r]/.test(s) || (/^[+-]/.test(s) && !/^[+-]?[\d.,\s]+$/.test(s));
+    if (dangerous) s = `'${s}`;
     return `"${s.replace(/"/g, '""')}"`;
   };
   return [keys.join(","), ...rows.map((r) => keys.map((k) => esc(r[k])).join(","))].join("\n");
