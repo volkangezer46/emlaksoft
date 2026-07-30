@@ -323,7 +323,7 @@ export function computePurchaseCosts(input: PurchaseCostInput): PurchaseCostResu
         note: isCommercial
           ? "İşyeri/ticari yeni bina alımında satış bedeline %20 KDV eklenir."
           : sqm && sqm <= 150
-            ? "Net alanı 150 m²'ye kadar yeni konutta %1 KDV. İkinci el alımda KDV yoktur."
+            ? "Girilen alan ≤150 m² → %1 varsayıldı. YASAL oranı NET kullanım alanı belirler; net alan 150 m²'yi aşıyorsa %20 uygulanır (girilen m² brüt olabilir — kontrol edin). İkinci elde KDV yoktur."
             : "150 m² üzeri yeni konutta %20 KDV. m² girilmezse üst oran varsayıldı.",
       });
     }

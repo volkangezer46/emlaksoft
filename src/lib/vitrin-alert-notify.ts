@@ -49,17 +49,20 @@ export async function processVitrinPriceAlerts(admin: AdminClient): Promise<Vitr
   const propertyIds = [...new Set(pending.map((a) => a.property_id))];
   const { data: props } = await admin
     .from("properties")
-    .select("id, title, property_code, list_price, status, deleted_at")
+    .select("id, tenant_id, title, property_code, list_price, status, deleted_at")
     .in("id", propertyIds);
 
   const propMap = new Map(
-    (props ?? []).map((p) => [p.id as string, p as { id: string; title: string | null; property_code: string; list_price: number | string | null; status: string; deleted_at: string | null }]),
+    (props ?? []).map((p) => [p.id as string, p as { id: string; tenant_id: string; title: string | null; property_code: string; list_price: number | string | null; status: string; deleted_at: string | null }]),
   );
 
   let notified = 0;
   for (const alert of pending) {
     const prop = propMap.get(alert.property_id);
-    if (!prop || prop.status !== "live" || prop.deleted_at != null) continue;
+    // tenant_id eşleşmesi (defense-in-depth): admin client RLS'i baypas eder;
+    // ilan alarmın tenant'ına ait değilse (veri bozulması olasılığı) atla —
+    // bir ofisin ilan bilgisi başka ofise SIZMASIN.
+    if (!prop || prop.tenant_id !== alert.tenant_id || prop.status !== "live" || prop.deleted_at != null) continue;
     const current = prop.list_price != null ? Number(prop.list_price) : null;
     const baseline = Number(alert.baseline_price);
     if (current == null || !Number.isFinite(baseline) || !(current < baseline)) continue;

@@ -132,8 +132,12 @@ export default async function CommissionPage({
   const [{ data, count: commissionTotal }, { data: statRows }, { data: memberRows }] = await Promise.all([
     ledgerQuery,
     // KPI toplamları filtreden ve sayfalamadan bağımsız — splits/created_at
-    // danışman dağılımı ve dönem KPI'ları için okunur
-    supabase.from("commissions").select("gross_amount, status, splits, created_at").limit(1000),
+    // danışman dağılımı ve dönem KPI'ları için okunur.
+    // .order eklendi: sırasız limit(1000) sayfa yüklemeleri arasında farklı 1000
+    // satır döndürüp KPI toplamlarını oynatıyordu (non-deterministik). En güncel
+    // 1000 tutarlı okunur. (Not: 1000+ komisyonlu ofiste toplam eksik sayar —
+    // tam doğruluk için ileride SUM RPC'si.)
+    supabase.from("commissions").select("gross_amount, status, splits, created_at").order("created_at", { ascending: false }).limit(1000),
     // Split etiketini danışman profiline bağlamak için ad → id eşlemesi
     supabase.from("profiles").select("id, full_name").eq("is_active", true),
   ]);

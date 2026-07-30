@@ -193,7 +193,9 @@ export default async function RegionAnalysisPage({
 
   // Yatırımcı özeti: en düşük amortisman (en hızlı geri dönüş) ilk 3 ilçe
   const investorTop = tableRows
-    .filter((r): r is typeof r & { multiplier: number } => r.multiplier != null)
+    // multiplier > 0 zorunlu: 0'a yuvarlanan (bozuk/uçuk veri — satış ₺/m² kira
+    // ₺/m²'ye göre çok küçük) satır "0 yıl amortisman · %∞ getiri" gösteriyordu.
+    .filter((r): r is typeof r & { multiplier: number } => r.multiplier != null && r.multiplier > 0)
     .sort((a, b) => a.multiplier - b.multiplier)
     .slice(0, 3);
 

@@ -77,16 +77,23 @@ export type LegalIncrease = {
   newRent: number;      // TÜFE tavanıyla hesaplanan yeni kira (₺, yuvarlanmış)
   appliedRate: number;  // Uygulanan oran (%) — yenileme ayının 12 aylık ort. TÜFE'si
   capped: boolean;      // Ay verisi yoksa en güncel aya düşüldü mü (fallback)
+  /** Bu ay için RESMİ 12 aylık ort. TÜFE var mı. false ise appliedRate/newRent
+   *  eski aya düşen TAHMİNDİR — yasal tavan olarak dayatılMAMALI ve denetim
+   *  kaydına "TÜFE %X" olarak YAZILMAMALIDIR (uydurma oran). Çağıran taraf bu
+   *  bayrağı kontrol etmeli. */
+  official: boolean;
 };
 
 /**
  * Yasal tavanla (12 aylık ort. TÜFE) yeni kirayı hesaplar.
  * Yenileme radarı ve "artışı uygula" akışının tek hesap kaynağı.
+ * `official=false` iken oran resmi değildir (fallback) — çağıran tavan dayatmamalı.
  */
 export function computeLegalIncrease(currentRent: number, renewalMonth: string): LegalIncrease {
+  const official = hasOfficialTufe(renewalMonth);
   const tufe = tufeRateForMonth(renewalMonth);
   const r = computeRentIncrease(currentRent, tufe.rate);
-  return { newRent: r.newRent, appliedRate: r.cappedRatePct, capped: !tufe.exact };
+  return { newRent: r.newRent, appliedRate: r.cappedRatePct, capped: !tufe.exact, official };
 }
 
 export type RentIncreaseResult = {

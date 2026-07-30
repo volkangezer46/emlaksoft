@@ -201,10 +201,15 @@ export async function GET(req: NextRequest) {
       const increase = computeLegalIncrease(Number(r.monthly_rent), renewalDate.slice(0, 7));
       const kalanGun = Math.max(0, Math.ceil((new Date(`${renewalDate}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86_400_000));
 
+      // Resmi TÜFE'si olmayan yenileme ayında (ör. 2026) uydurma bir tavan/tutar
+      // ÖNERİLMEZ — kullanıcı yanıltılmasın; resmi oran açıklanınca hesaplanır.
+      const oneri = increase.official
+        ? `önerilen yeni kira ${para(increase.newRent)} (TÜFE %${increase.appliedRate.toFixed(2)})`
+        : `resmi TÜFE açıklanınca yeni kira hesaplanmalı (mevcut ${para(Number(r.monthly_rent))})`;
       const { error: insNotifErr } = await admin.from("notifications").insert({
         tenant_id: r.tenant_id,
         title: "Kira yenileme yaklaşıyor",
-        body: `'${propName}' kirasının yenilenmesine ${kalanGun} gün — önerilen yeni kira ${para(increase.newRent)} (TÜFE %${increase.appliedRate.toFixed(2)})`,
+        body: `'${propName}' kirasının yenilenmesine ${kalanGun} gün — ${oneri}`,
         href,
         kind: "info",
       });

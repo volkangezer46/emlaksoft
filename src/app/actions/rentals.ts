@@ -298,8 +298,13 @@ export async function applyRentIncrease(
   if (newRent <= currentRent) return { error: "Yeni kira mevcut kiradan yüksek olmalı." };
 
   // Yasal tavan (TBK m.344): uygulama ayının 12 aylık ort. TÜFE'si — sunucu tarafında da kesilir.
+  // ANCAK yalnız RESMİ veri olan aylarda: resmi olmayan (ör. 2026) ayda oran
+  // eski aya düşen tahmindir; onu "yasal tavan" diye dayatmak yasal-üstü bir
+  // artışa izin verir (gerçek 2026 tavanı daha düşük olabilir). Bu aylarda tavan
+  // KESİLMEZ — sorumluluk, resmi oranı bilen kullanıcıdadır; denetim kaydına da
+  // uydurma "TÜFE %X" yazılmaz.
   const legal = computeLegalIncrease(currentRent, effectiveDate.slice(0, 7));
-  if (newRent > legal.newRent) {
+  if (legal.official && newRent > legal.newRent) {
     return {
       error: `Yeni kira yasal tavanı aşıyor — TÜFE %${legal.appliedRate.toFixed(2)} ile en fazla ${new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(legal.newRent)} olabilir.`,
     };
@@ -308,7 +313,8 @@ export async function applyRentIncrease(
   const para = (n: number) =>
     new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
   const tarih = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(`${effectiveDate}T00:00:00`));
-  const izSatiri = `Kira artışı: ${para(currentRent)} → ${para(newRent)}, TÜFE %${legal.appliedRate.toFixed(2)}, ${tarih}`;
+  const oranNotu = legal.official ? `TÜFE %${legal.appliedRate.toFixed(2)}` : "manuel oran (resmi TÜFE bekleniyor)";
+  const izSatiri = `Kira artışı: ${para(currentRent)} → ${para(newRent)}, ${oranNotu}, ${tarih}`;
   const notes = rental.notes ? `${rental.notes}\n${izSatiri}` : izSatiri;
 
   const { error } = await supabase
