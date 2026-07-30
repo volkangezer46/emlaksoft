@@ -42,7 +42,7 @@ function PillSelect({
   const { pending } = useFormStatus();
   return (
     <label
-      className={`focus-ring lift press group relative inline-flex min-w-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold shadow-[var(--shadow-xs)] transition hover:shadow-[var(--shadow-sm)] ${wrapCls} ${pending ? "opacity-60" : ""}`}
+      className={`focus-ring group relative inline-flex min-w-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${wrapCls} ${pending ? "opacity-60" : ""}`}
     >
       {leading}
       <select

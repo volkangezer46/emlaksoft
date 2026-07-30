@@ -703,51 +703,6 @@ p {
   box-shadow: var(--inner-top), var(--elev-4);
 }
 
-/* ————— Kürsör-takipli 3D eğim (Tilt3D bileşeni JS ile --rx/--ry/glare yazar) ————— */
-.tilt3d {
-  transform-style: preserve-3d;
-  transform: perspective(var(--tilt-persp, 1100px)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateZ(0);
-  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease;
-  will-change: transform;
-}
-.tilt3d__depth { transform: translateZ(var(--tz, 0px)); transform-style: preserve-3d; }
-.tilt3d__glare {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  opacity: var(--go, 0);
-  transition: opacity 0.3s ease;
-  background: radial-gradient(
-    260px circle at var(--gx, 50%) var(--gy, 50%),
-    rgba(255, 255, 255, var(--gi, 0)),
-    transparent 62%
-  );
-}
-
-/* ————— Staggered giriş (rise keyframe + inline animation-delay ile) ————— */
-.rise-in {
-  animation: rise 0.62s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-/* Yavaş nefes alan ambient glow (hero konik halka) */
-@keyframes glow-breathe {
-  0%, 100% { opacity: 0.55; transform: scale(1) rotate(0deg); }
-  50% { opacity: 0.9; transform: scale(1.08) rotate(8deg); }
-}
-.glow-breathe { animation: glow-breathe 9s ease-in-out infinite; }
-
-/* SVG halka/çubuk çizim animasyonu (stroke-dashoffset -> 0) */
-@keyframes ring-draw { to { stroke-dashoffset: 0; } }
-@keyframes bar-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-
-@media (prefers-reduced-motion: reduce) {
-  .tilt3d { transform: none !important; transition: none; }
-  .tilt3d__glare { display: none; }
-  .rise-in { animation: none; }
-  .glow-breathe { animation: none; }
-}
-
 /* animated conic ring border */
 @keyframes spin-conic { to { transform: rotate(360deg); } }
 .ring-anim { position: relative; overflow: hidden; }
