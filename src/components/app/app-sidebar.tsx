@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 // Doğrudan lucide import'u yalnızca KAVRAMSAL OLMAYAN öğeler için kalır
 // (hesap makinesi, chevron, hamburger, kapat, kıvılcım süsü).
-import { BadgeCheck, Calculator, ChevronRight, Globe, LayoutDashboard, LineChart, ListFilter, Menu, Sparkles, Trophy, X } from "lucide-react";
+import { BadgeCheck, Calculator, ChevronRight, Globe, LayoutDashboard, LineChart, ListFilter, Menu, Sparkles, Trophy, Tv, X } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar (müşteri, portföy, randevu…)
 // `src/lib/icons.ts` sözlüğünden gelir; sidebar bu sözlüğün referans
 // uygulamasıdır — bir kavramın ikonu değişirse tek yerden değişir.
@@ -67,6 +67,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { href: "/app/raporlar",     label: "Raporlar",      icon: ICONS.rapor,       module: "reports" },
       { href: "/app/danisman-kpi", label: "Danışman KPI",  icon: ICONS.kpi,         module: "reports" },
       { href: "/app/lig",          label: "Ekip Ligi",     icon: Trophy,            module: "reports" },
+      { href: "/app/pano-tv",      label: "Ofis Panosu (TV)", icon: Tv,             module: "reports" },
       { href: "/app/hedefler",     label: "Hedefler",      icon: ICONS.hedef,       module: "targets" },
       { href: "/app/bolge-analizi",label: "Bölge Analizi", icon: ICONS.bolge,       module: "reports" },
       { href: "/app/kayip-kacak",  label: "Kayıp-kaçak",   icon: ICONS.alarm,       module: "leak" },
