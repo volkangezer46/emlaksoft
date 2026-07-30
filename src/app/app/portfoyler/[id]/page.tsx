@@ -252,6 +252,26 @@ export default async function PropertyDetailPage({
 
   // "Neden satmıyor?" teşhisi — yalnızca aktif pazarlamadaki ilanlar için.
   const daysOnMarket = daysSince(property.published_at ?? property.created_at);
+  // Bölge (ilçe) satış hızı — region_stats_history'nin en güncel dönemi.
+  const txTypeStat = /kira/i.test(property.transaction_type ?? "")
+    ? "Kiralık"
+    : /sat/i.test(property.transaction_type ?? "")
+      ? "Satılık"
+      : "Tümü";
+  const { data: regionStat } = isDiagnosable(property.status) && property.district_id
+    ? await supabase
+        .from("region_stats_history")
+        .select("avg_days_listed")
+        .eq("district_id", property.district_id)
+        .eq("tx_type", txTypeStat)
+        .order("period", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+  const regionAvgDaysListed =
+    (regionStat as { avg_days_listed?: number | null } | null)?.avg_days_listed != null
+      ? Number((regionStat as { avg_days_listed: number }).avg_days_listed)
+      : null;
   const saleDiagnosis = isDiagnosable(property.status)
     ? diagnoseSaleBlockers({
         status: property.status,
@@ -263,6 +283,7 @@ export default async function PropertyDetailPage({
         livePortals: livePortals.length,
         mediaCount: mediaCount ?? 0,
         transactionType: property.transaction_type,
+        regionAvgDaysListed,
       })
     : null;
 

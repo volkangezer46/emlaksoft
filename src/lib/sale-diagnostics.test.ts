@@ -76,4 +76,20 @@ describe("diagnoseSaleBlockers", () => {
     const stale = d.blockers.find((b) => b.key === "stale_90");
     expect(stale?.detail).toContain("kiralanamıyor");
   });
+
+  it("bölge hızının belirgin üstünde → uyarı blocker", () => {
+    const d = diagnoseSaleBlockers({ ...healthy, daysOnMarket: 60, regionAvgDaysListed: 30 });
+    expect(d.blockers.some((b) => b.key === "slower_than_region")).toBe(true);
+  });
+
+  it("bölge hızının altında → pozitif, blocker yok", () => {
+    const d = diagnoseSaleBlockers({ ...healthy, daysOnMarket: 15, regionAvgDaysListed: 30 });
+    expect(d.blockers.some((b) => b.key === "slower_than_region")).toBe(false);
+    expect(d.positives.some((p) => /Bölge hızının altında/.test(p))).toBe(true);
+  });
+
+  it("bölge verisi yoksa kıyas yapılmaz", () => {
+    const d = diagnoseSaleBlockers({ ...healthy, daysOnMarket: 200, regionAvgDaysListed: null });
+    expect(d.blockers.some((b) => b.key === "slower_than_region")).toBe(false);
+  });
 });

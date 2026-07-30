@@ -42,6 +42,9 @@ export type SaleDiagnosticsInput = {
   mediaCount: number;
   /** İşlem türü — metinleri satış/kiralamaya göre uyarlar. */
   transactionType?: string | null;
+  /** Bölgenin (ilçe) ortalama ilan-açık-kalma günü — region_stats_history'den.
+   *  Verilirse "bölge hızına göre" karşılaştırması eklenir. */
+  regionAvgDaysListed?: number | null;
 };
 
 const CRITICAL_PENALTY = 24;
@@ -150,6 +153,23 @@ export function diagnoseSaleBlockers(input: SaleDiagnosticsInput): SaleDiagnosis
     }
   }
   if (input.views7d > 0) positives.push(`Son 7 günde ${input.views7d} görüntülenme.`);
+
+  // --- Bölge hızı kıyası ---------------------------------------------------
+  const region = input.regionAvgDaysListed;
+  if (region != null && region > 0) {
+    const r = Math.round(region);
+    if (input.daysOnMarket >= 21 && input.daysOnMarket > region * 1.4) {
+      blockers.push({
+        key: "slower_than_region",
+        severity: "warning",
+        title: `Bölge hızının üstünde (${input.daysOnMarket}g / emsal ~${r}g)`,
+        detail: `İlçedeki emsaller ortalama ~${r} günde el değiştiriyor; bu ilan belirgin biçimde geride.`,
+        action: "Fiyat/sunumu emsal hızına göre revize edin; öne çıkarmayı değerlendirin.",
+      });
+    } else if (input.daysOnMarket > 0 && input.daysOnMarket <= region * 0.8) {
+      positives.push(`Bölge hızının altında (emsal ~${r}g).`);
+    }
+  }
 
   // --- Skor & karar --------------------------------------------------------
   let score = 100;
