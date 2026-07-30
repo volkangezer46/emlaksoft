@@ -7,6 +7,24 @@ on:
     branches: [main]
 
 jobs:
+  secret-scan:
+    name: Sır tarama (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: gitleaks kur
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz \
+            | tar -xz -C /tmp gitleaks
+          sudo mv /tmp/gitleaks /usr/local/bin/gitleaks
+
+      - name: Sırları tara (çalışma ağacı)
+        # --no-git: git geçmişini değil, checkout edilen dosya ağacını tarar.
+        # .env.local artık repo'da olmadığından temiz geçer; ileride bir API
+        # anahtarı/secret koda sızarsa CI kırılır. --redact: değerleri gizler.
+        run: gitleaks detect --no-git --redact --verbose --exit-code 1
+
   type-check:
     name: Type check & build
     runs-on: ubuntu-latest

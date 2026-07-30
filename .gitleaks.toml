@@ -1,0 +1,13 @@
+# gitleaks yapılandırması — varsayılan kural setini kullanır, yalnızca bilinen
+# yanlış-pozitif gürültüyü eler. Amaç: gerçek API anahtarı/secret koda sızarsa
+# CI'ı kırmak; lock dosyası entropi gürültüsünde kırmamak.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Bilinen yanlış-pozitifler"
+paths = [
+  '''package-lock\.json''',
+  '''.*\.lock''',
+]
