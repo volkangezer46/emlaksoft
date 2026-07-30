@@ -29,7 +29,9 @@ import { MatchedSection, MatchedSkeleton, SatisfactionSection } from "./sections
 import type { TimelineItem } from "./customer-timeline-tab";
 import { COMM_CHANNELS } from "@/lib/comm-types";
 import { computeNextBestAction } from "./next-best-action";
-import { isPast } from "@/lib/clock";
+import { isPast, msSince, DAY_MS } from "@/lib/clock";
+import { scoreSellerLikelihood, isOwnerCustomer, hasListingIntent } from "@/lib/seller-prediction";
+import { SellerPotentialCard } from "@/components/app/seller-potential-card";
 // Ortak tekil SMS dialogu — tek kopya gelen-kutusu'nda yaşar (Yanıtla da onu kullanır)
 import { SmsDialog } from "../../gelen-kutusu/sms-dialog";
 
@@ -330,6 +332,18 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     hasActiveDeal: (dealsData ?? []).some((d) => d.stage !== "won" && d.stage !== "lost"),
   });
   const score = lead.score;
+
+  // Satıcı-tahmini — yalnız malik-tipi müşteride (bkz. lib/seller-prediction)
+  const daysAgoOf = (iso: string | null) => (iso ? Math.floor(msSince(iso) / DAY_MS) : null);
+  const sellerPrediction = isOwnerCustomer(types)
+    ? scoreSellerLikelihood({
+        isOwnerType: true,
+        daysSinceContact: daysAgoOf(lastActivityAt),
+        tenureDays: daysAgoOf(customer.created_at) ?? 0,
+        pastWonDeals: (dealsData ?? []).filter((d) => d.stage === "won").length,
+        hasListingIntentDemand: hasListingIntent(demands),
+      })
+    : null;
 
   // Sonraki en iyi aksiyon — kural motoru, mevcut sayfaverisiyle (bkz. ./next-best-action)
   const submittedOffer = (offersData ?? []).find((o) => o.status === "submitted") ?? null;
@@ -672,6 +686,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           </div>
         ) : null}
       </section>
+
+      {sellerPrediction ? <SellerPotentialCard prediction={sellerPrediction} /> : null}
 
       <Customer360Tabs
         customerId={customer.id}
