@@ -541,6 +541,7 @@ export async function cancelContract(id: string): Promise<ContractResult> {
     .eq("tenant_id", gate.tenantId);
 
   revalidatePath("/app/sozlesmeler");
+  revalidatePath(`/app/sozlesmeler/${id}`);
   return { ok: true };
 }
 

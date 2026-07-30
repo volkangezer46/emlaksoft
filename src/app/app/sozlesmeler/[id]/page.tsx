@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listContractVersions } from "@/app/actions/contracts";
 import { ContractSignPanel } from "./contract-sign-panel";
+import { CancelContractButton } from "./cancel-contract-button";
 import { CopySignLink } from "./copy-sign-link";
 import { FillFieldsDialog } from "./fill-fields-dialog";
 import { VersionHistory } from "./version-history";
@@ -243,35 +244,43 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <FileText className="h-4 w-4 text-brand-600" /> İçerik
             </h2>
-            {canEdit && contract.status === "draft" && (
-              <div className="flex items-center gap-2">
-                {/* Değişken doldurma sihirbazı — ___ / {{...}} kalıplarını
-                    müşteri+portföy verisinden önerilerle doldurur. key:
-                    içerik değişince alan listesi ve öneriler tazelensin. */}
-                <FillFieldsDialog
-                  key={contract.updated_at ?? contract.body.length}
-                  contractId={id}
-                  body={contract.body ?? ""}
-                  suggestions={{
-                    customerName:    customerRel?.full_name ?? null,
-                    customerPhone:   customerRel?.phone ?? null,
-                    customerEmail:   customerRel?.email ?? null,
-                    propertyLabel:   propertyRel
-                      ? (propertyRel.title ?? propertyRel.property_code ?? null)
-                      : null,
-                    propertyAddress: propertyRel?.address_line ?? null,
-                    priceText:       propertyRel?.list_price != null
-                      ? `${new Intl.NumberFormat("tr-TR").format(Number(propertyRel.list_price))} TL`
-                      : null,
-                    todayText: new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date(now())),
-                  }}
-                />
-                <Link
-                  href={`/app/sozlesmeler/${id}/duzenle`}
-                  className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-600/5"
-                >
-                  Düzenle
-                </Link>
+            {canEdit && (
+              <div className="flex flex-wrap items-center gap-2">
+                {contract.status === "draft" && (
+                  <>
+                    {/* Değişken doldurma sihirbazı — ___ / {{...}} kalıplarını
+                        müşteri+portföy verisinden önerilerle doldurur. key:
+                        içerik değişince alan listesi ve öneriler tazelensin. */}
+                    <FillFieldsDialog
+                      key={contract.updated_at ?? contract.body.length}
+                      contractId={id}
+                      body={contract.body ?? ""}
+                      suggestions={{
+                        customerName:    customerRel?.full_name ?? null,
+                        customerPhone:   customerRel?.phone ?? null,
+                        customerEmail:   customerRel?.email ?? null,
+                        propertyLabel:   propertyRel
+                          ? (propertyRel.title ?? propertyRel.property_code ?? null)
+                          : null,
+                        propertyAddress: propertyRel?.address_line ?? null,
+                        priceText:       propertyRel?.list_price != null
+                          ? `${new Intl.NumberFormat("tr-TR").format(Number(propertyRel.list_price))} TL`
+                          : null,
+                        todayText: new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date(now())),
+                      }}
+                    />
+                    <Link
+                      href={`/app/sozlesmeler/${id}/duzenle`}
+                      className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-600/5"
+                    >
+                      Düzenle
+                    </Link>
+                  </>
+                )}
+                {/* İptal: imzalanmamış/iptal edilmemiş sözleşmeler geri çekilebilir. */}
+                {["draft", "sent", "rejected"].includes(contract.status) && (
+                  <CancelContractButton id={id} />
+                )}
               </div>
             )}
           </div>

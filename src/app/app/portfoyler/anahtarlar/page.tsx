@@ -22,12 +22,10 @@ import { now } from "@/lib/clock";
 import {
   KEY_BOARD_FILTERS,
   isKeyOut,
-  isKeyOverdue,
   keyHolderLabel,
   keyOverdueDays,
   keyStatusLabel,
   keyStatusTone,
-  matchesKeyBoardFilter,
 } from "@/lib/key-overdue";
 
 /**
@@ -80,6 +78,9 @@ export default async function PropertyKeysBoardPage({
   const query = q.trim();
   const supabase = await createClient();
   const nowMs = now();
+  const nowIso = new Date(nowMs).toISOString();
+  // Dışarıda sayılan durumlar + gecikme tanımı SQL'e taşındı (bkz. key-overdue.ts).
+  const OUT_STATUSES = ["danisanda", "musteride"];
 
   // Arama: portföy kodu/başlık geo tabloları gibi ayrı bir tabloda olduğu için
   // önce eşleşen portföy id'leri bulunur, sonra anahtar etiketi/kişi adıyla
@@ -95,43 +96,61 @@ export default async function PropertyKeysBoardPage({
     propertyIdHits = (propHits ?? []).map((r) => r.id as string);
   }
 
-  let keysQuery = supabase
+  // Paylaşılan filtre (durum HARİÇ — sayaçlar birbirine göre okunsun): ?danisman= + ?q=.
+  const orClause = query
+    ? [orIlike(["label", "key_code", "holder_name"], query), inFilter("property_id", propertyIdHits)]
+        .filter(Boolean)
+        .join(",")
+    : null;
+
+  // Sayaç fabrikası — head:true (satır çekmeden yalnız COUNT). destek/page.tsx deseni.
+  function baseCount() {
+    let b = supabase.from("property_keys").select("id", { count: "exact", head: true });
+    if (danisman) b = b.eq("holder_staff_id", danisman);
+    if (orClause) b = b.or(orClause);
+    return b;
+  }
+  const headCount = (patch: (b: ReturnType<typeof baseCount>) => ReturnType<typeof baseCount>) => patch(baseCount());
+
+  const page = Math.max(1, Number.parseInt(sayfa, 10) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
+
+  // Liste: sunucu tarafı durum filtresi + gerçek .range() + count:"exact" (musteriler deseni).
+  let listQuery = supabase
     .from("property_keys")
     .select(
       "id, label, key_code, status, holder_staff_id, holder_name, holder_phone, taken_at, due_at, returned_at, property:properties!property_keys_property_id_fkey(id, property_code, title), holder:profiles!property_keys_holder_staff_id_fkey(full_name)",
+      { count: "exact" },
     )
     .order("due_at", { ascending: true, nullsFirst: false })
-    .order("created_at", { ascending: false })
-    .limit(1000);
+    .order("created_at", { ascending: false });
+  if (danisman) listQuery = listQuery.eq("holder_staff_id", danisman);
+  if (orClause) listQuery = listQuery.or(orClause);
+  if (durum === "ofiste") listQuery = listQuery.eq("status", "ofiste");
+  else if (durum === "disarida") listQuery = listQuery.in("status", OUT_STATUSES);
+  else if (durum === "kayip") listQuery = listQuery.eq("status", "kayip");
+  else if (durum === "gecikmis")
+    listQuery = listQuery.in("status", OUT_STATUSES).lt("due_at", nowIso).is("returned_at", null);
 
-  if (danisman) keysQuery = keysQuery.eq("holder_staff_id", danisman);
-  if (query) {
-    const clauses = [orIlike(["label", "key_code", "holder_name"], query)];
-    const propClause = inFilter("property_id", propertyIdHits);
-    if (propClause) clauses.push(propClause);
-    keysQuery = keysQuery.or(clauses.join(","));
-  }
-
-  const [{ data: keyData }, { data: staffData }] = await Promise.all([
-    keysQuery,
+  const [listRes, officeRes, outRes, overdueRes, lostRes, baseRes, staffRes] = await Promise.all([
+    listQuery.range(offset, offset + PAGE_SIZE - 1),
+    headCount((b) => b.eq("status", "ofiste")),
+    headCount((b) => b.in("status", OUT_STATUSES)),
+    headCount((b) => b.in("status", OUT_STATUSES).lt("due_at", nowIso).is("returned_at", null)),
+    headCount((b) => b.eq("status", "kayip")),
+    headCount((b) => b),
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
   ]);
 
-  const allRows = (keyData ?? []) as KeyRow[];
-  const staff = (staffData ?? []) as { id: string; full_name: string | null }[];
-
-  // Sayaçlar filtreden ETKİLENMEZ (yalnız ?q= ve ?danisman= daraltır) —
-  // durum kartları birbirine göre okunabilsin diye.
-  const officeCount = allRows.filter((r) => r.status === "ofiste").length;
-  const outCount = allRows.filter((r) => isKeyOut(r.status)).length;
-  const overdueCount = allRows.filter((r) => isKeyOverdue(r, nowMs)).length;
-  const lostCount = allRows.filter((r) => r.status === "kayip").length;
-
-  const visible = allRows.filter((row) => matchesKeyBoardFilter(row, durum, nowMs));
-
-  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
-  const page = Math.min(Math.max(1, Number.parseInt(sayfa, 10) || 1), totalPages);
-  const pageRows = visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageRows = (listRes.data ?? []) as KeyRow[];
+  const staff = (staffRes.data ?? []) as { id: string; full_name: string | null }[];
+  const officeCount = officeRes.count ?? 0;
+  const outCount = outRes.count ?? 0;
+  const overdueCount = overdueRes.count ?? 0;
+  const lostCount = lostRes.count ?? 0;
+  const baseTotal = baseRes.count ?? 0; // durum filtresi olmadan (q/danisman uygulanmış) toplam
+  const totalFiltered = listRes.count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
 
   // Filtre linkleri sayfa numarasını sıfırlar (portallar/page.tsx deseni).
   const href = (over: { durum?: string; danisman?: string; q?: string; sayfa?: number }) => {
@@ -226,7 +245,7 @@ export default async function PropertyKeysBoardPage({
         </button>
       </form>
 
-      {allRows.length === 0 && !hasFilter ? (
+      {baseTotal === 0 && !hasFilter ? (
         <EmptyState
           icon={KeyRound}
           title="Henüz anahtar kaydı yok"
@@ -240,7 +259,7 @@ export default async function PropertyKeysBoardPage({
             <div>
               <h2 className="font-display font-bold text-ink-950">Anahtarlar</h2>
               <p className="text-xs text-text-muted">
-                {visible.length} kayıt{visible.length !== allRows.length ? ` · ${allRows.length} içinden` : ""}
+                {totalFiltered} kayıt{totalFiltered !== baseTotal ? ` · ${baseTotal} içinden` : ""}
                 {totalPages > 1 ? ` · sayfa ${page}/${totalPages}` : ""}
               </p>
             </div>
@@ -279,7 +298,7 @@ export default async function PropertyKeysBoardPage({
             </div>
           </div>
 
-          {visible.length === 0 ? (
+          {totalFiltered === 0 ? (
             <div className="grid place-items-center px-6 py-14 text-center">
               <KeyRound className="h-8 w-8 text-text-faint" />
               <p className="mt-3 text-sm font-semibold text-ink-950">

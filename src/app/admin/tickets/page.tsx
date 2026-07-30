@@ -6,6 +6,8 @@ import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagina
 import { daysAgoIso } from "@/lib/clock";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { CountUp } from "@/components/admin/count-up";
+import { ExportButton } from "@/components/admin/export-button";
+import { exportTicketsCsv } from "@/app/actions/platform-export";
 import { slaSortRank, slaStateOf } from "./sla";
 import { SlaBadge } from "./sla-badge";
 import { TicketRowActions } from "./ticket-row-actions";
@@ -441,14 +443,17 @@ export default async function AdminTicketsPage({
             {priorityLabel[k]}
           </Link>
         ))}
-        {filterTenant ? (
-          <Link
-            href={buildHref({ durum, oncelik })}
-            className="focus-ring ml-auto inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
-          >
-            Ofis: {filterTenant.name} <X className="h-3 w-3" />
-          </Link>
-        ) : null}
+        <div className="ml-auto flex items-center gap-2">
+          {filterTenant ? (
+            <Link
+              href={buildHref({ durum, oncelik })}
+              className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
+            >
+              Ofis: {filterTenant.name} <X className="h-3 w-3" />
+            </Link>
+          ) : null}
+          <ExportButton action={exportTicketsCsv} label="CSV indir" variant="light" />
+        </div>
       </nav>
 
       <div className="overflow-hidden rounded-[20px] border border-line bg-surface">
