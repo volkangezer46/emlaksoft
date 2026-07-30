@@ -161,6 +161,8 @@ export function PurchaseCalculator({
   const [monthlyRatePct, setMonthlyRatePct] = useState(initial.monthlyRatePct);
   const [commissionPct, setCommissionPct] = useState(initial.commissionPct);
   const [deedFeeShare, setDeedFeeShare] = useState<DeedFeeShare>(initial.deedFeeShare);
+  const [newBuild, setNewBuild] = useState(false);
+  const [propertyKind, setPropertyKind] = useState<"residential" | "commercial">("residential");
   const [copied, setCopied] = useState(false);
 
   const downPct = price > 0 ? Math.round((downPayment / price) * 100) : 0;
@@ -173,8 +175,10 @@ export function PurchaseCalculator({
         sqm: sqm || null,
         commissionPct,
         deedFeeShare,
+        newBuild,
+        propertyKind,
       }),
-    [price, downPayment, sqm, commissionPct, deedFeeShare],
+    [price, downPayment, sqm, commissionPct, deedFeeShare, newBuild, propertyKind],
   );
 
   const loan = useMemo(
@@ -372,6 +376,45 @@ export function PurchaseCalculator({
                     </button>
                   ))}
                 </div>
+              </div>
+            </div>
+
+            {/* Yeni bina KDV + taşınmaz cinsi — ilk el alımda KDV, işyerinde stopaj notu */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <span className={labelCls}>Taşınmaz cinsi</span>
+                <div className="grid grid-cols-2 gap-1 rounded-[10px] border border-line bg-canvas p-1">
+                  {(
+                    [
+                      { key: "residential" as const, label: "Konut" },
+                      { key: "commercial" as const, label: "İşyeri" },
+                    ]
+                  ).map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setPropertyKind(opt.key)}
+                      className={`focus-ring press rounded-[8px] px-2 py-2 text-xs font-bold transition ${
+                        propertyKind === opt.key ? "bg-brand-600 text-white" : "text-text-muted hover:text-ink-950"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span className={labelCls}>Yapı durumu</span>
+                <label className="flex h-[42px] cursor-pointer items-center gap-2.5 rounded-[10px] border border-line bg-canvas px-3 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={newBuild}
+                    onChange={(e) => setNewBuild(e.target.checked)}
+                    className="h-4 w-4 accent-brand-600"
+                  />
+                  <span className="font-medium text-ink-950">Yeni bina (müteahhitten ilk el)</span>
+                </label>
+                <p className="mt-1 text-[11px] text-text-faint">İşaretliyse fiyata KDV eklenir; ikinci elde KDV yok.</p>
               </div>
             </div>
           </div>

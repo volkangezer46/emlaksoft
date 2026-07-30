@@ -83,6 +83,16 @@ export type PurchaseCostRates = {
    *  (Harçlar Kanunu m.123/son), yani ayrıca %o oranlı ipotek harcı çıkmaz;
    *  yalnızca hizmet bedeli kalır. */
   mortgageRegistrationFeeTry: number;
+
+  /** YENİ BİNA (müteahhitten ilk el) alımında satış bedeli üzerinden KDV.
+   *  İkinci el konutta KDV YOKTUR (bu kalem yalnız `newBuild` işaretliyken çıkar).
+   *  Net alanı 150 m²'ye kadar konut → %1; üzeri konut ve işyeri → %20
+   *  (2023 sonrası tarife). Durum: 2026 başı. */
+  newBuildVatResidentialSmallPct: number; // ≤150 m² konut
+  newBuildVatLargePct: number; // >150 m² konut / işyeri
+  /** İŞYERİ kiralamasında kiracının kestiği gelir vergisi STOPAJI (GVK m.94).
+   *  Konut kirasında stopaj yoktur. Kiracı brütten keser, malike net öder. */
+  rentWithholdingPct: number;
 };
 
 export const DEFAULT_RATES: PurchaseCostRates = {
@@ -104,6 +114,10 @@ export const DEFAULT_RATES: PurchaseCostRates = {
   appraisalFeeTry: 9_000,
   loanAllocationFeePct: 0.5,
   mortgageRegistrationFeeTry: 3_500,
+
+  newBuildVatResidentialSmallPct: 1,
+  newBuildVatLargePct: 20,
+  rentWithholdingPct: 20,
 };
 
 /** Konut kredisinde yasal azami vade (BDDK) — 120 ay. */
@@ -191,6 +205,10 @@ export type PurchaseCostInput = {
   vatPct?: number | null;
   includeDask?: boolean;
   includeHomeInsurance?: boolean;
+  /** Yeni bina (müteahhitten ilk el) — satış bedeline KDV eklenir. İkinci elde false. */
+  newBuild?: boolean;
+  /** Taşınmaz cinsi — yeni bina KDV oranı ve işyeri kira stopajı için. */
+  propertyKind?: "residential" | "commercial";
   /** Tek tek oran ezmek için (test / tenant özelleştirmesi). */
   rates?: Partial<PurchaseCostRates>;
 };
@@ -289,6 +307,26 @@ export function computePurchaseCosts(input: PurchaseCostInput): PurchaseCostResu
       amount: (price * commissionPct * vatMultiplier) / 100,
       note: "Taşınmaz Ticareti Yönetmeliği: satışta hizmet bedeli %4'ü aşamaz, aksi kararlaştırılmadıkça taraflardan yarı yarıya alınır.",
     });
+
+    // Yeni bina (müteahhitten ilk el) → satış bedeli üzerinden KDV. İkinci elde yok.
+    if (input.newBuild) {
+      const isCommercial = input.propertyKind === "commercial";
+      const newBuildVatPct = isCommercial
+        ? r.newBuildVatLargePct
+        : sqm && sqm <= 150
+          ? r.newBuildVatResidentialSmallPct
+          : r.newBuildVatLargePct;
+      add({
+        key: "new_build_vat",
+        label: `Yeni bina KDV (%${newBuildVatPct})`,
+        amount: (price * newBuildVatPct) / 100,
+        note: isCommercial
+          ? "İşyeri/ticari yeni bina alımında satış bedeline %20 KDV eklenir."
+          : sqm && sqm <= 150
+            ? "Net alanı 150 m²'ye kadar yeni konutta %1 KDV. İkinci el alımda KDV yoktur."
+            : "150 m² üzeri yeni konutta %20 KDV. m² girilmezse üst oran varsayıldı.",
+      });
+    }
   } else {
     // Kiralama: hizmet bedeli en çok BİR aylık kira + KDV.
     add({
@@ -298,6 +336,15 @@ export function computePurchaseCosts(input: PurchaseCostInput): PurchaseCostResu
       note: "Taşınmaz Ticareti Yönetmeliği: kiralamada hizmet bedeli bir aylık kira bedelini aşamaz.",
     });
     notes.push("Depozito ve peşin ödenen ilk kira bu hesaba dâhil değildir.");
+    // İşyeri kirasında gelir vergisi stopajı — kiracı brütten keser, malike net
+    // öder. Kiracının cebinden ÇIKMAZ (kesip vergi dairesine yatırır) → toplam
+    // maliyete eklenmez, bilgi notu olarak gösterilir.
+    if (input.propertyKind === "commercial" && r.rentWithholdingPct > 0) {
+      const monthlyWithholding = round2((price * r.rentWithholdingPct) / 100);
+      notes.push(
+        `İşyeri kirasında kiracı aylık %${r.rentWithholdingPct} gelir vergisi stopajı keser (~${nfTry.format(monthlyWithholding)} ₺/ay); malike NET ödenir, vergi dairesine yatırılır.`,
+      );
+    }
   }
 
   // --- Sigortalar ----------------------------------------------------------
