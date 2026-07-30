@@ -589,14 +589,22 @@ async function ensureCommissionForDeal(
   });
   const splits = buildSplits(calc.net);
 
-  await supabase.from("commissions").insert({
-    tenant_id: tenantId,
-    deal_id: dealId,
-    gross_amount: calc.net,
-    vat_amount: calc.vat,
-    status: "calculated",
-    splits,
-  });
+  // upsert + ignoreDuplicates: eşzamanlı "kazanıldı" geçişinde (çift-tık/retry)
+  // ikinci çağrı uq_commissions_deal_id kısıtına takılıp SESSİZCE atlanır —
+  // deal başına tek komisyon garanti (ciro/hakediş iki katına çıkmaz). Hata
+  // artık yutulmuyor, loglanıyor.
+  const { error: commErr } = await supabase.from("commissions").upsert(
+    {
+      tenant_id: tenantId,
+      deal_id: dealId,
+      gross_amount: calc.net,
+      vat_amount: calc.vat,
+      status: "calculated",
+      splits,
+    },
+    { onConflict: "deal_id", ignoreDuplicates: true },
+  );
+  if (commErr) console.error("ensureCommissionForDeal komisyon upsert", commErr);
 
   // Kira anlaşmasında portföy SATILDI olamaz — 'rented' (Kiralandı) yazılır.
   const nextStatus = wonDealPropertyStatus(dealType);
