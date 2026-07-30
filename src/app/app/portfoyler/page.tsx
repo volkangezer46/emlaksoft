@@ -28,6 +28,7 @@ import type { CompareItem } from "@/components/public/compare-table";
 import { NewPropertyDialog } from "./new-property-dialog";
 import { PropertyCompareShell } from "./compare-shell";
 import { PropertyBulkActions } from "./property-bulk-actions";
+import { PropertySortSelect } from "./property-sort-select";
 import { OwnerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { EmptyState } from "@/components/app/empty-state";
@@ -141,7 +142,7 @@ const PAGER_BTN_DISABLED =
 export default async function PropertiesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string; status?: string; saglik?: string; gorunum?: string; sayfa?: string }>;
+  searchParams?: Promise<{ q?: string; status?: string; saglik?: string; gorunum?: string; sayfa?: string; sirala?: string }>;
 }) {
   const { perms } = await requireModulePage("properties");
   const canCreate = (perms.properties ?? []).includes("create");
@@ -151,6 +152,8 @@ export default async function PropertiesPage({
   const statusFilter = STATUS_FILTERS.some((f) => f.value === params.status) ? params.status! : "all";
   const saglikFilter = SAGLIK_FILTERS.some((f) => f.value === params.saglik) ? (params.saglik as SaglikValue) : null;
   const view = params.gorunum === "harita" ? "harita" : "liste";
+  // Kullanıcı sıralaması: ?sirala=eski|fiyat_yuksek|fiyat_dusuk (varsayılan: yeni=created_at desc)
+  const siralaF = ["eski", "fiyat_yuksek", "fiyat_dusuk"].includes(params.sirala ?? "") ? (params.sirala as string) : "";
   const page = Math.max(1, Number.parseInt(params.sayfa ?? "", 10) || 1);
   const offset = (page - 1) * PAGE_SIZE;
   const supabase = await createClient();
@@ -160,6 +163,7 @@ export default async function PropertiesPage({
   if (q) savedViewParams.q = q;
   if (statusFilter !== "all") savedViewParams.status = statusFilter;
   if (saglikFilter) savedViewParams.saglik = saglikFilter;
+  if (siralaF) savedViewParams.sirala = siralaF;
   if (view === "harita") savedViewParams.gorunum = "harita";
 
   /*
@@ -221,9 +225,18 @@ export default async function PropertiesPage({
   // Liste görünümü sunucu-sayfalı; harita görünümü tüm konumlu sonuçları (cap) çeker.
   const listQuery =
     view === "liste"
-      ? buildFilteredQuery(LIST_COLS)
-          .order("created_at", { ascending: false })
-          .range(offset, offset + PAGE_SIZE - 1)
+      ? (() => {
+          const base = buildFilteredQuery(LIST_COLS);
+          const ordered =
+            siralaF === "eski"
+              ? base.order("created_at", { ascending: true })
+              : siralaF === "fiyat_yuksek"
+                ? base.order("list_price", { ascending: false, nullsFirst: false })
+                : siralaF === "fiyat_dusuk"
+                  ? base.order("list_price", { ascending: true, nullsFirst: false })
+                  : base.order("created_at", { ascending: false });
+          return ordered.range(offset, offset + PAGE_SIZE - 1);
+        })()
       : Promise.resolve({ data: null });
   const mapQuery =
     view === "harita"
@@ -340,6 +353,7 @@ export default async function PropertiesPage({
     if (q) sp.set("q", q);
     if (statusFilter !== "all") sp.set("status", statusFilter);
     if (saglikFilter) sp.set("saglik", saglikFilter);
+    if (siralaF) sp.set("sirala", siralaF);
     if (value === "harita") sp.set("gorunum", "harita");
     const qs = sp.toString();
     return qs ? `/app/portfoyler?${qs}` : "/app/portfoyler";
@@ -351,6 +365,7 @@ export default async function PropertiesPage({
     if (q) sp.set("q", q);
     if (statusFilter !== "all") sp.set("status", statusFilter);
     if (saglikFilter) sp.set("saglik", saglikFilter);
+    if (siralaF) sp.set("sirala", siralaF);
     if (target > 1) sp.set("sayfa", String(target));
     const qs = sp.toString();
     return qs ? `/app/portfoyler?${qs}` : "/app/portfoyler";
@@ -502,6 +517,13 @@ export default async function PropertiesPage({
 
       {/* Kayıtlı görünümler — aktif filtre kombinasyonu adlandırılıp saklanır */}
       <SavedViews route="/app/portfoyler" views={savedViews} currentParams={savedViewParams} />
+
+      {/* Sıralama — yalnız liste görünümünde ve portföy varken (harita created_at'te sabit) */}
+      {view === "liste" && (totalCount ?? 0) > 0 ? (
+        <div className="flex items-center justify-end">
+          <PropertySortSelect value={siralaF} />
+        </div>
+      ) : null}
 
       {(q || statusFilter !== "all" || saglikFilter) && (
         <p className="flex items-center gap-2 text-xs text-text-muted">
