@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 // Doğrudan lucide import'u yalnızca KAVRAMSAL OLMAYAN öğeler için kalır
 // (hesap makinesi, chevron, hamburger, kapat, kıvılcım süsü).
-import { BadgeCheck, Calculator, ChevronRight, Globe, LayoutDashboard, LineChart, ListFilter, Menu, Sparkles, Trophy, Tv, X } from "lucide-react";
+import { BadgeCheck, Calculator, ChevronRight, Globe, LayoutDashboard, LineChart, ListFilter, Menu, Sparkles, Sunrise, Trophy, Tv, X } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar (müşteri, portföy, randevu…)
 // `src/lib/icons.ts` sözlüğünden gelir; sidebar bu sözlüğün referans
 // uygulamasıdır — bir kavramın ikonu değişirse tek yerden değişir.
@@ -16,6 +16,7 @@ type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; modu
 
 const anaEkran: NavItem = { href: "/app", label: "Ana ekran", icon: ICONS.dashboard, module: "dashboard" };
 const aiAsistan: NavItem = { href: "/app/asistan", label: "AI Asistan", icon: ICONS.ai, module: "dashboard" };
+const brifing: NavItem = { href: "/app/brifing", label: "Günlük Brifing", icon: Sunrise, module: "dashboard" };
 
 const navGroups: { title: string; items: NavItem[] }[] = [
   {
@@ -152,7 +153,7 @@ export function AppSidebar({
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-4">
-        {showHome ? <nav className="space-y-1">{renderItem(anaEkran)}{renderItem(aiAsistan)}</nav> : null}
+        {showHome ? <nav className="space-y-1">{renderItem(anaEkran)}{renderItem(brifing)}{renderItem(aiAsistan)}</nav> : null}
         {groups.map((group) => (
           <div key={group.title} className="mt-5 first:mt-0">
             <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/45">{group.title}</p>
