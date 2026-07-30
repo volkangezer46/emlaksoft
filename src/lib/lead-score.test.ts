@@ -162,6 +162,31 @@ describe("sinyal katkıları", () => {
   });
 });
 
+describe("davranışsal niyet sinyalleri", () => {
+  it("teklif veren müşteri, vermeyen aynı profilden yüksek puan alır", () => {
+    const teklifli = computeLeadScore(ile({ hasPhone: true, offers: 2 })).score;
+    const teklifsiz = computeLeadScore(ile({ hasPhone: true })).score;
+    expect(teklifli).toBeGreaterThan(teklifsiz);
+  });
+
+  it("aktif anlaşma güçlü niyet puanı ekler", () => {
+    const anlasmali = computeLeadScore(ile({ hasPhone: true, hasActiveDeal: true }));
+    const anlasmasiz = computeLeadScore(ile({ hasPhone: true }));
+    expect(anlasmali.score).toBe(anlasmasiz.score + 15);
+    expect(anlasmali.factors.some((f) => f.label === "Aktif anlaşma")).toBe(true);
+  });
+
+  it("teklif puanı tavanı: 2 teklif ile 20 teklif aynı puanı verir", () => {
+    expect(computeLeadScore(ile({ offers: 2 })).score).toBe(computeLeadScore(ile({ offers: 20 })).score);
+  });
+
+  it("opsiyonel sinyaller yoksa eski davranış korunur (geriye uyum)", () => {
+    const eski = computeLeadScore(ile({ hasPhone: true, source: "web" }));
+    const yeni = computeLeadScore(ile({ hasPhone: true, source: "web", offers: 0, hasActiveDeal: false }));
+    expect(eski.score).toBe(yeni.score);
+  });
+});
+
 describe("faktör listesi", () => {
   it("yalnızca puan üreten sinyalleri listeler", () => {
     const r = computeLeadScore(ile({ hasPhone: true, lastActivityAt: gunOnce(1) }));

@@ -443,6 +443,23 @@ export default async function CustomersPage({
   const rangeStart = totalFiltered === 0 ? 0 : offset + 1;
   const rangeEnd = Math.min(offset + rows.length, totalFiltered);
 
+  // Davranışsal niyet sinyalleri — YALNIZ görünen satırlar için (≤50, customer_id
+  // indeksli). Teklif = güçlü niyet, açık anlaşma = en yüksek niyet.
+  const rowIds = rows.map((c) => c.id);
+  const [{ data: offerRows }, { data: openDealRows }] = rowIds.length
+    ? await Promise.all([
+        supabase.from("offers").select("customer_id").in("customer_id", rowIds),
+        supabase.from("deals").select("customer_id").in("customer_id", rowIds).not("stage", "in", "(won,lost)"),
+      ])
+    : [{ data: [] as { customer_id: string | null }[] }, { data: [] as { customer_id: string | null }[] }];
+  const offerCount = new Map<string, number>();
+  for (const o of (offerRows ?? []) as { customer_id: string | null }[]) {
+    if (o.customer_id) offerCount.set(o.customer_id, (offerCount.get(o.customer_id) ?? 0) + 1);
+  }
+  const activeDealSet = new Set(
+    ((openDealRows ?? []) as { customer_id: string | null }[]).map((d) => d.customer_id).filter(Boolean) as string[],
+  );
+
   // Lead skoru — YALNIZCA görünen sayfa için hesaplanır (bellek dostu)
   const signalMap = new Map<string, LeadSignalRow>();
   for (const s of (signals ?? []) as LeadSignalRow[]) signalMap.set(s.customer_id, s);
@@ -459,6 +476,8 @@ export default async function CustomersPage({
       lastActivityAt: s?.last_activity ?? null,
       createdAt: c.created_at,
       blacklist: Boolean(c.blacklist),
+      offers: offerCount.get(c.id) ?? 0,
+      hasActiveDeal: activeDealSet.has(c.id),
     });
   };
   const leadMap = new Map(rows.map((c) => [c.id, leadOf(c)]));

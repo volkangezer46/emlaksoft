@@ -326,6 +326,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     lastActivityAt,
     createdAt: customer.created_at,
     blacklist: Boolean(customer.blacklist),
+    offers: (offersData ?? []).length,
+    hasActiveDeal: (dealsData ?? []).some((d) => d.stage !== "won" && d.stage !== "lost"),
   });
   const score = lead.score;
 

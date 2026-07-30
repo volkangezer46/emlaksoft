@@ -15,6 +15,11 @@ export type LeadSignals = {
   lastActivityAt: string | null; // en son etkileşim (ISO)
   createdAt: string;       // müşteri kaydı (ISO)
   blacklist: boolean;
+  // --- Davranışsal / niyet sinyalleri (opsiyonel, geriye dönük uyumlu) ---
+  /** Bu müşteriyle ilişkili teklif sayısı — güçlü satın-alma niyeti. */
+  offers?: number;
+  /** Açık (kazanılmamış/kaybedilmemiş) pipeline anlaşması var mı — en yüksek niyet. */
+  hasActiveDeal?: boolean;
 };
 
 export type LeadScore = {
@@ -93,6 +98,13 @@ export function computeLeadScore(s: LeadSignals): LeadScore {
   // Randevu = yüksek niyet
   const apptPts = Math.min(18, s.appointments * 9);
   if (apptPts > 0) { score += apptPts; factors.push({ label: "Randevu", points: apptPts }); }
+
+  // Teklif = güçlü satın-alma niyeti (davranışsal sinyal)
+  const offerPts = Math.min(16, (s.offers ?? 0) * 8);
+  if (offerPts > 0) { score += offerPts; factors.push({ label: "Teklif verdi", points: offerPts }); }
+
+  // Açık pipeline anlaşması = en yüksek niyet
+  if (s.hasActiveDeal) { score += 15; factors.push({ label: "Aktif anlaşma", points: 15 }); }
 
   // Güncellik (son etkileşim yakınsa sıcak, eskiyse soğur)
   const d = daysSince(s.lastActivityAt ?? s.createdAt);
