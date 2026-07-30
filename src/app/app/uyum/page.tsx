@@ -55,7 +55,7 @@ export default async function CompliancePage({
     listErasureLog(50),
     supabase
       .from("iys_consents")
-      .select("id, channel, status, granted_at, created_at, customer:customers(id, full_name)")
+      .select("id, channel, status, granted_at, revoked_at, created_at, customer:customers(id, full_name)")
       .order("created_at", { ascending: false })
       .limit(100),
     supabase
@@ -104,7 +104,12 @@ export default async function CompliancePage({
       const custRow = Array.isArray(cust) ? cust[0] : cust;
       return {
         id: `iys-${c.id}`,
-        at: (c.granted_at as string | null) ?? (c.created_at as string),
+        // Reddedilen/geri alınan izinde yasal olarak anlamlı tarih revoked_at'tir
+        // (KVKK kanıtı) — granted_at null olur. Diğer durumlarda granted_at.
+        at:
+          c.status === "denied"
+            ? ((c.revoked_at as string | null) ?? (c.created_at as string))
+            : ((c.granted_at as string | null) ?? (c.created_at as string)),
         title: `${channelLabel[c.channel] ?? c.channel} — ${statusLabel[c.status] ?? c.status}`,
         detail: custRow?.full_name ?? "Müşteri",
         tone: c.status === "granted" ? "mint" : c.status === "denied" ? "danger" : "amber",
