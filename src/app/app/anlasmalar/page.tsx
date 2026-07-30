@@ -2,7 +2,8 @@ import Link from "next/link";
 import { AlarmClock, ArrowUpRight, Filter, Handshake, Target, TrendingUp, Trophy, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { DAY_MS, msSince } from "@/lib/clock";
+import { DAY_MS, msSince, daysAgoIso } from "@/lib/clock";
+import { InteractiveChart } from "@/components/app/interactive-chart";
 import { DealBoard, type BoardDeal } from "./deal-board";
 import { NewDealDialog } from "./new-deal-dialog";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
@@ -151,6 +152,25 @@ export default async function DealsPage() {
   });
   const funnelMax = Math.max(1, ...funnel.map((f) => f.count));
   const lostValue = lost.reduce((s, d) => s + (d.deal_value || 0), 0);
+
+  // Aylık kazanılan ciro (son 6 ay) — updated_at won-tarihi vekili (şemada ayrı
+  // kapanış tarihi yok). Ay bucketing saf string matematiğiyle (clock kuralı:
+  // bileşende new Date() yok); "YYYY-MM" karşılaştırması.
+  const MONTHS_TR = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+  const [curY, curM] = daysAgoIso(0).slice(0, 7).split("-").map(Number); // curM: 1-12
+  const wonByMonth = Array.from({ length: 6 }, (_, k) => {
+    const i = 5 - k; // 5 ay önce → bu ay
+    let idx = curM - 1 - i;
+    let y = curY;
+    while (idx < 0) { idx += 12; y -= 1; }
+    return { key: `${y}-${String(idx + 1).padStart(2, "0")}`, label: MONTHS_TR[idx], value: 0 };
+  });
+  for (const w of won) {
+    if (!w.updated_at) continue;
+    const b = wonByMonth.find((x) => x.key === String(w.updated_at).slice(0, 7));
+    if (b) b.value += w.deal_value || 0;
+  }
+  const wonTrendTotal = wonByMonth.reduce((s, m) => s + m.value, 0);
 
   return (
     <div className="space-y-6">
@@ -327,6 +347,28 @@ export default async function DealsPage() {
               ) : null}
             </div>
           </section>
+
+          {wonTrendTotal > 0 ? (
+            <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <h2 className="font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">
+                    Aylık kazanılan ciro
+                  </h2>
+                  <p className="mt-0.5 text-[11px] text-text-faint">Son 6 ay · kapanan anlaşma değeri</p>
+                </div>
+                <p className="numeric font-display text-xl font-extrabold text-mint-600 tabular-nums">{money(wonTrendTotal)}</p>
+              </div>
+              <InteractiveChart
+                data={wonByMonth.map((m) => ({ label: m.label, value: m.value }))}
+                color="var(--mint-500)"
+                name="Kazanılan"
+                format="money"
+                height={180}
+                className="mt-4"
+              />
+            </section>
+          ) : null}
 
           <div className="flex items-center gap-2 text-xs font-semibold text-text-muted">
             <Filter className="h-3.5 w-3.5" /> Tahta — sürükleyerek veya aşama butonlarıyla taşıyın

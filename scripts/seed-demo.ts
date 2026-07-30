@@ -528,6 +528,42 @@ async function main() {
     }
   }
 
+  // Aylık kazanılan ciro trendi için backdate'li kazanılan anlaşmalar (geçmiş aylar).
+  // Idempotent: 40+ gün önce güncellenmiş won anlaşma var mı marker'ı.
+  {
+    const { data: oldWon } = await admin
+      .from("deals")
+      .select("id, updated_at")
+      .eq("tenant_id", tenantId)
+      .eq("stage", "won")
+      .lte("updated_at", iso(daysFromNow(-40, 12)))
+      .limit(1);
+    if (!(oldWon && oldWon.length)) {
+      const extra = [
+        { prop: "DEMO-002", cust: "Ayşe Kaya", value: 9_600_000, daysAgo: 135 },
+        { prop: "DEMO-009", cust: "Ali Koç", value: 7_300_000, daysAgo: 100 },
+        { prop: "DEMO-010", cust: "Zeynep Aydın", value: 5_400_000, daysAgo: 70 },
+        { prop: "DEMO-011", cust: "Mustafa Çelik", value: 11_200_000, daysAgo: 45 },
+      ];
+      const rows = extra.map((d) => ({
+        tenant_id: tenantId,
+        property_id: propByCode(d.prop),
+        customer_id: custByName(d.cust),
+        deal_type: "sale",
+        stage: "won",
+        deal_value: d.value,
+        probability: 100,
+        assigned_to: advisorId,
+        created_at: iso(daysFromNow(-d.daysAgo - 20, 10)),
+        updated_at: iso(daysFromNow(-d.daysAgo, 15)),
+      }));
+      const n = (await insertRows("deals", rows)).length;
+      console.log(`✓ Ek kazanılan anlaşmalar (trend): ${n} kayıt üretildi`);
+    } else {
+      console.log("✓ Ek kazanılan anlaşmalar: mevcut (atlandı)");
+    }
+  }
+
   const { data: dealsData } = await admin
     .from("deals")
     .select("id, stage, deal_value, deal_type, property_id")
