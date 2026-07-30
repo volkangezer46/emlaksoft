@@ -682,6 +682,66 @@ async function main() {
     return (await insertRows("calls", rows)).length;
   });
 
+  // ---- Akıllı listeler demosu: orta müşterilere backdate'li talep + geçmiş temas ----
+  // Engagement (açık talep) + eski last_activity (dormancy) üretir → churn/dormant/
+  // sıcak segmentleri anlamlı dolar. Idempotent: çağrı disposition marker'ı.
+  {
+    const { data: mark } = await admin
+      .from("calls")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("disposition", "Geçmiş temas — takip")
+      .limit(1);
+    const { data: allCust } = await admin
+      .from("customers")
+      .select("id, phone")
+      .eq("tenant_id", tenantId)
+      .order("full_name");
+    if (allCust && allCust.length >= 20 && !(mark && mark.length)) {
+      const targets = allCust.slice(6, 20); // flagship dışı ~14 müşteri
+      const demandRows: Dict[] = [];
+      const callRows: Dict[] = [];
+      targets.forEach((c, i) => {
+        const daysAgo = 35 + i * 9; // 35..152 gün → karışık dormancy
+        const started = daysFromNow(-daysAgo, 11);
+        // 2 açık talep → warm lead + churn "açık talep" sinyali
+        for (let k = 0; k < 2; k++) {
+          demandRows.push({
+            tenant_id: tenantId,
+            customer_id: c.id,
+            transaction_type: k === 0 ? "Satılık" : "Kiralık",
+            property_type: "Daire",
+            province_id: geo.istanbulId,
+            district_id: i % 2 === 0 ? geo.kadikoyId : geo.maltepeId,
+            budget_min: k === 0 ? 4_000_000 : 18_000,
+            budget_max: k === 0 ? 9_000_000 : 32_000,
+            rooms: k === 0 ? "3+1" : "2+1",
+            min_sqm: 85,
+            urgency: "orta",
+            status: "active",
+          });
+        }
+        // Geçmiş temas → last_activity eski (dormancy)
+        callRows.push({
+          tenant_id: tenantId,
+          customer_id: c.id,
+          direction: "outbound",
+          phone: c.phone ?? "05320000000",
+          duration_sec: 150 + i * 8,
+          disposition: "Geçmiş temas — takip",
+          handled_by: advisorId,
+          started_at: iso(started),
+          ended_at: iso(new Date(started.getTime() + 150_000)),
+        });
+      });
+      const dn = (await insertRows("customer_demands", demandRows)).length;
+      const cn = (await insertRows("calls", callRows)).length;
+      console.log(`✓ Akıllı liste demosu: ${dn} talep + ${cn} geçmiş temas`);
+    } else {
+      console.log("✓ Akıllı liste demosu: mevcut (atlandı)");
+    }
+  }
+
   // ---------------- Portal ilanları (canlı + teyitsiz + 1 kapanış) ----------------
   await section("Portal ilanları", "portal_listings", tenantId, 10, async () => {
     const liveSpecs = [

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 // Doğrudan lucide import'u yalnızca KAVRAMSAL OLMAYAN öğeler için kalır
 // (hesap makinesi, chevron, hamburger, kapat, kıvılcım süsü).
-import { BadgeCheck, Calculator, ChevronRight, Globe, LayoutDashboard, LineChart, Menu, Sparkles, Trophy, X } from "lucide-react";
+import { BadgeCheck, Calculator, ChevronRight, Globe, LayoutDashboard, LineChart, ListFilter, Menu, Sparkles, Trophy, X } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar (müşteri, portföy, randevu…)
 // `src/lib/icons.ts` sözlüğünden gelir; sidebar bu sözlüğün referans
 // uygulamasıdır — bir kavramın ikonu değişirse tek yerden değişir.
@@ -22,6 +22,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
     title: "Satış",
     items: [
       { href: "/app/musteriler",   label: "Müşteriler",    icon: ICONS.musteri,     module: "customers" },
+      { href: "/app/akilli-listeler", label: "Akıllı Listeler", icon: ListFilter,   module: "customers" },
       { href: "/app/tavsiyeler",   label: "Tavsiyeler",    icon: ICONS.tavsiye,     module: "customers" },
       { href: "/app/talepler",     label: "Talepler",      icon: ICONS.talep,       module: "demands" },
       { href: "/app/eslestirme",   label: "Eşleştirme",    icon: ICONS.eslestirme,  module: "matching" },
