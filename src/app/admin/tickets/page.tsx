@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, CheckCircle2, Clock, LifeBuoy, Siren, TrendingUp, UserCheck, X } from "lucide-react";
-import { setTicketStatus } from "@/app/actions/tickets";
-import { assignTicketStaffAction } from "@/app/actions/admin-ticket-ops";
+import { AlertTriangle, ArrowUpRight, CheckCircle2, Clock, LifeBuoy, Siren, TrendingUp, X } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
@@ -9,6 +7,7 @@ import { daysAgoIso } from "@/lib/clock";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { slaSortRank, slaStateOf } from "./sla";
 import { SlaBadge } from "./sla-badge";
+import { TicketRowActions } from "./ticket-row-actions";
 import type { CSSProperties } from "react";
 
 const RING_C = 2 * Math.PI * 42;
@@ -122,7 +121,6 @@ export default async function AdminTicketsPage({
   const stats = statRows ?? [];
   const filterTenant = tenantRes.data;
   const staff = staffList ?? [];
-  const staffName = new Map(staff.map((s) => [s.id, s.full_name]));
 
   // SLA: sayfadaki ticket'lar için ilk personel yanıtı var mı? (tek sorgu)
   const pageIds = fetched.map((t) => t.id);
@@ -200,6 +198,8 @@ export default async function AdminTicketsPage({
   }
   const dailyNew = dayKeys.map((k) => ({ label: `${k.slice(8, 10)}.${k.slice(5, 7)}`, value: dailyMap.get(k) ?? 0 }));
   const newLast14 = dailyNew.reduce((s, d) => s + d.value, 0);
+
+  const statusOptions = Object.entries(statusLabel).map(([value, label]) => ({ value, label }));
 
   return (
     <div className="space-y-6">
@@ -432,76 +432,52 @@ export default async function AdminTicketsPage({
         ) : (
           <div className="divide-y divide-line">
             {rows.map((t) => (
-              <article key={t.id} className="grid gap-3 px-5 py-4 transition hover:bg-brand-600/[0.02] lg:grid-cols-[1.5fr_1fr_auto] lg:items-start">
-                <div>
+              <article key={t.id} className="flex flex-col gap-3 px-4 py-4 transition hover:bg-brand-600/[0.02] sm:px-5 lg:flex-row lg:items-center lg:gap-4">
+                {/* Bilgi */}
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    {t.priority === "urgent" ? <AlertTriangle className="h-3.5 w-3.5 text-danger-500" /> : null}
-                    <Link href={`/admin/tickets/${t.id}`} className="text-sm font-semibold text-ink-950 transition hover:text-brand-600">
+                    {t.priority === "urgent" ? <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-danger-500" /> : null}
+                    <Link href={`/admin/tickets/${t.id}`} className="truncate text-sm font-semibold text-ink-950 transition hover:text-brand-600">
                       {t.subject}
                     </Link>
                   </div>
-                  <p className="mt-1 line-clamp-2 text-xs text-text-muted">{t.body}</p>
-                  <p className="mt-2 text-[11px] text-text-faint">
+                  <p className="mt-1 line-clamp-1 text-xs text-text-muted">{t.body}</p>
+                  <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-text-faint">
                     {t.tenant_id ? (
                       <Link href={`/admin/tenants/${t.tenant_id}`} className="font-semibold text-brand-600 transition hover:underline">
                         {nameOf(t.tenant as Rel)}
                       </Link>
                     ) : (
-                      nameOf(t.tenant as Rel)
-                    )}{" "}
-                    · {categoryLabel[t.category] ?? t.category} ·{" "}
-                    <span className={`font-semibold ${priorityCls[t.priority] ?? ""}`}>{priorityLabel[t.priority] ?? t.priority}</span> ·{" "}
-                    {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(t.created_at))}
+                      <span>{nameOf(t.tenant as Rel)}</span>
+                    )}
+                    <span aria-hidden>·</span>
+                    <span>{categoryLabel[t.category] ?? t.category}</span>
+                    <span aria-hidden>·</span>
+                    <span className={`font-semibold ${priorityCls[t.priority] ?? ""}`}>{priorityLabel[t.priority] ?? t.priority}</span>
+                    <span aria-hidden>·</span>
+                    <span className="whitespace-nowrap">{new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(t.created_at))}</span>
                   </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">
-                    {statusLabel[t.status] ?? t.status}
-                  </span>
+
+                {/* SLA + konuşma */}
+                <div className="flex shrink-0 items-center gap-2">
                   <SlaBadge sla={t.sla} />
-                  {t.assigned_staff_id ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-cyan-400/12 px-2.5 py-1 text-[11px] font-bold text-cyan-700">
-                      <UserCheck className="h-3 w-3" />
-                      {staffName.get(t.assigned_staff_id) ?? "Personel"}
-                    </span>
-                  ) : null}
                   <Link
                     href={`/admin/tickets/${t.id}`}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 hover:underline"
+                    className="focus-ring inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
                   >
                     Konuşma <ArrowUpRight className="h-3 w-3" />
                   </Link>
                 </div>
-                <div className="flex flex-col items-start gap-2">
-                  <form action={setTicketStatus} className="flex items-center gap-2">
-                    <input type="hidden" name="id" value={t.id} />
-                    <select name="status" defaultValue={t.status} className="rounded-[9px] border border-line bg-canvas px-2 py-1.5 text-xs font-semibold outline-none focus:border-brand-400">
-                      {Object.entries(statusLabel).map(([v, l]) => (
-                        <option key={v} value={v}>{l}</option>
-                      ))}
-                    </select>
-                    <button type="submit" className="rounded-[9px] bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white">
-                      Güncelle
-                    </button>
-                  </form>
-                  <form action={assignTicketStaffAction} className="flex items-center gap-2">
-                    <input type="hidden" name="id" value={t.id} />
-                    <select
-                      name="staff_id"
-                      defaultValue={t.assigned_staff_id ?? ""}
-                      aria-label="Personel ata"
-                      className="rounded-[9px] border border-line bg-canvas px-2 py-1.5 text-xs font-semibold outline-none focus:border-brand-400"
-                    >
-                      <option value="">Atanmadı</option>
-                      {staff.map((s) => (
-                        <option key={s.id} value={s.id}>{s.full_name}</option>
-                      ))}
-                    </select>
-                    <button type="submit" className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:text-ink-950">
-                      Ata
-                    </button>
-                  </form>
-                </div>
+
+                {/* Aksiyonlar — durum + atama, değişince otomatik uygulanır (inline) */}
+                <TicketRowActions
+                  id={t.id}
+                  status={t.status}
+                  statusOptions={statusOptions}
+                  assignedId={t.assigned_staff_id ?? null}
+                  staff={staff}
+                />
               </article>
             ))}
           </div>
