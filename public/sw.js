@@ -1,5 +1,5 @@
 /* EmlakSoft PWA — sürümlü cache, offline fallback, push bildirimleri */
-const VERSION = "v3";
+const VERSION = "v4";
 const STATIC_CACHE = `emlaksoft-static-${VERSION}`;
 const PAGE_CACHE = `emlaksoft-pages-${VERSION}`;
 const CURRENT_CACHES = [STATIC_CACHE, PAGE_CACHE];
@@ -9,13 +9,29 @@ const PRECACHE_STATIC = [OFFLINE_URL, "/manifest.webmanifest", "/window.svg"];
 const PRECACHE_PAGES = ["/"];
 
 /**
- * Oturum gerektiren sayfalar ASLA cache'lenmez: /app veya /admin bir kez
- * PAGE_CACHE'e yazılırsa çıkış yapmış (veya başka) kullanıcı offline'da
- * paneli cache'ten görebilir. Bu path'ler network-first yerine yalnız
- * ağ + offline.html fallback alır.
+ * Oturum gerektiren VEYA kişiye-özel token sayfaları ASLA cache'lenmez. /app,
+ * /admin bir kez PAGE_CACHE'e yazılırsa çıkış yapmış (veya başka) kullanıcı
+ * offline'da paneli görebilir. Aynı risk token'lı public sayfalarda daha da
+ * ağır: paylaşılan/ortak bir cihazda birinin ödeme linki, malik/müşteri portalı,
+ * sunum veya randevu-teyit sayfası cache'ten BAŞKASINA açılabilir. Bu path'ler
+ * network-first yerine yalnız ağ + offline.html fallback alır.
  */
+const TOKEN_PREFIXES = [
+  "/paylas/",
+  "/sunum/",
+  "/tavsiye/",
+  "/musteri-portali/",
+  "/malik-portali/",
+  "/randevu-al/",
+  "/randevu-teyit/",
+  "/odeme-link/",
+  "/vitrin/",
+];
 function isPrivatePage(pathname) {
-  return pathname === "/app" || pathname.startsWith("/app/") || pathname === "/admin" || pathname.startsWith("/admin/");
+  if (pathname === "/app" || pathname.startsWith("/app/") || pathname === "/admin" || pathname.startsWith("/admin/")) {
+    return true;
+  }
+  return TOKEN_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
 self.addEventListener("install", (event) => {

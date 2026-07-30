@@ -68,13 +68,18 @@ export default async function AppLayout({
   const supabase = await createClient();
   const user = await getRequestUser();
 
-  const { data: profile } = user
-    ? await supabase
-        .from("profiles")
-        .select("full_name, role, tenant_id, tenants(name, plan, status, brand_color)")
-        .eq("id", user.id)
-        .maybeSingle()
-    : { data: null };
+  // profile ve platformStaff ikisi de yalnız `user`'a bağlı, birbirine değil →
+  // her navigasyonda seri iki round-trip yerine paralel (bootstrap hızlanır).
+  const [{ data: profile }, platformStaff] = await Promise.all([
+    user
+      ? supabase
+          .from("profiles")
+          .select("full_name, role, tenant_id, tenants(name, plan, status, brand_color)")
+          .eq("id", user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    getPlatformStaff(),
+  ]);
 
   const tenant = profile?.tenants as
     | { name?: string; plan?: string; status?: string; brand_color?: string | null }
@@ -99,8 +104,6 @@ export default async function AppLayout({
     professional: "Profesyonel",
     enterprise: "Kurumsal",
   };
-
-  const platformStaff = await getPlatformStaff();
 
   let officeScore: number | null = null;
   let officeScoreLabel = "—";
