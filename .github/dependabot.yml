@@ -1,0 +1,27 @@
+# Dependabot — otomatik bağımlılık güncelleme PR'ları (denetim P1.44).
+# Güvenlik açıkları ve sürüm gecikmesi sessizce birikmesin; haftalık gruplu PR.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    # Gürültüyü azalt: patch/minor'ları tek PR'da grupla; major ayrı gelsin
+    # (breaking olabilir, ayrı incelenir).
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels: ["ci"]
+    commit-message:
+      prefix: "chore(ci)"
