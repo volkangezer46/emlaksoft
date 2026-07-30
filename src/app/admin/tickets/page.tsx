@@ -5,9 +5,11 @@ import { requirePlatformModule } from "@/lib/platform";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { daysAgoIso } from "@/lib/clock";
 import { InteractiveChart } from "@/components/app/interactive-chart";
+import { CountUp } from "@/components/admin/count-up";
 import { slaSortRank, slaStateOf } from "./sla";
 import { SlaBadge } from "./sla-badge";
 import { TicketRowActions } from "./ticket-row-actions";
+import { Tilt3D } from "./tilt-3d";
 import type { CSSProperties } from "react";
 
 const RING_C = 2 * Math.PI * 42;
@@ -78,8 +80,10 @@ function buildHref(p: { durum?: string; oncelik?: string; tenant?: string; sayfa
 }
 
 const chipCls = (active: boolean) =>
-  `focus-ring press rounded-[9px] px-3 py-1.5 text-xs font-semibold transition ${
-    active ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
+  `focus-ring press lift rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+    active
+      ? "border border-ink-950 bg-ink-950 text-white shadow-[var(--elev-2)]"
+      : "border border-line bg-surface text-text-muted hover:border-brand-300 hover:text-ink-950 hover:shadow-[var(--shadow-xs)]"
   }`;
 
 export default async function AdminTicketsPage({
@@ -203,181 +207,204 @@ export default async function AdminTicketsPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="perspective theme-dark relative overflow-hidden rounded-[24px] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
+        {/* Nefes alan konik ambient halka — canlı, premium derinlik */}
+        <div className="glow-conic glow-breathe pointer-events-none absolute -right-24 -top-28 h-72 w-72 rounded-full opacity-70" />
         <div className="pointer-events-none absolute -right-12 -top-14 h-52 w-52 rounded-full bg-danger-500/20 blur-[90px]" />
         <div className="relative grid gap-6 lg:grid-cols-[1.15fr_1fr] lg:items-center">
           <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-amber-400">
+            <span className="rise-in flex items-center gap-2 text-xs font-semibold text-amber-400">
               <LifeBuoy className="h-4 w-4" /> Destek operasyonu
             </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white">Destek talebi kuyruğu</h1>
-            <p className="mt-1 text-sm text-white/60">
+            <h1 className="rise-in mt-2 font-display text-2xl font-extrabold text-white" style={{ animationDelay: "60ms" }}>Destek talebi kuyruğu</h1>
+            <p className="rise-in mt-1 text-sm text-white/60" style={{ animationDelay: "120ms" }}>
               {stats.length} talep · {open} açık/bekleyen
               {filtered ? ` · listede ${listCount ?? rows.length} sonuç` : ""}
             </p>
             <div className="mt-5 grid grid-cols-3 gap-3">
               <Link
                 href={buildHref({ tenant: tenantId })}
-                className="focus-ring press group relative block rounded-[14px] border border-white/10 bg-white/5 p-3 transition hover:border-white/25 hover:bg-white/8"
+                className="rise-in lift focus-ring group relative block overflow-hidden rounded-[16px] border border-white/10 bg-white/[0.06] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition hover:border-white/25 hover:bg-white/10"
+                style={{ animationDelay: "180ms" }}
               >
+                <span className="pointer-events-none absolute -right-6 -top-8 h-16 w-16 rounded-full bg-white/10 blur-2xl transition group-hover:bg-white/20" />
                 <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:text-amber-300 group-hover:opacity-100" />
-                <p className="font-display text-xl font-extrabold">{stats.length}</p>
+                <CountUp value={stats.length} className="font-display text-2xl font-extrabold" />
                 <p className="text-[11px] text-white/45">Toplam</p>
               </Link>
               <Link
                 href={buildHref({ durum: durum === "acik" ? undefined : "acik", oncelik, tenant: tenantId })}
                 aria-current={durum === "acik" ? "page" : undefined}
-                className={`focus-ring press group relative block rounded-[14px] border p-3 transition ${
-                  durum === "acik" ? "border-amber-300/50 bg-white/12" : "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/8"
+                className={`rise-in lift focus-ring group relative block overflow-hidden rounded-[16px] border p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition ${
+                  durum === "acik" ? "border-amber-300/50 bg-amber-300/12" : "border-white/10 bg-white/[0.06] hover:border-white/25 hover:bg-white/10"
                 }`}
+                style={{ animationDelay: "240ms" }}
               >
+                <span className="pointer-events-none absolute -right-6 -top-8 h-16 w-16 rounded-full bg-amber-400/20 blur-2xl transition group-hover:bg-amber-400/30" />
                 <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:text-amber-300 group-hover:opacity-100" />
-                <p className="font-display text-xl font-extrabold text-amber-300">{open}</p>
+                <CountUp value={open} className="font-display text-2xl font-extrabold text-amber-300" />
                 <p className="text-[11px] text-white/45">Açık kuyruk</p>
               </Link>
               <Link
                 href={buildHref({ oncelik: oncelik === "urgent" ? undefined : "urgent", durum, tenant: tenantId })}
                 aria-current={oncelik === "urgent" ? "page" : undefined}
-                className={`focus-ring press group relative block rounded-[14px] border p-3 transition ${
-                  oncelik === "urgent" ? "border-danger-400/50 bg-white/12" : "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/8"
+                className={`rise-in lift focus-ring group relative block overflow-hidden rounded-[16px] border p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition ${
+                  oncelik === "urgent" ? "border-danger-400/50 bg-danger-500/12" : "border-white/10 bg-white/[0.06] hover:border-white/25 hover:bg-white/10"
                 }`}
+                style={{ animationDelay: "300ms" }}
               >
+                <span className="pointer-events-none absolute -right-6 -top-8 h-16 w-16 rounded-full bg-danger-500/20 blur-2xl transition group-hover:bg-danger-500/30" />
                 <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:text-amber-300 group-hover:opacity-100" />
-                <p className="flex items-center gap-1.5 font-display text-xl font-extrabold text-danger-400">
+                <span className="flex items-center gap-1.5">
                   {urgent > 0 ? <span className="status-pulse h-2 w-2 rounded-full bg-danger-400" /> : null}
-                  {urgent}
-                </p>
+                  <CountUp value={urgent} className="font-display text-2xl font-extrabold text-danger-400" />
+                </span>
                 <p className="text-[11px] text-white/45">Acil</p>
               </Link>
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-[16px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/45">Durum</p>
-              <div className="relative mx-auto mt-3 grid h-24 w-24 place-items-center">
-                <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
-                  {arcs.filter((a) => a.count > 0).map((a) => (
-                    <circle
-                      key={a.key}
-                      cx="50"
-                      cy="50"
-                      r="42"
-                      fill="none"
-                      stroke={a.color}
-                      strokeWidth="10"
-                      strokeDasharray={`${a.dash} ${RING_C - a.dash}`}
-                      strokeDashoffset={-a.offset}
-                      className="ring-sweep"
-                      style={{ "--circ": RING_C, "--dash": RING_C - a.dash } as CSSProperties}
-                    />
-                  ))}
-                </svg>
-                <div className="absolute text-center">
-                  <p className="font-display text-lg font-extrabold">{open}</p>
-                  <p className="text-[8px] text-white/40">açık</p>
-                </div>
-              </div>
-              <div className="mt-3 space-y-0.5 text-[11px]">
-                {statusCounts.map((s) => {
-                  const active = durum === s.key;
-                  return (
-                    <Link
-                      key={s.key}
-                      href={buildHref({ durum: active ? undefined : s.key, oncelik, tenant: tenantId })}
-                      aria-current={active ? "page" : undefined}
-                      className={`focus-ring flex items-center gap-1.5 rounded-[6px] px-1 py-0.5 transition ${
-                        active ? "bg-white/12 text-white" : "text-white/60 hover:bg-white/6 hover:text-white"
-                      }`}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.color }} />
-                      <span className={`flex-1 ${active ? "font-bold" : ""}`}>{s.label}</span>
-                      <span className="font-bold text-white">{s.count}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="rounded-[16px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
-              <p className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/45">
-                <Siren className="h-3 w-3 text-danger-400" /> Öncelik
-              </p>
-              <div className="flex h-28 items-end gap-2">
-                {priorityCounts.map((p, i) => {
-                  const active = oncelik === p.key;
-                  return (
-                    <Link
-                      key={p.key}
-                      href={buildHref({ oncelik: active ? undefined : p.key, durum, tenant: tenantId })}
-                      aria-current={active ? "page" : undefined}
-                      title={active ? "Öncelik filtresini kaldır" : `Yalnızca "${priorityLabel[p.key]}" öncelikli talepler`}
-                      className={`focus-ring press flex h-full flex-1 flex-col items-center justify-end gap-1 rounded-[8px] pb-1 transition ${
-                        active ? "bg-white/12" : "hover:bg-white/6"
-                      }`}
-                    >
-                      <span className="text-[10px] font-bold text-white/80">{p.count}</span>
-                      <div
-                        className="bar-live w-full max-w-[22px] rounded-t-[4px]"
-                        style={{
-                          height: `${Math.max((p.count / maxPri) * 70, 8)}%`,
-                          background: p.color,
-                          animationDelay: `${i * 0.1}s`,
-                        }}
+            <div className="rise-in" style={{ animationDelay: "220ms" }}>
+              <Tilt3D max={9} glare={0.2} className="h-full rounded-[18px] border border-white/10 bg-white/[0.05] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/45">Durum</p>
+                <div className="tilt3d__depth relative mx-auto mt-3 grid h-24 w-24 place-items-center" style={{ ["--tz" as string]: "34px" }}>
+                  <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90 drop-shadow-[0_6px_14px_rgba(0,0,0,0.35)]">
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
+                    {arcs.filter((a) => a.count > 0).map((a) => (
+                      <circle
+                        key={a.key}
+                        cx="50"
+                        cy="50"
+                        r="42"
+                        fill="none"
+                        stroke={a.color}
+                        strokeWidth="10"
+                        strokeLinecap="round"
+                        strokeDasharray={`${a.dash} ${RING_C - a.dash}`}
+                        strokeDashoffset={-a.offset}
+                        className="ring-sweep"
+                        style={{ "--circ": RING_C, "--dash": RING_C - a.dash } as CSSProperties}
                       />
-                      <span className={`text-[8px] ${active ? "font-bold text-white" : "text-white/35"}`}>
-                        {priorityLabel[p.key]}
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
+                    ))}
+                  </svg>
+                  <div className="absolute text-center">
+                    <CountUp value={open} className="block font-display text-lg font-extrabold leading-none" />
+                    <p className="text-[8px] text-white/40">açık</p>
+                  </div>
+                </div>
+                <div className="mt-3 space-y-0.5 text-[11px]">
+                  {statusCounts.map((s) => {
+                    const active = durum === s.key;
+                    return (
+                      <Link
+                        key={s.key}
+                        href={buildHref({ durum: active ? undefined : s.key, oncelik, tenant: tenantId })}
+                        aria-current={active ? "page" : undefined}
+                        className={`focus-ring flex items-center gap-1.5 rounded-[6px] px-1 py-0.5 transition ${
+                          active ? "bg-white/12 text-white" : "text-white/60 hover:bg-white/6 hover:text-white"
+                        }`}
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full ring-2 ring-white/10" style={{ background: s.color }} />
+                        <span className={`flex-1 ${active ? "font-bold" : ""}`}>{s.label}</span>
+                        <span className="font-bold text-white">{s.count}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </Tilt3D>
+            </div>
+            <div className="rise-in" style={{ animationDelay: "300ms" }}>
+              <Tilt3D max={9} glare={0.2} className="h-full rounded-[18px] border border-white/10 bg-white/[0.05] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur">
+                <p className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/45">
+                  <Siren className="h-3 w-3 text-danger-400" /> Öncelik
+                </p>
+                <div className="tilt3d__depth flex h-28 items-end gap-2" style={{ ["--tz" as string]: "26px" }}>
+                  {priorityCounts.map((p, i) => {
+                    const active = oncelik === p.key;
+                    return (
+                      <Link
+                        key={p.key}
+                        href={buildHref({ oncelik: active ? undefined : p.key, durum, tenant: tenantId })}
+                        aria-current={active ? "page" : undefined}
+                        title={active ? "Öncelik filtresini kaldır" : `Yalnızca "${priorityLabel[p.key]}" öncelikli talepler`}
+                        className={`focus-ring press flex h-full flex-1 flex-col items-center justify-end gap-1 rounded-[8px] pb-1 transition ${
+                          active ? "bg-white/12" : "hover:bg-white/6"
+                        }`}
+                      >
+                        <span className="text-[10px] font-bold text-white/80">{p.count}</span>
+                        <div
+                          className="bar-live w-full max-w-[22px] origin-bottom rounded-t-[5px] shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
+                          style={{
+                            height: `${Math.max((p.count / maxPri) * 70, 8)}%`,
+                            background: `linear-gradient(180deg, ${p.color}, ${p.color}cc)`,
+                            animationDelay: `${i * 0.1}s`,
+                          }}
+                        />
+                        <span className={`text-[8px] ${active ? "font-bold text-white" : "text-white/35"}`}>
+                          {priorityLabel[p.key]}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </Tilt3D>
             </div>
           </div>
         </div>
       </section>
 
       {/* Talep akışı + performans — zaman serisi ve çözüm metrikleri */}
-      <section className="grid gap-4 lg:grid-cols-[1.7fr_1fr]">
-        <div className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
-                <TrendingUp className="h-4 w-4" /> Talep akışı
-              </p>
-              <h2 className="mt-0.5 font-display text-base font-bold text-ink-950">Son 14 gün · yeni destek talebi</h2>
+      <section className="perspective grid gap-4 lg:grid-cols-[1.7fr_1fr]">
+        <div className="rise-in" style={{ animationDelay: "80ms" }}>
+          <Tilt3D max={4} glare={0.1} perspective={1600} className="card-hover h-full rounded-[22px] border border-line bg-surface p-5 shadow-[var(--shadow-sm)]">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
+                  <TrendingUp className="h-4 w-4" /> Talep akışı
+                </p>
+                <h2 className="mt-0.5 font-display text-base font-bold text-ink-950">Son 14 gün · yeni destek talebi</h2>
+              </div>
+              <CountUp value={newLast14} className="font-display text-2xl font-extrabold tabular-nums text-brand-600" />
             </div>
-            <p className="numeric font-display text-2xl font-extrabold tabular-nums text-brand-600">{newLast14}</p>
-          </div>
-          <InteractiveChart
-            data={dailyNew}
-            color="var(--brand-600)"
-            name="Yeni talep"
-            format="number"
-            height={180}
-            labelEvery={2}
-            className="mt-4"
-          />
+            <InteractiveChart
+              data={dailyNew}
+              color="var(--brand-600)"
+              name="Yeni talep"
+              format="number"
+              height={180}
+              labelEvery={2}
+              className="mt-4"
+            />
+          </Tilt3D>
         </div>
 
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-1">
-          <div className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-            <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
-              <CheckCircle2 className="h-4 w-4" /> Çözüm oranı
-            </p>
-            <p className="mt-2 font-display text-4xl font-extrabold leading-none text-ink-950">%{resolutionRate}</p>
-            <p className="mt-1 text-xs text-text-muted">{resolvedCount}/{totalReal} talep çözüldü/kapandı</p>
-            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-canvas">
-              <div className="h-full rounded-full bg-mint-500 transition-all" style={{ width: `${resolutionRate}%` }} />
-            </div>
+          <div className="rise-in" style={{ animationDelay: "160ms" }}>
+            <Tilt3D max={8} glare={0.12} className="group h-full overflow-hidden rounded-[22px] border border-line bg-surface p-5 shadow-[var(--shadow-sm)]">
+              <span className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-mint-500/10 blur-2xl transition group-hover:bg-mint-500/20" />
+              <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
+                <CheckCircle2 className="h-4 w-4" /> Çözüm oranı
+              </p>
+              <p className="tilt3d__depth mt-2 font-display text-4xl font-extrabold leading-none text-ink-950" style={{ ["--tz" as string]: "30px" }}>
+                <CountUp value={resolutionRate} prefix="%" />
+              </p>
+              <p className="mt-1 text-xs text-text-muted">{resolvedCount}/{totalReal} talep çözüldü/kapandı</p>
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-canvas ring-1 ring-inset ring-line">
+                <div className="bar-live h-full origin-left rounded-full bg-[linear-gradient(90deg,var(--mint-400),var(--mint-500))]" style={{ width: `${resolutionRate}%` }} />
+              </div>
+            </Tilt3D>
           </div>
-          <div className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-            <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
-              <Clock className="h-4 w-4" /> Ort. çözüm süresi
-            </p>
-            <p className="mt-2 font-display text-4xl font-extrabold leading-none text-ink-950">{avgResolveLabel}</p>
-            <p className="mt-1 text-xs text-text-muted">açılıştan çözüme, çözülen taleplerde</p>
+          <div className="rise-in" style={{ animationDelay: "240ms" }}>
+            <Tilt3D max={8} glare={0.12} className="group h-full overflow-hidden rounded-[22px] border border-line bg-surface p-5 shadow-[var(--shadow-sm)]">
+              <span className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-brand-600/10 blur-2xl transition group-hover:bg-brand-600/20" />
+              <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
+                <Clock className="h-4 w-4" /> Ort. çözüm süresi
+              </p>
+              <p className="tilt3d__depth mt-2 font-display text-4xl font-extrabold leading-none text-ink-950" style={{ ["--tz" as string]: "30px" }}>{avgResolveLabel}</p>
+              <p className="mt-1 text-xs text-text-muted">açılıştan çözüme, çözülen taleplerde</p>
+            </Tilt3D>
           </div>
         </div>
       </section>
@@ -431,8 +458,14 @@ export default async function AdminTicketsPage({
           </p>
         ) : (
           <div className="divide-y divide-line">
-            {rows.map((t) => (
-              <article key={t.id} className="flex flex-col gap-3 px-4 py-4 transition hover:bg-brand-600/[0.02] sm:px-5 lg:flex-row lg:items-center lg:gap-4">
+            {rows.map((t, i) => (
+              <article
+                key={t.id}
+                className="rise-in group relative flex flex-col gap-3 px-4 py-4 transition-colors hover:bg-brand-600/[0.03] sm:px-5 lg:flex-row lg:items-center lg:gap-4"
+                style={{ animationDelay: `${Math.min(i * 45, 520)}ms` }}
+              >
+                {/* Sol vurgu şeridi — hover'da büyür (premium his) */}
+                <span className="pointer-events-none absolute inset-y-2 left-0 w-0.5 origin-center scale-y-0 rounded-full bg-[linear-gradient(180deg,var(--brand-400),var(--brand-600))] transition-transform duration-300 group-hover:scale-y-100" aria-hidden />
                 {/* Bilgi */}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -464,9 +497,9 @@ export default async function AdminTicketsPage({
                   <SlaBadge sla={t.sla} />
                   <Link
                     href={`/admin/tickets/${t.id}`}
-                    className="focus-ring inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                    className="focus-ring lift press inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-line bg-surface px-3 py-1.5 text-[11px] font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 hover:shadow-[var(--shadow-xs)]"
                   >
-                    Konuşma <ArrowUpRight className="h-3 w-3" />
+                    Konuşma <ArrowUpRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                   </Link>
                 </div>
 
