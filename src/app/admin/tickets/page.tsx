@@ -1,15 +1,18 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, LifeBuoy, X } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Clock, Inbox, LifeBuoy, Siren, X } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { daysAgoIso } from "@/lib/clock";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { ExportButton } from "@/components/admin/export-button";
+import { ButtonLink } from "@/components/ui/button";
 import { exportTicketsCsv } from "@/app/actions/platform-export";
 import { slaSortRank, slaStateOf } from "./sla";
 import { SlaBadge } from "./sla-badge";
 import { TicketRowActions } from "./ticket-row-actions";
+import { cn } from "@/lib/utils";
 
 const statusLabel: Record<string, string> = {
   open: "Açık",
@@ -69,27 +72,29 @@ function buildHref(p: { durum?: string; oncelik?: string; tenant?: string; sayfa
   return s ? `/admin/tickets?${s}` : "/admin/tickets";
 }
 
-/** TEK segment-çip stili — durum + öncelik filtreleri aynı dili konuşur. */
+/** TEK segment-pill stili — durum + öncelik filtreleri aynı dili konuşur. */
 function segCls(active: boolean) {
-  return `focus-ring inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
-    active ? "bg-ink-950 text-white shadow-[var(--shadow-xs)]" : "text-text-muted hover:bg-surface hover:text-ink-950"
-  }`;
+  return cn(
+    "focus-ring press inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition",
+    active ? "bg-ink-950 text-white shadow-[var(--shadow-xs)]" : "text-text-muted hover:bg-surface hover:text-ink-950",
+  );
 }
 
-/** Sayaç rozeti — çip içinde, aktifken beyaz zeminli. */
+/** Sayaç rozeti — pill içinde, aktifken beyaz zeminli. */
 function CountBadge({ n, active }: { n: number; active: boolean }) {
   return (
-    <span className={`rounded px-1 text-[10px] font-bold tabular-nums ${active ? "bg-white/20 text-white" : "bg-ink-950/6 text-text-muted"}`}>
+    <span className={cn("rounded-full px-1.5 text-[10px] font-bold tabular-nums", active ? "bg-white/20 text-white" : "bg-ink-950/6 text-text-muted")}>
       {n}
     </span>
   );
 }
 
-/** Kompakt, tıklanabilir KPI kutucuğu — hepsi filtrelenmiş hedefe götürür. */
+/** Kompakt, tıklanabilir KPI kartı — ikon rozeti + değer + etiket, hepsi filtrelenmiş hedefe götürür. */
 function MetricTile({
   label,
   value,
   href,
+  icon: Icon,
   tone = "default",
   active = false,
   pulse = false,
@@ -97,25 +102,40 @@ function MetricTile({
   label: string;
   value: string | number;
   href: string;
+  icon: LucideIcon;
   tone?: "default" | "amber" | "danger" | "mint";
   active?: boolean;
   pulse?: boolean;
 }) {
   const toneCls =
     tone === "amber" ? "text-amber-600" : tone === "danger" ? "text-danger-600" : tone === "mint" ? "text-mint-600" : "text-ink-950";
+  const iconToneCls =
+    tone === "amber"
+      ? "bg-amber-400/12 text-amber-600"
+      : tone === "danger"
+        ? "bg-danger-500/12 text-danger-600"
+        : tone === "mint"
+          ? "bg-mint-500/12 text-mint-600"
+          : "bg-brand-600/10 text-brand-600";
   return (
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`focus-ring inline-flex items-baseline gap-1.5 rounded-lg border px-2.5 py-1.5 transition ${
-        active ? "border-ink-950 bg-ink-950/[0.04]" : "border-line bg-surface hover:border-brand-300 hover:bg-canvas"
-      }`}
+      className={cn(
+        "lift focus-ring group inline-flex items-center gap-2.5 rounded-xl border px-3 py-2 transition",
+        active ? "border-ink-950 bg-ink-950/[0.04]" : "border-line bg-surface hover:border-brand-300/60 hover:bg-canvas",
+      )}
     >
-      <span className={`font-display text-base font-extrabold leading-none tabular-nums ${toneCls}`}>
-        {pulse ? <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-danger-500 align-middle" /> : null}
-        {value}
+      <span className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-transform group-hover:scale-105", iconToneCls)}>
+        <Icon className="h-3.5 w-3.5" aria-hidden />
       </span>
-      <span className="text-[11px] font-medium text-text-muted">{label}</span>
+      <span className="flex items-baseline gap-1.5">
+        <span className={cn("font-display text-base font-extrabold leading-none tabular-nums", toneCls)}>
+          {pulse ? <span className="status-pulse mr-1 inline-block h-1.5 w-1.5 rounded-full bg-danger-500 align-middle" /> : null}
+          {value}
+        </span>
+        <span className="text-[11px] font-medium text-text-muted">{label}</span>
+      </span>
     </Link>
   );
 }
@@ -232,10 +252,11 @@ export default async function AdminTicketsPage({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <MetricTile label="Toplam" value={stats.length} href={buildHref({ tenant: tenantId })} active={!filtered} />
+          <MetricTile label="Toplam" value={stats.length} icon={Inbox} href={buildHref({ tenant: tenantId })} active={!filtered} />
           <MetricTile
             label="Açık"
             value={open}
+            icon={Clock}
             tone="amber"
             active={durum === "acik"}
             href={buildHref({ durum: durum === "acik" ? undefined : "acik", oncelik, tenant: tenantId })}
@@ -243,6 +264,7 @@ export default async function AdminTicketsPage({
           <MetricTile
             label="Acil"
             value={urgent}
+            icon={Siren}
             tone="danger"
             pulse={urgent > 0}
             active={oncelik === "urgent"}
@@ -369,7 +391,10 @@ export default async function AdminTicketsPage({
             {rows.map((t) => (
               <article
                 key={t.id}
-                className="flex flex-col gap-2 px-4 py-2.5 transition-colors hover:bg-canvas/50 lg:flex-row lg:items-center lg:gap-4"
+                className={cn(
+                  "flex flex-col gap-2 border-l-2 px-4 py-2.5 transition-colors hover:bg-canvas/50 lg:flex-row lg:items-center lg:gap-4",
+                  t.priority === "urgent" ? "border-l-danger-500/50" : "border-l-transparent",
+                )}
               >
                 {/* Bilgi */}
                 <div className="min-w-0 flex-1">
@@ -399,12 +424,9 @@ export default async function AdminTicketsPage({
                 {/* SLA + konuşma */}
                 <div className="flex shrink-0 items-center gap-2">
                   <SlaBadge sla={t.sla} />
-                  <Link
-                    href={`/admin/tickets/${t.id}`}
-                    className="focus-ring inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-line px-2.5 py-1 text-[11px] font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
-                  >
-                    Konuşma <ArrowUpRight className="h-3 w-3" />
-                  </Link>
+                  <ButtonLink href={`/admin/tickets/${t.id}`} variant="secondary" size="xs" iconRight={ArrowUpRight}>
+                    Konuşma
+                  </ButtonLink>
                 </div>
 
                 {/* Aksiyonlar — durum + atama, değişince otomatik uygulanır (inline) */}
