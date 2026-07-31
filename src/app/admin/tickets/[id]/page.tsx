@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Building2, Clock, LifeBuoy, Shield, Trash2, UserRound } from "lucide-react";
+import { ArrowLeft, Building2, Clock, Plus, Trash2, UserRound } from "lucide-react";
 import { createTicketMacroAction, deleteTicketMacroAction } from "@/app/actions/admin-ticket-ops";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { StaffReplyForm } from "../staff-reply-form";
 import { TicketDetailControls } from "./ticket-detail-controls";
 import { slaStateOf } from "../sla";
@@ -56,6 +58,27 @@ function nameOf(v: Rel) {
 
 function dt(iso: string) {
   return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+}
+
+/** Baş harf rozeti — konuşma katılımcıları ve ofis kimliği için tutarlı avatar. */
+function initials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+/** Avatar rozeti — renk tonu role göre (ofis=brand, personel=amber). */
+function Avatar({ name, tone, size = "md" }: { name: string; tone: "brand" | "amber"; size?: "sm" | "md" }) {
+  const toneCls = tone === "amber" ? "bg-amber-400/15 text-amber-700" : "bg-brand-600/10 text-brand-700";
+  const sizeCls = size === "sm" ? "h-7 w-7 text-[10px]" : "h-9 w-9 text-xs";
+  return (
+    <span className={cn("grid shrink-0 place-items-center rounded-full font-bold", toneCls, sizeCls)} aria-hidden>
+      {initials(name)}
+    </span>
+  );
 }
 
 /** Yan panel özellik satırı. */
@@ -135,23 +158,26 @@ export default async function AdminTicketDetailPage({
       {/* Kompakt profesyonel başlık */}
       <header className="rounded-xl border border-line bg-surface px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-text-muted">
-              <Building2 className="h-3.5 w-3.5 text-brand-600" />
-              {ticket.tenant_id ? (
-                <Link href={`/admin/tenants/${ticket.tenant_id}`} className="font-semibold text-brand-600 transition hover:underline">
-                  {nameOf(ticket.tenant as Rel)}
-                </Link>
-              ) : (
-                <span className="font-semibold text-ink-950">{nameOf(ticket.tenant as Rel)}</span>
-              )}
-              <span aria-hidden>·</span>
-              <span>{categoryLabel[ticket.category] ?? ticket.category}</span>
-              <span aria-hidden>·</span>
-              <span className={`font-semibold ${priorityCls[ticket.priority] ?? ""}`}>{priorityLabel[ticket.priority] ?? ticket.priority}</span>
-            </p>
-            <h1 className="mt-1.5 font-display text-xl font-bold text-ink-950">{ticket.subject}</h1>
-            <p className="mt-1 text-xs text-text-faint">Açılış {dt(ticket.created_at)} · {replyCount} personel yanıtı</p>
+          <div className="flex min-w-0 items-start gap-3">
+            <Avatar name={nameOf(ticket.tenant as Rel)} tone="brand" />
+            <div className="min-w-0">
+              <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-text-muted">
+                <Building2 className="h-3.5 w-3.5 text-brand-600" />
+                {ticket.tenant_id ? (
+                  <Link href={`/admin/tenants/${ticket.tenant_id}`} className="font-semibold text-brand-600 transition hover:underline">
+                    {nameOf(ticket.tenant as Rel)}
+                  </Link>
+                ) : (
+                  <span className="font-semibold text-ink-950">{nameOf(ticket.tenant as Rel)}</span>
+                )}
+                <span aria-hidden>·</span>
+                <span>{categoryLabel[ticket.category] ?? ticket.category}</span>
+                <span aria-hidden>·</span>
+                <span className={`font-semibold ${priorityCls[ticket.priority] ?? ""}`}>{priorityLabel[ticket.priority] ?? ticket.priority}</span>
+              </p>
+              <h1 className="mt-1.5 font-display text-xl font-bold text-ink-950">{ticket.subject}</h1>
+              <p className="mt-1 text-xs text-text-faint">Açılış {dt(ticket.created_at)} · {replyCount} personel yanıtı</p>
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <SlaBadge sla={sla} />
@@ -167,11 +193,9 @@ export default async function AdminTicketDetailPage({
         {/* Ana: konuşma dizisi + yanıt */}
         <div className="space-y-3">
           {ticket.body?.trim() ? (
-            <article className="rounded-xl border border-line bg-surface p-4">
+            <article className="rounded-xl border border-l-2 border-line border-l-transparent bg-surface p-4">
               <div className="flex items-center gap-2.5">
-                <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-600/10 text-brand-600">
-                  <LifeBuoy className="h-4 w-4" />
-                </span>
+                <Avatar name={nameOf(ticket.tenant as Rel)} tone="brand" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-ink-950">{nameOf(ticket.tenant as Rel)}</p>
                   <p className="text-[11px] text-text-faint">{dt(ticket.created_at)} · talebi açtı</p>
@@ -187,12 +211,13 @@ export default async function AdminTicketDetailPage({
             return (
               <article
                 key={m.id}
-                className={`rounded-xl border p-4 ${isStaff ? "border-amber-400/30 bg-amber-400/[0.06]" : "border-line bg-surface"}`}
+                className={cn(
+                  "rounded-xl border border-l-2 p-4",
+                  isStaff ? "border-line border-l-amber-400/60 bg-amber-400/[0.03]" : "border-line border-l-transparent bg-surface",
+                )}
               >
                 <div className="flex items-center gap-2.5">
-                  <span className={`grid h-8 w-8 place-items-center rounded-lg ${isStaff ? "bg-amber-400/15 text-amber-600" : "bg-brand-600/10 text-brand-600"}`}>
-                    {isStaff ? <Shield className="h-4 w-4" /> : <LifeBuoy className="h-4 w-4" />}
-                  </span>
+                  <Avatar name={name} tone={isStaff ? "amber" : "brand"} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-ink-950">{name}</p>
                     <p className="text-[11px] text-text-faint">{dt(m.created_at)}</p>
@@ -315,9 +340,9 @@ export default async function AdminTicketDetailPage({
                     placeholder="Hazır yanıt metni…"
                     className="w-full resize-none rounded-lg border border-line bg-canvas px-2.5 py-2 text-xs outline-none focus:border-brand-400"
                   />
-                  <button type="submit" className="focus-ring rounded-lg bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-ink-800">
+                  <Button type="submit" size="sm" icon={Plus} className="w-full">
                     Makro ekle
-                  </button>
+                  </Button>
                 </form>
               </div>
             </details>
