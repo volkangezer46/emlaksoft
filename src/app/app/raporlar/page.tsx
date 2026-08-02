@@ -14,12 +14,49 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { InteractiveChart } from "@/components/app/interactive-chart";
-import { computeOfficeScore, loadOfficeScoreInputs } from "@/lib/office-score";
-import { DAY_MS, msSince } from "@/lib/clock";
+import { computeOfficeScore, type OfficeScoreInputs } from "@/lib/office-score";
+import { now as clockNow } from "@/lib/clock";
 import { ICONS } from "@/lib/icons";
+import { requireReportingData } from "@/lib/reporting/result";
+
+type TenantReportingAggregate = {
+  summary: {
+    customers: number;
+    demands: number;
+    properties: number;
+    live_portals: number;
+    overdue_confirmations: number;
+    month_commission: number;
+    month_lost: number;
+    prev_month_lost: number;
+    month_new_demands: number;
+    prev_month_new_demands: number;
+    closures_30d: number;
+    appointments_7d: number;
+    calls_7d: number;
+  };
+  customer_sources: { source: string; customer_count: number }[];
+  loss_reasons: { reason: string; deal_count: number; deal_value: number }[];
+  roi: { source: string; customers: number; won_count: number; won_value: number }[];
+  monthly: { month_start: string; income: number; expense: number }[];
+};
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+}
+
+/** Verilen anın İstanbul yerel takvim bileşenleri (yıl, ay [0-indeksli]) —
+ *  tenant_reporting_aggregates artık ay sınırlarını İstanbul takvimine göre
+ *  döndürüyor; UTC dizgesi doğrudan dilimlenirse (+03:00 farkı yüzünden)
+ *  yanlış aya kayabilir. */
+function istanbulYearMonth(iso: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(new Date(iso));
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  return { year: get("year"), month: get("month") - 1 };
 }
 
 type TrendInfo = { label: string; dir: "up" | "down" | "flat" | "new"; good?: boolean };
@@ -62,73 +99,23 @@ function TrendBadge({ trend }: { trend: TrendInfo }) {
 export default async function ReportsPage() {
   await requireModulePage("reports");
   const supabase = await createClient();
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
-  // Önceki dönem kıyası için geçen ayın başı
-  const prevMonthStart = new Date(monthStart);
-  prevMonthStart.setMonth(prevMonthStart.getMonth() - 1);
-  // Gelir/gider trendi: görünen pencere son 6 ay; "hayalet" önceki dönem
-  // serisi için ondan önceki 6 ay da çekilir (tek sorgu, 12 aylık aralık).
-  const twelveMonthsAgo = new Date(monthStart);
-  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 11);
-  const twelveMonthsAgoIso = twelveMonthsAgo.toISOString();
-  const twelveMonthsAgoDate = twelveMonthsAgoIso.slice(0, 10);
-
-  const [
-    scoreInputs,
-    { count: customers },
-    { count: demands },
-    { count: properties },
-    { data: commissions },
-    { data: closures },
-    { data: portals },
-    { data: customerSources },
-    { data: commissionTrend },
-    { data: expenseTrend },
-    { data: lostDeals },
-    { data: wonDeals },
-    { data: prevClosures },
-    { count: demandsNewThisMonth },
-    { count: demandsNewPrevMonth },
-  ] = await Promise.all([
-    loadOfficeScoreInputs(supabase),
-    supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
-    supabase.from("customer_demands").select("id", { count: "exact", head: true }).in("status", ["new", "active", "matched"]),
-    supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null),
-    supabase.from("commissions").select("gross_amount, status, created_at").gte("created_at", monthStart.toISOString()).limit(200),
-    supabase.from("listing_closures").select("estimated_lost_commission").gte("created_at", monthStart.toISOString()).limit(100),
-    supabase.from("portal_listings").select("status, last_confirmed_at").eq("status", "live").limit(200),
-    // Müşteri kaynak dağılımı
-    supabase.from("customers").select("source").is("deleted_at", null).not("source", "is", null).limit(1000),
-    // Gelir trendi (komisyon, son 12 ay — 6 görünen + 6 hayalet önceki dönem)
-    supabase.from("commissions").select("gross_amount, created_at").gte("created_at", twelveMonthsAgoIso).limit(2000),
-    // Gider trendi (son 12 ay — 6 görünen + 6 hayalet önceki dönem)
-    supabase.from("expenses").select("amount, expense_date").gte("expense_date", twelveMonthsAgoDate).limit(2000),
-    // Kayıp nedeni raporu — kaybedilen anlaşmalar
-    supabase.from("deals").select("loss_reason, deal_value").eq("stage", "lost").limit(1000),
-    // Kaynak ROI — kazanılan anlaşmalar × müşteri kaynağı
-    supabase.from("deals").select("deal_value, customer:customers(source)").eq("stage", "won").not("customer_id", "is", null).limit(1000),
-    // Önceki dönem kıyası — geçen ayın tahmini kaybı (dar select)
-    supabase
-      .from("listing_closures")
-      .select("estimated_lost_commission")
-      .gte("created_at", prevMonthStart.toISOString())
-      .lt("created_at", monthStart.toISOString())
-      .limit(100),
-    // Önceki dönem kıyası — talep akışı: bu ay ve geçen ay AÇILAN talepler
-    // (head-count; "açık talep" stok metriğinin geçmiş anlık görüntüsü yok,
-    // rozet dürüst bir vekil olan yeni talep akışını karşılaştırır)
-    supabase
-      .from("customer_demands")
-      .select("id", { count: "exact", head: true })
-      .gte("created_at", monthStart.toISOString()),
-    supabase
-      .from("customer_demands")
-      .select("id", { count: "exact", head: true })
-      .gte("created_at", prevMonthStart.toISOString())
-      .lt("created_at", monthStart.toISOString()),
-  ]);
+  const asOf = new Date(clockNow());
+  const aggregateResult = await supabase.rpc("tenant_reporting_aggregates", {
+    p_as_of: asOf.toISOString(),
+  });
+  const aggregate = requireReportingData(
+    "tenant-reporting-aggregates",
+    aggregateResult,
+  ) as unknown as TenantReportingAggregate;
+  const summary = aggregate.summary;
+  const scoreInputs: OfficeScoreInputs = {
+    openDemands: Number(summary.demands),
+    livePortals: Number(summary.live_portals),
+    overdueConfirmations: Number(summary.overdue_confirmations),
+    closures30d: Number(summary.closures_30d),
+    appointments7d: Number(summary.appointments_7d),
+    calls7d: Number(summary.calls_7d),
+  };
 
   const office = computeOfficeScore(scoreInputs);
   // Skor bileşenleri — computeOfficeScore ile aynı formüller (baz 42 puan)
@@ -140,50 +127,43 @@ export default async function ReportsPage() {
     { label: "Kapanış (30 gün)", input: scoreInputs.closures30d, points: Math.min(12, scoreInputs.closures30d * 4), note: "+4/adet · maks 12" },
     { label: "Gecikmiş teyit cezası", input: scoreInputs.overdueConfirmations, points: -Math.min(28, scoreInputs.overdueConfirmations * 7), note: "−7/adet · maks −28" },
   ];
-  const commissionTotal = (commissions ?? []).reduce((s, c) => s + Number(c.gross_amount || 0), 0);
-  const lost = (closures ?? []).reduce((s, c) => s + Number(c.estimated_lost_commission || 0), 0);
-  const overdue = (portals ?? []).filter((p) => {
-    if (!p.last_confirmed_at) return true;
-    return msSince(p.last_confirmed_at) > 7 * DAY_MS;
-  }).length;
+  const commissionTotal = Number(summary.month_commission);
+  const lost = Number(summary.month_lost);
+  const overdue = Number(summary.overdue_confirmations);
 
   // Ortak ölçek: her bar kendi değerine göre değil, en büyük değere göre ölçeklenir —
   // aksi halde tüm barlar %100 görünür ve grafik anlamsızlaşır.
-  const barMax = Math.max(10, customers ?? 0, demands ?? 0, properties ?? 0, portals?.length ?? 0);
+  const customers = Number(summary.customers);
+  const demands = Number(summary.demands);
+  const properties = Number(summary.properties);
+  const livePortals = Number(summary.live_portals);
+  const barMax = Math.max(10, customers, demands, properties, livePortals);
   const bars = [
-    { label: "Müşteri", value: customers ?? 0, max: barMax, href: "/app/musteriler" },
-    { label: "Talep", value: demands ?? 0, max: barMax, href: "/app/talepler" },
-    { label: "Portföy", value: properties ?? 0, max: barMax, href: "/app/portfoyler" },
-    { label: "Canlı portal", value: portals?.length ?? 0, max: barMax, href: "/app/portallar?durum=live" },
+    { label: "Müşteri", value: customers, max: barMax, href: "/app/musteriler" },
+    { label: "Talep", value: demands, max: barMax, href: "/app/talepler" },
+    { label: "Portföy", value: properties, max: barMax, href: "/app/portfoyler" },
+    { label: "Canlı portal", value: livePortals, max: barMax, href: "/app/portallar?durum=live" },
   ];
 
   // Müşteri kaynak dağılımı
-  const sourceMap = new Map<string, number>();
-  for (const row of customerSources ?? []) {
-    const src = (row.source as string | null) ?? "Belirtilmedi";
-    sourceMap.set(src, (sourceMap.get(src) ?? 0) + 1);
-  }
-  const sourceBars = [...sourceMap.entries()]
-    .sort((a, b) => b[1] - a[1])
+  const sourceBars = aggregate.customer_sources
+    .map((row) => ({ label: row.source, count: Number(row.customer_count) }))
+    .sort((a, b) => b.count - a.count)
     .slice(0, 8)
     // value: müşteriler sayfasının ?source= filtresine giden ham DB değeri
-    .map(([label, count]) => ({ label, count, value: label === "Belirtilmedi" ? null : label }));
-  const sourceTotal = Math.max(1, sourceBars.reduce((s, b) => s + b.count, 0));
+    .map(({ label, count }) => ({ label, count, value: label === "Belirtilmedi" ? null : label }));
+  const sourceTotal = Math.max(1, customers);
   const sourceMax = Math.max(1, ...sourceBars.map((b) => b.count));
 
   // Kayıp nedeni raporu — neden × adet + kaybedilen toplam değer
-  const lossAgg = new Map<string, { count: number; value: number }>();
-  for (const d of lostDeals ?? []) {
-    const reason = ((d.loss_reason as string | null) ?? "").trim() || "Belirtilmedi";
-    const cur = lossAgg.get(reason) ?? { count: 0, value: 0 };
-    cur.count += 1;
-    cur.value += Number(d.deal_value || 0);
-    lossAgg.set(reason, cur);
-  }
-  const lostCount = [...lossAgg.values()].reduce((s, v) => s + v.count, 0);
-  const lostValue = [...lossAgg.values()].reduce((s, v) => s + v.value, 0);
-  const lossRows = [...lossAgg.entries()]
-    .map(([reason, v]) => ({ reason, count: v.count, value: v.value }))
+  const allLossRows = aggregate.loss_reasons.map((row) => ({
+    reason: row.reason,
+    count: Number(row.deal_count),
+    value: Number(row.deal_value),
+  }));
+  const lostCount = allLossRows.reduce((sum, row) => sum + row.count, 0);
+  const lostValue = allLossRows.reduce((sum, row) => sum + row.value, 0);
+  const lossRows = allLossRows
     .sort((a, b) => b.count - a.count || b.value - a.value)
     .slice(0, 8);
   const lossMax = Math.max(1, ...lossRows.map((r) => r.count));
@@ -199,22 +179,15 @@ export default async function ReportsPage() {
     other:    "Diğer",
   };
   const sourceLabel = (s: string) => SOURCE_LABELS[s] ?? s;
-  const roiAgg = new Map<string, { customers: number; wonCount: number; wonValue: number }>();
-  // Kaynağı olan tüm müşteriler taban olarak girer (kazandırmayan kaynak da görünsün)
-  for (const [src, count] of sourceMap) roiAgg.set(src, { customers: count, wonCount: 0, wonValue: 0 });
-  for (const d of wonDeals ?? []) {
-    const rel = d.customer as { source?: string | null } | { source?: string | null }[] | null;
-    const cust = Array.isArray(rel) ? rel[0] : rel;
-    const src = (cust?.source ?? "").trim() || "Belirtilmedi";
-    const cur = roiAgg.get(src) ?? { customers: 0, wonCount: 0, wonValue: 0 };
-    cur.wonCount += 1;
-    cur.wonValue += Number(d.deal_value || 0);
-    roiAgg.set(src, cur);
-  }
-  const roiWonCount = [...roiAgg.values()].reduce((s, v) => s + v.wonCount, 0);
-  const roiWonValue = [...roiAgg.values()].reduce((s, v) => s + v.wonValue, 0);
-  const roiRows = [...roiAgg.entries()]
-    .map(([source, v]) => ({ source, ...v }))
+  const allRoiRows = aggregate.roi.map((row) => ({
+    source: row.source,
+    customers: Number(row.customers),
+    wonCount: Number(row.won_count),
+    wonValue: Number(row.won_value),
+  }));
+  const roiWonCount = allRoiRows.reduce((sum, row) => sum + row.wonCount, 0);
+  const roiWonValue = allRoiRows.reduce((sum, row) => sum + row.wonValue, 0);
+  const roiRows = allRoiRows
     .sort((a, b) => b.wonValue - a.wonValue || b.wonCount - a.wonCount || b.customers - a.customers)
     .slice(0, 8);
   const roiValueMax = Math.max(1, ...roiRows.map((r) => r.wonValue));
@@ -224,22 +197,15 @@ export default async function ReportsPage() {
   // Gelir/gider karşılaştırma trendi — 12 aylık kova: son 6'sı görünen dönem,
   // ilk 6'sı "hayalet" önceki dönem serisi (aynı sıradaki ay ile kıyaslanır).
   const MONTH_LABELS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
-  const allMonths = Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(monthStart);
-    d.setMonth(d.getMonth() - (11 - i));
-    return { key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: MONTH_LABELS[d.getMonth()], income: 0, expense: 0 };
+  const allMonths = aggregate.monthly.map((row) => {
+    const { year, month } = istanbulYearMonth(row.month_start);
+    return {
+      key: `${year}-${String(month + 1).padStart(2, "0")}`,
+      label: MONTH_LABELS[month],
+      income: Number(row.income),
+      expense: Number(row.expense),
+    };
   });
-  const trendIndex = new Map(allMonths.map((m, i) => [m.key, i]));
-  for (const c of commissionTrend ?? []) {
-    const key = String(c.created_at).slice(0, 7);
-    const idx = trendIndex.get(key);
-    if (idx !== undefined) allMonths[idx].income += Number(c.gross_amount || 0);
-  }
-  for (const e of expenseTrend ?? []) {
-    const key = String(e.expense_date).slice(0, 7);
-    const idx = trendIndex.get(key);
-    if (idx !== undefined) allMonths[idx].expense += Number(e.amount || 0);
-  }
   const prevPeriodMonths = allMonths.slice(0, 6);
   const trendMonths = allMonths.slice(6);
   const trendIncomeTotal = trendMonths.reduce((s, m) => s + m.income, 0);
@@ -249,12 +215,11 @@ export default async function ReportsPage() {
   const prevIncomeTotal = prevPeriodMonths.reduce((s, m) => s + m.income, 0);
   const hasPrevPeriodData = prevIncomeTotal > 0;
 
-  // Hero KPI önceki dönem rozetleri — komisyon trendi mevcut 12 aylık
-  // seriden (ek sorgu yok); kayıp ve talep akışı dar ek sorgulardan.
-  const prevLost = (prevClosures ?? []).reduce((s, c) => s + Number(c.estimated_lost_commission || 0), 0);
+  // Hero KPI dönem rozetleri aynı tam-kapsamlı aggregate snapshot'tan gelir.
+  const prevLost = Number(summary.prev_month_lost);
   const commissionMoM = calcTrend(trendMonths[5]?.income ?? 0, trendMonths[4]?.income ?? 0);
   const lostMoM = calcTrend(lost, prevLost, true);
-  const demandFlowMoM = calcTrend(demandsNewThisMonth ?? 0, demandsNewPrevMonth ?? 0);
+  const demandFlowMoM = calcTrend(Number(summary.month_new_demands), Number(summary.prev_month_new_demands));
 
   return (
     <div className="space-y-6">
@@ -301,7 +266,7 @@ export default async function ReportsPage() {
             // İkonografi: "Gecikmiş teyit" /app/portallar'a gidiyor ama Building2
             // (portföy ikonu) ile çiziliyordu — portal kavramı ICONS.portal.
             { label: "Gecikmiş teyit", value: String(overdue), icon: ICONS.portal, tone: "text-warn-400", href: "/app/portallar?durum=teyit", trend: undefined as TrendInfo | undefined, trendTitle: "" },
-            { label: "Açık talep", value: String(demands ?? 0), icon: ICONS.talep, tone: "text-mint-300", href: "/app/talepler", trend: demandFlowMoM, trendTitle: "Yeni talep akışı, geçen aya göre" },
+            { label: "Açık talep", value: String(demands), icon: ICONS.talep, tone: "text-mint-300", href: "/app/talepler", trend: demandFlowMoM, trendTitle: "Yeni talep akışı, geçen aya göre" },
           ].map((k) => (
             <Link
               key={k.label}
@@ -438,7 +403,7 @@ export default async function ReportsPage() {
           <div className="flex items-center gap-2">
             <PieChart className="h-4 w-4 text-brand-600" />
             <h2 className="font-display font-bold text-ink-950">Müşteri kaynak dağılımı</h2>
-            <span className="ml-auto text-xs text-text-muted">{sourceTotal} müşteri</span>
+            <span className="ml-auto text-xs text-text-muted">{sourceTotal} müşteri · en yüksek 8 kaynak</span>
           </div>
           <div className="mt-5 space-y-3">
             {sourceBars.map((b, i) => (
@@ -478,7 +443,7 @@ export default async function ReportsPage() {
           <h2 className="font-display font-bold text-ink-950">Kaynak ROI · kazanılan anlaşmalar</h2>
           {roiRows.length > 0 ? (
             <span className="ml-auto text-xs text-text-muted">
-              {roiWonCount} kazanılan · {money(roiWonValue)}
+              {roiWonCount} kazanılan · {money(roiWonValue)} · en yüksek 8 kaynak
             </span>
           ) : null}
         </div>
@@ -533,7 +498,7 @@ export default async function ReportsPage() {
           <h2 className="font-display font-bold text-ink-950">Kayıp nedeni analizi</h2>
           {lostCount > 0 ? (
             <span className="ml-auto text-xs text-text-muted">
-              {lostCount} kayıp · {money(lostValue)} kaybedilen değer
+              {lostCount} kayıp · {money(lostValue)} kaybedilen değer · en yüksek 8 neden
             </span>
           ) : null}
         </div>

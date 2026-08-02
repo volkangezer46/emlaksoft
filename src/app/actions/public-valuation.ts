@@ -1,10 +1,18 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 import { estimateMultiSourceValue } from "@/lib/valuation";
 import { intakeLead } from "@/lib/lead-intake";
 import { compareTr } from "@/lib/tr-text";
 import { publicValuationSourceEntry } from "@/lib/public-valuation-source";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
+import { publicEvidenceHash } from "@/lib/public-request-security";
+
+/** Bu huninin KVKK rıza kanıtı sürümü — metin değişirse artırılır. */
+const VALUATION_CONSENT_VERSION = "valuation-lead-v1-2026-08-02";
 
 /**
  * "Evim ne kadar eder?" — /vitrin/[slug]/degerleme public satıcı hunisi.
@@ -76,6 +84,13 @@ export async function estimatePublicValuation(
   if ((input.website ?? "").trim()) return { ok: true, sufficient: false };
   if (!input.kvkk) return { ok: false, error: "Devam etmek için KVKK onayı gerekli." };
 
+  // Ücretli harici API çağrısına (Endeksa/Tapusor) inmeden IP bazlı hız sınırı —
+  // sınırsız çağrı doğrudan maliyet/DoS vektörü (bkz. kardeş dosyalardaki
+  // vitrin-degerleme deseni: booking-public.ts, open-house-public.ts, vb.).
+  const ip = await clientIp();
+  const { allowed } = await checkRateLimit(`vitrin-degerleme:${ip}`, { limit: 10, windowSec: 60, failurePolicy: "deny" });
+  if (!allowed) return { ok: false, error: "Çok fazla istek. Lütfen biraz sonra tekrar deneyin." };
+
   const slug = (input.slug ?? "").trim();
   const propertyType = (input.propertyType ?? "").trim().slice(0, 40);
   const sqm = Number(input.sqm);
@@ -89,7 +104,7 @@ export async function estimatePublicValuation(
   const admin = createAdminClient();
 
   const [{ data: tenant }, { data: district }] = await Promise.all([
-    admin.from("tenants").select("id, name").eq("slug", slug).maybeSingle(),
+    admin.from("tenants").select("id, name, status").eq("slug", slug).maybeSingle(),
     admin
       .from("geo_districts")
       .select("id, name, province_id, province:geo_provinces(name)")
@@ -97,7 +112,9 @@ export async function estimatePublicValuation(
       .maybeSingle(),
   ]);
 
-  if (!tenant) return { ok: false, error: "Ofis bulunamadı." };
+  if (!tenant || !isPublicTenantActive(tenant.status)) {
+    return { ok: false, error: "Ofis bulunamadı." };
+  }
   if (!district || district.province_id !== input.provinceId) {
     return { ok: false, error: "İl/ilçe seçimi geçersiz." };
   }
@@ -162,6 +179,9 @@ export type PublicValuationLeadInput = {
   low?: number | null;
   high?: number | null;
   website?: string;
+  kvkk: boolean;
+  /** İstemci idempotency anahtarı — verilmezse sunucu üretir. */
+  requestId?: string;
 };
 
 export type PublicValuationLeadResult = { ok: true } | { ok: false; error: string };
@@ -173,17 +193,24 @@ export async function submitValuationLead(
 ): Promise<PublicValuationLeadResult> {
   // Honeypot: botlara sessizce "başarılı" de.
   if ((input.website ?? "").trim()) return { ok: true };
+  if (!input.kvkk) return { ok: false, error: "Devam etmek için KVKK onayı gerekli." };
 
   const slug = (input.slug ?? "").trim();
   const fullName = (input.fullName ?? "").trim().slice(0, 120);
   if (!slug || !fullName) return { ok: false, error: "Ad soyad zorunlu." };
   if (!(input.phone ?? "").trim()) return { ok: false, error: "Telefon zorunlu." };
 
+  // Ad+telefon içeren gerçek bir müşteri kaydı açılacağı için — diğer tüm
+  // public lead uçlarıyla (booking/referral/survey/vitrin) aynı hız sınırı.
+  const ip = await clientIp();
+  const { allowed } = await checkRateLimit(`vitrin-degerleme-lead:${ip}`, { limit: 10, windowSec: 60, failurePolicy: "deny" });
+  if (!allowed) return { ok: false, error: "Çok fazla istek. Lütfen biraz sonra tekrar deneyin." };
+
   const admin = createAdminClient();
   const [{ data: tenant }, { data: district }] = await Promise.all([
     admin
       .from("tenants")
-      .select("id, lead_capture_token, lead_capture_enabled")
+      .select("id, status, lead_capture_token, lead_capture_enabled")
       .eq("slug", slug)
       .maybeSingle(),
     admin
@@ -193,7 +220,11 @@ export async function submitValuationLead(
       .maybeSingle(),
   ]);
 
-  if (!tenant?.lead_capture_token || tenant.lead_capture_enabled === false) {
+  if (
+    !tenant?.lead_capture_token ||
+    !isPublicTenantActive(tenant.status) ||
+    tenant.lead_capture_enabled === false
+  ) {
     return { ok: false, error: "Talep formu şu anda kapalı." };
   }
 
@@ -213,6 +244,12 @@ export async function submitValuationLead(
       : "Ön tahmin üretilemedi (bölge verisi yetersiz)";
   const message = `Değerleme talebi: ${parts.join(", ")}. ${range}. Satıcı net değerleme için aranmak istiyor.`;
 
+  const h = await headers().catch(() => null);
+  const requestId =
+    input.requestId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.requestId)
+      ? input.requestId
+      : randomUUID();
+
   // Mevcut public lead yolu: intakeLead (mükerrer kontrolü, atama, bildirim dahil).
   const result = await intakeLead(tenant.lead_capture_token, {
     fullName,
@@ -227,6 +264,16 @@ export async function submitValuationLead(
     customer_types: ["Satıcı"],
     provinceId: input.provinceId || undefined,
     rooms: input.rooms ? String(input.rooms).slice(0, 20) : undefined,
+    // KVKK rıza kanıtı — diğer public lead uçlarıyla (booking/referral/survey/
+    // leads-webhook) aynı desen; ad+telefon içeren gerçek kayıt kanıtsız açılmaz.
+    consent: {
+      requestId,
+      scope: "valuation_lead",
+      version: VALUATION_CONSENT_VERSION,
+      acceptedAt: new Date().toISOString(),
+      ipHash: publicEvidenceHash(ip),
+      userAgentHash: publicEvidenceHash(h?.get("user-agent")),
+    },
   });
 
   if (!result.ok) return { ok: false, error: result.error };

@@ -2,11 +2,13 @@ import Link from "next/link";
 import { ArrowUpRight, CalendarRange, Receipt, Plus, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now as nowMs } from "@/lib/clock";
+import { createClient } from "@/lib/supabase/server";
 import { exportExpensesCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
-import { listExpenses, listExpenseMonthlyTrend } from "@/app/actions/expenses";
+import { listExpenses } from "@/app/actions/expenses";
 import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 import { getDefinitions } from "@/lib/definitions";
+import { requireReportingData } from "@/lib/reporting/result";
 import { EmptyState } from "@/components/app/empty-state";
 import { ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { InteractiveChart } from "@/components/app/interactive-chart";
@@ -34,8 +36,27 @@ function money(n: number) {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+// UTC getter'lar kullanılır — bu yardımcı yalnız istanbulMonthUtc ile Date.UTC(...)
+// üzerinden kurulan tarihleri biçimlendirir, sunucunun yerel saat dilimine bağımlı olmaz.
 function fmtDate(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+/** Verilen anın İstanbul yerel takvim bileşenleri (yıl, ay [0-indeksli], gün). */
+function istanbulDateParts(ms: number) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(ms));
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  return { year: get("year"), month: get("month") - 1, day: get("day") };
+}
+
+/** İstanbul takvimine göre bir ayın 1'i (UTC-getter'larla okunacak şekilde Date.UTC ile kurulur). */
+function istanbulMonthUtc(year: number, month: number, day = 1) {
+  return new Date(Date.UTC(year, month, day));
 }
 
 /** Boş olmayan paramlardan query string üretir — mevcut filtreler korunur. */
@@ -59,13 +80,24 @@ export default async function GiderlerPage({
   const params = (await searchParams) ?? {};
   const fromF = ISO_DATE.test(params.from ?? "") ? params.from! : null;
   const toF = ISO_DATE.test(params.to ?? "") ? params.to! : null;
+  const now = new Date(nowMs());
 
-  const [expenses, catDefs, trendRows] = await Promise.all([
-    // ?from=&to= sunucu tarafında uygulanır (expense_date aralığı)
+  const supabase = await createClient();
+  const [expenses, catDefs, aggregateResult] = await Promise.all([
+    // Tablo listesi — ?from=&to= sunucu tarafında uygulanır (expense_date aralığı).
+    // NOT: KPI/kırılım/trend artık aşağıdaki RPC'den gelir, bu diziden DEĞİL —
+    // liste görünümü için 200 kayıt tavanı yeterli, ama toplam/tutar asla bu
+    // tavana bağlı olmamalı (bkz. tenant_expense_aggregates).
     listExpenses(undefined, { from: fromF ?? undefined, to: toF ?? undefined }),
     getDefinitions("expense_category"),
-    listExpenseMonthlyTrend(),
+    supabase.rpc("tenant_expense_aggregates", { p_from: fromF, p_to: toF, p_as_of: now.toISOString() }),
   ]);
+  const aggregate = requireReportingData("tenant-expense-aggregates", aggregateResult) as unknown as {
+    total: number;
+    record_count: number;
+    by_category: { category: string; total: number }[];
+    monthly: { month_start: string; total: number }[];
+  };
   const canCreate = perms.expenses?.includes("create") ?? false;
   const canEdit = perms.expenses?.includes("edit") ?? false;
   const canDelete = perms.expenses?.includes("delete") ?? false;
@@ -86,51 +118,42 @@ export default async function GiderlerPage({
       to: next.to === undefined ? toF : next.to,
     })}`;
 
-  // Hızlı tarih çipleri — sunucu saatine göre
-  const now = new Date(nowMs());
+  // Hızlı tarih çipleri — İstanbul takvimine göre (sunucu UTC olabilir)
+  const istNow = istanbulDateParts(nowMs());
+  const istToday = istanbulMonthUtc(istNow.year, istNow.month, istNow.day);
   const presets = [
-    { label: "Bu ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth(), 1)), to: fmtDate(now) },
-    { label: "Geçen ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth() - 1, 1)), to: fmtDate(new Date(now.getFullYear(), now.getMonth(), 0)) },
-    { label: "Son 3 ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth() - 2, 1)), to: fmtDate(now) },
+    { label: "Bu ay", from: fmtDate(istanbulMonthUtc(istNow.year, istNow.month)), to: fmtDate(istToday) },
+    { label: "Geçen ay", from: fmtDate(istanbulMonthUtc(istNow.year, istNow.month - 1)), to: fmtDate(istanbulMonthUtc(istNow.year, istNow.month, 0)) },
+    { label: "Son 3 ay", from: fmtDate(istanbulMonthUtc(istNow.year, istNow.month - 2)), to: fmtDate(istToday) },
   ];
 
-  // Özet/kırılım tarih aralığına saygılıdır; ?kategori= yalnızca listeyi süzer
-  const total = expenses.reduce((s, e) => s + Number(e.amount), 0);
+  // Özet/kırılım tarih aralığına saygılıdır (RPC p_from/p_to); ?kategori= yalnızca listeyi süzer
+  const total = Number(aggregate.total);
   const byCategory = categories.map((c) => ({
     ...c,
-    total: expenses.filter((e) => e.category === c.value).reduce((s, e) => s + Number(e.amount), 0),
+    total: Number(aggregate.by_category.find((bc) => bc.category === c.value)?.total ?? 0),
   }));
   const activeCategories = byCategory.filter((c) => c.total > 0);
   const categoryChart = activeCategories
     .sort((a, b) => b.total - a.total)
     .map((c) => ({ name: c.label, value: c.total, category: c.value }));
 
-  // Son 6 ay trendi — filtrelerden bağımsız (YYYY-MM anahtarıyla toplanır)
-  const monthKeys: string[] = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    monthKeys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
-  }
-  const trendTotals = new Map(monthKeys.map((k) => [k, 0]));
-  for (const row of trendRows) {
-    const key = String(row.expense_date ?? "").slice(0, 7);
-    if (trendTotals.has(key)) trendTotals.set(key, (trendTotals.get(key) ?? 0) + Number(row.amount));
-  }
-  const ayFmt = new Intl.DateTimeFormat("tr-TR", { month: "short" });
-  const trendChart = monthKeys.map((k) => ({
-    ay: ayFmt.format(new Date(`${k}-01T00:00:00`)),
-    tutar: Math.round(trendTotals.get(k) ?? 0),
+  // Son 6 ay trendi — filtrelerden bağımsız, RPC'den (İstanbul ay sınırlarıyla)
+  const ayFmt = new Intl.DateTimeFormat("tr-TR", { month: "short", timeZone: "Europe/Istanbul" });
+  const trendChart = aggregate.monthly.map((row) => ({
+    ay: ayFmt.format(new Date(row.month_start)),
+    tutar: Math.round(Number(row.total)),
   }));
   const hasTrend = trendChart.some((t) => t.tutar > 0);
 
   // Ay karşılaştırması — içinde bulunulan ay vs önceki ay (filtrelerden bağımsız)
-  const buAyKey = monthKeys[monthKeys.length - 1];
-  const gecenAyKey = monthKeys[monthKeys.length - 2];
-  const buAyTutar = Math.round(trendTotals.get(buAyKey) ?? 0);
-  const gecenAyTutar = Math.round(trendTotals.get(gecenAyKey) ?? 0);
-  const ayUzunFmt = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" });
-  const buAyLabel = ayUzunFmt.format(new Date(`${buAyKey}-01T00:00:00`));
-  const gecenAyLabel = ayUzunFmt.format(new Date(`${gecenAyKey}-01T00:00:00`));
+  const buAyRow = aggregate.monthly[aggregate.monthly.length - 1];
+  const gecenAyRow = aggregate.monthly[aggregate.monthly.length - 2];
+  const buAyTutar = Math.round(Number(buAyRow?.total ?? 0));
+  const gecenAyTutar = Math.round(Number(gecenAyRow?.total ?? 0));
+  const ayUzunFmt = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric", timeZone: "Europe/Istanbul" });
+  const buAyLabel = buAyRow ? ayUzunFmt.format(new Date(buAyRow.month_start)) : "";
+  const gecenAyLabel = gecenAyRow ? ayUzunFmt.format(new Date(gecenAyRow.month_start)) : "";
   const aylikFark = buAyTutar - gecenAyTutar;
   const aylikDegisim = gecenAyTutar > 0 ? Math.round((aylikFark / gecenAyTutar) * 100) : null;
   const kiyasMax = Math.max(1, buAyTutar, gecenAyTutar);
@@ -168,7 +191,7 @@ export default async function GiderlerPage({
               className="focus-ring press lift group block rounded-[14px] border border-white/12 bg-white/8 p-3 text-center hover:border-white/30"
             >
               <p className="flex items-center justify-center gap-1 font-display text-2xl font-extrabold text-white">
-                {expenses.length}
+                {aggregate.record_count}
                 <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
               </p>
               <p className="text-[11px] text-white/70">Kayıt</p>
@@ -334,13 +357,18 @@ export default async function GiderlerPage({
         <section className="rounded-[20px] border border-line bg-surface p-5">
           <h2 className="mb-4 font-display font-bold text-ink-950">Yeni Gider Ekle</h2>
           <form action={handleCreate} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <input name="title" required placeholder="Başlık" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
-            <input name="amount" type="number" min="0" step="0.01" required placeholder="Tutar (TRY)" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
-            <select name="category" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300">
+            <label htmlFor="expense-title" className="sr-only">Gider başlığı</label>
+            <input id="expense-title" name="title" required placeholder="Başlık" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
+            <label htmlFor="expense-amount" className="sr-only">Tutar (TRY)</label>
+            <input id="expense-amount" name="amount" type="number" min="0" step="0.01" required placeholder="Tutar (TRY)" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
+            <label htmlFor="expense-category" className="sr-only">Gider kategorisi</label>
+            <select id="expense-category" name="category" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300">
               {categories.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
-            <input name="expense_date" type="date" defaultValue={new Date(nowMs()).toISOString().slice(0, 10)} className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
-            <input name="notes" placeholder="Not (opsiyonel)" className="sm:col-span-2 rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
+            <label htmlFor="expense-date" className="sr-only">Gider tarihi</label>
+            <input id="expense-date" name="expense_date" type="date" defaultValue={new Date(nowMs()).toISOString().slice(0, 10)} className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
+            <label htmlFor="expense-notes" className="sr-only">Not (opsiyonel)</label>
+            <input id="expense-notes" name="notes" placeholder="Not (opsiyonel)" className="sm:col-span-2 rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
             <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 sm:col-span-2">
               <Plus className="h-4 w-4" /> Kaydet
             </button>

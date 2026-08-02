@@ -24,6 +24,7 @@ import { CommissionSimulator } from "./commission-simulator";
 import { CommissionActions } from "./commission-actions";
 import { CommissionSplitEditor } from "./commission-split-editor";
 import { BulkCollectBar, BulkCollectCheckbox, BulkCollectProvider } from "./bulk-collect";
+import { requireReportingCount, requireReportingData } from "@/lib/reporting/result";
 
 type CommissionRow = {
   id: string;
@@ -46,6 +47,19 @@ type CommissionRow = {
   }[] | null;
 };
 
+type CommissionAggregate = {
+  total: number;
+  paid: number;
+  pending: number;
+  record_count: number;
+  month_total: number;
+  month_paid: number;
+  month_pending: number;
+  month_record_count: number;
+  monthly: { month_start: string; accrued: number; paid: number }[];
+  advisors: { label: string; pay: number; record_count: number }[];
+};
+
 function money(value: number) {
   return new Intl.NumberFormat("tr-TR", {
     style: "currency",
@@ -65,8 +79,28 @@ type DurumFilter = (typeof DURUM_FILTERS)[number];
 const PAGE_SIZE = 50;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+// UTC getter'lar kullanılır: bu yardımcı yalnız aşağıdaki istanbulMonthUtc/istanbulTodayUtc
+// ile Date.UTC(...) üzerinden kurulan tarihleri biçimlendirir — sunucunun yerel saat
+// dilimine (Vercel'de tipik olarak UTC) bağımlı olmadan tutarlı kalır.
 function fmtDate(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+/** Verilen anın İstanbul yerel takvim bileşenleri (yıl, ay [0-indeksli], gün). */
+function istanbulDateParts(ms: number) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(ms));
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  return { year: get("year"), month: get("month") - 1, day: get("day") };
+}
+
+/** İstanbul takvimine göre ayın 1'i (UTC-getter'larla okunacak şekilde Date.UTC ile kurulur). */
+function istanbulMonthUtc(year: number, month: number, day = 1) {
+  return new Date(Date.UTC(year, month, day));
 }
 
 /** `to` günü dahil olsun diye timestamptz karşılaştırmasında ertesi gün (hariç) kullanılır. */
@@ -99,18 +133,20 @@ export default async function CommissionPage({
   const to = ISO_DATE.test(params.to ?? "") ? params.to! : null;
   const sayfa = Math.max(1, Number.parseInt(params.sayfa ?? "1", 10) || 1);
 
-  // Hızlı tarih çipleri — sunucu saatine göre hesaplanır
+  // Hızlı tarih çipleri — İstanbul takvimine göre hesaplanır (sunucu UTC olabilir,
+  // ayın ilk saatlerinde "bu ay" yanlış aya kaymasın diye bkz. istanbulDateParts).
   const now = new Date(nowMs());
+  const istNow = istanbulDateParts(nowMs());
+  const istToday = istanbulMonthUtc(istNow.year, istNow.month, istNow.day);
   const presets = [
-    { label: "Bu ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth(), 1)), to: fmtDate(now) },
-    { label: "Geçen ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth() - 1, 1)), to: fmtDate(new Date(now.getFullYear(), now.getMonth(), 0)) },
-    { label: "Son 3 ay", from: fmtDate(new Date(now.getFullYear(), now.getMonth() - 2, 1)), to: fmtDate(now) },
+    { label: "Bu ay", from: fmtDate(istanbulMonthUtc(istNow.year, istNow.month)), to: fmtDate(istToday) },
+    { label: "Geçen ay", from: fmtDate(istanbulMonthUtc(istNow.year, istNow.month - 1)), to: fmtDate(istanbulMonthUtc(istNow.year, istNow.month, 0)) },
+    { label: "Son 3 ay", from: fmtDate(istanbulMonthUtc(istNow.year, istNow.month - 2)), to: fmtDate(istToday) },
   ];
 
   const supabase = await createClient();
   const savedViews = await listSavedViews("/app/komisyon");
   // Onay merkezi rozeti — tek head-count sorgusu (bkz. /app/onaylar).
-  const bekleyenOnay = (await supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("status", "bekliyor")).count ?? 0;
   // Kayıtlı görünümler için aktif filtre paramları (sayfa hariç)
   const savedViewParams: Record<string, string> = {};
   if (durum) savedViewParams.durum = durum;
@@ -129,78 +165,63 @@ export default async function CommissionPage({
   if (from) ledgerQuery = ledgerQuery.gte("created_at", from);
   if (to) ledgerQuery = ledgerQuery.lt("created_at", nextDay(to));
 
-  const [{ data, count: commissionTotal }, { data: statRows }, { data: memberRows }] = await Promise.all([
+  const [ledgerResult, aggregateResult, memberResult, approvalResult] = await Promise.all([
     ledgerQuery,
-    // KPI toplamları filtreden ve sayfalamadan bağımsız — splits/created_at
-    // danışman dağılımı ve dönem KPI'ları için okunur.
-    // .order eklendi: sırasız limit(1000) sayfa yüklemeleri arasında farklı 1000
-    // satır döndürüp KPI toplamlarını oynatıyordu (non-deterministik). En güncel
-    // 1000 tutarlı okunur. (Not: 1000+ komisyonlu ofiste toplam eksik sayar —
-    // tam doğruluk için ileride SUM RPC'si.)
-    supabase.from("commissions").select("gross_amount, status, splits, created_at").order("created_at", { ascending: false }).limit(1000),
-    // Split etiketini danışman profiline bağlamak için ad → id eşlemesi
+    // Sayfalama dışı KPI, dağılım ve aylık seri tam kapsamlı SQL aggregate'tir.
+    supabase.rpc("tenant_commission_aggregates", { p_as_of: now.toISOString() }),
+    // Split etiketini danışman profiline bağlamak için ad → id eşlemesi.
     supabase.from("profiles").select("id, full_name").eq("is_active", true),
+    supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("status", "bekliyor"),
   ]);
 
-  const rows = (data ?? []) as CommissionRow[];
-  const stats = (statRows ?? []) as {
-    gross_amount: number;
-    status: string;
-    splits: { label?: string; amount?: number; rate?: number }[] | null;
-    created_at: string;
-  }[];
-  const statPaid = (s: { status: string }) => s.status === "paid" || s.status === "collected";
-  const total = stats.reduce((sum, row) => sum + Number(row.gross_amount), 0);
-  const paid = stats.filter(statPaid).reduce((sum, row) => sum + Number(row.gross_amount), 0);
-  const pending = total - paid;
+  const rows = requireReportingData("commission-ledger", ledgerResult) as CommissionRow[];
+  const commissionTotal = requireReportingCount("commission-ledger-count", ledgerResult);
+  const aggregate = requireReportingData("tenant-commission-aggregates", aggregateResult) as unknown as CommissionAggregate;
+  const memberRows = requireReportingData("commission-members", memberResult);
+  const bekleyenOnay = requireReportingCount("pending-approvals", approvalResult);
+  const total = Number(aggregate.total);
+  const paid = Number(aggregate.paid);
+  const pending = Number(aggregate.pending);
 
-  // Dönem (bu ay) KPI şeridi — filtrelerden bağımsız, ayın 1'inden bugüne
-  const donemLabel = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(now);
-  const donemStats = stats.filter((r) => String(r.created_at).slice(0, 10) >= presets[0].from);
-  const donemToplam = donemStats.reduce((s, r) => s + Number(r.gross_amount), 0);
-  const donemTahsil = donemStats.filter(statPaid).reduce((s, r) => s + Number(r.gross_amount), 0);
-  const donemBekleyen = donemToplam - donemTahsil;
+  // Dönem (bu ay) KPI şeridi — filtrelerden bağımsız, ayın 1'inden bugüne (İstanbul takvimi)
+  const donemLabel = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric", timeZone: "Europe/Istanbul" }).format(now);
+  const donemToplam = Number(aggregate.month_total);
+  const donemTahsil = Number(aggregate.month_paid);
+  const donemBekleyen = Number(aggregate.month_pending);
 
   // Danışman bazlı dağılım — split etiketlerine göre pay (brüt × oran)
-  const advisorTotals = new Map<string, { pay: number; adet: number }>();
-  for (const r of stats) {
-    const splits = Array.isArray(r.splits) ? r.splits : [];
-    for (const s of splits) {
-      const label = (s.label ?? "").trim();
-      const rate = Number(s.rate) || 0;
-      if (!label || rate <= 0) continue;
-      const entry = advisorTotals.get(label) ?? { pay: 0, adet: 0 };
-      entry.pay += Math.round(Number(r.gross_amount) * (rate / 100));
-      entry.adet += 1;
-      advisorTotals.set(label, entry);
-    }
-  }
-  const advisorDist = Array.from(advisorTotals, ([label, v]) => ({ label, ...v }))
-    .sort((a, b) => b.pay - a.pay)
-    .slice(0, 8);
+  const advisorDist = aggregate.advisors.map((row) => ({
+    label: row.label,
+    pay: Number(row.pay),
+    adet: Number(row.record_count),
+  }));
   const advisorMax = Math.max(1, ...advisorDist.map((a) => a.pay));
 
-  // Beklenen vs tahsil edilen — son 6 ay, çift seri (tahakkuk / tahsilat)
-  const kpiAyFmt = new Intl.DateTimeFormat("tr-TR", { month: "short" });
+  // Beklenen vs tahsil edilen — son 6 ay, çift seri (tahakkuk / tahsilat), İstanbul takvimi
+  const kpiAyFmt = new Intl.DateTimeFormat("tr-TR", { month: "short", timeZone: "Europe/Istanbul" });
   const aylikSeri = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    const d = istanbulMonthUtc(istNow.year, istNow.month - (5 - i));
     return {
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      key: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`,
       label: kpiAyFmt.format(d),
       value: 0,
       value2: 0,
     };
   });
   const seriIndex = new Map(aylikSeri.map((m, i) => [m.key, i]));
-  for (const r of stats) {
-    const idx = seriIndex.get(String(r.created_at).slice(0, 7));
+  for (const r of aggregate.monthly) {
+    // month_start artık İstanbul ay başlangıcının doğru UTC anı — UTC dizgesinin
+    // ilk 7 karakteri (ör. +03:00 farkı yüzünden) yanlış aya kayabilir, bu yüzden
+    // İstanbul takvim bileşenleriyle yeniden hesaplanır (aylikSeri anahtarıyla aynı yöntem).
+    const rParts = istanbulDateParts(new Date(r.month_start).getTime());
+    const idx = seriIndex.get(`${rParts.year}-${String(rParts.month + 1).padStart(2, "0")}`);
     if (idx === undefined) continue;
-    aylikSeri[idx].value += Number(r.gross_amount);
-    if (statPaid(r)) aylikSeri[idx].value2 += Number(r.gross_amount);
+    aylikSeri[idx].value = Number(r.accrued);
+    aylikSeri[idx].value2 = Number(r.paid);
   }
   const hasAylikSeri = aylikSeri.some((m) => m.value > 0);
 
-  const totalCount = commissionTotal ?? rows.length;
+  const totalCount = commissionTotal;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   // Sayfa dışındaki paramları koruyarak link üretir; sayfa değişince filtreler kalır
   const pageHref = (p: number) => `/app/komisyon${qs({ durum: durum ?? undefined, from, to, sayfa: p > 1 ? String(p) : undefined })}`;
@@ -273,7 +294,7 @@ export default async function CommissionPage({
             { label: "Dönem komisyonu", value: money(donemToplam), href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "text-ink-950" },
             { label: "Tahsil edilen", value: money(donemTahsil), href: filterHref({ durum: "tahsil", from: presets[0].from, to: presets[0].to }), tone: "text-mint-600" },
             { label: "Bekleyen", value: money(donemBekleyen), href: filterHref({ durum: "bekleyen", from: presets[0].from, to: presets[0].to }), tone: "text-amber-600" },
-            { label: "Kayıt", value: donemStats.length.toLocaleString("tr-TR"), href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "text-brand-600" },
+            { label: "Kayıt", value: Number(aggregate.month_record_count).toLocaleString("tr-TR"), href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "text-brand-600" },
           ].map((k) => (
             <Link
               key={k.label}
@@ -309,7 +330,7 @@ export default async function CommissionPage({
             <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Wallet className="h-4 w-4" /> Paylaşım analizi</p>
               <h2 className="mt-1 font-display font-bold text-ink-950">Danışman bazlı dağılım</h2>
-              <p className="mt-0.5 text-[11px] text-text-muted">Split oranlarından hesaplanan pay toplamları — tüm defter</p>
+              <p className="mt-0.5 text-[11px] text-text-muted">Tüm defterden hesaplanan en yüksek 8 danışman payı</p>
               <ul className="mt-4 space-y-3">
                 {advisorDist.map((a) => {
                   const memberId = memberIdByName.get(a.label);

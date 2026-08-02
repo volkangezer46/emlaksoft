@@ -8,11 +8,17 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { isNetgsmConfigured } from "@/lib/messaging/netgsm";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 import {
   getTenantNetgsmConfig,
   isSignerSmsAvailable,
   sendSignerSms,
 } from "@/app/imza/_lib/sms";
+
+type TenantStatusRel = { status?: string | null } | { status?: string | null }[] | null;
+function tenantStatusOf(rel: TenantStatusRel): string | null | undefined {
+  return Array.isArray(rel) ? rel[0]?.status : rel?.status;
+}
 
 function appBaseUrl() {
   return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -308,11 +314,16 @@ export async function signContractByToken(
   // Sunucu tarafı zorunlu kontrol — görüntü kontrolü doğrudan action çağrısıyla atlanamasın
   const { data: contract } = await admin
     .from("contracts")
-    .select("status, expires_at, tenant_id")
+    .select("status, expires_at, tenant_id, tenant:tenants(status)")
     .eq("id", signer.contract_id)
     .maybeSingle();
 
   if (!contract) return { error: "Sözleşme bulunamadı." };
+  // Tenant askıya alındı/iptal edildiyse imza akışı da kapansın (görüntüleme
+  // sayfasıyla aynı kapı — doğrudan action çağrısıyla atlanamasın).
+  if (!isPublicTenantActive(tenantStatusOf(contract.tenant as TenantStatusRel))) {
+    return { error: "Sözleşme bulunamadı." };
+  }
   if (contract.status === "cancelled") return { error: "Bu sözleşme iptal edilmiştir; imza alınamaz." };
   if (contract.expires_at && new Date(contract.expires_at).getTime() < Date.now()) {
     return { error: "Bu imza linkinin geçerlilik süresi dolmuştur." };
@@ -370,7 +381,11 @@ export async function submitSignatureByToken(
     undefined;
 
   // Token tahmini/kaba kuvvet koruması — IP başına dakikada 10 deneme
-  const { allowed } = await checkRateLimit(`sign:${ip ?? "unknown"}`, { limit: 10, windowSec: 60 });
+  const { allowed } = await checkRateLimit(`sign:${ip ?? "unknown"}`, {
+    limit: 10,
+    windowSec: 60,
+    failurePolicy: "deny",
+  });
   if (!allowed) return { error: "Çok fazla deneme. Lütfen biraz sonra tekrar deneyin." };
 
   const result = await signContractByToken(token, ip);
@@ -396,7 +411,11 @@ export async function requestSignatureOtp(
 
   // SMS bombardımanı koruması — IP başına 5 dakikada 10 istek
   const ip = await clientIp();
-  const ipLimit = await checkRateLimit(`imza-otp:${ip}`, { limit: 10, windowSec: 300 });
+  const ipLimit = await checkRateLimit(`imza-otp:${ip}`, {
+    limit: 10,
+    windowSec: 300,
+    failurePolicy: "deny",
+  });
   if (!ipLimit.allowed) return { error: "Çok fazla deneme. Lütfen biraz sonra tekrar deneyin." };
 
   const admin = createAdminClient();
@@ -412,11 +431,14 @@ export async function requestSignatureOtp(
 
   const { data: contract } = await admin
     .from("contracts")
-    .select("status, expires_at, tenant_id")
+    .select("status, expires_at, tenant_id, tenant:tenants(status)")
     .eq("id", signer.contract_id)
     .maybeSingle();
 
   if (!contract) return { error: "Sözleşme bulunamadı." };
+  if (!isPublicTenantActive(tenantStatusOf(contract.tenant as TenantStatusRel))) {
+    return { error: "Sözleşme bulunamadı." };
+  }
   if (contract.status === "cancelled") return { error: "Bu sözleşme iptal edilmiştir; imza alınamaz." };
   if (contract.expires_at && new Date(contract.expires_at).getTime() < Date.now()) {
     return { error: "Bu imza linkinin geçerlilik süresi dolmuştur." };
@@ -427,7 +449,11 @@ export async function requestSignatureOtp(
   }
 
   // İmzalayan başına 5 dakikada en çok 3 kod
-  const signerLimit = await checkRateLimit(`imza-otp-signer:${signer.id}`, { limit: 3, windowSec: 300 });
+  const signerLimit = await checkRateLimit(`imza-otp-signer:${signer.id}`, {
+    limit: 3,
+    windowSec: 300,
+    failurePolicy: "deny",
+  });
   if (!signerLimit.allowed) return { error: "Çok sık kod istendi. Lütfen birkaç dakika sonra tekrar deneyin." };
 
   const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
@@ -472,18 +498,31 @@ export async function verifySignatureOtp(
   if (!/^\d{6}$/.test(code)) return { error: "6 haneli doğrulama kodunu girin." };
 
   const ip = await clientIp();
-  const { allowed } = await checkRateLimit(`imza-otp-verify:${ip}`, { limit: 15, windowSec: 60 });
+  const { allowed } = await checkRateLimit(`imza-otp-verify:${ip}`, {
+    limit: 15,
+    windowSec: 60,
+    failurePolicy: "deny",
+  });
   if (!allowed) return { error: "Çok fazla deneme. Lütfen biraz sonra tekrar deneyin." };
 
   const admin = createAdminClient();
   const { data: signer } = await admin
     .from("contract_signers")
-    .select("id, status, otp_hash, otp_expires_at, otp_attempts")
+    .select("id, contract_id, status, otp_hash, otp_expires_at, otp_attempts")
     .eq("token", token)
     .maybeSingle();
 
   if (!signer) return { error: "Geçersiz veya süresi dolmuş imza linki." };
   if (signer.status !== "pending") return { error: "Bu sözleşme zaten imzalandı veya reddedildi." };
+
+  const { data: contract } = await admin
+    .from("contracts")
+    .select("tenant:tenants(status)")
+    .eq("id", signer.contract_id)
+    .maybeSingle();
+  if (!contract || !isPublicTenantActive(tenantStatusOf(contract.tenant as TenantStatusRel))) {
+    return { error: "Sözleşme bulunamadı." };
+  }
   if (!signer.otp_hash || !signer.otp_expires_at) return { error: "Önce doğrulama kodu isteyin." };
   if (new Date(signer.otp_expires_at).getTime() < Date.now()) {
     return { error: "Kodun süresi doldu. Lütfen yeni kod isteyin." };

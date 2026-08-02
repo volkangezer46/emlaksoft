@@ -93,8 +93,11 @@ export function NewCampaignDialog() {
                 >
                   <option value="sms">SMS (Netgsm)</option>
                   <option value="whatsapp">WhatsApp</option>
-                  <option value="email">E-posta</option>
+                  <option value="email" disabled>E-posta (yakında)</option>
                 </select>
+                <p className="mt-1.5 text-xs text-text-faint">
+                  E-posta gönderim sağlayıcısı henüz bağlanmadı; bu kanal seçilemez.
+                </p>
               </div>
 
               {/* Hedef kitle */}

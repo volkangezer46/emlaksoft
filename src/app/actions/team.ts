@@ -6,6 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { isValidOptionalTurkishMobile, normalizeTurkishPhone, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
+import { getPlan } from "@/lib/billing/plans";
+import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 
 export type TeamResult = { error?: string; ok?: boolean };
 
@@ -25,6 +27,65 @@ type Role =
 const MANAGER_ROLES: Role[] = ["owner", "gm", "branch_manager"];
 // Roles a manager can assign (owner cannot be created/assigned through this flow)
 const ASSIGNABLE_ROLES: Role[] = ["gm", "branch_manager", "team_lead", "advisor", "call_center", "accounting", "readonly"];
+const ROLES_BY_MANAGER: Record<"owner" | "gm" | "branch_manager", readonly Role[]> = {
+  owner: ASSIGNABLE_ROLES,
+  gm: ["branch_manager", "team_lead", "advisor", "call_center", "accounting", "readonly"],
+  branch_manager: ["team_lead", "advisor", "call_center", "accounting", "readonly"],
+};
+
+function canManageRole(actorRole: Role, targetRole: Role): boolean {
+  return MANAGER_ROLES.includes(actorRole) &&
+    ROLES_BY_MANAGER[actorRole as "owner" | "gm" | "branch_manager"].includes(targetRole);
+}
+
+async function ensureBranchBelongsToTenant(
+  admin: ReturnType<typeof createAdminClient>,
+  branchId: string,
+  tenantId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!branchId) return { ok: true };
+  const { data: branch, error } = await admin
+    .from("branches")
+    .select("id")
+    .eq("id", branchId)
+    .eq("tenant_id", tenantId)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (error || !branch) {
+    return { ok: false, error: "Seçilen şube bu ofise ait değil veya aktif değil." };
+  }
+  return { ok: true };
+}
+
+async function ensureSeatAvailable(
+  admin: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const [{ data: tenant, error: tenantError }, { count, error: countError }] =
+    await Promise.all([
+      admin.from("tenants").select("plan, status").eq("id", tenantId).maybeSingle(),
+      admin
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true),
+    ]);
+  if (tenantError || countError || !tenant) {
+    return { ok: false, error: "Paket ve ekip kapasitesi doğrulanamadı." };
+  }
+  if (tenant.status === "suspended" || tenant.status === "cancelled") {
+    return { ok: false, error: "Askıdaki veya iptal edilmiş ofise üye eklenemez." };
+  }
+
+  const limit = getPlan(String(tenant.plan)).limits.seats;
+  if ((count ?? 0) >= limit) {
+    return {
+      ok: false,
+      error: `Paketiniz en fazla ${limit} aktif kullanıcı destekliyor. Paketi yükseltin veya bir üyeyi pasife alın.`,
+    };
+  }
+  return { ok: true };
+}
 
 async function requireManager() {
   const gate = await requirePermission("team", "edit");
@@ -43,7 +104,7 @@ async function requireManager() {
 export async function createTeamMember(_prev: TeamResult, formData: FormData): Promise<TeamResult> {
   const ctx = await requireManager();
   if ("error" in ctx) return { error: ctx.error };
-  const { tenantId } = ctx;
+  const { tenantId, role: actorRole } = ctx;
 
   const fullName = String(formData.get("full_name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -52,6 +113,10 @@ export async function createTeamMember(_prev: TeamResult, formData: FormData): P
   const role = String(formData.get("role") ?? "advisor").trim() as Role;
   const branchId = String(formData.get("branch_id") ?? "").trim();
 
+  if (!ASSIGNABLE_ROLES.includes(role) || !canManageRole(actorRole, role)) {
+    return { error: "Bu rolü atama yetkiniz yok." };
+  }
+
   if (!fullName || !email) return { error: "Ad ve e-posta zorunlu." };
   if (!isValidOptionalTurkishMobile(phone)) return { error: TR_MOBILE_ERROR_MESSAGE };
   if (!ASSIGNABLE_ROLES.includes(role)) return { error: "Geçerli bir rol seçin." };
@@ -59,6 +124,10 @@ export async function createTeamMember(_prev: TeamResult, formData: FormData): P
 
   const normalizedPhone = phone ? normalizeTurkishPhone(phone) : "";
   const admin = createAdminClient();
+  const branch = await ensureBranchBelongsToTenant(admin, branchId, tenantId);
+  if (!branch.ok) return { error: branch.error };
+  const seat = await ensureSeatAvailable(admin, tenantId);
+  if (!seat.ok) return { error: seat.error };
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
     email,
@@ -86,7 +155,9 @@ export async function createTeamMember(_prev: TeamResult, formData: FormData): P
   });
 
   if (profileError) {
+    const planError = planLimitErrorMessage(profileError);
     await admin.auth.admin.deleteUser(created.user.id);
+    if (planError) return { error: planError };
     return { error: "Profil oluşturulamadı." };
   }
 
@@ -97,7 +168,7 @@ export async function createTeamMember(_prev: TeamResult, formData: FormData): P
 export async function updateTeamMember(formData: FormData): Promise<TeamResult> {
   const ctx = await requireManager();
   if ("error" in ctx) return { error: ctx.error };
-  const { tenantId, user } = ctx;
+  const { tenantId, user, role: actorRole } = ctx;
 
   const id = String(formData.get("id") ?? "").trim();
   const role = String(formData.get("role") ?? "").trim() as Role;
@@ -118,11 +189,27 @@ export async function updateTeamMember(formData: FormData): Promise<TeamResult> 
   // ensure the target belongs to the same tenant
   const { data: target } = await admin
     .from("profiles")
-    .select("id, tenant_id, role")
+    .select("id, tenant_id, role, branch_id, is_active")
     .eq("id", id)
     .maybeSingle();
   if (!target || target.tenant_id !== tenantId) return { error: "Üye bu ofise ait değil." };
   if (target.role === "owner") return { error: "Ofis sahibi bu ekrandan düzenlenemez." };
+
+  if (!canManageRole(actorRole, target.role as Role)) {
+    return { error: "Bu üyeyi yönetme yetkiniz yok." };
+  }
+  if (role && (!ASSIGNABLE_ROLES.includes(role) || !canManageRole(actorRole, role))) {
+    return { error: "Bu rolü atama yetkiniz yok." };
+  }
+  if (formData.has("branch_id")) {
+    const branch = await ensureBranchBelongsToTenant(admin, branchId, tenantId);
+    if (!branch.ok) return { error: branch.error };
+  }
+
+  if (activeRaw === "true" && !target.is_active) {
+    const seat = await ensureSeatAvailable(admin, tenantId);
+    if (!seat.ok) return { error: seat.error };
+  }
 
   const patch: Record<string, unknown> = {};
   if (role) {
@@ -134,14 +221,64 @@ export async function updateTeamMember(formData: FormData): Promise<TeamResult> 
 
   if (Object.keys(patch).length === 0) return { ok: true };
 
+  const requiresIdentitySync = Boolean(patch.role) || "is_active" in patch;
+  const { data: authRecord, error: authReadError } = requiresIdentitySync
+    ? await admin.auth.admin.getUserById(id)
+    : { data: { user: null }, error: null };
+  if (requiresIdentitySync && (authReadError || !authRecord.user)) {
+    console.error("team identity read", authReadError);
+    return { error: "Üyenin kimlik kaydı doğrulanamadı." };
+  }
+
   const { error } = await admin.from("profiles").update(patch).eq("id", id);
+  const planError = planLimitErrorMessage(error);
+  if (planError) return { error: planError };
   if (error) return { error: "Üye güncellenemedi." };
 
-  // keep auth claims in sync with role changes
-  if (patch.role) {
-    await admin.auth.admin.updateUserById(id, {
-      app_metadata: { tenant_id: tenantId, role: patch.role },
+  // Claims, ban state and canonical profile move as one compensated operation.
+  if (requiresIdentitySync) {
+    const currentMeta = (authRecord.user!.app_metadata ?? {}) as Record<string, unknown>;
+    const includesActive = "is_active" in patch;
+    const nextActive = includesActive ? patch.is_active === true : target.is_active;
+    const { error: claimError } = await admin.auth.admin.updateUserById(id, {
+      app_metadata: {
+        ...currentMeta,
+        tenant_id: tenantId,
+        role: patch.role ?? target.role,
+        account_active: nextActive,
+        deactivated_at: nextActive ? null : new Date().toISOString(),
+      },
+      ...(includesActive
+        ? { ban_duration: nextActive ? ("none" as const) : "876000h" }
+        : {}),
     });
+    if (claimError) {
+      const rollback: Record<string, unknown> = { role: target.role };
+      if ("branch_id" in patch) rollback.branch_id = target.branch_id;
+      if ("is_active" in patch) rollback.is_active = target.is_active;
+      const { error: rollbackError } = await admin.from("profiles").update(rollback).eq("id", id);
+      if (rollbackError) {
+        console.error("team role claim rollback", {
+          claim: claimError.message,
+          rollback: rollbackError.message,
+          profileId: id,
+        });
+      }
+      return { error: "Rol kimliği güncellenemedi; değişiklik geri alındı." };
+    }
+  }
+
+  if ("is_active" in patch && patch.is_active === false) {
+    const { error: revokeError } = await admin.rpc("revoke_team_member_sessions", {
+      p_user_id: id,
+      p_tenant_id: tenantId,
+    });
+    if (revokeError) {
+      // Fail secure: profile is inactive and Auth user is banned even if a
+      // rolling migration delays physical session cleanup.
+      console.error("team session revoke", { profileId: id, error: revokeError.message });
+      return { error: "Üye pasife alındı; açık oturum temizliği tekrar denenmeli." };
+    }
   }
 
   revalidatePath("/app/ekip");
@@ -171,6 +308,8 @@ export async function createBranch(_prev: TeamResult, formData: FormData): Promi
     name,
     province_id: provinceId || null,
   });
+  const planError = planLimitErrorMessage(error);
+  if (planError) return { error: planError };
   if (error) return { error: "Şube oluşturulamadı." };
 
   revalidatePath("/app/ekip");
@@ -193,6 +332,8 @@ export async function updateBranch(formData: FormData): Promise<TeamResult> {
   if (formData.has("is_active")) patch.is_active = String(formData.get("is_active")) === "true";
 
   const { error } = await supabase.from("branches").update(patch).eq("id", id).eq("tenant_id", tenantId);
+  const planError = planLimitErrorMessage(error);
+  if (planError) return { error: planError };
   if (error) return { error: "Şube güncellenemedi." };
 
   revalidatePath("/app/ekip");

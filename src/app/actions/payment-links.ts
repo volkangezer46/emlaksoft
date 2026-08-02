@@ -9,6 +9,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { initializeCheckoutForm, isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { fulfillPaymentLinkByToken } from "@/lib/billing/payment-link-fulfill";
 import { toE164TurkishPhone } from "@/lib/phone";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 export type PayLinkResult = { error?: string; ok?: boolean; url?: string; checkoutUrl?: string };
 
@@ -61,14 +63,26 @@ export async function createPaymentLink(formData: FormData): Promise<PayLinkResu
 
 /** iyzico yapılandırılmışsa Checkout Form; değilse demo yolu açık kalır */
 export async function startPaymentLinkCheckout(token: string): Promise<PayLinkResult> {
+  const ip = await clientIp();
+  // Token tahmini / kaba kuvvet koruması — IP başına dakikada 20 istek
+  const { allowed } = await checkRateLimit(`odeme-link-checkout:${ip}`, {
+    limit: 20,
+    windowSec: 60,
+    failurePolicy: "deny",
+  });
+  if (!allowed) return { error: "Çok fazla istek. Lütfen biraz sonra tekrar deneyin." };
+
   const admin = createAdminClient();
   const { data: link } = await admin
     .from("payment_links")
-    .select("id, token, title, amount_try, status, expires_at, tenant_id, meta, customer:customers(full_name, phone, email)")
+    .select("id, token, title, amount_try, status, expires_at, tenant_id, meta, customer:customers(full_name, phone, email), tenant:tenants(status)")
     .eq("token", token)
     .maybeSingle();
 
   if (!link) return { error: "Link bulunamadı." };
+  const linkTenant = link.tenant as { status?: string | null } | { status?: string | null }[] | null;
+  const tenantStatus = Array.isArray(linkTenant) ? linkTenant[0]?.status : linkTenant?.status;
+  if (!isPublicTenantActive(tenantStatus)) return { error: "Link bulunamadı." };
   if (link.status === "paid") return { ok: true, url: `${appUrl()}/odeme-link/${token}?paid=1` };
   if (link.expires_at && new Date(link.expires_at).getTime() < Date.now()) {
     return { error: "Bu linkin süresi dolmuş." };
@@ -93,6 +107,7 @@ export async function startPaymentLinkCheckout(token: string): Promise<PayLinkRe
   const amount = Number(link.amount_try);
 
   try {
+    const buyerIp = await clientIp();
     const init = await initializeCheckoutForm({
       conversationId,
       price: amount,
@@ -111,6 +126,7 @@ export async function startPaymentLinkCheckout(token: string): Promise<PayLinkRe
         registrationAddress: "Türkiye",
         city: "Istanbul",
         country: "Turkey",
+        ip: buyerIp,
       },
       billingAddress: {
         contactName: fullName,
@@ -145,8 +161,19 @@ export async function startPaymentLinkCheckout(token: string): Promise<PayLinkRe
 
 /** Demo: yalnızca iyzico yokken veya açıkça izinli ortamda */
 export async function markPaymentLinkPaid(token: string): Promise<PayLinkResult> {
-  if (isIyzicoConfigured() && process.env.ALLOW_PAYMENT_LINK_DEMO !== "1") {
+  const demoAllowed = process.env.NODE_ENV !== "production" || process.env.ALLOW_PAYMENT_LINK_DEMO === "1";
+  if (!demoAllowed || (isIyzicoConfigured() && process.env.ALLOW_PAYMENT_LINK_DEMO !== "1")) {
     return { error: "Canlı iyzico açık — demo tahsilat kapalı. Gerçek ödeme butonunu kullanın." };
   }
+
+  // Token tahmini / kaba kuvvet koruması — IP başına dakikada 20 istek
+  const ip = await clientIp();
+  const { allowed } = await checkRateLimit(`odeme-link-demo:${ip}`, {
+    limit: 20,
+    windowSec: 60,
+    failurePolicy: "deny",
+  });
+  if (!allowed) return { error: "Çok fazla istek. Lütfen biraz sonra tekrar deneyin." };
+
   return fulfillPaymentLinkByToken(token, "demo");
 }

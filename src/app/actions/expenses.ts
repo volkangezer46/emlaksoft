@@ -122,26 +122,3 @@ export async function listExpenses(
   const { data } = await query;
   return data ?? [];
 }
-
-/**
- * Son 6 ayın gider kayıtları (tutar + tarih) — aylık trend grafiği için.
- * Sayfadaki tarih/kategori filtresinden bağımsız çalışır.
- */
-export async function listExpenseMonthlyTrend() {
-  const gate = await requirePermission("expenses", "view");
-  if (!gate.ok) return [];
-
-  const supabase = await createClient();
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-  const from = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-01`;
-
-  const { data } = await supabase
-    .from("expenses")
-    .select("amount, expense_date")
-    .eq("tenant_id", gate.tenantId)
-    .gte("expense_date", from)
-    .limit(5000);
-
-  return (data ?? []) as { amount: number; expense_date: string }[];
-}

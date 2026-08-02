@@ -1,5 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  PUBLIC_REQUEST_MAX_BYTES,
+  readRequestBodyLimited,
+  requestBodyTooLarge,
+} from "@/lib/public-request-security";
 
 /**
  * Meta (WhatsApp Business / Messenger) webhook iskeleti.
@@ -20,10 +25,14 @@ export async function GET(req: NextRequest) {
 
   const sp = req.nextUrl.searchParams;
   const mode = sp.get("hub.mode");
-  const token = sp.get("hub.verify_token");
+  const token = sp.get("hub.verify_token") ?? "";
   const challenge = sp.get("hub.challenge");
 
-  if (mode === "subscribe" && token === verifyToken && challenge) {
+  const tokenBuf = Buffer.from(token);
+  const verifyBuf = Buffer.from(verifyToken);
+  const tokenValid = tokenBuf.length === verifyBuf.length && timingSafeEqual(tokenBuf, verifyBuf);
+
+  if (mode === "subscribe" && tokenValid && challenge) {
     // Meta düz metin olarak challenge'ın aynen yansıtılmasını bekler
     return new NextResponse(challenge, {
       status: 200,
@@ -40,8 +49,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "yapılandırılmamış" }, { status: 503 });
   }
 
-  // İmza ham gövde üzerinden hesaplanır — json() öncesi text() ile oku
-  const rawBody = await req.text();
+  // Gövde-boyutu sınırı imza/HMAC hesaplamasından ÖNCE kontrol edilir — kardeş
+  // netgsm-sms ucuyla aynı desen (bkz. public-request-security.ts). Aksi halde
+  // imzasız/rastgele büyük POST'lar tüm gövde belleğe alınıp HMAC'lenerek
+  // CPU/bellek tüketimine yol açabilir.
+  if (requestBodyTooLarge(req.headers, PUBLIC_REQUEST_MAX_BYTES)) {
+    return NextResponse.json({ ok: false, error: "payload_too_large" }, { status: 413 });
+  }
+  const bodyBytes = await readRequestBodyLimited(req, PUBLIC_REQUEST_MAX_BYTES);
+  if (bodyBytes === null) {
+    return NextResponse.json({ ok: false, error: "payload_too_large" }, { status: 413 });
+  }
+  // İmza ham gövde üzerinden hesaplanır — json() öncesi ham bayt/metin kullanılır
+  const rawBody = new TextDecoder().decode(bodyBytes);
   const header = req.headers.get("x-hub-signature-256") ?? "";
   const expected = `sha256=${createHmac("sha256", appSecret).update(rawBody).digest("hex")}`;
 

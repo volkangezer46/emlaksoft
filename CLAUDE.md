@@ -4,7 +4,7 @@
 
 Türk emlak ofisleri için multi-tenant SaaS (Next.js 16 App Router + Supabase + Vercel).
 Müşteri/talep/portföy/randevu/anlaşma/komisyon omurgası + kayıp-kaçak kalkanı, değerleme
-(emsal motoru), otomasyonlar, 13 cron, AI asistan, vitrin ve token'lı public portallar.
+(emsal motoru), otomasyonlar, 22 cron (bkz. `vercel.json`), AI asistan, vitrin ve token'lı public portallar.
 Tamamı Türkçe; deploy bilinçli olarak en sona bırakıldı (`docs/DEPLOY_CHECKLIST.md`).
 
 ## Komutlar

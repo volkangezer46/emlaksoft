@@ -5,11 +5,17 @@ import { SignPanel } from "./sign-panel";
 import { PrintButton } from "./print-button";
 import { isPast } from "@/lib/clock";
 import { isSignerSmsAvailable, maskPhone } from "../_lib/sms";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 export const metadata = {
   title: "Sözleşme imzası",
   robots: { index: false, follow: false },
 };
+
+// İmza/tenant durumu her açılışta canlı okunmalı; sayfa önbelleğe takılmasın
+// (sunum/[token] deseni) — aksi halde imzalanmış/iptal/askıya alınmış durum
+// eski (cache'lenmiş) haliyle gösterilebilir.
+export const dynamic = "force-dynamic";
 
 function formatDate(iso: string | null) {
   if (!iso) return "—";
@@ -32,14 +38,16 @@ export default async function PublicContractSignPage({ params }: { params: Promi
 
   const { data: contract } = await admin
     .from("contracts")
-    .select("id, tenant_id, title, contract_type, body, status, expires_at, created_at, tenant:tenants(name), signers:contract_signers(id, full_name, status, signed_at, verified_at)")
+    .select("id, tenant_id, title, contract_type, body, status, expires_at, created_at, tenant:tenants(name, status), signers:contract_signers(id, full_name, status, signed_at, verified_at)")
     .eq("id", signer.contract_id)
     .maybeSingle();
 
   if (!contract) notFound();
 
-  const tenant = contract.tenant as { name?: string } | { name?: string }[] | null;
-  const office = (Array.isArray(tenant) ? tenant[0]?.name : tenant?.name) || "EmlakSoft";
+  const tenant = contract.tenant as { name?: string; status?: string | null } | { name?: string; status?: string | null }[] | null;
+  const tenantRow = Array.isArray(tenant) ? tenant[0] : tenant;
+  if (!tenantRow || !isPublicTenantActive(tenantRow.status)) notFound();
+  const office = tenantRow?.name || "EmlakSoft";
   const signers = ((contract.signers ?? []) as SignerRow[]).slice().sort((a, b) => a.full_name.localeCompare(b.full_name, "tr"));
   const expired = isPast(contract.expires_at);
   const cancelled = contract.status === "cancelled";

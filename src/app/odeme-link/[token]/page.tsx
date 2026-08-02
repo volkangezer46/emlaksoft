@@ -5,11 +5,17 @@ import { isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { PayButtons } from "./pay-buttons";
 import { isPast, msUntil, DAY_MS } from "@/lib/clock";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 export const metadata = {
   title: "Güvenli Ödeme",
   robots: { index: false, follow: false },
 };
+
+// Ödeme/tenant durumu her açılışta canlı okunmalı; sayfa önbelleğe takılmasın
+// (sunum/[token] deseni) — aksi halde ödendi/süresi doldu/askıya alındı durumu
+// eski (cache'lenmiş) haliyle gösterilebilir.
+export const dynamic = "force-dynamic";
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -21,7 +27,10 @@ function formatDateTime(iso: string) {
   }).format(new Date(iso));
 }
 
-type TenantRel = { name?: string; phone?: string | null } | { name?: string; phone?: string | null }[] | null;
+type TenantRel =
+  | { name?: string; phone?: string | null; status?: string | null }
+  | { name?: string; phone?: string | null; status?: string | null }[]
+  | null;
 
 export default async function PublicPaymentLinkPage({
   params,
@@ -35,7 +44,7 @@ export default async function PublicPaymentLinkPage({
   const admin = createAdminClient();
   const { data: link } = await admin
     .from("payment_links")
-    .select("id, title, amount_try, status, expires_at, created_by, tenant:tenants(name, phone)")
+    .select("id, title, amount_try, status, expires_at, created_by, tenant:tenants(name, phone, status)")
     .eq("token", token)
     .maybeSingle();
 
@@ -43,6 +52,7 @@ export default async function PublicPaymentLinkPage({
 
   const tenant = link.tenant as TenantRel;
   const tenantRow = Array.isArray(tenant) ? tenant[0] : tenant;
+  if (!tenantRow || !isPublicTenantActive(tenantRow.status)) notFound();
   const office = tenantRow?.name;
   const officePhone = tenantRow?.phone ?? null;
   const officeTel = toTelHref(officePhone);

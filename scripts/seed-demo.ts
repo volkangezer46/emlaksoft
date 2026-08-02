@@ -1023,8 +1023,10 @@ async function main() {
       { subject: "Fatura PDF'i inmiyor", body: "Abonelik faturasının PDF indirme butonu hata veriyor.", category: "billing", priority: "high", status: "open", created_by: ownerId, created_at: iso(daysFromNow(-1, 10)), resolved_at: null as string | null },
       { subject: "Portal ilanı Sahibinden'e gitmedi", body: "DEMO-003 ilanını yayınladım ama Sahibinden'de görünmüyor.", category: "bug", priority: "urgent", status: "in_progress", created_by: advisorId, created_at: iso(daysFromNow(-4, 9)), resolved_at: null as string | null },
       { subject: "WhatsApp şablonu önerisi", body: "Randevu hatırlatma için hazır bir şablon eklenebilir mi?", category: "feature", priority: "normal", status: "waiting", created_by: advisorId, created_at: iso(daysFromNow(-9, 14)), resolved_at: null as string | null },
-      // resolved: created_at (6g önce) < resolved_at (2g önce) → ~4 gün çözüm süresi
-      { subject: "KVKK aydınlatma metni güncellemesi", body: "Yeni mevzuata göre metni güncellemek istiyoruz.", category: "compliance", priority: "normal", status: "resolved", created_by: ownerId, created_at: iso(daysFromNow(-6, 11)), resolved_at: iso(daysFromNow(-2, 15)) },
+      // resolved: created_at (6g önce) < resolved_at (2g önce) → ~4 gün çözüm süresi.
+      // resolution_code/summary zorunlu (support_tickets_terminal_integrity_v3 CHECK) —
+      // bu satır RPC'yi bypass eden ham insert olduğu için burada elle set edilir.
+      { subject: "KVKK aydınlatma metni güncellemesi", body: "Yeni mevzuata göre metni güncellemek istiyoruz.", category: "compliance", priority: "normal", status: "resolved", created_by: ownerId, created_at: iso(daysFromNow(-6, 11)), resolved_at: iso(daysFromNow(-2, 15)), resolution_code: "content_updated", resolution_summary: "KVKK aydınlatma metni yeni mevzuata göre güncellendi." },
     ].map((t) => ({ tenant_id: tenantId, ...t }));
     return (await insertRows("support_tickets", rows)).length;
   });

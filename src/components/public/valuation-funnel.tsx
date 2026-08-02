@@ -122,6 +122,8 @@ export function ValuationFunnel({
         low: estimate?.sufficient ? estimate.low : null,
         high: estimate?.sufficient ? estimate.high : null,
         website: honeypot,
+        // 1. adımda zaten onaylanmış KVKK durumu (checkbox tüm huniyi kapsar).
+        kvkk,
       });
       if (!res.ok) {
         setLeadError(res.error);

@@ -54,7 +54,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   // Token tahmini / kaba kuvvet koruması — IP başına dakikada 30 istek
   // (takvim uygulamaları tipik olarak 15 dk - birkaç saatte bir çeker).
   const ip = await clientIp();
-  const { allowed } = await checkRateLimit(`takvim-ics:${ip}`, { limit: 30, windowSec: 60 });
+  const { allowed } = await checkRateLimit(`takvim-ics:${ip}`, { limit: 30, windowSec: 60, failurePolicy: "deny" });
   if (!allowed) {
     return new Response("Too many requests", { status: 429 });
   }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { toE164TurkishPhone } from "@/lib/phone";
 
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   }
 
   const ip = await clientIp();
-  const { allowed } = await checkRateLimit(`vcard:${ip}`, { limit: 30, windowSec: 60 });
+  const { allowed } = await checkRateLimit(`vcard:${ip}`, { limit: 30, windowSec: 60, failurePolicy: "deny" });
   if (!allowed) {
     return NextResponse.json({ error: "Çok fazla istek. Lütfen biraz sonra tekrar deneyin." }, { status: 429 });
   }
@@ -58,9 +59,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 
   const { data: tenant } = await admin
     .from("tenants")
-    .select("name, slug")
+    .select("name, slug, status")
     .eq("id", agent.tenant_id)
     .maybeSingle();
+  if (!tenant || !isPublicTenantActive(tenant.status)) {
+    return new Response("Not found", { status: 404 });
+  }
 
   const fullName = String(agent.full_name ?? "").trim() || "Emlak danışmanı";
   const parts = fullName.split(/\s+/);

@@ -1,23 +1,50 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
-import { requireActiveTenant } from "@/lib/tenant-guard";
+import { requirePermission } from "@/lib/require-permission";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
+import { notifyTenant } from "@/lib/notify";
+import {
+  TICKET_LIMITS,
+  isTicketPriority,
+  isTicketStatus,
+  isTicketVisibility,
+  isUuid,
+  normalizeOptionalRequestId,
+  validateTicketBody,
+  validateTicketCategory,
+  validateTicketResolution,
+  validateTicketSubject,
+} from "@/lib/support/ticket-contract";
 
-async function tenantName(tenantId: string): Promise<string> {
-  const admin = createAdminClient();
-  const { data } = await admin.from("tenants").select("name").eq("id", tenantId).maybeSingle();
-  return data?.name ?? "Bir ofis";
-}
+export type TicketResult = {
+  error?: string;
+  ok?: boolean;
+  already?: boolean;
+  ticketId?: string;
+  ticketNo?: string;
+  messageId?: string;
+};
 
-export type TicketResult = { error?: string; ok?: boolean };
+type TicketMutationPayload = {
+  ok: boolean;
+  already?: boolean;
+  ticketId: string;
+  ticketNo?: string;
+  messageId?: string;
+  tenantId: string;
+  createdBy?: string | null;
+  assignedStaffId?: string | null;
+  subject: string;
+  status: string;
+  oldStatus?: string;
+};
 
-const CATEGORIES = ["general", "billing", "bug", "feature", "compliance", "onboarding"];
-const PRIORITIES = ["low", "normal", "high", "urgent"];
-const STATUSES = ["open", "in_progress", "waiting", "resolved", "closed"];
+const QUEUE_ROLES = ["super_admin", "ops", "support"] as const;
 
 function revalidateTicket(id: string) {
   revalidatePath("/app/destek");
@@ -26,86 +53,217 @@ function revalidateTicket(id: string) {
   revalidatePath(`/admin/tickets/${id}`);
 }
 
-export async function createSupportTicket(
-  _prev: TicketResult,
-  formData: FormData,
-): Promise<TicketResult> {
-  const gate = await requireActiveTenant();
-  if (!gate.ok) return { error: gate.error };
+function payloadOf(data: unknown): TicketMutationPayload | null {
+  if (!data || typeof data !== "object") return null;
+  const row = data as Record<string, unknown>;
+  if (
+    row.ok !== true ||
+    typeof row.ticketId !== "string" ||
+    typeof row.tenantId !== "string" ||
+    typeof row.subject !== "string" ||
+    typeof row.status !== "string"
+  ) {
+    return null;
+  }
+  return row as unknown as TicketMutationPayload;
+}
 
+function publicResult(payload: TicketMutationPayload): TicketResult {
+  return {
+    ok: true,
+    already: payload.already,
+    ticketId: payload.ticketId,
+    ticketNo: payload.ticketNo,
+    messageId: payload.messageId,
+  };
+}
+
+function rpcFailure(label: string, error: { code?: string; message?: string } | null, fallback: string) {
+  console.error(label, { code: error?.code ?? "unknown", message: error?.message ?? "empty result" });
+  if (error?.message?.includes("Invalid ticket transition")) return "Bu durum geçişi yapılamaz.";
+  if (error?.message?.includes("Invalid category")) return "Seçilen destek kategorisi artık kullanılamıyor.";
+  if (error?.message?.includes("Ticket not found")) return "Destek talebi bulunamadı.";
+  return fallback;
+}
+
+async function ticketRateLimit(key: string, limit: number, windowSec: number): Promise<string | null> {
+  const result = await checkRateLimit(key, { limit, windowSec, failurePolicy: "deny" });
+  return result.allowed ? null : "Çok sık işlem yapıldı. Lütfen kısa bir süre sonra yeniden deneyin.";
+}
+
+async function tenantName(tenantId: string): Promise<string> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.from("tenants").select("name").eq("id", tenantId).maybeSingle();
+  if (error) console.error("ticket tenant name", { code: error.code });
+  return data?.name ?? "Bir ofis";
+}
+
+async function notifySupportQueue(payload: TicketMutationPayload, title: string, kind: "info" | "danger" = "info") {
+  await notifyPlatformStaff({
+    title,
+    body: `${await tenantName(payload.tenantId)} · ${payload.ticketNo ?? "Destek"} · ${payload.subject}`,
+    href: `/admin/tickets/${payload.ticketId}`,
+    kind,
+    staffId: payload.assignedStaffId ?? undefined,
+    roles: [...QUEUE_ROLES],
+    meta: { ticket_id: payload.ticketId, ticket_no: payload.ticketNo },
+  });
+}
+
+async function notifyTicketRequester(
+  payload: TicketMutationPayload,
+  title: string,
+  kind: "info" | "success" | "warning" = "info",
+) {
+  await notifyTenant({
+    tenantId: payload.tenantId,
+    userId: payload.createdBy ?? null,
+    title,
+    body: `${payload.ticketNo ?? "Destek talebi"} · ${payload.subject}`,
+    href: `/app/destek/${payload.ticketId}`,
+    kind,
+    prefKey: "support",
+  });
+}
+
+function requestId(formData: FormData) {
+  return normalizeOptionalRequestId(formData.get("request_id")) ?? randomUUID();
+}
+
+function validateCreateInput(formData: FormData) {
   const subject = String(formData.get("subject") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
   const category = String(formData.get("category") ?? "general").trim();
   const priority = String(formData.get("priority") ?? "normal").trim();
+  const error =
+    validateTicketSubject(subject) ??
+    validateTicketBody(body) ??
+    validateTicketCategory(category) ??
+    (!isTicketPriority(priority) ? "Geçersiz öncelik." : null);
+  return { subject, body, category, priority, error };
+}
 
-  if (!subject || !body) return { error: "Konu ve açıklama zorunlu." };
-  if (!CATEGORIES.includes(category)) return { error: "Geçersiz kategori." };
-  if (!PRIORITIES.includes(priority)) return { error: "Geçersiz öncelik." };
+export async function createSupportTicket(
+  _prev: TicketResult,
+  formData: FormData,
+): Promise<TicketResult> {
+  const gate = await requirePermission("support", "create");
+  if (!gate.ok) return { error: gate.error };
 
-  const supabase = await createClient();
-  const { data: ticket, error } = await supabase
-    .from("support_tickets")
-    .insert({
-      tenant_id: gate.tenantId,
-      created_by: gate.userId,
-      subject,
-      body,
-      category,
-      priority,
-      status: "open",
-    })
-    .select("id")
-    .single();
+  const input = validateCreateInput(formData);
+  if (input.error) return { error: input.error };
+  const rateError = await ticketRateLimit(`ticket-create:${gate.tenantId}:${gate.userId}`, 10, 600);
+  if (rateError) return { error: rateError };
 
-  if (error || !ticket) {
-    console.error("createSupportTicket", error);
-    return { error: "Ticket oluşturulamadı." };
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("create_support_ticket_v2", {
+    p_tenant_id: gate.tenantId,
+    p_actor_id: gate.userId,
+    p_actor_kind: "tenant",
+    p_subject: input.subject,
+    p_body: input.body,
+    p_category: input.category,
+    p_priority: input.priority,
+    p_request_id: requestId(formData),
+  });
+  const payload = payloadOf(data);
+  if (error || !payload) return { error: rpcFailure("createSupportTicket", error, "Destek talebi oluşturulamadı.") };
+
+  if (!payload.already) {
+    await notifySupportQueue(
+      payload,
+      input.priority === "urgent" ? "Acil destek talebi" : "Yeni destek talebi",
+      input.priority === "urgent" ? "danger" : "info",
+    );
   }
+  revalidateTicket(payload.ticketId);
+  return publicResult(payload);
+}
 
-  await supabase.from("support_ticket_messages").insert({
-    ticket_id: ticket.id,
-    author_user_id: gate.userId,
-    author_kind: "tenant",
-    body,
+/** Platform personeli doğrulanmış bir tenant adına ticket açar. */
+export async function createSupportTicketAsStaff(
+  _prev: TicketResult,
+  formData: FormData,
+): Promise<TicketResult> {
+  const staff = await requirePlatformModule("tickets");
+  const tenantId = String(formData.get("tenant_id") ?? "").trim();
+  if (!isUuid(tenantId)) return { error: "Geçerli bir ofis seçin." };
+  const input = validateCreateInput(formData);
+  if (input.error) return { error: input.error };
+  const rateError = await ticketRateLimit(`ticket-staff-create:${staff.id}`, 30, 600);
+  if (rateError) return { error: rateError };
+
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("create_support_ticket_v2", {
+    p_tenant_id: tenantId,
+    p_actor_id: staff.id,
+    p_actor_kind: "staff",
+    p_subject: input.subject,
+    p_body: input.body,
+    p_category: input.category,
+    p_priority: input.priority,
+    p_request_id: requestId(formData),
   });
+  const payload = payloadOf(data);
+  if (error || !payload) return { error: rpcFailure("createSupportTicketAsStaff", error, "Destek talebi oluşturulamadı.") };
 
-  await notifyPlatformStaff({
-    title: priority === "urgent" ? "🚨 Acil destek talebi" : "Yeni destek talebi",
-    body: `${await tenantName(gate.tenantId)} · ${subject}`,
-    href: `/admin/tickets/${ticket.id}`,
-    kind: priority === "urgent" ? "danger" : "info",
-    meta: { ticket_id: ticket.id, category, priority },
-  });
-
-  revalidateTicket(ticket.id);
-  return { ok: true };
+  if (!payload.already) {
+    const { data: owner } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("role", "owner")
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+    await notifyTenant({
+      tenantId,
+      userId: owner?.id ?? null,
+      title: "EmlakSoft destek talebi oluşturdu",
+      body: `${payload.ticketNo ?? "Destek talebi"} · ${payload.subject}`,
+      href: `/app/destek/${payload.ticketId}`,
+      kind: "info",
+      prefKey: "support",
+    });
+  }
+  revalidateTicket(payload.ticketId);
+  return publicResult(payload);
 }
 
 export async function updateTicketStatus(formData: FormData): Promise<TicketResult> {
-  await requirePlatformModule("tickets");
-
+  const staff = await requirePlatformModule("tickets");
   const id = String(formData.get("id") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
-  if (!id || !STATUSES.includes(status)) return { error: "Geçersiz durum." };
+  const resolutionCode = String(formData.get("resolution_code") ?? "").trim();
+  const resolutionSummary = String(formData.get("resolution_summary") ?? "").trim();
+  if (!isUuid(id) || !isTicketStatus(status)) return { error: "Geçersiz durum." };
+  const resolutionError = validateTicketResolution(status, resolutionCode, resolutionSummary);
+  if (resolutionError) return { error: resolutionError };
+  const rateError = await ticketRateLimit(`ticket-staff-status:${staff.id}`, 60, 300);
+  if (rateError) return { error: rateError };
 
   const admin = createAdminClient();
-  const patch: Record<string, unknown> = {
-    status,
-    updated_at: new Date().toISOString(),
-  };
-  if (status === "resolved" || status === "closed") {
-    patch.resolved_at = new Date().toISOString();
+  const { data, error } = await admin.rpc("transition_support_ticket_v2", {
+    p_ticket_id: id,
+    p_tenant_id: null,
+    p_actor_id: staff.id,
+    p_actor_kind: "staff",
+    p_status: status,
+    p_resolution_code: resolutionCode || null,
+    p_resolution_summary: resolutionSummary || null,
+  });
+  const payload = payloadOf(data);
+  if (error || !payload) return { error: rpcFailure("updateTicketStatus", error, "Durum güncellenemedi.") };
+
+  if (!payload.already && ["resolved", "closed", "open"].includes(status)) {
+    await notifyTicketRequester(
+      payload,
+      status === "resolved" ? "Destek talebiniz çözüldü" : status === "closed" ? "Destek talebiniz kapatıldı" : "Destek talebiniz yeniden açıldı",
+      status === "resolved" ? "success" : "info",
+    );
   }
-
-  const { error } = await admin.from("support_tickets").update(patch).eq("id", id);
-  if (error) return { error: "Durum güncellenemedi." };
-
   revalidateTicket(id);
-  return { ok: true };
-}
-
-export async function setTicketStatus(formData: FormData): Promise<void> {
-  await updateTicketStatus(formData);
+  return publicResult(payload);
 }
 
 export async function replyTicketAsStaff(
@@ -115,121 +273,121 @@ export async function replyTicketAsStaff(
   const staff = await requirePlatformModule("tickets");
   const id = String(formData.get("id") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
-  if (!id || !body) return { error: "Yanıt boş olamaz." };
+  const visibilityRaw = String(formData.get("visibility") ?? "public").trim();
+  if (!isUuid(id)) return { error: "Destek talebi bulunamadı." };
+  const bodyError = validateTicketBody(body);
+  if (bodyError) return { error: bodyError };
+  if (!isTicketVisibility(visibilityRaw)) return { error: "Geçersiz mesaj görünürlüğü." };
+  const rateError = await ticketRateLimit(`ticket-staff-reply:${staff.id}`, 60, 300);
+  if (rateError) return { error: rateError };
 
   const admin = createAdminClient();
-  const { data: ticket } = await admin
-    .from("support_tickets")
-    .select("id, status")
-    .eq("id", id)
-    .maybeSingle();
-  if (!ticket) return { error: "Ticket bulunamadı." };
-  if (ticket.status === "closed") return { error: "Kapalı ticket’a yanıt eklenemez." };
-
-  const { error: msgErr } = await admin.from("support_ticket_messages").insert({
-    ticket_id: id,
-    author_user_id: staff.id,
-    author_kind: "staff",
-    body,
+  const { data, error } = await admin.rpc("reply_support_ticket_v2", {
+    p_ticket_id: id,
+    p_tenant_id: null,
+    p_actor_id: staff.id,
+    p_actor_kind: "staff",
+    p_body: body,
+    p_visibility: visibilityRaw,
+    p_request_id: requestId(formData),
   });
-  if (msgErr) return { error: "Yanıt eklenemedi." };
+  const payload = payloadOf(data);
+  if (error || !payload) return { error: rpcFailure("replyTicketAsStaff", error, "Yanıt eklenemedi.") };
 
-  await admin
-    .from("support_tickets")
-    .update({
-      status: "waiting",
-      updated_at: new Date().toISOString(),
-      assigned_to: staff.id,
-    })
-    .eq("id", id);
-
+  if (!payload.already && visibilityRaw === "public") {
+    await notifyTicketRequester(payload, "Destek ekibinden yeni yanıt");
+  }
   revalidateTicket(id);
-  return { ok: true };
+  return publicResult(payload);
 }
 
-/** Tenant kendi ticket'ını kapatabilir veya (çözüldü/kapandı ise) yeniden açabilir. */
+/** Tenant kendi ticket'ını kapatabilir veya sonuçlanan ticketı yeniden açabilir. */
 export async function setTicketStatusAsTenant(formData: FormData): Promise<TicketResult> {
-  const gate = await requireActiveTenant();
+  const gate = await requirePermission("support", "edit");
   if (!gate.ok) return { error: gate.error };
-
   const id = String(formData.get("id") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
-  if (!id) return { error: "Ticket bulunamadı." };
-  if (!["open", "closed"].includes(status)) return { error: "Bu işlem yapılamaz." };
+  if (!isUuid(id) || !["open", "closed"].includes(status)) return { error: "Bu işlem yapılamaz." };
+  const rateError = await ticketRateLimit(`ticket-tenant-status:${gate.userId}`, 30, 300);
+  if (rateError) return { error: rateError };
 
-  const supabase = await createClient();
-  const { data: ticket } = await supabase
-    .from("support_tickets")
-    .select("id, tenant_id, status")
-    .eq("id", id)
-    .maybeSingle();
-  if (!ticket || ticket.tenant_id !== gate.tenantId) return { error: "Ticket bulunamadı." };
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("transition_support_ticket_v2", {
+    p_ticket_id: id,
+    p_tenant_id: gate.tenantId,
+    p_actor_id: gate.userId,
+    p_actor_kind: "tenant",
+    p_status: status,
+    p_resolution_code: status === "closed" ? "closed_by_customer" : null,
+    p_resolution_summary: status === "closed" ? "Müşteri talebi kapattı." : null,
+  });
+  const payload = payloadOf(data);
+  if (error || !payload) return { error: rpcFailure("setTicketStatusAsTenant", error, "Durum güncellenemedi.") };
 
-  const patch: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
-  if (status === "closed") patch.resolved_at = new Date().toISOString();
-  if (status === "open") patch.resolved_at = null;
-
-  const { error } = await supabase
-    .from("support_tickets")
-    .update(patch)
-    .eq("id", id)
-    .eq("tenant_id", gate.tenantId);
-  if (error) return { error: "Durum güncellenemedi." };
-
+  if (!payload.already) {
+    await notifySupportQueue(payload, status === "open" ? "Destek talebi yeniden açıldı" : "Destek talebi müşteri tarafından kapatıldı");
+  }
   revalidateTicket(id);
-  return { ok: true };
-}
-
-export async function setTicketStatusTenantAction(formData: FormData): Promise<void> {
-  await setTicketStatusAsTenant(formData);
+  return publicResult(payload);
 }
 
 export async function replyTicketAsTenant(
   _prev: TicketResult,
   formData: FormData,
 ): Promise<TicketResult> {
-  const gate = await requireActiveTenant();
+  const gate = await requirePermission("support", "edit");
   if (!gate.ok) return { error: gate.error };
-
   const id = String(formData.get("id") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
-  if (!id || !body) return { error: "Yanıt boş olamaz." };
+  if (!isUuid(id)) return { error: "Destek talebi bulunamadı." };
+  const bodyError = validateTicketBody(body);
+  if (bodyError) return { error: bodyError };
+  const rateError = await ticketRateLimit(`ticket-tenant-reply:${gate.tenantId}:${gate.userId}`, 30, 300);
+  if (rateError) return { error: rateError };
 
-  const supabase = await createClient();
-  const { data: ticket } = await supabase
-    .from("support_tickets")
-    .select("id, status, tenant_id")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (!ticket || ticket.tenant_id !== gate.tenantId) {
-    return { error: "Ticket bulunamadı." };
-  }
-  if (ticket.status === "closed" || ticket.status === "resolved") {
-    return { error: "Bu ticket kapatılmış. Yeni talep açabilirsiniz." };
-  }
-
-  const { error: msgErr } = await supabase.from("support_ticket_messages").insert({
-    ticket_id: id,
-    author_user_id: gate.userId,
-    author_kind: "tenant",
-    body,
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("reply_support_ticket_v2", {
+    p_ticket_id: id,
+    p_tenant_id: gate.tenantId,
+    p_actor_id: gate.userId,
+    p_actor_kind: "tenant",
+    p_body: body,
+    p_visibility: "public",
+    p_request_id: requestId(formData),
   });
-  if (msgErr) return { error: "Yanıt eklenemedi." };
+  const payload = payloadOf(data);
+  if (error || !payload) return { error: rpcFailure("replyTicketAsTenant", error, "Yanıt eklenemedi.") };
 
-  await supabase
-    .from("support_tickets")
-    .update({ status: "in_progress", updated_at: new Date().toISOString() })
-    .eq("id", id);
-
-  await notifyPlatformStaff({
-    title: "Destek talebine yanıt geldi",
-    body: `${await tenantName(gate.tenantId)} bir ticket'a yanıt yazdı.`,
-    href: `/admin/tickets/${id}`,
-    kind: "info",
-    meta: { ticket_id: id },
-  });
-
+  if (!payload.already) await notifySupportQueue(payload, "Destek talebine yanıt geldi");
   revalidateTicket(id);
-  return { ok: true };
+  return publicResult(payload);
+}
+
+export async function submitTicketCsat(
+  _prev: TicketResult,
+  formData: FormData,
+): Promise<TicketResult> {
+  const gate = await requirePermission("support", "view");
+  if (!gate.ok) return { error: gate.error };
+  const id = String(formData.get("id") ?? "").trim();
+  const score = Number.parseInt(String(formData.get("score") ?? ""), 10);
+  const comment = String(formData.get("comment") ?? "").trim();
+  if (!isUuid(id) || !Number.isInteger(score) || score < 1 || score > 5) return { error: "Geçerli bir puan seçin." };
+  if (comment.length > TICKET_LIMITS.csatCommentMax) return { error: "Yorum en fazla 1.000 karakter olabilir." };
+  const rateError = await ticketRateLimit(`ticket-csat:${gate.tenantId}:${gate.userId}`, 10, 600);
+  if (rateError) return { error: rateError };
+
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("submit_support_ticket_csat_v2", {
+    p_ticket_id: id,
+    p_tenant_id: gate.tenantId,
+    p_actor_id: gate.userId,
+    p_score: score,
+    p_comment: comment || null,
+  });
+  if (error || !data || typeof data !== "object") {
+    return { error: rpcFailure("submitTicketCsat", error, "Değerlendirmeniz kaydedilemedi.") };
+  }
+  revalidateTicket(id);
+  return { ok: true, already: (data as Record<string, unknown>).already === true, ticketId: id };
 }
