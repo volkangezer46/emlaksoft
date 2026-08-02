@@ -35,6 +35,13 @@ const nextConfig: NextConfig = {
     // Navigasyonlarda tarayıcının View Transitions API'si devreye girer;
     // desteklemeyen tarayıcıda hiçbir şey değişmez (progressive enhancement).
     viewTransition: true,
+    // Next 15+'ta dinamik sayfaların istemci router cache TTL'i varsayılan 0sn
+    // (docs: 01-next-config-js/staleTimes.md) — /app ve /admin'in tamamı auth/cookie
+    // gerektirdiği için "dinamik" sayılıyor, yani her tık (geri/ileri dahil) sunucuya
+    // sıfırdan gidiyordu. 30sn içinde tekrar ziyaret edilen bir segment artık
+    // önbellekten anında açılır (bu tamamen istemci tarafı, tek oturuma özel bellek
+    // önbelleği — sunucudaki no-store Cache-Control başlıklarını etkilemez).
+    staleTimes: { dynamic: 30 },
     // Barrel-import maliyetini düşür: yalnızca kullanılan alt modüller derlenir.
     // Buradaki her paket gerçekten kurulu olmalı — aksi halde satır ölü kalır.
     optimizePackageImports: [
@@ -63,16 +70,6 @@ const nextConfig: NextConfig = {
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
           // Gereksiz güçlü API'leri kapat
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self), interest-cohort=()" },
-        ],
-      },
-      // Statik varlıklar — uzun cache
-      {
-        source: "/_next/static/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
         ],
       },
       // API route'ları — cache yok
