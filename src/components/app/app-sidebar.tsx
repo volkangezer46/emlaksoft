@@ -5,12 +5,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 // Doğrudan lucide import'u yalnızca KAVRAMSAL OLMAYAN öğeler için kalır
 // (hesap makinesi, chevron, hamburger, kapat, kıvılcım süsü).
-import { BadgeCheck, Calculator, ChevronRight, Globe, LayoutDashboard, LineChart, ListFilter, Menu, Sparkles, Sunrise, Trophy, Tv, X } from "lucide-react";
+import { BadgeCheck, Calculator, CalendarOff, ChevronRight, Globe, IdCard, KeySquare, LayoutDashboard, LineChart, ListFilter, Megaphone, Menu, MessagesSquare, Presentation, Sparkles, Stamp, Sunrise, Trophy, Tv, Workflow, X } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar (müşteri, portföy, randevu…)
 // `src/lib/icons.ts` sözlüğünden gelir; sidebar bu sözlüğün referans
 // uygulamasıdır — bir kavramın ikonu değişirse tek yerden değişir.
 import { ICONS } from "@/lib/icons";
 import type { AppModule } from "@/lib/permissions";
+import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
 
 type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; module: AppModule };
 
@@ -40,6 +41,8 @@ const navGroups: { title: string; items: NavItem[] }[] = [
     title: "Portföy",
     items: [
       { href: "/app/portfoyler",   label: "Portföyler",    icon: ICONS.portfoy,     module: "properties" },
+      { href: "/app/portfoyler/anahtarlar", label: "Anahtar Takibi", icon: KeySquare,    module: "properties" },
+      { href: "/app/portfoyler/sunumlar",   label: "Sunumlar",       icon: Presentation, module: "properties" },
       { href: "/app/portallar",    label: "Portal Kontrol",icon: ICONS.portal,      module: "portals" },
       { href: "/app/acik-ev",      label: "Açık Ev",       icon: ICONS.acikEv,      module: "open_house" },
       { href: "/app/kiralama",     label: "Kiralama",      icon: ICONS.anahtar,     module: "rentals" },
@@ -79,6 +82,8 @@ const navGroups: { title: string; items: NavItem[] }[] = [
     title: "Yönetim",
     items: [
       { href: "/app/ekip",         label: "Ekip",          icon: ICONS.ekip,        module: "team" },
+      { href: "/app/ekip/kartvizitim", label: "Kartvizitim", icon: IdCard,         module: "team" },
+      { href: "/app/ekip/izinler",  label: "İzinler",       icon: CalendarOff,      module: "team" },
       { href: "/app/otomasyonlar", label: "Otomasyonlar",  icon: ICONS.otomasyon,   module: "settings" },
       { href: "/app/kampanyalar",  label: "Kampanyalar",   icon: ICONS.mesaj,       module: "campaigns" },
       { href: "/app/uyum",         label: "Uyum",          icon: ICONS.uyum,        module: "compliance" },
@@ -87,6 +92,10 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { href: "/app/denetim",      label: "Denetim",       icon: ICONS.denetim,     module: "settings" },
       { href: "/app/destek",       label: "Destek",        icon: ICONS.destek,      module: "support" },
       { href: "/app/ayarlar",      label: "Ayarlar",       icon: ICONS.ayar,        module: "settings" },
+      { href: "/app/ayarlar/filigran",         label: "Filigran",         icon: Stamp,          module: "settings" },
+      { href: "/app/ayarlar/mesaj-sablonlari", label: "Mesaj Şablonları", icon: MessagesSquare, module: "settings" },
+      { href: "/app/ayarlar/is-akislari",      label: "İş Akışları",      icon: Workflow,       module: "settings" },
+      { href: "/app/ayarlar/duyurular",        label: "Duyurular",        icon: Megaphone,      module: "settings" },
     ],
   },
 ];
@@ -125,11 +134,12 @@ export function AppSidebar({
       <Link
         key={item.href}
         href={item.href}
+        aria-current={active ? "page" : undefined}
         onClick={() => setOpen(false)}
         onMouseEnter={() => router.prefetch(item.href)}
         onFocus={() => router.prefetch(item.href)}
         className={`group relative flex items-center gap-3 overflow-hidden rounded-[11px] px-3 py-2.5 text-sm transition ${
-          active ? "bg-white/10 font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]" : "text-white/70 hover:bg-white/6 hover:text-white"
+          active ? "bg-white/10 font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]" : "text-white/80 hover:bg-white/6 hover:text-white"
         }`}
       >
         {active ? <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-mint-400" /> : null}
@@ -156,7 +166,7 @@ export function AppSidebar({
         {showHome ? <nav className="space-y-1">{renderItem(anaEkran)}{renderItem(brifing)}{renderItem(aiAsistan)}</nav> : null}
         {groups.map((group) => (
           <div key={group.title} className="mt-5 first:mt-0">
-            <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/45">{group.title}</p>
+            <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/70">{group.title}</p>
             <nav className="mt-2 space-y-1">{group.items.map(renderItem)}</nav>
           </div>
         ))}
@@ -172,7 +182,7 @@ export function AppSidebar({
           <p className="relative mt-2 truncate text-sm font-bold text-white">{officeName}</p>
           <div className="relative mt-3 flex items-center justify-between">
             <span className="rounded-full bg-mint-400/12 px-2 py-1 text-[11px] font-semibold text-mint-400">{plan}</span>
-            <span className="text-[11px] text-white/35">
+            <span className="text-[11px] text-white/65">
               {officeScore != null ? `Skor ${officeScore}` : "Skor —"}
             </span>
           </div>
@@ -191,22 +201,24 @@ export function AppSidebar({
   ].filter((t) => accessibleModules.includes(t.module));
 
   return (
-    <>
-      <button type="button" onClick={() => setOpen(true)} className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-10 w-10 place-items-center rounded-[11px] bg-ink-950 text-white shadow-[var(--shadow-card)] md:hidden" aria-label="Panel menüsünü aç">
-        <Menu className="h-5 w-5" />
-      </button>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button type="button" className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-10 w-10 place-items-center rounded-[11px] bg-ink-950 text-white shadow-[var(--shadow-card)] md:hidden" aria-label="Panel menüsünü aç">
+          <Menu className="h-5 w-5" />
+        </button>
+      </DialogTrigger>
       <aside className="hidden w-[260px] shrink-0 flex-col bg-[linear-gradient(180deg,#071a38_0%,#041127_100%)] md:flex">
         {content}
       </aside>
-      {open ? (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <button type="button" aria-label="Menüyü kapat" onClick={() => setOpen(false)} className="absolute inset-0 bg-ink-950/55 backdrop-blur-sm" />
-          <aside className="relative flex h-full w-[280px] flex-col bg-[linear-gradient(180deg,#071a38_0%,#041127_100%)] shadow-[var(--shadow-lg)]">
-            <button type="button" onClick={() => setOpen(false)} className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-[10px] bg-white/8 text-white/70" aria-label="Kapat"><X className="h-5 w-5" /></button>
-            {content}
-          </aside>
-        </div>
-      ) : null}
+      <DialogDrawerContent id="app-mobile-navigation" aria-describedby={undefined}>
+        <DialogTitleHidden>Panel menüsü</DialogTitleHidden>
+        <aside className="flex h-full flex-col bg-[linear-gradient(180deg,#071a38_0%,#041127_100%)]">
+          <DialogClose asChild>
+            <button type="button" className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-[10px] bg-white/8 text-white/80" aria-label="Kapat"><X className="h-5 w-5" /></button>
+          </DialogClose>
+          {content}
+        </aside>
+      </DialogDrawerContent>
       <nav
         aria-label="Mobil hızlı gezinme"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-line/70 bg-surface/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
@@ -218,6 +230,7 @@ export function AppSidebar({
               <Link
                 key={tab.href}
                 href={tab.href}
+                aria-current={active ? "page" : undefined}
                 onClick={() => setOpen(false)}
                 className={`flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold transition ${
                   active ? "text-brand-600" : "text-text-faint hover:text-ink-950"
@@ -230,18 +243,16 @@ export function AppSidebar({
               </Link>
             );
           })}
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold text-text-faint transition hover:text-ink-950"
-          >
-            <span className="grid h-7 w-11 place-items-center rounded-full">
-              <Menu className="h-[18px] w-[18px]" />
-            </span>
-            Menü
-          </button>
+          <DialogTrigger asChild>
+            <button type="button" className="flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold text-text-faint transition hover:text-ink-950">
+              <span className="grid h-7 w-11 place-items-center rounded-full">
+                <Menu className="h-[18px] w-[18px]" />
+              </span>
+              Menü
+            </button>
+          </DialogTrigger>
         </div>
       </nav>
-    </>
+    </Dialog>
   );
 }

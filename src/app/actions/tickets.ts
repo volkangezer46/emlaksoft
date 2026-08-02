@@ -80,10 +80,21 @@ function publicResult(payload: TicketMutationPayload): TicketResult {
 
 function rpcFailure(label: string, error: { code?: string; message?: string } | null, fallback: string) {
   console.error(label, { code: error?.code ?? "unknown", message: error?.message ?? "empty result" });
+  if (error?.message?.includes("VERSION_CONFLICT")) {
+    return "Bu talep az önce başka biri tarafından güncellendi. Sayfayı yenileyip tekrar deneyin.";
+  }
   if (error?.message?.includes("Invalid ticket transition")) return "Bu durum geçişi yapılamaz.";
   if (error?.message?.includes("Invalid category")) return "Seçilen destek kategorisi artık kullanılamıyor.";
   if (error?.message?.includes("Ticket not found")) return "Destek talebi bulunamadı.";
   return fallback;
+}
+
+/** `version` alanı formda varsa optimistic-concurrency kontrolü için RPC'ye iletilir. */
+function expectedVersion(formData: FormData): number | null {
+  const raw = formData.get("expected_version");
+  if (raw == null) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
 }
 
 async function ticketRateLimit(key: string, limit: number, windowSec: number): Promise<string | null> {
@@ -251,6 +262,7 @@ export async function updateTicketStatus(formData: FormData): Promise<TicketResu
     p_status: status,
     p_resolution_code: resolutionCode || null,
     p_resolution_summary: resolutionSummary || null,
+    p_expected_version: expectedVersion(formData),
   });
   const payload = payloadOf(data);
   if (error || !payload) return { error: rpcFailure("updateTicketStatus", error, "Durum güncellenemedi.") };
@@ -290,6 +302,7 @@ export async function replyTicketAsStaff(
     p_body: body,
     p_visibility: visibilityRaw,
     p_request_id: requestId(formData),
+    p_expected_version: expectedVersion(formData),
   });
   const payload = payloadOf(data);
   if (error || !payload) return { error: rpcFailure("replyTicketAsStaff", error, "Yanıt eklenemedi.") };
@@ -320,6 +333,7 @@ export async function setTicketStatusAsTenant(formData: FormData): Promise<Ticke
     p_status: status,
     p_resolution_code: status === "closed" ? "closed_by_customer" : null,
     p_resolution_summary: status === "closed" ? "Müşteri talebi kapattı." : null,
+    p_expected_version: expectedVersion(formData),
   });
   const payload = payloadOf(data);
   if (error || !payload) return { error: rpcFailure("setTicketStatusAsTenant", error, "Durum güncellenemedi.") };
@@ -354,6 +368,7 @@ export async function replyTicketAsTenant(
     p_body: body,
     p_visibility: "public",
     p_request_id: requestId(formData),
+    p_expected_version: expectedVersion(formData),
   });
   const payload = payloadOf(data);
   if (error || !payload) return { error: rpcFailure("replyTicketAsTenant", error, "Yanıt eklenemedi.") };

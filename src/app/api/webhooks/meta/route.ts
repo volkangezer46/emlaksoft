@@ -5,12 +5,18 @@ import {
   readRequestBodyLimited,
   requestBodyTooLarge,
 } from "@/lib/public-request-security";
+import { ingestMetaInboundMessage, type MetaInboundMessage } from "@/lib/webhooks/meta-inbound";
 
 /**
- * Meta (WhatsApp Business / Messenger) webhook iskeleti.
+ * Meta (WhatsApp Business) webhook ucu.
  *
  * GET  → Meta'nın webhook doğrulama el sıkışması (hub.challenge yansıtma).
- * POST → X-Hub-Signature-256 imza kontrolü + gövde özeti log; işleme henüz YOK.
+ * POST → X-Hub-Signature-256 imza kontrolü, sonra her `messages[]` girdisi
+ *        Netgsm SMS inbound akışıyla aynı iskeletle (bkz. meta-inbound.ts)
+ *        `communications` tablosuna yazılır. Tenant SADECE Meta'nın
+ *        phone_number_id'sinden çözülür — müşteri numarasından asla.
+ *        Delivery/read status webhook'ları (`value.statuses[]`) kasıtlı
+ *        olarak ele alınmıyor; giden WhatsApp gönderimi henüz yok.
  *
  * Env:
  *   META_VERIFY_TOKEN — Meta panelinde webhook kurarken girilen doğrulama token'ı
@@ -75,29 +81,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "bad_signature" }, { status: 401 });
   }
 
-  // Gövde özeti — hata logu DEĞİL, gözlem amaçlı console kaydı:
-  // hangi obje/alan geldiğini görmek entegrasyonu bağlarken yol gösterir.
-  try {
-    const body = JSON.parse(rawBody) as {
-      object?: string;
-      entry?: { id?: string; changes?: { field?: string }[] }[];
+  type MetaChange = {
+    field?: string;
+    value?: {
+      metadata?: { phone_number_id?: string };
+      messages?: MetaInboundMessage[];
     };
-    console.log("[meta-webhook] alındı:", {
-      object: body.object ?? null,
-      entries: body.entry?.length ?? 0,
-      fields: (body.entry ?? []).flatMap((e) => (e.changes ?? []).map((c) => c.field ?? "?")),
-    });
+  };
+  let body: { object?: string; entry?: { id?: string; changes?: MetaChange[] }[] };
+  try {
+    body = JSON.parse(rawBody) as typeof body;
   } catch {
     console.log("[meta-webhook] alındı: JSON olmayan gövde,", rawBody.length, "bayt");
+    return NextResponse.json({ ok: true });
   }
 
-  // STUB: WhatsApp Business hesabı bağlanınca ingest buraya —
-  // entry[].changes[].value.messages[] içinden from/text okunup, Netgsm SMS
-  // akışındaki gibi ingestInboundWhatsapp(...) benzeri bir service-role
-  // fonksiyonuyla communications tablosuna (channel: 'whatsapp',
-  // direction: 'inbound') yazılacak. Tenant eşlemesi burada daha net olacak:
-  // entry[].id (WABA/phone_number_id) → tenant_integrations(provider:'whatsapp')
-  // kaydındaki credentials ile birebir eşlenebilir.
+  let ingested = 0;
+  let quarantined = 0;
+  for (const entry of body.entry ?? []) {
+    for (const change of entry.changes ?? []) {
+      const phoneNumberId = change.value?.metadata?.phone_number_id ?? null;
+      for (const message of change.value?.messages ?? []) {
+        const result = await ingestMetaInboundMessage(message, phoneNumberId, change as unknown as Record<string, unknown>);
+        if (result.quarantined) quarantined += 1;
+        else if (result.ok) ingested += 1;
+      }
+    }
+  }
+  console.log("[meta-webhook] alındı:", { object: body.object ?? null, ingested, quarantined });
 
   return NextResponse.json({ ok: true });
 }

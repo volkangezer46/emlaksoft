@@ -89,11 +89,20 @@ export async function getTicketCategoriesForTenant(
   }
 }
 
+/** `version` formda varsa optimistic-concurrency kontrolü için RPC'ye iletilir. */
+function expectedVersion(formData: FormData): number | null {
+  const raw = formData.get("expected_version");
+  if (raw == null) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
 async function updateAdminField(
   staffId: string,
   ticketId: string,
   field: "priority" | "category" | "assigned_staff_id",
   value: string,
+  expectedVersionValue: number | null,
 ): Promise<AdminTicketOpsResult> {
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("admin_update_support_ticket_v2", {
@@ -101,10 +110,14 @@ async function updateAdminField(
     p_actor_id: staffId,
     p_field: field,
     p_value: value,
+    p_expected_version: expectedVersionValue,
   });
   const payload = adminPayload(data);
   if (error || !payload) {
     console.error("admin ticket update", { field, code: error?.code ?? "unknown", message: error?.message ?? "empty result" });
+    if (error?.message?.includes("VERSION_CONFLICT")) {
+      return { error: "Bu talep az önce başka biri tarafından güncellendi. Sayfayı yenileyip tekrar deneyin." };
+    }
     return { error: field === "assigned_staff_id" ? "Atama kaydedilemedi." : "Destek talebi güncellenemedi." };
   }
   revalidateTicketPages(ticketId);
@@ -120,7 +133,7 @@ export async function assignTicketStaff(formData: FormData): Promise<AdminTicket
   const rateError = await adminRate(staff.id, "assign");
   if (rateError) return { error: rateError };
 
-  const result = await updateAdminField(staff.id, id, "assigned_staff_id", staffId);
+  const result = await updateAdminField(staff.id, id, "assigned_staff_id", staffId, expectedVersion(formData));
   if (result.ok && staffId) {
     await notifyPlatformStaff({
       staffId,
@@ -142,7 +155,7 @@ export async function updateTicketPriority(formData: FormData): Promise<AdminTic
   if (!isUuid(id) || !isTicketPriority(priority)) return { error: "Geçersiz öncelik." };
   const rateError = await adminRate(staff.id, "priority");
   if (rateError) return { error: rateError };
-  return updateAdminField(staff.id, id, "priority", priority);
+  return updateAdminField(staff.id, id, "priority", priority, expectedVersion(formData));
 }
 
 export async function updateTicketCategory(formData: FormData): Promise<AdminTicketOpsResult> {
@@ -154,7 +167,7 @@ export async function updateTicketCategory(formData: FormData): Promise<AdminTic
   if (categoryError) return { error: categoryError };
   const rateError = await adminRate(staff.id, "category");
   if (rateError) return { error: rateError };
-  return updateAdminField(staff.id, id, "category", category);
+  return updateAdminField(staff.id, id, "category", category, expectedVersion(formData));
 }
 
 /** Internal note is stored as a staff message hidden by tenant RLS and Realtime. */

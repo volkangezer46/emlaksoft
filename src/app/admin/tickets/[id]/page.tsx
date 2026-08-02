@@ -323,7 +323,7 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-brand-600/10 text-brand-700"><MessageSquareText className="h-4 w-4" /></span>
               <div><h2 className="font-display text-sm font-bold text-ink-950">Yanıt veya iç not ekle</h2><p className="mt-0.5 text-xs text-text-muted">Müşteri yanıtı bildirime gider; iç not yalnız destek ekibinde kalır.</p></div>
             </div>
-            <div className="mt-4"><StaffReplyForm ticketId={ticket.id} closed={ticket.status === "closed"} macros={macros} /></div>
+            <div className="mt-4"><StaffReplyForm ticketId={ticket.id} closed={ticket.status === "closed"} macros={macros} version={ticket.version} /></div>
           </section>
         </main>
 
@@ -339,6 +339,7 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
               priority={ticket.priority}
               category={ticket.category}
               categoryOptions={categoryOptions}
+              version={ticket.version}
             />
           </section>
 
