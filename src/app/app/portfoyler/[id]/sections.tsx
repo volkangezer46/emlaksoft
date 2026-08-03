@@ -385,6 +385,7 @@ export async function HealthSection({
 
   const propertyHealth = computePropertyHealth({
     title: input.title,
+    description: input.description,
     property_type: input.property_type,
     transaction_type: input.transaction_type,
     list_price: input.list_price,

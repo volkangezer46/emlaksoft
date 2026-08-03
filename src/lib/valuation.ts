@@ -38,6 +38,11 @@ export async function estimateMultiSourceValue(input: {
   propertyType?: string | null;
   transactionType?: string | null;
   excludePropertyId?: string | null;
+  /** Emsal düzeltme katsayıları için hedefin kendi özellikleri (opsiyonel). */
+  targetFloor?: number | null;
+  targetBuildingAge?: number | null;
+  targetHeating?: string | null;
+  targetFacade?: string | null;
 }): Promise<MultiSourceValuation> {
   const sources: ValuationSource[] = [];
   const list = input.listPrice && input.listPrice > 0 ? input.listPrice : null;
@@ -69,6 +74,10 @@ export async function estimateMultiSourceValue(input: {
       transactionType: input.transactionType ?? null,
       sqm,
       excludePropertyId: input.excludePropertyId ?? null,
+      targetFloor: input.targetFloor ?? null,
+      targetBuildingAge: input.targetBuildingAge ?? null,
+      targetHeating: input.targetHeating ?? null,
+      targetFacade: input.targetFacade ?? null,
     });
 
     if (comparables.estimatedValue && comparables.confidence !== "yetersiz") {

@@ -62,10 +62,11 @@ async function refreshPriceHealth(admin: ReturnType<typeof createAdminClient>): 
     perTenant.set(tenantId, used + 1);
 
     try {
+      const feat = row.features as Record<string, unknown> | null;
       const health = await resolvePriceHealth(admin, {
         tenantId,
         listPrice: row.list_price != null ? Number(row.list_price) : null,
-        sqm: sqmFromFeatures(row.features as Record<string, unknown> | null),
+        sqm: sqmFromFeatures(feat),
         districtId: row.district_id ? String(row.district_id) : null,
         propertyType: row.property_type,
         transactionType: row.transaction_type,
@@ -73,6 +74,10 @@ async function refreshPriceHealth(admin: ReturnType<typeof createAdminClient>): 
           relName(row.district as { name?: string } | { name?: string }[] | null) ??
           relName(row.province as { name?: string } | { name?: string }[] | null),
         excludePropertyId: row.id,
+        targetFloor: feat?.floor != null ? Number(feat.floor) : null,
+        targetBuildingAge: feat?.building_age != null ? Number(feat.building_age) : null,
+        targetHeating: (feat?.heating as string | undefined) ?? null,
+        targetFacade: (feat?.facade as string | undefined) ?? null,
       });
       // 'pending' tekrar yazılmaz: kolon null kalır, sonraki tur (m² gelince) yeniden dener.
       if (health === "pending") continue;

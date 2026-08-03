@@ -5,21 +5,65 @@ export type LostSaleLead = {
   id:         string;
   full_name:  string;
   phone:      string | null;
-  reason:     "no_follow_up" | "no_match_sent" | "no_call" | "overdue_demand";
+  reason:     "no_follow_up" | "no_match_sent" | "no_call" | "overdue_demand" | "fragile_deal_type";
   reasonLabel: string;
   daysSince:  number;
   urgency:    "critical" | "warning";
 };
 
+export type FragileDealType = "sale" | "rent";
+
+const TRANSACTION_TO_DEAL_TYPE: Record<string, FragileDealType> = {
+  "Satılık": "sale",
+  "Kiralık": "rent",
+};
+
+const FRAGILE_LABEL: Record<FragileDealType, string> = {
+  sale: "Satılık",
+  rent: "Kiralık",
+};
+
+/**
+ * Kapanan (won/lost) anlaşmalardan hangi işlem türünün (satılık/kiralık)
+ * kırılgan olduğunu çıkarır — `kayip-satis` sayfasındaki "kaçan fırsat
+ * radarı" içgörüsüyle AYNI eşik (min 4 kapanış, kayıp oranı ≥ %50). Tek
+ * kaynak burada tutulur; sayfa hem bu fonksiyonu hem ondan türeyen ofis
+ * geneli içgörüyü kullanır — iki ayrı hesap yolu birbirinden sapmasın.
+ */
+export function computeFragileDealType(
+  deals: { stage: string; deal_type: string | null }[],
+): FragileDealType | null {
+  const byType = new Map<FragileDealType, { lost: number; won: number }>();
+  for (const d of deals) {
+    if (d.deal_type !== "sale" && d.deal_type !== "rent") continue;
+    const rec = byType.get(d.deal_type) ?? { lost: 0, won: 0 };
+    if (d.stage === "lost") rec.lost += 1;
+    else if (d.stage === "won") rec.won += 1;
+    byType.set(d.deal_type, rec);
+  }
+  const fragile = [...byType.entries()]
+    .filter(([, v]) => v.lost + v.won >= 4 && v.lost / (v.lost + v.won) >= 0.5)
+    .sort((a, b) => b[1].lost / (b[1].lost + b[1].won) - a[1].lost / (a[1].lost + a[1].won))[0];
+  return fragile ? fragile[0] : null;
+}
+
 /**
  * Kayıp satış riski taşıyan müşterileri tespit eder.
- * 
+ *
  * Kriterler:
  * 1. Son 14+ gün hiç çağrı/iletişim kaydı yok (aktif talep varken)
  * 2. Aktif talebi olan ama hiç portföy eşleşmesi gönderilmemiş müşteriler
  * 3. 30+ gün önce oluşturulan ama hâlâ "new" statüsünde talepler
+ * 4. `fragileDealType` verildiyse (kaçan fırsat radarının ofis geneli
+ *    deseni, bkz. `computeFragileDealType`): o işlem türünde aktif talebi
+ *    olan ama ilk 3 kural hiçbirine girmeyen müşteriler — mined deseni CANLI
+ *    bir kayda bağlayan tek yer burası (önceden yalnız ofis geneli kart
+ *    olarak gösteriliyordu, hiçbir talebe geri bağlanmıyordu).
  */
-export async function detectLostSaleRisks(limit = 20): Promise<LostSaleLead[]> {
+export async function detectLostSaleRisks(
+  limit = 20,
+  fragileDealType?: FragileDealType | null,
+): Promise<LostSaleLead[]> {
   const gate = await requirePermission("customers", "view");
   if (!gate.ok) return [];
 
@@ -53,7 +97,7 @@ export async function detectLostSaleRisks(limit = 20): Promise<LostSaleLead[]> {
       .order("created_at", { ascending: false }),
     supabase
       .from("customer_demands")
-      .select("customer_id, status, created_at")
+      .select("customer_id, status, created_at, transaction_type")
       .in("customer_id", customerIds)
       .neq("status", "closed"),
     supabase
@@ -66,7 +110,7 @@ export async function detectLostSaleRisks(limit = 20): Promise<LostSaleLead[]> {
   // customer bazında grupla
   const lastCallMap   = new Map<string, number>();
   const lastCommMap   = new Map<string, number>();
-  const demandMap     = new Map<string, { status: string; created_at: string }[]>();
+  const demandMap     = new Map<string, { status: string; created_at: string; transaction_type: string }[]>();
   const lastMatchMap  = new Map<string, number>();
 
   for (const c of calls ?? []) {
@@ -81,7 +125,7 @@ export async function detectLostSaleRisks(limit = 20): Promise<LostSaleLead[]> {
   }
   for (const d of demands ?? []) {
     const arr = demandMap.get(d.customer_id) ?? [];
-    arr.push({ status: d.status, created_at: d.created_at });
+    arr.push({ status: d.status, created_at: d.created_at, transaction_type: d.transaction_type });
     demandMap.set(d.customer_id, arr);
   }
   for (const m of matches ?? []) {
@@ -147,6 +191,27 @@ export async function detectLostSaleRisks(limit = 20): Promise<LostSaleLead[]> {
         daysSince:   days,
         urgency:     days >= 60 ? "critical" : "warning",
       });
+      continue;
+    }
+
+    // Kural 4: kaçan fırsat radarının ofis geneli deseni CANLI bir talebe bağlanır —
+    // ilk 3 kuraldan hiçbirine girmeyen müşteri, kırılgan işlem türünde aktif
+    // talep taşıyorsa yumuşak (warning) bir uyarı alır.
+    if (fragileDealType) {
+      const fragileDemand = customerDemands.find(
+        (d) => TRANSACTION_TO_DEAL_TYPE[d.transaction_type] === fragileDealType,
+      );
+      if (fragileDemand) {
+        risks.push({
+          id:          customer.id,
+          full_name:   customer.full_name,
+          phone:       customer.phone ?? null,
+          reason:      "fragile_deal_type",
+          reasonLabel: `"${FRAGILE_LABEL[fragileDealType]}" işlemlerde son dönemde kayıp oranı yüksek`,
+          daysSince:   0,
+          urgency:     "warning",
+        });
+      }
     }
   }
 

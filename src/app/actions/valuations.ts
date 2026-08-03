@@ -100,6 +100,13 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
   let propertyType: string | null = formPropertyType || null;
   let transactionType: string | null = formTransactionType || null;
 
+  // Emsal DÜZELTME katsayıları için hedefin kendi özellikleri — yalnız
+  // portföy seçildiyse doludur, formda ayrı alanları yok (bkz. comparables.ts).
+  let targetFloor: number | null = null;
+  let targetBuildingAge: number | null = null;
+  let targetHeating: string | null = null;
+  let targetFacade: string | null = null;
+
   // Form ilce/il secildiyse adlarini tek sorguda coz.
   if (formDistrictId) {
     const { data: d } = await supabase
@@ -129,8 +136,18 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
     if (p) {
       resolvedTitle = resolvedTitle || p.title || p.property_code;
       price = price ?? (p.list_price != null ? Number(p.list_price) : null);
-      const feat = p.features as { sqm?: number } | null;
+      const feat = p.features as {
+        sqm?: number;
+        floor?: number;
+        building_age?: number;
+        heating?: string;
+        facade?: string;
+      } | null;
       area = area ?? (feat?.sqm != null ? Number(feat.sqm) : null);
+      targetFloor = feat?.floor != null ? Number(feat.floor) : null;
+      targetBuildingAge = feat?.building_age != null ? Number(feat.building_age) : null;
+      targetHeating = feat?.heating ?? null;
+      targetFacade = feat?.facade ?? null;
       adaVal = adaVal ?? p.parcel_block ?? null;
       parselVal = parselVal ?? p.parcel_lot ?? null;
       // Formda secim yoksa portfoyden devral (?? ile: bos string degil, null kontrolu).
@@ -158,6 +175,10 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
     propertyType,
     transactionType,
     excludePropertyId: propertyId,
+    targetFloor,
+    targetBuildingAge,
+    targetHeating,
+    targetFacade,
   });
 
   // Emsal ANLIK GÖRÜNTÜSÜ: motorun kullandığı küme (aynı RPC zinciri) rapor
@@ -171,6 +192,10 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
     transactionType,
     sqm: area,
     excludePropertyId: propertyId,
+    targetFloor,
+    targetBuildingAge,
+    targetHeating,
+    targetFacade,
   });
   const sourcesToSave = compRows.length > 0 ? [...est.sources, comparablesSourceEntry(compRows)] : est.sources;
 

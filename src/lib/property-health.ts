@@ -5,6 +5,8 @@
  * Her iki skor da 0–100 arasında, ağırlıklı puan hesabı ile.
  */
 
+import { isPast } from "@/lib/clock";
+
 // ---------------------------------------------------------------------------
 // Tipler
 // ---------------------------------------------------------------------------
@@ -38,6 +40,7 @@ export type ListingQualityScore = {
 
 type PropertyInput = {
   title:              string | null;
+  description:        string | null;
   property_type:      string | null;
   transaction_type:   string | null;
   list_price:         number | null;
@@ -119,6 +122,15 @@ const HEALTH_CHECKS: ((p: PropertyInput) => HealthCheckItem)[] = [
     tip:    "Komisyon oranı girilmezse hakediş hesaplanamaz.",
   }),
 
+  // İçerik (ağırlık 2)
+  (p) => ({
+    key:    "description",
+    label:  "Açıklama 100+ karakter",
+    passed: (p.description?.trim().length ?? 0) >= 100,
+    weight: 2,
+    tip:    "Detaylı bir açıklama müşterinin karar vermesini kolaylaştırır.",
+  }),
+
   // Medya (ağırlık 3)
   (p) => ({
     key:    "photos",
@@ -165,13 +177,22 @@ const HEALTH_CHECKS: ((p: PropertyInput) => HealthCheckItem)[] = [
     tip:    "Isınma türü portallerde ayrıca filtrelenir.",
   }),
 
-  // Yetki belgesi (ağırlık 2)
+  // Yetki belgesi (ağırlık 2 + 3)
   (p) => ({
     key:    "authorization",
     label:  "Yetki belgesi girildi",
     passed: Boolean(p.authorization_start && p.authorization_end),
     weight: 2,
     tip:    "Yetki belgesi tarihleri takip için zorunludur.",
+  }),
+  (p) => ({
+    key:    "authorization_valid",
+    label:  "Yetki belgesi süresi geçerli",
+    passed: Boolean(p.authorization_end) && !isPast(p.authorization_end),
+    weight: 3,
+    tip:    p.authorization_end && isPast(p.authorization_end)
+      ? "Yetki belgesinin süresi doldu — yenilenmeden bu portföy yasal olarak pazarlanamaz."
+      : "Yetki belgesi bitiş tarihi girilmeden süre takibi yapılamaz.",
   }),
 
   // Portal (ağırlık 2)

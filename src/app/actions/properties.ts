@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { resolvePriceHealth } from "@/lib/comparables";
@@ -199,6 +200,8 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   // ilce alani hic yoktu. Artik once ilce, yoksa il adi kullaniliyor —
   // ilce bazli m2 referanslari (Kadikoy, Cankaya, Nilufer...) ancak boyle devreye giriyor.
   const districtHint = await resolveGeoHint(supabase, provinceId, districtId);
+  // Tek sefer hesaplanır — hem emsal düzeltmesine hem insert'e aynı nesne girer.
+  const features = parseFeatureFields(formData, { rooms, sqm: sqmValue });
   // Önce emsal motoru, yetersizse m² referans modeli — kalıcı price_health tek karar noktasından.
   const health = await resolvePriceHealth(supabase, {
     tenantId: gate.tenantId,
@@ -208,6 +211,10 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
     propertyType,
     transactionType,
     districtHint,
+    targetFloor: features.floor as number | null,
+    targetBuildingAge: features.building_age as number | null,
+    targetHeating: features.heating as string | null,
+    targetFacade: features.facade as string | null,
   });
 
   const { data, error } = await supabase
@@ -230,7 +237,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
       lng: lngVal,
       parcel_block: parcelBlock || null,
       parcel_lot: parcelLot || null,
-      features: parseFeatureFields(formData, { rooms, sqm: sqmValue }),
+      features,
       price_health: health,
       assigned_to: gate.userId,
       created_by: gate.userId,
@@ -240,7 +247,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
 
   if (error || !data) {
     console.error("createProperty", error);
-    return { error: "Portföy eklenemedi. Lütfen tekrar deneyin." };
+    return { error: planLimitErrorMessage(error) ?? "Portföy eklenemedi. Lütfen tekrar deneyin." };
   }
 
   await logActivity({
@@ -354,6 +361,12 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
   // ilce alani hic yoktu. Artik once ilce, yoksa il adi kullaniliyor —
   // ilce bazli m2 referanslari (Kadikoy, Cankaya, Nilufer...) ancak boyle devreye giriyor.
   const districtHint = await resolveGeoHint(supabase, provinceId, districtId);
+
+  // Mevcut features MERGE edilir: OCR/AI gibi form dışı kaynakların yazdığı
+  // anahtarlar (ör. tapu alan bilgisi) form kaydında silinip gitmesin.
+  const prevFeatures = (existing?.features ?? {}) as Record<string, unknown>;
+  const mergedFeatures = { ...prevFeatures, ...parseFeatureFields(formData, { rooms, sqm: sqmValue }) };
+
   // Fiyat her güncellendiğinde sağlık ANINDA yeniden hesaplanır — önce emsal, yetersizse m² modeli.
   const health = await resolvePriceHealth(supabase, {
     tenantId: gate.tenantId,
@@ -364,11 +377,11 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
     transactionType,
     districtHint,
     excludePropertyId: id,
+    targetFloor: mergedFeatures.floor as number | null,
+    targetBuildingAge: mergedFeatures.building_age as number | null,
+    targetHeating: mergedFeatures.heating as string | null,
+    targetFacade: mergedFeatures.facade as string | null,
   });
-
-  // Mevcut features MERGE edilir: OCR/AI gibi form dışı kaynakların yazdığı
-  // anahtarlar (ör. tapu alan bilgisi) form kaydında silinip gitmesin.
-  const prevFeatures = (existing?.features ?? {}) as Record<string, unknown>;
 
   const updatePatch: Record<string, unknown> = {
     title,
@@ -383,7 +396,7 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
     address_line: addressLine || null,
     lat: latVal,
     lng: lngVal,
-    features: { ...prevFeatures, ...parseFeatureFields(formData, { rooms, sqm: sqmValue }) },
+    features: mergedFeatures,
     price_health: health,
     updated_at: new Date().toISOString(),
   };

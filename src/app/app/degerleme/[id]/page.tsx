@@ -107,7 +107,14 @@ export default async function ValuationReportPage({
 
   const province = property ? rel(property.province as { name: string } | { name: string }[] | null) : null;
   const district = property ? rel(property.district as { name: string } | { name: string }[] | null) : null;
-  const features = (property?.features ?? {}) as { sqm?: number | string | null; rooms?: string | null };
+  const features = (property?.features ?? {}) as {
+    sqm?: number | string | null;
+    rooms?: string | null;
+    floor?: number | string | null;
+    building_age?: number | string | null;
+    heating?: string | null;
+    facade?: string | null;
+  };
   const sqm = features.sqm != null ? Number(features.sqm) : null;
 
   const mid = valuation.estimated_mid != null ? Number(valuation.estimated_mid) : null;
@@ -139,6 +146,10 @@ export default async function ValuationReportPage({
       transactionType: property.transaction_type,
       sqm,
       excludePropertyId: valuation.property_id,
+      targetFloor: features.floor != null ? Number(features.floor) : null,
+      targetBuildingAge: features.building_age != null ? Number(features.building_age) : null,
+      targetHeating: features.heating ?? null,
+      targetFacade: features.facade ?? null,
     });
     comparablesRecomputed = comparableRows.length > 0;
   }
@@ -361,6 +372,8 @@ export default async function ValuationReportPage({
             </h2>
             <p className="mt-1 text-[11px] text-text-faint">
               Emsal motoru bu kayıtlara dayandı — aynı ilçe/tip, m² bandı ±%30, son 18 ay.
+              ₺/m², hedefin kat/yaş/ısıtma/cephe farkına göre düzeltilmiştir; ham değerden
+              farklıysa altında küçük yazıyla gösterilir.
             </p>
             <TableFrame className="mt-3" minWidth={640}>
               <Table>
@@ -371,7 +384,7 @@ export default async function ValuationReportPage({
                     <TH>Oda</TH>
                     <TH align="right">m²</TH>
                     <TH align="right">Fiyat</TH>
-                    <TH align="right">₺/m²</TH>
+                    <TH align="right">Düzeltilmiş ₺/m²</TH>
                     <TH>Kaynak</TH>
                   </TR>
                 </THead>
@@ -394,7 +407,22 @@ export default async function ValuationReportPage({
                       <TD>{c.rooms ?? "—"}</TD>
                       <TD align="right">{c.sqm != null ? `${c.sqm}` : "—"}</TD>
                       <TD align="right">{money(c.price)}</TD>
-                      <TD align="right">{c.price_per_sqm != null ? money(c.price_per_sqm) : "—"}</TD>
+                      <TD align="right">
+                        {c.adjusted_price_per_sqm != null ? (
+                          <>
+                            <div>{money(c.adjusted_price_per_sqm)}</div>
+                            {c.price_per_sqm != null && c.price_per_sqm !== c.adjusted_price_per_sqm ? (
+                              <div className="text-[10px] font-normal text-text-faint">
+                                ham: {money(c.price_per_sqm)}
+                              </div>
+                            ) : null}
+                          </>
+                        ) : c.price_per_sqm != null ? (
+                          money(c.price_per_sqm)
+                        ) : (
+                          "—"
+                        )}
+                      </TD>
                       <TD className="text-text-muted">{sourceLabel(c.source)}</TD>
                     </TR>
                   ))}

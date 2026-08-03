@@ -54,45 +54,31 @@ edilir; yarım iş push edilmez.
       lockfile metadata'sını doğruladığı için `npm ci` Linux runner'da patlıyor.
       Karar: kapı kaldırıldı. Node sürümü zaten `.nvmrc` (CI okuyor) +
       `engines` uyarısıyla korunuyor. Gerekçe `.npmrc` içinde yazılı.
-- [ ] **F2** `scripts/apply-migrations.ts` bozuk: sabit listede **9** migration
-      var, diskte **54**. `npm run db:migrate` 10–54'ü sessizce uygulamıyor.
-  - [ ] Dizini tarayıp ada göre sıralayan sürüme çevir
-  - [ ] Uygulanan migration'ları izleyen `schema_migrations` tablosu ekle
-        (şu an hiçbir izleme yok — neyin uygulandığı bilinmiyor)
-  - [ ] `--dry-run` ve tek dosya modu
-- [~] **F3** Güvenlik açıkları — **KISMEN AÇIK, ENGELLİ. Sıradaki ilk iş.**
+- [x] **F2** `scripts/apply-migrations.ts` düzeltildi — artık dizini tarayıp ada
+      göre sıralıyor (`listMigrations()`), uygulanan sürümleri kendi oluşturduğu
+      `public.schema_migrations` tablosunda izliyor, düzenlenmiş dosyalarda
+      checksum uyuşmazlığını yakalıyor, `--dry-run`/`--baseline`/`--only`
+      destekliyor. **Yine de:** proje politikası gereği migration'lar tek tek
+      `apply-one.ts` ile uygulanır (bkz. CLAUDE.md) — bu script yalnız
+      toplu/senkronizasyon amaçlı, birincil yol değil.
+- [~] **F3** Güvenlik açıkları — **BÜYÜK ÖLÇÜDE KAPANDI.** `package.json`'da
+      `overrides: { sharp: "^0.35.3", postcss: "^8.5.23" }` eklendi, `npm audit
+      --audit-level=high --omit=dev` → **0**. Kalan tek açık (`brace-expansion`
+      via `eslint`→`minimatch@3`) salt devDependency, çalışma zamanı riski yok.
+      CI'da `npm ci`'ın bu override'larla yeşil olup olmadığı teyit edilmedi
+      (bu ortamdan `gh`/Actions log erişimi yok) — kullanıcı bir sonraki push'ta
+      CI'ı kontrol etmeli.
 
-  **Durum:** `sharp` 0.34.5 (libvips CVE-2026-33327/33328/35590/35591) ve
-  `postcss` 8.4.31 (XSS + path traversal) prod bağımlılığı olarak açık.
-  Kalan 9 açık ESLint zincirinde (devDependency, çalışma zamanı riski yok).
-
-  **Neden kapatılamadı — üç yaklaşım denendi, üçü de ölçüldü:**
-
-  | Yaklaşım | Sonuç |
-  |---|---|
-  | `overrides: { sharp, postcss }` | Yerelde her şey yeşil, **CI'da `npm ci` patlıyor** (780fbf5→f713d38, 5 push kırmızı) |
-  | `overrides: { sharp }` tek başına | Aynı — **suçlu sharp override'ı** (c1ff535 kırmızı) |
-  | `sharp`i doğrudan dependency yapmak | `npm ci` ve build geçiyor **ama açık kapanmıyor**: Next kendi `next/node_modules/sharp`'ında 0.34.5 taşıyor ve onu kullanıyor. Sadece `overrides` tekilleştiriyor |
-
-  **Elenen sebepler (hepsi ölçümle):** lockfile senkronu (yerel `npm ci` exit 0),
-  Linux platform kapsamı (`--os=linux --cpu=x64` dry-run exit 0, tüm musl/gnu/arm
-  varyantları lockfile'da), registry'de paket eksikliği (üçü de mevcut), install
-  script hatası (sharp'ın yok), `engine-strict` (kaldırıldı, CI hâlâ kırmızıydı).
-
-  **GERÇEK ENGEL:** CI'ın `npm ci` hata mesajını okuyamıyorum. GitHub Actions
-  log API'si public repo için de **403** veriyor, `gh` CLI kurulu değil. Bu yüzden
-  bisection'la çalıştım; kök sebep kesinleşti (sharp override) ama *neden*
-  kırdığı bilinmiyor.
-
-  - [ ] **Yapılacak (5 dakikalık iş, kullanıcı tarafında):** GitHub → Actions →
-        kırmızı run (`c1ff535`) → "Install dependencies" adımının log'unu aç,
-        `npm error` satırlarını paylaş. Hata mesajıyla bu madde tek hamlede kapanır.
-  - [ ] Alternatif: `gh auth login` yapılırsa logu kendim okuyabilirim.
-  - [ ] Alternatif: Next'in sharp pinini yükseltmesini beklemek (pasif).
-  - [ ] CI audit adımı şu an `continue-on-error: true` — sinyal görünür, ama
-        bloklamıyor. Açık kapanınca bu satır kaldırılacak.
-- [ ] **F4** `.env.local.example`'a eksik değişkenleri ekle (`CRON_SECRET` zorunlu
-      — **7 cron route** ona bağlı, yoksa hepsi sessizce çalışmaz)
+  **Geçmiş (neden zordu):** `overrides: { sharp, postcss }` daha önce 5 push
+  boyunca CI'da `npm ci`'ı kırmıştı, kök sebep asla netleşmedi (GitHub Actions
+  log erişimi bu ortamdan hep 403). O override şu an package.json'da duruyor ve
+  yerel `npm audit --omit=dev` temiz — **ama bu haliyle CI'da yeşil olduğu
+  henüz tekrar teyit edilmedi**, aynı sınıf hata sessizce geri dönmüş olabilir.
+  - [ ] Kullanıcı bir sonraki push'ta Actions sekmesinden `npm ci` adımını
+        kontrol etmeli.
+- [x] **F4** `.env.example` zaten güncel — cron route'larının kullandığı tüm
+      değişkenler (`CRON_SECRET`, `NODE_ENV`, `NEXT_PUBLIC_APP_URL`) belgeli.
+      (Not: dosya adı `.env.local.example` değil `.env.example`.)
 - [ ] **F5** Sır rotasyonu notu: `service_role` + DB şifresi sohbette paylaşıldı
 
 ## 2. Tema ve görsel kalite (T)
@@ -129,49 +115,82 @@ katmanını yükseltip iyileşmenin kendiliğinden yayılmasını sağlamak.
 
 ## 3. Fiyat geçmişi ve para birimi (V)
 
-- [ ] **V1** TCMB kur altyapısı
-  - [ ] `tcmb_rates` tablosu (tarih, USD, EUR, kaynak, çekilme zamanı)
-  - [ ] Günlük cron — TCMB resmî XML (15:30 sonrası yayınlanır)
-  - [ ] Tarihsel geri dolum (backfill) scripti
-  - [ ] Tatil/hafta sonu: en yakın önceki iş günü kuruna düşme
-- [ ] **V2** Fiyat geçmişinde çoklu para birimi
-  - [ ] Her kaydın o günkü resmî kurla ₺/$/€ karşılığı
-  - [ ] Para birimi seçici; grafik seçilen birimde
-  - [ ] "₺ bazında arttı ama $ bazında düştü" içgörüsü — Türkiye için kritik
-- [ ] **V3** Fiyat değişim uyarıları
-  - [ ] Takip edilen portföyde fiyat düşüşünde bildirim
-  - [ ] Müşteri talebine uyan portföyde indirim → otomatik eşleşme bildirimi
-- [ ] **V4** Portföy fiyat sağlığı: piyasa medyanına göre konum (pahalı/uygun)
+- [x] **V1** TCMB kur altyapısı — `tcmb_rates` tablosu (migration 000050),
+      günlük cron `api/cron/tcmb-kur`, `scripts/tcmb-backfill.ts` (`npm run
+      kur:backfill`), tatil/hafta sonu düşmesi `tcmb_rate_on()` SQL fonksiyonu
+      + `fetchLatestTcmbRate(7)` (7 gün geriye bakar).
+- [x] **V2** Fiyat geçmişinde çoklu para birimi — `property-price-history.tsx`
+      TRY/$/€ seçici, `price-history.ts` + `property_price_history_fx` view
+      her satırı kendi günün TCMB kuruyla dönüştürüyor; "₺ arttı $ düştü"
+      içgörüsü gerçek (para birimine göre bağımsız hesap).
+- [x] **V3** Fiyat değişim uyarıları — `vitrin-alert-notify.ts` (takip edilen
+      portföy düşüşü → ofis bildirimi) + `notifyPriceDropToMatchingDemands`
+      (`actions/properties.ts`, indirim → eşleşen talep sahiplerine bildirim).
+- [x] **V4** Portföy fiyat sağlığı — `comparables.ts`'teki `pricePosition()`/
+      `healthFromDeviation()` gerçek emsal medyanına göre "piyasa üstü/altı/
+      seviyesinde" döndürüyor, portföy sayfasında gösteriliyor.
 
 ## 4. Değerleme ve piyasa zekâsı (D) — API'siz
 
-- [ ] **D1** Emsal (comparable) motoru
-  - [ ] SQL fonksiyonu: ilçe + tip + m² bandı + oda → medyan/çeyrek ₺/m²
-  - [ ] Düzeltme katsayıları: kat, yaş, ısıtma, cephe, asansör, otopark
-  - [ ] Güven skoru (emsal sayısı + yayılım) — az veriyle "emin" görünmemeli
-  - [ ] Kapanan işlemler > aktif ilanlar ağırlığı (gerçekleşen fiyat daha değerli)
-- [ ] **D2** Bölge trendi: ilçe/mahalle bazlı ₺/m² zaman serisi
-- [ ] **D3** Değerleme raporu (PDF): emsaller, düzeltmeler, aralık, imza alanı
+- [x] **D1** Emsal (comparable) motoru — `find_comparables()` SQL fonksiyonu
+      (migration 000051 + 20260803000010): ilçe+tip+m² bandı → medyan/çeyrek
+      ₺/m², güven skoru, kapanan işlem ağırlığı, **kat/yaş/ısıtma/cephe
+      düzeltme katsayıları** (`comparable_feature_desirability()`, ±%15
+      sınırlı). **Asansör/otopark kapsam dışı** — `properties.features`
+      şemasında hiç yakalanmıyor (form alanı yok); eklemek ayrı bir
+      form/şema değişikliği ister.
+- [x] **D2** Bölge trendi — `/app/bolge-analizi` + `api/cron/bolge-snapshot`.
+- [x] **D3** Değerleme raporu — emsaller ✓, aralık ✓, imza alanı ✓, **düzeltmeler ✓**
+      (`/app/degerleme/[id]/page.tsx`). Tablo artık "Düzeltilmiş ₺/m²" +
+      farklıysa "ham: X" alt notu gösteriyor; `estimate_property_value` de
+      medyan/çeyrek hesabını düzeltilmiş değerler üzerinden yapıyor (yalnız
+      kozmetik değil, tahminin kendisi iyileşti). Canlı Playwright ile
+      doğrulandı: hedef (zemin üstü kat, 30 yaşında, kombi, cephesiz) için
+      87.273 ₺/m² → 82.037 ₺/m² (×0,94, matematik doğrulandı).
+      `resolvePriceHealth`'e de aynı düzeltme parametreleri eklendi
+      (properties.ts create/update + portal-teyit cron) — tutarlı tek karar
+      noktası.
 - [x] **D4** Kira çarpanı / getiri (yield) analizi
 - [x] **D5** Satış süresi tahmini (kendi kapanma verinizden)
-- [ ] **D6** Talep-arz ısı haritası (ilçe bazlı talep/portföy dengesi)
+- [x] **D6** Talep-arz ısı haritası — `/app/raporlar/talep-arz` + `talep-arz.ts`
+      `aggregateTalepArz()`, ilçe bazlı medyan bütçe/fiyat + kapsam oranı +
+      harita.
 
 ## 5. Hız (P) — "en iyi seviye"
 
-- [ ] **P1** Ölçüm önce: bundle analizi, en ağır rotalar, First Load JS tablosu
+- [x] **P1** Ölçülüp spekülatif iş yapılmadı — `recharts` yalnızca 4 sayfada,
+      paylaşılan kabukta değil, kanıtlanabilir kazanç yok (bkz. §11).
 - [x] **P2** N+1 sorgu avı — server action'larda döngü içi sorgu taraması
   - Tarama: baskın desen zaten batch-sorgu + bellekte toplama (`.in()` + Map). Kalan
     sıralı döngüler kasıtlı (WhatsApp rate-limit, cron düşük hacim). Tek gerçek offender
     düzeltildi: `abonelik-kontrol` cron'u satır başına 3 yazma → küme başına 3 toplu yazma.
-- [ ] **P3** Index kapsamı: her sık filtre/sıralama için index doğrulaması
-  - [ ] `explain analyze` ile en yavaş 10 sorgu
-- [ ] **P4** Streaming/Suspense: ağır panelleri kabuk sonrası akıt
-- [ ] **P5** `use cache` / ISR: değişmeyen veriyi (geo, tanımlar, planlar) önbellekle
-- [ ] **P6** Görsel: `next/image` boyut disiplini, LQIP/blur, AVIF
-- [ ] **P7** Yazı tipi: subset + `size-adjust` ile CLS sıfırlama
-- [ ] **P8** Prefetch stratejisi: sidebar rotaları için akıllı ön yükleme
-- [ ] **P9** RSC payload küçültme: gereksiz `"use client"` sınırlarını geri çekme
-- [ ] **P10** Lighthouse/Core Web Vitals hedefi: LCP < 1.8s, INP < 200ms, CLS < 0.05
+- [~] **P3** Index kapsamı — kritik filtre/sıralama kombinasyonları için
+      composite/GIN index'ler zaten var (`idx_customers_tenant_active`,
+      `idx_properties_tenant_status_created`, `idx_demands_tenant_status_created`
+      vb.). Dev DB çok küçük (onlarca satır) olduğu için planlayıcı gerçek
+      kullanımda kanıt vermiyor (her sorguda Seq Scan — bu boyutta doğru
+      davranış). `explain analyze` ile en yavaş 10 sorgu prod ölçeğinde hâlâ
+      doğrulanmadı.
+- [ ] **P4** Streaming/Suspense: `/app` dashboard'da tek kullanım var
+      (`<Suspense><BriefingAiLine/></Suspense>`); ağır liste sayfaları
+      (`musteriler` 14 sorgulu `Promise.all`, `portfoyler`) tamamen senkron —
+      kabuk, veri hazır olana kadar hiç akmıyor.
+- [x] **P5** `use cache` / ISR — `geo.ts` (`unstable_cache`, 15dk TTL,
+      `revalidateTag`), `definitions.ts`, `office-score.ts`, `admin-badges.ts`.
+- [x] **P6** Görsel disiplini — 20 `<Image>` kullanımının tamamı `fill+sizes`
+      veya açık `width`/`height` taşıyor.
+- [x] **P7** Yazı tipi — `Manrope`/`Inter`/`Geist_Mono` hepsi
+      `subsets:["latin"]`, `display:"swap"`, gereksiz ağırlık preload edilmiyor.
+- [x] **P8** Prefetch stratejisi — sidebar linkleri `onMouseEnter`/`onFocus` ile
+      `router.prefetch()` çağırıyor; bu oturumda eklenen
+      `staleTimes:{dynamic:30}` ile birleşince "hover'da ön-yükle, 30sn içinde
+      anında navigasyon" stratejisi tamamlanıyor.
+- [ ] **P9** RSC payload küçültme — geri çekilmemiş büyük `"use client"`
+      bileşenleri: `property-media-manager.tsx` (897 satır),
+      `investment-analyzer.tsx` (832), `advisor-chat.tsx` (637),
+      `playbooks-manager.tsx` (626), `calculator.tsx` (595),
+      `command-search.tsx` (569).
+- [ ] **P10** Lighthouse/Core Web Vitals hedefi — CI'da hiçbir CWV kapısı yok.
 
 ## 6. Paylaşılan altyapıyı yaygınlaştırma (U)
 
@@ -213,7 +232,9 @@ Araştırıldı. Bizde **olmayan** ve eklenmesi gerekenler:
 - [ ] **R5** Çok dilli ilan: otomatik çeviri (mevcut OpenAI katmanı üzerine)
 - [ ] **R6** Telefon CRM: gelen aramada arayanı tanıma, çağrı sırasında not
 - [ ] **R7** Uluslararası portal yayını (ListGlobally/Properstar sınıfı)
-- [x] **R8** Franchise/çok markalı ofis yönetimi (route var, içerik zayıf)
+- [x] **R8** Franchise/çok markalı ofis yönetimi — dönem filtreli şube rollup,
+      şube kıyaslama grafikleri, lider şube rozeti, şube bazlı kayıp-kaçak
+      kırılımı; "içerik zayıf" notu artık geçerli değil.
 - [ ] **R9** Referans ağı: ofisler arası müşteri yönlendirme + komisyon
 - [ ] **R10** Mobil: PWA var → push + offline derinleştirme
 
@@ -228,11 +249,23 @@ Rakiplerde görmediğim, gerçek acıyı çözen ve savunulabilir olanlar:
 > (`deals.probability`), **X9** (`communication-timeline`), **X12** (komut
 > paleti) kısmen mevcut. **X4** ve **X6** gerçekten yoktu.
 
-- [ ] **X1** **Portföy sağlık skoru** — fiyat/görsel/açıklama/yetki süresi/portal
-      durumunu tek skora indir, "bu portföy neden satmıyor" sorusunu cevapla
-      (`property-health.ts` var, derinleştirilecek)
-- [ ] **X2** **Kaçan fırsat radarı** — kapanan/kaybedilen işlemlerden desen
-      çıkarıp "bu talebi kaçırma" uyarısı (`lost-sale-detector.ts` temeli var)
+- [ ] **X1** **Portföy sağlık skoru** — `property-health.ts` fiyat/görsel/portal
+      kontrollerini yapıyor ama **açıklama kontrolü skora hiç girmiyor**
+      (yalnız portal-yayını-varken çalışan ayrı `computeListingQuality`'de var)
+      ve **yetki süresi yalnız "girildi mi" bakıyor, süresi geçmiş/yaklaşan
+      hiç kontrol edilmiyor**. Ayrıca yalnız tek portföy detay sayfasında
+      gösteriliyor. "Neden satmıyor" sorusunu zaten `sale-diagnostics.ts`
+      (`diagnoseSaleBlockers`) cevaplıyor — roadmap bu modülü X1'e hiç
+      saymamış, aynı sayfada zaten render ediliyor.
+- [x] **X2** **Kaçan fırsat radarı** — ofis geneli desen artık canlı talebe
+      bağlanıyor: `computeFragileDealType()` (kapanan işlemlerden "satılık mı
+      kiralık mı daha kırılgan" çıkarır, min 4 kapanış + kayıp oranı ≥ %50 —
+      `buildLossInsights`'ın #4 içgörüsüyle AYNI eşik, tek kaynak) artık
+      `detectLostSaleRisks`'e 4. kural olarak geçiriliyor: ilk 3 kuraldan
+      hiçbirine girmeyen ama kırılgan türde aktif talebi olan müşteri
+      "warning" seviyesinde yeni bir sebeple (`fragile_deal_type`) işaretlenir.
+      6 birim testle + canlı doğrulamayla (geçici test anlaşması eklenip
+      silinerek) kanıtlandı.
 - [x] **X3** Danışman koçu — 18 test. Sayfa doğru sayıları gösteriyordu ama
       "bu hafta ne yapmalıyım" sorusunu cevaplamak danışmanın işiydi.
       **En fazla 4 madde** (onbirlik liste kimsenin okumadığı listedir),
@@ -304,7 +337,11 @@ Rakiplerde görmediğim, gerçek acıyı çözen ve savunulabilir olanlar:
     etmek demek — kırılgan ve düşük getirili. Testler saf mantıkta.
   - **Testin bulduğu:** `hasPermission` asimetrisi — boş rol advisor yetkisi
     alıyor, hatalı rol hiç yetki almıyor. Davranış korundu, gerekçesi yazıldı.
-- [ ] **Q1b** Playwright + kritik akış (giriş, portföy ekle, teklif, sözleşme imza)
+- [~] **Q1b** Playwright altyapısı gerçek: 8 dosya, 43 test, gerçek girişle
+      `auth.setup.ts`. Ama roadmap'in istediği 4 akıştan yalnız **girişin**
+      spec kapsamı var — **portföy ekle, teklif, sözleşme imza için hiç test
+      yok** (grep'te "teklif"/"imza" hiç geçmiyor). MASTER_PLAN.md'nin "fiilen
+      kapandı" notu bu ölçütle iyimser.
 - [x] **Q2** RLS denetimi — `npm run db:rls-audit`. İlk koşuda **gerçek bir
       hata buldu**: `tasks` ve `property_media` normal kullanıcıya görünmüyordu
       (bkz. 10.6). Şu an 39 tablo, bulgu yok.
@@ -436,13 +473,12 @@ belirliyor.
 sorguya `{ count: "exact" }` eklenerek **aynı yanıtta** geliyor; ek gidiş-dönüş
 yok. Her şey ekrandaysa uyarı hiç render edilmiyor.
 
-### 10.8 CI 3 push kırmızı — araç zinciri sürüklenmesi
-`npm install` (yerel npm 11.6.2) lockfile'dan `@emnapi/*` girdilerini düşürdü.
-npm 11.6.2 tolere ediyor, **npm 11.18.0 etmiyor**. CI `.nvmrc: 24`'ten en
-güncel 24.x'i kuruyor, o da 11.18 getiriyor. Actions log API'si public repoda
-bile 403 verdiği için teşhis çalışma sürelerinden gitti (yeşiller ~90 sn,
-kırmızılar 8-12 sn → 496 paket indirilmiyor, anında hata).
-→ **[x]** Yerel Node 24.18.0 + npm 11.18.0'a çıkarıldı; artık CI ile birebir.
+### 10.8 CI araç zinciri sürüklenmesi
+Farklı npm sürümleri lockfile'ın opsiyonel platform girdilerini farklı ele
+aldığı için yerel ve CI kurulumu ayrışmıştı. Doğrulanan çalışma ortamı Node
+24.11.1 + npm 11.6.2'dir.
+→ **[x]** `packageManager`, root engine, lockfile engine ve iki CI işi npm
+11.6.2'ye sabitlendi; yerel ve CI aynı araç zincirini kullanıyor.
 
 ---
 

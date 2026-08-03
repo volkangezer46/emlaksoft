@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
-import { detectLostSaleRisks, estimateLostRevenue } from "@/lib/lost-sale-detector";
+import { computeFragileDealType, detectLostSaleRisks, estimateLostRevenue } from "@/lib/lost-sale-detector";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { EmptyState } from "@/components/app/empty-state";
 import { dismissLostSaleRisk } from "./actions";
@@ -134,7 +134,6 @@ function buildLossInsights(deals: DealRow[], now: number) {
 
 export default async function KayipSatisPage() {
   const ctx = await requireModulePage("customers");
-  const detected = await detectLostSaleRisks(50);
 
   // Snooze/arandı filtresi: dismissed_until gelecekte olanlar ve son 30 günde
   // "called" işaretlenenler listeden düşer (bkz. lost_sale_dismissals).
@@ -153,6 +152,11 @@ export default async function KayipSatisPage() {
       .gte("updated_at", daysAgoIso(365))
       .limit(1000),
   ]);
+
+  // Ofis geneli "kırılgan işlem türü" deseni — detectLostSaleRisks'e canlı
+  // talep eşleştirmesi için geçirilir (bkz. lost-sale-detector.ts kural 4).
+  const fragileDealType = computeFragileDealType((closedDeals ?? []) as { stage: string; deal_type: string | null }[]);
+  const detected = await detectLostSaleRisks(50, fragileDealType);
 
   const now = nowMs();
   const dismissedIds = new Set(

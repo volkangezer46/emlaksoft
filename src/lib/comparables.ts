@@ -27,6 +27,8 @@ export type ComparableRow = {
   price: number;
   sqm: number | null;
   price_per_sqm: number | null;
+  /** Hedefin kat/yaş/ısıtma/cephe özelliklerine göre düzeltilmiş ₺/m². */
+  adjusted_price_per_sqm: number | null;
   rooms: string | null;
   happened_at: string;
 };
@@ -61,6 +63,13 @@ export type ComparableInput = {
   sqm: number | null;
   /** Değerlenen portföyün kendisi emsal listesine girmesin */
   excludePropertyId?: string | null;
+  /** Düzeltme katsayıları için hedefin kendi özellikleri — hiçbiri zorunlu
+   * değil, verilmeyen alan nötr (0) sayılır. Asansör/otopark şemada
+   * yakalanmadığı için kapsam dışı (bkz. migration 20260803000010). */
+  targetFloor?: number | null;
+  targetBuildingAge?: number | null;
+  targetHeating?: string | null;
+  targetFacade?: string | null;
 };
 
 function usable(input: ComparableInput): boolean {
@@ -103,6 +112,10 @@ export async function estimateFromComparables(
     p_transaction_type: input.transactionType,
     p_sqm: input.sqm,
     p_exclude_property: input.excludePropertyId ?? null,
+    p_target_floor: input.targetFloor ?? null,
+    p_target_building_age: input.targetBuildingAge ?? null,
+    p_target_heating: input.targetHeating ?? null,
+    p_target_facade: input.targetFacade ?? null,
   });
 
   if (error) {
@@ -144,6 +157,10 @@ export async function listComparables(
     p_sqm: input.sqm,
     p_exclude_property: input.excludePropertyId ?? null,
     p_limit: limit,
+    p_target_floor: input.targetFloor ?? null,
+    p_target_building_age: input.targetBuildingAge ?? null,
+    p_target_heating: input.targetHeating ?? null,
+    p_target_facade: input.targetFacade ?? null,
   });
 
   if (error) {
@@ -157,6 +174,10 @@ export async function listComparables(
     title: (r.title as string | null) ?? null,
     price: Number(r.price),
     sqm: r.sqm === null || r.sqm === undefined ? null : Number(r.sqm),
+    adjusted_price_per_sqm:
+      r.adjusted_price_per_sqm === null || r.adjusted_price_per_sqm === undefined
+        ? null
+        : Number(r.adjusted_price_per_sqm),
     price_per_sqm:
       r.price_per_sqm === null || r.price_per_sqm === undefined ? null : Number(r.price_per_sqm),
     rooms: (r.rooms as string | null) ?? null,
@@ -332,6 +353,10 @@ export async function resolvePriceHealth(
     /** m² modeli için konum ipucu (ilçe adı, yoksa il adı) */
     districtHint: string | null;
     excludePropertyId?: string | null;
+    targetFloor?: number | null;
+    targetBuildingAge?: number | null;
+    targetHeating?: string | null;
+    targetFacade?: string | null;
   },
 ): Promise<PriceHealth> {
   try {
@@ -342,6 +367,10 @@ export async function resolvePriceHealth(
       transactionType: input.transactionType,
       sqm: input.sqm,
       excludePropertyId: input.excludePropertyId ?? null,
+      targetFloor: input.targetFloor ?? null,
+      targetBuildingAge: input.targetBuildingAge ?? null,
+      targetHeating: input.targetHeating ?? null,
+      targetFacade: input.targetFacade ?? null,
     });
     const position = pricePosition(input.listPrice, estimate);
     if (position) return healthFromDeviation(position.deviationPct);
