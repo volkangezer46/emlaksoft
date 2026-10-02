@@ -3,9 +3,9 @@ import { cn } from "@/lib/utils";
 /**
  * Skeleton — yükleniyor iskeletleri (shimmer'lı).
  *
- * `components/app/skeleton.tsx` içindeki sayfa ölçekli iskeletler (dashboard,
- * liste) yerinde duruyor; burası PARÇA ölçeğinde ortak yapı taşlarını verir:
- * satır, metin bloğu, kart ve tablo. İkisi de aynı `.skeleton` CSS sınıfını
+ * Sayfa ölçekli iskeletler (SkeletonDashboard, SkeletonList) ve parça ölçeğinde
+ * yapı taşları (satır, metin bloğu, kart, tablo) tek burada; `components/app/skeleton.tsx`
+ * yalnız geriye dönük re-export'tur. İkisi de aynı `.skeleton` CSS sınıfını
  * kullanır — parlama animasyonu tek yerden gelir ve `prefers-reduced-motion`
  * altında otomatik kapanır (bkz. globals.css "TASARIM SİSTEMİ v2" bloğu).
  *
@@ -78,7 +78,7 @@ export function SkeletonStat({ className }: { className?: string }) {
       </div>
       <Skeleton className="mt-4 h-3 w-24" />
       <Skeleton className="mt-2 h-7 w-20" />
-      <Skeleton className="mt-3 h-8 w-full rounded-[6px]" />
+      <Skeleton className="mt-3 h-8 w-full rounded-md" />
     </div>
   );
 }
@@ -114,6 +114,78 @@ export function SkeletonTable({
           ))}
         </div>
       ))}
+    </div>
+  );
+}
+
+export function SkeletonCard() {
+  return (
+    <div className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+      <div className="flex items-start justify-between">
+        <Skeleton className="h-10 w-10 rounded-[var(--radius-card)]" />
+        <Skeleton className="h-5 w-14 rounded-full" />
+      </div>
+      <Skeleton className="mt-4 h-3 w-24" />
+      <Skeleton className="mt-2 h-7 w-20" />
+    </div>
+  );
+}
+
+export function SkeletonRow() {
+  return (
+    <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5">
+      <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <Skeleton className="h-3.5 w-1/3" />
+        <Skeleton className="h-3 w-1/4" />
+      </div>
+    </div>
+  );
+}
+
+export function SkeletonDashboard() {
+  return (
+    <div role="status" aria-busy="true" aria-live="polite" className="space-y-6">
+      <span className="sr-only">Kontrol paneli yükleniyor</span>
+      <Skeleton className="h-40 rounded-[var(--radius-panel)]" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
+      </div>
+      <div className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
+        <Skeleton className="h-72 rounded-[var(--radius-panel)]" />
+        <Skeleton className="h-72 rounded-[var(--radius-panel)]" />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="space-y-2.5 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+            <Skeleton className="h-4 w-1/2" />
+            {Array.from({ length: 3 }).map((__, j) => (
+              <SkeletonRow key={j} />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function SkeletonList({ rows = 6 }: { rows?: number }) {
+  return (
+    <div role="status" aria-busy="true" aria-live="polite" className="space-y-6">
+      <span className="sr-only">Liste yükleniyor</span>
+      <Skeleton className="h-32 rounded-[var(--radius-panel)]" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
+      </div>
+      <div className="space-y-2.5 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+        {Array.from({ length: rows }).map((_, i) => (
+          <SkeletonRow key={i} />
+        ))}
+      </div>
     </div>
   );
 }

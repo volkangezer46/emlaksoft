@@ -89,7 +89,7 @@ export function CompareToggle({
           className={`inline-flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
             active
               ? "border-mint-500/40 bg-mint-500/10 text-mint-600"
-              : "border-zinc-200 bg-white text-zinc-500 hover:border-mint-500/40 hover:text-mint-600"
+              : "border-zinc-200 bg-white text-text-muted hover:border-mint-500/40 hover:text-mint-600"
           }`}
         >
           {active ? <Check className="h-3.5 w-3.5" /> : <Scale className="h-3.5 w-3.5" />}
@@ -111,7 +111,7 @@ export function CompareToggle({
         e.stopPropagation();
         toggleCompare(item);
       }}
-      className={`focus-ring press relative z-10 grid h-9 w-9 place-items-center rounded-full border shadow-sm backdrop-blur transition disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`focus-ring press relative z-10 grid h-9 w-9 place-items-center rounded-full border shadow-[var(--shadow-sm)] backdrop-blur transition disabled:cursor-not-allowed disabled:opacity-50 ${
         active
           ? "border-mint-500/50 bg-mint-500 text-white"
           : "border-white/40 bg-white/85 text-ink-950/60 hover:text-mint-600"

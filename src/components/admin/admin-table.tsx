@@ -101,7 +101,7 @@ export function AdminSortHeader({
       aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
       title={active ? "Sıralama yönünü çevir" : `"${label}" sütununa göre sırala`}
       className={[
-        "focus-ring inline-flex items-center gap-1 rounded-[6px] px-1 py-0.5 text-xs font-bold uppercase tracking-wide transition",
+        "focus-ring inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-bold uppercase tracking-wide transition",
         active ? "text-brand-600" : "text-text-faint hover:text-ink-950",
         align === "right" ? "justify-end" : align === "center" ? "justify-center" : "",
         className,

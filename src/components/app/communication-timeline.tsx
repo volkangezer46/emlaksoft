@@ -241,7 +241,7 @@ export function CommunicationTimeline({
                         setItems((prev) => prev.filter((i) => i.id !== item.id));
                       });
                     }}
-                    className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-[7px] text-text-faint transition hover:bg-red-50 hover:text-red-600"
+                    className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md text-text-faint transition hover:bg-red-50 hover:text-red-600"
                     aria-label="Kaydı sil"
                   >
                     <Trash2 className="h-3.5 w-3.5" />

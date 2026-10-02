@@ -327,10 +327,10 @@ export function InteractiveChart({
       {dual && showLegend ? (
         <div className="mt-2 flex items-center justify-center gap-4 text-xs text-text-muted">
           <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: color }} /> {name}
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: color }} /> {name}
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: color2 }} /> {name2}
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: color2 }} /> {name2}
           </span>
         </div>
       ) : null}

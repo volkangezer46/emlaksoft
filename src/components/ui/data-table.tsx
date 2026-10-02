@@ -288,7 +288,7 @@ export function DataTable({
                         type="button"
                         onClick={() => toggleSort(col.key)}
                         className={cn(
-                          "focus-ring inline-flex items-center gap-1.5 rounded-[6px] px-0.5 uppercase tracking-[0.04em] transition hover:text-ink-950",
+                          "focus-ring inline-flex items-center gap-1.5 rounded-md px-0.5 uppercase tracking-[0.04em] transition hover:text-ink-950",
                           active && "text-brand-700",
                         )}
                       >

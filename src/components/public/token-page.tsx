@@ -83,7 +83,7 @@ export function PublicFooterNote({
         {purpose} ·{" "}
         <Link
           href="/"
-          className="focus-ring rounded-[4px] font-semibold underline-offset-2 transition hover:text-text-muted hover:underline"
+          className="focus-ring rounded-sm font-semibold underline-offset-2 transition hover:text-text-muted hover:underline"
         >
           Powered by EmlakSoft
         </Link>
@@ -92,14 +92,14 @@ export function PublicFooterNote({
       <p>
         <Link
           href="/kvkk-aydinlatma"
-          className="focus-ring rounded-[4px] underline-offset-2 transition hover:text-text-muted hover:underline"
+          className="focus-ring rounded-sm underline-offset-2 transition hover:text-text-muted hover:underline"
         >
           KVKK Aydınlatma Metni
         </Link>
         <span aria-hidden="true"> · </span>
         <Link
           href="/gizlilik"
-          className="focus-ring rounded-[4px] underline-offset-2 transition hover:text-text-muted hover:underline"
+          className="focus-ring rounded-sm underline-offset-2 transition hover:text-text-muted hover:underline"
         >
           Gizlilik Politikası
         </Link>

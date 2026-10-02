@@ -68,16 +68,16 @@
   --grad-brand-soft: linear-gradient(120deg, rgba(20, 99, 255, 0.12), rgba(16, 185, 163, 0.12));
   --grad-ink: linear-gradient(160deg, #0a2247 0%, #071a38 60%, #05122a 100%);
 
-  /* shadows */
-  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06);
-  --shadow-card: 0 8px 30px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 24px 60px -20px rgba(10, 34, 71, 0.35);
+  /* shadows: tek kaynak --elev-1..5 (aşağıda); --shadow-* yalnız takma ad */
+  --shadow-xs: var(--elev-1);
+  --shadow-sm: var(--elev-1);
+  --shadow-card: var(--elev-3);
+  --shadow-lg: var(--elev-4);
   /* Dialog/modal katmanı — lg'den bir kademe daha derin. Kod tabanında
      shadow-[var(--shadow-xl)] ve --shadow-modal referansları vardı ama
      tanımları yoktu; tanımsız değişken sessizce gölgesiz bırakır. */
-  --shadow-xl: 0 32px 80px -24px rgba(10, 34, 71, 0.42);
-  --shadow-modal: 0 28px 70px -18px rgba(10, 34, 71, 0.45);
+  --shadow-xl: var(--elev-5);
+  --shadow-modal: var(--elev-5);
   --shadow-glow-brand: 0 20px 50px -18px rgba(20, 99, 255, 0.55);
   --shadow-glow-mint: 0 20px 50px -18px rgba(16, 185, 163, 0.5);
 
@@ -1792,3 +1792,8 @@ p {
   .skeleton { background-image: none; }
   .anim-d1, .anim-d2, .anim-d3, .anim-d4 { animation-delay: 0ms !important; }
 }
+
+/* AA kontrast: açık zeminde amber-600 / mint-500 METİN tonları koyulaştırılır
+   (dolgu, kenarlık ve ikon rengi etkilenmez; koyu temada -700 tonları açık tona çevrilir). */
+.text-amber-600 { color: var(--amber-700); }
+.text-mint-500 { color: var(--mint-700); }

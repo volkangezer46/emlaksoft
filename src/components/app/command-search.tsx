@@ -366,7 +366,7 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
         <span className="block truncate text-base font-bold tabular-nums text-ink-950">= {calc.display}</span>
         <span className="block truncate text-xs text-text-muted">{calc.currency} · Enter panoya kopyalar</span>
       </span>
-      <span className="ml-2 shrink-0 rounded-[6px] bg-brand-600/10 px-1.5 py-0.5 text-xs font-bold text-brand-600">
+      <span className="ml-2 shrink-0 rounded-md bg-brand-600/10 px-1.5 py-0.5 text-xs font-bold text-brand-600">
         Hesap
       </span>
     </button>
@@ -392,7 +392,7 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
         <span className="truncate sm:hidden">Ara…</span>
         <span className="hidden truncate sm:inline">Müşteri, portföy, anlaşma, görev, ilan no ara…</span>
-        <span className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded-[7px] border border-hairline bg-surface px-2 py-1 text-xs text-text-faint sm:flex">
+        <span className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded-md border border-hairline bg-surface px-2 py-1 text-xs text-text-faint sm:flex">
           <Command className="h-3 w-3" /> K
         </span>
       </button>
@@ -482,7 +482,7 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
                                 </span>
                                 <span className="flex-1 truncate text-sm font-semibold text-ink-950">{item.label}</span>
                                 {meta ? (
-                                  <span className={`ml-2 shrink-0 rounded-[6px] px-1.5 py-0.5 text-xs font-bold ${meta.tone}`}>
+                                  <span className={`ml-2 shrink-0 rounded-md px-1.5 py-0.5 text-xs font-bold ${meta.tone}`}>
                                     {meta.label}
                                   </span>
                                 ) : null}
@@ -560,7 +560,7 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
                             <span className="block truncate text-xs text-text-muted">{hit.subtitle}</span>
                           </span>
                           {/* Sonuç tipi rozeti */}
-                          <span className={`ml-2 shrink-0 rounded-[6px] px-1.5 py-0.5 text-xs font-bold ${meta.tone}`}>
+                          <span className={`ml-2 shrink-0 rounded-md px-1.5 py-0.5 text-xs font-bold ${meta.tone}`}>
                             {meta.label}
                           </span>
                         </button>
@@ -576,14 +576,14 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
             {/* Klavye ipuçları çubuğu */}
             <div className="flex items-center gap-3 border-t border-line px-4 py-2 text-xs text-text-faint">
               <span className="flex items-center gap-1">
-                <kbd className="rounded-[5px] border border-hairline bg-canvas px-1 py-0.5 text-xs">↑↓</kbd> gezin
+                <kbd className="rounded-sm border border-hairline bg-canvas px-1 py-0.5 text-xs">↑↓</kbd> gezin
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="rounded-[5px] border border-hairline bg-canvas px-1 py-0.5 text-xs">Enter</kbd>
+                <kbd className="rounded-sm border border-hairline bg-canvas px-1 py-0.5 text-xs">Enter</kbd>
                 {calcVisible ? "kopyala" : "aç"}
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="rounded-[5px] border border-hairline bg-canvas px-1 py-0.5 text-xs">Esc</kbd> kapat
+                <kbd className="rounded-sm border border-hairline bg-canvas px-1 py-0.5 text-xs">Esc</kbd> kapat
               </span>
             </div>
           </div>

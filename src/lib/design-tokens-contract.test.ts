@@ -29,6 +29,14 @@ describe("tasarım token sözleşmesi", () => {
     expect(offenders(/rounded(?:-[a-z]{1,2})?-\[(?:[89]|1\d|2[0-8])px\]/)).toEqual([]);
   });
 
+  it("src/components: rounded-[Npx], text-[Npx] ve text-zinc-* yok (token/semantik sınıf kullan)", () => {
+    const comps = FILES.filter((f) => f.split("\\").join("/").startsWith("src/components/"));
+    const bad = (re: RegExp) => comps.filter((f) => re.test(readFileSync(f, "utf8")));
+    expect(bad(/rounded(?:-[a-z]{1,2})?-\[\d+px\]/)).toEqual([]);
+    expect(bad(/text-\[\d+px\]/)).toEqual([]);
+    expect(bad(/text-zinc-/)).toEqual([]);
+  });
+
   it("koyu tema yalnız /app ve /admin için tanımlı ve kök layout'ta açılış script'i var", () => {
     const layout = readFileSync("src/app/layout.tsx", "utf8");
     expect(layout).toContain("THEME_BOOT_SCRIPT");
