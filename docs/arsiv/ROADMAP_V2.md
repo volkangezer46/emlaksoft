@@ -1,3 +1,5 @@
+> **ARŞİV — güncel kaynak: docs/ROADMAP.md** (durum: docs/DURUM.md, deploy: docs/DEPLOY.md). Bu belge tarihsel kayıttır; sayılar ve talimatlar eskimiş olabilir.
+
 # EmlakSoft — Program V2
 
 Hedef: Türk mevzuatına uygun, dünyadaki emlak CRM/SaaS özelliklerini barındıran,

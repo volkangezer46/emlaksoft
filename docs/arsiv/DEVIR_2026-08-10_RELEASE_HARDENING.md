@@ -1,3 +1,5 @@
+> **ARŞİV — güncel kaynak: docs/ROADMAP.md** (durum: docs/DURUM.md, deploy: docs/DEPLOY.md). Bu belge tarihsel kayıttır; sayılar ve talimatlar eskimiş olabilir.
+
 # EmlakSoft — 10 Ağustos 2026 Güvenli Devir Kaydı
 
 > **Durum:** Kod ve kalite çalışmaları tamamlandı; yayın dış bağımlılıklar nedeniyle bilinçli olarak durduruldu.

@@ -1,3 +1,5 @@
+> **ARŞİV — güncel kaynak: docs/ROADMAP.md** (durum: docs/DURUM.md, deploy: docs/DEPLOY.md). Bu belge tarihsel kayıttır; sayılar ve talimatlar eskimiş olabilir.
+
 # EmlakSoft — Master Uygulama Planı
 
 **Son güncelleme:** 2026-07-26 (uygulama dalgaları A–D sonrası)  

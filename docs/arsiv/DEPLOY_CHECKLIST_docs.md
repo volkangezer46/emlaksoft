@@ -1,3 +1,5 @@
+> **ARŞİV — güncel kaynak: docs/ROADMAP.md** (durum: docs/DURUM.md, deploy: docs/DEPLOY.md). Bu belge tarihsel kayıttır; sayılar ve talimatlar eskimiş olabilir.
+
 # Production Release Guide
 
 Bu rehber Vercel + Supabase üretim hattının güncel sözleşmesidir. Rota ve

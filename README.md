@@ -42,11 +42,11 @@
 
 | Layer | Stack |
 |-------|-------|
-| **Frontend** | Next.js 16 (App Router) · React 19 · TypeScript 6 · Tailwind 4 |
+| **Frontend** | Next.js 16 (App Router) · React 19 · TypeScript 5 · Tailwind 4 |
 | **Backend** | Supabase (PostgreSQL + Auth + Storage + Realtime) |
 | **Payments** | iyzico Checkout Form · Webhook |
 | **Deployment** | Vercel · Cron Jobs |
-| **Testing** | TypeScript strict mode · Permission contract tests |
+| **Testing** | Vitest (birim + contract) · Playwright (public smoke E2E) · TypeScript strict |
 
 ---
 
@@ -194,10 +194,8 @@ npx vercel link
    - `RELEASE_MIGRATION` + `RELEASE_MIGRATION_CHECKSUM` (`npm run check:migrations -- --release`)
    - iyzico keys (eğer varsa)
 
-3. Deploy:
-```bash
-npx vercel --prod
-```
+3. Deploy sırası: önce veritabanı (`npm run db:migrate`), sonra kod. Tam sıra, zorunlu env listesi ve
+   demo bayrakları için `docs/DEPLOY.md` tek kaynaktır.
 
 ### Cron Jobs
 
@@ -217,7 +215,7 @@ kontrolünde kullanın. Güncel rota/sıklık listesi doğrudan `vercel.json` ve
 
 ### Deploy Checklist
 
-Detaylı adımlar için `DEPLOY_CHECKLIST.md`; olay, rollback ve restore
+Detaylı adımlar için `docs/DEPLOY.md`; olay, rollback ve restore
 prosedürleri için `docs/runbooks/` dizinine bakın.
 
 ---
@@ -252,8 +250,14 @@ prosedürleri için `docs/runbooks/` dizinine bakın.
 # Dev server
 npm run dev
 
-# Type check
+# Type check, lint, birim test, build
 npm run type-check
+npm run lint
+npm run test
+npm run build
+
+# Public E2E (Playwright, salt-okunur)
+npm run test:e2e:public
 
 # Smoke test
 npm run test:smoke
@@ -269,20 +273,21 @@ npm run geo:sync
 | Dosya | İçerik |
 |-------|--------|
 | `README.md` | Ana proje dokümantasyonu (bu dosya) |
-| `docs/PREMIUM_PLUS.md` | Premium Plus özellik envanteri |
-| `docs/MASTER_PLAN.md` | Ürün vizyonu & roadmap |
-| `docs/SPRINT_FINAL.md` | Sprint retrospektifi |
+| `docs/ROADMAP.md` | Tek güncel yol haritası |
+| `docs/DURUM.md` | Bugünün durumu (sürümler, sayılar, son 7 gün) |
+| `docs/OZELLIK_MASTER_LISTESI.md` | Özellik envanteri |
 | `MIGRATION_GUIDE.md` | Veritabanı migration rehberi |
-| `DEPLOY_CHECKLIST.md` | Production deploy kontrol listesi |
+| `docs/DEPLOY.md` | Tek deploy sırası ve env listesi |
 
 ---
 
 ## 🧪 Test stratejisi
 
-1. **Type safety**: TypeScript strict mode (`npm run type-check`)
-2. **Smoke test**: Auth + DB bağlantısı (`npm run test:smoke`)
-3. **Permission contract**: `000011_permission_tests.sql` (sembolik)
-4. **Manual QA**: Her sprint sonrası staging testleri
+1. **Type safety**: TypeScript strict mode (`npm run type-check`) ve `npm run lint`
+2. **Birim + contract testleri**: Vitest (`npm run test`)
+3. **Public E2E (salt-okunur)**: Playwright (`npm run test:e2e:public`); oturumlu E2E yalnız izole test DB'de
+4. **Statik kapılar**: `check:links`, `check:migrations`, `check:cron`, `audit:actions`, `audit:deps`, `db:rls-audit`
+5. **Smoke test**: Auth + DB bağlantısı (`npm run test:smoke`)
 
 ---
 
@@ -301,18 +306,6 @@ Tescilli yazılım © 2026 EmlakSoft
 
 ---
 
-## 🎉 Sprint tamamlandı!
+## Sıradaki adımlar
 
-✅ **10+ yeni özellik**  
-✅ **3 yeni migration**  
-✅ **iyzico live tahsilat**  
-✅ **Müşteri 360 + dosyalar**  
-✅ **Leak Shield proaktif uyarı**  
-✅ **useApi + ErrorBoundary**  
-✅ **Smoke test + docs**
-
-**Sıradaki adımlar:** `docs/PREMIUM_PLUS.md` → kalan özellikler
-
----
-
-Sorular için: [your-email@emlaksoft.com](mailto:your-email@emlaksoft.com)
+Açık işler ve öncelikler: `docs/ROADMAP.md` · bugünün durumu: `docs/DURUM.md`.

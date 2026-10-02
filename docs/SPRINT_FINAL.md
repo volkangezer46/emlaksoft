@@ -1,3 +1,5 @@
+> **ARŞİV — güncel kaynak: docs/ROADMAP.md** (durum: docs/DURUM.md, deploy: docs/DEPLOY.md). Bu belge tarihsel kayıttır; sayılar ve talimatlar eskimiş olabilir.
+
 # Premium Plus Sprint - Final Summary
 
 **Tarih:** 2026-07-22  

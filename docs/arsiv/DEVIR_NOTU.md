@@ -1,3 +1,5 @@
+> **ARŞİV — güncel kaynak: docs/ROADMAP.md** (durum: docs/DURUM.md, deploy: docs/DEPLOY.md). Bu belge tarihsel kayıttır; sayılar ve talimatlar eskimiş olabilir.
+
 # DEVİR NOTU — Başka bilgisayarda devam etme rehberi
 
 **Tarih:** 2026-07-27 · Bu belge tarihsel ürün/devir geçmişidir.
