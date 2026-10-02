@@ -50,7 +50,7 @@ alter table public.tenant_integrations
       connection_status = 'healthy'
       and binding_verified_at is not null
       and binding_fingerprint ~ '^[0-9a-f]{64}$'
-      and binding_fingerprint = encode(digest(
+      and binding_fingerprint = encode(extensions.digest(
         external_account_id || '|' || whatsapp_business_account_id || '|' || graph_api_version,
         'sha256'
       ), 'hex')
@@ -123,7 +123,7 @@ begin
   end if;
 
   if new.provider = 'whatsapp' and new.is_active then
-    v_expected_fingerprint := encode(digest(
+    v_expected_fingerprint := encode(extensions.digest(
       new.external_account_id || '|' || new.whatsapp_business_account_id || '|' || new.graph_api_version,
       'sha256'
     ), 'hex');
@@ -258,7 +258,7 @@ begin
    where tenant_id = p_tenant_id
      and provider = 'whatsapp';
 
-  v_fingerprint := encode(digest(
+  v_fingerprint := encode(extensions.digest(
     v_phone_number_id || '|' || v_waba_id || '|' || v_graph_version,
     'sha256'
   ), 'hex');
@@ -477,7 +477,7 @@ as $$
     and ti.is_active = true
     and ti.connection_status = 'healthy'
     and ti.binding_verified_at is not null
-    and ti.binding_fingerprint = encode(digest(
+    and ti.binding_fingerprint = encode(extensions.digest(
       ti.external_account_id || '|' || ti.whatsapp_business_account_id || '|' || ti.graph_api_version,
       'sha256'
     ), 'hex')

@@ -805,7 +805,7 @@ begin
   end if;
 
   v_request_key := encode(
-    digest(
+    extensions.digest(
       p_public_token::text || '|' ||
       floor(extract(epoch from p_start_at) * 1000)::bigint::text || '|' ||
       btrim(p_phone) || '|' ||

@@ -57,7 +57,8 @@ describe("Meta inbound webhook production contract", () => {
     expect(bindingMigration).toContain("ti.connection_status = 'healthy'");
     expect(bindingMigration).toContain("ti.binding_verified_at is not null");
     expect(bindingMigration).toContain("ti.whatsapp_business_account_id = btrim");
-    expect(bindingMigration).toContain("ti.binding_fingerprint = encode(digest");
+    // pgcrypto Supabase'de `extensions` şemasında; boş search_path'li fonksiyonlarda şema nitelemesi şart.
+    expect(bindingMigration).toContain("ti.binding_fingerprint = encode(extensions.digest");
   });
 
   it("applies outbound statuses through an atomic tenant-bound campaign RPC", () => {
