@@ -9,6 +9,7 @@ import {
   toTelHref,
   toWhatsAppLink,
   toWhatsAppMsisdn,
+  toWhatsAppShareLink,
 } from "./phone";
 
 /**
@@ -151,5 +152,18 @@ describe("dış servis biçimleri", () => {
   it("boş numarada E.164 boş döner, '+90' gibi yarım değer üretmez", () => {
     expect(toE164TurkishPhone(null)).toBe("");
     expect(toWhatsAppMsisdn("")).toBe("");
+  });
+});
+
+describe("WhatsApp tek kaynak (ülke kodu normalizasyonu)", () => {
+  it.each(["05321234567", "905321234567", "+905321234567", "0090 532 123 45 67", "532 123 45 67"])(
+    "%s -> wa.me/905321234567",
+    (v) => {
+      expect(toWhatsAppLink(v)).toBe("https://wa.me/905321234567");
+    },
+  );
+  it("paylaşım linki boş mesajda null", () => {
+    expect(toWhatsAppShareLink(" ")).toBeNull();
+    expect(toWhatsAppShareLink("a b")).toBe("https://wa.me/?text=a%20b");
   });
 });

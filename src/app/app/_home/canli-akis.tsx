@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MessageCircle, Phone, Zap } from "lucide-react";
+import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { Widget } from "../dashboard-widgets";
 import { loadActivityFeed, type HomeCtx } from "./data";
 import { timeFmt } from "./format";
@@ -24,8 +25,10 @@ export async function CanliAkis({ ctx }: { ctx: HomeCtx }) {
       href: `/app/musteriler/${c.id}`,
       actions: c.phone
         ? [
-            { key: "tel", kind: "tel" as const, href: `tel:${c.phone}` },
-            { key: "wa", kind: "wa" as const, href: `https://wa.me/${String(c.phone).replace(/\D/g, "")}` },
+            { key: "tel", kind: "tel" as const, href: toTelHref(c.phone) ?? `tel:${c.phone}` },
+            ...(toWhatsAppLink(c.phone)
+              ? [{ key: "wa", kind: "wa" as const, href: toWhatsAppLink(c.phone) as string }]
+              : []),
           ]
         : [],
     })),

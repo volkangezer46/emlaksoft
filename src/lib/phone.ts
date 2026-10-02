@@ -66,6 +66,12 @@ export function toWhatsAppLink(input: string | null | undefined, message?: strin
   return `https://wa.me/${msisdn}${query}`;
 }
 
+/** Alıcı seçmeden paylaşım linki (wa.me/?text=); mesaj boşsa null. */
+export function toWhatsAppShareLink(message: string | null | undefined): string | null {
+  const text = (message ?? "").trim();
+  return text ? `https://wa.me/?text=${encodeURIComponent(text)}` : null;
+}
+
 export function toTelHref(input: string | null | undefined): string | null {
   const digits = normalizeTurkishPhone(input);
   if (!digits) return null;
