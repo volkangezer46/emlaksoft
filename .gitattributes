@@ -1,0 +1,8 @@
+# Satır sonlarını normalize et: depoda LF, çalışma ağacında platforma göre.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.woff2 binary
