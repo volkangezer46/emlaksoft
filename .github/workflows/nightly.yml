@@ -1,0 +1,53 @@
+name: Nightly
+
+# Gece boyu salt-okunur denetimler. Yazma yapan hiçbir adım yok:
+# - db:rls-audit yalnız katalog sorgular.
+# - cron:smoke yalnız --auth-only modunda (yetkisiz isteğin reddini doğrular).
+# Gerekli secret/variable tanımlı değilse ilgili adım atlanır, iş hata vermez.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  readonly-audits:
+    name: Salt-okunur denetimler
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_POOLER_URL: ${{ secrets.DATABASE_POOLER_URL }}
+      APP_URL: ${{ vars.APP_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: RLS denetimi (salt-okunur)
+        if: ${{ env.DATABASE_URL != '' || env.DATABASE_POOLER_URL != '' }}
+        run: npm run db:rls-audit
+
+      - name: RLS denetimi atlandı
+        if: ${{ env.DATABASE_URL == '' && env.DATABASE_POOLER_URL == '' }}
+        run: echo "DATABASE_URL / DATABASE_POOLER_URL tanımlı değil; db:rls-audit atlandı."
+
+      - name: Cron yetki smoke (yalnız --auth-only, salt-okunur)
+        if: ${{ env.APP_URL != '' }}
+        run: npm run cron:smoke -- --auth-only
+
+      - name: Cron smoke atlandı
+        if: ${{ env.APP_URL == '' }}
+        run: echo "APP_URL değişkeni tanımlı değil; cron:smoke atlandı."

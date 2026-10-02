@@ -29,6 +29,7 @@
     "check:migrations": "tsx scripts/validate-migrations.ts",
     "check:workflow-data": "tsx scripts/check-core-workflow-data.ts",
     "check:cron": "tsx scripts/check-cron-contracts.ts",
+    "check:bundle": "tsx scripts/check-bundle-budget.ts",
     "test:e2e:public": "playwright test --project=public",
     "audit:deps": "tsx scripts/audit-gate.ts"
   },
