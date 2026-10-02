@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Link2, Loader2, MessageCircle, Share2 } from "lucide-react";
 import { generateValuationShareLink } from "@/app/actions/valuations";
+import { toWhatsAppShareLink } from "@/lib/phone";
 import { useToast } from "@/components/app/toast-provider";
 
 /**
@@ -43,9 +44,7 @@ export function ShareButton({ valuationId, title }: { valuationId: string; title
   }
 
   const whatsappHref = shareUrl
-    ? `https://wa.me/?text=${encodeURIComponent(
-        `${title ?? "Değerleme raporu"} — değerleme raporunuz hazır: ${shareUrl}`,
-      )}`
+    ? toWhatsAppShareLink(`${title ?? "Değerleme raporu"} — değerleme raporunuz hazır: ${shareUrl}`)
     : null;
 
   return (

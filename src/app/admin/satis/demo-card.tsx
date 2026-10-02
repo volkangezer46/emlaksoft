@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowUpRight, Building2, Check, MailCheck, MailWarning, MapPin, MessageCircle, Phone, Rocket, Send, StickyNote, UserPlus } from "lucide-react";
+import { toWhatsAppLink } from "@/lib/phone";
 import { addDemoNote, assignDemo, convertDemoToTenant, resendConvertedOwnerAccessLink, setDemoStatus, type ConvertResult } from "@/app/actions/platform-sales";
 
 export type DemoRow = {
@@ -48,7 +49,7 @@ export function DemoCard({ row, staff }: { row: DemoRow; staff: { id: string; fu
   const [accessMessage, setAccessMessage] = useState<string | null>(null);
 
   const current = STATUS.find((s) => s.key === row.status) ?? STATUS[0]!;
-  const waPhone = row.phone?.replace(/\D/g, "").replace(/^0/, "90");
+  const waHref = toWhatsAppLink(row.phone);
 
   const run = (fn: (fd: FormData) => Promise<unknown>, fd: FormData) => {
     startTransition(async () => {
@@ -141,8 +142,8 @@ export function DemoCard({ row, staff }: { row: DemoRow; staff: { id: string; fu
             <a href={`tel:${row.phone}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300">
               <Phone className="h-3.5 w-3.5 text-brand-600" /> Ara
             </a>
-            {waPhone ? (
-              <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-mint-500/50">
+            {waHref ? (
+              <a href={waHref} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-mint-500/50">
                 <MessageCircle className="h-3.5 w-3.5 text-mint-600" /> WhatsApp
               </a>
             ) : null}

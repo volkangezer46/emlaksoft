@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2,
@@ -19,6 +19,7 @@ import {
   Loader2,
 } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
+import { createRecentsStore, matchesQuery } from "@/lib/palette-core";
 
 type Hit = {
   id: string;
@@ -43,6 +44,9 @@ const ALL_NAV: NavCmd[] = [
   { label: "Sistem sağlığı", href: "/admin/sistem", icon: Radar, module: "sistem" },
 ];
 
+// Yalnız yetkili sayfalar kaydedilir ve gösterilir (kayıt içeriği KVKK gereği saklanmaz).
+const recentsStore = createRecentsStore("admin_palette_recents");
+
 const typeIcon = { tenant: Building2, member: User, ticket: LifeBuoy };
 const typeLabel = { tenant: "Ofis", member: "Kullanıcı", ticket: "Destek talebi" };
 
@@ -56,15 +60,21 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const navCmds = ALL_NAV.filter((n) => modules.includes(n.module));
-  const filteredNav = q
-    ? navCmds.filter((n) => n.label.toLocaleLowerCase("tr-TR").includes(q.toLocaleLowerCase("tr-TR")))
-    : navCmds;
+  const filteredNav = q ? navCmds.filter((n) => matchesQuery(n.label, q)) : navCmds;
+  const recents = useSyncExternalStore(recentsStore.subscribe, recentsStore.read, recentsStore.getServerSnapshot);
+  const recentNav = q.trim()
+    ? []
+    : recents.flatMap((r) => {
+        const cmd = navCmds.find((n) => n.href === r.href);
+        return cmd ? [cmd] : [];
+      });
 
   // Sorgu 2 karakterin altındayken sunucu sonuçları gösterilmez. Bunu efektle
   // `hits`'i boşaltarak değil, türeterek yapıyoruz — state tek kaynak kalıyor.
   const shownHits = q.trim().length < 2 ? [] : hits;
 
   const flat = [
+    ...recentNav.map((n) => ({ kind: "recent" as const, ...n })),
     ...filteredNav.map((n) => ({ kind: "nav" as const, ...n })),
     ...shownHits.map((h) => ({ kind: "hit" as const, ...h })),
   ];
@@ -122,6 +132,8 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
 
   const go = useCallback(
     (href: string) => {
+      const cmd = ALL_NAV.find((n) => n.href === href);
+      if (cmd) recentsStore.push({ label: cmd.label, href: cmd.href, kind: "page" });
       close();
       router.push(href);
     },
@@ -203,15 +215,22 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
             </div>
 
             <div id="admin-command-results" role="listbox" aria-label="Arama sonuçları" className="max-h-[min(60vh,28rem)] overflow-y-auto p-2">
-              {filteredNav.length > 0 ? (
+              {filteredNav.length > 0 && recentNav.length === 0 ? (
                 <p className="px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Sayfalar</p>
               ) : null}
               {flat.map((item, i) => {
-                const Icon = item.kind === "nav" ? item.icon : typeIcon[item.type];
+                const Icon = item.kind === "hit" ? typeIcon[item.type] : item.icon;
                 const isActive = i === activeIndex;
-                const isFirstHit = item.kind === "hit" && (flat[i - 1]?.kind ?? "nav") === "nav";
+                const isFirstHit = item.kind === "hit" && (flat[i - 1]?.kind ?? "nav") !== "hit";
+                const isFirstNav = item.kind === "nav" && (flat[i - 1]?.kind ?? "nav") !== "nav";
                 return (
                   <div key={`${item.kind}-${item.href}-${i}`}>
+                    {item.kind === "recent" && i === 0 ? (
+                      <p className="px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Son görülenler</p>
+                    ) : null}
+                    {isFirstNav && recentNav.length > 0 ? (
+                      <p className="px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Git</p>
+                    ) : null}
                     {isFirstHit ? (
                       <p className="px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Kayıtlar</p>
                     ) : null}
@@ -235,7 +254,7 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold text-ink-950">
-                          {item.kind === "nav" ? item.label : item.title}
+                          {item.kind === "hit" ? item.title : item.label}
                         </span>
                         {item.kind === "hit" ? (
                           <span className="block truncate text-xs text-text-faint">

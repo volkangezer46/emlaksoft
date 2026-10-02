@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   useCallback,
@@ -11,10 +11,8 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import {
-  BarChart3,
   Building2,
   Calculator,
-  CalendarDays,
   Command,
   Handshake,
   History,
@@ -22,17 +20,22 @@ import {
   ListChecks,
   Loader2,
   Search,
-  Settings,
   Sparkles,
   Target,
   Users,
-  Wallet,
   X,
 } from "lucide-react";
 import { searchWorkspace, type SearchHit } from "@/app/actions/search";
 import { evaluatePaletteInput } from "@/lib/palette-calc";
 import { useToast } from "@/components/app/toast-provider";
 import type { AppModule } from "@/lib/permissions";
+import {
+  createRecentsStore,
+  getAppActions,
+  getAppGoItems,
+  type PaletteEntry,
+  type RecentItem,
+} from "@/lib/palette-core";
 
 const kindMeta: Record<SearchHit["kind"], { label: string; icon: typeof Users; tone: string }> = {
   customer: { label: "Müşteri", icon: Users, tone: "text-brand-600 bg-brand-600/10" },
@@ -43,18 +46,6 @@ const kindMeta: Record<SearchHit["kind"], { label: string; icon: typeof Users; t
   ticket: { label: "Destek", icon: LifeBuoy, tone: "text-amber-600 bg-amber-400/15" },
 };
 
-// Boş palet durumu: sayfa navigasyonu kısayolları (ok tuşları + Enter da çalışır).
-const QUICK_ACTIONS: { label: string; href: string; icon: typeof Users; module: AppModule }[] = [
-  { label: "Müşteriler", href: "/app/musteriler", icon: Users, module: "customers" },
-  { label: "Portföyler", href: "/app/portfoyler", icon: Building2, module: "properties" },
-  { label: "Anlaşmalar", href: "/app/anlasmalar", icon: Handshake, module: "commissions" },
-  { label: "Komisyon", href: "/app/komisyon", icon: Wallet, module: "commissions" },
-  { label: "Raporlar", href: "/app/raporlar", icon: BarChart3, module: "reports" },
-  { label: "Görevler", href: "/app/gorevler", icon: ListChecks, module: "tasks" },
-  { label: "Randevular", href: "/app/randevular", icon: CalendarDays, module: "appointments" },
-  { label: "Ayarlar", href: "/app/ayarlar", icon: Settings, module: "settings" },
-];
-
 const RECENT_KIND_MODULE: Record<SearchHit["kind"], AppModule> = {
   customer: "customers",
   property: "properties",
@@ -64,74 +55,10 @@ const RECENT_KIND_MODULE: Record<SearchHit["kind"], AppModule> = {
   ticket: "support",
 };
 
-/* ------------------------------------------------------------------
-   Son kullanılanlar — localStorage destekli küçük dış store,
-   dashboard-widgets ile aynı desen: useSyncExternalStore ile okunur,
-   SSR/ilk hydrate'te boş liste döner (palet zaten kapalı), açılınca
-   gerçek liste gelir; hydration hatası üretmez.
-   ------------------------------------------------------------------ */
-type RecentKind = SearchHit["kind"] | "page";
-type RecentItem = { label: string; href: string; kind: RecentKind };
+const recentsStore = createRecentsStore("palette_recents");
 
-const RECENTS_KEY = "palette_recents";
-const MAX_RECENTS = 8;
-const NO_RECENTS: RecentItem[] = [];
-
-let recentsRaw: string | null = null;
-let recentsCache: RecentItem[] = NO_RECENTS;
-const recentsListeners = new Set<() => void>();
-
-function readRecents(): RecentItem[] {
-  let raw: string | null = null;
-  try {
-    raw = window.localStorage.getItem(RECENTS_KEY);
-  } catch {
-    return recentsCache;
-  }
-  if (raw !== recentsRaw) {
-    recentsRaw = raw;
-    try {
-      const parsed: unknown = raw ? JSON.parse(raw) : [];
-      recentsCache = Array.isArray(parsed)
-        ? parsed
-            .filter(
-              (x): x is RecentItem =>
-                !!x &&
-                typeof x === "object" &&
-                typeof (x as RecentItem).label === "string" &&
-                typeof (x as RecentItem).href === "string" &&
-                typeof (x as RecentItem).kind === "string",
-            )
-            .slice(0, MAX_RECENTS)
-        : NO_RECENTS;
-    } catch {
-      recentsCache = NO_RECENTS;
-    }
-  }
-  return recentsCache;
-}
-
-function subscribeRecents(cb: () => void) {
-  recentsListeners.add(cb);
-  return () => recentsListeners.delete(cb);
-}
-
-function pushRecent(item: RecentItem) {
-  const next = [item, ...readRecents().filter((r) => r.href !== item.href)].slice(0, MAX_RECENTS);
-  const raw = JSON.stringify(next);
-  try {
-    window.localStorage.setItem(RECENTS_KEY, raw);
-  } catch {
-    // depolama kapalı/dolu — yalnız oturum içi çalışır
-  }
-  recentsRaw = raw;
-  recentsCache = next;
-  recentsListeners.forEach((l) => l());
-}
-
-function recentIcon(item: RecentItem): typeof Users {
-  if (item.kind !== "page") return kindMeta[item.kind].icon;
-  return QUICK_ACTIONS.find((a) => a.href === item.href)?.icon ?? History;
+function isSearchKind(kind: string): kind is SearchHit["kind"] {
+  return kind in kindMeta;
 }
 
 export function CommandSearch({ accessibleModules }: { accessibleModules: AppModule[] }) {
@@ -145,20 +72,23 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
   const [active, setActive] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchSequence = useRef(0);
-  const recents = useSyncExternalStore(subscribeRecents, readRecents, () => NO_RECENTS);
+  const recents = useSyncExternalStore(recentsStore.subscribe, recentsStore.read, recentsStore.getServerSnapshot);
   const allowedModules = useMemo(() => new Set(accessibleModules), [accessibleModules]);
-  const quickActions = useMemo(
-    () => QUICK_ACTIONS.filter((action) => allowedModules.has(action.module)),
-    [allowedModules],
-  );
-  const visibleRecents = useMemo(
-    () =>
-      recents.filter((item) => {
-        if (item.kind !== "page") return allowedModules.has(RECENT_KIND_MODULE[item.kind]);
-        const action = QUICK_ACTIONS.find((candidate) => candidate.href === item.href);
-        return Boolean(action && allowedModules.has(action.module));
-      }),
-    [allowedModules, recents],
+  // Yetki süzgeci: Eylemler ve Git, menüyle aynı kaynaktan (nav-config) ve erişilebilir modüllerden gelir.
+  const quickActions = useMemo(() => getAppActions(accessibleModules, q), [accessibleModules, q]);
+  const goItems = useMemo(() => getAppGoItems(accessibleModules, q), [accessibleModules, q]);
+  const visibleRecents = useMemo(() => {
+    const pageHrefs = new Set([
+      ...getAppActions(accessibleModules).map((a) => a.href),
+      ...getAppGoItems(accessibleModules).map((a) => a.href),
+    ]);
+    return recents.filter((item) =>
+      isSearchKind(item.kind) ? allowedModules.has(RECENT_KIND_MODULE[item.kind]) : pageHrefs.has(item.href),
+    );
+  }, [accessibleModules, allowedModules, recents]);
+  const pageIcons = useMemo(
+    () => new Map<string, PaletteEntry["icon"]>([...getAppActions(accessibleModules), ...getAppGoItems(accessibleModules)].map((e) => [e.href, e.icon])),
+    [accessibleModules],
   );
 
   const runSearch = useCallback((value: string) => {
@@ -232,7 +162,7 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
   const allHref = `/app/arama-sonuclari?q=${encodeURIComponent(trimmed)}`;
 
   // Gezinilebilir satır sırası: [hesap] → [son kullanılanlar → hızlı eylemler | sonuçlar] → [tüm sonuçlar] → [AI]
-  const baseCount = calcVisible ? 1 : showQuick ? visibleRecents.length + quickActions.length : hits.length;
+  const baseCount = calcVisible ? 1 : showQuick ? visibleRecents.length + quickActions.length + goItems.length : hits.length;
   const allIndex = baseCount;
   const askIndex = baseCount + (allVisible ? 1 : 0);
   const maxIndex = baseCount + (allVisible ? 1 : 0) + (askVisible ? 1 : 0) - 1;
@@ -247,7 +177,7 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
 
   // Seçilen kayıt/sayfa son kullanılanlara yazılır (max 8).
   function goRecent(item: RecentItem) {
-    pushRecent(item);
+    recentsStore.push(item);
     goHref(item.href);
   }
 
@@ -274,7 +204,7 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
         return;
       }
       const qi = i - visibleRecents.length;
-      const action = quickActions[qi];
+      const action = quickActions[qi] ?? goItems[qi - quickActions.length];
       if (action) {
         goRecent({ label: action.label, href: action.href, kind: "page" });
         return;
@@ -455,11 +385,11 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
                 <div>
                   {visibleRecents.length > 0 ? (
                     <>
-                      <p className="px-3 pb-1.5 pt-2 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Son kullanılanlar</p>
+                      <p className="px-3 pb-1.5 pt-2 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Son görülenler</p>
                       <ul className="space-y-1">
                         {visibleRecents.map((item, i) => {
-                          const Icon = recentIcon(item);
-                          const meta = item.kind !== "page" ? kindMeta[item.kind] : null;
+                          const Icon = isSearchKind(item.kind) ? kindMeta[item.kind].icon : (pageIcons.get(item.href) ?? History);
+                          const meta = isSearchKind(item.kind) ? kindMeta[item.kind] : null;
                           return (
                             <li key={item.href}>
                               <button
@@ -493,37 +423,46 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
                       </ul>
                     </>
                   ) : null}
-                  <p className="px-3 pb-1.5 pt-2 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Hızlı eylemler</p>
-                  <ul className="space-y-1">
-                    {quickActions.map((action, i) => {
-                      const Icon = action.icon;
-                      const idx = visibleRecents.length + i;
-                      return (
-                        <li key={action.href}>
-                          <button
-                            id={`app-command-option-${idx}`}
-                            role="option"
-                            aria-selected={idx === active}
-                            type="button"
-                            onClick={() => goRecent({ label: action.label, href: action.href, kind: "page" })}
-                            onMouseEnter={() => setActive(idx)}
-                            className={`flex w-full items-center gap-3 rounded-[var(--radius-card)] px-3 py-2.5 text-left transition ${
-                              idx === active ? "bg-brand-600/8" : "hover:bg-canvas"
-                            }`}
-                          >
-                            <span
-                              className={`grid h-9 w-9 place-items-center rounded-[var(--radius-control)] transition ${
-                                idx === active ? "bg-brand-600/10 text-brand-600" : "bg-canvas text-text-muted"
-                              }`}
-                            >
-                              <Icon className="h-4 w-4" />
-                            </span>
-                            <span className="flex-1 truncate text-sm font-semibold text-ink-950">{action.label}</span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  {[
+                    { title: "Eylemler", entries: quickActions, offset: visibleRecents.length },
+                    { title: "Git", entries: goItems, offset: visibleRecents.length + quickActions.length },
+                  ].map((group) =>
+                    group.entries.length > 0 ? (
+                      <div key={group.title} role="group" aria-label={group.title}>
+                        <p className="px-3 pb-1.5 pt-2 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">{group.title}</p>
+                        <ul className="space-y-1">
+                          {group.entries.map((action, i) => {
+                            const Icon = action.icon;
+                            const idx = group.offset + i;
+                            return (
+                              <li key={action.href}>
+                                <button
+                                  id={`app-command-option-${idx}`}
+                                  role="option"
+                                  aria-selected={idx === active}
+                                  type="button"
+                                  onClick={() => goRecent({ label: action.label, href: action.href, kind: "page" })}
+                                  onMouseEnter={() => setActive(idx)}
+                                  className={`flex w-full items-center gap-3 rounded-[var(--radius-card)] px-3 py-2.5 text-left transition ${
+                                    idx === active ? "bg-brand-600/8" : "hover:bg-canvas"
+                                  }`}
+                                >
+                                  <span
+                                    className={`grid h-9 w-9 place-items-center rounded-[var(--radius-control)] transition ${
+                                      idx === active ? "bg-brand-600/10 text-brand-600" : "bg-canvas text-text-muted"
+                                    }`}
+                                  >
+                                    <Icon className="h-4 w-4" />
+                                  </span>
+                                  <span className="flex-1 truncate text-sm font-semibold text-ink-950">{action.label}</span>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ) : null,
+                  )}
                   {askRow ? <div className="mt-1 border-t border-line pt-1">{askRow}</div> : null}
                   <p className="mt-1 border-t border-line px-3 py-2.5 text-center text-xs text-text-muted">
                     Kayıt aramak için en az 2 karakter yazın: müşteri, portföy, talep, anlaşma, görev, destek.
