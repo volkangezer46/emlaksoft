@@ -51,7 +51,7 @@ Ticari beta (güvenilir "Ofis paketi") → tam vizyon. Uygulama canlıda: https:
 ### P1 — Ürün
 - [ ] **Türkiye uyum paketi:** EİDS tamamlama (iskelet var), İYS entegrasyonu, GİB BTRANS raporlama
   (Taşınmaz Ticareti Yönetmeliği), KVKK akışlarının sağlamlaştırılması. `[~]` iskeletler mevcut, resmi entegrasyon yok.
-- [ ] **Wizard'lar:** kuruluş/ilk kurulum, portföy ekleme, talep→eşleşme→randevu→anlaşma akışları için
+- [~] **Wizard'lar:** (kuruluş sihirbazı `/app/baslangic` yapıldı)  kuruluş/ilk kurulum, portföy ekleme, talep→eşleşme→randevu→anlaşma akışları için
   adım adım sihirbazlar (CSV içe aktarma sihirbazı mevcut — `[x]`).
 - [~] **AI katmanı:** asistan + onaylı aksiyon kartları + belge OCR mevcut; çok dilli ilan çevirisi,
   portföy sağlık skoru, AI kalite/maliyet gözlemi açık.
