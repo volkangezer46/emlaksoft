@@ -192,6 +192,36 @@ export default async function AppointmentsPage({
   const todayEndIso = new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + 1).toISOString();
   const weekAheadIso = new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + 7).toISOString();
 
+  // Rota verisi (yalnız ?gorunum=rota) ana sorgulardan bağımsız: aynı turda başlatılır.
+  const rotaSelectedAdvisor = danismanF || gate.userId;
+  const rotaDayStart = new Date(todayStart.getTime() + (rotaGun === "yarin" ? 86_400_000 : 0));
+  const rotaDayEnd = new Date(rotaDayStart.getTime() + 86_400_000);
+  const rotaFetch =
+    gorunum === "rota"
+      ? (async () => {
+        let rotaQuery = supabase
+          .from("appointments")
+          .select(
+            "id, appointment_type, scheduled_at, duration_min, location, customer:customers!appointments_customer_id_fkey(id, full_name), property:properties!appointments_property_id_fkey(id, title, property_code, lat, lng)",
+          )
+          .neq("status", "cancelled")
+          .eq("assigned_to", rotaSelectedAdvisor);
+        // Üstteki tip/durum çipleri rota görünümünde de sorguya iner (filtre kontratı)
+        if (tipF) rotaQuery = rotaQuery.eq("appointment_type", tipF);
+        if (durumF) rotaQuery = rotaQuery.eq("status", durumF);
+        return Promise.all([
+          rotaQuery
+            .gte("scheduled_at", rotaDayStart.toISOString())
+            .lt("scheduled_at", rotaDayEnd.toISOString())
+            .order("scheduled_at", { ascending: true })
+            .limit(50),
+          isYonetici
+            ? supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name").limit(200)
+            : Promise.resolve({ data: null as { id: string; full_name: string | null }[] | null }),
+        ]);
+        })()
+      : null;
+
   const [
     { data: appts, count: apptTotal },
     { data: customers },
@@ -207,6 +237,7 @@ export default async function AppointmentsPage({
     { count: valuationCount },
     { count: contractCount },
     { data: weekBarRows },
+    { data: ownProfile },
   ] = await Promise.all([
     apptQuery.order("scheduled_at", { ascending: true }).limit(500),
     // Bu iki sorgu SINIRSIZDI: sayfa her acildiginda ofisin TUM musteri ve
@@ -241,6 +272,8 @@ export default async function AppointmentsPage({
       .gte("scheduled_at", todayStart.toISOString())
       .lt("scheduled_at", weekAheadIso)
       .limit(1000),
+    // Takvim aboneliği (ICS) için kullanıcının gizli token'ı — diğerlerinden bağımsız.
+    supabase.from("profiles").select("calendar_token").eq("id", gate.userId).maybeSingle(),
   ]);
 
   // Tür başına gerçek toplam (hero + "Randevu türleri" paneli + rozetler).
@@ -251,12 +284,7 @@ export default async function AppointmentsPage({
     contract: contractCount ?? 0,
   };
 
-  // Takvim aboneliği (ICS) linki — kullanıcının kendi profilindeki gizli token.
-  const { data: ownProfile } = await supabase
-    .from("profiles")
-    .select("calendar_token")
-    .eq("id", gate.userId)
-    .maybeSingle();
+  // Takvim aboneliği (ICS) linki — ownProfile yukarıdaki toplu turda gelir.
   const calendarToken = (ownProfile?.calendar_token as string | null) ?? null;
   const appointmentTypeOptions = apptTypeDefs.length > 0 ? apptTypeDefs.map((t) => ({ value: t.value, label: t.label })) : undefined;
 
@@ -377,9 +405,6 @@ export default async function AppointmentsPage({
   // Varsayılan danışman: giriş yapan kullanıcı; yönetici ?danisman= ile ekipten
   // birini seçebilir. Gün: ?gun=bugun|yarin. Koordinat kaynağı: properties.lat/lng
   // (portföy koordinatı) — appointments.gps_lat/gps_lng imza GPS'idir, plana girmez.
-  const rotaSelectedAdvisor = danismanF || gate.userId;
-  const rotaDayStart = new Date(startOfDay.getTime() + (rotaGun === "yarin" ? 86_400_000 : 0));
-  const rotaDayEnd = new Date(rotaDayStart.getTime() + 86_400_000);
   let rotaDuraklar: RotaDurak[] = [];
   let rotaTotalKm = 0;
   let rotaTightCount = 0;
@@ -394,26 +419,7 @@ export default async function AppointmentsPage({
       customer: Rel;
       property: Rel;
     };
-    let rotaQuery = supabase
-      .from("appointments")
-      .select(
-        "id, appointment_type, scheduled_at, duration_min, location, customer:customers!appointments_customer_id_fkey(id, full_name), property:properties!appointments_property_id_fkey(id, title, property_code, lat, lng)",
-      )
-      .neq("status", "cancelled")
-      .eq("assigned_to", rotaSelectedAdvisor);
-    // Üstteki tip/durum çipleri rota görünümünde de sorguya iner (filtre kontratı)
-    if (tipF) rotaQuery = rotaQuery.eq("appointment_type", tipF);
-    if (durumF) rotaQuery = rotaQuery.eq("status", durumF);
-    const [{ data: rotaRows }, advisorsRes] = await Promise.all([
-      rotaQuery
-        .gte("scheduled_at", rotaDayStart.toISOString())
-        .lt("scheduled_at", rotaDayEnd.toISOString())
-        .order("scheduled_at", { ascending: true })
-        .limit(50),
-      isYonetici
-        ? supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name").limit(200)
-        : Promise.resolve({ data: null as { id: string; full_name: string | null }[] | null }),
-    ]);
+    const [{ data: rotaRows }, advisorsRes] = await rotaFetch!;
     const rotaList = (rotaRows ?? []) as RotaRow[];
     const byId = new Map(rotaList.map((r) => [r.id, r]));
     const planStops: RoutePlanStop[] = rotaList.map((r) => {

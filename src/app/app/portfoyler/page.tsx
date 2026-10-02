@@ -160,7 +160,8 @@ export default async function PropertiesPage({
   const page = Math.max(1, Number.parseInt(params.sayfa ?? "", 10) || 1);
   const offset = (page - 1) * PAGE_SIZE;
   const supabase = await createClient();
-  const savedViews = await listSavedViews("/app/portfoyler");
+  // Bağımsız: sorgularla aynı turda beklenir (aşağıdaki Promise.all).
+  const savedViewsPromise = listSavedViews("/app/portfoyler");
   // Kayıtlı görünümler için aktif filtre paramları (varsayılanlar hariç)
   const savedViewParams: Record<string, string> = {};
   if (q) savedViewParams.q = q;
@@ -266,6 +267,7 @@ export default async function PropertiesPage({
     { count: yellowCount },
     { count: redCount },
     { data: valueRows },
+    savedViews,
   ] = await Promise.all([
     listQuery,
     mapQuery,
@@ -290,6 +292,7 @@ export default async function PropertiesPage({
     buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.riskli),
     // Toplam portföy değeri — hafif tek kolon; sayfa dilimi değil (makul üst sınırla).
     supabase.from("properties").select("list_price").is("deleted_at", null).limit(VALUE_SUM_LIMIT),
+    savedViewsPromise,
   ]);
 
   const rows = (data ?? []) as unknown as PropertyRow[];

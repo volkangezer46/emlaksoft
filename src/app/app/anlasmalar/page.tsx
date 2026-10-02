@@ -65,27 +65,30 @@ export default async function DealsPage() {
   const dealCustomerIds = [
     ...new Set((dealsRaw ?? []).map((d) => d.customer_id).filter((v): v is string => Boolean(v))),
   ];
-  const { data: smsConsents } = dealCustomerIds.length
-    ? await supabase
-        .from("iys_consents")
-        .select("customer_id, status")
-        .eq("channel", "sms")
-        .in("customer_id", dealCustomerIds)
-    : { data: [] as { customer_id: string; status: string }[] };
-  const smsGranted = new Set(
-    (smsConsents ?? []).filter((c) => c.status === "granted").map((c) => c.customer_id),
-  );
 
   // Evrak durumu rozeti: tüm kartlar için TEK toplu sorgu (N+1 yok) —
   // deal_id in-list, zorunlu maddeler client'ta gruplanır (200 kart × ~9 madde).
   const dealIds = (dealsRaw ?? []).map((d) => d.id);
-  const { data: checklistRows } = dealIds.length
-    ? await supabase
-        .from("deal_checklist_items")
-        .select("deal_id, is_required, is_done")
-        .in("deal_id", dealIds)
-        .eq("is_required", true)
-    : { data: [] as { deal_id: string; is_required: boolean; is_done: boolean }[] };
+  // İki sorgu birbirinden bağımsız (ikisi de deal listesine bağlı) → paralel.
+  const [{ data: smsConsents }, { data: checklistRows }] = await Promise.all([
+    dealCustomerIds.length
+      ? supabase
+          .from("iys_consents")
+          .select("customer_id, status")
+          .eq("channel", "sms")
+          .in("customer_id", dealCustomerIds)
+      : Promise.resolve({ data: [] as { customer_id: string; status: string }[] }),
+    dealIds.length
+      ? supabase
+          .from("deal_checklist_items")
+          .select("deal_id, is_required, is_done")
+          .in("deal_id", dealIds)
+          .eq("is_required", true)
+      : Promise.resolve({ data: [] as { deal_id: string; is_required: boolean; is_done: boolean }[] }),
+  ]);
+  const smsGranted = new Set(
+    (smsConsents ?? []).filter((c) => c.status === "granted").map((c) => c.customer_id),
+  );
   const checklistByDeal = new Map<string, { done: number; total: number }>();
   for (const r of checklistRows ?? []) {
     const agg = checklistByDeal.get(r.deal_id) ?? { done: 0, total: 0 };
