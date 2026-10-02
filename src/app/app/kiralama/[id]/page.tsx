@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Building2, CalendarClock, KeyRound, TrendingUp, User } from "lucide-react";
+import { ArrowLeft, Building2, CalendarClock, TrendingUp, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DepositReturnControl } from "./deposit-return";
@@ -10,6 +10,7 @@ import { ChargesPanel } from "./charges-panel";
 import { MaintenancePanel } from "./maintenance-panel";
 import { EndRentalButton } from "./end-rental-button";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Kira detayı" };
 
 function money(n: number) {
@@ -69,28 +70,17 @@ export default async function KiraDetayPage({ params }: { params: Promise<{ id: 
       </Link>
 
       {/* Hero — kira künyesi */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="relative flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-cyan-300">
-              <KeyRound className="h-3.5 w-3.5" /> Kira kaydı
-            </p>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">
-              {prop?.title ?? prop?.property_code ?? "Portföy"}
-            </h1>
-            <p className="mt-2 text-sm text-white/60">
-              Başlangıç: {dateLabel(rental.start_date)}
-              {rental.end_date ? ` · Bitiş: ${dateLabel(rental.end_date)}` : " · Süresiz"}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+      <PageHeader title={prop?.title ?? prop?.property_code ?? "Portföy"} eyebrow="Kira kaydı" description={`Başlangıç: ${dateLabel(rental.start_date)}${rental.end_date ? ` · Bitiş: ${dateLabel(rental.end_date)}` : " · Süresiz"}`} actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-2">
             <Badge variant={active ? "success" : "outline"} className={active ? "" : "text-white/70 ring-white/25"}>
               {active ? "Aktif" : "Bitti"}
             </Badge>
             {canEdit && active ? <EndRentalButton rentalId={rental.id} /> : null}
-          </div>
-        </div>
+          </div></div>
+} />
+<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
+        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
+        
 
         {/* Künye kartları — portföy + kiracı LİNKLİ */}
         <div className="relative mt-5 flex flex-wrap gap-4">
@@ -98,7 +88,7 @@ export default async function KiraDetayPage({ params }: { params: Promise<{ id: 
             <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-2 text-sm">
               <Building2 className="h-4 w-4 text-cyan-400" />
               <span className="text-white/80">Portföy:</span>
-              <Link href={`/app/portfoyler/${prop.id}`} className="focus-ring rounded-[6px] font-semibold text-white hover:underline">
+              <Link href={`/app/portfoyler/${prop.id}`} className="focus-ring rounded-[var(--radius-control)] font-semibold text-white hover:underline">
                 {prop.title ?? prop.property_code}
               </Link>
             </div>
@@ -107,7 +97,7 @@ export default async function KiraDetayPage({ params }: { params: Promise<{ id: 
             <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-2 text-sm">
               <User className="h-4 w-4 text-mint-400" />
               <span className="text-white/80">Kiracı:</span>
-              <Link href={`/app/musteriler/${renter.id}`} className="focus-ring rounded-[6px] font-semibold text-white hover:underline">
+              <Link href={`/app/musteriler/${renter.id}`} className="focus-ring rounded-[var(--radius-control)] font-semibold text-white hover:underline">
                 {renter.full_name ?? "İsimsiz"}
               </Link>
               {renter.phone ? <span className="text-white/50">{renter.phone}</span> : null}

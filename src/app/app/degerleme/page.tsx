@@ -20,6 +20,7 @@ import { ValuationForm } from "./valuation-form";
 import { DataPartnerStatus } from "@/components/app/data-partner-badges";
 import { EmptyState } from "@/components/app/empty-state";
 
+import { PageHeader } from "@/components/ui/page-header";
 type ValuationSource = { name: string; weight: number; value: number; note: string };
 
 const nf0 = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
@@ -258,25 +259,16 @@ export default async function ValuationPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-cyan-400/20 blur-[80px]" />
-        <div className="relative flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-cyan-400">
-              <Gauge className="h-3.5 w-3.5" /> Çok kaynaklı değerleme
-            </p>
-            <h1 className="mt-2 font-display text-3xl font-extrabold">Değerleme motoru</h1>
-            <p className="mt-2 max-w-xl text-sm text-white/60">
-              Ofis listesi + emsal m² + <strong className="text-white">Endeksa</strong> bölge endeksi +{" "}
-              <strong className="text-white">Tapusor</strong> EDİ yapay zeka değerlemesi — insan onayı şart.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2">
+      <PageHeader title="Değerleme motoru" eyebrow="Çok kaynaklı değerleme" description="Ofis listesi + emsal m² + Endeksa bölge endeksi + Tapusor EDİ yapay zeka değerlemesi — insan onayı şart." actions={
+<div className="theme-dark flex flex-col gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2">
             <DataPartnerStatus name="Endeksa" icon={Landmark} configured={endeksaOn} />
             <DataPartnerStatus name="Tapusor" icon={MapPinned} configured={tapusorOn} />
           </div>
-        </div>
+} />
+<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
+        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
+        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-cyan-400/20 blur-[80px]" />
+        
         <div className="relative mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {heroKpis.map((k) => (
             <a

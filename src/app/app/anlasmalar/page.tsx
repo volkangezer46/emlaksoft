@@ -10,6 +10,7 @@ import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportDealsCsv } from "@/app/actions/export";
 
+import { PageHeader } from "@/components/ui/page-header";
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
 }
@@ -177,28 +178,20 @@ export default async function DealsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-mint-500/20 blur-[90px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-mint-400">
-              <Handshake className="h-3.5 w-3.5" /> Anlaşma hattı
-            </p>
-            <h1 className="mt-2 font-display text-3xl font-extrabold md:text-4xl">Anlaşma tahtası</h1>
-            <p className="mt-2 max-w-lg text-sm text-white/60">
-              Yeni → nitelikli → müzakere → kazan/kayıp. Kazanıldığında komisyon otomatik üretilir.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+      <PageHeader title="Anlaşma tahtası" eyebrow="Anlaşma hattı" description="Yeni → nitelikli → müzakere → kazan/kayıp. Kazanıldığında komisyon otomatik üretilir." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex flex-wrap items-center gap-2">
             <ExportCsvButton
               label="Dışa aktar"
               action={exportDealsCsv}
               className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
             />
             {canCreate ? <NewDealDialog properties={properties ?? []} customers={customers ?? []} /> : null}
-          </div>
-        </div>
+          </div></div>
+} />
+<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
+        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
+        <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-mint-500/20 blur-[90px]" />
+        
         <div className="relative mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {/* KPI'lar tahtaya çapa: açık metrikler tahtanın başına, kazanılanlar
               doğrudan "Kazanıldı" sütununa götürür. */}
@@ -269,9 +262,9 @@ export default async function DealsPage() {
                             <ArrowUpRight className="ml-1 inline h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                           </span>
                         </div>
-                        <div className="mt-1.5 h-3 overflow-hidden rounded-[6px] bg-canvas">
+                        <div className="mt-1.5 h-3 overflow-hidden rounded-[var(--radius-control)] bg-canvas">
                           <div
-                            className={`h-full rounded-[6px] ${f.bar} transition-all`}
+                            className={`h-full rounded-[var(--radius-control)] ${f.bar} transition-all`}
                             style={{ width: `${Math.max(f.count > 0 ? 4 : 0, Math.round((f.count / funnelMax) * 100))}%` }}
                           />
                         </div>
@@ -324,7 +317,7 @@ export default async function DealsPage() {
                         <li key={f.key} className="flex items-center gap-2 text-xs">
                           <span className={`h-2.5 w-2.5 shrink-0 rounded-[3px] ${f.bar}`} aria-hidden />
                           <span className="text-text-muted">{f.label}</span>
-                          <Link href={`#sutun-${f.key}`} className="numeric focus-ring ml-auto rounded-[6px] font-bold text-ink-950 hover:text-brand-600 hover:underline">
+                          <Link href={`#sutun-${f.key}`} className="numeric focus-ring ml-auto rounded-[var(--radius-control)] font-bold text-ink-950 hover:text-brand-600 hover:underline">
                             {money(f.value)}
                           </Link>
                         </li>

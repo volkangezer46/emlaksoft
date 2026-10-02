@@ -16,6 +16,7 @@ import { CategoryDonut } from "./category-donut-lazy";
 import { ExpensesTable } from "./expenses-table";
 import { ExpenseCreateForm } from "./expense-create-form";
 
+import { PageHeader } from "@/components/ui/page-header";
 // Inline server action wrappers — void return için form action uyumlu
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -156,17 +157,8 @@ export default async function GiderlerPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-brand-300">
-              <Receipt className="h-4 w-4" /> Gider takibi
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Masraf &amp; Giderler</h1>
-            <p className="mt-1 text-sm text-white/75">Ofis giderlerini kategorilere göre takip edin.</p>
-          </div>
-          <div className="flex items-center gap-3">
+      <PageHeader title="Masraf & Giderler" eyebrow="Gider takibi" description="Ofis giderlerini kategorilere göre takip edin." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-3">
             <ExportCsvButton
               action={exportExpensesCsv}
               label="Dışa aktar"
@@ -193,9 +185,8 @@ export default async function GiderlerPage({
               </p>
               <p className="text-xs text-white/70">Toplam gider</p>
             </Link>
-          </div>
-        </div>
-      </section>
+          </div></div>
+} />
 
       {/* Tarih aralığı filtresi — GET formu (?from=&to=) + hızlı çipler; ?kategori= korunur */}
       <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">

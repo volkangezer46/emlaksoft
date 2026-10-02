@@ -252,8 +252,8 @@ export default async function AramaSonuclariPage({
             );
           })}
           <p className="px-1 text-xs text-text-muted">
-            İpucu: <kbd className="rounded-[5px] border border-hairline bg-canvas px-1 py-0.5 text-xs">Ctrl</kbd>+
-            <kbd className="rounded-[5px] border border-hairline bg-canvas px-1 py-0.5 text-xs">K</kbd> ile her
+            İpucu: <kbd className="rounded-[var(--radius-control)] border border-hairline bg-canvas px-1 py-0.5 text-xs">Ctrl</kbd>+
+            <kbd className="rounded-[var(--radius-control)] border border-hairline bg-canvas px-1 py-0.5 text-xs">K</kbd> ile her
             sayfadan hızlı arama açabilirsiniz.
           </p>
         </div>

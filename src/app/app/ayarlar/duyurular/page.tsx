@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { ArrowLeft, Megaphone, Users2 } from "lucide-react";
+import { ArrowLeft, Users2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { isPast } from "@/lib/clock";
 import { AnnouncementsManager, type AnnouncementRow } from "./announcements-manager";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Duyurular" };
 
 export default async function AnnouncementsSettingsPage() {
@@ -62,29 +63,15 @@ export default async function AnnouncementsSettingsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/35 blur-[80px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-              <Megaphone className="h-4 w-4" /> Duyuru panosu
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">Ofis içi duyurular</h1>
-            <p className="mt-1 max-w-xl text-sm text-white/60">
-              Ekibinize toplantı, komisyon oranı veya kampanya duyurusu yayınlayın. Duyurular herkesin
-              dashboard&apos;unda görünür; kim okudu buradan takip edilir.
-            </p>
-          </div>
-          <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-5 py-3">
+      <PageHeader title="Ofis içi duyurular" eyebrow="Duyuru panosu" description="Ekibinize toplantı, komisyon oranı veya kampanya duyurusu yayınlayın. Duyurular herkesin dashboard'unda görünür; kim okudu buradan takip edilir." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-5 py-3">
             <Users2 className="h-5 w-5 text-mint-300" />
             <div>
               <p className="font-display text-xl font-extrabold text-mint-300">{activeCount}</p>
               <p className="text-xs text-white/55">yayında duyuru</p>
             </div>
-          </div>
-        </div>
-      </section>
+          </div></div>
+} />
 
       <AnnouncementsManager announcements={announcements} teamCount={teamCount ?? 0} />
     </div>

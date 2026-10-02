@@ -11,6 +11,7 @@ import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { EmptyState } from "@/components/app/empty-state";
 import { dismissLostSaleRisk } from "./actions";
 
+import { PageHeader } from "@/components/ui/page-header";
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 }
@@ -200,23 +201,8 @@ export default async function KayipSatisPage() {
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-14 h-52 w-52 rounded-full bg-red-500/25 blur-[90px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-red-300">
-              <TrendingDown className="h-4 w-4" /> Kayıp satış dedektörü
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">
-              Risk Altındaki Müşteriler
-            </h1>
-            <p className="mt-1 max-w-lg text-sm text-white/75">
-              Uzun süredir iletişim kurulmamış, portföy gönderilmemiş veya
-              hareketsiz kalan müşteriler. Hemen arayın, kayıp önleyin.
-            </p>
-          </div>
-          {/* KPI'lar ilgili bölüm çapalarına iner */}
+      <PageHeader title="Risk Altındaki Müşteriler" eyebrow="Kayıp satış dedektörü" description="Uzun süredir iletişim kurulmamış, portföy gönderilmemiş veya hareketsiz kalan müşteriler. Hemen arayın, kayıp önleyin." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2">{/* KPI'lar ilgili bölüm çapalarına iner */}
           <div className="flex gap-3">
             <Link
               href="#kritik"
@@ -247,9 +233,8 @@ export default async function KayipSatisPage() {
               <p className="font-display text-lg font-extrabold text-danger-300">{money(lostRevenue)}</p>
               <p className="text-xs text-white/70">Kaybedilen ciro · 12 ay</p>
             </Link>
-          </div>
-        </div>
-      </section>
+          </div></div>
+} />
 
       {hiddenCount > 0 ? (
         <p className="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2.5 text-xs text-text-muted">

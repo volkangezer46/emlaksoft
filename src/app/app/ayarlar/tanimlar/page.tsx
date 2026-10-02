@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { ArrowLeft, ListTree } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { DefinitionsManager, type DefRow } from "./definitions-manager";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Tanımlar" };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -51,17 +52,7 @@ export default async function DefinitionsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlar
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="relative">
-          <span className="flex items-center gap-2 text-xs font-semibold text-cyan-400"><ListTree className="h-4 w-4" /> Tanımlar</span>
-          <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">Seçim listeleri & tanımlar</h1>
-          <p className="mt-1 max-w-2xl text-sm text-white/70">
-            Müşteri tipi, kaynak, portföy tipi gibi tüm dropdown seçenekleri buradan yönetilir. Sistem
-            varsayılanları korunur; ofisinize özel seçenekler ekleyebilir, kendi eklediklerinizi düzenleyebilirsiniz.
-          </p>
-        </div>
-      </section>
+      <PageHeader title="Seçim listeleri & tanımlar" eyebrow="Tanımlar" description="Müşteri tipi, kaynak, portföy tipi gibi tüm dropdown seçenekleri buradan yönetilir. Sistem varsayılanları korunur; ofisinize özel seçenekler ekleyebilir, kendi eklediklerinizi düzenleyebilirsiniz." />
 
       <DefinitionsManager categories={categories} tenantId={tenantId} />
     </div>

@@ -364,11 +364,11 @@ export function UserExceptions({
 
           <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-text-faint">
             <span className="flex items-center gap-1.5">
-              <span className="grid h-4 w-4 place-items-center rounded-[5px] border border-mint-500/30 bg-mint-500/8"><Check className="h-3 w-3 text-mint-600/60" /></span>
+              <span className="grid h-4 w-4 place-items-center rounded-[var(--radius-control)] border border-mint-500/30 bg-mint-500/8"><Check className="h-3 w-3 text-mint-600/60" /></span>
               rolünden geliyor (soluk)
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="grid h-4 w-4 place-items-center rounded-[5px] border border-amber-400/60 bg-amber-400/15"><Check className="h-3 w-3 text-amber-600" /></span>
+              <span className="grid h-4 w-4 place-items-center rounded-[var(--radius-control)] border border-amber-400/60 bg-amber-400/15"><Check className="h-3 w-3 text-amber-600" /></span>
               kişiye özel istisna
             </span>
             <span className="flex items-center gap-1.5">

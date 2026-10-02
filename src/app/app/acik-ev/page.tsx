@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { NewOpenHouseDialog } from "./new-open-house-dialog";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Açık Ev Takibi" };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -91,25 +92,8 @@ export default async function AcikEvPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-mint-500/25 blur-[70px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-mint-300">
-              <DoorOpen className="h-4 w-4" /> Açık ev günleri
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Açık Ev Takibi</h1>
-            <p className="mt-1 max-w-xl text-sm text-white/75">
-              Portföy tanıtım günlerini planlayın, ziyaretçileri kapıda kaydedin, tamamlanan etkinliklerin verimini izleyin.
-            </p>
-            {canCreate ? (
-              <div className="mt-4">
-                <NewOpenHouseDialog />
-              </div>
-            ) : null}
-          </div>
-          {live.length > 0 ? (
+      <PageHeader title="Açık Ev Takibi" eyebrow="Açık ev günleri" description="Portföy tanıtım günlerini planlayın, ziyaretçileri kapıda kaydedin, tamamlanan etkinliklerin verimini izleyin." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2">{live.length > 0 ? (
             <Link
               href="/app/acik-ev?durum=active"
               className="focus-ring press lift flex items-center gap-3 rounded-[var(--radius-card)] border border-mint-400/40 bg-mint-500/15 px-4 py-3"
@@ -124,8 +108,12 @@ export default async function AcikEvPage({
               </div>
             </Link>
           ) : null}
-        </div>
-      </section>
+<>{canCreate ? (
+              <div className="mt-4">
+                <NewOpenHouseDialog />
+              </div>
+            ) : null}</></div>
+} />
 
       {/* KPI şeridi — hepsi listeyi süzer */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -346,7 +334,7 @@ export default async function AcikEvPage({
                 <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
                   <Link
                     href={`/app/acik-ev/${e.id}`}
-                    className="focus-ring relative z-10 rounded-[6px] text-xs font-semibold text-brand-600 hover:underline"
+                    className="focus-ring relative z-10 rounded-[var(--radius-control)] text-xs font-semibold text-brand-600 hover:underline"
                   >
                     {e.status === "completed" ? "Ziyaretçi listesi →" : "Etkinliği yönet →"}
                   </Link>

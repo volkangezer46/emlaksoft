@@ -5,7 +5,6 @@ import {
   PhoneIncoming,
   PhoneMissed,
   PhoneOutgoing,
-  Radio,
   UserCheck,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -16,6 +15,7 @@ import { CallAiSummary } from "./call-ai-summary";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 import { isAiConfigured } from "@/lib/ai-advisor";
 
+import { PageHeader } from "@/components/ui/page-header";
 type CallRow = {
   id: string;
   direction: string;
@@ -182,36 +182,8 @@ export default async function PhoneOsPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-mint-500/25 blur-[80px]" />
-        <div className="relative grid gap-6 lg:grid-cols-[1.1fr_1fr] lg:items-center">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-mint-400"><Radio className="h-4 w-4" /> Görüşme kayıt merkezi</span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Akıllı Arama</h1>
-            <p className="mt-1 text-sm text-white/60">Müşteri eşleştirme, sonuç kodu ve görüşme geçmişi tek akışta kayıt altında.</p>
-            <div className="mt-6 grid grid-cols-3 gap-3">
-              {[
-                { label: "Gelen çağrı", value: inbound, icon: PhoneIncoming, tone: "text-cyan-400", href: kpiHref({ yon: "inbound" }), active: yon === "inbound" },
-                { label: "Cevapsız", value: missed, icon: PhoneMissed, tone: "text-danger-500", href: kpiHref({ yon: "missed" }), active: yon === "missed" },
-                { label: "Randevu", value: appointments, icon: UserCheck, tone: "text-mint-400", href: kpiHref({ sonuc: "randevu" }), active: sonuc === "randevu" },
-              ].map((item) => (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={`focus-ring press lift block rounded-[var(--radius-card)] border p-3 backdrop-blur transition ${
-                    item.active ? "border-mint-400/50 bg-white/12" : "border-white/10 bg-white/5 hover:border-white/30"
-                  }`}
-                >
-                  <item.icon className={`h-4 w-4 ${item.tone}`} />
-                  <p className="mt-2 font-display text-xl font-extrabold text-white">{item.value}</p>
-                  <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          {/* live call volume */}
+      <PageHeader title="Akıllı Arama" eyebrow="Görüşme kayıt merkezi" description="Müşteri eşleştirme, sonuç kodu ve görüşme geçmişi tek akışta kayıt altında." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2">{/* live call volume */}
           <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="flex items-center justify-between">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-white/75"><Activity className="h-3.5 w-3.5 text-cyan-400" /> Arama hacmi · son 7 gün</p>
@@ -239,8 +211,26 @@ export default async function PhoneOsPage({
               <span className="text-xs text-white/55">Ort. görüşme {duration(avgDur)} · {rows.length} kayıt</span>
             </div>
           </div>
-        </div>
-      </section>
+<><div className="mt-6 grid grid-cols-3 gap-3">
+              {[
+                { label: "Gelen çağrı", value: inbound, icon: PhoneIncoming, tone: "text-cyan-400", href: kpiHref({ yon: "inbound" }), active: yon === "inbound" },
+                { label: "Cevapsız", value: missed, icon: PhoneMissed, tone: "text-danger-500", href: kpiHref({ yon: "missed" }), active: yon === "missed" },
+                { label: "Randevu", value: appointments, icon: UserCheck, tone: "text-mint-400", href: kpiHref({ sonuc: "randevu" }), active: sonuc === "randevu" },
+              ].map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={`focus-ring press lift block rounded-[var(--radius-card)] border p-3 backdrop-blur transition ${
+                    item.active ? "border-mint-400/50 bg-white/12" : "border-white/10 bg-white/5 hover:border-white/30"
+                  }`}
+                >
+                  <item.icon className={`h-4 w-4 ${item.tone}`} />
+                  <p className="mt-2 font-display text-xl font-extrabold text-white">{item.value}</p>
+                  <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
+                </Link>
+              ))}
+            </div></></div>
+} />
 
       <CallConsole customers={customerList} demandCounts={demandCounts} matchCounts={matchCounts} initialCustomerId={preCustomerId} />
 

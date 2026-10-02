@@ -59,7 +59,7 @@ export function EditDemandDialog({
     /* Radix Dialog: focus trap + Esc (öncesinde yoktu) + scroll lock + ARIA. */
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button type="button" className="focus-ring rounded-[6px] text-xs font-semibold text-brand-700 hover:underline">
+        <button type="button" className="focus-ring rounded-[var(--radius-control)] text-xs font-semibold text-brand-700 hover:underline">
           <span className="inline-flex items-center gap-0.5"><Pencil className="h-3 w-3" /> Düzenle</span>
         </button>
       </DialogTrigger>

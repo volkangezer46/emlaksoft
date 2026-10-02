@@ -8,7 +8,6 @@ import {
   Building2,
   CalendarClock,
   Gauge,
-  Handshake,
   HeartHandshake,
   ListChecks,
   MessageSquareQuote,
@@ -38,6 +37,7 @@ import {
  */
 import { CopySurveyLinkButton, CreateSurveyButton } from "../../raporlar/memnuniyet/survey-actions";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Anlaşma detayı" };
 
 /** Pipeline aşamaları — deal-board ile aynı sıra ve etiketler. */
@@ -283,21 +283,8 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         <ArrowLeft className="h-4 w-4" /> Pipeline&apos;a dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-mint-500/25 blur-[80px]" />
-        <div className="relative">
-          <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-            <Handshake className="h-3.5 w-3.5" /> {deal.deal_type === "rent" ? "Kiralama" : "Satış"} anlaşması
-          </span>
-          <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">
-            {property?.title ?? property?.property_code ?? "Portföysüz anlaşma"}
-          </h1>
-          <p className="mt-1 text-sm text-white/60">
-            {customer?.full_name ?? "Müşteri atanmadı"} · {tarih(deal.created_at)} tarihinde açıldı
-          </p>
-
-          {/* Pipeline şeridi: anlaşmanın hangi aşamada olduğunu tek bakışta göster. */}
+      <PageHeader title={property?.title ?? property?.property_code ?? "Portföysüz anlaşma"} eyebrow={`${deal.deal_type === "rent" ? "Kiralama" : "Satış"} anlaşması`} description={`${customer?.full_name ?? "Müşteri atanmadı"} · ${tarih(deal.created_at)} tarihinde açıldı`} />
+<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative">{/* Pipeline şeridi: anlaşmanın hangi aşamada olduğunu tek bakışta göster. */}
           <ol className="relative mt-6 flex flex-wrap gap-2" aria-label="Anlaşma aşaması">
             {STAGES.map((s, i) => {
               const gecildi = !kayip && stageIdx >= 0 && i <= stageIdx && s.key !== "lost";
@@ -354,9 +341,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 </div>
               ),
             )}
-          </div>
-        </div>
-      </section>
+          </div></div></section>
 
       {kayip && deal.loss_reason ? (
         <p
@@ -557,7 +542,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 {deal.assigned_to ? (
                   <Link
                     href={`/app/ekip/${deal.assigned_to}`}
-                    className="focus-ring rounded-[6px] text-brand-600 hover:underline"
+                    className="focus-ring rounded-[var(--radius-control)] text-brand-600 hover:underline"
                   >
                     {assignee?.full_name ?? "Danışman"}
                   </Link>

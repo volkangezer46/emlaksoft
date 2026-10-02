@@ -29,6 +29,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { SaveMatchButton } from "./save-match-button";
 import type { CSSProperties } from "react";
 
+import { PageHeader } from "@/components/ui/page-header";
 const RING_C = 2 * Math.PI * 42;
 
 type DemandRow = MatchDemand & {
@@ -239,43 +240,8 @@ export default async function MatchingPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-cyan-400/20 blur-[90px]" />
-        <div className="relative grid gap-6 lg:grid-cols-[1.2fr_1fr] lg:items-center">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-cyan-300">
-              <Crosshair className="h-4 w-4" /> Talep × Portföy eşleştirme
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Akıllı eşleşme motoru</h1>
-            <p className="mt-1 max-w-lg text-sm text-white/60">
-              Müşteri taleplerini portföylerle bütçe, konum, oda ve işlem türüne göre skorlar. Scraping yok — kendi veriniz.
-            </p>
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {/* Güçlü/iyi kutuları öneri listesini ?kademe= ile daraltır;
-                  aktifken tekrar tıklamak filtreyi kaldırır. */}
-              {[
-                { label: "Açık talep", value: demands.length, cls: "", href: "/app/talepler" },
-                { label: "Portföy", value: properties.length, cls: "", href: "/app/portfoyler" },
-                { label: "Güçlü eşleşme", value: strong, cls: "text-mint-400", href: matchHref({ kademe: kademeF === "strong" ? null : "guclu", minSkor: null }) },
-                { label: "İyi eşleşme", value: good, cls: "text-cyan-300", href: matchHref({ kademe: kademeF === "good" ? null : "iyi", minSkor: null }) },
-              ].map((item) => (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 transition hover:border-brand-300"
-                >
-                  <p className={`flex items-start justify-between font-display text-xl font-extrabold ${item.cls}`}>
-                    {item.value}
-                    <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                  </p>
-                  <p className="text-xs text-white/45">{item.label}</p>
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-5 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
+      <PageHeader title="Akıllı eşleşme motoru" eyebrow="Talep × Portföy eşleştirme" description="Müşteri taleplerini portföylerle bütçe, konum, oda ve işlem türüne göre skorlar. Scraping yok — kendi veriniz." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-5 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="relative grid h-28 w-28 place-items-center">
               <div
                 className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-25 blur-md"
@@ -316,7 +282,7 @@ export default async function MatchingPage({
                       key={b.label}
                       href={matchHref({ minSkor: active ? null : String(b.min), kademe: null })}
                       title={`Skor ≥ ${b.min} önerilerini listele`}
-                      className={`focus-ring group flex flex-1 flex-col items-center gap-1 rounded-[6px] transition ${active ? "bg-white/10" : "hover:bg-white/5"}`}
+                      className={`focus-ring group flex flex-1 flex-col items-center gap-1 rounded-[var(--radius-control)] transition ${active ? "bg-white/10" : "hover:bg-white/5"}`}
                     >
                       <span className="text-xs font-bold text-white/80">{scoreBuckets[i]}</span>
                       <div
@@ -330,8 +296,29 @@ export default async function MatchingPage({
               </div>
             </div>
           </div>
-        </div>
-      </section>
+<><div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {/* Güçlü/iyi kutuları öneri listesini ?kademe= ile daraltır;
+                  aktifken tekrar tıklamak filtreyi kaldırır. */}
+              {[
+                { label: "Açık talep", value: demands.length, cls: "", href: "/app/talepler" },
+                { label: "Portföy", value: properties.length, cls: "", href: "/app/portfoyler" },
+                { label: "Güçlü eşleşme", value: strong, cls: "text-mint-400", href: matchHref({ kademe: kademeF === "strong" ? null : "guclu", minSkor: null }) },
+                { label: "İyi eşleşme", value: good, cls: "text-cyan-300", href: matchHref({ kademe: kademeF === "good" ? null : "iyi", minSkor: null }) },
+              ].map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 transition hover:border-brand-300"
+                >
+                  <p className={`flex items-start justify-between font-display text-xl font-extrabold ${item.cls}`}>
+                    {item.value}
+                    <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                  </p>
+                  <p className="text-xs text-white/45">{item.label}</p>
+                </Link>
+              ))}
+            </div></></div>
+} />
 
       {/* Aktif ağırlık seti — şeffaflık satırı + Ayarlar bağlantısı */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2.5 text-xs text-text-muted">

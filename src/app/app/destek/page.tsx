@@ -21,6 +21,7 @@ import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
 import { NewTicketDialog } from "./new-ticket-dialog";
 import type { CSSProperties } from "react";
 
+import { PageHeader } from "@/components/ui/page-header";
 const RING_C = 2 * Math.PI * 42;
 
 /** Sayfa başına kayıt — gerçek sayfalama, 100'lük dilim + bellek filtresi yerine. */
@@ -265,21 +266,15 @@ export default async function SupportPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
+      <PageHeader title="Talepleriniz" eyebrow="Destek merkezi" description="EmlakSoft ekibine fatura, kurulum ve teknik taleplerinizi iletin." actions={
+<NewTicketDialog categoryOptions={categoryOptions} />
+} />
+<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-mint-500/20 blur-[90px]" />
         <div className="relative grid gap-6 lg:grid-cols-[1.2fr_1fr] lg:items-center">
           <div>
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-                  <LifeBuoy className="h-4 w-4" /> Destek merkezi
-                </span>
-                <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Talepleriniz</h1>
-                <p className="mt-1 text-sm text-white/60">EmlakSoft ekibine fatura, kurulum ve teknik taleplerinizi iletin.</p>
-              </div>
-              <NewTicketDialog categoryOptions={categoryOptions} />
-            </div>
+            
             {/* KPI kartları listeyi ?durum= parametresiyle süzer */}
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
@@ -351,7 +346,7 @@ export default async function SupportPage({
                 <Link
                   key={s.key}
                   href={buildHref({ durum: s.key })}
-                  className={`focus-ring group flex items-center gap-2 rounded-[6px] px-1 py-0.5 transition hover:bg-white/5 ${
+                  className={`focus-ring group flex items-center gap-2 rounded-[var(--radius-control)] px-1 py-0.5 transition hover:bg-white/5 ${
                     durum === s.key ? "bg-white/10 text-white" : "text-white/70"
                   }`}
                 >

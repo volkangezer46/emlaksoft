@@ -35,6 +35,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/app/empty-state";
 import { AddLeaveDialog } from "./leave-form";
 
+import { PageHeader } from "@/components/ui/page-header";
 const DAY_MS = 86_400_000;
 const MONTH_RE = /^(\d{4})-(\d{2})$/;
 
@@ -219,22 +220,8 @@ export default async function LeavesPage({
   return (
     <div className="space-y-6">
       {/* premium header */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-mint-500/25 blur-[90px]" />
-        <div className="relative">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-                <CalendarRange className="h-4 w-4" /> Ekip müsaitliği
-              </span>
-              <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">İzin takvimi</h1>
-              <p className="mt-1 max-w-lg text-sm text-white/60">
-                Kim bugün sahada, kim izinde? Onaylanan izinlerde danışmanın online randevu linki o günler için
-                otomatik kapanır — müşteri izinli güne randevu alamaz.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
+      <PageHeader title="İzin takvimi" eyebrow="Ekip müsaitliği" description="Kim bugün sahada, kim izinde? Onaylanan izinlerde danışmanın online randevu linki o günler için otomatik kapanır — müşteri izinli güne randevu alamaz." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex flex-wrap items-center gap-2">
               <Link
                 href="/app/ekip"
                 className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
@@ -248,8 +235,13 @@ export default async function LeavesPage({
                 selfName={selfName}
                 today={today}
               />
-            </div>
-          </div>
+            </div></div>
+} />
+<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
+        <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-mint-500/25 blur-[90px]" />
+        <div className="relative">
+          
 
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {kpis.map((k) => (
@@ -359,7 +351,7 @@ export default async function LeavesPage({
                         <span
                           key={l.id}
                           title={`${nameById.get(l.staff_id) ?? "Personel"} — ${LEAVE_KIND_LABELS[kind]}${pending ? " (onay bekliyor)" : ""}`}
-                          className={`block truncate rounded-[6px] px-1.5 py-0.5 text-xs font-bold ${LEAVE_KIND_TONES[kind]} ${pending ? "opacity-55 ring-1 ring-inset ring-current" : ""}`}
+                          className={`block truncate rounded-[var(--radius-control)] px-1.5 py-0.5 text-xs font-bold ${LEAVE_KIND_TONES[kind]} ${pending ? "opacity-55 ring-1 ring-inset ring-current" : ""}`}
                         >
                           {nameById.get(l.staff_id) ?? "Personel"}
                         </span>

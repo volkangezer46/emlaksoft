@@ -20,6 +20,7 @@ import {
 } from "@/lib/gamification";
 import { loadLeagueData, periodOf, periodRange, previousPeriod } from "@/lib/gamification-query";
 
+import { PageHeader } from "@/components/ui/page-header";
 /**
  * /app/lig — ofis motivasyon ekranı.
  *
@@ -66,7 +67,7 @@ function Cell({ href, value, label }: { href: string; value: number; label: stri
     <TD align="right" className={value > 0 ? "text-ink-950" : "text-text-faint"}>
       <Link
         href={href}
-        className="focus-ring relative z-10 rounded-[6px] font-semibold hover:text-brand-600 hover:underline"
+        className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold hover:text-brand-600 hover:underline"
         aria-label={label}
       >
         {value}
@@ -323,19 +324,24 @@ export default async function LigPage({
   return (
     <div className="space-y-6">
       {/* Hero: dönem seçici + kapsam + TV modu girişi */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-amber-300">
-              <Trophy className="h-4 w-4" /> Ekip ligi
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Lig Tablosu</h1>
-            <p className="mt-1 text-sm text-white/75">
-              Aylık puan yarışı, rozetler ve günlük aktivite serileri.
-            </p>
-
-            <div className="mt-3 flex flex-wrap items-center gap-1">
+      <PageHeader title="Lig Tablosu" eyebrow="Ekip ligi" description="Aylık puan yarışı, rozetler ve günlük aktivite serileri." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-3">
+            <Link
+              href="/app/danisman-kpi"
+              className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-xs font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
+            >
+              Danışman KPI karnesi
+            </Link>
+            <Link
+              href={`/app/lig?donem=${period}${keepScope}&tv=1`}
+              title="TV modu — ofis ekranı görünümü"
+              aria-label="TV modunu aç"
+              className="focus-ring press grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-white/15 bg-white/5 text-white/75 transition hover:bg-white/10 hover:text-white"
+            >
+              <Tv className="h-4 w-4" />
+            </Link>
+          </div>
+<><div className="mt-3 flex flex-wrap items-center gap-1">
               <Link
                 href={prevHref}
                 className="focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-white/15 text-white/70 transition hover:bg-white/10 hover:text-white"
@@ -395,27 +401,8 @@ export default async function LigPage({
                   </Link>
                 ))}
               </div>
-            ) : null}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Link
-              href="/app/danisman-kpi"
-              className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-xs font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
-            >
-              Danışman KPI karnesi
-            </Link>
-            <Link
-              href={`/app/lig?donem=${period}${keepScope}&tv=1`}
-              title="TV modu — ofis ekranı görünümü"
-              aria-label="TV modunu aç"
-              className="focus-ring press grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-white/15 bg-white/5 text-white/75 transition hover:bg-white/10 hover:text-white"
-            >
-              <Tv className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      </section>
+            ) : null}</></div>
+} />
 
       {!hasActivity ? (
         <>

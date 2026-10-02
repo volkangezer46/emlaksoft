@@ -184,7 +184,7 @@ export function DealChecklistSection({
                         onClick={() => toggle(item.id)}
                         aria-pressed={item.is_done}
                         aria-label={item.is_done ? `${item.label} — tamamlandı, geri al` : `${item.label} — tamamlandı işaretle`}
-                        className={`focus-ring press shrink-0 rounded-[6px] transition disabled:opacity-50 ${
+                        className={`focus-ring press shrink-0 rounded-[var(--radius-control)] transition disabled:opacity-50 ${
                           item.is_done ? "text-mint-600" : "text-text-faint hover:text-brand-600"
                         }`}
                       >
@@ -207,7 +207,7 @@ export function DealChecklistSection({
                         Zorunlu
                       </span>
                     ) : (
-                      <span className="shrink-0 rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs font-semibold text-zinc-500 ring-1 ring-inset ring-zinc-500/10">
+                      <span className="shrink-0 rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs font-semibold text-text-faint ring-1 ring-inset ring-zinc-500/10">
                         Opsiyonel
                       </span>
                     )}

@@ -69,7 +69,7 @@ export function CoachPanel({ actions, adSoyad }: { actions: CoachActionWithLink[
                 {a.href ? (
                   <Link
                     href={a.href}
-                    className="focus-ring mt-1.5 inline-flex items-center gap-1 rounded-[6px] text-xs font-semibold text-brand-700 hover:underline"
+                    className="focus-ring mt-1.5 inline-flex items-center gap-1 rounded-[var(--radius-control)] text-xs font-semibold text-brand-700 hover:underline"
                   >
                     {a.hrefLabel ?? "İlgili ekrana git"}
                     <ArrowUpRight className="h-3.5 w-3.5" />

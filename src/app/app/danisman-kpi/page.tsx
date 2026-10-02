@@ -718,7 +718,7 @@ export default async function DanismanKpiPage({
                   <TD align="right" className="text-text-muted">
                     <Link
                       href={`/app/musteriler?assigned=${a.id}`}
-                      className="focus-ring relative z-10 rounded-[6px] hover:text-brand-600 hover:underline"
+                      className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-brand-600 hover:underline"
                       aria-label={`${a.full_name} müşterileri`}
                     >
                       {a.customerCount}
@@ -727,7 +727,7 @@ export default async function DanismanKpiPage({
                   <TD align="right" className="text-text-muted">
                     <Link
                       href={`/app/arama?danisman=${a.id}`}
-                      className="focus-ring relative z-10 rounded-[6px] hover:text-brand-600 hover:underline"
+                      className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-brand-600 hover:underline"
                       aria-label={`${a.full_name} çağrıları`}
                     >
                       {a.callCount}
@@ -736,7 +736,7 @@ export default async function DanismanKpiPage({
                   <TD align="right" className="text-text-muted">
                     <Link
                       href="/app/randevular"
-                      className="focus-ring relative z-10 rounded-[6px] hover:text-brand-600 hover:underline"
+                      className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-brand-600 hover:underline"
                       aria-label={`${a.full_name} randevuları`}
                     >
                       {a.appointCount}

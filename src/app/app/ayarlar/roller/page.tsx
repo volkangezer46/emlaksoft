@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Fingerprint, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getEffectivePermissions } from "@/lib/permissions-effective";
@@ -7,6 +7,7 @@ import type { AppModule, AppRole } from "@/lib/permissions";
 import { MODULE_LABELS, RolePermissionsMatrix } from "./role-permissions-matrix";
 import { UserExceptions, type ExceptionMember, type OverrideRow } from "./user-exceptions";
 
+import { PageHeader } from "@/components/ui/page-header";
 const ROLES: { value: AppRole; label: string }[] = [
   { value: "owner", label: "Ofis sahibi" },
   { value: "gm", label: "Genel müdür" },
@@ -128,20 +129,7 @@ export default async function RolePermissionsPage({
         </Link>
       </div>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/35 blur-[80px]" />
-        <div className="relative">
-          <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-            <Fingerprint className="h-4 w-4" /> Rol & izin yönetimi
-          </span>
-          <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">İzin matrisi</h1>
-          <p className="mt-1 max-w-2xl text-sm text-white/60">
-            Her rolün hangi modüle hangi işlemle erişebileceğini bu ekrandan özelleştirin. Değişiklikler yalnızca bu ofisi
-            etkiler ve anında etkin olur. Kişiye özel durumlar için &quot;Kullanıcı istisnaları&quot; sekmesini kullanın.
-          </p>
-        </div>
-      </section>
+      <PageHeader title="İzin matrisi" eyebrow="Rol & izin yönetimi" description={"Her rolün hangi modüle hangi işlemle erişebileceğini bu ekrandan özelleştirin. Değişiklikler yalnızca bu ofisi etkiler ve anında etkin olur. Kişiye özel durumlar için \"Kullanıcı istisnaları\" sekmesini kullanın."} />
 
       {/* Sekmeler: rol matrisi / kullanıcı istisnaları */}
       <div className="flex gap-2">

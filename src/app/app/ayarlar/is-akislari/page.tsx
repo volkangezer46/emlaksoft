@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, ListChecks, Workflow } from "lucide-react";
+import { ArrowLeft, ListChecks } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { PLAYBOOK_TEMPLATES } from "@/lib/playbook-templates";
@@ -7,6 +7,7 @@ import type { PlaybookTriggerEvent } from "@/lib/playbook-engine";
 import { PLAYBOOK_TRIGGER_LABELS } from "@/lib/playbook-labels";
 import { PlaybooksManager, type PlaybookListRow, type StaffOption } from "./playbooks-manager";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "İş akışları" };
 
 type PlaybookRow = {
@@ -122,23 +123,8 @@ export default async function IsAkislariPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/35 blur-[80px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-              <Workflow className="h-4 w-4" /> İş akışı şablonları
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">İş akışları</h1>
-            <p className="mt-1 max-w-2xl text-sm text-white/60">
-              Otomasyonlar tek bir aksiyon üretir; iş akışları ise bir olay gerçekleşince{" "}
-              <strong className="font-semibold text-white/85">sıralı ve vadeli bir görev listesini</strong> tek
-              seferde açar. Örneğin yeni satılık portföy alındığında tapu, fotoğraf, portal, komşu ve fiyat
-              kontrolü görevleri kendiliğinden takvime düşer.
-            </p>
-          </div>
-          <div className="flex gap-3">
+      <PageHeader title="İş akışları" eyebrow="İş akışı şablonları" description="Otomasyonlar tek bir aksiyon üretir; iş akışları ise bir olay gerçekleşince sıralı ve vadeli bir görev listesini tek seferde açar. Örneğin yeni satılık portföy alındığında tapu, fotoğraf, portal, komşu ve fiyat kontrolü görevleri kendiliğinden takvime düşer." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex gap-3">
             <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-5 py-3 text-center">
               <p className="font-display text-xl font-extrabold text-mint-300">{activeCount}</p>
               <p className="text-xs text-white/55">aktif akış</p>
@@ -153,9 +139,8 @@ export default async function IsAkislariPage() {
                 <p className="text-xs text-white/55">tanımlı adım</p>
               </div>
             </Link>
-          </div>
-        </div>
-      </section>
+          </div></div>
+} />
 
       <PlaybooksManager playbooks={rows} staff={staff} templates={templates} canEdit={canEdit} />
     </div>

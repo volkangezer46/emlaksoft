@@ -5,7 +5,6 @@ import {
   Fingerprint,
   FolderArchive,
   ScrollText,
-  Shield,
   ShieldAlert,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -14,6 +13,7 @@ import { exportAuditCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { daysAgoIso, now } from "@/lib/clock";
 
+import { PageHeader } from "@/components/ui/page-header";
 // `logActivity` çağrılarında geçen TÜM aksiyon kodları (grep: action: "...").
 // Haritada olmayan kod ham haliyle görünür — sessizce kaybolmaz.
 const actionLabel: Record<string, string> = {
@@ -240,19 +240,20 @@ export default async function AuditPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -left-10 bottom-0 h-48 w-48 rounded-full bg-danger-500/20 blur-[80px]" />
-        <div className="relative grid gap-6 lg:grid-cols-[1.2fr_1fr] lg:items-center">
-          <div>
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-danger-300">
-              <Shield className="h-3.5 w-3.5" /> KVKK / denetim izi
-            </p>
-            <h1 className="mt-2 font-display text-3xl font-extrabold">Denetim kayıtları</h1>
-            <p className="mt-2 max-w-lg text-sm text-white/60">
-              Yazma işlemlerinin immutable günlüğü. Sahte aktivite yok — yalnızca `logActivity` kayıtları.
-            </p>
-            {/* Belge Merkezi girişi — aynı modül kapısı (settings) arkasında.
+      <PageHeader title="Denetim kayıtları" eyebrow="KVKK / denetim izi" description="Yazma işlemlerinin immutable günlüğü. Sahte aktivite yok — yalnızca `logActivity` kayıtları." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4">
+            <p className="text-xs font-semibold text-white/70">Aktivite · son 24 saat (2s dilim)</p>
+            <div className="mt-4 flex h-28 items-end gap-1.5">
+              {buckets.map((b, i) => (
+                <div
+                  key={i}
+                  className="bar-live flex-1 rounded-t-[4px] bg-gradient-to-t from-amber-500/80 to-amber-300"
+                  style={{ height: `${Math.max(8, (b / maxB) * 100)}%`, animationDelay: `${i * 40}ms` }}
+                />
+              ))}
+            </div>
+          </div>
+<>{/* Belge Merkezi girişi — aynı modül kapısı (settings) arkasında.
                 Denetim izi "kim ne yaptı", belge merkezi "hangi dosya nerede"
                 sorusunu cevaplıyor; KVKK incelemesinde ikisi birlikte kullanılır. */}
             <Link
@@ -283,22 +284,8 @@ export default async function AuditPage({
                   <p className="text-xs text-white/45">{k.label}</p>
                 </a>
               ))}
-            </div>
-          </div>
-          <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4">
-            <p className="text-xs font-semibold text-white/70">Aktivite · son 24 saat (2s dilim)</p>
-            <div className="mt-4 flex h-28 items-end gap-1.5">
-              {buckets.map((b, i) => (
-                <div
-                  key={i}
-                  className="bar-live flex-1 rounded-t-[4px] bg-gradient-to-t from-amber-500/80 to-amber-300"
-                  style={{ height: `${Math.max(8, (b / maxB) * 100)}%`, animationDelay: `${i * 40}ms` }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+            </div></></div>
+} />
 
       <section id="akis" className="scroll-mt-24 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">

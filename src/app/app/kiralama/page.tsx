@@ -13,6 +13,7 @@ import { NewRentalDialog } from "./new-rental-dialog";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportRentalsCsv } from "@/app/actions/export";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Kiralama" };
 
 function money(n: number) {
@@ -233,20 +234,8 @@ export default async function KiralamaPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-cyan-400/20 blur-[70px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-cyan-300">
-              <KeyRound className="h-4 w-4" /> Mülk yönetimi
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Kiralama</h1>
-            <p className="mt-1 text-sm text-white/70">
-              Kira sözleşmeleri, aylık tahakkuklar ve bakım talepleri tek yerde.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+      <PageHeader title="Kiralama" eyebrow="Mülk yönetimi" description="Kira sözleşmeleri, aylık tahakkuklar ve bakım talepleri tek yerde." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-2">
             <Link
               href="/app/kira-artis"
               className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/8 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-white/15"
@@ -267,9 +256,8 @@ export default async function KiralamaPage({
                 defaultMonthlyRent={prefillRent}
                 autoOpen={autoOpenRentalDialog}
               /> : null}
-          </div>
-        </div>
-      </section>
+          </div></div>
+} />
 
       {/* KPI'lar — hepsi tıklanınca listeyi süzer ("sıfır çıkmaz metrik") */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -346,14 +334,14 @@ export default async function KiralamaPage({
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       {prop ? (
-                        <Link href={`/app/portfoyler/${prop.id}`} className="focus-ring block truncate rounded-[6px] text-sm font-bold text-ink-950 hover:text-brand-600 hover:underline">
+                        <Link href={`/app/portfoyler/${prop.id}`} className="focus-ring block truncate rounded-[var(--radius-control)] text-sm font-bold text-ink-950 hover:text-brand-600 hover:underline">
                           {propName}
                         </Link>
                       ) : (
                         <p className="truncate text-sm font-bold text-ink-950">{propName}</p>
                       )}
                       {renter ? (
-                        <Link href={`/app/musteriler/${renter.id}`} className="focus-ring rounded-[6px] text-xs text-text-muted hover:text-brand-600 hover:underline">
+                        <Link href={`/app/musteriler/${renter.id}`} className="focus-ring rounded-[var(--radius-control)] text-xs text-text-muted hover:text-brand-600 hover:underline">
                           {renter.full_name ?? "İsimsiz"}
                         </Link>
                       ) : (
@@ -379,7 +367,7 @@ export default async function KiralamaPage({
                     </div>
                   </div>
                   <div className="flex items-center justify-between gap-2">
-                    <Link href={`/app/kiralama/${r.id}`} className="focus-ring rounded-[6px] text-xs font-semibold text-brand-600 hover:underline">
+                    <Link href={`/app/kiralama/${r.id}`} className="focus-ring rounded-[var(--radius-control)] text-xs font-semibold text-brand-600 hover:underline">
                       Kira detayı
                     </Link>
                     {canEdit ? (
@@ -495,7 +483,7 @@ export default async function KiralamaPage({
                         aria-label={`${prop?.title ?? prop?.property_code ?? "Kira kaydı"} kira detayını aç`}
                       />
                       {prop ? (
-                        <Link href={`/app/portfoyler/${prop.id}`} className="focus-ring relative z-10 rounded-[6px] hover:text-brand-600 hover:underline">
+                        <Link href={`/app/portfoyler/${prop.id}`} className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-brand-600 hover:underline">
                           {prop.title ?? prop.property_code}
                         </Link>
                       ) : (
@@ -504,7 +492,7 @@ export default async function KiralamaPage({
                     </TD>
                     <TD className="text-text-muted">
                       {renter ? (
-                        <Link href={`/app/musteriler/${renter.id}`} className="focus-ring relative z-10 rounded-[6px] font-semibold text-ink-950 hover:text-brand-600 hover:underline">
+                        <Link href={`/app/musteriler/${renter.id}`} className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-ink-950 hover:text-brand-600 hover:underline">
                           {renter.full_name ?? "İsimsiz"}
                         </Link>
                       ) : (
