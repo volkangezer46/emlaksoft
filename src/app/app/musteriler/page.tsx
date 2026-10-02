@@ -1,5 +1,9 @@
 import Link from "next/link";
 import { daysAgoIso, msSince, now } from "@/lib/clock";
+import { Badge } from "@/components/ui/badge";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   ArrowDown,
   ArrowUp,
@@ -40,7 +44,7 @@ import {
   CustomerSelectAllCheckbox,
 } from "./customer-bulk-actions";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
-import { computeLeadScore, leadTierCls } from "@/lib/lead-score";
+import { computeLeadScore } from "@/lib/lead-score";
 import {
   HEAT_SEGMENTS,
   heatTitle,
@@ -148,7 +152,7 @@ function SortHeaderLink({
   return (
     <Link
       href={href}
-      className={`focus-ring inline-flex items-center gap-1.5 rounded-[6px] px-0.5 uppercase tracking-[0.04em] transition hover:text-ink-950 ${active ? "text-brand-700" : ""}`}
+      className={`focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-0.5 uppercase tracking-[0.04em] transition hover:text-ink-950 ${active ? "text-brand-700" : ""}`}
     >
       {label}
       <Icon className={`h-3.5 w-3.5 ${active ? "text-brand-600" : "text-text-faint"}`} />
@@ -516,11 +520,6 @@ export default async function CustomersPage({
     const idx = 7 - Math.floor((nowMs - new Date(row.created_at).getTime()) / weekMs);
     if (idx >= 0 && idx < 8) buckets[idx] += 1;
   });
-  const maxBucket = Math.max(1, ...buckets);
-  const growthPts = buckets.map((b, i) => ({ x: (i / 7) * 200, y: 56 - (b / maxBucket) * 44 - 6 }));
-  const growthLine = growthPts.map((p) => `${p.x},${p.y}`).join(" ");
-  const growthArea = `0,60 ${growthLine} 200,60`;
-  const growthLast = growthPts[growthPts.length - 1];
 
   // ---- Link kurucu: filtreler sayfa/sıralama linklerinde korunur ----------
   const baseParams: Record<string, string> = {};
@@ -556,90 +555,59 @@ export default async function CustomersPage({
   };
   const pageIds = displayRows.map((c) => c.id);
 
+  const growthTotal = buckets.reduce((a, b) => a + b, 0);
+  const growthFromDate = eightWeeksAgo.slice(0, 10);
+
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/35 blur-[70px]" />
-        <div className="relative flex flex-wrap items-start justify-between gap-5">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-              <span className="status-pulse h-2 w-2 rounded-full bg-mint-400" /> CRM canlı
+      <PageHeader
+        title="Müşteriler"
+        description="Talep, iletişim ve müşteri yolculuğu tek ekranda."
+        actions={
+          <>
+            <ButtonLink href="/app/musteriler/cift-kayit" variant="secondary" size="sm" icon={Copy}>
+              Çift kayıt kontrolü
+            </ButtonLink>
+            <ExportCsvButton action={exportCustomersCsv} label="Dışa aktar" />
+            {canCreate ? <NewCustomerDialog key={sp.yeni === "1" ? "new-customer" : "customer-dialog"} provinces={provinceList} branches={branchList} types={customerTypeValues} defaultOpen={sp.yeni === "1"} /> : null}
+          </>
+        }
+      />
+
+      {/* Kompakt KPI satırı. Linkler filtre formunun kendi parametreleriyle
+          listeye iner; sayılar head-count sorgularından gelir (gerçek toplam). */}
+      <Card className="grid grid-cols-2 divide-line sm:grid-cols-4 sm:divide-x">
+        {[
+          { label: "Toplam kayıt", value: totalAll ?? 0, icon: ICONS.musteri, href: "/app/musteriler" },
+          { label: "Aktif alıcı", value: buyerCount ?? 0, icon: UserCheck, href: `/app/musteriler?type=${encodeURIComponent("Alıcı")}` },
+          { label: "Mülk sahibi", value: ownerCount ?? 0, icon: ICONS.portfoy, href: `/app/musteriler?type=${encodeURIComponent("Mülk sahibi")}` },
+          { label: "Yeni · son 8 hafta", value: growthTotal, icon: TrendingUp, href: `/app/musteriler?from=${growthFromDate}` },
+        ].map((item) => (
+          <Link
+            key={item.label}
+            href={item.href}
+            className="focus-ring group flex items-center gap-3 px-4 py-3 transition hover:bg-canvas"
+          >
+            <item.icon aria-hidden="true" className="h-4 w-4 shrink-0 text-text-faint" />
+            <span className="min-w-0">
+              <span className="numeric block font-display text-lg font-bold text-ink-950">{item.value.toLocaleString("tr-TR")}</span>
+              <span className="block truncate text-xs text-text-muted">{item.label}</span>
             </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Müşteri merkezi</h1>
-            <p className="mt-1 text-sm text-white/60">Talep, iletişim ve müşteri yolculuğu tek operasyon ekranında.</p>
-          </div>
-          {canCreate ? <NewCustomerDialog key={sp.yeni === "1" ? "new-customer" : "customer-dialog"} provinces={provinceList} branches={branchList} types={customerTypeValues} defaultOpen={sp.yeni === "1"} /> : null}
-        </div>
-        <div className="relative mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
-          <div className="stagger-grid grid grid-cols-3 gap-3">
-            {/* KPI'lar filtre formunun kendi parametreleriyle listeye iner: tip
-                sayımları sabit "Alıcı"/"Mülk sahibi" etiketleriyle yapıldığından
-                linkler de aynı değerleri kullanır. Sayılar head-count
-                sorgularından gelir — sayfa dilimi değil, gerçek toplamlar. */}
-            {[
-              // İkonografi: "müşteri" kavramı her ekranda ICONS.musteri (Users).
-              // "Mülk sahibi" MapPin (konum ikonu) ile çiziliyordu — kavramla
-              // ilgisi yoktu; portföy sahipliğini anlatan ICONS.portfoy ile
-              // değiştirildi.
-              { label: "Toplam kayıt", value: totalAll ?? 0, icon: ICONS.musteri, href: "/app/musteriler" },
-              { label: "Aktif alıcı", value: buyerCount ?? 0, icon: UserCheck, href: `/app/musteriler?type=${encodeURIComponent("Alıcı")}` },
-              { label: "Mülk sahibi", value: ownerCount ?? 0, icon: ICONS.portfoy, href: `/app/musteriler?type=${encodeURIComponent("Mülk sahibi")}` },
-            ].map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
-              >
-                <div className="flex items-start justify-between">
-                  <item.icon className="h-4 w-4 text-mint-400" />
-                  <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                </div>
-                <p className="mt-2 font-display text-xl font-extrabold text-white">{item.value}</p>
-                <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
-              </Link>
-            ))}
-          </div>
-          <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
-            <div className="flex items-center justify-between">
-              <p className="flex items-center gap-1.5 text-xs font-semibold text-white/75"><TrendingUp className="h-3.5 w-3.5 text-cyan-400" /> Yeni müşteri · son 8 hafta</p>
-              <span className="rounded-full bg-brand-500/20 px-2 py-0.5 text-xs font-bold text-cyan-300">{buckets[7]} bu hafta</span>
-            </div>
-            <svg viewBox="0 0 200 60" className="mt-3 h-20 w-full overflow-visible" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="custGrowth" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--cyan-400)" stopOpacity="0.32" />
-                  <stop offset="100%" stopColor="var(--cyan-400)" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <polygon points={growthArea} fill="url(#custGrowth)" />
-              <polyline
-                className="chart-draw"
-                style={{ "--len": 320 } as React.CSSProperties}
-                points={growthLine}
-                fill="none"
-                stroke="var(--cyan-400)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <circle cx={growthLast.x} cy={growthLast.y} r="3" fill="var(--cyan-400)" opacity="0.4" className="glow-halo" />
-              <circle cx={growthLast.x} cy={growthLast.y} r="2.6" fill="#fff" />
-            </svg>
-          </div>
-        </div>
-      </section>
+          </Link>
+        ))}
+      </Card>
+      {growthTotal === 0 && (totalAll ?? 0) > 0 ? (
+        <p className="-mt-3 text-xs text-text-faint">Son 8 haftada yeni müşteri eklenmedi.</p>
+      ) : null}
 
       {/* Yaklaşan doğum günü / yıldönümü hatırlatma */}
       {occasions.length > 0 ? (
-        <section className="overflow-hidden rounded-[var(--radius-card)] border border-amber-300/60 bg-gradient-to-r from-amber-50 to-rose-50/60 p-4 shadow-[var(--shadow-xs)] dark:border-amber-400/25 dark:from-amber-500/[0.08] dark:to-rose-500/[0.06]">
+        <Card className="p-4">
           <div className="flex items-center gap-2">
-            <span className="grid h-8 w-8 place-items-center rounded-full bg-amber-400/20 text-amber-600 dark:text-amber-400">
-              <Gift className="h-4 w-4" />
-            </span>
-            <p className="text-sm font-bold text-ink-950">
+            <Gift aria-hidden="true" className="h-4 w-4 text-text-muted" />
+            <p className="text-sm font-semibold text-ink-950">
               Yaklaşan özel günler
-              <span className="ml-1.5 font-medium text-text-muted">· önümüzdeki {WINDOW_DAYS} gün</span>
+              <span className="ml-1.5 font-normal text-text-muted">· önümüzdeki {WINDOW_DAYS} gün</span>
             </p>
           </div>
           <ul className="mt-3 flex flex-wrap gap-2">
@@ -647,18 +615,18 @@ export default async function CustomersPage({
               <li key={`${o.id}-${o.kind}`}>
                 <Link
                   href={`/app/musteriler/${o.id}`}
-                  className="group inline-flex items-center gap-2 rounded-full border border-line bg-surface/80 px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-500/10"
+                  className="focus-ring group inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300"
                   title={o.note ?? undefined}
                 >
                   {o.kind === "birthday" ? (
-                    <Cake className="h-3.5 w-3.5 text-rose-500" />
+                    <Cake aria-hidden="true" className="h-3.5 w-3.5 text-text-muted" />
                   ) : (
-                    <Gift className="h-3.5 w-3.5 text-amber-500" />
+                    <Gift aria-hidden="true" className="h-3.5 w-3.5 text-text-muted" />
                   )}
                   <span>{o.name}</span>
-                  <span className={`rounded-full px-1.5 py-0.5 text-xs font-bold ${o.days === 0 ? "bg-rose-500 text-white" : "bg-amber-400/20 text-amber-700 dark:text-amber-300"}`}>
-                    {o.kind === "birthday" ? "🎂" : "🎉"} {occasionLabel(o.days)}
-                  </span>
+                  <Badge size="sm" variant={o.days === 0 ? "warning" : "neutral"}>
+                    {o.kind === "birthday" ? "Doğum günü" : "Yıldönümü"} · {occasionLabel(o.days)}
+                  </Badge>
                 </Link>
               </li>
             ))}
@@ -666,12 +634,13 @@ export default async function CustomersPage({
               <li className="self-center text-xs font-medium text-text-muted">+{occasions.length - 12} daha</li>
             ) : null}
           </ul>
-        </section>
+        </Card>
       ) : null}
 
       {/* Filtre toolbar — form GET olduğu için sayfa 1'e döner; sıralama gizli
           alanlarla korunur */}
-      <form className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] space-y-3" action="/app/musteriler">
+      <Card className="p-4">
+      <form className="space-y-3" action="/app/musteriler">
         {siralaF ? <input type="hidden" name="sirala" value={siralaF} /> : null}
         {yonF ? <input type="hidden" name="yon" value={yonF} /> : null}
         {segmentF ? <input type="hidden" name="segment" value={segmentF} /> : null}
@@ -753,9 +722,9 @@ export default async function CustomersPage({
               className="min-w-0 max-w-[150px] flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 sm:flex-none"
             />
           </div>
-          <button type="submit" className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700">
+          <Button type="submit" size="sm">
             Filtrele
-          </button>
+          </Button>
           {(activeFilters > 0 || q || sortF || siralaF) && (
             <Link href="/app/musteriler" className="text-xs font-semibold text-text-muted hover:text-danger-500">
               Temizle
@@ -765,16 +734,15 @@ export default async function CustomersPage({
             type="submit"
             name="sort"
             value={sortF === "hot" ? "" : "hot"}
-            className={`inline-flex items-center gap-1 rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold transition ${sortF === "hot" ? "bg-danger-500/15 text-danger-500 ring-1 ring-danger-500/25" : "border border-line text-text-muted hover:border-danger-500/50 hover:text-danger-500"}`}
+            className={`focus-ring inline-flex items-center gap-1 rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold transition ${sortF === "hot" ? "bg-brand-600/10 text-brand-700 ring-1 ring-brand-600/25" : "border border-line text-text-muted hover:border-brand-300 hover:text-brand-700"}`}
             title="Bu sayfadaki kayıtları lead skoruna göre sırala"
           >
-            🔥 Sıcak önce{hotCount > 0 ? ` · ${hotCount}` : ""}
+            Sıcak önce{hotCount > 0 ? ` · ${hotCount}` : ""}
           </button>
-          <span className="ml-auto rounded-full bg-brand-600/10 px-3 py-1.5 text-xs font-semibold text-brand-600">
-            {totalFiltered.toLocaleString("tr-TR")} sonuç
-          </span>
+          <Badge className="ml-auto">{totalFiltered.toLocaleString("tr-TR")} sonuç</Badge>
         </div>
       </form>
+      </Card>
 
       {/* Kayıtlı görünümler — aktif filtre kombinasyonu adlandırılıp saklanır */}
       <SavedViews route="/app/musteriler" views={savedViews} currentParams={baseParams} />
@@ -786,10 +754,10 @@ export default async function CustomersPage({
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {(
               [
-                { key: "sicak" as const, icon: Flame, tone: "danger" as const },
+                { key: "sicak" as const, icon: Flame, tone: "neutral" as const },
                 { key: "ilgili" as const, icon: Sparkles, tone: "neutral" as const },
                 { key: "soguk" as const, icon: Snowflake, tone: "neutral" as const },
-                { key: "uykuda" as const, icon: Moon, tone: "warning" as const },
+                { key: "uykuda" as const, icon: Moon, tone: "neutral" as const },
               ]
             ).map((card) => (
               <StatCard
@@ -817,23 +785,6 @@ export default async function CustomersPage({
           ) : null}
         </section>
       ) : null}
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          {/* Cift kayit kontrolu: telefon/e-posta uzerinde benzersizlik kisiti
-              YOK, yani ayni kisi iki kez girilebiliyor ve bunu goren bir ekran
-              yoktu. */}
-          <Link
-            href="/app/musteriler/cift-kayit"
-            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-amber-400 hover:text-amber-600"
-          >
-            <Copy className="h-3.5 w-3.5" /> Çift kayıt kontrolü
-          </Link>
-        </div>
-        <div className="flex items-center gap-2">
-          <ExportCsvButton action={exportCustomersCsv} iconOnly label="Müşterileri CSV indir" />
-        </div>
-      </div>
 
       {(totalAll ?? 0) === 0 ? (
         <EmptyState
@@ -927,24 +878,25 @@ export default async function CustomersPage({
                           <p className="flex items-center gap-1.5 font-semibold text-ink-950">
                             {c.full_name}
                             {lead && !c.blacklist ? (
-                              <span
-                                className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-bold ring-1 ring-inset ${leadTierCls(lead.tier)}`}
-                                title={`Lead skoru: ${lead.score}`}
-                              >
-                                {lead.tier === "hot" ? "🔥" : lead.tier === "warm" ? "🌤️" : "❄️"} {lead.score}
+                              <span title={`Lead skoru: ${lead.score}`}>
+                                <Badge size="sm" variant={lead.tier === "hot" ? "warning" : "neutral"} className="numeric">
+                                  {lead.score}
+                                </Badge>
                               </span>
                             ) : null}
                             {/* Sıcaklık segmenti — title: skor dökümü (hangi bileşen kaç puan);
                                 uykudaysa temassız gün sayısı da başlıkta */}
                             {heat ? (
-                              <span
-                                className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-bold ring-1 ring-inset ${HEAT_SEGMENTS[heat.segment].badgeCls}`}
-                                title={heatTitle(heat)}
-                              >
-                                {HEAT_SEGMENTS[heat.segment].emoji} {HEAT_SEGMENTS[heat.segment].label}
-                                {heat.segment === "uykuda" && heat.daysSinceContact !== null
-                                  ? ` · ${heat.daysSinceContact} gün`
-                                  : ""}
+                              <span title={heatTitle(heat)}>
+                                <Badge
+                                  size="sm"
+                                  variant={heat.segment === "sicak" ? "warning" : heat.segment === "ilgili" ? "success" : "neutral"}
+                                >
+                                  {HEAT_SEGMENTS[heat.segment].label}
+                                  {heat.segment === "uykuda" && heat.daysSinceContact !== null
+                                    ? ` · ${heat.daysSinceContact} gün`
+                                    : ""}
+                                </Badge>
                               </span>
                             ) : null}
                           </p>
@@ -958,9 +910,7 @@ export default async function CustomersPage({
                     </TD>
                     <TD className="hidden sm:table-cell">
                       {c.customer_types && c.customer_types.length > 0 ? (
-                        <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-medium text-brand-600">
-                          {c.customer_types[0]}
-                        </span>
+                        <Badge>{c.customer_types[0]}</Badge>
                       ) : (
                         <span className="text-text-faint">—</span>
                       )}
@@ -968,9 +918,7 @@ export default async function CustomersPage({
                       {c.tags && c.tags.length > 0 ? (
                         <span className="mt-1 flex flex-wrap items-center gap-1">
                           {c.tags.slice(0, 2).map((t) => (
-                            <span key={t} className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs font-semibold text-cyan-700">
-                              {t}
-                            </span>
+                            <Badge key={t} size="sm" variant="outline">{t}</Badge>
                           ))}
                           {c.tags.length > 2 ? (
                             <span className="text-xs font-semibold text-text-faint" title={c.tags.slice(2).join(", ")}>
