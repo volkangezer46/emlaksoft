@@ -5,6 +5,7 @@ const empty: OnboardingCounts = {
   profileFilled: { phone: false, city: false, licenseNo: false },
   customers: 0,
   properties: 0,
+  wonDeals: 0,
   members: 1,
   activeIntegrations: 0,
 };
@@ -14,7 +15,7 @@ describe("onboarding-checklist", () => {
     const s = buildOnboarding(empty);
     expect(s.percent).toBe(0);
     expect(s.nextId).toBe("profile");
-    expect(s.total).toBe(5);
+    expect(s.total).toBe(6);
     expect(s.complete).toBe(false);
   });
 
@@ -31,8 +32,8 @@ describe("onboarding-checklist", () => {
       profileFilled: { phone: true, city: true, licenseNo: false },
     });
     expect(s.doneCount).toBe(3);
-    expect(s.percent).toBe(60);
-    expect(s.nextId).toBe("team");
+    expect(s.percent).toBe(50);
+    expect(s.nextId).toBe("deal");
   });
 
   it("atlanan adım sonraki adım seçilmez ama tamamlanmış sayılmaz", () => {
@@ -46,12 +47,21 @@ describe("onboarding-checklist", () => {
       profileFilled: { phone: true, city: true, licenseNo: true },
       customers: 1,
       properties: 1,
+      wonDeals: 1,
       members: 2,
       activeIntegrations: 1,
     });
     expect(s.complete).toBe(true);
     expect(s.percent).toBe(100);
     expect(s.nextId).toBeNull();
+  });
+
+  it("komisyon adımı kazanılmış anlaşmaya bağlıdır, elle komisyon yoktur", () => {
+    const open = buildOnboarding(empty).steps.find((x) => x.id === "deal")!;
+    expect(open.done).toBe(false);
+    expect(open.href).toBe("/app/anlasmalar/yeni");
+    const won = buildOnboarding({ ...empty, wonDeals: 1 }).steps.find((x) => x.id === "deal")!;
+    expect(won.done).toBe(true);
   });
 
   it("her adımın hedefi /app ile başlar", () => {

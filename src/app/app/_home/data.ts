@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { computeLeadScore } from "@/lib/lead-score";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { daysAgoIso, now } from "@/lib/clock";
+import { buildOnboarding } from "@/lib/onboarding-checklist";
 import {
   commissionSummaryFromAggregate,
   type CommissionAggregate,
@@ -383,4 +384,48 @@ export const loadTenantRow = cache(async (ctx: HomeCtx) => {
   const result = await supabase.from("tenants").select("name, sample_seeded_at").eq("id", ctx.tenantId).maybeSingle();
   assertQueryBatchSucceeded([result], ["tenant"], "Ana panel");
   return result.data;
+});
+
+/** Boş ofis ayrımı: müşteri ve portföy sayısı (iki hafif sayım). Hata varsa null — sahte "boş" üretilmez. */
+export const loadEmptyProbe = cache(async (ctx: HomeCtx) => {
+  if (!ctx.tenantId) return null as { customers: number; properties: number } | null;
+  const supabase = await createClient();
+  const results = await Promise.all([
+    supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
+    supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null),
+  ]);
+  if (results.some((r) => r.error)) return null;
+  return { customers: results[0].count ?? 0, properties: results[1].count ?? 0 };
+});
+
+/** Kurulum şeridi verisi (/app/baslangic ile aynı sayımlar). Hata varsa null — şerit gizlenir. */
+export const loadOnboardingState = cache(async (ctx: HomeCtx) => {
+  if (!ctx.tenantId) return null;
+  const supabase = await createClient();
+  const results = await Promise.all([
+    supabase.from("tenants").select("phone, city, license_no").eq("id", ctx.tenantId).maybeSingle(),
+    supabase.from("customers").select("id", { count: "exact", head: true }).eq("is_sample", false),
+    supabase.from("properties").select("id", { count: "exact", head: true }).eq("is_sample", false),
+    supabase.from("deals").select("id", { count: "exact", head: true }).eq("stage", "won").eq("is_sample", false),
+    supabase.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId),
+    supabase
+      .from("tenant_integrations")
+      .select("id", { count: "exact", head: true })
+      .eq("is_active", true)
+      .in("provider", ["netgsm", "whatsapp"]),
+  ]);
+  if (results.some((r) => r.error)) return null;
+  const tenant = results[0].data as { phone: string | null; city: string | null; license_no: string | null } | null;
+  return buildOnboarding({
+    profileFilled: {
+      phone: Boolean(tenant?.phone),
+      city: Boolean(tenant?.city),
+      licenseNo: Boolean(tenant?.license_no),
+    },
+    customers: results[1].count ?? 0,
+    properties: results[2].count ?? 0,
+    wonDeals: results[3].count ?? 0,
+    members: results[4].count ?? 0,
+    activeIntegrations: results[5].count ?? 0,
+  });
 });

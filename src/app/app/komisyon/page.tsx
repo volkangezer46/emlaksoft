@@ -475,12 +475,28 @@ export default async function CommissionPage({
                   ? "Bu filtrelerle eşleşen komisyon kaydı yok"
                   : "Henüz komisyon kaydı yok"}
               </h3>
-              <p className="mt-1 max-w-md text-sm text-text-muted">Kapanan anlaşmalardan oluşan komisyon ve hakediş kayıtları burada izlenecek.</p>
               {durum || from || to || sayfa > 1 ? (
-                <Link href="/app/komisyon" className="mt-3 text-sm font-semibold text-brand-600 hover:underline">
-                  Filtreleri temizle
-                </Link>
-              ) : null}
+                <>
+                  <p className="mt-1 max-w-md text-sm text-text-muted">Kapanan anlaşmalardan oluşan komisyon ve hakediş kayıtları burada izlenir.</p>
+                  <Link href="/app/komisyon" className="mt-3 text-sm font-semibold text-brand-600 hover:underline">
+                    Filtreleri temizle
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <p className="mt-1 max-w-md text-sm text-text-muted">
+                    Komisyon elle girilmez; bir anlaşma kazanıldığında otomatik oluşur. Böylece her komisyon bir
+                    anlaşmaya ve portföye bağlı kalır, kayıt dışı kalmaz. İlk anlaşmanızı ekleyip kazanıldı olarak
+                    kapatın, komisyonunuz burada görünsün.
+                  </p>
+                  <Link
+                    href="/app/anlasmalar/yeni"
+                    className="focus-ring btn-shine mt-4 inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  >
+                    Anlaşma ekle
+                  </Link>
+                </>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-line">

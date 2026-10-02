@@ -4,10 +4,9 @@ import { clearSampleDataForm } from "@/app/actions/sample-data";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getCachedOfficeScore, getOfficeScoreCached } from "@/lib/office-score";
 import { DAY_MS, msUntil, now } from "@/lib/clock";
-import { SampleDataCta } from "../sample-data-cta";
 import { TvAutoRefresh, TvClock } from "../tv-mode";
 import { WidgetEditToggle } from "../dashboard-widgets";
-import { loadExpiringAuthority, loadKpiCounts, loadTenantRow, type HomeCtx } from "./data";
+import { loadExpiringAuthority, loadTenantRow, type HomeCtx } from "./data";
 import { greetingFor } from "./helpers";
 
 /**
@@ -32,7 +31,7 @@ export function SayfaBasligi({ firstName, hasName }: { firstName: string; hasNam
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Link
-          href="/app/musteriler"
+          href="/app/musteriler/yeni"
           className="btn-shine focus-ring inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
         >
           <Plus className="h-4 w-4" /> Müşteri
@@ -93,7 +92,7 @@ export async function TvUst({ ctx }: { ctx: HomeCtx }) {
  * yüklüyken ince amber şerit (bkz. actions/sample-data.ts). TV modunda hiç gösterilmez.
  */
 export async function OrnekVeri({ ctx }: { ctx: HomeCtx }) {
-  const [tenant, counts] = await Promise.all([loadTenantRow(ctx), loadKpiCounts(ctx)]);
+  const tenant = await loadTenantRow(ctx);
   const sampleSeededAt = tenant?.sample_seeded_at ?? null;
 
   if (sampleSeededAt) {
@@ -120,7 +119,7 @@ export async function OrnekVeri({ ctx }: { ctx: HomeCtx }) {
       </div>
     );
   }
-  if (counts.customerCount === 0 && counts.propertyCount === 0) return <SampleDataCta />;
+  // Boş ofis: örnek veri eylemi artık "Başlayalım" kartında (bkz. baslayalim.tsx).
   return null;
 }
 
