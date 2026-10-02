@@ -45,6 +45,9 @@ import { SaleDiagnosticsCard } from "@/components/app/sale-diagnostics-card";
 import { isEndeksaConfiguredFull } from "@/lib/integrations/endeksa";
 import { isTapusorConfiguredFull } from "@/lib/integrations/tapusor";
 import { daysAgoIso, msSince, now } from "@/lib/clock";
+import { generateListingText } from "@/lib/listing-text";
+import { CopyListingText } from "@/components/app/copy-listing-text";
+import { WhatsAppLink } from "@/components/app/whatsapp-link";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import {
   ClosuresSection,
@@ -224,6 +227,15 @@ export default async function PropertyDetailPage({
   const province = relName(property.province as Rel);
   const district = relName(property.district as Rel);
   const assignee = assigneeProfile?.full_name ?? null;
+  const listingText = generateListingText({
+    title: property.title,
+    transaction_type: property.transaction_type,
+    property_type: property.property_type,
+    list_price: property.list_price != null ? Number(property.list_price) : null,
+    province,
+    district,
+    features: (property.features ?? null) as Record<string, unknown> | null,
+  });
 
   const healthGood = property.price_health === "green" || property.price_health === "Yeşil";
   const healthWarn = property.price_health === "yellow" || property.price_health === "Sarı" || property.price_health === "red";
@@ -424,7 +436,12 @@ export default async function PropertyDetailPage({
               <Link href={pipelineHref} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
                 Pipeline{relatedDeal ? <ArrowUpRight className="h-3.5 w-3.5 text-white/60" /> : null}
               </Link>
+              <WhatsAppLink share label="Müşteriye WhatsApp ile gönder" message={listingText.description ? `${listingText.title}\n\n${listingText.description}` : null} />
               {canDelete ? <DeletePropertyButton propertyId={property.id} /> : null}
+            </div>
+            {/* Portal ara çözümü: ilan metnini üret, portala yapıştır */}
+            <div className="mt-3">
+              <CopyListingText title={listingText.title} description={listingText.description} warnings={listingText.warnings} />
             </div>
           </div>
 

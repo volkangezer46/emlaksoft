@@ -23,6 +23,7 @@ import { Customer360Tabs } from "./customer-360-tabs";
 import { CustomerTasks, type CustomerTaskRow } from "./customer-tasks";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 import { WaTemplateMenu } from "@/components/app/wa-template-menu";
+import { WhatsAppLink } from "@/components/app/whatsapp-link";
 import { computeLeadScore, leadTierCls } from "@/lib/lead-score";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
 import { MatchedSection, MatchedSkeleton, SatisfactionSection } from "./sections";
@@ -567,6 +568,12 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                       ofis: waTenant?.name ?? "",
                       telefon: waTenant?.phone ?? "",
                     }}
+                  />
+                ) : null}
+                {customer.phone ? (
+                  <WhatsAppLink
+                    phone={customer.phone}
+                    message={`Merhaba ${customer.full_name.split(" ")[0]}, ${waTenant?.name ?? "ofisimiz"} adına yazıyorum.`}
                   />
                 ) : null}
                 {customer.phone && canEdit ? (
