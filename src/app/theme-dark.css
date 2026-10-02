@@ -43,8 +43,14 @@ html[data-theme="dark"] {
   --ink-700: #31528f;
 
   /* Marka: metin olarak okunur, beyaz yazılı düğmede yeterli kontrast */
-  --accent: var(--brand-500);
-  --accent-hover: var(--brand-400);
+  --accent: var(--brand-600); /* beyaz yazı ≥4.5:1 (eski brand-500 4.0:1 idi) */
+  --accent-hover: var(--brand-500);
+  --accent-text: var(--brand-700);
+  --ring: var(--accent-text);
+  --heading: var(--text);
+  --selection-bg: color-mix(in srgb, var(--accent) 45%, transparent);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.32);
   --brand-50: rgba(47, 120, 255, 0.14);
   --brand-700: #7aa9ff;
 
@@ -119,7 +125,4 @@ html[data-theme="dark"] select {
 }
 html[data-theme="dark"] ::placeholder {
   color: var(--text-faint);
-}
-html[data-theme="dark"] ::selection {
-  background: color-mix(in srgb, var(--accent) 45%, transparent);
 }

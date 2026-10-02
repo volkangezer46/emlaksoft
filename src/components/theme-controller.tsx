@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { applyTheme, subscribeTheme } from "@/lib/theme";
+import { applyTheme, clearTheme, subscribeTheme } from "@/lib/theme";
 
 /**
  * /app ve /admin layout'larında bir kez yerleştirilir. Tercih değişince
@@ -14,7 +14,7 @@ export function ThemeController() {
     const unsubscribe = subscribeTheme(applyTheme);
     return () => {
       unsubscribe();
-      document.documentElement.removeAttribute("data-theme");
+      clearTheme();
     };
   }, []);
   return null;

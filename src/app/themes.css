@@ -1,0 +1,88 @@
+/* ============================================================================
+   EmlakSoft — VURGU TEMALARI (yalnız /app ve /admin)
+   ----------------------------------------------------------------------------
+   Seçim: <html data-accent="emerald|indigo|amber|graphite"> (+ data-theme="dark").
+   "ocean" varsayılandır ve öznitelik gerektirmez (tokens.css değerleri).
+   Öznitelikleri ThemeController yönetir; ilk boyamada satır içi script
+   (THEME_BOOT_SCRIPT) uygular. Public vitrin/portallar bu attribute'ları
+   ASLA almaz — her zaman açık ve marka renginde kalır.
+
+   Mekanizma: yalnız --brand-* ölçeği çevrilir. --accent, --accent-hover,
+   --accent-subtle, --accent-text, --info-*, gradyanlar zaten bu ölçeğe bağlı;
+   bileşenlerde değişiklik gerekmez.
+
+     --brand-600  DOLGU  (düğme/aktif öğe) — üzerinde beyaz yazı ≥ 4.5:1
+     --brand-700  METİN  (bağlantı/ikon)   — açıkta beyaz zeminde ≥ 4.5:1,
+                                              koyuda --surface üzerinde ≥ 4.5:1
+     --brand-500/400/300/50  yardımcı tonlar (hover, gradyan, yumuşak zemin)
+
+   Kontrast değerleri src/lib/design-tokens-contract.test.ts içinde hesaplanır
+   ve korunur; paleti değiştirirsen o test kırılır. Değerler: lib/theme.ts ACCENTS
+   tablosuyla senkron kalmalı (örnek kart renkleri).
+   ========================================================================== */
+
+/* ---- Zümrüt ---------------------------------------------------------------- */
+html[data-accent="emerald"] {
+  --brand-700: #065f46;
+  --brand-600: #047857;
+  --brand-500: #059669;
+  --brand-400: #10b981;
+  --brand-300: #6ee7b7;
+  --brand-50: #ecfdf5;
+}
+html[data-theme="dark"][data-accent="emerald"] {
+  --brand-700: #34d399;
+  --brand-50: rgba(16, 185, 129, 0.14);
+}
+
+/* ---- İndigo (gece mavisi) --------------------------------------------------- */
+html[data-accent="indigo"] {
+  --brand-700: #3a46c0;
+  --brand-600: #4350d6;
+  --brand-500: #5b66e8;
+  --brand-400: #6f79ee;
+  --brand-300: #a5acf7;
+  --brand-50: #eef0ff;
+}
+html[data-theme="dark"][data-accent="indigo"] {
+  --brand-700: #a5b4fc;
+  --brand-50: rgba(99, 102, 241, 0.16);
+}
+
+/* ---- Kehribar / altın ------------------------------------------------------- */
+html[data-accent="amber"] {
+  --brand-700: #92400e;
+  --brand-600: #b45309;
+  --brand-500: #d97706;
+  --brand-400: #f59e0b;
+  --brand-300: #fcd34d;
+  --brand-50: #fffbeb;
+}
+html[data-theme="dark"][data-accent="amber"] {
+  --brand-700: #fbbf24;
+  --brand-50: rgba(245, 158, 11, 0.14);
+}
+
+/* ---- Grafit ------------------------------------------------------------------ */
+html[data-accent="graphite"] {
+  --brand-700: #1e293b;
+  --brand-600: #334155;
+  --brand-500: #475569;
+  --brand-400: #64748b;
+  --brand-300: #cbd5e1;
+  --brand-50: #f1f5f9;
+}
+html[data-theme="dark"][data-accent="graphite"] {
+  /* Koyuda #334155 zeminle karışır; dolgu bir kademe açılır (beyaz yazı 4.76:1) */
+  --brand-600: #64748b;
+  --brand-500: #7b8aa0;
+  --brand-700: #cbd5e1;
+  --brand-50: rgba(148, 163, 184, 0.14);
+}
+
+/* ---- Vurgu geçişi: yalnız renk, 150ms; hareket azaltmada anında ------------- */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-accent] body {
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+}
