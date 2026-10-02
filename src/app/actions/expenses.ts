@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { validateTenantReferences } from "@/lib/tenant-references";
@@ -41,6 +42,7 @@ export async function createExpense(
   if (error || !data) return { error: "Gider kaydedilemedi." };
 
   revalidatePath("/app/giderler");
+  revalidateTenantData(gate.tenantId);
   return { ok: true, id: data.id };
 }
 
@@ -74,6 +76,7 @@ export async function updateExpense(
   if (!data) return { error: "Gider kaydı bulunamadı." };
 
   revalidatePath("/app/giderler");
+  revalidateTenantData(gate.tenantId);
   return { ok: true, id };
 }
 
@@ -100,6 +103,7 @@ export async function deleteExpense(id: string): Promise<ExpenseResult> {
   if (!data) return { error: "Gider kaydı bulunamadı." };
 
   revalidatePath("/app/giderler");
+  revalidateTenantData(gate.tenantId);
   return { ok: true, id: cleanId };
 }
 

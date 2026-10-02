@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
@@ -68,6 +69,7 @@ export async function requestCustomerErasure(formData: FormData): Promise<KvkkRe
   revalidatePath("/app/uyum");
   revalidatePath("/app/musteriler");
   revalidatePath(`/app/musteriler/${customerId}`);
+  revalidateTenantData(gate.tenantId);
   return { ok: true, ref: sonuc.ref };
 }
 
@@ -109,6 +111,7 @@ export async function purgeStaleCustomers(formData: FormData): Promise<KvkkResul
   }
 
   revalidatePath("/app/uyum");
+  revalidateTenantData(gate.tenantId);
   return { ok: true, count: adet };
 }
 

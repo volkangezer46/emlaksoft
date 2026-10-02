@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateTenantData } from "@/lib/revalidate";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { normalizeCloseFlags } from "@/lib/leak-shield";
@@ -49,6 +50,7 @@ export async function createPortalListing(formData: FormData): Promise<PortalRes
   revalidatePath("/app/portfoyler");
   revalidatePath("/app/kayip-kacak");
   revalidatePath("/app");
+  revalidateTenantData(gate.tenantId);
   return { ok: true };
 }
 
@@ -75,6 +77,7 @@ export async function confirmPortalListing(formData: FormData): Promise<void> {
   revalidatePath("/app/portallar");
   revalidatePath("/app/kayip-kacak");
   revalidatePath("/app");
+  revalidateTenantData(gate.tenantId);
 }
 
 /**
@@ -103,6 +106,7 @@ export async function confirmPortalListingsBulk(formData: FormData): Promise<voi
   revalidatePath("/app/portallar");
   revalidatePath("/app/kayip-kacak");
   revalidatePath("/app");
+  revalidateTenantData(gate.tenantId);
 }
 
 export async function closePortalListing(formData: FormData): Promise<PortalResult> {
@@ -166,5 +170,6 @@ export async function closePortalListing(formData: FormData): Promise<PortalResu
   revalidatePath("/app/kayip-kacak");
   revalidatePath("/app/komisyon");
   revalidatePath("/app");
+  revalidateTenantData(gate.tenantId);
   return { ok: true };
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
@@ -113,6 +114,7 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
     revalidatePath(`/app/portfoyler/${propertyId}`);
     revalidatePath("/app/raporlar");
     revalidatePath("/app");
+    revalidateTenantData(gate.tenantId);
     return { ok: true, dealId, commissionId };
   }
 
@@ -137,6 +139,7 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
       entityId: id,
     });
     revalidatePath("/app/komisyon");
+    revalidateTenantData(gate.tenantId);
     return { ok: true, commissionId: id };
   }
 

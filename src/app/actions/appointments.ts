@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
@@ -164,6 +165,7 @@ export async function createAppointment(formData: FormData): Promise<Appointment
 
   revalidatePath("/app/randevular");
   revalidatePath("/app");
+  revalidateTenantData(gate.tenantId);
   return { ok: true };
 }
 
@@ -258,6 +260,7 @@ export async function updateAppointmentStatus(formData: FormData): Promise<Appoi
   if (!updated) return { error: "Randevu bu sırada değişti; sayfayı yenileyin." };
 
   revalidatePath("/app/randevular");
+  revalidateTenantData(gate.tenantId);
   return { ok: true };
 }
 
@@ -349,5 +352,6 @@ export async function updateAppointment(formData: FormData): Promise<Appointment
 
   revalidatePath("/app/randevular");
   revalidatePath("/app");
+  revalidateTenantData(gate.tenantId);
   return { ok: true };
 }

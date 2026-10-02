@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
@@ -306,6 +307,7 @@ export async function convertOfferToDeal(offerId: string): Promise<ConvertOfferR
   revalidatePath(`/app/teklifler/${offerId}`);
   revalidatePath("/app/anlasmalar");
   revalidatePath(`/app/anlasmalar/${dealId}`);
+  revalidateTenantData(gate.tenantId);
   return { ok: true, dealId, linked };
 }
 

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
@@ -196,6 +197,7 @@ export async function importCustomers(rows: CustomerImportRow[]): Promise<Import
   });
 
   revalidatePath("/app/musteriler");
+  revalidateTenantData(gate.tenantId);
   errors.sort((a, b) => a.row - b.row);
   return { ok: true, inserted, skipped, errors };
 }
@@ -275,6 +277,7 @@ export async function importProperties(rows: PropertyImportRow[]): Promise<Impor
   });
 
   revalidatePath("/app/portfoyler");
+  revalidateTenantData(gate.tenantId);
   errors.sort((a, b) => a.row - b.row);
   return { ok: true, inserted, skipped: 0, errors };
 }
