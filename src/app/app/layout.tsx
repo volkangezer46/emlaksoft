@@ -19,7 +19,7 @@ import { cookies } from "next/headers";
 import { AppPrefetcher } from "@/components/app/app-prefetcher";
 import { ToastProvider } from "@/components/app/toast-provider";
 import { OpsImpersonationBanner } from "@/components/app/ops-impersonation-banner";
-import { LiveOfficeStrip } from "@/components/app/live-office-strip";
+import { SectionTabs } from "@/components/app/section-tabs";
 import { RealtimeRefresh } from "@/components/app/realtime-refresh";
 import { KeyboardShortcuts } from "@/components/app/keyboard-shortcuts";
 import { listMyNotifications } from "@/app/actions/notifications";
@@ -280,7 +280,7 @@ export default async function AppLayout({
               </form>
             </div>
           </header>
-          {/* grid + minmax(0,1fr): her doğrudan çocuk (LiveOfficeStrip + sayfa)
+          {/* grid + minmax(0,1fr): her doğrudan çocuk (SectionTabs + sayfa)
               tam olarak kullanılabilir genişliğe sabitlenir; içteki geniş tablonun
               overflow-x-auto kabı düzgün kaydırılır ve belgeyi (ICB'yi) şişiremez.
               iOS Safari `overflow:clip`'i viewport'a propagate etmiyor (sayfa yana
@@ -289,7 +289,7 @@ export default async function AppLayout({
             id="main-content"
             className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1fr)] content-start overflow-x-clip p-4 pb-28 md:px-6 md:pt-6 lg:p-8"
           >
-            <LiveOfficeStrip tenantId={tenantId} />
+            <SectionTabs accessibleModules={accessibleModules} />
             {children}
           </main>
         </div>

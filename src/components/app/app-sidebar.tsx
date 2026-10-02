@@ -3,103 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-// Doğrudan lucide import'u yalnızca KAVRAMSAL OLMAYAN öğeler için kalır
-// (hesap makinesi, chevron, hamburger, kapat, kıvılcım süsü).
-import { BadgeCheck, Calculator, CalendarOff, ChevronRight, Globe, IdCard, KeySquare, LayoutDashboard, LineChart, ListFilter, Megaphone, Menu, MessagesSquare, Presentation, Sparkles, Stamp, Sunrise, Trophy, Tv, Workflow, X } from "lucide-react";
-// İkonografi tek kaynaktan: kavramsal ikonlar (müşteri, portföy, randevu…)
-// `src/lib/icons.ts` sözlüğünden gelir; sidebar bu sözlüğün referans
-// uygulamasıdır — bir kavramın ikonu değişirse tek yerden değişir.
+import { ChevronRight, Menu, Sparkles, X } from "lucide-react";
+// İkonografi tek kaynaktan: kavramsal ikonlar `src/lib/icons.ts` sözlüğünden gelir.
 import { ICONS } from "@/lib/icons";
 import { findActiveNavigationHref } from "@/lib/navigation";
+import { resolveActiveNav, visibleSections, type NavItem, type VisibleSection } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
 import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
-
-type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; module: AppModule };
-
-const anaEkran: NavItem = { href: "/app", label: "Ana ekran", icon: ICONS.dashboard, module: "dashboard" };
-const aiAsistan: NavItem = { href: "/app/asistan", label: "AI Asistan", icon: ICONS.ai, module: "dashboard" };
-const brifing: NavItem = { href: "/app/brifing", label: "Günlük Brifing", icon: Sunrise, module: "dashboard" };
-
-const navGroups: { title: string; items: NavItem[] }[] = [
-  {
-    title: "Satış",
-    items: [
-      { href: "/app/musteriler",   label: "Müşteriler",    icon: ICONS.musteri,     module: "customers" },
-      { href: "/app/akilli-listeler", label: "Akıllı Listeler", icon: ListFilter,   module: "customers" },
-      { href: "/app/tavsiyeler",   label: "Tavsiyeler",    icon: ICONS.tavsiye,     module: "customers" },
-      { href: "/app/talepler",     label: "Talepler",      icon: ICONS.talep,       module: "demands" },
-      { href: "/app/eslestirme",   label: "Eşleştirme",    icon: ICONS.eslestirme,  module: "matching" },
-      { href: "/app/anlasmalar",   label: "Anlaşmalar",    icon: ICONS.anlasma,     module: "commissions" },
-      { href: "/app/teklifler",    label: "Teklifler",     icon: ICONS.teklif,      module: "offers" },
-      { href: "/app/sozlesmeler",  label: "Sözleşmeler",   icon: ICONS.sozlesme,    module: "contracts" },
-      { href: "/app/gelen-kutusu", label: "Gelen Kutusu",  icon: ICONS.gelenKutusu, module: "calls" },
-      { href: "/app/arama",        label: "Akıllı Arama",  icon: ICONS.telefon,     module: "calls" },
-      { href: "/app/randevular",   label: "Randevular",    icon: ICONS.randevu,     module: "appointments" },
-      { href: "/app/gorevler",     label: "Görevler",      icon: ICONS.gorev,       module: "tasks" },
-    ],
-  },
-  {
-    title: "Portföy",
-    items: [
-      { href: "/app/portfoyler",   label: "Portföyler",    icon: ICONS.portfoy,     module: "properties" },
-      { href: "/app/portfoyler/anahtarlar", label: "Anahtar Takibi", icon: KeySquare,    module: "properties" },
-      { href: "/app/portfoyler/sunumlar",   label: "Sunumlar",       icon: Presentation, module: "properties" },
-      { href: "/app/portallar",    label: "Portal Kontrol",icon: ICONS.portal,      module: "portals" },
-      { href: "/app/acik-ev",      label: "Açık Ev",       icon: ICONS.acikEv,      module: "open_house" },
-      { href: "/app/kiralama",     label: "Kiralama",      icon: ICONS.anahtar,     module: "rentals" },
-      { href: "/app/ag",           label: "Ofisler Arası Ağ", icon: ICONS.ag,       module: "network" },
-      { href: "/app/projeler",     label: "Projeler",      icon: ICONS.proje,       module: "projects" },
-      { href: "/app/degerleme",    label: "Değerleme",     icon: ICONS.skor,        module: "valuation" },
-      { href: "/app/hesaplayici",  label: "Hesaplayıcı",   icon: Calculator,        module: "valuation" },
-      { href: "/app/yatirim",      label: "Yatırım Getirisi", icon: LineChart,      module: "valuation" },
-      { href: "/app/yabanci-satis",label: "Yabancıya Satış", icon: Globe,           module: "properties" },
-    ],
-  },
-  {
-    title: "Finans",
-    items: [
-      { href: "/app/komisyon",     label: "Komisyon",      icon: ICONS.komisyon,    module: "commissions" },
-      { href: "/app/cuzdan",       label: "Cüzdanım",      icon: ICONS.cuzdan,      module: "commissions" },
-      { href: "/app/giderler",     label: "Giderler",      icon: ICONS.gider,       module: "expenses" },
-      { href: "/app/aidat",        label: "Aidat",         icon: ICONS.aidat,       module: "expenses" },
-      { href: "/app/kira-artis",   label: "Kira Artışı",   icon: ICONS.oran,        module: "valuation" },
-      { href: "/app/abonelik",     label: "Abonelik",      icon: ICONS.abonelik,    module: "billing" },
-    ],
-  },
-  {
-    title: "Analiz",
-    items: [
-      { href: "/app/raporlar",     label: "Raporlar",      icon: ICONS.rapor,       module: "reports" },
-      { href: "/app/danisman-kpi", label: "Danışman KPI",  icon: ICONS.kpi,         module: "reports" },
-      { href: "/app/lig",          label: "Ekip Ligi",     icon: Trophy,            module: "reports" },
-      { href: "/app/pano-tv",      label: "Ofis Panosu (TV)", icon: Tv,             module: "reports" },
-      { href: "/app/hedefler",     label: "Hedefler",      icon: ICONS.hedef,       module: "targets" },
-      { href: "/app/bolge-analizi",label: "Bölge Analizi", icon: ICONS.bolge,       module: "reports" },
-      { href: "/app/kayip-kacak",  label: "Kayıp-kaçak",   icon: ICONS.alarm,       module: "leak" },
-      { href: "/app/kayip-satis",  label: "Kayıp Satış",   icon: ICONS.dusus,       module: "customers" },
-    ],
-  },
-  {
-    title: "Yönetim",
-    items: [
-      { href: "/app/ekip",         label: "Ekip",          icon: ICONS.ekip,        module: "team" },
-      { href: "/app/ekip/kartvizitim", label: "Kartvizitim", icon: IdCard,         module: "team" },
-      { href: "/app/ekip/izinler",  label: "İzinler",       icon: CalendarOff,      module: "team" },
-      { href: "/app/otomasyonlar", label: "Otomasyonlar",  icon: ICONS.otomasyon,   module: "settings" },
-      { href: "/app/kampanyalar",  label: "Kampanyalar",   icon: ICONS.mesaj,       module: "campaigns" },
-      { href: "/app/uyum",         label: "Uyum",          icon: ICONS.uyum,        module: "compliance" },
-      { href: "/app/onaylar",      label: "Onaylar",       icon: BadgeCheck,        module: "commissions" },
-      { href: "/app/belgeler",     label: "Belge Merkezi", icon: ICONS.belge,       module: "settings" },
-      { href: "/app/denetim",      label: "Denetim",       icon: ICONS.denetim,     module: "settings" },
-      { href: "/app/destek",       label: "Destek",        icon: ICONS.destek,      module: "support" },
-      { href: "/app/ayarlar",      label: "Ayarlar",       icon: ICONS.ayar,        module: "settings" },
-      { href: "/app/ayarlar/filigran",         label: "Filigran",         icon: Stamp,          module: "settings" },
-      { href: "/app/ayarlar/mesaj-sablonlari", label: "Mesaj Şablonları", icon: MessagesSquare, module: "settings" },
-      { href: "/app/ayarlar/is-akislari",      label: "İş Akışları",      icon: Workflow,       module: "settings" },
-      { href: "/app/ayarlar/duyurular",        label: "Duyurular",        icon: Megaphone,      module: "settings" },
-    ],
-  },
-];
 
 export function AppSidebar({
   officeName,
@@ -119,29 +29,12 @@ export function AppSidebar({
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  // Grup içinde izinli tek modül bile yoksa grup başlığı da gizlenir
-  const groups = useMemo(
-    () =>
-      navGroups
-        .map((group) => ({ ...group, items: group.items.filter((item) => accessibleModules.includes(item.module)) }))
-        .filter((group) => group.items.length > 0),
-    [accessibleModules],
-  );
-  const showHome = accessibleModules.includes(anaEkran.module);
-  const visibleItems = useMemo(
-    () => [
-      ...(showHome ? [anaEkran, brifing, aiAsistan] : []),
-      ...groups.flatMap((group) => group.items),
-    ],
-    [groups, showHome],
-  );
-  const activeHref = findActiveNavigationHref(
-    pathname,
-    visibleItems.map((item) => item.href),
-    "/app",
-  );
+  // Menü 9 iş başlığına indirgendi (bkz. src/lib/nav-config.ts). Başlıkta izinli
+  // hiçbir sayfa yoksa başlık gizlenir; giriş bağlantısı ilk izinli sayfadır.
+  const sections = useMemo(() => visibleSections(accessibleModules), [accessibleModules]);
+  const { section: activeSection, href: activeHref } = resolveActiveNav(pathname, sections);
 
-  const renderItem = (item: NavItem) => {
+  const renderChild = (item: NavItem) => {
     const active = item.href === activeHref;
     return (
       <Link
@@ -151,17 +44,42 @@ export function AppSidebar({
         onClick={() => setOpen(false)}
         onMouseEnter={() => router.prefetch(item.href)}
         onFocus={() => router.prefetch(item.href)}
-        className={`group relative flex items-center gap-3 overflow-hidden rounded-[var(--radius-control)] px-3 py-2.5 text-sm transition ${
-          active ? "bg-white/10 font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]" : "text-white/80 hover:bg-white/6 hover:text-white"
+        className={`flex items-center gap-2.5 rounded-[var(--radius-control)] py-2 pl-3 pr-2 text-sm transition ${
+          active ? "bg-white/10 font-semibold text-white" : "text-white/75 hover:bg-white/6 hover:text-white"
         }`}
       >
-        {active ? <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-mint-400" /> : null}
-        <span className={`grid h-8 w-8 place-items-center rounded-[var(--radius-control)] transition ${active ? "bg-brand-600 text-white" : "bg-white/5 text-white/55 group-hover:bg-white/10 group-hover:text-cyan-400"}`}>
-          <item.icon className="h-4 w-4" />
-        </span>
-        <span className="flex-1">{item.label}</span>
-        <ChevronRight className={`h-3.5 w-3.5 transition ${active ? "text-mint-400" : "text-white/15 group-hover:translate-x-0.5"}`} />
+        <item.icon className={`h-3.5 w-3.5 shrink-0 ${active ? "text-mint-400" : "text-white/45"}`} />
+        <span className="flex-1 truncate">{item.label}</span>
       </Link>
+    );
+  };
+
+  const renderSection = (section: VisibleSection) => {
+    const active = section.id === activeSection?.id;
+    return (
+      <div key={section.id}>
+        <Link
+          href={section.href}
+          aria-current={active ? "true" : undefined}
+          aria-expanded={active}
+          onClick={() => setOpen(false)}
+          onMouseEnter={() => router.prefetch(section.href)}
+          onFocus={() => router.prefetch(section.href)}
+          className={`group relative flex items-center gap-3 overflow-hidden rounded-[var(--radius-control)] px-3 py-2.5 text-sm transition ${
+            active ? "bg-white/10 font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]" : "text-white/80 hover:bg-white/6 hover:text-white"
+          }`}
+        >
+          {active ? <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-mint-400" /> : null}
+          <span className={`grid h-8 w-8 place-items-center rounded-[var(--radius-control)] transition ${active ? "bg-brand-600 text-white" : "bg-white/5 text-white/55 group-hover:bg-white/10 group-hover:text-cyan-400"}`}>
+            <section.icon className="h-4 w-4" />
+          </span>
+          <span className="flex-1">{section.title}</span>
+          <ChevronRight className={`h-3.5 w-3.5 transition ${active ? "rotate-90 text-mint-400" : "text-white/15 group-hover:translate-x-0.5"}`} />
+        </Link>
+        {active && section.items.length > 1 ? (
+          <div className="ml-6 mt-1 space-y-0.5 border-l border-white/10 pl-2">{section.items.map(renderChild)}</div>
+        ) : null}
+      </div>
     );
   };
 
@@ -175,14 +93,8 @@ export function AppSidebar({
         </div>
       </div>
 
-      <nav aria-label="Uygulama ana menüsü" className="flex-1 overflow-y-auto px-3 py-4">
-        {showHome ? <div className="space-y-1">{renderItem(anaEkran)}{renderItem(brifing)}{renderItem(aiAsistan)}</div> : null}
-        {groups.map((group) => (
-          <div key={group.title} className="mt-5 first:mt-0">
-            <p className="px-3 text-xs font-semibold uppercase tracking-[0.12em] text-white/70">{group.title}</p>
-            <div className="mt-2 space-y-1">{group.items.map(renderItem)}</div>
-          </div>
-        ))}
+      <nav aria-label="Uygulama ana menüsü" className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        {sections.map(renderSection)}
       </nav>
 
       <div className="p-3">
