@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Plug, CheckCircle2, Clock, Landmark, MessageSquare, LineChart, Image as ImageIcon, ArrowLeft, CreditCard } from "lucide-react";
+import { CheckCircle2, Clock, Landmark, MessageSquare, LineChart, Image as ImageIcon, ArrowLeft, CreditCard } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listIntegrations, type IntegrationCategory } from "@/lib/integrations/registry";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Entegrasyonlar" };
 
 const CATS: { key: IntegrationCategory; label: string; icon: typeof Landmark; sub: string }[] = [
@@ -24,24 +25,12 @@ export default async function EntegrasyonlarPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlar
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-cyan-500/25 blur-[70px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-cyan-300"><Plug className="h-4 w-4" /> Bağlantı merkezi</span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">Entegrasyonlar</h1>
-            <p className="mt-1 max-w-xl text-sm text-white/70">
-              Dış servis bağlantılarının ofisinize ait yapılandırma durumunu izleyin. “Yapılandırıldı” yalnız gerekli
-              yerel kimlik ve güvenlik sözleşmesi tamamlandığında gösterilir; sağlayıcı sağlığı işlem anında ayrıca doğrulanır.
-            </p>
-          </div>
-          <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/8 px-5 py-4 text-center">
+      <PageHeader title="Entegrasyonlar" eyebrow="Bağlantı merkezi" description="Dış servis bağlantılarının ofisinize ait yapılandırma durumunu izleyin. “Yapılandırıldı” yalnız gerekli yerel kimlik ve güvenlik sözleşmesi tamamlandığında gösterilir; sağlayıcı sağlığı işlem anında ayrıca doğrulanır." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="rounded-[var(--radius-card)] border border-white/12 bg-white/8 px-5 py-4 text-center">
             <p className="font-display text-3xl font-extrabold">{configured}/{integrations.length}</p>
             <p className="text-xs text-white/60">yapılandırılmış bağlantı</p>
-          </div>
-        </div>
-      </section>
+          </div></div>
+} />
 
       {CATS.map((cat) => {
         const items = integrations.filter((i) => i.category === cat.key);

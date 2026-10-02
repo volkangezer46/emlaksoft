@@ -21,6 +21,7 @@ import { ChartFrame, BarCompare } from "@/app/app/_ui/lazy-chart";
 import { Table, TableFrame, TBody, TD, TFoot, TH, THead, TR } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Franchise / Şube Analitiği" };
 
 /**
@@ -167,28 +168,20 @@ export default async function FranchiseBiPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-amber-400/20 blur-[70px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-amber-300">
-              <Network className="h-3.5 w-3.5" /> Şube analitiği
-            </p>
-            <h1 className="mt-2 font-display text-3xl font-extrabold">{tenant?.name ?? "Ofis ağı"}</h1>
-            <p className="mt-2 max-w-xl text-sm text-white/60">
-              {isMultiBranch
+      <PageHeader title={tenant?.name ?? "Ofis ağı"} eyebrow="Şube analitiği" description={isMultiBranch
                 ? "Şube bazlı canlı rollup: portföy, müşteri, danışman ve kazanılan işlem hacmi."
-                : "Şu an tek şube aktif. İkinci şubeyi eklediğinizde bu ekran otomatik olarak şube kıyaslamasına geçer."}
-            </p>
-          </div>
-          <Link
+                : "Şu an tek şube aktif. İkinci şubeyi eklediğinizde bu ekran otomatik olarak şube kıyaslamasına geçer."} actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><Link
             href="/app/ekip#subeler"
             className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
           >
             <Plus className="h-4 w-4" /> Şube ekle / yönet
-          </Link>
-        </div>
+          </Link></div>
+} />
+<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
+        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
+        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-amber-400/20 blur-[70px]" />
+        
         <div className="relative mt-6 grid gap-3 sm:grid-cols-3">
           {[
             { label: "Ofis skoru", value: office.score, icon: TrendingUp, href: "/app/raporlar" },
@@ -406,7 +399,7 @@ export default async function FranchiseBiPage({
                     <TR key={r.id}>
                       <TD className="font-semibold text-ink-950">
                         <span className="inline-flex items-center gap-2">
-                          <Link href="/app/ekip#subeler" className="focus-ring rounded-[6px] hover:text-brand-600 hover:underline">
+                          <Link href="/app/ekip#subeler" className="focus-ring rounded-[var(--radius-control)] hover:text-brand-600 hover:underline">
                             {r.name}
                           </Link>
                           {leaderId === r.id ? (
@@ -417,36 +410,36 @@ export default async function FranchiseBiPage({
                         </span>
                       </TD>
                       <TD align="right">
-                        <Link href="/app/portfoyler" className="focus-ring rounded-[6px] text-text-muted hover:text-brand-600 hover:underline">
+                        <Link href="/app/portfoyler" className="focus-ring rounded-[var(--radius-control)] text-text-muted hover:text-brand-600 hover:underline">
                           {r.properties}
                         </Link>
                       </TD>
                       <TD align="right">
-                        <Link href="/app/musteriler" className="focus-ring rounded-[6px] text-text-muted hover:text-brand-600 hover:underline">
+                        <Link href="/app/musteriler" className="focus-ring rounded-[var(--radius-control)] text-text-muted hover:text-brand-600 hover:underline">
                           {r.customers}
                         </Link>
                       </TD>
                       <TD align="right">
-                        <Link href="/app/ekip" className="focus-ring rounded-[6px] text-text-muted hover:text-brand-600 hover:underline">
+                        <Link href="/app/ekip" className="focus-ring rounded-[var(--radius-control)] text-text-muted hover:text-brand-600 hover:underline">
                           {r.advisors}
                         </Link>
                       </TD>
                       <TD align="right">
-                        <Link href="/app/anlasmalar" className="focus-ring rounded-[6px] text-text-muted hover:text-brand-600 hover:underline">
+                        <Link href="/app/anlasmalar" className="focus-ring rounded-[var(--radius-control)] text-text-muted hover:text-brand-600 hover:underline">
                           {r.won}
                         </Link>
                       </TD>
                       <TD align="right">
                         <Link
                           href="/app/danisman-kpi"
-                          className="focus-ring rounded-[6px] text-text-muted hover:text-brand-600 hover:underline"
+                          className="focus-ring rounded-[var(--radius-control)] text-text-muted hover:text-brand-600 hover:underline"
                           title="Danışman başına kazanılan hacim"
                         >
                           {r.advisors > 0 ? moneyTry(Math.round(r.wonValue / r.advisors)) : "—"}
                         </Link>
                       </TD>
                       <TD align="right">
-                        <Link href="/app/anlasmalar" className="focus-ring rounded-[6px] font-bold text-mint-600 hover:underline">
+                        <Link href="/app/anlasmalar" className="focus-ring rounded-[var(--radius-control)] font-bold text-mint-600 hover:underline">
                           {moneyTry(r.wonValue)}
                         </Link>
                       </TD>

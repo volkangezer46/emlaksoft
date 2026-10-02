@@ -19,7 +19,7 @@ const KIND_META: Record<DealCostKind, { label: string; badge: string }> = {
   tapu_harci: { label: "Tapu harcı", badge: "bg-brand-50 text-brand-700 ring-brand-600/20" },
   ekspertiz: { label: "Ekspertiz", badge: "bg-amber-50 text-amber-700 ring-amber-600/20" },
   komisyon_dis: { label: "Dış komisyon", badge: "bg-cyan-50 text-cyan-700 ring-cyan-600/20" },
-  diger: { label: "Diğer", badge: "bg-zinc-100 text-zinc-600 ring-zinc-500/10" },
+  diger: { label: "Diğer", badge: "bg-zinc-100 text-text-muted ring-zinc-500/10" },
 };
 
 function money(n: number) {
@@ -128,7 +128,7 @@ export function DealCostsSection({
                       className={`focus-ring press inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset transition disabled:opacity-60 ${
                         c.paid
                           ? "bg-mint-500/10 text-mint-700 ring-mint-600/20"
-                          : "bg-zinc-100 text-zinc-600 ring-zinc-500/10 hover:bg-zinc-200"
+                          : "bg-zinc-100 text-text-muted ring-zinc-500/10 hover:bg-zinc-200"
                       }`}
                     >
                       {c.paid ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
@@ -139,7 +139,7 @@ export function DealCostsSection({
                       className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${
                         c.paid
                           ? "bg-mint-500/10 text-mint-700 ring-mint-600/20"
-                          : "bg-zinc-100 text-zinc-600 ring-zinc-500/10"
+                          : "bg-zinc-100 text-text-muted ring-zinc-500/10"
                       }`}
                     >
                       {c.paid ? "Ödendi" : "Ödenmedi"}

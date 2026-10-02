@@ -337,7 +337,7 @@ export function DealBoard({
                           <Link
                             href={`/app/ekip/${d.assigned_to}`}
                             draggable={false}
-                            className="focus-ring group/danisman relative z-10 flex min-w-0 items-center gap-1.5 rounded-[6px]"
+                            className="focus-ring group/danisman relative z-10 flex min-w-0 items-center gap-1.5 rounded-[var(--radius-control)]"
                             title="Danışman profilini aç"
                           >
                             <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[image:var(--grad-brand)] text-xs font-bold text-white">
@@ -369,7 +369,7 @@ export function DealBoard({
                               editReturnFocusRef.current = event.currentTarget;
                               setEditing(d);
                             }}
-                            className="inline-flex items-center gap-1 rounded-[7px] border border-line px-2 py-1 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
+                            className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2 py-1 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
                           >
                             <Pencil className="h-3 w-3" /> Düzenle
                           </button>
@@ -378,7 +378,7 @@ export function DealBoard({
                           <Link
                             href={`/app/portfoyler/${d.property_id}`}
                             draggable={false}
-                            className="rounded-[7px] border border-line px-2 py-1 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
+                            className="rounded-[var(--radius-control)] border border-line px-2 py-1 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
                           >
                             Portföy
                           </Link>
@@ -387,7 +387,7 @@ export function DealBoard({
                           <Link
                             href={`/app/musteriler/${d.customer_id}`}
                             draggable={false}
-                            className="rounded-[7px] border border-line px-2 py-1 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
+                            className="rounded-[var(--radius-control)] border border-line px-2 py-1 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
                           >
                             Müşteri
                           </Link>
@@ -397,7 +397,7 @@ export function DealBoard({
                             type="button"
                             disabled={busy}
                             onClick={() => move(d.id, next.key)}
-                            className="ml-auto inline-flex items-center gap-1 rounded-[7px] bg-ink-950 px-2 py-1 text-xs font-bold text-white disabled:opacity-50"
+                            className="ml-auto inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-ink-950 px-2 py-1 text-xs font-bold text-white disabled:opacity-50"
                           >
                             {next.label} <ArrowRight className="h-3 w-3" />
                           </button>
@@ -407,7 +407,7 @@ export function DealBoard({
                             type="button"
                             disabled={busy}
                             onClick={() => move(d.id, "won")}
-                            className="inline-flex items-center gap-1 rounded-[7px] bg-mint-500/15 px-2 py-1 text-xs font-bold text-mint-700 disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-mint-500/15 px-2 py-1 text-xs font-bold text-mint-700 disabled:opacity-50"
                           >
                             <Sparkles className="h-3 w-3" /> Kazan
                           </button>
@@ -421,7 +421,7 @@ export function DealBoard({
                               lossReturnFocusRef.current = event.currentTarget;
                               setLossFor(d);
                             }}
-                            className="rounded-[7px] px-2 py-1 text-xs font-semibold text-danger-500 hover:bg-danger-500/10 disabled:opacity-50"
+                            className="rounded-[var(--radius-control)] px-2 py-1 text-xs font-semibold text-danger-500 hover:bg-danger-500/10 disabled:opacity-50"
                           >
                             Kayıp
                           </button>

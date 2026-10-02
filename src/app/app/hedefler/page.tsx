@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/app/empty-state";
 import { TargetFormDialog, type TargetFormValues } from "./target-form-dialog";
 
+import { PageHeader } from "@/components/ui/page-header";
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 }
@@ -113,19 +114,17 @@ export default async function HedeflerPage() {
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
+      <PageHeader title="Hedefler & Kota" eyebrow="Performans hedefleri" description="Danışman ve ofis bazında satış hedeflerini takip edin." actions={
+canCreate ? (
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2">
+<TargetFormDialog members={memberList} triggerVariant="hero" />
+</div>
+) : null
+} />
+<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-500/25 blur-[80px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-brand-300">
-              <TrendingUp className="h-4 w-4" /> Performans hedefleri
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Hedefler &amp; Kota</h1>
-            <p className="mt-1 text-sm text-white/75">Danışman ve ofis bazında satış hedeflerini takip edin.</p>
-          </div>
-          {canCreate ? <TargetFormDialog members={memberList} triggerVariant="hero" /> : null}
-        </div>
+        
         {targets.length > 0 ? (
           <div className="relative mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
@@ -268,7 +267,7 @@ export default async function HedeflerPage() {
                   <div>
                     <div className="mb-1 flex justify-between text-xs">
                       <span className="text-text-muted">Anlaşma</span>
-                      <Link href="/app/anlasmalar" className="focus-ring relative z-10 rounded-[6px] font-semibold text-ink-950 hover:text-brand-600 hover:underline">
+                      <Link href="/app/anlasmalar" className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-ink-950 hover:text-brand-600 hover:underline">
                         {t.actual_deals} / {t.target_deals}
                       </Link>
                     </div>
@@ -285,7 +284,7 @@ export default async function HedeflerPage() {
                   <div>
                     <div className="mb-1 flex justify-between text-xs">
                       <span className="text-text-muted">Gelir</span>
-                      <Link href="/app/anlasmalar" className="focus-ring relative z-10 rounded-[6px] font-semibold text-ink-950 hover:text-brand-600 hover:underline">
+                      <Link href="/app/anlasmalar" className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-ink-950 hover:text-brand-600 hover:underline">
                         {money(Number(t.actual_revenue))} / {money(Number(t.target_revenue))}
                       </Link>
                     </div>

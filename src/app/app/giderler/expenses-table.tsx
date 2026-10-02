@@ -166,7 +166,7 @@ export function ExpensesTable({
                           trigger={
                             <button
                               type="button"
-                              className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[7px] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600"
+                              className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600"
                               aria-label={`${e.title} giderini sil`}
                             >
                               <Trash2 className="h-3.5 w-3.5" />

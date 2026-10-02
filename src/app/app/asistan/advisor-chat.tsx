@@ -153,7 +153,7 @@ function SessionSidebar({
               <button
                 type="button"
                 onClick={() => onSelect(s.id)}
-                className="focus-ring min-w-0 flex-1 cursor-pointer rounded-[6px] text-left"
+                className="focus-ring min-w-0 flex-1 cursor-pointer rounded-[var(--radius-control)] text-left"
               >
                 <p
                   className={`truncate text-xs font-semibold ${

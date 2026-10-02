@@ -8,6 +8,7 @@ import { CampaignActions } from "./campaign-actions";
 import { EmptyState } from "@/components/app/empty-state";
 import { DataTable, type DataTableColumn, type DataTableRow } from "@/components/ui/data-table";
 
+import { PageHeader } from "@/components/ui/page-header";
 /**
  * Durum/kanal → paylaşılan Badge varyantları.
  * Etiketler artık burada; ayrı STATUS_LABELS/CHANNEL_LABELS haritaları
@@ -150,22 +151,8 @@ export default async function KampanyalarPage({
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-14 h-52 w-52 rounded-full bg-brand-500/25 blur-[90px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-brand-300">
-              <MessageSquare className="h-4 w-4" /> Mesajlaşma
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">
-              SMS &amp; WhatsApp Kampanyaları
-            </h1>
-            <p className="mt-1 max-w-lg text-sm text-white/75">
-              Kampanyalar küçük partilerle işlenir; her teslimattan hemen önce sistemde kayıtlı kanal izni yeniden doğrulanır.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:flex">
+      <PageHeader title="SMS & WhatsApp Kampanyaları" eyebrow="Mesajlaşma" description="Kampanyalar küçük partilerle işlenir; her teslimattan hemen önce sistemde kayıtlı kanal izni yeniden doğrulanır." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="grid grid-cols-2 gap-3 sm:flex">
             {[
               { label: "Toplam", value: total, href: "/app/kampanyalar" },
               { label: "Gönderildi", value: done, href: "/app/kampanyalar?durum=done" },
@@ -182,9 +169,8 @@ export default async function KampanyalarPage({
                 <p className="text-xs text-white/70">{k.label}</p>
               </Link>
             ))}
-          </div>
-        </div>
-      </section>
+          </div></div>
+} />
 
       {/* Performans + kanal dağılımı — yalnız gerçek veri; kampanya yoksa çizilmez */}
       {campaigns.length > 0 ? (

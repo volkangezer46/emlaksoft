@@ -1,8 +1,9 @@
-import { Percent, ShieldCheck, Scale } from "lucide-react";
+import { ShieldCheck, Scale } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { TUFE_12M_AVG, TUFE_PENDING_MONTHS, latestTufeMonth } from "@/lib/tufe";
 import { RentCalculator } from "./rent-calculator";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Kira Artış Hesaplama" };
 
 export default async function KiraArtisPage() {
@@ -14,28 +15,15 @@ export default async function KiraArtisPage() {
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-mint-500/25 blur-[70px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-mint-300">
-              <Percent className="h-4 w-4" /> TÜFE kira artışı
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Kira artış hesaplama</h1>
-            <p className="mt-1 max-w-xl text-sm text-white/70">
-              12 aylık ortalama TÜFE’ye göre yasal tavanı otomatik uygular; yeni kirayı, aylık ve yıllık farkı anında gösterir.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/12 bg-white/8 px-4 py-3">
+      <PageHeader title="Kira artış hesaplama" eyebrow="TÜFE kira artışı" description="12 aylık ortalama TÜFE’ye göre yasal tavanı otomatik uygular; yeni kirayı, aylık ve yıllık farkı anında gösterir." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/12 bg-white/8 px-4 py-3">
             <Scale className="h-5 w-5 text-cyan-400" />
             <div>
               <p className="text-xs text-white/60">TBK m.344</p>
               <p className="text-sm font-semibold text-white">Yasal tavan uyumlu</p>
             </div>
-          </div>
-        </div>
-      </section>
+          </div></div>
+} />
 
       <RentCalculator months={months} latestMonth={latest} />
 

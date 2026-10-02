@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ArrowUpRight, CheckCircle2, Clock3, MessageSquare, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowUpRight, CheckCircle2, Clock3, Users } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getCampaign, listCampaignRecipients } from "@/app/actions/campaigns";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Kampanya detayı" };
 
 const CHANNEL_LABELS: Record<string, string> = {
@@ -145,20 +146,8 @@ export default async function CampaignDetailPage({
         <ArrowLeft className="h-4 w-4" /> Kampanyalara dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/30 blur-[80px]" />
-        <div className="relative">
-          <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-            <MessageSquare className="h-3.5 w-3.5" /> {CHANNEL_LABELS[campaign.channel] ?? campaign.channel} kampanyası
-          </span>
-          <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">{campaign.title}</h1>
-          <p className="mt-1 text-sm text-white/60">
-            {tarih(campaign.created_at)} tarihinde oluşturuldu
-            {campaign.sent_at ? ` · ${tarih(campaign.sent_at)} tarihinde gönderildi` : ""}
-          </p>
-
-          {/* KPI kartları alıcı tablosunu ?durum= parametresiyle süzer */}
+      <PageHeader title={campaign.title} eyebrow={`${CHANNEL_LABELS[campaign.channel] ?? campaign.channel} kampanyası`} description={`${tarih(campaign.created_at)} tarihinde oluşturuldu${campaign.sent_at ? ` · ${tarih(campaign.sent_at)} tarihinde gönderildi` : ""}`} />
+<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative">{/* KPI kartları alıcı tablosunu ?durum= parametresiyle süzer */}
           <div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
               { label: "Toplam alıcı", value: String(recipients.length), icon: Users, durum: "" },
@@ -184,9 +173,7 @@ export default async function CampaignDetailPage({
                 <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
               </Link>
             ))}
-          </div>
-        </div>
-      </section>
+          </div></div></section>
 
       <div className="flex flex-wrap items-center gap-3">
         <Badge variant={campaign.status === "done" ? "success" : campaign.status === "failed" ? "danger" : "info"}>

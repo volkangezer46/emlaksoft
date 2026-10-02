@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { ArrowLeft, ArrowUpRight, Radio, Zap } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { LeadCapturePanel } from "./lead-capture-panel";
 import { VitrinQr } from "@/components/public/vitrin-qr";
 import { getBaseUrl } from "@/lib/base-url";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const dynamic = "force-dynamic";
 
 export default async function LeadCaptureSettingsPage() {
@@ -37,21 +38,8 @@ export default async function LeadCaptureSettingsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-mint-500/30 blur-[80px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-              <Radio className="h-4 w-4" /> Aday yakalama
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">Gelen aday & hızlı yanıt</h1>
-            <p className="mt-1 max-w-xl text-sm text-white/60">
-              Web sitesi formu, reklam veya portal adaylarını CRM&apos;e otomatik düşürün. Her aday sırayla
-              en uygun danışmana atanır ve anında bildirim gönderilir.
-            </p>
-          </div>
-          <Link
+      <PageHeader title="Gelen aday & hızlı yanıt" eyebrow="Aday yakalama" description="Web sitesi formu, reklam veya portal adaylarını CRM'e otomatik düşürün. Her aday sırayla en uygun danışmana atanır ve anında bildirim gönderilir." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><Link
             href="/app/musteriler"
             className="focus-ring press lift group relative block rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-5 py-3 text-center transition hover:border-mint-400/40"
           >
@@ -60,9 +48,8 @@ export default async function LeadCaptureSettingsPage() {
               <Zap className="h-5 w-5" /> {leadCount ?? 0}
             </p>
             <p className="text-xs text-white/50">otomatik atanan aday · müşterilere git</p>
-          </Link>
-        </div>
-      </section>
+          </Link></div>
+} />
 
       <LeadCapturePanel token={token} enabled={enabled} baseUrl={baseUrl} vitrinUrl={vitrinUrl} />
 

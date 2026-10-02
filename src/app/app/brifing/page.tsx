@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Sunrise, CalendarClock, ListChecks, ShieldAlert, Flame, ArrowUpRight, MapPin, Clock3 } from "lucide-react";
+import { CalendarClock, ListChecks, ShieldAlert, Flame, ArrowUpRight, MapPin, Clock3 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Günlük Brifing" };
 
 type Rel = { full_name?: string } | { full_name?: string }[] | null;
@@ -59,26 +60,14 @@ export default async function BrifingPage() {
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-amber-400/20 blur-[70px]" />
-        <div className="relative">
-          <span className="flex items-center gap-2 text-xs font-semibold text-amber-300">
-            <Sunrise className="h-4 w-4" /> {officeWide ? "Ofis brifingi" : "Güne başla"}
-          </span>
-          <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">Günlük Brifing</h1>
-          <p className="mt-1 max-w-xl text-sm text-white/70">
-            {total > 0
+      <PageHeader title="Günlük Brifing" eyebrow={officeWide ? "Ofis brifingi" : "Güne başla"} description={total > 0
               ? `Bugün odaklanman gereken ${total} madde: yaklaşan randevular, geciken görevler ve süresi dolan yetkiler.`
-              : "Bugün acil bir madde yok — sıcak müşterilere dokunmak için harika bir gün."}
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
+              : "Bugün acil bir madde yok — sıcak müşterilere dokunmak için harika bir gün."} />
+<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative"><div className="mt-4 flex flex-wrap gap-2">
             <span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold"><CalendarClock className="mr-1 inline h-3.5 w-3.5" />{apptRows.length} randevu</span>
             <span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold"><ListChecks className="mr-1 inline h-3.5 w-3.5" />{taskRows.length} görev</span>
             <span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold"><ShieldAlert className="mr-1 inline h-3.5 w-3.5" />{expRows.length} yetki bitişi</span>
-          </div>
-        </div>
-      </section>
+          </div></div></section>
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Randevular */}

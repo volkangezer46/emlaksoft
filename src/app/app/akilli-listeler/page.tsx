@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Phone, ArrowUpRight, Flame, AlarmClock, TrendingUp, MoonStar, ListFilter } from "lucide-react";
+import { Phone, ArrowUpRight, Flame, AlarmClock, TrendingUp, MoonStar } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { daysAgoIso, msSince, DAY_MS } from "@/lib/clock";
@@ -7,6 +7,7 @@ import { computeLeadScore } from "@/lib/lead-score";
 import { computeChurnRisk } from "@/lib/churn-risk";
 import { scoreSellerLikelihood, isOwnerCustomer } from "@/lib/seller-prediction";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Akıllı Listeler" };
 
 type Cust = {
@@ -173,21 +174,8 @@ export default async function AkilliListelerPage() {
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/30 blur-[70px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-cyan-300">
-              <ListFilter className="h-4 w-4" /> Davranışsal segmentler
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">Akıllı Listeler</h1>
-            <p className="mt-1 max-w-xl text-sm text-white/70">
-              Müşteri tabanını her sabah otomatik tarar; kimi arayacağını davranış sinyallerinden
-              önceliklendirir. Statik filtre değil — skor, churn ve niyet birleşimi.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <PageHeader title="Akıllı Listeler" eyebrow="Davranışsal segmentler" description="Müşteri tabanını her sabah otomatik tarar; kimi arayacağını davranış sinyallerinden önceliklendirir. Statik filtre değil — skor, churn ve niyet birleşimi." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {segments.map((s) => (
               <a
                 key={s.key}
@@ -198,9 +186,8 @@ export default async function AkilliListelerPage() {
                 <p className="text-xs text-white/60">{s.title}</p>
               </a>
             ))}
-          </div>
-        </div>
-      </section>
+          </div></div>
+} />
 
       {segments.map((s) => {
         const tone = TONE[s.tone];

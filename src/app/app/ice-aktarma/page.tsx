@@ -19,6 +19,7 @@ import { daysAgoIso } from "@/lib/clock";
 import { ImportWizard } from "./import-wizard";
 import { IMPORT_ROW_LIMIT } from "./import-config";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "İçe aktarma" };
 
 const nf = new Intl.NumberFormat("tr-TR");
@@ -133,20 +134,8 @@ export default async function ImportPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/35 blur-[80px]" />
-        <div className="pointer-events-none absolute -left-20 bottom-0 h-44 w-44 rounded-full bg-mint-500/20 blur-[80px]" />
-        <div className="relative">
-          <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-            <UploadCloud className="h-4 w-4" /> Veri taşıma
-          </span>
-          <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">CSV içe aktarma</h1>
-          <p className="mt-1 max-w-2xl text-sm text-white/60">
-            Eski programınızdan veya Excel&apos;den aldığınız müşteri ve portföy listelerini üç
-            adımda EmlakSoft&apos;a taşıyın: dosya yükleyin, kolonları eşleyin, sonucu görün.
-          </p>
-          <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/70">
+      <PageHeader title="CSV içe aktarma" eyebrow="Veri taşıma" description="Eski programınızdan veya Excel'den aldığınız müşteri ve portföy listelerini üç adımda EmlakSoft'a taşıyın: dosya yükleyin, kolonları eşleyin, sonucu görün." />
+<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative"><p className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/70">
             <FileSpreadsheet className="h-3.5 w-3.5 text-mint-400" />
             Excel dosyanızı &quot;Farklı Kaydet → CSV&quot; ile kaydedin — .xlsx doğrudan desteklenmez.
           </p>
@@ -171,9 +160,7 @@ export default async function ImportPage() {
                 </Link>
               );
             })}
-          </div>
-        </div>
-      </section>
+          </div></div></section>
 
       {/* Nasıl çalışır — 3 adım */}
       <section className="grid gap-3 md:grid-cols-3">

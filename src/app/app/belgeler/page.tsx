@@ -34,6 +34,7 @@ import {
 } from "@/lib/documents";
 import { DocumentList } from "./document-list";
 
+import { PageHeader } from "@/components/ui/page-header";
 /**
  * Belge Merkezi — ofisin dört ayrı yerde duran dosyaları tek listede.
  *
@@ -626,20 +627,7 @@ export default async function DocumentsPage({
   return (
     <div className="space-y-6">
       {/* ---------------------------------------------------------------- */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full bg-brand-500/25 blur-[80px]" />
-        <div className="relative">
-          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-mint-400">
-            <Archive className="h-3.5 w-3.5" /> Belge merkezi
-          </p>
-          <h1 className="mt-2 font-display text-3xl font-extrabold">Ofisin tüm dosyaları</h1>
-          <p className="mt-2 max-w-2xl text-sm text-white/60">
-            Müşteri dosyaları, portföy medyası, sözleşmeler ve anlaşma evrakları tek listede. “Şu müşterinin kimlik
-            fotokopisi nerede?” sorusunun tek cevabı burada.
-          </p>
-        </div>
-      </section>
+      <PageHeader title="Ofisin tüm dosyaları" eyebrow="Belge merkezi" description="Müşteri dosyaları, portföy medyası, sözleşmeler ve anlaşma evrakları tek listede. “Şu müşterinin kimlik fotokopisi nerede?” sorusunun tek cevabı burada." />
 
       {/* --- 4 href'li StatCard ------------------------------------------- */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

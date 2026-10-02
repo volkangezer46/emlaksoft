@@ -5,7 +5,6 @@ import {
   Building2,
   Check,
   Contact2,
-  CreditCard,
   Gauge,
   GitBranch,
   Sparkles,
@@ -20,6 +19,7 @@ import { isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { CheckoutButton } from "./checkout-button";
 
+import { PageHeader } from "@/components/ui/page-header";
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
 }
@@ -114,22 +114,10 @@ export default async function BillingPage({
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/30 blur-[90px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-cyan-400">
-              <CreditCard className="h-3.5 w-3.5" /> Abonelik & iyzico
-            </p>
-            <h1 className="mt-2 font-display text-3xl font-extrabold text-white">Paket ve ödeme</h1>
-            <p className="mt-2 max-w-xl text-sm text-white/60">
-              {configured
+      <PageHeader title="Paket ve ödeme" eyebrow="Abonelik & iyzico" description={configured
                 ? "iyzico Checkout Form bağlı. Ödeme sonrası abonelik otomatik aktifleşir."
-                : "Sandbox anahtarı yok — demo ödeme ile paket yükseltmeyi yerel test edebilirsiniz."}
-            </p>
-          </div>
-          <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-5 py-4 backdrop-blur">
+                : "Sandbox anahtarı yok — demo ödeme ile paket yükseltmeyi yerel test edebilirsiniz."} actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-5 py-4 backdrop-blur">
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-white/45">Mevcut paket</p>
             <p className="mt-1 font-display text-2xl font-extrabold">{planLabel(currentPlan)}</p>
             <p className="mt-1 text-xs text-mint-400">
@@ -150,9 +138,8 @@ export default async function BillingPage({
                   : "Deneme süresi doldu — paket seçin."}
               </p>
             ) : null}
-          </div>
-        </div>
-      </section>
+          </div></div>
+} />
 
       {sp.paid ? (
         <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/10 px-4 py-3 text-sm font-medium text-mint-700">

@@ -43,6 +43,7 @@ import { ShareDemandDialog } from "./share-demand-dialog";
 import { DemandResponseDialog } from "./demand-response-dialog";
 import { DemandRespondButtons, DemandWithdrawButton, MyDemandActions } from "./demand-row-actions";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Ofisler Arası Ağ" };
 
 const REQUEST_STATUS_LABELS: Record<string, string> = {
@@ -209,25 +210,8 @@ export default async function AgPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-500/25 blur-[70px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-brand-300">
-              <Globe2 className="h-4 w-4" /> Ofisler arası ağ
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Ağ</h1>
-            <p className="mt-1 max-w-xl text-sm text-white/75">
-              Portföyünüzü diğer ofislerin talebine açın; komisyon paylaşımlı iş birliği kurun.
-            </p>
-            {canCreate ? (
-              <div className="mt-4">
-                <ShareNetworkDialog properties={liveProperties} />
-              </div>
-            ) : null}
-          </div>
-          <div className="flex gap-3">
+      <PageHeader title="Ağ" eyebrow="Ofisler arası ağ" description="Portföyünüzü diğer ofislerin talebine açın; komisyon paylaşımlı iş birliği kurun." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex gap-3">
             {[
               { label: "Havuzdaki ilan", value: pool.length, href: "#havuz" },
               { label: "Havuzdaki talep", value: demandPool.length, href: "#talep-havuzu" },
@@ -247,8 +231,12 @@ export default async function AgPage({
               </a>
             ))}
           </div>
-        </div>
-      </section>
+<>{canCreate ? (
+              <div className="mt-4">
+                <ShareNetworkDialog properties={liveProperties} />
+              </div>
+            ) : null}</></div>
+} />
 
       {/* Güven metni — ağın veri sözleşmesi */}
       <div className="flex items-start gap-3 rounded-[var(--radius-card)] border border-brand-600/20 bg-brand-600/6 p-4">

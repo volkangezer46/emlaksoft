@@ -9,6 +9,7 @@ import {
 import { relativeTimeTR } from "@/lib/admin-format";
 import { daysAgoIso } from "@/lib/clock";
 
+import { PageHeader } from "@/components/ui/page-header";
 /**
  * Tenant bildirim arşivi — zil panelindeki son 30 kaydın sayfalı/filtreli tam
  * listesi. Sorgu mantığı zil ile aynı (bkz. listMyNotifications): RLS + kendi
@@ -153,24 +154,8 @@ export default async function BildirimlerPage({
   return (
     <div className="space-y-5">
       {/* Koyu hero — KPI şeridi filtre kısayoludur */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/30 blur-[80px]" />
-        <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-amber-400/12 blur-[70px]" />
-        <div className="relative">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <span className="flex items-center gap-2 text-xs font-semibold text-brand-300">
-                <Bell className="h-4 w-4" /> Bildirim merkezi
-              </span>
-              <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">Bildirimler</h1>
-              <p className="mt-1 text-sm text-white/65">
-                {unread > 0 ? `${unread} okunmamış bildiriminiz var.` : "Tüm bildirimler okundu — güncel durumdasınız."}
-                {tur ? ` · "${kindLabel[tur]}" türü filtrede` : ""}
-                {durum ? " · yalnız okunmamışlar" : ""}
-              </p>
-            </div>
-            {unread > 0 ? (
+      <PageHeader title="Bildirimler" eyebrow="Bildirim merkezi" description={`${unread > 0 ? `${unread} okunmamış bildiriminiz var.` : "Tüm bildirimler okundu — güncel durumdasınız."}${tur ? ` · "${kindLabel[tur]}" türü filtrede` : ""}${durum ? " · yalnız okunmamışlar" : ""}`} actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2">{unread > 0 ? (
               <form action={markAllNotificationsReadForm}>
                 <button
                   type="submit"
@@ -179,8 +164,14 @@ export default async function BildirimlerPage({
                   <CheckCheck className="h-3.5 w-3.5" /> Tümünü okundu işaretle
                 </button>
               </form>
-            ) : null}
-          </div>
+            ) : null}</div>
+} />
+<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
+        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
+        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/30 blur-[80px]" />
+        <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-amber-400/12 blur-[70px]" />
+        <div className="relative">
+          
 
           <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {kpis.map((k) => {

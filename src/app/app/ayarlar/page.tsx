@@ -35,6 +35,7 @@ import { IntegrationsForm } from "./integrations-form";
 import { NotificationPrefsPanel } from "@/components/app/notification-prefs";
 import { planLabel } from "@/lib/billing/plans";
 
+import { PageHeader } from "@/components/ui/page-header";
 type SettingCard = {
   title: string;
   desc: string;
@@ -162,16 +163,8 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       {/* premium header */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/35 blur-[80px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-mint-400"><Sliders className="h-4 w-4" /> Ofis yapılandırması</span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">{tenant.name || "Ayarlar"}</h1>
-            <p className="mt-1 text-sm text-white/60">{planLabel(tenant.plan)} planı · ofis, ekip, uyum ve entegrasyonları tek merkezden yönetin.</p>
-          </div>
-          <details className="group/ring text-left">
+      <PageHeader title={tenant.name || "Ayarlar"} eyebrow="Ofis yapılandırması" description={`${planLabel(tenant.plan)} planı · ofis, ekip, uyum ve entegrasyonları tek merkezden yönetin.`} actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><details className="group/ring text-left">
             <summary
               className="focus-ring block cursor-pointer list-none rounded-full [&::-webkit-details-marker]:hidden"
               title="Eksik kurulum alanlarını görmek için tıklayın"
@@ -226,9 +219,8 @@ export default async function SettingsPage() {
                 <p className="mt-3 border-t border-white/10 pt-3 text-xs font-semibold text-mint-400">Kurulum tamam 🎉</p>
               ) : null}
             </div>
-          </details>
-        </div>
-      </section>
+          </details></div>
+} />
 
       {/* Logo + company form */}
       <section id="marka-kimlik" className="dashboard-panel scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">

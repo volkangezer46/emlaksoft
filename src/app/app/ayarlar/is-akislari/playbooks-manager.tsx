@@ -81,7 +81,7 @@ function emptyStep(): StepDraft {
 }
 
 const PRIORITY_BADGE: Record<string, string> = {
-  low: "bg-zinc-100 text-zinc-500",
+  low: "bg-zinc-100 text-text-faint",
   normal: "bg-brand-600/10 text-brand-700",
   high: "bg-danger-500/10 text-danger-500",
 };
@@ -521,7 +521,7 @@ export function PlaybooksManager({
                       <span className="truncate">{p.name}</span>
                       <span
                         className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
-                          p.is_active ? "bg-mint-50 text-mint-700" : "bg-zinc-100 text-zinc-500"
+                          p.is_active ? "bg-mint-50 text-mint-700" : "bg-zinc-100 text-text-faint"
                         }`}
                       >
                         {p.is_active ? "Yayında" : "Pasif"}

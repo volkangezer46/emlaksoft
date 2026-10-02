@@ -63,7 +63,7 @@ export function ExpenseEditDialog({
         <DialogTrigger asChild>
           <button
             type="button"
-            className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[7px] text-text-faint transition hover:bg-brand-50 hover:text-brand-600"
+            className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-brand-50 hover:text-brand-600"
             aria-label="Gideri düzenle"
           >
             <Pencil className="h-3.5 w-3.5" />

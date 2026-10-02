@@ -7,6 +7,7 @@ import { DuesClient } from "./dues-client";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportDuesCsv } from "@/app/actions/export";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Aidat & Ortak Gider" };
 
 function money(n: number) {
@@ -168,16 +169,8 @@ export default async function AidatPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-amber-400/20 blur-[70px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-amber-300"><Coins className="h-4 w-4" /> Aidat & ortak gider</span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Aidat takibi</h1>
-            <p className="mt-1 text-sm text-white/70">Portföy bazlı aidat/ortak gider ve ödeme durumu tek yerde.</p>
-          </div>
-          {/* KPI kartları ?durum= filtresine bağlı: tıklayınca liste süzülür (dönem korunur) */}
+      <PageHeader title="Aidat takibi" eyebrow="Aidat & ortak gider" description="Portföy bazlı aidat/ortak gider ve ödeme durumu tek yerde." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2">{/* KPI kartları ?durum= filtresine bağlı: tıklayınca liste süzülür (dönem korunur) */}
           <div className="grid w-full grid-cols-2 gap-3 sm:w-auto sm:grid-cols-4">
             <Link
               href={href({ durum: "paid" })}
@@ -238,9 +231,8 @@ export default async function AidatPage({
               </p>
               <p className="text-xs text-white/60">Gecikmiş</p>
             </Link>
-          </div>
-        </div>
-      </section>
+          </div></div>
+} />
 
       {/* Geciken ödemeler şeridi — vadesi geçmiş kayıtlar, en eski vade önce.
           Kart portföye (varsa) gider; başlık linki listeyi ?durum=overdue süzer. */}

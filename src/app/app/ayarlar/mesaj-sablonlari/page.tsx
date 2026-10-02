@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { ArrowLeft, MessageSquareText, Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import type { MessageTemplateRow } from "@/app/actions/message-templates";
 import { TemplatesManager } from "./templates-manager";
 
+import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Mesaj şablonları" };
 
 export default async function MessageTemplatesSettingsPage() {
@@ -32,22 +33,8 @@ export default async function MessageTemplatesSettingsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-mint-500/30 blur-[80px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-              <MessageSquareText className="h-4 w-4" /> WhatsApp mesaj kütüphanesi
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">Mesaj şablonları</h1>
-            <p className="mt-1 max-w-2xl text-sm text-white/60">
-              Ofisinizin standart WhatsApp metinlerini bir kez yazın; danışman müşteri kartındaki
-              WhatsApp düğmesinden şablonu seçsin, değişkenler otomatik dolsun. Mesaj kendi
-              WhatsApp&apos;ınızdan gönderilir — otomatik gönderim yoktur.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
+      <PageHeader title="Mesaj şablonları" eyebrow="WhatsApp mesaj kütüphanesi" description="Ofisinizin standart WhatsApp metinlerini bir kez yazın; danışman müşteri kartındaki WhatsApp düğmesinden şablonu seçsin, değişkenler otomatik dolsun. Mesaj kendi WhatsApp'ınızdan gönderilir — otomatik gönderim yoktur." actions={
+<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-3">
             <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-5 py-3 text-center">
               <p className="font-display text-xl font-extrabold text-mint-300">{activeCount}</p>
               <p className="text-xs text-white/55">aktif şablon</p>
@@ -56,9 +43,8 @@ export default async function MessageTemplatesSettingsPage() {
               <p className="font-display text-xl font-extrabold text-white">{totalUsage}</p>
               <p className="text-xs text-white/55">toplam kullanım</p>
             </div>
-          </div>
-        </div>
-      </section>
+          </div></div>
+} />
 
       <section className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-4 text-sm">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-amber-400/15 text-amber-600">

@@ -209,7 +209,7 @@ export default async function ValuationReportPage({
                 {valuation.created_by && author?.full_name ? (
                   <Link
                     href={`/app/ekip/${valuation.created_by}`}
-                    className="focus-ring rounded-[6px] hover:text-brand-600 hover:underline"
+                    className="focus-ring rounded-[var(--radius-control)] hover:text-brand-600 hover:underline"
                   >
                     {author.full_name}
                   </Link>
@@ -287,7 +287,7 @@ export default async function ValuationReportPage({
                 valuation.property_id && property?.property_code ? (
                   <Link
                     href={`/app/portfoyler/${valuation.property_id}`}
-                    className="focus-ring rounded-[6px] hover:text-brand-600 hover:underline"
+                    className="focus-ring rounded-[var(--radius-control)] hover:text-brand-600 hover:underline"
                   >
                     {property.property_code}
                   </Link>
@@ -395,7 +395,7 @@ export default async function ValuationReportPage({
                         {c.property_code ? (
                           <Link
                             href={`/app/portfoyler/${c.property_id}`}
-                            className="focus-ring rounded-[6px] hover:text-brand-600 hover:underline"
+                            className="focus-ring rounded-[var(--radius-control)] hover:text-brand-600 hover:underline"
                           >
                             {c.property_code}
                           </Link>
