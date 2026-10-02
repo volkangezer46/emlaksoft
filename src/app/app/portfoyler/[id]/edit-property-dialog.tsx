@@ -14,7 +14,7 @@ import { updateProperty } from "@/app/actions/properties";
 import { useToast } from "@/components/app/toast-provider";
 import { LatLngPicker } from "@/components/app/lat-lng-picker";
 import { GeoSelect } from "@/components/app/geo-select";
-import { HEATING_OPTIONS, FACADE_OPTIONS } from "@/app/app/portfoyler/new-property-dialog";
+import { HEATING_OPTIONS, FACADE_OPTIONS } from "@/app/app/portfoyler/yeni/property-options";
 import { defaultDefinitionValues, LEGACY_TRANSACTION_TYPE_VALUES } from "@/lib/definition-defaults";
 
 type Province = { id: string; name: string };

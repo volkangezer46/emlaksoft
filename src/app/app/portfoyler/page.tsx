@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import Image from "next/image";
 import { inFilter, orIlike, safeLike } from "@/lib/pgrst";
 import {
@@ -11,20 +12,18 @@ import {
   LayoutGrid,
   Map as MapIcon,
   MapPin,
+  Plus,
   Search,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { getDefinitions } from "@/lib/definitions";
-import { getProvincesCached } from "@/lib/geo";
 import { exportPropertiesCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { CompareBar } from "@/components/public/compare-select";
 import type { CompareItem } from "@/components/public/compare-table";
-import { NewPropertyDialog } from "./new-property-dialog";
 import { PropertyCompareShell } from "./compare-shell";
 import { PropertyBulkActions } from "./property-bulk-actions";
 import { PropertySortSelect } from "./property-sort-select";
@@ -151,6 +150,7 @@ export default async function PropertiesPage({
   const canCreate = (perms.properties ?? []).includes("create");
   const canEditProperty = (perms.properties ?? []).includes("edit");
   const params = (await searchParams) ?? {};
+  if (params.yeni === "1") redirect("/app/portfoyler/yeni");
   const q = (params.q ?? "").trim();
   const statusFilter = STATUS_FILTERS.some((f) => f.value === params.status) ? params.status! : "all";
   const saglikFilter = SAGLIK_FILTERS.some((f) => f.value === params.saglik) ? (params.saglik as SaglikValue) : null;
@@ -255,10 +255,6 @@ export default async function PropertiesPage({
     { data },
     { data: mapData, count: mapLocatedTotal },
     { count: filteredTotal },
-    provinces,
-    { data: branches },
-    propertyTypeDefs,
-    transactionTypeDefs,
     fxRates,
     { count: totalCount },
     { count: liveCount },
@@ -274,11 +270,6 @@ export default async function PropertiesPage({
     // Filtrelenmiş gerçek toplam — hem sayfalama ("X-Y / Toplam Z") hem de
     // harita görünümünde konumsuz portföy sayısı için tek doğruluk kaynağı.
     buildFilteredQuery("id", { count: "exact", head: true }),
-    // İl listesi 81 satırlık sabit referans verisi — istekler arası cache'li (src/lib/geo.ts)
-    getProvincesCached(),
-    supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
-    getDefinitions("property_type"),
-    getDefinitions("transaction_type"),
     // TCMB kuru — yoksa null döner ve döviz satırı hiç basılmaz (uydurma kur yok).
     fetchLatestRates(supabase),
     // KPI sayıları — liste artık sayfalı olduğundan head-count sorgularıyla
@@ -325,10 +316,6 @@ export default async function PropertiesPage({
     }
   }
 
-  const provinceList = provinces;
-  const branchList = branches ?? [];
-  const propertyTypeOptions = propertyTypeDefs.length ? propertyTypeDefs.map((d) => d.value) : undefined;
-  const transactionTypeOptions = transactionTypeDefs.length ? transactionTypeDefs.map((d) => d.value) : undefined;
 
   // Fiyat sağlığı dağılımı — head-count sorgularından (gerçek toplamlar).
   const greenN = greenCount ?? 0;
@@ -400,7 +387,7 @@ export default async function PropertiesPage({
               label="Dışa aktar"
               className="focus-ring press inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-4 text-sm font-semibold text-ink-950 transition hover:bg-canvas disabled:opacity-50"
             />
-            {canCreate ? <NewPropertyDialog key={params.yeni === "1" ? "new-property" : "property-dialog"} provinces={provinceList} branches={branchList} propertyTypes={propertyTypeOptions} transactionTypes={transactionTypeOptions} defaultOpen={params.yeni === "1"} /> : null}
+            {canCreate ? <ButtonLink href="/app/portfoyler/yeni"><Plus className="h-4 w-4" /> Yeni portföy</ButtonLink> : null}
           </>
         }
       />
@@ -545,9 +532,7 @@ export default async function PropertiesPage({
             canCreate
               ? {
                   node: (
-                    <div className="[&>button]:bg-brand-600 [&>button]:text-white">
-                      <NewPropertyDialog provinces={provinceList} branches={branchList} propertyTypes={propertyTypeOptions} transactionTypes={transactionTypeOptions} />
-                    </div>
+                    <ButtonLink href="/app/portfoyler/yeni"><Plus className="h-4 w-4" /> Yeni portföy</ButtonLink>
                   ),
                 }
               : undefined

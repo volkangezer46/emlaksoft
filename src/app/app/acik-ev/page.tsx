@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -16,7 +17,7 @@ import { isPast, msUntil, DAY_MS } from "@/lib/clock";
 import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/app/empty-state";
 import { Badge } from "@/components/ui/badge";
-import { NewOpenHouseDialog } from "./new-open-house-dialog";
+import { ButtonLink } from "@/components/ui/button";
 
 import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Açık Ev Takibi" };
@@ -60,10 +61,11 @@ function countdownLabel(iso: string): string | null {
 export default async function AcikEvPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string }>;
+  searchParams?: Promise<{ durum?: string; yeni?: string }>;
 }) {
   const { perms } = await requireModulePage("open_house", "/app/acik-ev");
   const params = (await searchParams) ?? {};
+  if (params.yeni === "1") redirect("/app/acik-ev/yeni");
   const durum = Object.keys(FILTER_LABELS).includes(params.durum ?? "") ? params.durum : undefined;
   const events = await listOpenHouses();
   const canCreate = (perms.open_house ?? perms.appointments ?? []).includes("create");
@@ -110,7 +112,7 @@ export default async function AcikEvPage({
           ) : null}
 <>{canCreate ? (
               <div className="mt-4">
-                <NewOpenHouseDialog />
+                <ButtonLink href="/app/acik-ev/yeni">Yeni açık ev</ButtonLink>
               </div>
             ) : null}</></div>
 } />
@@ -240,7 +242,7 @@ export default async function AcikEvPage({
           tone="mint"
           action={
             events.length === 0 && canCreate
-              ? { node: <NewOpenHouseDialog /> }
+              ? { node: <ButtonLink href="/app/acik-ev/yeni">Yeni açık ev</ButtonLink> }
               : events.length > 0
                 ? { href: "/app/acik-ev", label: "Filtreyi temizle" }
                 : undefined
