@@ -59,10 +59,8 @@ const nextConfig: NextConfig = {
     // remaining logo/profile-photo actions are capped at 2/3 MB; 4 MB leaves
     // multipart overhead without exposing every action to a 16 MB body.
     serverActions: { bodySizeLimit: "4mb" },
-    // React <ViewTransition> entegrasyonu (docs: 01-next-config-js/viewTransition.md).
-    // Navigasyonlarda tarayıcının View Transitions API'si devreye girer;
-    // desteklemeyen tarayıcıda hiçbir şey değişmez (progressive enhancement).
-    viewTransition: true,
+    // Next 16.3+: React <ViewTransition> yapılandırma gerektirmez (docs: 02-guides/view-transitions.md);
+    // eski `experimental.viewTransition` seçeneği kaldırıldı.
     // Next 15+'ta dinamik sayfaların istemci router cache TTL'i varsayılan 0sn
     // (docs: 01-next-config-js/staleTimes.md) — /app ve /admin'in tamamı auth/cookie
     // gerektirdiği için "dinamik" sayılıyor, yani her tık (geri/ileri dahil) sunucuya
