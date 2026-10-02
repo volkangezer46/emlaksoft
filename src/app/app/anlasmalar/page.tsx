@@ -1,16 +1,17 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
-import { AlarmClock, ArrowUpRight, Filter, Handshake, Target, TrendingUp, Trophy, Wallet } from "lucide-react";
+import { AlarmClock, ArrowUpRight, Filter, Handshake, Plus, Target, TrendingUp, Trophy, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DAY_MS, msSince, daysAgoIso } from "@/lib/clock";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { DealBoard, type BoardDeal } from "./deal-board";
-import { NewDealDialog } from "./new-deal-dialog";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportDealsCsv } from "@/app/actions/export";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { ButtonLink } from "@/components/ui/button";
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
 }
@@ -26,13 +27,14 @@ const FUNNEL_STAGES: { key: string; label: string; bar: string; text: string }[]
   { key: "won", label: "Kazanıldı", bar: "bg-mint-500", text: "text-mint-600" },
 ];
 
-export default async function DealsPage() {
+export default async function DealsPage({ searchParams }: { searchParams?: Promise<{ yeni?: string }> }) {
+  if (((await searchParams) ?? {}).yeni === "1") redirect("/app/anlasmalar/yeni");
   const { perms } = await requireModulePage("commissions");
   const canCreate = (perms.commissions ?? []).includes("create");
   const canEdit = (perms.commissions ?? []).includes("edit");
   const supabase = await createClient();
 
-  const [{ data: dealsRaw, count: dealTotal }, { data: properties }, { data: customers }, { data: members }] = await Promise.all([
+  const [{ data: dealsRaw, count: dealTotal }, { data: members }] = await Promise.all([
     supabase
       .from("deals")
       // Pipeline 200 anlaşmayla sınırlı; gerçek toplam olmadan kullanıcı
@@ -46,18 +48,6 @@ export default async function DealsPage() {
         { count: "exact" },
       )
       .order("updated_at", { ascending: false })
-      .limit(200),
-    supabase
-      .from("properties")
-      .select("id, property_code, title, list_price, transaction_type")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(100),
-    supabase
-      .from("customers")
-      .select("id, full_name")
-      .is("deleted_at", null)
-      .order("full_name")
       .limit(200),
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
   ]);
@@ -185,7 +175,7 @@ export default async function DealsPage() {
               action={exportDealsCsv}
               className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
             />
-            {canCreate ? <NewDealDialog properties={properties ?? []} customers={customers ?? []} /> : null}
+            {canCreate ? <ButtonLink href="/app/anlasmalar/yeni" icon={Plus}>Yeni anlaşma</ButtonLink> : null}
           </div></div>
 } />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
@@ -228,7 +218,7 @@ export default async function DealsPage() {
             İlk anlaşmayı ekleyin veya portföyden “Anlaşma + komisyon” ile kazanan işlem açın.
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
-            {canCreate ? <NewDealDialog properties={properties ?? []} customers={customers ?? []} /> : null}
+            {canCreate ? <ButtonLink href="/app/anlasmalar/yeni" icon={Plus}>Yeni anlaşma</ButtonLink> : null}
             <Link href="/app/portfoyler" className="rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-semibold text-brand-600">
               Portföye git
             </Link>

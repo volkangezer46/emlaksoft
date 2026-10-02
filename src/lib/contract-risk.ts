@@ -10,7 +10,7 @@
  * Arayüzde bu açıkça yazılı.
  *
  * NEDEN GEREKLİ: Sözleşme şablonları `___________` yer tutucularıyla geliyor
- * (`new-contract-dialog.tsx` içindeki TEMPLATES). Doldurulmamış bir şablonu
+ * (`yeni/new-contract-form.tsx` içindeki TEMPLATES). Doldurulmamış bir şablonu
  * imzaya göndermek sahada en sık yapılan hata ve hiçbir kontrol yoktu —
  * `createContract` yalnızca başlık ve gövdenin boş olmadığına bakıyordu.
  */
