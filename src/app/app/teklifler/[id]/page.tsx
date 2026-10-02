@@ -49,8 +49,8 @@ const STATUS_STYLE: Record<string, string> = {
   rejected: "bg-red-50 text-red-700 ring-red-600/20",
   submitted: "bg-brand-50 text-brand-700 ring-brand-600/20",
   countered: "bg-amber-50 text-amber-700 ring-amber-600/20",
-  draft: "bg-zinc-100 text-zinc-600 ring-zinc-500/10",
-  withdrawn: "bg-zinc-50 text-zinc-500 ring-zinc-400/10",
+  draft: "bg-zinc-100 text-text-muted ring-zinc-500/10",
+  withdrawn: "bg-zinc-50 text-text-muted ring-zinc-400/10",
 };
 
 function money(n: number | null) {
@@ -259,7 +259,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
                 <p className="font-semibold text-ink-950 group-hover:text-brand-600">{customer.full_name}</p>
                 <div className="relative z-10 flex flex-wrap items-center gap-3 text-xs text-text-muted">
                   {telHref ? (
-                    <a href={telHref} className="focus-ring flex items-center gap-1 rounded-[6px] font-semibold transition hover:text-brand-600">
+                    <a href={telHref} className="focus-ring flex items-center gap-1 rounded-[var(--radius-control)] font-semibold transition hover:text-brand-600">
                       <Phone className="h-3.5 w-3.5" /> {formatTurkishPhone(customer.phone)}
                     </a>
                   ) : null}
@@ -268,13 +268,13 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
                       href={waHref}
                       target="_blank"
                       rel="noreferrer"
-                      className="focus-ring flex items-center gap-1 rounded-[6px] font-semibold text-mint-600 transition hover:underline"
+                      className="focus-ring flex items-center gap-1 rounded-[var(--radius-control)] font-semibold text-mint-600 transition hover:underline"
                     >
                       <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
                     </a>
                   ) : null}
                   {customer.email ? (
-                    <a href={`mailto:${customer.email}`} className="focus-ring flex items-center gap-1 rounded-[6px] transition hover:text-brand-600">
+                    <a href={`mailto:${customer.email}`} className="focus-ring flex items-center gap-1 rounded-[var(--radius-control)] transition hover:text-brand-600">
                       <Mail className="h-3.5 w-3.5" /> {customer.email}
                     </a>
                   ) : null}

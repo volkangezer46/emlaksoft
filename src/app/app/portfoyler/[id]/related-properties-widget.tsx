@@ -26,7 +26,7 @@ function provinceName(value: RelatedProperty["province"]) {
 
 const statusCls: Record<string, string> = {
   live: "bg-mint-500/12 text-mint-600",
-  draft: "bg-zinc-100 text-zinc-500",
+  draft: "bg-zinc-100 text-text-muted",
   reserved: "bg-amber-400/15 text-amber-600",
   sold: "bg-brand-600/10 text-brand-600",
 };
@@ -132,7 +132,7 @@ export async function RelatedPropertiesWidget({
               <span className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">
                 {p.transaction_type}{p.property_type ? ` · ${p.property_type}` : ""}
               </span>
-              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${statusCls[p.status] ?? "bg-zinc-100 text-zinc-500"}`}>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${statusCls[p.status] ?? "bg-zinc-100 text-text-muted"}`}>
                 {statusLabel[p.status] ?? p.status}
               </span>
             </div>

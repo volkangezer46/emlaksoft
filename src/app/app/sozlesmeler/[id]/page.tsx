@@ -34,11 +34,11 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const STATUS_STYLES: Record<string, { cls: string; icon: React.ReactNode; label: string }> = {
-  draft:    { cls: "bg-zinc-100 text-zinc-600", icon: <Clock className="h-3.5 w-3.5" />, label: "Taslak" },
+  draft:    { cls: "bg-zinc-100 text-text-muted", icon: <Clock className="h-3.5 w-3.5" />, label: "Taslak" },
   sent:     { cls: "bg-brand-50 text-brand-700",  icon: <FileSignature className="h-3.5 w-3.5" />, label: "Gönderildi" },
   signed:   { cls: "bg-mint-50 text-mint-700", icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "İmzalandı" },
   rejected: { cls: "bg-red-50 text-red-700",    icon: <XCircle className="h-3.5 w-3.5" />, label: "Reddedildi" },
-  cancelled:{ cls: "bg-zinc-50 text-zinc-500",  icon: <XCircle className="h-3.5 w-3.5" />, label: "İptal" },
+  cancelled:{ cls: "bg-zinc-50 text-text-muted",  icon: <XCircle className="h-3.5 w-3.5" />, label: "İptal" },
 };
 
 function relDate(iso: string) {
@@ -154,7 +154,7 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
               <span className="text-white/80">Müşteri:</span>
               <span className="font-semibold text-white">
                 {customerRel?.id ? (
-                  <Link href={`/app/musteriler/${customerRel.id}`} className="focus-ring rounded-[6px] hover:underline">
+                  <Link href={`/app/musteriler/${customerRel.id}`} className="focus-ring rounded-[var(--radius-control)] hover:underline">
                     {customerName}
                   </Link>
                 ) : (
@@ -169,7 +169,7 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
               <span className="text-white/80">Portföy:</span>
               <span className="font-semibold text-white">
                 {propertyRel?.id ? (
-                  <Link href={`/app/portfoyler/${propertyRel.id}`} className="focus-ring rounded-[6px] hover:underline">
+                  <Link href={`/app/portfoyler/${propertyRel.id}`} className="focus-ring rounded-[var(--radius-control)] hover:underline">
                     {propertyName}
                   </Link>
                 ) : (
@@ -366,7 +366,7 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
                     <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
                       s.status === "signed" ? "bg-mint-500/12 text-mint-600" :
                       s.status === "rejected" ? "bg-danger-500/12 text-danger-500" :
-                      "bg-zinc-100 text-zinc-500"
+                      "bg-zinc-100 text-text-muted"
                     }`}>
                       {s.status === "signed" ? "İmzaladı" : s.status === "rejected" ? "Reddetti" : "Bekliyor"}
                     </span>

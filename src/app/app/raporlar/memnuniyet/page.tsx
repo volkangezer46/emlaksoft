@@ -226,7 +226,7 @@ export default async function SatisfactionReportPage() {
                   <div className="min-w-0 flex-1">
                     <Link
                       href={cust?.id ? `/app/musteriler/${cust.id}` : "/app/musteriler"}
-                      className="focus-ring rounded-[6px] text-sm font-semibold text-ink-950 underline-offset-2 hover:underline"
+                      className="focus-ring rounded-[var(--radius-control)] text-sm font-semibold text-ink-950 underline-offset-2 hover:underline"
                     >
                       {cust?.full_name ?? "Müşteri"}
                     </Link>
@@ -321,7 +321,7 @@ export default async function SatisfactionReportPage() {
                     <div className="min-w-0 flex-1">
                       <Link
                         href={cust?.id ? `/app/musteriler/${cust.id}` : "/app/musteriler"}
-                        className="focus-ring rounded-[6px] text-sm font-semibold text-ink-950 underline-offset-2 hover:underline"
+                        className="focus-ring rounded-[var(--radius-control)] text-sm font-semibold text-ink-950 underline-offset-2 hover:underline"
                       >
                         {cust?.full_name ?? "Müşteri"}
                       </Link>
@@ -361,7 +361,7 @@ export default async function SatisfactionReportPage() {
                     <div className="min-w-0">
                       <Link
                         href={cust?.id ? `/app/musteriler/${cust.id}` : "/app/musteriler"}
-                        className="focus-ring block truncate rounded-[6px] text-sm font-bold text-ink-950 underline-offset-2 hover:underline"
+                        className="focus-ring block truncate rounded-[var(--radius-control)] text-sm font-bold text-ink-950 underline-offset-2 hover:underline"
                       >
                         {cust?.full_name ?? "Müşteri"}
                       </Link>

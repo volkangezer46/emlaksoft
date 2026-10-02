@@ -76,14 +76,14 @@ function RevokeButton({ row }: { row: SharedPortalRow }) {
           type="button"
           onClick={revoke}
           disabled={pending}
-          className="rounded-[7px] bg-danger-500 px-2 py-1 text-xs font-bold text-white transition hover:bg-danger-600 disabled:opacity-60"
+          className="rounded-[var(--radius-control)] bg-danger-500 px-2 py-1 text-xs font-bold text-white transition hover:bg-danger-600 disabled:opacity-60"
         >
           {pending ? "İptal ediliyor…" : "İptal et"}
         </button>
         <button
           type="button"
           onClick={() => setConfirming(false)}
-          className="rounded-[7px] px-1.5 py-1 text-xs font-semibold text-text-muted hover:text-ink-950"
+          className="rounded-[var(--radius-control)] px-1.5 py-1 text-xs font-semibold text-text-muted hover:text-ink-950"
         >
           Vazgeç
         </button>
@@ -193,7 +193,7 @@ export function SharedPortals({ rows }: { rows: SharedPortalRow[] }) {
                     {row.href ? (
                       <Link
                         href={row.href}
-                        className="focus-ring rounded-[6px] font-semibold text-ink-950 underline-offset-2 transition hover:text-brand-600 hover:underline"
+                        className="focus-ring rounded-[var(--radius-control)] font-semibold text-ink-950 underline-offset-2 transition hover:text-brand-600 hover:underline"
                       >
                         {row.subject}
                       </Link>

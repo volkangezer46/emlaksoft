@@ -41,7 +41,7 @@ type RecentLog = {
 
 const LOG_RESULT_BADGES: Record<string, { label: string; className: string }> = {
   ok:    { label: "Çalıştı", className: "bg-mint-50 text-mint-700" },
-  skip:  { label: "Atlandı", className: "bg-zinc-100 text-zinc-500" },
+  skip:  { label: "Atlandı", className: "bg-zinc-100 text-text-muted" },
   error: { label: "Hata",    className: "bg-danger-500/10 text-danger-500" },
 };
 
@@ -267,7 +267,7 @@ export default async function OtomasyonlarPage({
                 <div key={r.id} className="group relative flex items-center gap-3 px-5 py-3.5 transition hover:bg-brand-600/[0.03]">
                   <Link href={`/app/otomasyonlar/${r.id}`} className="absolute inset-0" aria-label={`${r.name} otomasyon detayı`} />
                   <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] ${
-                    r.status === "active" ? "bg-mint-500/12 text-mint-600" : "bg-zinc-100 text-zinc-400"
+                    r.status === "active" ? "bg-mint-500/12 text-mint-600" : "bg-zinc-100 text-text-faint"
                   }`}>
                     {r.status === "active" ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
                   </span>
@@ -297,7 +297,7 @@ export default async function OtomasyonlarPage({
                   <div className="relative z-10 shrink-0 text-right">
                     <Link
                       href={`/app/otomasyonlar/${r.id}#calisma-gecmisi`}
-                      className="focus-ring rounded-[6px] text-xs font-semibold text-ink-950 underline-offset-2 hover:text-brand-600 hover:underline"
+                      className="focus-ring rounded-[var(--radius-control)] text-xs font-semibold text-ink-950 underline-offset-2 hover:text-brand-600 hover:underline"
                     >
                       {r.run_count} çalışma
                     </Link>
@@ -309,8 +309,8 @@ export default async function OtomasyonlarPage({
                   </div>
                   <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
                     r.status === "active" ? "bg-mint-50 text-mint-700" :
-                    r.status === "draft"  ? "bg-zinc-100 text-zinc-500" :
-                    "bg-zinc-50 text-zinc-400"
+                    r.status === "draft"  ? "bg-zinc-100 text-text-muted" :
+                    "bg-zinc-50 text-text-faint"
                   }`}>
                     {r.status === "active" ? "Aktif" : r.status === "draft" ? "Taslak" : "Pasif"}
                   </span>

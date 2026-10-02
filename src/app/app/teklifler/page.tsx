@@ -364,7 +364,7 @@ export default async function TekliflerPage({
               ))}
             </div>
             {/* Dağılım şeridi — 2px boşluklu segmentler; metin rozetler kimliği zaten taşıyor */}
-            <div className="mt-3 flex h-2.5 gap-0.5 overflow-hidden rounded-[6px]" aria-hidden>
+            <div className="mt-3 flex h-2.5 gap-0.5 overflow-hidden rounded-[var(--radius-control)]" aria-hidden>
               {[
                 { key: "draft", cls: "bg-line-strong" },
                 { key: "submitted", cls: "bg-brand-600" },
@@ -490,7 +490,7 @@ export default async function TekliflerPage({
                         {o.property_id ? (
                           <Link
                             href={`/app/portfoyler/${o.property_id}`}
-                            className="focus-ring relative z-10 rounded-[6px] transition hover:text-brand-600 hover:underline"
+                            className="focus-ring relative z-10 rounded-[var(--radius-control)] transition hover:text-brand-600 hover:underline"
                           >
                             {o.property_label ?? "Portföy"}
                           </Link>
@@ -502,7 +502,7 @@ export default async function TekliflerPage({
                         {o.customer_id ? (
                           <Link
                             href={`/app/musteriler/${o.customer_id}`}
-                            className="focus-ring relative z-10 rounded-[6px] font-medium text-ink-950 transition hover:text-brand-600 hover:underline"
+                            className="focus-ring relative z-10 rounded-[var(--radius-control)] font-medium text-ink-950 transition hover:text-brand-600 hover:underline"
                           >
                             {o.customer_name ?? "Müşteri"}
                           </Link>

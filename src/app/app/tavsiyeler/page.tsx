@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   ChevronLeft,
   ChevronRight,
@@ -225,24 +226,19 @@ export default async function ReferralsPage({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 font-display text-2xl font-extrabold text-ink-950">
-            <HeartHandshake className="h-6 w-6 text-brand-600" />
-            Tavsiyeler
-          </h1>
-          <p className="mt-1 text-sm text-text-muted">
-            Memnun müşteri yeni müşteri getirir. Kişiye özel link üretin, gelen tavsiyeleri takip edin.
-          </p>
-        </div>
-        <Link
-          href="/app/raporlar/memnuniyet"
-          className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-3 py-2 text-xs font-semibold text-ink-950 transition hover:bg-canvas"
-        >
-          <Sparkles className="h-3.5 w-3.5 text-brand-600" />
-          Memnuniyet raporu
-        </Link>
-      </header>
+      <PageHeader
+        title="Tavsiyeler"
+        description="Memnun müşteri yeni müşteri getirir. Kişiye özel link üretin, gelen tavsiyeleri takip edin."
+        actions={
+          <Link
+            href="/app/raporlar/memnuniyet"
+            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-3 py-2 text-xs font-semibold text-ink-950 transition hover:bg-canvas"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-brand-600" />
+            Memnuniyet raporu
+          </Link>
+        }
+      />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard

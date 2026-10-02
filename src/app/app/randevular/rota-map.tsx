@@ -203,7 +203,7 @@ export function RotaMap({ markers }: { markers: RotaMarker[] }) {
               type="button"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => setActiveId(active ? null : p.id)}
-              className={`absolute z-10 grid h-8 w-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-brand-600 text-[13px] font-extrabold text-white shadow-[0_2px_8px_rgba(20,99,255,0.45)] ring-2 ring-white transition-transform hover:scale-110 ${active ? "scale-110" : ""}`}
+              className={`absolute z-10 grid h-8 w-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-brand-600 text-sm font-extrabold text-white shadow-[0_2px_8px_rgba(20,99,255,0.45)] ring-2 ring-white transition-transform hover:scale-110 ${active ? "scale-110" : ""}`}
               style={{ left: p.x, top: p.y }}
               aria-label={`Durak ${p.order}: ${p.label} — ${p.timeLabel}`}
               title={`${p.order}. ${p.label} · ${p.timeLabel}`}

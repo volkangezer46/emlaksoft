@@ -187,9 +187,9 @@ export function ProductTour() {
           </DialogDescription>
           <p className="mt-3 rounded-[var(--radius-control)] bg-canvas px-3 py-2 text-xs text-text-muted">
             İstediğinde{" "}
-            <kbd className="rounded-[5px] border border-line bg-surface px-1.5 py-0.5 font-semibold text-ink-950">?</kbd>{" "}
+            <kbd className="rounded-[var(--radius-control)] border border-line bg-surface px-1.5 py-0.5 font-semibold text-ink-950">?</kbd>{" "}
             klavye kısayollarını,{" "}
-            <kbd className="rounded-[5px] border border-line bg-surface px-1.5 py-0.5 font-semibold text-ink-950">Ctrl+K</kbd>{" "}
+            <kbd className="rounded-[var(--radius-control)] border border-line bg-surface px-1.5 py-0.5 font-semibold text-ink-950">Ctrl+K</kbd>{" "}
             komut paletini açar.
           </p>
           <button
