@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlarmClock, ArrowUpRight, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Repeat, Sunrise } from "lucide-react";
+import { AlarmClock, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Repeat, Sunrise } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DAY_MS, daysFromNowIso, now } from "@/lib/clock";
@@ -8,6 +8,8 @@ import { TaskCard, type TaskRow } from "./task-card";
 import { TaskBulkList } from "./task-bulk-list";
 import { EmptyState } from "@/components/app/empty-state";
 import { ICONS } from "@/lib/icons";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
@@ -226,46 +228,33 @@ export default async function TasksPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/30 blur-[80px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-              <ICONS.gorev className="h-4 w-4" /> Görev & takip otomasyonu
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">Hiçbir takip unutulmasın</h1>
-            <p className="mt-1 max-w-xl text-sm text-white/60">
-              Arama, ziyaret, evrak ve follow-up görevlerini planlayın; ekibe atayın, gecikmeleri anında görün.
-            </p>
-          </div>
-          {canCreate ? <NewTaskDialog key={params.yeni === "1" ? "new-task" : "task-dialog"} members={members ?? []} customers={customers ?? []} defaultOpen={params.yeni === "1"} /> : null}
-        </div>
-        <div className="stagger-grid relative mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          {/* Sayaçlar mevcut ?filter= parametresiyle ilgili listeye iner. */}
-          {[
-            // İkonografi: "Açık görev" CalendarClock (randevu/saat ikonu) ile
-            // çiziliyordu; görev kavramının ikonu ICONS.gorev (ListChecks).
-            { label: "Açık görev", value: counts.open, icon: ICONS.gorev, tone: "text-cyan-300", href: taskHref({ filter: "open" }) },
-            { label: "Gecikmiş", value: counts.overdue, icon: AlarmClock, tone: "text-danger-300", href: taskHref({ filter: "overdue" }) },
-            { label: "Bugün", value: counts.today, icon: Sunrise, tone: "text-amber-300", href: taskHref({ filter: "today" }) },
-            { label: "Yaklaşan 7 gün", value: counts.upcoming, icon: ICONS.randevu, tone: "text-brand-300", href: taskHref({ filter: "yaklasan" }) },
-            { label: "Tamamlanan", value: counts.done, icon: CheckCircle2, tone: "text-mint-300", href: taskHref({ filter: "done" }) },
-          ].map((s) => (
-            <Link
-              key={s.label}
-              href={s.href}
-              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/[0.05] px-4 py-3 transition hover:border-brand-300"
-            >
-              <p className={`flex items-center gap-1.5 font-display text-2xl font-extrabold ${s.tone}`}>
-                <s.icon className="h-4 w-4" /> {s.value}
-                <ArrowUpRight className="hover-action ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-              </p>
-              <p className="text-xs text-white/50">{s.label}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
+      <PageHeader
+        title="Görevler"
+        description="Arama, ziyaret, evrak ve takip görevlerini planlayın; ekibe atayın, gecikmeleri anında görün."
+        actions={canCreate ? <NewTaskDialog key={params.yeni === "1" ? "new-task" : "task-dialog"} members={members ?? []} customers={customers ?? []} defaultOpen={params.yeni === "1"} /> : null}
+      />
+
+      {/* Kompakt, tıklanabilir sayaçlar — mevcut ?filter= parametresiyle ilgili listeye iner; sıfırlar sönük. */}
+      <Card className="flex flex-wrap items-center gap-x-2 gap-y-1 p-2">
+        {[
+          // İkonografi: görev kavramının ikonu ICONS.gorev (ListChecks).
+          { label: "Açık görev", value: counts.open, icon: ICONS.gorev, tone: "text-cyan-600", href: taskHref({ filter: "open" }) },
+          { label: "Gecikmiş", value: counts.overdue, icon: AlarmClock, tone: "text-danger-500", href: taskHref({ filter: "overdue" }) },
+          { label: "Bugün", value: counts.today, icon: Sunrise, tone: "text-amber-600", href: taskHref({ filter: "today" }) },
+          { label: "Yaklaşan 7 gün", value: counts.upcoming, icon: ICONS.randevu, tone: "text-brand-600", href: taskHref({ filter: "yaklasan" }) },
+          { label: "Tamamlanan", value: counts.done, icon: CheckCircle2, tone: "text-mint-600", href: taskHref({ filter: "done" }) },
+        ].map((st) => (
+          <Link
+            key={st.label}
+            href={st.href}
+            className={`focus-ring press flex items-center gap-2.5 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-canvas ${st.value === 0 ? "opacity-55" : ""}`}
+          >
+            <st.icon className={`h-4 w-4 ${st.tone}`} />
+            <span className="font-display text-lg font-bold leading-none text-text">{st.value.toLocaleString("tr-TR")}</span>
+            <span className="text-xs text-text-muted">{st.label}</span>
+          </Link>
+        ))}
+      </Card>
 
       <div className="flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => {

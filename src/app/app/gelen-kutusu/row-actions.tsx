@@ -29,7 +29,7 @@ import { useToast } from "@/components/app/toast-provider";
  */
 
 const ROW_BTN =
-  "focus-ring press hover-action relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-faint opacity-0 transition group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40";
+  "focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-faint transition disabled:cursor-not-allowed disabled:opacity-40";
 
 const fieldClass =
   "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";

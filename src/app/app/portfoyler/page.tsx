@@ -11,7 +11,6 @@ import {
   LayoutGrid,
   Map as MapIcon,
   MapPin,
-  Radio,
   Search,
 } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -33,6 +32,10 @@ import { OwnerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { EmptyState } from "@/components/app/empty-state";
 import { ICONS } from "@/lib/icons";
+import { PageHeader } from "@/components/ui/page-header";
+import { ButtonLink } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { DAY_MS, msSince, now } from "@/lib/clock";
 import { fetchLatestRates, formatFx, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 
@@ -384,106 +387,101 @@ export default async function PropertiesPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-12 -top-20 h-60 w-60 rounded-full bg-mint-500/25 blur-[80px]" />
-        <div className="relative flex flex-wrap items-start justify-between gap-5">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-mint-400"><Radio className="h-3.5 w-3.5" /> Portföy ağı canlı</span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Portföy operasyonu</h1>
-            <p className="mt-1 text-sm text-white/60">Fiyat sağlığı, portal teyidi ve yetki durumu tek merkezde.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center overflow-hidden rounded-[var(--radius-control)] border border-white/12 bg-white/8 backdrop-blur">
-              {(
-                [
-                  { label: "Liste", value: "liste", icon: LayoutGrid },
-                  { label: "Harita", value: "harita", icon: MapIcon },
-                ] as const
-              ).map((option) => (
-                <Link
-                  key={option.value}
-                  href={viewHref(option.value)}
-                  aria-current={view === option.value ? "page" : undefined}
-                  className={`focus-ring press inline-flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-semibold transition ${
-                    view === option.value ? "bg-white/15 text-white" : "text-white/60 hover:text-white"
-                  }`}
-                >
-                  <option.icon className="h-4 w-4" />
-                  {option.label}
-                </Link>
-              ))}
-            </div>
-            <Link href="/app/yabanci-satis" className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white">Yabancıya satış</Link>
-            <Link href="/app/portfoyler/sunumlar" className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white">Sunumlar &amp; portallar</Link>
-            <Link href="/app/portfoyler/anahtarlar" className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white">Anahtarlar</Link>
+      <PageHeader
+        title="Portföyler"
+        description="Fiyat sağlığı, portal teyidi ve yetki durumu tek merkezde."
+        actions={
+          <>
             <ExportCsvButton
               action={exportPropertiesCsv}
               label="Dışa aktar"
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
+              className="focus-ring press inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-4 text-sm font-semibold text-ink-950 transition hover:bg-canvas disabled:opacity-50"
             />
             {canCreate ? <NewPropertyDialog key={params.yeni === "1" ? "new-property" : "property-dialog"} provinces={provinceList} branches={branchList} propertyTypes={propertyTypeOptions} transactionTypes={transactionTypeOptions} defaultOpen={params.yeni === "1"} /> : null}
-          </div>
+          </>
+        }
+      />
+
+      {/* Görünüm seçici + ilgili ekranlar — ikincil gezinme */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center overflow-hidden rounded-[var(--radius-control)] border border-line bg-surface">
+          {(
+            [
+              { label: "Liste", value: "liste", icon: LayoutGrid },
+              { label: "Harita", value: "harita", icon: MapIcon },
+            ] as const
+          ).map((option) => (
+            <Link
+              key={option.value}
+              href={viewHref(option.value)}
+              aria-current={view === option.value ? "page" : undefined}
+              className={`focus-ring press inline-flex h-9 items-center gap-1.5 px-3.5 text-sm font-semibold transition ${
+                view === option.value ? "bg-brand-600/10 text-brand-600" : "text-text-muted hover:text-ink-950"
+              }`}
+            >
+              <option.icon className="h-4 w-4" />
+              {option.label}
+            </Link>
+          ))}
         </div>
-        {/* Toplam portföy değeri + döviz karşılığı — kur yoksa satır hiç çizilmez */}
-        <p className="relative mt-5 text-sm text-white/70" title={fxTitle}>
-          Toplam portföy değeri{" "}
-          <span className="font-display font-extrabold text-white">{formatFx(totalValueTry, "TRY")}</span>
-          {totalValueFx ? <span className="ml-2 text-xs text-white/45">{totalValueFx}</span> : null}
+        <span aria-hidden className="mx-1 hidden h-4 w-px bg-line sm:block" />
+        <ButtonLink href="/app/yabanci-satis" variant="ghost" size="sm">Yabancıya satış</ButtonLink>
+        <ButtonLink href="/app/portfoyler/sunumlar" variant="ghost" size="sm">Sunumlar &amp; portallar</ButtonLink>
+        <ButtonLink href="/app/portfoyler/anahtarlar" variant="ghost" size="sm">Anahtarlar</ButtonLink>
+      </div>
+
+      {/* Kompakt, tıklanabilir özet — sıfır değerler sönük */}
+      <Card className="flex flex-wrap items-stretch gap-x-6 gap-y-3 p-4">
+        <p className="flex min-w-[10rem] flex-col justify-center text-sm text-text-muted" title={fxTitle}>
+          Toplam portföy değeri
+          <span className="font-display text-xl font-bold text-text">{formatFx(totalValueTry, "TRY")}</span>
+          {totalValueFx ? <span className="text-xs text-text-faint">{totalValueFx}</span> : null}
         </p>
-        <div className="relative mt-4 grid gap-4 lg:grid-cols-[1fr_1fr]">
-          <div className="stagger-grid grid grid-cols-3 gap-3">
-            {[
-              // İkonografi: "canlı portal" CircleCheck ile çiziliyordu; portal
-              // kavramının tek ikonu ICONS.portal (RadioTower) — sidebar ve
-              // raporlar ekranıyla aynı.
-              { label: "Aktif portföy", value: liveCount ?? 0, icon: ICONS.portfoy, href: q ? `/app/portfoyler?q=${encodeURIComponent(q)}&status=live` : "/app/portfoyler?status=live" },
-              { label: "Canlı portal", value: portalCount ?? 0, icon: ICONS.portal, href: "/app/portallar?durum=live" },
-              { label: "Fiyat uyarısı", value: warningCount, icon: ICONS.alarm, href: saglikHref("riskli") },
-            ].map((item) => (
+        {[
+          // İkonografi: portal kavramının tek ikonu ICONS.portal.
+          { label: "Aktif portföy", value: liveCount ?? 0, icon: ICONS.portfoy, href: q ? `/app/portfoyler?q=${encodeURIComponent(q)}&status=live` : "/app/portfoyler?status=live" },
+          { label: "Canlı portal", value: portalCount ?? 0, icon: ICONS.portal, href: "/app/portallar?durum=live" },
+          { label: "Fiyat uyarısı", value: warningCount, icon: ICONS.alarm, href: saglikHref("riskli") },
+        ].map((item) => (
+          <Link
+            key={item.label}
+            href={item.href}
+            className={`focus-ring press group flex items-center gap-2.5 rounded-[var(--radius-control)] px-2 py-1 transition hover:bg-canvas ${item.value === 0 ? "opacity-55" : ""}`}
+          >
+            <item.icon className="h-4 w-4 text-brand-600" />
+            <span>
+              <span className="block font-display text-lg font-bold leading-tight text-text">{item.value.toLocaleString("tr-TR")}</span>
+              <span className="block text-xs text-text-muted">{item.label}</span>
+            </span>
+          </Link>
+        ))}
+        <div className="ml-auto min-w-[14rem] flex-1 sm:max-w-sm">
+          <div className="flex items-center justify-between">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-text-muted"><Gauge className="h-3.5 w-3.5 text-brand-600" /> Fiyat sağlığı</p>
+            <span className="text-xs text-text-faint">{healthKnownTotal} portföy</span>
+          </div>
+          <div className="mt-2 flex h-2 gap-0.5 overflow-hidden rounded-full bg-canvas">
+            {healthSegments.map((s) => (
+              <div key={s.label} className={`pipeline-fill h-full ${s.bar}`} style={{ width: `${(s.count / healthTotal) * 100}%`, animationDelay: s.delay }} />
+            ))}
+          </div>
+          <div className="mt-2 flex gap-1.5">
+            {healthSegments.map((s) => (
               <Link
-                key={item.label}
-                href={item.href}
-                className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
+                key={s.label}
+                href={saglikHref(s.param)}
+                aria-current={saglikFilter === s.param ? "true" : undefined}
+                className={`focus-ring press inline-flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border px-2 py-1 text-xs font-semibold transition hover:bg-canvas ${
+                  saglikFilter === s.param ? "border-brand-400 bg-brand-600/10 text-brand-600" : "border-line text-text-muted"
+                } ${s.count === 0 ? "opacity-55" : ""}`}
               >
-                <div className="flex items-start justify-between">
-                  <item.icon className="h-4 w-4 text-mint-400" />
-                  <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                </div>
-                <p className="mt-2 font-display text-xl font-extrabold text-white">{item.value}</p>
-                <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
+                <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+                {s.label} <span className="numeric text-text">{s.count}</span>
               </Link>
             ))}
           </div>
-          <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
-            <div className="flex items-center justify-between">
-              <p className="flex items-center gap-1.5 text-xs font-semibold text-white/75"><Gauge className="h-3.5 w-3.5 text-mint-400" /> Fiyat sağlığı dağılımı</p>
-              <span className="text-xs text-white/45">{healthKnownTotal} portföy</span>
-            </div>
-            <div className="mt-4 flex h-3 gap-0.5 overflow-hidden rounded-full bg-white/10">
-              {healthSegments.map((s) => (
-                <div key={s.label} className={`pipeline-fill h-full ${s.bar}`} style={{ width: `${(s.count / healthTotal) * 100}%`, animationDelay: s.delay }} />
-              ))}
-            </div>
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              {healthSegments.map((s) => (
-                <Link
-                  key={s.label}
-                  href={saglikHref(s.param)}
-                  className={`focus-ring press group relative block rounded-[var(--radius-control)] border bg-white/[0.03] px-2 py-2 text-center transition hover:border-white/30 ${
-                    saglikFilter === s.param ? "border-white/40" : "border-white/8"
-                  }`}
-                >
-                  <ArrowUpRight className="hover-action absolute right-1.5 top-1.5 h-3 w-3 text-white/50 opacity-0 transition group-hover:opacity-100" />
-                  <span className={`mx-auto block h-1.5 w-1.5 rounded-full ${s.dot}`} />
-                  <p className={`mt-1.5 font-display text-lg font-extrabold ${s.text}`}>{s.count}</p>
-                  <p className="text-xs text-white/45">{s.label}</p>
-                </Link>
-              ))}
-            </div>
-          </div>
         </div>
-      </section>
+      </Card>
 
       <form className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]" action="/app/portfoyler">
         {/* Durum butonlarıyla submit edilince aktif sağlık filtresi kaybolmasın */}
@@ -652,16 +650,23 @@ export default async function PropertiesPage({
                       <Building2 className="h-12 w-12 text-brand-600/35 transition duration-500 group-hover:scale-110" />
                     </>
                   )}
-                  <span className="absolute left-4 top-4 flex items-center gap-1.5">
-                    <span className="rounded-full bg-white/85 px-2.5 py-1 text-xs font-bold text-ink-950 shadow-[var(--shadow-xs)] backdrop-blur">{property.property_code}</span>
+                  <span className="absolute left-3 top-3 flex max-w-[60%] items-center gap-1.5">
+                    <span className="truncate rounded-full bg-surface/90 px-2.5 py-1 text-xs font-bold text-ink-950 shadow-[var(--shadow-xs)] backdrop-blur">{property.property_code}</span>
                     {/* Son 7 günde yayına giren portföy — published_at gerçek yayın damgası (vitrindeki rozetle aynı kural) */}
                     {property.published_at != null && msSince(property.published_at) < 7 * DAY_MS ? (
-                      <span className="rounded-full bg-mint-500 px-2 py-0.5 text-xs font-bold uppercase text-white shadow-[var(--shadow-xs)]">Yeni</span>
+                      <span className="shrink-0 rounded-full bg-mint-500 px-2 py-0.5 text-xs font-bold text-white shadow-[var(--shadow-xs)]">Yeni</span>
                     ) : null}
                   </span>
-                  <span className={`absolute right-4 top-4 rounded-full px-2.5 py-1 text-xs font-bold ${healthGood ? "bg-mint-500/15 text-mint-600" : "bg-amber-400/20 text-amber-500"}`}>
-                    Fiyat {property.price_health ?? "bekliyor"}
-                  </span>
+                  {/* Fiyat sağlığı — ham değer yerine Türkçe etiket, kesilmez; bilinmiyorsa gösterilmez */}
+                  {healthLabel(property.price_health) !== "Bekliyor" ? (
+                    <Badge
+                      variant={healthGood ? "success" : property.price_health === "red" || property.price_health === "Kırmızı" ? "danger" : "warning"}
+                      dot
+                      className="absolute right-3 top-3 whitespace-nowrap bg-surface/90 shadow-[var(--shadow-xs)]"
+                    >
+                      Fiyat: {healthLabel(property.price_health)}
+                    </Badge>
+                  ) : null}
                 </div>
                 <div className="p-5">
                   <div className="flex items-start justify-between gap-3">

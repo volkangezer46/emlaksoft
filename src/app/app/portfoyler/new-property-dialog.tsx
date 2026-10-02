@@ -84,7 +84,7 @@ export function NewPropertyDialog({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 shadow-[var(--elev-2)]"
+          className="focus-ring press inline-flex h-10 items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white shadow-[var(--inner-top-dark)] transition hover:bg-brand-700"
         >
           <Plus className="h-4 w-4" /> Yeni portföy
         </button>
