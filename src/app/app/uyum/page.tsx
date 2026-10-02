@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight, CircleCheck, CircleX, Clock3, Eraser, FileCheck2, History, ShieldAlert, ShieldCheck } from "lucide-react";
+import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { IysForm } from "./iys-form";
@@ -234,9 +235,23 @@ export default async function CompliancePage({
             ) : null}
           </div>
           {filteredConsents.length === 0 ? (
-            <p className="mt-6 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
-              {(consents ?? []).length === 0 ? "Henüz İYS kaydı yok." : "Filtreye uyan izin kaydı yok."}
-            </p>
+            <EmptyStateV3
+              className="mt-6"
+              icon={<FileCheck2 />}
+              title={(consents ?? []).length === 0 ? "Henüz İYS kaydı yok" : "Filtreye uyan izin kaydı yok"}
+              description={
+                (consents ?? []).length === 0
+                  ? "Müşterilerden aldığınız ticari ileti izinlerini yukarıdaki formdan kaydedin."
+                  : "Filtreyi temizleyerek tüm izin kayıtlarını görün."
+              }
+              action={
+                (consents ?? []).length === 0 ? undefined : (
+                  <Link href="/app/uyum" className="text-sm font-semibold text-brand-600 hover:underline">
+                    Filtreyi temizle
+                  </Link>
+                )
+              }
+            />
           ) : (
             <div className="mt-4 space-y-2">
               {filteredConsents.map((c) => {

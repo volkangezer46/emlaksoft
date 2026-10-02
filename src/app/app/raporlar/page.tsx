@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Trophy,
 } from "lucide-react";
+import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import { createClient } from "@/lib/supabase/server";
 import { getDefinitionsOrDefault, toLabelMap } from "@/lib/definitions";
 import { defaultLabelMap } from "@/lib/definition-defaults";
@@ -443,10 +444,12 @@ export default async function ReportsPage() {
           ) : null}
         </div>
         {roiRows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-text-muted">
-            Henüz kaynak verisi veya kazanılan anlaşma yok. Müşterilere kaynak girip anlaşma kazandıkça
-            kaynakların getirisi burada karşılaştırılır.
-          </p>
+          <EmptyStateV3
+            icon={<BarChart3 />}
+            title="Henüz kaynak verisi yok"
+            description="Müşterilere kaynak girip anlaşma kazandıkça kaynakların getirisi burada karşılaştırılır."
+            action={<Link href="/app/musteriler" className="text-sm font-semibold text-brand-600 hover:underline">Müşterilere git</Link>}
+          />
         ) : (
           <div className="mt-5 space-y-3">
             {roiRows.map((r, i) => {
@@ -498,10 +501,12 @@ export default async function ReportsPage() {
           ) : null}
         </div>
         {lossRows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-text-muted">
-            Henüz kaybedilen anlaşma yok. Anlaşma tahtasında &ldquo;Kaybedildi&rdquo;ye taşınan kartlar
-            nedenleriyle burada toplanır.
-          </p>
+          <EmptyStateV3
+            icon={<BarChart3 />}
+            title="Henüz kaybedilen anlaşma yok"
+            description="Anlaşma tahtasında “Kaybedildi”ye taşınan kartlar nedenleriyle burada toplanır."
+            action={<Link href="/app/anlasmalar" className="text-sm font-semibold text-brand-600 hover:underline">Anlaşma tahtasına git</Link>}
+          />
         ) : (
           <div className="mt-5 space-y-3">
             {lossRows.map((r, i) => (

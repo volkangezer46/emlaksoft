@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -97,40 +98,43 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
         <ArrowLeft className="h-4 w-4" /> Ekip
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/30 blur-[70px]" />
-        <div className="relative flex flex-wrap items-center justify-between gap-5">
-          <div className="flex items-center gap-4">
-            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-[var(--radius-panel)] bg-[image:var(--grad-brand)] font-display text-xl font-extrabold text-white shadow-[var(--shadow-glow-brand)]">
-              {initials(member.full_name)}
-            </span>
-            <div>
-              <h1 className="font-display text-2xl font-extrabold text-white md:text-3xl">{member.full_name}</h1>
-              <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/70">
-                <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-semibold">{ROLE_LABELS[member.role] ?? member.role}</span>
-                {branch ? <span>{branch}</span> : null}
-                {!member.is_active ? <span className="rounded-full bg-danger-500/20 px-2 py-0.5 text-xs font-bold text-danger-400">Pasif</span> : null}
-              </p>
-              {member.phone ? (
-                <a href={`tel:${member.phone}`} className="mt-2 inline-flex items-center gap-1.5 text-sm text-white/70 hover:text-mint-300">
-                  <Phone className="h-3.5 w-3.5" /> {formatTurkishPhone(member.phone)}
-                </a>
-              ) : null}
-            </div>
-          </div>
+      <PageHeader
+        className="mb-0"
+        icon={
+          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-[var(--radius-panel)] bg-[image:var(--grad-brand)] font-display text-xl font-extrabold text-white shadow-[var(--shadow-glow-brand)]">
+            {initials(member.full_name)}
+          </span>
+        }
+        title={member.full_name}
+        meta={
+          <>
+            <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-xs font-semibold text-brand-700">{ROLE_LABELS[member.role] ?? member.role}</span>
+            {!member.is_active ? <span className="rounded-full bg-danger-500/10 px-2 py-0.5 text-xs font-bold text-danger-600">Pasif</span> : null}
+          </>
+        }
+        description={
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {branch ? <span>{branch}</span> : null}
+            {member.phone ? (
+              <a href={`tel:${member.phone}`} className="inline-flex items-center gap-1.5 hover:text-brand-600">
+                <Phone className="h-3.5 w-3.5" /> {formatTurkishPhone(member.phone)}
+              </a>
+            ) : null}
+          </span>
+        }
+        actions={
           <Link
             href="/app/komisyon"
-            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/12 bg-white/8 px-5 py-4 text-center hover:border-white/30"
+            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-surface px-5 py-3 text-center shadow-[var(--shadow-xs)] hover:border-brand-300"
           >
-            <p className="flex items-center justify-center gap-1.5 text-xs text-white/60"><Wallet className="h-3.5 w-3.5" /> Bu ay komisyon</p>
-            <p className="mt-1 flex items-center justify-center gap-1 font-display text-2xl font-extrabold text-mint-300">
+            <p className="flex items-center justify-center gap-1.5 text-xs text-text-muted"><Wallet className="h-3.5 w-3.5" /> Bu ay komisyon</p>
+            <p className="mt-1 flex items-center justify-center gap-1 font-display text-xl font-extrabold text-mint-700">
               {money(myCommission)}
-              <ArrowUpRight className="hover-action h-4 w-4 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
+              <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
             </p>
           </Link>
-        </div>
-      </section>
+        }
+      />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((s) => (
