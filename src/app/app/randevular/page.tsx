@@ -10,13 +10,15 @@ import {
   MapPinned,
   Navigation,
   Radio,
+  Plus,
   Undo2,
 } from "lucide-react";
+import { redirect } from "next/navigation";
+import { ButtonLink } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now } from "@/lib/clock";
 import { setAppointmentStatus } from "@/app/actions/appointments";
-import { NewAppointmentDialog } from "./new-appointment-dialog";
 import { CompleteAppointmentDialog } from "./complete-appointment-dialog";
 import { APPOINTMENT_OUTCOME_META, isAppointmentOutcome } from "@/lib/appointment-outcome";
 import { getDefinitions } from "@/lib/definitions";
@@ -109,6 +111,12 @@ export default async function AppointmentsPage({
   const gate = await requireModulePage("appointments");
   const supabase = await createClient();
   const sp = (await searchParams) ?? {};
+  // Eski ?yeni=1 adresleri tam sayfa forma gider (customer/property ön seçimi taşınır).
+  const newApptQuery = new URLSearchParams();
+  if (sp.customer) newApptQuery.set("customer", sp.customer);
+  if (sp.property) newApptQuery.set("property", sp.property);
+  const newApptHref = newApptQuery.size ? `/app/randevular/yeni?${newApptQuery.toString()}` : "/app/randevular/yeni";
+  if (sp.yeni === "1") redirect(newApptHref);
   const tipF = sp.tip && typeLabel[sp.tip] ? sp.tip : "";
   const durumF = sp.durum && FILTERABLE_STATUSES.includes(sp.durum) ? sp.durum : "";
   const customerF = sp.customer ?? "";
@@ -224,8 +232,6 @@ export default async function AppointmentsPage({
 
   const [
     { data: appts, count: apptTotal },
-    { data: customers },
-    { data: properties },
     apptTypeDefs,
     { data: filteredCustomer },
     { data: filteredProperty },
@@ -244,8 +250,6 @@ export default async function AppointmentsPage({
     // portfoy kayitlari cekiliyordu. Secici artik sunucu tarafinda arama
     // yaptigi icin buradaki liste yalnizca "son eklenenler" kisayolu —
     // 50 kayit yeterli, gerisi yazarak bulunuyor.
-    supabase.from("customers").select("id, full_name").is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
-    supabase.from("properties").select("id, title, property_code").is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
     getDefinitions("appointment_type"),
     // ?customer= ile gelindiğinde (müşteri kartındaki "Randevu ver") çipte ad
     // gösterebilmek ve diyalogda müşteriyi önceden seçmek için tek kayıt.
@@ -308,15 +312,6 @@ export default async function AppointmentsPage({
       .gte("ends_on", dayKeys.reduce((a, d) => (d < a ? d : a), dayKeys[0]!))
       .limit(500);
     leaveRows = (leaves ?? []) as LeaveLike[];
-  }
-
-  const customerOptions = (customers ?? []).map((c) => ({ id: c.id, label: c.full_name }));
-  if (filteredCustomer && !customerOptions.some((c) => c.id === filteredCustomer.id)) {
-    customerOptions.unshift({ id: filteredCustomer.id, label: filteredCustomer.full_name });
-  }
-  const propertyOptions = (properties ?? []).map((p) => ({ id: p.id, label: p.title || p.property_code }));
-  if (filteredProperty && !propertyOptions.some((p) => p.id === filteredProperty.id)) {
-    propertyOptions.unshift({ id: filteredProperty.id, label: filteredProperty.title || filteredProperty.property_code });
   }
 
   // Filtre linkleri diğer parametreleri korur (görünüm/tarih dahil).
@@ -527,7 +522,7 @@ export default async function AppointmentsPage({
               action={exportAppointmentsCsv.bind(null, { tip: tipF, durum: durumF, customer: customerF, property: propertyF })}
               className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
             />
-            <NewAppointmentDialog key={sp.yeni === "1" ? "new-appointment" : "appointment-dialog"} customers={customerOptions} properties={propertyOptions} typeOptions={appointmentTypeOptions} defaultCustomerId={filteredCustomer?.id} defaultPropertyId={filteredProperty?.id} defaultOpen={sp.yeni === "1"} />
+            <ButtonLink href={newApptHref} icon={Plus}>Yeni randevu</ButtonLink>
           </div>
         </div>
         <div className="relative mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
@@ -684,13 +679,7 @@ export default async function AppointmentsPage({
             selectedAdvisorId={rotaSelectedAdvisor}
             advisorBaseQuery={rotaBaseQuery}
             newAppointmentSlot={
-              <NewAppointmentDialog
-                customers={customerOptions}
-                properties={propertyOptions}
-                typeOptions={appointmentTypeOptions}
-                defaultCustomerId={filteredCustomer?.id}
-                defaultPropertyId={filteredProperty?.id}
-              />
+              <ButtonLink href={newApptHref} icon={Plus}>Yeni randevu</ButtonLink>
             }
           />
         ) : (

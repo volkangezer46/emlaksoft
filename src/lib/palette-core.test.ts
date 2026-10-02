@@ -18,7 +18,7 @@ describe("palette-core", () => {
   });
 
   it("Eylemler yetkiye göre süzülür", () => {
-    expect(getAppActions(["tasks"]).map((a) => a.href)).toEqual(["/app/gorevler?yeni=1"]);
+    expect(getAppActions(["tasks"]).map((a) => a.href)).toEqual(["/app/gorevler/yeni"]);
     expect(getAppActions(["customers", "tasks"], "müşteri").map((a) => a.label)).toEqual(["Yeni müşteri"]);
     expect(getAppActions([])).toEqual([]);
   });

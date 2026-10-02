@@ -38,7 +38,7 @@ const PERIODS = [
   { value: "yearly",    label: "Yıllık" },
 ];
 
-// Kısa listede native <select> tercih edildi (bkz. gorevler/new-task-dialog).
+// Kısa listede native <select> tercih edildi (bkz. gorevler/yeni/task-form).
 const selectClass =
   "w-full appearance-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 

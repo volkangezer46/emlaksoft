@@ -236,12 +236,12 @@ export default async function AppLayout({
                     </Link>
                   </DropdownMenuItem> : null}
                   {canCreateAppointment ? <DropdownMenuItem asChild>
-                    <Link href="/app/randevular?yeni=1">
+                    <Link href="/app/randevular/yeni">
                       <CalendarDays /> Randevu
                     </Link>
                   </DropdownMenuItem> : null}
                   {canCreateTask ? <DropdownMenuItem asChild>
-                    <Link href="/app/gorevler?yeni=1">
+                    <Link href="/app/gorevler/yeni">
                       <ListChecks /> Görev
                     </Link>
                   </DropdownMenuItem> : null}
