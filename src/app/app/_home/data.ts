@@ -12,7 +12,13 @@ import { createClient } from "@/lib/supabase/server";
 import { computeLeadScore } from "@/lib/lead-score";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { daysAgoIso, now } from "@/lib/clock";
-import type { CommissionRow, DealRow, DemandCounts, ListingRow } from "./helpers";
+import {
+  commissionSummaryFromAggregate,
+  type CommissionAggregate,
+  type DealRow,
+  type DemandCounts,
+  type ListingRow,
+} from "./helpers";
 
 export type HomeCtx = {
   tenantId: string | null;
@@ -169,16 +175,33 @@ export const loadLiveListings = cache(async () => {
   return (result.data ?? []) as ListingRow[];
 });
 
-export const loadCommissions = cache(async (ctx: HomeCtx) => {
+/**
+ * Son 6 ay komisyon özeti — tam kapsamlı SQL aggregate (`tenant_commission_aggregates`).
+ * Eskiden 500 satır çekilip JS'te toplanıyordu (500'ü aşan ofiste kırpılırdı).
+ * Kapsam aynı: RLS ile RPC aynı tenant + commissions:view kapısını kullanır. Ana ekran
+ * yalnız "dashboard" yetkisi istediği için commissions:view olmayan kullanıcıda RPC 42501
+ * döner; RLS altında eski sorgu boş dönüyordu → aynı şekilde sıfır özet.
+ */
+export const loadCommissionSummary = cache(async (ctx: HomeCtx) => {
+  void ctx; // cache anahtarı: aynı istek bağlamı
   const supabase = await createClient();
-  // Yalnız son 6 ay, yalnız 3 kolon (deal join yok)
+  const result = await supabase.rpc("tenant_commission_aggregates", { p_as_of: new Date(now()).toISOString() });
+  if (result.error?.code === "42501") return commissionSummaryFromAggregate(null);
+  assertQueryBatchSucceeded([result], ["commission-aggregates"], "Ana panel");
+  return commissionSummaryFromAggregate(result.data as unknown as CommissionAggregate);
+});
+
+/** KPI sparkline: yalnız son 7 haftanın komisyon oluşturma tarihleri (tek kolon). */
+export const loadCommissionWeekDates = cache(async () => {
+  const supabase = await createClient();
   const result = await supabase
     .from("commissions")
-    .select("gross_amount, status, created_at")
-    .gte("created_at", ctx.sixMonthsAgoIso)
+    .select("created_at")
+    .gte("created_at", daysAgoIso(49))
+    .order("created_at", { ascending: false })
     .limit(500);
-  assertQueryBatchSucceeded([result], ["commissions"], "Ana panel");
-  return (result.data ?? []) as CommissionRow[];
+  assertQueryBatchSucceeded([result], ["commission-trend"], "Ana panel");
+  return (result.data ?? []).map((c) => (c.created_at as string | null) ?? "");
 });
 
 export const loadClosures = cache(async (ctx: HomeCtx) => {

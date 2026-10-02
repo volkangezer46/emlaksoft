@@ -4,14 +4,12 @@ import { moneyTry } from "@/lib/leak-shield";
 import { now } from "@/lib/clock";
 import { OdometerNumber } from "../odometer-number";
 import { Widget } from "../dashboard-widgets";
-import { loadCommissions, type HomeCtx } from "./data";
-import { chartGeometry, commissionTotals, lastSixMonthKeys, monthTotalsFor } from "./helpers";
+import { loadCommissionSummary, type HomeCtx } from "./data";
+import { chartGeometry, lastSixMonthKeys } from "./helpers";
 
 export async function KomisyonAkisi({ ctx }: { ctx: HomeCtx }) {
-  const commissions = await loadCommissions(ctx);
-  const { paid, pending } = commissionTotals(commissions);
+  const { paid, pending, monthTotals } = await loadCommissionSummary(ctx);
   const keys = lastSixMonthKeys(now());
-  const monthTotals = monthTotalsFor(commissions, keys);
   const chart = chartGeometry(monthTotals);
   const monthLabels = keys.map((k) => {
     const [y, m] = k.split("-");

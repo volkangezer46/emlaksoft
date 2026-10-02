@@ -118,7 +118,9 @@ export default async function LeakShieldPage({
   // toplamları PostgREST'te head-count edilemez; RPC eklenmedi).
   let closuresQuery = supabase
     .from("listing_closures")
-    .select(CLOSURE_SELECT)
+    // Havuz yalnız toplam/trend/neden/ciddiyet hesabına girer; portföy embed'i ve
+    // deal_* kolonları burada okunmaz (yalnız liste sorgusu kullanır).
+    .select("id, reason, closed_by_us, competitor_closed, estimated_lost_commission, leak_severity, created_at")
     .order("created_at", { ascending: false })
     .limit(500);
   if (fromF) closuresQuery = closuresQuery.gte("created_at", fromF);
