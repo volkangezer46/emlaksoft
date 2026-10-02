@@ -87,7 +87,9 @@ function bounded(value: unknown, max: number): string | undefined {
 
 export async function POST(
   req: NextRequest,
-  { params }: RouteContext<"/api/leads/[token]">,
+  // `RouteContext` global tipi yalnız `next dev/build` sonrası `.next/types`'ta bulunur;
+  // temiz checkout'ta (CI) `tsc` daha build'den önce koşar. Açık tip bundan bağımsızdır.
+  { params }: { params: Promise<{ token: string }> },
 ) {
   const { token } = await params;
   if (token.length < 32 || token.length > 128 || !/^[A-Za-z0-9._~-]+$/.test(token)) {
