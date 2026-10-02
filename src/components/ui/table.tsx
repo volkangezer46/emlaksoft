@@ -24,11 +24,14 @@ export function TableFrame({
   children,
   className,
   minWidth,
+  maxHeight,
 }: {
   children: ReactNode;
   className?: string;
   /** İçerik bu genişliğin altına sıkışmaz; kap yatay kaydırılır. */
   minWidth?: number;
+  /** Verilirse kap dikey kayar ve `THead sticky` başlık bu kapta yapışır (ör. "70vh"). */
+  maxHeight?: string;
 }) {
   return (
     <div
@@ -43,7 +46,10 @@ export function TableFrame({
         className,
       )}
     >
-      <div className="w-full max-w-full [contain:inline-size] overflow-x-auto">
+      <div
+        className={cn("w-full max-w-full [contain:inline-size] overflow-x-auto", maxHeight && "overflow-y-auto")}
+        style={maxHeight ? { maxHeight } : undefined}
+      >
         {/* İç kap `w-max` (width:max-content) — tablonun DOĞAL genişliğine büyür,
             böylece overflow-x-auto kabının düzgün "oversized" çocuğu olur ve tablo
             İÇTE kaydırılır. Önceki `min-w-full` div'i viewport'ta (356px) kalıyor,
