@@ -22,6 +22,10 @@ import {
   type MatchProperty,
 } from "@/lib/matching";
 import { NewDemandListDialog } from "./new-demand-list-dialog";
+import { Badge } from "@/components/ui/badge";
+import { ButtonLink } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportDemandsCsv } from "@/app/actions/export";
 
@@ -340,54 +344,49 @@ export default async function DemandsPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-brand-600/25 blur-[80px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-cyan-400">
-              <Target className="h-3.5 w-3.5" /> Talep merkezi
-            </p>
-            <h1 className="mt-2 font-display text-3xl font-extrabold text-white">Müşteri talepleri</h1>
-            <p className="mt-2 max-w-xl text-sm text-white/60">
-              Açık talepleri yönetin, bütçe ve konum kriterlerini eşleştirme motoruna bağlayın.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/app/talepler"
-              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-3 text-center transition hover:border-brand-300"
-            >
-              <p className="flex items-center justify-center gap-1 font-display text-2xl font-extrabold">
-                {openCount}
-                <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-              </p>
-              <p className="text-xs text-white/50">Listelenen</p>
-            </Link>
-            <Link
-              href={demandHref({ aciliyet: "high,urgent" })}
-              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-3 text-center transition hover:border-brand-300"
-            >
-              <p className="flex items-center justify-center gap-1 font-display text-2xl font-extrabold text-amber-300">
-                {urgentCount}
-                <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-              </p>
-              <p className="text-xs text-white/50">Acil / yüksek</p>
-            </Link>
-            {/* Eşleşme hazır: portföy havuzunda en az 1 güçlü eşleşmesi olan talepler */}
-            <Link
-              href="/app/eslestirme"
-              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-mint-500/25 bg-mint-500/10 px-4 py-3 text-center transition hover:border-mint-400/60"
-            >
-              <p className="flex items-center justify-center gap-1 font-display text-2xl font-extrabold text-mint-300">
-                {matchReadyCount}
-                <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-mint-300 group-hover:opacity-100" />
-              </p>
-              <p className="text-xs text-white/50">Eşleşme hazır</p>
-            </Link>
-          </div>
-        </div>
-      </section>
+      <PageHeader
+        title="Talepler"
+        description="Açık talepleri yönetin, bütçe ve konum kriterlerini eşleştirme motoruna bağlayın."
+        actions={
+          <>
+            <ButtonLink href="/app/eslestirme" variant="secondary" size="sm" icon={Crosshair}>
+              Eşleştirme motoru
+            </ButtonLink>
+            <ExportCsvButton
+              label="Dışa aktar"
+              action={exportDemandsCsv.bind(null, {
+                status: sp.status ?? "",
+                aciliyet: aciliyetF,
+                il: ilF,
+                butce: butceF,
+                yas: yasF ? String(AGING_DAYS) : "",
+              })}
+            />
+            {canCreate ? <NewDemandListDialog customers={dialogCustomers} provinces={dialogProvinces} /> : null}
+          </>
+        }
+      />
+
+      {/* Kompakt KPI satırı — her sayı filtreli bir hedefe gider */}
+      <Card className="grid grid-cols-1 divide-line sm:grid-cols-3 sm:divide-x">
+        {[
+          { label: "Listelenen", value: openCount, href: "/app/talepler" },
+          { label: "Acil / yüksek", value: urgentCount, href: demandHref({ aciliyet: "high,urgent" }) },
+          { label: "Eşleşme hazır", value: matchReadyCount, href: "/app/eslestirme" },
+        ].map((item) => (
+          <Link
+            key={item.label}
+            href={item.href}
+            className="focus-ring group flex items-center justify-between gap-3 px-4 py-3 transition hover:bg-canvas"
+          >
+            <span>
+              <span className="numeric block font-display text-lg font-bold text-ink-950">{item.value.toLocaleString("tr-TR")}</span>
+              <span className="block text-xs text-text-muted">{item.label}</span>
+            </span>
+            <ArrowUpRight aria-hidden="true" className="h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" />
+          </Link>
+        ))}
+      </Card>
 
       {/* ── Yaşlanan talepler uyarısı — 30+ gündür açık, hâlâ kapanmamış ────── */}
       {agingCount > 0 && !yasF ? (
@@ -442,8 +441,8 @@ export default async function DemandsPage({
               href={demandHref({ aciliyet: active ? "" : f.key })}
               className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
                 active
-                  ? "bg-amber-500 text-white"
-                  : "border border-line bg-surface text-text-muted hover:border-amber-400 hover:text-amber-600"
+                  ? "bg-brand-600 text-white"
+                  : "border border-line bg-surface text-text-muted hover:border-brand-400 hover:text-brand-600"
               }`}
             >
               {f.label}
@@ -453,38 +452,17 @@ export default async function DemandsPage({
         {aciliyetValues.length > 1 ? (
           <Link
             href={demandHref({ aciliyet: "" })}
-            className="rounded-full bg-amber-500 px-3.5 py-1.5 text-xs font-semibold text-white"
+            className="rounded-full bg-brand-600 px-3.5 py-1.5 text-xs font-semibold text-white"
             title="Aciliyet filtresini kaldır"
           >
             Acil + Yüksek ✕
           </Link>
         ) : null}
-        <div className="ml-auto flex items-center gap-2">
-          <Link
-            href="/app/eslestirme"
-            className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-400"
-          >
-            <Crosshair className="h-3.5 w-3.5 text-brand-600" /> Eşleştirme motoru
-          </Link>
-          <ExportCsvButton
-            label="Dışa aktar"
-            action={exportDemandsCsv.bind(null, {
-              status: sp.status ?? "",
-              aciliyet: aciliyetF,
-              il: ilF,
-              butce: butceF,
-              yas: yasF ? String(AGING_DAYS) : "",
-            })}
-          />
-          {canCreate ? (
-            <NewDemandListDialog customers={dialogCustomers} provinces={dialogProvinces} />
-          ) : null}
-        </div>
       </div>
 
       {/* ── Segmentasyon şeridi: bütçe bantları + en yoğun iller (açık talepler) ── */}
       {bandCounts.size > 0 || topProvinces.length > 0 ? (
-        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface px-4 py-3.5">
+        <Card className="px-4 py-3.5">
           <div className="flex flex-col gap-2.5">
             {bandCounts.size > 0 ? (
               <div className="flex flex-wrap items-center gap-1.5">
@@ -516,7 +494,7 @@ export default async function DemandsPage({
             {topProvinces.length > 0 ? (
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="mr-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
-                  <MapPin className="h-3.5 w-3.5 text-mint-600" /> Bölge
+                  <MapPin className="h-3.5 w-3.5 text-brand-600" /> Bölge
                 </span>
                 {topProvinces.map(([id, { name, count }]) => {
                   const active = ilF === id;
@@ -527,12 +505,12 @@ export default async function DemandsPage({
                       aria-current={active ? "page" : undefined}
                       className={`focus-ring press inline-flex min-h-[32px] items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                         active
-                          ? "bg-mint-600 text-white"
-                          : "border border-line bg-canvas/60 text-text-muted hover:border-mint-500 hover:text-mint-600"
+                          ? "bg-brand-600 text-white"
+                          : "border border-line bg-canvas/60 text-text-muted hover:border-brand-400 hover:text-brand-600"
                       }`}
                     >
                       {name}
-                      <span className={`numeric rounded-full px-1.5 text-xs font-bold ${active ? "bg-white/20" : "bg-mint-500/12 text-mint-700"}`}>
+                      <span className={`numeric rounded-full px-1.5 text-xs font-bold ${active ? "bg-white/20" : "bg-brand-600/10 text-brand-700"}`}>
                         {count}
                       </span>
                     </Link>
@@ -547,7 +525,7 @@ export default async function DemandsPage({
               (yaklaşık). Filtre uygulandığında liste tamamı sunucuda doğru daraltılır.
             </p>
           ) : null}
-        </section>
+        </Card>
       ) : null}
 
       {rows.length === 0 ? (
@@ -558,7 +536,6 @@ export default async function DemandsPage({
             {canCreate ? "Buradan veya müşteri detayından yeni talep ekleyebilirsiniz." : "Müşteri detayından yeni talep ekleyebilirsiniz."}
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-            {canCreate ? <NewDemandListDialog customers={dialogCustomers} provinces={dialogProvinces} /> : null}
             <Link href="/app/musteriler" className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:underline">
               <Users className="h-4 w-4" /> Müşterilere git
             </Link>
@@ -583,23 +560,21 @@ export default async function DemandsPage({
                       <span className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">
                         {d.transaction_type}{d.property_type ? ` · ${d.property_type}` : ""}
                       </span>
-                      <span className="rounded-full bg-mint-500/10 px-2 py-0.5 text-xs font-bold text-mint-600">
+                      <Badge size="sm" variant={d.status === "matched" ? "success" : "neutral"}>
                         {statusLabel[d.status] ?? d.status}
-                      </span>
+                      </Badge>
                       {d.urgency ? (
-                        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-600">
+                        <Badge size="sm" variant={d.urgency === "urgent" || d.urgency === "high" ? "warning" : "neutral"}>
                           {urgencyLabel[d.urgency] ?? d.urgency}
-                        </span>
+                        </Badge>
                       ) : null}
                       {/* Eşleşme potansiyeli — gerçek skor motorundan (lib/matching) */}
                       {match && (match.strong > 0 || match.good > 0) ? (
                         <Link
                           href={`/app/eslestirme?demand=${d.id}`}
                           title={`En iyi skor ${match.best} · eşleştirmede aç`}
-                          className={`relative z-10 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold transition ${
-                            match.strong > 0
-                              ? "bg-mint-500/12 text-mint-600 hover:bg-mint-500/25"
-                              : "bg-brand-600/10 text-brand-600 hover:bg-brand-600/20"
+                          className={`focus-ring relative z-10 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold transition hover:opacity-80 ${
+                            match.strong > 0 ? "tone-success" : "tone-neutral"
                           }`}
                         >
                           <Sparkles className="h-3 w-3" />
@@ -608,7 +583,7 @@ export default async function DemandsPage({
                             : `${match.good} iyi eşleşme`}
                         </Link>
                       ) : match ? (
-                        <span className="rounded-full bg-canvas px-2 py-0.5 text-xs font-semibold text-text-faint" title="Portföy havuzunda skor ≥ 55 aday yok">
+                        <span title="Portföy havuzunda skor ≥ 55 aday yok" className="text-xs text-text-faint">
                           Eşleşme adayı yok
                         </span>
                       ) : null}
