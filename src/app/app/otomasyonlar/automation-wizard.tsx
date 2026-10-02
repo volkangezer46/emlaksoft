@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bolt, Check, ChevronLeft, ChevronRight, Filter, Loader2, Plus, Trash2, Wand2, Zap } from "lucide-react";
 import {
@@ -59,10 +60,14 @@ export function AutomationWizard({
   staff,
   initial,
   trigger,
+  mode = "dialog",
 }: {
   staff: StaffOption[];
   initial?: WizardInitial;
-  trigger: ReactNode;
+  /** Yalnız dialog modunda gerekli (düzenleme düğmesi). */
+  trigger?: ReactNode;
+  /** "page": tam sayfa form (yeni otomasyon); "dialog": hızlı düzenleme. */
+  mode?: "dialog" | "page";
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -176,31 +181,20 @@ export function AutomationWizard({
         setError(res.error);
         return;
       }
+      if (mode === "page") {
+        router.push("/app/otomasyonlar");
+        return;
+      }
       setOpen(false);
       setStep(0);
       router.refresh();
     });
   }
 
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (next) {
-          setStep(0);
-          setError(null);
-        }
-      }}
-    >
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent size="lg">
-        <DialogHeader
-          icon={<Wand2 />}
-          title={initial ? "Otomasyonu düzenle" : "Yeni otomasyon"}
-          description="Tetikleyici → koşul → aksiyon: kuralınızı 3 adımda oluşturun."
-        />
+  const isPage = mode === "page";
 
+  const content = (
+    <>
         {/* Adım göstergesi */}
         <div className="flex items-center gap-2 border-b border-line px-6 py-3">
           {STEPS.map((s, i) => {
@@ -227,7 +221,7 @@ export function AutomationWizard({
           })}
         </div>
 
-        <div className="max-h-[55vh] overflow-y-auto p-6">
+        <div className={isPage ? "p-4 md:p-6" : "max-h-[55vh] overflow-y-auto p-6"}>
           {/* ADIM 1 — Tetikleyici */}
           {step === 0 && (
             <div className="space-y-4">
@@ -467,11 +461,17 @@ export function AutomationWizard({
 
         {/* Alt bar */}
         <div className="flex items-center justify-between gap-2 border-t border-line px-6 py-4">
-          <DialogClose asChild>
-            <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
+          {isPage ? (
+            <Link href="/app/otomasyonlar" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
               Vazgeç
-            </button>
-          </DialogClose>
+            </Link>
+          ) : (
+            <DialogClose asChild>
+              <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
+                Vazgeç
+              </button>
+            </DialogClose>
+          )}
           <div className="flex items-center gap-2">
             {step > 0 && (
               <button
@@ -504,6 +504,36 @@ export function AutomationWizard({
             )}
           </div>
         </div>
+    </>
+  );
+
+  if (isPage) {
+    return (
+      <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) {
+          setStep(0);
+          setError(null);
+        }
+      }}
+    >
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogContent size="lg">
+        <DialogHeader
+          icon={<Wand2 />}
+          title={initial ? "Otomasyonu düzenle" : "Yeni otomasyon"}
+          description="Tetikleyici → koşul → aksiyon: kuralınızı 3 adımda oluşturun."
+        />
+        {content}
       </DialogContent>
     </Dialog>
   );

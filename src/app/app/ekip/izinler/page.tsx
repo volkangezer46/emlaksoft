@@ -33,7 +33,7 @@ import {
 import { approveLeaveForm, deleteLeaveForm, rejectLeaveForm } from "@/app/actions/staff-leaves";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/app/empty-state";
-import { AddLeaveDialog } from "./leave-form";
+import { AddLeavePanel, AddLeaveTrigger } from "./leave-form";
 
 import { PageHeader } from "@/components/ui/page-header";
 const DAY_MS = 86_400_000;
@@ -228,15 +228,16 @@ export default async function LeavesPage({
               >
                 <ArrowLeft className="h-4 w-4" /> Ekip
               </Link>
-              <AddLeaveDialog
-                members={selectableMembers}
-                canManage={canManage}
-                selfId={gate.userId}
-                selfName={selfName}
-                today={today}
-              />
+              <AddLeaveTrigger />
             </div></div>
 } />
+<AddLeavePanel
+  members={selectableMembers}
+  canManage={canManage}
+  selfId={gate.userId}
+  selfName={selfName}
+  today={today}
+/>
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-mint-500/25 blur-[90px]" />

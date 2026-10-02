@@ -35,11 +35,11 @@ import {
 import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/app/empty-state";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
-import { ShareNetworkDialog } from "./share-network-dialog";
+import { ShareNetworkPanel, ShareNetworkTrigger } from "./share-network-panel";
 import { CollabRequestDialog } from "./collab-request-dialog";
 import { PoolFilters } from "./pool-filters";
 import { MyListingActions, RespondButtons, WithdrawButton } from "./network-row-actions";
-import { ShareDemandDialog } from "./share-demand-dialog";
+import { ShareDemandPanel, ShareDemandTrigger } from "./share-demand-panel";
 import { DemandResponseDialog } from "./demand-response-dialog";
 import { DemandRespondButtons, DemandWithdrawButton, MyDemandActions } from "./demand-row-actions";
 
@@ -233,10 +233,11 @@ export default async function AgPage({
           </div>
 <>{canCreate ? (
               <div className="mt-4">
-                <ShareNetworkDialog properties={liveProperties} />
+                <ShareNetworkTrigger />
               </div>
             ) : null}</></div>
 } />
+{canCreate ? <ShareNetworkPanel properties={liveProperties} /> : null}
 
       {/* Güven metni — ağın veri sözleşmesi */}
       <div className="flex items-start gap-3 rounded-[var(--radius-card)] border border-brand-600/20 bg-brand-600/6 p-4">
@@ -314,7 +315,7 @@ export default async function AgPage({
             title="Havuzda ilan yok"
             description="Seçili filtrelerde ağa açılmış ilan bulunamadı. Filtreleri genişletin ya da ilk paylaşımı siz yapın — paylaşan ofis, gelen her iş birliğinde komisyonun aslan payını korur."
             tone="brand"
-            action={canCreate ? { node: <ShareNetworkDialog properties={liveProperties} /> } : undefined}
+            action={canCreate ? { node: <ShareNetworkTrigger /> } : undefined}
           />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -400,7 +401,7 @@ export default async function AgPage({
             title="Henüz portföy paylaşmadınız"
             description="Yayındaki bir portföyünüzü komisyon paylaşım oranıyla ağa açın; diğer ofislerden iş birliği talepleri alın. Malik bilgisi ve açık adres her zaman maskeli kalır."
             tone="mint"
-            action={canCreate ? { node: <ShareNetworkDialog properties={liveProperties} /> } : undefined}
+            action={canCreate ? { node: <ShareNetworkTrigger /> } : undefined}
           />
         ) : (
           <div className="space-y-4">
@@ -514,8 +515,9 @@ export default async function AgPage({
               Diğer ofislerin alıcı talepleri — müşteri bilgisi maskeli, bütçe yuvarlanmış aralık.
             </p>
           </div>
-          {canCreate ? <ShareDemandDialog demands={myOpenDemands} /> : null}
+          {canCreate ? <ShareDemandTrigger /> : null}
         </div>
+        {canCreate ? <ShareDemandPanel demands={myOpenDemands} /> : null}
 
         {/* Talep havuzu nabzı */}
         {demandPool.length > 0 ? (
@@ -562,7 +564,7 @@ export default async function AgPage({
                 ? "Seçili filtrelerde ağa açılmış alıcı talebi bulunamadı. Filtreleri genişletmeyi deneyin."
                 : "Henüz ağa açılmış alıcı talebi bulunmuyor. Açık taleplerinizden birini paylaşarak diğer ofislerin portföylerini talebinize çekin."
             }
-            action={canCreate ? { node: <ShareDemandDialog demands={myOpenDemands} /> } : undefined}
+            action={canCreate ? { node: <ShareDemandTrigger /> } : undefined}
           />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -633,7 +635,7 @@ export default async function AgPage({
             title="Henüz talep paylaşmadınız"
             description="Açık bir alıcı talebinizi komisyon paylaşım oranıyla ağa açın; diğer ofislerden portföy önerileri alın. Müşteri kimliği maskeli, bütçe yuvarlanmış aralık olarak görünür."
             tone="amber"
-            action={canCreate ? { node: <ShareDemandDialog demands={myOpenDemands} /> } : undefined}
+            action={canCreate ? { node: <ShareDemandTrigger /> } : undefined}
           />
         ) : (
           <div className="space-y-4">
