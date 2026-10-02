@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { Building2, CalendarDays, ListChecks, LogOut, Phone, Plus, Shield, UserPlus } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
@@ -76,6 +77,12 @@ type OfficeSummary = {
   created_at?: string | null;
 };
 
+/** Bildirim listesi (requireActiveTenant zinciri) Suspense içinde akar. */
+async function NotificationBellStream() {
+  const notifications = await listMyNotifications().catch(() => []);
+  return <NotificationBell initial={notifications} />;
+}
+
 export default async function AppLayout({
   children,
 }: {
@@ -131,33 +138,27 @@ export default async function AppLayout({
     .slice(0, 2)
     .toUpperCase();
 
-  let officeScore: number | null = null;
-  let officeScoreLabel = "—";
-  let notifications: Awaited<ReturnType<typeof listMyNotifications>> = [];
-
-  if (user && tenantId) {
-    // Skor (navigasyonlar arası cache'li, 3 dk) + bildirimler paralel
-    const [scoreComputed, notifResult] = await Promise.all([
-      getOfficeScoreCached(tenantId).catch(() => null),
-      listMyNotifications().catch(() => []),
-    ]);
-    if (scoreComputed) {
-      officeScore = scoreComputed.score;
-      officeScoreLabel = scoreComputed.label;
-    }
-    notifications = notifResult;
-  }
-
   const platformStaffFullAccess = Boolean(platformStaff && !impersonating);
+
+  // Etkin izinler yalnız profilden gelen tenant/rol'e bağlı: skor ile aynı anda
+  // başlat (önceden skor+bildirim beklendikten SONRA seri çalışıyordu).
+  const effectivePermsPromise = platformStaffFullAccess
+    ? Promise.resolve(null)
+    : impersonating
+      ? Promise.resolve(immutableReadonlyPermissions())
+      : getEffectivePermissions(tenantId, effectiveRole, user?.id);
+  // Skor (navigasyonlar arası cache'li, 3 dk; anahtar tenantId içerir). Kenar çubuğu
+  // sayıyı prop olarak aldığı için bloklayıcı kalır ama izinlerle paralel.
+  const scorePromise =
+    user && tenantId ? getOfficeScoreCached(tenantId).catch(() => null) : Promise.resolve(null);
+  const [effectivePerms, scoreComputed] = await Promise.all([effectivePermsPromise, scorePromise]);
+  const officeScore: number | null = scoreComputed ? scoreComputed.score : null;
+  const officeScoreLabel = scoreComputed ? scoreComputed.label : "—";
+  const showNotifications = Boolean(user && tenantId);
   // Paket kilidi: menüde kilit simgesi gösterilecek sayfalar (platform personeli hariç)
   const lockedNavHrefs = platformStaffFullAccess
     ? []
     : lockedHrefs({ plan: office?.plan, trial: office?.status === "trial", tenantCreatedAt: office?.created_at });
-  const effectivePerms = platformStaffFullAccess
-    ? null
-    : impersonating
-      ? immutableReadonlyPermissions()
-      : await getEffectivePermissions(tenantId, effectiveRole, user?.id);
   const accessibleModules = platformStaffFullAccess
     ? NAV_MODULES
     : NAV_MODULES.filter((mod) => effectiveCanAccessModule(effectivePerms ?? {}, mod));
@@ -263,7 +264,14 @@ export default async function AppLayout({
                   <Shield className="h-3.5 w-3.5" /> Ops
                 </Link>
               ) : null}
-              <NotificationBell initial={notifications} />
+              {/* Bildirimler sayfayı bloke etmez: kabuk anında gider, liste akar */}
+              {showNotifications ? (
+                <Suspense fallback={<NotificationBell initial={[]} />}>
+                  <NotificationBellStream />
+                </Suspense>
+              ) : (
+                <NotificationBell initial={[]} />
+              )}
               <Link href="/app/ayarlar" className="flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface p-1.5 sm:pr-3 transition hover:border-brand-300">
                 <div
                   className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] text-xs font-bold text-white"
