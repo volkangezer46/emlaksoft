@@ -1,7 +1,6 @@
-import { cache } from "react";
 import { redirect } from "next/navigation";
 import { lockedGate } from "@/lib/billing/page-gates";
-import { createClient } from "@/lib/supabase/server";
+import { getRequestProfile, getTenantGateContext } from "@/lib/cache/request";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaff } from "@/lib/platform";
 import { type AppModule, DEFAULT_MATRIX } from "@/lib/permissions";
@@ -17,17 +16,6 @@ import {
  * Platform staff (impersonation hariç) geçer. DB-tabanlı etkin izinleri kullanır
  * (bkz. `getEffectivePermissions`) — sadece varsayılan matris değil, tenant override'ları da uygulanır.
  */
-/** Tenant'ın paket ve deneme bilgisi (istek başına tek sorgu). */
-const getTenantGateContext = cache(async (tenantId: string) => {
-  const supabase = await createClient();
-  const { data } = await supabase.from("tenants").select("plan, status, created_at").eq("id", tenantId).maybeSingle();
-  return {
-    plan: data?.plan ?? null,
-    trial: data?.status === "trial",
-    tenantCreatedAt: data?.created_at ?? null,
-  };
-});
-
 /**
  * `href` verilirse paket kilidi de uygulanır (bkz. src/lib/billing/page-gates.ts):
  * kilitliyse kullanıcı özelliğin ne işe yaradığını anlatan yükseltme sayfasına gider.
@@ -43,12 +31,7 @@ export async function requireModulePage(mod: AppModule, href?: string) {
     return { userId: user.id, role: "owner" as string, tenantId: null as string | null, perms: ownerPerms };
   }
 
-  const supabase = await createClient();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, tenant_id")
-    .eq("id", user.id)
-    .maybeSingle();
+  const profile = await getRequestProfile(user.id);
   const role = impersonating ? "readonly" : (profile?.role ?? "advisor");
   const claimedTenantId = typeof user.app_metadata?.tenant_id === "string"
     ? user.app_metadata.tenant_id.trim() || null
