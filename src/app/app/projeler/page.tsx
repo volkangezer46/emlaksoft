@@ -309,7 +309,7 @@ export default async function ProjelerPage({
                 <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
                   <Link
                     href={`/app/projeler/${p.id}`}
-                    className="focus-ring relative z-10 rounded-[6px] text-xs font-semibold text-brand-600 hover:underline"
+                    className="focus-ring relative z-10 rounded-[var(--radius-control)] text-xs font-semibold text-brand-600 hover:underline"
                   >
                     Stok ızgarası →
                   </Link>

@@ -46,7 +46,7 @@ function logEntityHref(entityType: string | null, entityId: string | null): stri
 
 const RESULT_BADGES: Record<string, { label: string; className: string }> = {
   ok:    { label: "Çalıştı", className: "bg-mint-50 text-mint-700" },
-  skip:  { label: "Atlandı", className: "bg-zinc-100 text-zinc-500" },
+  skip:  { label: "Atlandı", className: "bg-zinc-100 text-text-muted" },
   error: { label: "Hata",    className: "bg-danger-500/10 text-danger-600" },
 };
 
@@ -105,7 +105,7 @@ export default async function AutomationDetailPage({ params }: { params: Promise
           </div>
           <div className="flex flex-col items-end gap-2">
             <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold">{STATUS_LABELS[rule.status] ?? rule.status}</span>
-            <a href="#calisma-gecmisi" className="focus-ring rounded-[6px] text-xs text-white/50 underline-offset-2 transition hover:text-white hover:underline">
+            <a href="#calisma-gecmisi" className="focus-ring rounded-[var(--radius-control)] text-xs text-white/50 underline-offset-2 transition hover:text-white hover:underline">
               {rule.run_count} kez çalıştı
             </a>
             <div className="flex items-center gap-2">
@@ -228,7 +228,7 @@ export default async function AutomationDetailPage({ params }: { params: Promise
                     <p className="text-sm text-ink-950">
                       <Link
                         href={logEntityHref(log.entity_type, log.entity_id)}
-                        className="focus-ring rounded-[6px] font-semibold hover:text-brand-600 hover:underline"
+                        className="focus-ring rounded-[var(--radius-control)] font-semibold hover:text-brand-600 hover:underline"
                       >
                         {LOG_ENTITY_LABELS[log.entity_type ?? ""] ?? "Kayıt"}
                         {log.entity_id ? ` · ${String(log.entity_id).slice(0, 8)}` : ""}

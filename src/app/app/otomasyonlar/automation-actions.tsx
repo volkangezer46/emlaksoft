@@ -32,7 +32,7 @@ export function ApplyTemplateButton({ templateKey }: { templateKey: string }) {
 
   if (result?.ok) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-[7px] bg-mint-500/12 px-2 py-1 text-xs font-bold text-mint-600">
+      <span className="inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-mint-500/12 px-2 py-1 text-xs font-bold text-mint-600">
         <CheckCircle2 className="h-3 w-3" /> Eklendi
       </span>
     );
@@ -49,7 +49,7 @@ export function ApplyTemplateButton({ templateKey }: { templateKey: string }) {
           apply();
         }}
         disabled={pending}
-        className="shrink-0 rounded-[7px] border border-brand-300/40 px-2 py-1 text-xs font-semibold text-brand-600 transition hover:bg-brand-600/5 disabled:opacity-50"
+        className="shrink-0 rounded-[var(--radius-control)] border border-brand-300/40 px-2 py-1 text-xs font-semibold text-brand-600 transition hover:bg-brand-600/5 disabled:opacity-50"
       >
         {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Uygula"}
       </button>
@@ -84,7 +84,7 @@ export function AutomationRowActions({ row }: { row: AutomationRow }) {
         onClick={toggle}
         disabled={pending}
         title={isActive ? "Pasif yap" : "Aktif yap"}
-        className={`grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[7px] border transition disabled:opacity-50 ${
+        className={`grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] border transition disabled:opacity-50 ${
           isActive
             ? "border-amber-400/30 text-amber-600 hover:bg-amber-50"
             : "border-mint-500/30 text-mint-600 hover:bg-mint-50"
@@ -104,7 +104,7 @@ export function AutomationRowActions({ row }: { row: AutomationRow }) {
             type="button"
             disabled={pending}
             aria-label="Otomasyonu sil"
-            className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[7px] border border-line text-text-faint transition hover:border-danger-500/30 hover:text-danger-500 disabled:opacity-50"
+            className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-faint transition hover:border-danger-500/30 hover:text-danger-500 disabled:opacity-50"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>

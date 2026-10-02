@@ -98,7 +98,7 @@ export function PropertyBulkActions({
           <button
             type="button"
             onClick={() => setSelectedIds(new Set())}
-            className="ml-auto grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[7px] text-text-muted hover:bg-line"
+            className="ml-auto grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-line"
             aria-label="Seçimi temizle"
           >
             <X className="h-4 w-4" />
@@ -165,7 +165,7 @@ export function PropertyBulkActions({
                   </span>
                   <span className="ml-2 text-xs text-text-faint">{p.property_code}</span>
                 </span>
-                <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
+                <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-text-muted">
                   {p.status}
                 </span>
               </label>

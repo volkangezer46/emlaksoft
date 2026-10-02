@@ -433,7 +433,7 @@ export default async function SozlesmelerPage({
                           {c.property_id ? (
                             <Link
                               href={`/app/portfoyler/${c.property_id}`}
-                              className="focus-ring relative z-10 mt-0.5 block w-fit rounded-[6px] text-xs font-normal text-text-faint transition hover:text-brand-600 hover:underline"
+                              className="focus-ring relative z-10 mt-0.5 block w-fit rounded-[var(--radius-control)] text-xs font-normal text-text-faint transition hover:text-brand-600 hover:underline"
                             >
                               {c.property_label}
                             </Link>
@@ -465,7 +465,7 @@ export default async function SozlesmelerPage({
                           {c.customer_id ? (
                             <Link
                               href={`/app/musteriler/${c.customer_id}`}
-                              className="focus-ring relative z-10 rounded-[6px] font-medium text-ink-950 transition hover:text-brand-600 hover:underline"
+                              className="focus-ring relative z-10 rounded-[var(--radius-control)] font-medium text-ink-950 transition hover:text-brand-600 hover:underline"
                             >
                               {c.customer_name ?? "Müşteri"}
                             </Link>

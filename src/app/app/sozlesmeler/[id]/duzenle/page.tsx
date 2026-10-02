@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, FileSignature } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { EditContractForm } from "./edit-contract-form";
@@ -37,12 +38,11 @@ export default async function ContractEditPage({ params }: { params: Promise<{ i
       </Link>
 
       <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-6 shadow-[var(--shadow-xs)]">
-        <h1 className="flex items-center gap-2 font-display text-xl font-extrabold text-ink-950">
-          <FileSignature className="h-5 w-5 text-brand-600" /> Sözleşmeyi düzenle
-        </h1>
-        <p className="mt-1 text-sm text-text-muted">
-          Kaydettiğinizde mevcut içerik sürüm geçmişine eklenir; gerekirse geri dönebilirsiniz.
-        </p>
+        <PageHeader
+          title="Sözleşmeyi düzenle"
+          description="Kaydettiğinizde mevcut içerik sürüm geçmişine eklenir; gerekirse geri dönebilirsiniz."
+          className="mb-0"
+        />
 
         <div className="mt-5">
           <EditContractForm id={id} title={data.title ?? ""} body={data.body ?? ""} />
