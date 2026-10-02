@@ -111,14 +111,14 @@ describe("navigation accessibility contract", () => {
 
   it("announces shared route loading states without forcing motion", () => {
     const rootLoading = source("src/app/loading.tsx");
-    const sharedSkeleton = source("src/components/app/skeleton.tsx");
+    const sharedSkeleton = source("src/components/ui/skeleton.tsx");
 
     expect(rootLoading).toContain('role="status"');
     expect(rootLoading).toContain('aria-busy="true"');
     expect(rootLoading).toContain("motion-safe:animate-pulse");
     expect(rootLoading).not.toContain('className="grid h-10 w-10 animate-pulse');
 
-    expect(sharedSkeleton.match(/role="status"/g)).toHaveLength(2);
-    expect(sharedSkeleton.match(/aria-busy="true"/g)).toHaveLength(2);
+    expect(sharedSkeleton.match(/role="status"/g)).toHaveLength(3);
+    expect(sharedSkeleton.match(/aria-busy="true"/g)).toHaveLength(3);
   });
 });
