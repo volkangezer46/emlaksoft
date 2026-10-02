@@ -1,11 +1,10 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
-import { AlarmClock, ArrowUpRight, CalendarRange, ChevronLeft, ChevronRight, FileSignature, PenLine } from "lucide-react";
+import { AlarmClock, ArrowUpRight, CalendarRange, ChevronLeft, ChevronRight, FileSignature, PenLine, Plus } from "lucide-react";
 import { DAY_MS, daysFromNowIso, msSince, msUntil, now } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
-import { getDefinitions } from "@/lib/definitions";
 import { createClient } from "@/lib/supabase/server";
-import { listContractTemplates } from "@/app/actions/contracts";
-import { NewContractDialog } from "./new-contract-dialog";
+import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/app/empty-state";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportContractsCsv } from "@/app/actions/export";
@@ -100,10 +99,18 @@ function qs(params: Record<string, string | null | undefined>) {
 export default async function SozlesmelerPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; customer?: string; property?: string; from?: string; to?: string; yenileme?: string; sayfa?: string }>;
+  searchParams?: Promise<{ durum?: string; customer?: string; property?: string; from?: string; to?: string; yenileme?: string; sayfa?: string; yeni?: string; tur?: string }>;
 }) {
   const { perms } = await requireModulePage("contracts", "/app/sozlesmeler");
   const params = (await searchParams) ?? {};
+  // Eski popup adresleri: ?yeni=1 ve teklif/randevu ön dolgusu (?customer=&property=&tur=) tam sayfa forma gider.
+  if ((perms.contracts?.includes("create") ?? false) && (params.yeni === "1" || params.customer || params.property || params.tur)) {
+    const q = new URLSearchParams();
+    if (params.customer) q.set("customer", params.customer);
+    if (params.property) q.set("property", params.property);
+    if (params.tur) q.set("tur", params.tur);
+    redirect(`/app/sozlesmeler/yeni${q.size ? `?${q}` : ""}`);
+  }
   // Filtre değerleri DB'deki gerçek durum enum'ları (draft/sent/signed/…)
   const durum = params.durum && STATUS_LABELS[params.durum] ? params.durum : null;
   const from = ISO_DATE.test(params.from ?? "") ? params.from! : null;
@@ -172,20 +179,13 @@ export default async function SozlesmelerPage({
   // Gerçek sayfalama — 100'lük sessiz dilim yerine sayfa dilimi.
   contractQuery = contractQuery.range(offset, offset + PAGE_SIZE - 1);
 
-  const [{ data: contractData, count: contractTotal }, { data: statusData }, contractTypeDefs, templates] = await Promise.all([
+  const [{ data: contractData, count: contractTotal }, { data: statusData }] = await Promise.all([
     contractQuery,
     // KPI sayıları filtreden bağımsız — süre sonu şeridi için expires_at da gelir
     supabase.from("contracts").select("status, expires_at").limit(1000),
-    getDefinitions("contract_type"),
-    // "Şablondan başla" galerisi — global hazır şablonlar + ofis şablonları
-    listContractTemplates(),
   ]);
 
   const canCreate = perms.contracts?.includes("create") ?? false;
-  const contractTypeOptions = contractTypeDefs.length
-    ? contractTypeDefs.map((d) => ({ value: d.value, label: d.label }))
-    : undefined;
-
   const contracts = (contractData ?? []).map((c) => {
     const p = one(c.property as { id: string; property_code: string; title: string | null } | { id: string; property_code: string; title: string | null }[] | null);
     const cu = one(c.customer as { id: string; full_name: string } | { id: string; full_name: string }[] | null);
@@ -307,7 +307,7 @@ export default async function SozlesmelerPage({
         <p className="text-sm text-text-muted">{total} sözleşme</p>
         <div className="flex items-center gap-2">
           {total > 0 ? <ExportCsvButton action={exportContractsCsv} label="Dışa aktar" /> : null}
-          {canCreate && <NewContractDialog contractTypes={contractTypeOptions} templates={templates} />}
+          {canCreate && <ButtonLink href="/app/sozlesmeler/yeni" icon={Plus}>Yeni sözleşme</ButtonLink>}
         </div>
       </div>
 
@@ -318,7 +318,7 @@ export default async function SozlesmelerPage({
           title="Henüz sözleşme yok"
           description="İlk sözleşme taslağınızı oluşturun, imzalayanları ekleyin ve dijital onay alın."
           tone="brand"
-          action={canCreate ? { label: "Yeni sözleşme", node: <NewContractDialog contractTypes={contractTypeOptions} templates={templates} /> } : undefined}
+          action={canCreate ? { label: "Yeni sözleşme", href: "/app/sozlesmeler/yeni" } : undefined}
         />
       ) : (
         <>
