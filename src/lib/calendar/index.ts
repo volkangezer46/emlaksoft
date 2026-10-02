@@ -9,6 +9,15 @@
  * OAuth tokenları platform_settings'te tenant bazlı saklanır.
  */
 
+import {
+  discardExternalResponse,
+  fetchExternal,
+  readExternalJson,
+} from "@/lib/external-fetch";
+
+const CALENDAR_TIMEOUT_MS = 15_000;
+const CALENDAR_MAX_RESPONSE_BYTES = 256 * 1024;
+
 // ---------------------------------------------------------------------------
 // ICS (iCalendar) format üreticisi
 // ---------------------------------------------------------------------------
@@ -78,6 +87,7 @@ function escapeICS(s: string): string {
 export type GoogleCalendarConfig = {
   accessToken: string;
   calendarId?: string; // varsayılan "primary"
+  signal?: AbortSignal;
 };
 
 export type CalendarSyncResult = {
@@ -109,7 +119,7 @@ export async function addToGoogleCalendar(
   };
 
   try {
-    const res = await fetch(
+    const res = await fetchExternal(
       `https://www.googleapis.com/calendar/v3/calendars/${calId}/events`,
       {
         method: "POST",
@@ -119,17 +129,21 @@ export async function addToGoogleCalendar(
         },
         body: JSON.stringify(body),
       },
+      { timeoutMs: CALENDAR_TIMEOUT_MS, signal: cfg.signal },
     );
 
     if (!res.ok) {
-      const err = await res.json() as { error?: { message?: string } };
-      return { ok: false, error: err.error?.message ?? `HTTP ${res.status}` };
+      await discardExternalResponse(res);
+      return { ok: false, error: `Takvim sağlayıcısı isteği başarısız oldu (HTTP ${res.status}).` };
     }
 
-    const data = await res.json() as { id?: string; htmlLink?: string };
+    const data = await readExternalJson<{ id?: string; htmlLink?: string }>(
+      res,
+      CALENDAR_MAX_RESPONSE_BYTES,
+    );
     return { ok: true, eventId: data.id, htmlLink: data.htmlLink };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Bağlantı hatası." };
+  } catch {
+    return { ok: false, error: "Takvim sağlayıcısına bağlanılamadı." };
   }
 }
 
@@ -138,17 +152,23 @@ export async function deleteFromGoogleCalendar(
   cfg: GoogleCalendarConfig,
 ): Promise<CalendarSyncResult> {
   const calId = encodeURIComponent(cfg.calendarId ?? "primary");
+  const encodedEventId = encodeURIComponent(eventId);
   try {
-    const res = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/${calId}/events/${eventId}`,
+    const res = await fetchExternal(
+      `https://www.googleapis.com/calendar/v3/calendars/${calId}/events/${encodedEventId}`,
       {
         method: "DELETE",
         headers: { Authorization: `Bearer ${cfg.accessToken}` },
       },
+      { timeoutMs: CALENDAR_TIMEOUT_MS, signal: cfg.signal },
     );
-    return { ok: res.ok || res.status === 410 }; // 410 = already deleted
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Bağlantı hatası." };
+    const ok = res.ok || res.status === 410; // 410 = already deleted
+    await discardExternalResponse(res);
+    return ok
+      ? { ok: true }
+      : { ok: false, error: `Takvim sağlayıcısı isteği başarısız oldu (HTTP ${res.status}).` };
+  } catch {
+    return { ok: false, error: "Takvim sağlayıcısına bağlanılamadı." };
   }
 }
 
@@ -158,6 +178,7 @@ export async function deleteFromGoogleCalendar(
 
 export type OutlookCalendarConfig = {
   accessToken: string;
+  signal?: AbortSignal;
 };
 
 export async function addToOutlookCalendar(
@@ -179,24 +200,27 @@ export async function addToOutlookCalendar(
   };
 
   try {
-    const res = await fetch("https://graph.microsoft.com/v1.0/me/events", {
+    const res = await fetchExternal("https://graph.microsoft.com/v1.0/me/events", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization:  `Bearer ${cfg.accessToken}`,
       },
       body: JSON.stringify(body),
-    });
+    }, { timeoutMs: CALENDAR_TIMEOUT_MS, signal: cfg.signal });
 
     if (!res.ok) {
-      const err = await res.json() as { error?: { message?: string } };
-      return { ok: false, error: err.error?.message ?? `HTTP ${res.status}` };
+      await discardExternalResponse(res);
+      return { ok: false, error: `Takvim sağlayıcısı isteği başarısız oldu (HTTP ${res.status}).` };
     }
 
-    const data = await res.json() as { id?: string; webLink?: string };
+    const data = await readExternalJson<{ id?: string; webLink?: string }>(
+      res,
+      CALENDAR_MAX_RESPONSE_BYTES,
+    );
     return { ok: true, eventId: data.id, htmlLink: data.webLink };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Bağlantı hatası." };
+  } catch {
+    return { ok: false, error: "Takvim sağlayıcısına bağlanılamadı." };
   }
 }
 

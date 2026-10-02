@@ -129,11 +129,11 @@ export default async function AdminSalesPage({
       </AdminPageHeader>
 
       {/* pipeline */}
-      <section className="dashboard-panel rounded-[18px] border border-line bg-surface p-5">
+      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
         <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><TrendingUp className="h-4 w-4" /> Satış hunisi</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-4">
           {funnel.map((f, i) => (
-            <Link key={f.label} href={f.href} className="focus-ring group block rounded-[8px]">
+            <Link key={f.label} href={f.href} className="focus-ring group block rounded-[var(--radius-control)]">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-ink-950 transition group-hover:text-brand-600">{f.label}</span>
                 <span className="tabular-nums text-text-muted">{f.value}</span>
@@ -161,7 +161,7 @@ export default async function AdminSalesPage({
               }`}
             >
               {f.label}
-              <span className={`rounded-full px-1.5 text-[11px] ${active ? "bg-white/20" : "bg-canvas text-text-faint"}`}>{count}</span>
+              <span className={`rounded-full px-1.5 text-xs ${active ? "bg-white/20" : "bg-canvas text-text-faint"}`}>{count}</span>
             </Link>
           );
         })}
@@ -174,7 +174,7 @@ export default async function AdminSalesPage({
 
       {/* list */}
       {visible.length === 0 ? (
-        <div className="dashboard-panel rounded-[18px] border border-line bg-surface">
+        <div className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface">
           <AdminEmpty
             icon={Users}
             title={q ? "Aramayla eşleşen talep yok" : filter === "all" ? "Henüz demo talebi yok" : "Bu filtrede talep yok"}
@@ -189,7 +189,7 @@ export default async function AdminSalesPage({
               q || filter !== "all" ? (
                 <Link
                   href="/admin/satis"
-                  className="focus-ring press inline-flex rounded-[10px] border border-line px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-400"
+                  className="focus-ring press inline-flex rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-400"
                 >
                   Filtreleri temizle
                 </Link>

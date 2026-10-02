@@ -5,6 +5,13 @@ import { useState, useTransition } from "react";
 import { ArrowRight, Check, Copy, FileText, Info, KeyRound, PartyPopper, Star, X } from "lucide-react";
 import { SmsDialog } from "@/app/app/gelen-kutusu/sms-dialog";
 import { createSurveyForDeal } from "@/app/actions/surveys";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { BoardDeal } from "./deal-board";
 
 /**
@@ -57,11 +64,11 @@ function SurveyStep({ dealId }: { dealId: string }) {
 
   if (url) {
     return (
-      <div className="rounded-[12px] border border-amber-400/40 bg-amber-400/5 px-3 py-2.5">
+      <div className="rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/5 px-3 py-2.5">
         <p className="flex items-center gap-2 text-sm font-semibold text-ink-950">
           <Star className="h-4 w-4 text-amber-500" /> Anket linki hazır
         </p>
-        <p className="numeric mt-1.5 select-all break-all rounded-[8px] border border-line bg-canvas px-2 py-1.5 text-[11px] text-ink-950">
+        <p className="numeric mt-1.5 select-all break-all rounded-[var(--radius-control)] border border-line bg-canvas px-2 py-1.5 text-xs text-ink-950">
           {url}
         </p>
         <div className="mt-2 flex items-center gap-2">
@@ -76,16 +83,16 @@ function SurveyStep({ dealId }: { dealId: string }) {
                 setError("Panoya kopyalanamadı — linki elle seçip kopyalayın.");
               }
             }}
-            className="focus-ring press inline-flex items-center gap-1.5 rounded-[8px] border border-line bg-surface px-2.5 py-1.5 text-[11px] font-semibold text-ink-950 hover:bg-canvas"
+            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-ink-950 hover:bg-canvas"
           >
             {copied ? <Check className="h-3 w-3 text-mint-600" /> : <Copy className="h-3 w-3" />}
             {copied ? "Kopyalandı" : "Linki kopyala"}
           </button>
-          <Link href="/app/raporlar/memnuniyet" className="text-[11px] font-semibold text-brand-600 hover:underline">
+          <Link href="/app/raporlar/memnuniyet" className="text-xs font-semibold text-brand-600 hover:underline">
             Anketler →
           </Link>
         </div>
-        {error ? <p className="mt-2 text-[11px] font-semibold text-danger-500">{error}</p> : null}
+        {error ? <p className="mt-2 text-xs font-semibold text-danger-500">{error}</p> : null}
       </div>
     );
   }
@@ -96,7 +103,7 @@ function SurveyStep({ dealId }: { dealId: string }) {
         type="button"
         onClick={create}
         disabled={pending}
-        className="focus-ring group flex w-full items-center gap-3 rounded-[12px] border border-line bg-canvas px-3 py-2.5 text-left transition hover:border-amber-400/50 hover:bg-surface disabled:opacity-60"
+        className="focus-ring group flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 text-left transition hover:border-amber-400/50 hover:bg-surface disabled:opacity-60"
       >
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-amber-400/15 text-amber-600">
           <Star className="h-4 w-4" />
@@ -105,20 +112,22 @@ function SurveyStep({ dealId }: { dealId: string }) {
           <span className="block text-sm font-semibold text-ink-950">
             {pending ? "Anket oluşturuluyor…" : "Memnuniyet anketi gönder"}
           </span>
-          <span className="block text-[11px] text-text-muted">Link üretilir, müşteriye siz iletirsiniz</span>
+          <span className="block text-xs text-text-muted">Link üretilir, müşteriye siz iletirsiniz</span>
         </span>
         <ArrowRight className="h-4 w-4 shrink-0 text-text-faint transition group-hover:text-amber-600" />
       </button>
-      {error ? <p className="px-1 text-[11px] font-semibold text-danger-500">{error}</p> : null}
+      {error ? <p className="px-1 text-xs font-semibold text-danger-500">{error}</p> : null}
     </>
   );
 }
 
 export function WinCelebrationDialog({
   deal,
+  returnFocus,
   onClose,
 }: {
   deal: BoardDeal;
+  returnFocus?: () => void;
   onClose: () => void;
 }) {
   const title = deal.property_title ?? deal.property_code ?? "Anlaşma";
@@ -141,16 +150,15 @@ export function WinCelebrationDialog({
   const smsText = `Sayın ${deal.customer_name ?? "müşterimiz"}, ${title} için anlaşmanız tamamlandı. Hayırlı olsun! 🎉 Sürecin kalanında yanınızdayız.`;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/40 p-4 backdrop-blur-sm sm:items-center"
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Anlaşma kazanıldı"
-        className="relative w-full max-w-sm overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-lg)]"
-        onClick={(e) => e.stopPropagation()}
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        size="sm"
+        overlayClassName="bg-ink-950/40 backdrop-blur-sm"
+        className="relative w-full max-w-sm overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-lg)]"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          returnFocus?.();
+        }}
       >
         {/* Tek seferlik ölçülü konfeti — yalnız hareket tercihi açık kullanıcıda */}
         <style>{`
@@ -174,51 +182,52 @@ export function WinCelebrationDialog({
 
         <div className="flex items-start justify-between gap-3 border-b border-line px-6 py-4">
           <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-mint-500/12 text-mint-600">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] bg-mint-500/12 text-mint-600">
               <PartyPopper className="h-5 w-5" />
             </span>
             <div>
-              <h2 className="font-display text-lg font-bold text-ink-950">✅ Anlaşma kazanıldı!</h2>
-              <p className="text-xs text-text-muted">
+              <DialogTitle className="font-display text-lg font-bold text-ink-950">✅ Anlaşma kazanıldı!</DialogTitle>
+              <DialogDescription className="text-xs text-text-muted">
                 {title}
                 {deal.customer_name ? ` · ${deal.customer_name}` : ""}
-              </p>
+              </DialogDescription>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] text-text-muted hover:bg-canvas"
-            aria-label="Kapat"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <DialogClose asChild>
+            <button
+              type="button"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-canvas"
+              aria-label="Kapat"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </DialogClose>
         </div>
 
         <div className="space-y-2.5 p-6">
-          <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-faint">Sonraki adımlar</p>
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-text-faint">Sonraki adımlar</p>
 
           {/* a) Komisyon — updateDealStage won'a ilk geçişte portföy bağlıysa otomatik üretir */}
           {deal.property_id ? (
             <Link
               href="/app/komisyon"
-              className="focus-ring group flex items-center gap-3 rounded-[12px] border border-mint-500/30 bg-mint-500/5 px-3 py-2.5 transition hover:border-mint-500/50"
+              className="focus-ring group flex items-center gap-3 rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/5 px-3 py-2.5 transition hover:border-mint-500/50"
             >
               <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-mint-500/15 text-mint-600">
                 <Check className="h-4 w-4" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold text-ink-950">Komisyon kaydı oluşturuldu ✓</span>
-                <span className="block text-[11px] text-text-muted">Tutarı ve paylaşımı kontrol edin</span>
+                <span className="block text-xs text-text-muted">Tutarı ve paylaşımı kontrol edin</span>
               </span>
               <ArrowRight className="h-4 w-4 shrink-0 text-text-faint transition group-hover:text-mint-600" />
             </Link>
           ) : (
-            <div className="flex items-center gap-3 rounded-[12px] border border-line bg-canvas px-3 py-2.5">
+            <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5">
               <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-amber-400/15 text-amber-600">
                 <Info className="h-4 w-4" />
               </span>
-              <span className="min-w-0 flex-1 text-[11px] text-text-muted">
+              <span className="min-w-0 flex-1 text-xs text-text-muted">
                 Portföy bağlı olmadığı için komisyon otomatik oluşmadı —{" "}
                 <Link href="/app/komisyon" className="font-semibold text-brand-600 hover:underline">
                   komisyon sayfasından
@@ -231,7 +240,7 @@ export function WinCelebrationDialog({
           {/* b) Sözleşme taslağı — müşteri/portföy/tür ön dolgulu */}
           <Link
             href={contractHref}
-            className="focus-ring group flex items-center gap-3 rounded-[12px] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
+            className="focus-ring group flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
           >
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-600/10 text-brand-600">
               <FileText className="h-4 w-4" />
@@ -244,14 +253,14 @@ export function WinCelebrationDialog({
           {isRent ? (
             <Link
               href={rentalHref}
-              className="focus-ring group flex items-center gap-3 rounded-[12px] border border-cyan-400/35 bg-cyan-400/5 px-3 py-2.5 transition hover:border-cyan-400/60"
+              className="focus-ring group flex items-center gap-3 rounded-[var(--radius-card)] border border-cyan-400/35 bg-cyan-400/5 px-3 py-2.5 transition hover:border-cyan-400/60"
             >
               <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-cyan-400/15 text-cyan-600">
                 <KeyRound className="h-4 w-4" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold text-ink-950">Kira sözleşmesi oluştur</span>
-                <span className="block text-[11px] text-text-muted">
+                <span className="block text-xs text-text-muted">
                   Portföy, kiracı ve kira tutarı ön dolgulu gelir — vade gününü seçin
                 </span>
               </span>
@@ -269,7 +278,7 @@ export function WinCelebrationDialog({
               trigger={
                 <button
                   type="button"
-                  className="focus-ring group flex w-full items-center gap-3 rounded-[12px] border border-line bg-canvas px-3 py-2.5 text-left transition hover:border-brand-300 hover:bg-surface"
+                  className="focus-ring group flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 text-left transition hover:border-brand-300 hover:bg-surface"
                 >
                   <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-cyan-500/10 text-cyan-600">
                     <span className="text-sm" aria-hidden>💬</span>
@@ -287,16 +296,17 @@ export function WinCelebrationDialog({
 
           {/* e) Kapat */}
           <div className="flex justify-end pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:bg-canvas"
-            >
-              Kapat
-            </button>
+            <DialogClose asChild>
+              <button
+                type="button"
+                className="rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+              >
+                Kapat
+              </button>
+            </DialogClose>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

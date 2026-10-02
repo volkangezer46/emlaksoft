@@ -110,7 +110,7 @@ export function MergeWizard({ kayitlar }: { kayitlar: DuplicateRecord[] }) {
             />
             <DialogBody>
               <div className="grid place-items-center py-4 text-center">
-                <span className="grid h-14 w-14 place-items-center rounded-[16px] bg-mint-500/12 text-mint-600">
+                <span className="grid h-14 w-14 place-items-center rounded-[var(--radius-card)] bg-mint-500/12 text-mint-600">
                   <CheckCircle2 className="h-7 w-7" />
                 </span>
                 <p className="mt-4 font-display text-lg font-bold text-ink-950">
@@ -144,7 +144,7 @@ export function MergeWizard({ kayitlar }: { kayitlar: DuplicateRecord[] }) {
             <DialogBody className="space-y-4">
               {error ? (
                 <p
-                  className="rounded-[12px] border border-danger-500/30 bg-danger-500/5 px-3 py-2 text-sm text-danger-600"
+                  className="rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 px-3 py-2 text-sm text-danger-600"
                   role="alert"
                 >
                   {error}
@@ -164,7 +164,7 @@ export function MergeWizard({ kayitlar }: { kayitlar: DuplicateRecord[] }) {
                       return (
                         <label
                           key={k.customer_id}
-                          className={`focus-ring flex cursor-pointer items-start gap-3 rounded-[14px] border p-3.5 transition ${
+                          className={`focus-ring flex cursor-pointer items-start gap-3 rounded-[var(--radius-card)] border p-3.5 transition ${
                             secili
                               ? "border-brand-500 bg-brand-600/[0.05]"
                               : "border-line bg-canvas hover:border-brand-400"
@@ -183,7 +183,7 @@ export function MergeWizard({ kayitlar }: { kayitlar: DuplicateRecord[] }) {
                                 {k.full_name ?? "İsimsiz"}
                               </span>
                               {onerilen ? (
-                                <span className="rounded-full bg-mint-500/12 px-2 py-0.5 text-[11px] font-semibold text-mint-600">
+                                <span className="rounded-full bg-mint-500/12 px-2 py-0.5 text-xs font-semibold text-mint-600">
                                   Önerilen — en dolu kayıt
                                 </span>
                               ) : null}
@@ -192,7 +192,7 @@ export function MergeWizard({ kayitlar }: { kayitlar: DuplicateRecord[] }) {
                               {k.phone ? formatTurkishPhone(k.phone) : "Telefon yok"} ·{" "}
                               {k.email ?? "E-posta yok"}
                             </span>
-                            <span className="numeric mt-0.5 block text-[11px] text-text-faint">
+                            <span className="numeric mt-0.5 block text-xs text-text-faint">
                               {k.activity} kayıt hareketi
                             </span>
                           </span>
@@ -210,7 +210,7 @@ export function MergeWizard({ kayitlar }: { kayitlar: DuplicateRecord[] }) {
                     </div>
                   ) : (
                     <>
-                      <div className="rounded-[14px] border border-line bg-canvas p-4">
+                      <div className="rounded-[var(--radius-card)] border border-line bg-canvas p-4">
                         <p className="text-xs font-semibold text-text-muted">
                           Ana kayıt: <span className="text-ink-950">{primary?.full_name ?? "—"}</span>{" "}
                           · {duplicateIds.length} kopya kapatılacak
@@ -251,7 +251,7 @@ export function MergeWizard({ kayitlar }: { kayitlar: DuplicateRecord[] }) {
                           </>
                         ) : null}
                       </div>
-                      <p className="flex items-start gap-2 rounded-[12px] border border-danger-500/30 bg-danger-500/5 px-3 py-2.5 text-xs leading-relaxed text-danger-600">
+                      <p className="flex items-start gap-2 rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 px-3 py-2.5 text-xs leading-relaxed text-danger-600">
                         <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
                         <span>
                           <strong>Bu işlem geri alınamaz.</strong> Kopya kayıtlar silinir ve tüm

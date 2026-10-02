@@ -76,7 +76,7 @@ export function ApplyIncreaseDialog({
           description={`${propertyName} — TÜFE tavanına göre önerilen oran %${appliedRate.toFixed(2)}.`}
         />
         <DialogBody className="space-y-4">
-          <div className="flex items-center justify-center gap-3 rounded-[12px] border border-line bg-canvas p-3 text-sm">
+          <div className="flex items-center justify-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas p-3 text-sm">
             <span className="font-semibold text-text-muted">{money(currentRent)}</span>
             <ArrowRight className="h-4 w-4 text-brand-600" />
             <span className="font-bold text-ink-950">{validRent ? money(rentNum) : "—"}</span>
@@ -108,7 +108,7 @@ export function ApplyIncreaseDialog({
             />
           </FormField>
           {overCap ? (
-            <p className="rounded-[10px] border border-amber-300/50 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700" role="alert">
+            <p className="rounded-[var(--radius-control)] border border-amber-300/50 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700" role="alert">
               Girilen tutar yasal tavanı aşıyor — TÜFE %{appliedRate.toFixed(2)} ile en fazla {money(suggestedRent)} uygulanabilir.
             </p>
           ) : null}

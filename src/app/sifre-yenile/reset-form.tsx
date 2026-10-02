@@ -19,7 +19,7 @@ import { PasswordStrengthMeter } from "@/components/auth/password-strength";
 type Phase = "checking" | "ready" | "invalid" | "done";
 
 const inputCls =
-  "w-full rounded-[12px] border border-line bg-surface py-3 pl-10 pr-11 text-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10";
+  "w-full rounded-[var(--radius-card)] border border-line bg-surface py-3 pl-10 pr-11 text-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10";
 
 export function ResetPasswordForm() {
   const supabase = useMemo(() => createClient(), []);
@@ -100,13 +100,13 @@ export function ResetPasswordForm() {
     >
       <div className="mt-8 lg:mt-0">
         {phase === "checking" ? (
-          <div className="rounded-[16px] border border-line bg-surface px-6 py-12 text-center">
+          <div className="rounded-[var(--radius-card)] border border-line bg-surface px-6 py-12 text-center">
             <Loader2 className="mx-auto h-8 w-8 animate-spin text-brand-600" />
             <p className="mt-4 text-sm font-semibold text-ink-950">Bağlantı doğrulanıyor…</p>
             <p className="mt-1 text-sm text-text-muted">Lütfen birkaç saniye bekleyin.</p>
           </div>
         ) : phase === "invalid" ? (
-          <div className="rounded-[16px] border border-danger-500/25 bg-danger-500/8 px-6 py-10 text-center">
+          <div className="rounded-[var(--radius-card)] border border-danger-500/25 bg-danger-500/8 px-6 py-10 text-center">
             <ShieldAlert className="mx-auto h-10 w-10 text-danger-500" />
             <p className="mt-3 font-display text-lg font-bold text-ink-950">
               Bağlantı geçersiz veya süresi dolmuş
@@ -117,13 +117,13 @@ export function ResetPasswordForm() {
             </p>
             <Link
               href="/sifre-sifirla"
-              className="btn-shine mt-5 inline-flex items-center justify-center gap-2 rounded-[12px] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+              className="btn-shine mt-5 inline-flex items-center justify-center gap-2 rounded-[var(--radius-card)] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
             >
               Yeni bağlantı iste <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         ) : phase === "done" ? (
-          <div className="rounded-[16px] border border-mint-500/30 bg-mint-500/10 px-6 py-10 text-center">
+          <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/10 px-6 py-10 text-center">
             <CheckCircle2 className="mx-auto h-10 w-10 text-mint-600" />
             <p className="mt-3 font-display text-lg font-bold text-ink-950">Şifreniz güncellendi</p>
             <p className="mt-1 text-sm text-text-muted">
@@ -131,7 +131,7 @@ export function ResetPasswordForm() {
             </p>
             <Link
               href="/app"
-              className="btn-shine mt-5 inline-flex items-center justify-center gap-2 rounded-[12px] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+              className="btn-shine mt-5 inline-flex items-center justify-center gap-2 rounded-[var(--radius-card)] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
             >
               Panele devam et <ArrowRight className="h-4 w-4" />
             </Link>
@@ -166,7 +166,7 @@ export function ResetPasswordForm() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-[8px] text-text-faint transition hover:bg-canvas hover:text-ink-800"
+                    className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-800"
                     aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -196,7 +196,7 @@ export function ResetPasswordForm() {
               </div>
 
               {error ? (
-                <p className="rounded-[10px] border border-danger-500/25 bg-danger-500/8 px-3.5 py-2.5 text-sm font-medium text-danger-600" role="alert">
+                <p className="rounded-[var(--radius-control)] border border-danger-500/25 bg-danger-500/8 px-3.5 py-2.5 text-sm font-medium text-danger-600" role="alert">
                   {error}
                 </p>
               ) : null}
@@ -204,7 +204,7 @@ export function ResetPasswordForm() {
               <button
                 type="submit"
                 disabled={pending}
-                className="btn-shine group flex w-full items-center justify-center gap-2 rounded-[12px] bg-[image:var(--grad-brand)] px-4 py-3 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:brightness-[1.06] disabled:opacity-60"
+                className="btn-shine group flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-brand)] px-4 py-3 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:brightness-[1.06] disabled:opacity-60"
               >
                 {pending ? (
                   <>
@@ -217,7 +217,7 @@ export function ResetPasswordForm() {
                 )}
               </button>
 
-              <p className="flex items-center justify-center gap-1.5 text-[11px] text-text-faint">
+              <p className="flex items-center justify-center gap-1.5 text-xs text-text-faint">
                 <ShieldCheck className="h-3.5 w-3.5 text-mint-600" /> 256-bit TLS ile şifreli bağlantı
               </p>
             </form>

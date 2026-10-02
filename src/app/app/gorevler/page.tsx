@@ -15,9 +15,9 @@ export const dynamic = "force-dynamic";
 const PAGE_SIZE = 50;
 
 const PAGER_BTN =
-  "focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+  "focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
 const PAGER_BTN_DISABLED =
-  "inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
+  "inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
 const FILTERS = [
   { key: "open", label: "Açık" },
@@ -51,7 +51,7 @@ function endOfToday() {
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ filter?: string; mine?: string; tur?: string; tekrar?: string; sayfa?: string }>;
+  searchParams?: Promise<{ filter?: string; mine?: string; tur?: string; tekrar?: string; sayfa?: string; yeni?: string }>;
 }) {
   const ctx = await requireModulePage("tasks");
   const canEdit = (ctx.perms.tasks ?? []).includes("edit");
@@ -197,10 +197,10 @@ export default async function TasksPage({
         id: `serit-${g.key}`,
         selectable: false,
         card: (
-          <div className={`mt-2 flex items-center gap-2 rounded-[12px] border px-3.5 py-2 first:mt-0 ${g.cls}`}>
+          <div className={`mt-2 flex items-center gap-2 rounded-[var(--radius-card)] border px-3.5 py-2 first:mt-0 ${g.cls}`}>
             <g.icon className="h-4 w-4" />
             <span className="text-xs font-extrabold uppercase tracking-[0.08em]">{g.label}</span>
-            <span className="numeric ml-auto rounded-full bg-surface px-2 py-0.5 text-[11px] font-extrabold text-ink-950 shadow-[var(--shadow-xs)]">
+            <span className="numeric ml-auto rounded-full bg-surface px-2 py-0.5 text-xs font-extrabold text-ink-950 shadow-[var(--shadow-xs)]">
               {rows.length}
             </span>
           </div>
@@ -226,7 +226,7 @@ export default async function TasksPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/30 blur-[80px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -239,7 +239,7 @@ export default async function TasksPage({
               Arama, ziyaret, evrak ve follow-up görevlerini planlayın; ekibe atayın, gecikmeleri anında görün.
             </p>
           </div>
-          {canCreate ? <NewTaskDialog members={members ?? []} customers={customers ?? []} /> : null}
+          {canCreate ? <NewTaskDialog key={params.yeni === "1" ? "new-task" : "task-dialog"} members={members ?? []} customers={customers ?? []} defaultOpen={params.yeni === "1"} /> : null}
         </div>
         <div className="stagger-grid relative mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {/* Sayaçlar mevcut ?filter= parametresiyle ilgili listeye iner. */}
@@ -255,13 +255,13 @@ export default async function TasksPage({
             <Link
               key={s.label}
               href={s.href}
-              className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/[0.05] px-4 py-3 transition hover:border-brand-300"
+              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/[0.05] px-4 py-3 transition hover:border-brand-300"
             >
               <p className={`flex items-center gap-1.5 font-display text-2xl font-extrabold ${s.tone}`}>
                 <s.icon className="h-4 w-4" /> {s.value}
                 <ArrowUpRight className="hover-action ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
               </p>
-              <p className="text-[11px] text-white/50">{s.label}</p>
+              <p className="text-xs text-white/50">{s.label}</p>
             </Link>
           ))}
         </div>
@@ -274,7 +274,7 @@ export default async function TasksPage({
             <Link
               key={f.key}
               href={taskHref({ filter: f.key })}
-              className={`rounded-[10px] border px-3.5 py-2 text-xs font-semibold transition ${
+              className={`rounded-[var(--radius-control)] border px-3.5 py-2 text-xs font-semibold transition ${
                 active ? "border-brand-400/50 bg-brand-600/10 text-brand-600" : "border-line bg-surface text-ink-950 hover:border-brand-300"
               }`}
             >
@@ -290,7 +290,7 @@ export default async function TasksPage({
             <Link
               key={k.key}
               href={taskHref({ tur: active ? "" : k.key })}
-              className={`rounded-[10px] border px-3.5 py-2 text-xs font-semibold transition ${
+              className={`rounded-[var(--radius-control)] border px-3.5 py-2 text-xs font-semibold transition ${
                 active ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-600" : "border-line bg-surface text-text-muted hover:border-cyan-400/50 hover:text-cyan-600"
               }`}
             >
@@ -301,7 +301,7 @@ export default async function TasksPage({
         {/* Tekrarlayan çipi: ?tekrar=1 → sunucu filtresi recurrence not null */}
         <Link
           href={taskHref({ tekrar: !tekrar })}
-          className={`flex items-center gap-1.5 rounded-[10px] border px-3.5 py-2 text-xs font-semibold transition ${
+          className={`flex items-center gap-1.5 rounded-[var(--radius-control)] border px-3.5 py-2 text-xs font-semibold transition ${
             tekrar ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-600" : "border-line bg-surface text-text-muted hover:border-cyan-400/50 hover:text-cyan-600"
           }`}
         >
@@ -309,7 +309,7 @@ export default async function TasksPage({
         </Link>
         <Link
           href={taskHref({ mine: !mine })}
-          className={`ml-auto rounded-[10px] border px-3.5 py-2 text-xs font-semibold transition ${
+          className={`ml-auto rounded-[var(--radius-control)] border px-3.5 py-2 text-xs font-semibold transition ${
             mine ? "border-mint-400/50 bg-mint-500/10 text-mint-600" : "border-line bg-surface text-text-muted hover:border-brand-300"
           }`}
         >

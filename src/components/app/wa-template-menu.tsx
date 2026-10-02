@@ -123,14 +123,14 @@ export function WaTemplateMenu({
       <button
         type="button"
         aria-label="Şablonla WhatsApp mesajı"
-        className="focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[9px] text-text-faint transition hover:bg-mint-500/10 hover:text-mint-600"
+        className="focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-mint-500/10 hover:text-mint-600"
       >
         <MessageCircle className="h-4 w-4" />
       </button>
     ) : (
       <button
         type="button"
-        className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+        className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
       >
         <MessageCircle className="h-4 w-4" /> {label}
       </button>
@@ -158,7 +158,7 @@ export function WaTemplateMenu({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Şablon ara…"
                 aria-label="Şablon ara"
-                className="focus-ring w-full rounded-[10px] border border-line bg-canvas py-2.5 pl-9 pr-3 text-sm text-ink-950 placeholder:text-text-faint"
+                className="focus-ring w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2.5 pl-9 pr-3 text-sm text-ink-950 placeholder:text-text-faint"
               />
             </div>
           ) : null}
@@ -167,18 +167,18 @@ export function WaTemplateMenu({
           {loading && templates === null ? (
             <p className="py-6 text-center text-sm text-text-muted">Şablonlar yükleniyor…</p>
           ) : loadError ? (
-            <p className="rounded-[10px] border border-danger-500/25 bg-danger-500/8 px-3 py-2 text-xs font-semibold text-danger-500">
+            <p className="rounded-[var(--radius-control)] border border-danger-500/25 bg-danger-500/8 px-3 py-2 text-xs font-semibold text-danger-500">
               {loadError}
             </p>
           ) : (templates?.length ?? 0) === 0 ? (
-            <div className="rounded-[12px] border border-line bg-canvas px-4 py-5 text-center">
+            <div className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-5 text-center">
               <p className="text-sm font-semibold text-ink-950">Şablon tanımlanmamış</p>
               <p className="mt-1 text-xs text-text-muted">
                 Ofisinizin standart mesajlarını bir kez tanımlayın, herkes tek tıkla kullansın.
               </p>
               <Link
                 href="/app/ayarlar/mesaj-sablonlari"
-                className="focus-ring press mt-3 inline-flex items-center gap-1.5 rounded-[10px] border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
+                className="focus-ring press mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
               >
                 <Settings2 className="h-3.5 w-3.5" /> Ayarlar › Mesaj Şablonları
               </Link>
@@ -189,7 +189,7 @@ export function WaTemplateMenu({
             <div className="max-h-64 space-y-3 overflow-y-auto pr-1">
               {grouped.map((g) => (
                 <div key={g.cat}>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
+                  <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
                     {CATEGORY_LABELS[g.cat]}
                   </p>
                   <ul className="mt-1.5 space-y-1.5">
@@ -199,7 +199,7 @@ export function WaTemplateMenu({
                           type="button"
                           onClick={() => handleSelect(t)}
                           aria-pressed={selected?.id === t.id}
-                          className={`focus-ring press w-full rounded-[11px] border px-3 py-2.5 text-left transition ${
+                          className={`focus-ring press w-full rounded-[var(--radius-control)] border px-3 py-2.5 text-left transition ${
                             selected?.id === t.id
                               ? "border-brand-300 bg-brand-600/8"
                               : "border-line bg-canvas hover:border-brand-300"
@@ -207,7 +207,7 @@ export function WaTemplateMenu({
                         >
                           <span className="flex items-center gap-2">
                             <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-950">{t.title}</span>
-                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${CATEGORY_BADGE[t.category as TemplateCategory] ?? CATEGORY_BADGE.genel}`}>
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${CATEGORY_BADGE[t.category as TemplateCategory] ?? CATEGORY_BADGE.genel}`}>
                               {CATEGORY_LABELS[t.category as TemplateCategory] ?? "Genel"}
                             </span>
                           </span>
@@ -223,9 +223,9 @@ export function WaTemplateMenu({
 
           {/* Önizleme */}
           {selected ? (
-            <div className="rounded-[12px] border border-line bg-canvas p-3.5">
-              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">Gönderilecek mesaj</p>
-              <p className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap rounded-[10px] bg-mint-500/8 px-3 py-2.5 text-sm leading-relaxed text-ink-950">
+            <div className="rounded-[var(--radius-card)] border border-line bg-canvas p-3.5">
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Gönderilecek mesaj</p>
+              <p className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap rounded-[var(--radius-control)] bg-mint-500/8 px-3 py-2.5 text-sm leading-relaxed text-ink-950">
                 {message}
               </p>
             </div>
@@ -236,7 +236,7 @@ export function WaTemplateMenu({
               <button
                 type="button"
                 onClick={handleCopy}
-                className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+                className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
               >
                 {copied ? <Check className="h-4 w-4 text-mint-600" /> : <Copy className="h-4 w-4" />}
                 {copied ? "Kopyalandı" : "Metni kopyala"}
@@ -247,7 +247,7 @@ export function WaTemplateMenu({
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setOpen(false)}
-              className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-mint-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-mint-700"
+              className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-mint-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-mint-700"
             >
               <ExternalLink className="h-4 w-4" />
               {selected ? "WhatsApp'ta aç" : "Boş mesajla aç"}

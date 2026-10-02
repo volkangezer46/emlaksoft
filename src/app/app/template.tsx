@@ -1,8 +1,8 @@
 /**
  * Panel sayfa geçişi — iki katmanlı progressive enhancement:
  *
- * 1) View Transitions destekleyen tarayıcı: React <ViewTransition> (experimental.viewTransition
- *    bayrağı ile) navigasyonda tarayıcının native cross-fade'ini tetikler; süre/easing
+ * 1) View Transitions destekleyen tarayıcı: React <ViewTransition> (Next 16.3+, yapılandırma gerekmez)
+ *    navigasyonda tarayıcının native cross-fade'ini tetikler; süre/easing
  *    globals.css'te ::view-transition-*(root) ve .page-fade sınıfında (180ms).
  *    Bu durumda .page-in keyframe'i @supports (view-transition-name: root) bloğunda
  *    .vt-page üzerinden kapatılır — çift animasyon olmaz.

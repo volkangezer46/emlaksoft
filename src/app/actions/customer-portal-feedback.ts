@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { notifyTenant } from "@/lib/notify";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 export type MatchFeedbackVerdict = "liked" | "disliked";
 
@@ -35,12 +35,12 @@ export async function submitMatchFeedbackByToken(
   const verdict = verdictRaw as MatchFeedbackVerdict;
 
   // Token tahmini / spam koruması — IP başına dakikada 30 istek
-  const hdrs = await headers();
-  const ip =
-    hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    hdrs.get("x-real-ip") ||
-    "unknown";
-  const { allowed } = await checkRateLimit(`portalfeedback:${ip}`, { limit: 30, windowSec: 60 });
+  const ip = await clientIp();
+  const { allowed } = await checkRateLimit(`portalfeedback:${ip}`, {
+    limit: 30,
+    windowSec: 60,
+    failurePolicy: "deny",
+  });
   if (!allowed) return { error: "Çok fazla istek. Lütfen biraz sonra tekrar deneyin." };
 
   const admin = createAdminClient();
@@ -60,22 +60,34 @@ export async function submitMatchFeedbackByToken(
   const customerId = portalToken.customer_id;
   const tenantId   = portalToken.tenant_id;
 
+  const { data: tenant } = await admin
+    .from("tenants")
+    .select("status")
+    .eq("id", tenantId)
+    .maybeSingle();
+  if (!tenant || !isPublicTenantActive(tenant.status)) {
+    return { error: "Bağlantı geçersiz veya süresi dolmuş." };
+  }
+
   const [{ data: customer }, { data: property }, { data: existing }] = await Promise.all([
     admin
       .from("customers")
       .select("id, full_name, assigned_to")
       .eq("id", customerId)
       .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
       .maybeSingle(),
     admin
       .from("properties")
       .select("id, property_code, title, assigned_to")
       .eq("id", propertyId)
       .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
       .maybeSingle(),
     admin
       .from("portal_match_feedback")
       .select("id, verdict")
+      .eq("tenant_id", tenantId)
       .eq("customer_id", customerId)
       .eq("property_id", propertyId)
       .maybeSingle(),
@@ -107,9 +119,19 @@ export async function submitMatchFeedbackByToken(
 
   // Danışmana bildirim — müşterinin danışmanı öncelikli, yoksa portföyünki
   const propLabel = property.title ?? property.property_code;
+  const advisorId = customer.assigned_to ?? property.assigned_to ?? null;
+  const { data: advisor } = advisorId
+    ? await admin
+        .from("profiles")
+        .select("id")
+        .eq("id", advisorId)
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true)
+        .maybeSingle()
+    : { data: null };
   await notifyTenant({
     tenantId,
-    userId: customer.assigned_to ?? property.assigned_to ?? undefined,
+    userId: advisor?.id ?? undefined,
     title:  verdict === "liked" ? "Müşteri portföyü beğendi" : "Müşteri portföyle ilgilenmiyor",
     body:
       verdict === "liked"

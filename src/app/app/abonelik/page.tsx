@@ -7,6 +7,7 @@ import {
   Contact2,
   CreditCard,
   Gauge,
+  GitBranch,
   Sparkles,
   ShieldCheck,
   Users2,
@@ -14,7 +15,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DAY_MS, msUntil } from "@/lib/clock";
-import { PLANS, planAmountTry, planLabel, type BillingCycle } from "@/lib/billing/plans";
+import { PLANS, getPlan, planAmountTry, planLabel, type BillingCycle } from "@/lib/billing/plans";
 import { isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { CheckoutButton } from "./checkout-button";
@@ -54,6 +55,7 @@ export default async function BillingPage({
     { count: memberCount },
     { count: propertyCount },
     { count: customerCount },
+    { count: branchCount },
   ] = await Promise.all([
     tenantId
       ? supabase.from("tenants").select("id, name, plan, status").eq("id", tenantId).maybeSingle()
@@ -70,30 +72,35 @@ export default async function BillingPage({
           .from("invoices")
           .select("id, invoice_no, status, total_try, paid_at, created_at")
           .eq("tenant_id", tenantId)
+          .in("status", ["open", "paid", "void", "uncollectible"])
           .order("created_at", { ascending: false })
           .limit(8)
       : Promise.resolve({ data: [] }),
     tenantId
-      ? supabase.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId)
+      ? supabase
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId)
+          .eq("is_active", true)
       : Promise.resolve({ count: null }),
-    // Kullanım göstergeleri — gerçek kayıt sayıları (RLS tenant kapsamında)
-    supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null),
+    // Kullanım göstergeleri DB entitlement tetikleyicisiyle aynı kapsamı sayar.
+    supabase
+      .from("properties")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null)
+      .in("status", ["draft", "live", "reserved"]),
     supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
+    supabase.from("branches").select("id", { count: "exact", head: true }).eq("is_active", true),
   ]);
 
   const currentPlan = sub?.plan ?? tenant?.plan ?? "office";
 
-  /**
-   * Kullanım göstergeleri — plan tanımlarında yapısal kayıt limiti YOK;
-   * tek sayısal sınır Danışman paketinin "1 kullanıcı" özelliği (PLANS).
-   * Limitli metrikte doluluk çubuğu, limitsizde yalnız gerçek sayım gösterilir.
-   */
-  const USER_LIMIT_BY_PLAN: Partial<Record<string, number>> = { advisor: 1 };
-  const userLimit = USER_LIMIT_BY_PLAN[currentPlan] ?? null;
+  const currentPlanDef = getPlan(currentPlan);
   const usage = [
-    { label: "Kullanıcı", value: memberCount ?? 0, limit: userLimit, icon: Users2, href: "/app/ekip", tone: "text-brand-600 bg-brand-600/10" },
-    { label: "Portföy kaydı", value: propertyCount ?? 0, limit: null, icon: Building2, href: "/app/portfoyler", tone: "text-mint-600 bg-mint-500/10" },
-    { label: "Müşteri kaydı", value: customerCount ?? 0, limit: null, icon: Contact2, href: "/app/musteriler", tone: "text-amber-600 bg-amber-400/10" },
+    { label: "Kullanıcı", value: memberCount ?? 0, limit: currentPlanDef.limits.seats, icon: Users2, href: "/app/ekip", tone: "text-brand-600 bg-brand-600/10" },
+    { label: "Aktif portföy", value: propertyCount ?? 0, limit: currentPlanDef.limits.activeProperties, icon: Building2, href: "/app/portfoyler", tone: "text-mint-600 bg-mint-500/10" },
+    { label: "Müşteri kaydı", value: customerCount ?? 0, limit: currentPlanDef.limits.customers, icon: Contact2, href: "/app/musteriler", tone: "text-amber-600 bg-amber-400/10" },
+    { label: "Aktif şube", value: branchCount ?? 0, limit: currentPlanDef.limits.branches, icon: GitBranch, href: "/app/ekip", tone: "text-cyan-600 bg-cyan-400/10" },
   ];
 
   // Deneme geri sayımı — yalnızca trialing durumunda anlamlı
@@ -107,12 +114,12 @@ export default async function BillingPage({
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/30 blur-[90px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-cyan-400">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-cyan-400">
               <CreditCard className="h-3.5 w-3.5" /> Abonelik & iyzico
             </p>
             <h1 className="mt-2 font-display text-3xl font-extrabold text-white">Paket ve ödeme</h1>
@@ -122,8 +129,8 @@ export default async function BillingPage({
                 : "Sandbox anahtarı yok — demo ödeme ile paket yükseltmeyi yerel test edebilirsiniz."}
             </p>
           </div>
-          <div className="rounded-[16px] border border-white/10 bg-white/5 px-5 py-4 backdrop-blur">
-            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-white/45">Mevcut paket</p>
+          <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-5 py-4 backdrop-blur">
+            <p className="text-xs font-bold uppercase tracking-[0.08em] text-white/45">Mevcut paket</p>
             <p className="mt-1 font-display text-2xl font-extrabold">{planLabel(currentPlan)}</p>
             <p className="mt-1 text-xs text-mint-400">
               {statusLabel[sub?.status ?? "trialing"] ?? sub?.status ?? "Deneme"}
@@ -132,12 +139,12 @@ export default async function BillingPage({
             {/* Plan tanımlarında yapısal kullanıcı limiti yok — yalnızca gerçek kullanım gösteriliyor */}
             <Link
               href="/app/ekip"
-              className="focus-ring mt-2 inline-flex items-center gap-1.5 rounded-[8px] text-xs text-white/70 transition hover:text-white"
+              className="focus-ring mt-2 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] text-xs text-white/70 transition hover:text-white"
             >
               <Users2 className="h-3.5 w-3.5" /> {memberCount ?? 0} kullanıcı · ekibi yönet
             </Link>
             {showTrial ? (
-              <p className={`mt-1.5 text-[11px] font-semibold ${trialDaysLeft! > 3 ? "text-white/60" : "text-amber-400"}`}>
+              <p className={`mt-1.5 text-xs font-semibold ${trialDaysLeft! > 3 ? "text-white/60" : "text-amber-400"}`}>
                 {trialDaysLeft! > 0
                   ? `Deneme bitişine ${trialDaysLeft} gün (${new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(trialEnds!)})`
                   : "Deneme süresi doldu — paket seçin."}
@@ -148,7 +155,7 @@ export default async function BillingPage({
       </section>
 
       {sp.paid ? (
-        <div className="rounded-[14px] border border-mint-500/30 bg-mint-500/10 px-4 py-3 text-sm font-medium text-mint-700">
+        <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/10 px-4 py-3 text-sm font-medium text-mint-700">
           <span className="inline-flex items-center gap-2">
             <Check className="h-4 w-4" />
             Ödeme alındı{sp.demo ? " (demo)" : ""}. {sp.plan ? `${planLabel(sp.plan)} paketi aktif.` : "Paket güncellendi."}
@@ -156,31 +163,31 @@ export default async function BillingPage({
         </div>
       ) : null}
       {sp.error ? (
-        <div className="rounded-[14px] border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-sm text-danger-600">
+        <div className="rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-sm text-danger-600">
           Ödeme tamamlanamadı ({sp.error}). Destek veya tekrar deneyin.
         </div>
       ) : null}
 
       {/* Kullanım göstergeleri — gerçek kayıt sayıları; kartlar ilgili modüle gider */}
-      <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Gauge className="h-4 w-4" /> Kullanım</p>
             <h2 className="mt-1 font-display font-bold text-ink-950">Hesap kullanım göstergeleri</h2>
           </div>
-          <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">{planLabel(currentPlan)} paketi</span>
+          <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">{planLabel(currentPlan)} paketi</span>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {usage.map((u) => {
             const doluluk = u.limit ? Math.min(100, Math.round((u.value / u.limit) * 100)) : null;
             return (
               <Link
                 key={u.label}
                 href={u.href}
-                className="focus-ring press lift group block rounded-[16px] border border-line bg-canvas/50 p-4 transition hover:border-brand-300"
+                className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-canvas/50 p-4 transition hover:border-brand-300"
               >
                 <div className="flex items-start justify-between">
-                  <span className={`grid h-9 w-9 place-items-center rounded-[10px] ${u.tone}`}>
+                  <span className={`grid h-9 w-9 place-items-center rounded-[var(--radius-control)] ${u.tone}`}>
                     <u.icon className="h-4.5 w-4.5" />
                   </span>
                   <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
@@ -198,12 +205,12 @@ export default async function BillingPage({
                         style={{ width: `${Math.max(4, doluluk)}%` }}
                       />
                     </div>
-                    <p className={`mt-1 text-[11px] font-semibold ${doluluk >= 100 ? "text-danger-500" : "text-text-muted"}`}>
+                    <p className={`mt-1 text-xs font-semibold ${doluluk >= 100 ? "text-danger-500" : "text-text-muted"}`}>
                       {doluluk >= 100 ? "Paket limiti doldu — üst pakete geçin" : `Limitin %${doluluk}'i kullanımda`}
                     </p>
                   </>
                 ) : (
-                  <p className="mt-1 text-[11px] text-text-faint">Bu pakette kayıt sınırı uygulanmıyor</p>
+                  <p className="mt-1 text-xs text-text-faint">Bu pakette kayıt sınırı uygulanmıyor</p>
                 )}
               </Link>
             );
@@ -237,16 +244,16 @@ export default async function BillingPage({
           return (
             <article
               key={plan.id}
-              className={`relative flex flex-col rounded-[20px] border p-5 shadow-[var(--shadow-xs)] ${
+              className={`relative flex flex-col rounded-[var(--radius-panel)] border p-5 shadow-[var(--shadow-xs)] ${
                 current ? "border-brand-400 bg-brand-600/[0.03]" : "border-line bg-surface"
               }`}
             >
               {current ? (
-                <span className="absolute right-4 top-4 rounded-full bg-mint-500/15 px-2 py-0.5 text-[11px] font-bold text-mint-600">
+                <span className="absolute right-4 top-4 rounded-full bg-mint-500/15 px-2 py-0.5 text-xs font-bold text-mint-600">
                   Aktif
                 </span>
               ) : null}
-              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">{plan.blurb}</p>
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">{plan.blurb}</p>
               <h2 className="mt-1 font-display text-xl font-extrabold text-ink-950">{plan.name}</h2>
               <p className="mt-3 font-display text-3xl font-extrabold text-ink-950">
                 {money(amount)}
@@ -254,7 +261,7 @@ export default async function BillingPage({
                   /{cycle === "yearly" ? "yıl" : "ay"}
                 </span>
               </p>
-              <p className="mt-1 text-[11px] text-text-faint">
+              <p className="mt-1 text-xs text-text-faint">
                 KDV hariç
                 {cycle === "yearly" ? ` · aylık ${money(Math.round(amount / 12))}'ye gelir` : ""}
               </p>
@@ -280,20 +287,20 @@ export default async function BillingPage({
       </div>
 
       {/* Fatura geçmişi — okunabilir tablo düzeni (mobilde yatay kaydırma) */}
-      <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-amber-500" />
             <h2 className="font-display font-bold text-ink-950">Fatura geçmişi</h2>
           </div>
           {(invoices ?? []).length > 0 ? (
-            <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">
+            <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
               Son {(invoices ?? []).length} fatura
             </span>
           ) : null}
         </div>
         {(invoices ?? []).length === 0 ? (
-          <p className="mt-4 rounded-[12px] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
+          <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
             Henüz fatura kesilmedi — ilk ödeme sonrası faturalar burada listelenir.
           </p>
         ) : (
@@ -322,7 +329,7 @@ export default async function BillingPage({
                     </TD>
                     <TD>
                       <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
                           inv.status === "paid" ? "bg-mint-500/10 text-mint-600" : "bg-amber-400/15 text-amber-600"
                         }`}
                       >

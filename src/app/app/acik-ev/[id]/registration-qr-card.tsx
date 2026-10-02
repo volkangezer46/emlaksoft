@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Check, Copy, Download, Loader2, MonitorSmartphone, Printer, QrCode } from "lucide-react";
+import { fetchTrustedQrPng } from "@/lib/client-download";
 
 /**
  * Açık ev kayıt QR kartı — public self check-in linki (/acik-ev-kayit/[token]).
@@ -36,9 +37,7 @@ export function RegistrationQrCard({ publicUrl }: { publicUrl: string }) {
   async function onDownload() {
     setDownloading(true);
     try {
-      const res = await fetch(qrPrintSrc);
-      if (!res.ok) throw new Error(String(res.status));
-      const blob = await res.blob();
+      const blob = await fetchTrustedQrPng(qrPrintSrc);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -80,14 +79,14 @@ export function RegistrationQrCard({ publicUrl }: { publicUrl: string }) {
             Kapıya asın — ziyaretçiler telefonla okutup kendileri kaydolur; siz kapıda isim yazmakla
             uğraşmazsınız.
           </p>
-          <code className="mt-3 block w-fit max-w-full truncate rounded-[10px] border border-line bg-canvas px-3 py-2 text-xs text-ink-950">
+          <code className="mt-3 block w-fit max-w-full truncate rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs text-ink-950">
             {publicUrl}
           </code>
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={onCopy}
-              className="inline-flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-brand-600/90"
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-brand-600/90"
             >
               {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               {copied ? "Kopyalandı" : "Linki kopyala"}
@@ -96,7 +95,7 @@ export function RegistrationQrCard({ publicUrl }: { publicUrl: string }) {
               type="button"
               onClick={onDownload}
               disabled={downloading}
-              className="inline-flex items-center gap-1.5 rounded-[10px] border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-300 disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-300 disabled:opacity-60"
             >
               {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
               PNG indir
@@ -104,7 +103,7 @@ export function RegistrationQrCard({ publicUrl }: { publicUrl: string }) {
             <button
               type="button"
               onClick={onPrint}
-              className="inline-flex items-center gap-1.5 rounded-[10px] border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
             >
               <Printer className="h-3.5 w-3.5" /> Yazdır
             </button>
@@ -114,7 +113,7 @@ export function RegistrationQrCard({ publicUrl }: { publicUrl: string }) {
             href={kioskUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-4 flex w-fit items-start gap-2 rounded-[12px] border border-line bg-canvas/60 px-3.5 py-2.5 text-xs text-text-muted transition hover:border-brand-300"
+            className="mt-4 flex w-fit items-start gap-2 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3.5 py-2.5 text-xs text-text-muted transition hover:border-brand-300"
           >
             <MonitorSmartphone className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600" />
             <span>
@@ -123,7 +122,7 @@ export function RegistrationQrCard({ publicUrl }: { publicUrl: string }) {
             </span>
           </a>
 
-          <p className="mt-3 text-[11px] text-text-faint">
+          <p className="mt-3 text-xs text-text-faint">
             QR görseli harici bir servisle (goqr.me) üretilir; yalnızca herkese açık kayıt linki iletilir.
             Sayfada açık adres gösterilmez.{" "}
             <Link href={publicUrl} target="_blank" className="font-semibold underline-offset-2 hover:underline">
@@ -131,7 +130,7 @@ export function RegistrationQrCard({ publicUrl }: { publicUrl: string }) {
             </Link>
           </p>
         </div>
-        <div className="rounded-[14px] border border-line bg-white p-3">
+        <div className="rounded-[var(--radius-card)] border border-line bg-white p-3">
           {/* Harici servis görseli — next/image yerine img: uzak domain yapılandırması gerektirmez */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img

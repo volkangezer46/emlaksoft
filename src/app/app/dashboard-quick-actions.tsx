@@ -39,13 +39,13 @@ export function TaskQuickRow({
               router.refresh();
             });
           }}
-          className="hover-action focus-ring press absolute right-2 top-1/2 z-10 inline-flex -translate-y-1/2 items-center gap-1 rounded-[8px] bg-mint-500 px-2.5 py-1.5 text-xs font-bold text-white opacity-0 shadow-sm transition hover:bg-mint-600 focus-visible:opacity-100 group-hover/task:opacity-100"
+          className="hover-action focus-ring press absolute right-2 top-1/2 z-10 inline-flex -translate-y-1/2 items-center gap-1 rounded-[var(--radius-control)] bg-mint-500 px-2.5 py-1.5 text-xs font-bold text-white opacity-0 shadow-sm transition hover:bg-mint-600 focus-visible:opacity-100 group-hover/task:opacity-100"
         >
           <Check className="h-3.5 w-3.5" /> Tamamla
         </button>
       ) : null}
       {done ? (
-        <span className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-[8px] bg-mint-500/15 px-2.5 py-1.5 text-xs font-bold text-mint-600">
+        <span className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-[var(--radius-control)] bg-mint-500/15 px-2.5 py-1.5 text-xs font-bold text-mint-600">
           Tamamlandı ✓
         </span>
       ) : null}
@@ -61,7 +61,7 @@ export function AppointmentConfirmButton({ id }: { id: string }) {
 
   if (confirmed) {
     return (
-      <span className="rounded-[8px] bg-mint-500/15 px-2 py-1 text-xs font-bold text-mint-600">
+      <span className="rounded-[var(--radius-control)] bg-mint-500/15 px-2 py-1 text-xs font-bold text-mint-600">
         Onaylandı ✓
       </span>
     );
@@ -80,7 +80,7 @@ export function AppointmentConfirmButton({ id }: { id: string }) {
           router.refresh();
         });
       }}
-      className="focus-ring press inline-flex items-center gap-1 rounded-[8px] bg-brand-600 px-2 py-1 text-xs font-bold text-white shadow-sm transition hover:bg-brand-700"
+      className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-brand-600 px-2 py-1 text-xs font-bold text-white shadow-sm transition hover:bg-brand-700"
     >
       <CalendarCheck className="h-3.5 w-3.5" /> Onayla
     </button>

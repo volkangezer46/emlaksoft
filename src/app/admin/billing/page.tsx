@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, ArrowUpRight, CreditCard, FileText, TrendingUp, X } from "lucide-react";
+import { Activity, AlertTriangle, ArrowUpRight, CreditCard, FileText, RefreshCw, TrendingUp, X } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { orIlike } from "@/lib/pgrst";
@@ -8,16 +8,10 @@ import { ExportButton } from "@/components/admin/export-button";
 import { AdminEmpty, AdminFilterChip, AdminSearchForm } from "@/components/admin/admin-table";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { now as clockNow } from "@/lib/clock";
+import { planLabel } from "@/lib/billing/plans";
 import type { CSSProperties } from "react";
 
 const RING_C = 2 * Math.PI * 42;
-
-const planLabel: Record<string, string> = {
-  advisor: "Danışman",
-  office: "Ofis",
-  professional: "Profesyonel",
-  enterprise: "Kurumsal",
-};
 
 const subStatus: Record<string, string> = {
   trialing: "Deneme",
@@ -128,16 +122,29 @@ export default async function AdminBillingPage({
   if (matchedTenantIds) invQuery = invQuery.in("tenant_id", matchedTenantIds.length ? matchedTenantIds : [""]);
 
   // Halka, trend ve hero sayıları filtreden bağımsız — liste sorguları ayrı daralır
-  const [{ data: subs, count: subCount }, { data: statRows }, { data: invoices, count: invCount }] = await Promise.all([
+  const [
+    { data: subs, count: subCount },
+    { data: statRows },
+    { data: invoices, count: invCount },
+    { data: captureQueue, count: captureQueueCount, error: captureQueueError },
+  ] = await Promise.all([
     subsQuery,
     admin.from("subscriptions").select("status, amount_try, created_at").limit(1000),
     invQuery,
+    admin
+      .from("billing_payment_captures")
+      .select("id, tenant_id, payment_id, target_type, amount_try, status, reconciliation_attempt_count, last_error_code, captured_at", { count: "exact" })
+      .in("status", ["captured_pending", "retry_pending", "manual_review", "refund_required"])
+      .order("captured_at", { ascending: false })
+      .limit(20),
   ]);
 
   const listRows = subs ?? [];
   const listFiltered = Boolean(durum || dateFiltered || query);
   const subRows = statRows ?? [];
   const invRows = invoices ?? [];
+  const reconciliationRows = captureQueue ?? [];
+  const reconciliationCount = captureQueueCount ?? reconciliationRows.length;
   const mrr = subRows.filter((s) => s.status === "active").reduce((sum, s) => sum + Number(s.amount_try || 0), 0);
   const trialing = subRows.filter((s) => s.status === "trialing").length;
   const pastDue = subRows.filter((s) => s.status === "past_due").length;
@@ -197,7 +204,7 @@ export default async function AdminBillingPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-amber-400/20 blur-[80px]" />
         <div className="relative grid gap-6 lg:grid-cols-[1.15fr_1fr] lg:items-center">
@@ -222,7 +229,7 @@ export default async function AdminBillingPage({
                     key={k.key}
                     href={billingHref({ durum: active ? undefined : k.key, from, to, q: query })}
                     aria-current={active ? "page" : undefined}
-                    className={`focus-ring press group relative block rounded-[14px] border p-3 transition ${
+                    className={`focus-ring press group relative block rounded-[var(--radius-card)] border p-3 transition ${
                       active
                         ? "border-amber-300/50 bg-white/15"
                         : "border-white/12 bg-white/8 hover:border-white/25 hover:bg-white/12"
@@ -230,19 +237,19 @@ export default async function AdminBillingPage({
                   >
                     <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:text-amber-300 group-hover:opacity-100" />
                     <p className={`font-display text-xl font-extrabold ${k.tone}`}>{k.value}</p>
-                    <p className="text-[11px] text-white/70">{k.label}</p>
+                    <p className="text-xs text-white/70">{k.label}</p>
                   </Link>
                 );
               })}
             </div>
           </div>
 
-          <div className="rounded-[16px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
+          <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="flex items-center justify-between">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-white/75">
                 <TrendingUp className="h-3.5 w-3.5 text-amber-400" /> Aylık gelir trendi · 8 ay
               </p>
-              <span className="rounded-full bg-mint-500/15 px-2 py-0.5 text-[11px] font-bold text-mint-300">{money(mrr)}</span>
+              <span className="rounded-full bg-mint-500/15 px-2 py-0.5 text-xs font-bold text-mint-300">{money(mrr)}</span>
             </div>
             <svg viewBox="0 0 280 80" className="mt-3 h-24 w-full overflow-visible" preserveAspectRatio="none">
               <defs>
@@ -272,7 +279,7 @@ export default async function AdminBillingPage({
                 </circle>
               ))}
             </svg>
-            <div className="mt-1 flex justify-between text-[10px] text-white/35">
+            <div className="mt-1 flex justify-between text-xs text-white/35">
               {trend.map((m) => (
                 <span key={m.key}>{m.label}</span>
               ))}
@@ -281,10 +288,77 @@ export default async function AdminBillingPage({
         </div>
       </section>
 
+      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
+          <div>
+            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+              <RefreshCw className="h-4 w-4 text-brand-600" /> Tahsilat mutabakat kuyruğu
+            </h2>
+            <p className="mt-0.5 text-xs text-text-faint">
+              Sağlayıcıda doğrulanıp yerel işleme alınmayı bekleyen son 20 kayıt. İade gerektirenler otomatik para hareketi başlatmaz.
+            </p>
+          </div>
+          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+            reconciliationCount > 0
+              ? "bg-danger-500/10 text-danger-600"
+              : "bg-mint-500/10 text-mint-700"
+          }`}>
+            {reconciliationCount > 0 ? `${reconciliationCount} işlem gerekiyor` : "Kuyruk temiz"}
+          </span>
+        </div>
+
+        {captureQueueError ? (
+          <div className="flex items-start gap-2 px-5 py-4 text-sm text-warn-600">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>Mutabakat kuyruğu okunamadı. Billing reconciliation migration ve servis erişimini doğrulayın.</p>
+          </div>
+        ) : reconciliationRows.length === 0 ? (
+          <div className="px-5 py-5 text-sm text-text-muted">Bekleyen, inceleme veya iade kuyruğunda tahsilat yok.</div>
+        ) : (
+          <div className="divide-y divide-line">
+            {reconciliationRows.map((capture) => {
+              const statusLabel: Record<string, string> = {
+                captured_pending: "İşleme alınacak",
+                retry_pending: "Yeniden denenecek",
+                manual_review: "Manuel inceleme",
+                refund_required: "İade gerekli",
+              };
+              const urgent = capture.status === "refund_required" || capture.status === "manual_review";
+              return (
+                <div key={capture.id} className="grid gap-2 px-5 py-3 text-xs sm:grid-cols-[1fr_.8fr_.7fr_.8fr] sm:items-center">
+                  <div>
+                    <Link
+                      href={`/admin/tenants/${capture.tenant_id}`}
+                      className="focus-ring font-semibold text-ink-950 hover:text-brand-600"
+                    >
+                      {capture.target_type === "subscription" ? "Abonelik" : "Ödeme linki"}
+                    </Link>
+                    <p className="font-mono text-xs text-text-faint">{String(capture.payment_id).slice(0, 18)}…</p>
+                  </div>
+                  <p className="font-semibold text-ink-950">{money(Number(capture.amount_try))}</p>
+                  <div>
+                    <span className={`inline-flex rounded-full px-2 py-0.5 font-bold ${
+                      urgent ? "bg-danger-500/10 text-danger-600" : "bg-warn-500/10 text-warn-600"
+                    }`}>
+                      {statusLabel[capture.status] ?? capture.status}
+                    </span>
+                    <p className="mt-1 text-xs text-text-faint">Mutabakat denemesi: {capture.reconciliation_attempt_count}</p>
+                  </div>
+                  <div className="sm:text-right">
+                    <p className="text-text-muted">{new Date(capture.captured_at).toLocaleString("tr-TR")}</p>
+                    {capture.last_error_code ? <p className="font-mono text-xs text-danger-600">{capture.last_error_code}</p> : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
       {/* Tarih aralığı — yalnızca abonelik ve fatura LİSTELERİNİ daraltır */}
       <form
         action="/admin/billing"
-        className="flex flex-wrap items-end gap-3 rounded-[16px] border border-line bg-surface p-3"
+        className="flex flex-wrap items-end gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3"
       >
         {durum ? <input type="hidden" name="durum" value={durum} /> : null}
         {query ? <input type="hidden" name="q" value={query} /> : null}
@@ -294,7 +368,7 @@ export default async function AdminBillingPage({
             type="date"
             name="from"
             defaultValue={from}
-            className="mt-1 block rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
+            className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
           />
         </label>
         <label className="text-xs font-semibold text-text-muted">
@@ -303,30 +377,30 @@ export default async function AdminBillingPage({
             type="date"
             name="to"
             defaultValue={to}
-            className="mt-1 block rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
+            className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
           />
         </label>
         <button
           type="submit"
-          className="focus-ring press rounded-[9px] bg-ink-950 px-3 py-2 text-xs font-semibold text-white"
+          className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-3 py-2 text-xs font-semibold text-white"
         >
           Uygula
         </button>
         {dateFiltered ? (
           <Link
             href={billingHref({ durum, q: query })}
-            className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
+            className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
           >
             Tarih: {from ?? "…"} → {to ?? "…"} <X className="h-3 w-3" />
           </Link>
         ) : null}
-        <p className="ml-auto text-[11px] text-text-faint">
+        <p className="ml-auto text-xs text-text-faint">
           Aralık, abonelik ve fatura listelerine uygulanır; özet kartlar tüm veriyi gösterir.
         </p>
       </form>
 
       {/* Ofis araması — abonelik ve fatura listelerinin ikisini birden daraltır */}
-      <div className="flex flex-wrap items-center gap-3 rounded-[16px] border border-line bg-surface p-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3">
         <AdminSearchForm
           action="/admin/billing"
           defaultValue={query}
@@ -338,13 +412,13 @@ export default async function AdminBillingPage({
             Ofis araması: {query} <X className="h-3 w-3" />
           </AdminFilterChip>
         ) : null}
-        <p className="ml-auto text-[11px] text-text-faint">
+        <p className="ml-auto text-xs text-text-faint">
           Arama ofis adına göre çalışır; eşleşen ofislerin abonelik ve faturaları listelenir.
         </p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-xs font-semibold text-amber-600">
             <Activity className="h-4 w-4" /> Abonelik durumu
           </p>
@@ -373,7 +447,7 @@ export default async function AdminBillingPage({
               </svg>
               <div className="absolute text-center">
                 <p className="font-display text-lg font-extrabold text-ink-950">{subRows.length}</p>
-                <p className="text-[10px] text-text-faint">abonelik</p>
+                <p className="text-xs text-text-faint">abonelik</p>
               </div>
             </div>
             <div className="space-y-1 text-xs">
@@ -399,7 +473,7 @@ export default async function AdminBillingPage({
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+        <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
           <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <CreditCard className="h-4 w-4 text-brand-600" /> Abonelikler
@@ -407,7 +481,7 @@ export default async function AdminBillingPage({
             {durum ? (
               <Link
                 href={billingHref({ from, to, q: query })}
-                className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
+                className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
               >
                 Durum: {subStatus[durum]} <X className="h-3 w-3" />
               </Link>
@@ -422,9 +496,9 @@ export default async function AdminBillingPage({
                   <Link href={`/admin/tenants/${tenantId}`} className="absolute inset-0" aria-label={`${nameOf(s.tenant as Rel)} kaydını aç`} />
                 ) : null}
                 <p className="text-sm font-semibold text-ink-950">{nameOf(s.tenant as Rel)}</p>
-                <p className="text-xs text-text-muted">{planLabel[s.plan] ?? s.plan} · {s.billing_cycle}</p>
+                <p className="text-xs text-text-muted">{planLabel(s.plan)} · {s.billing_cycle}</p>
                 <p className="text-xs font-semibold text-ink-950">{money(Number(s.amount_try))}</p>
-                <span className="w-fit rounded-full bg-amber-400/15 px-2.5 py-1 text-[11px] font-bold text-amber-600">
+                <span className="w-fit rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-600">
                   {subStatus[s.status] ?? s.status}
                 </span>
               </div>
@@ -452,11 +526,11 @@ export default async function AdminBillingPage({
         </section>
       </div>
 
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <FileText className="h-4 w-4 text-brand-600" /> Faturalar
-            <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-[11px] font-bold text-brand-600">
+            <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-xs font-bold text-brand-600">
               {invCount ?? 0}
             </span>
           </h2>
@@ -469,7 +543,7 @@ export default async function AdminBillingPage({
             description={
               listFiltered
                 ? "Seçili tarih aralığı veya ofis aramasında fatura bulunamadı."
-                : "iyzico bağlandığında faturalar otomatik oluşacak; şimdilik abonelik iskeleti üzerinden takip edebilirsiniz."
+                : "Henüz ödeme oturumu başlatılmadı. Fatura taslağı ödeme başlatıldığında oluşur; yalnız doğrulanmış tahsilattan sonra ödendi durumuna geçer."
             }
           />
         ) : (
@@ -487,13 +561,13 @@ export default async function AdminBillingPage({
                 </div>
                 <p className="text-xs font-semibold">{money(Number(inv.total_try))}</p>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="w-fit rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">
+                  <span className="w-fit rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
                     {invStatus[inv.status] ?? inv.status}
                   </span>
                   {Number(inv.reminder_count) > 0 ? (
                     // Dunning cron'unun bıraktığı iz: kaç hatırlatma gitti?
                     <span
-                      className="w-fit rounded-full bg-amber-400/15 px-2.5 py-1 text-[11px] font-bold text-amber-600"
+                      className="w-fit rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-600"
                       title={
                         inv.last_reminder_at
                           ? `Son hatırlatma: ${new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(inv.last_reminder_at))}`

@@ -68,7 +68,7 @@ function downloadBlob(content: string, filename: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
-export function ImportWizard() {
+export function ImportWizard({ canImportProperties }: { canImportProperties: boolean }) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [target, setTarget] = useState<ImportTarget>("customers");
   const [fileName, setFileName] = useState("");
@@ -206,7 +206,7 @@ export function ImportWizard() {
   return (
     <div className="space-y-5">
       {/* adım göstergesi */}
-      <div className="flex flex-wrap items-center gap-4 rounded-[16px] border border-line bg-surface px-4 py-3">
+      <div className="flex flex-wrap items-center gap-4 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3">
         {stepBadge(1, "Dosya & hedef")}
         <span className="h-px w-8 bg-line" />
         {stepBadge(2, "Kolon eşleme & önizleme")}
@@ -216,33 +216,48 @@ export function ImportWizard() {
 
       {/* ADIM 1 — dosya + hedef */}
       {step === 1 && (
-        <section className="dashboard-panel space-y-5 rounded-[20px] border border-line bg-surface p-6">
+        <section className="dashboard-panel space-y-5 rounded-[var(--radius-panel)] border border-line bg-surface p-6">
           <div>
             <h2 className="font-display font-bold text-ink-950">1. Hedef seçin</h2>
             <p className="text-xs text-text-muted">İçe aktarılan satırlar hangi listeye eklenecek?</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {TARGETS.map((t) => {
                 const active = target === t.key;
+                const allowed = t.key !== "properties" || canImportProperties;
                 return (
                   <button
                     key={t.key}
                     type="button"
-                    onClick={() => setTarget(t.key)}
-                    className={`focus-ring press flex items-start gap-3 rounded-[16px] border p-4 text-left transition ${
+                    disabled={!allowed}
+                    aria-describedby={!allowed ? "property-import-permission-note" : undefined}
+                    onClick={() => {
+                      if (allowed) setTarget(t.key);
+                    }}
+                    className={`focus-ring press flex items-start gap-3 rounded-[var(--radius-card)] border p-4 text-left transition ${
                       active ? "border-brand-400 bg-brand-600/[0.06]" : "border-line bg-canvas hover:border-brand-300"
-                    }`}
+                    } disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:border-line`}
                   >
-                    <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[12px] ${active ? "bg-brand-600 text-white" : "bg-brand-600/10 text-brand-600"}`}>
+                    <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] ${active ? "bg-brand-600 text-white" : "bg-brand-600/10 text-brand-600"}`}>
                       <t.icon className="h-5 w-5" />
                     </span>
                     <span>
                       <span className="block text-sm font-bold text-ink-950">{t.label}</span>
-                      <span className="mt-0.5 block text-xs text-text-muted">{t.desc}</span>
+                      <span className="mt-0.5 block text-xs text-text-muted">
+                        {allowed ? t.desc : "Portföy ekleme yetkisi gerekir."}
+                      </span>
                     </span>
                   </button>
                 );
               })}
             </div>
+            {!canImportProperties ? (
+              <p
+                id="property-import-permission-note"
+                className="mt-2 rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/5 px-3 py-2.5 text-xs text-amber-700"
+              >
+                Müşteri aktarımına devam edebilirsiniz. Portföy aktarımı için portföy oluşturma yetkisi gerekir.
+              </p>
+            ) : null}
           </div>
 
           <div>
@@ -251,7 +266,7 @@ export function ImportWizard() {
               Virgül veya noktalı virgül ayraçlı CSV desteklenir; ayraç ve Türkçe karakter kodlaması
               (UTF-8 / Windows-1254) otomatik algılanır. En fazla {IMPORT_ROW_LIMIT} satır.
             </p>
-            <label className="mt-3 block cursor-pointer rounded-[16px] border border-dashed border-line-strong bg-canvas px-6 py-10 text-center transition hover:border-brand-400">
+            <label className="mt-3 block cursor-pointer rounded-[var(--radius-card)] border border-dashed border-line-strong bg-canvas px-6 py-10 text-center transition hover:border-brand-400">
               <input
                 ref={fileRef}
                 type="file"
@@ -269,12 +284,12 @@ export function ImportWizard() {
               <p className="mt-1 text-xs text-text-faint">.csv — Excel dosyanızı önce &quot;CSV olarak kaydedin&quot;</p>
             </label>
             {fileError ? (
-              <p className="mt-2 flex items-start gap-2 rounded-[12px] border border-danger-500/30 bg-danger-500/5 px-3 py-2.5 text-xs text-danger-600" role="alert">
+              <p className="mt-2 flex items-start gap-2 rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 px-3 py-2.5 text-xs text-danger-600" role="alert">
                 <FileWarning className="mt-0.5 h-4 w-4 shrink-0" /> {fileError}
               </p>
             ) : null}
             {parsed ? (
-              <p className="mt-2 flex items-center gap-2 rounded-[12px] border border-mint-500/25 bg-mint-500/5 px-3 py-2.5 text-xs font-semibold text-mint-600">
+              <p className="mt-2 flex items-center gap-2 rounded-[var(--radius-card)] border border-mint-500/25 bg-mint-500/5 px-3 py-2.5 text-xs font-semibold text-mint-600">
                 <CheckCircle2 className="h-4 w-4" />
                 {parsed.rows.length} veri satırı, {parsed.headers.length} kolon okundu
                 (ayraç: {parsed.delimiter === ";" ? "noktalı virgül" : "virgül"}).
@@ -311,7 +326,7 @@ export function ImportWizard() {
 
       {/* ADIM 2 — eşleme + önizleme */}
       {step === 2 && parsed && (
-        <section className="dashboard-panel space-y-5 rounded-[20px] border border-line bg-surface p-6">
+        <section className="dashboard-panel space-y-5 rounded-[var(--radius-panel)] border border-line bg-surface p-6">
           <div>
             <h2 className="font-display font-bold text-ink-950">Kolon eşleme</h2>
             <p className="text-xs text-text-muted">
@@ -355,7 +370,7 @@ export function ImportWizard() {
 
           <div>
             <h3 className="text-sm font-bold text-ink-950">Önizleme (ilk 10 satır, eşlenmiş haliyle)</h3>
-            <div className="mt-2 overflow-x-auto rounded-[14px] border border-line">
+            <div className="mt-2 overflow-x-auto rounded-[var(--radius-card)] border border-line">
               <table className="w-full min-w-[640px] text-left text-xs">
                 <thead className="bg-canvas text-text-muted">
                   <tr>
@@ -382,13 +397,13 @@ export function ImportWizard() {
                 </tbody>
               </table>
             </div>
-            <p className="mt-1.5 text-[11px] text-text-faint">
+            <p className="mt-1.5 text-xs text-text-faint">
               Toplam {parsed.rows.length} satır aktarılacak. Satır numaraları dosyadaki sırayı izler (1 = başlık).
             </p>
           </div>
 
           {target === "customers" ? (
-            <p className="flex items-start gap-2 rounded-[12px] border border-line bg-canvas px-3 py-2.5 text-xs text-text-muted">
+            <p className="flex items-start gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 text-xs text-text-muted">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
               Mükerrer koruması: telefonu zaten kayıtlı olan satırlar eklenmez, raporda &quot;atlandı
               (mevcut)&quot; olarak listelenir.
@@ -408,7 +423,7 @@ export function ImportWizard() {
 
       {/* ADIM 3 — sonuç raporu */}
       {step === 3 && (
-        <section className="dashboard-panel space-y-5 rounded-[20px] border border-line bg-surface p-6">
+        <section className="dashboard-panel space-y-5 rounded-[var(--radius-panel)] border border-line bg-surface p-6">
           {!result || result.error ? (
             <EmptyState
               icon={XCircle}
@@ -424,15 +439,15 @@ export function ImportWizard() {
                 <p className="text-xs text-text-muted">{fileName} · {target === "customers" ? "Müşteriler" : "Portföyler"}</p>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-[14px] border border-mint-500/25 bg-mint-500/5 p-4">
+                <div className="rounded-[var(--radius-card)] border border-mint-500/25 bg-mint-500/5 p-4">
                   <p className="flex items-center gap-1.5 text-xs font-semibold text-mint-600"><CheckCircle2 className="h-4 w-4" /> Eklendi</p>
                   <p className="numeric mt-1 font-display text-2xl font-extrabold text-ink-950">{result.inserted ?? 0}</p>
                 </div>
-                <div className="rounded-[14px] border border-amber-400/30 bg-amber-400/5 p-4">
+                <div className="rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/5 p-4">
                   <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-600"><AlertTriangle className="h-4 w-4" /> Atlandı (mevcut)</p>
                   <p className="numeric mt-1 font-display text-2xl font-extrabold text-ink-950">{result.skipped ?? 0}</p>
                 </div>
-                <div className="rounded-[14px] border border-danger-500/25 bg-danger-500/5 p-4">
+                <div className="rounded-[var(--radius-card)] border border-danger-500/25 bg-danger-500/5 p-4">
                   <p className="flex items-center gap-1.5 text-xs font-semibold text-danger-600"><XCircle className="h-4 w-4" /> Hatalı</p>
                   <p className="numeric mt-1 font-display text-2xl font-extrabold text-ink-950">
                     {(result.errors?.length ?? 0) - (result.skipped ?? 0)}
@@ -453,7 +468,7 @@ export function ImportWizard() {
                       <Download className="h-3.5 w-3.5" /> Tam raporu indir (.txt)
                     </Button>
                   </div>
-                  <div className="mt-2 max-h-80 overflow-auto rounded-[14px] border border-line">
+                  <div className="mt-2 max-h-80 overflow-auto rounded-[var(--radius-card)] border border-line">
                     <table className="w-full text-left text-xs">
                       <thead className="sticky top-0 bg-canvas text-text-muted">
                         <tr>
@@ -473,7 +488,7 @@ export function ImportWizard() {
                   </div>
                 </div>
               ) : (
-                <p className="flex items-center gap-2 rounded-[12px] border border-mint-500/25 bg-mint-500/5 px-3 py-2.5 text-xs font-semibold text-mint-600">
+                <p className="flex items-center gap-2 rounded-[var(--radius-card)] border border-mint-500/25 bg-mint-500/5 px-3 py-2.5 text-xs font-semibold text-mint-600">
                   <CheckCircle2 className="h-4 w-4" /> Tüm satırlar sorunsuz aktarıldı.
                 </p>
               )}

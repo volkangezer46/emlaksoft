@@ -146,8 +146,6 @@ export const TRIGGER_CONDITION_FIELDS: Record<string, { value: string; label: st
 export const STATUS_ENTITY_BY_TRIGGER: Record<string, "demand" | "deal"> = {
   new_demand:   "demand",
   demand_stale: "demand",
-  deal_won:     "deal",
-  deal_lost:    "deal",
 };
 
 export const DEMAND_STATUS_OPTIONS = [
@@ -185,7 +183,6 @@ export function availableActionsForTrigger(trigger: string): ActionOption[] {
   if (!NO_CUSTOMER_TRIGGERS.has(trigger)) {
     options.push(
       { value: "send_sms",      label: "SMS gönder",      description: "Müşterinin telefonuna SMS gönderir." },
-      { value: "send_whatsapp", label: "WhatsApp gönder", description: "Müşteriye WhatsApp mesajı gönderir." },
       { value: "add_tag",       label: "Etiket ekle",     description: "Müşteri kartına otomatik etiket ekler." },
     );
   }

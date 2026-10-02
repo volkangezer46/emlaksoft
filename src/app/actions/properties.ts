@@ -13,6 +13,7 @@ import { notifyTenant } from "@/lib/notify";
 import { fetchTenantMatchingWeights, scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
+import { parseMoneyInput } from "@/lib/money-input";
 
 export type PropertyResult = { error?: string; ok?: boolean; matchedDemands?: number };
 
@@ -25,7 +26,7 @@ function parseCoord(raw: FormDataEntryValue | null): number | null {
   return n;
 }
 
-const STATUSES = ["draft", "live", "reserved", "sold", "rented", "archived"];
+const MANUAL_STATUSES = ["draft", "live", "reserved", "archived"];
 
 /**
  * Public vitrin sayfaları ISR'lı (`export const revalidate = 120`). Yayın
@@ -179,18 +180,22 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   const lngVal = parseCoord(formData.get("lng"));
   const rooms = String(formData.get("rooms") ?? "").trim();
   const sqmValue = Number(String(formData.get("sqm") ?? "").replace(",", "."));
-  const rawPrice = String(formData.get("list_price") ?? "").replace(/[^\d.,]/g, "");
-  const priceValue = Number(rawPrice.replace(/\./g, "").replace(",", "."));
-  const commissionValue = Number(String(formData.get("commission_rate") ?? "").replace(",", "."));
+  const priceResult = parseMoneyInput(formData.get("list_price"), { max: 1_000_000_000_000 });
+  const commissionResult = parseMoneyInput(formData.get("commission_rate"), { max: 100 });
   const parcelBlock = String(formData.get("parcel_block") ?? "").trim();
   const parcelLot = String(formData.get("parcel_lot") ?? "").trim();
 
   if (!title || !transactionType || !propertyType) {
     return { error: "Başlık, işlem türü ve portföy türü zorunlu." };
   }
-  if (!Number.isFinite(priceValue) || priceValue <= 0) {
+  if (!priceResult.ok || priceResult.value == null) {
     return { error: "Geçerli bir liste fiyatı girin." };
   }
+  if (!commissionResult.ok || commissionResult.value == null) {
+    return { error: "Komisyon oranı 0'dan büyük, en fazla 100 ve en çok iki ondalık haneli olmalıdır." };
+  }
+  const priceValue = priceResult.value;
+  const commissionValue = commissionResult.value;
 
   const stamp = new Date().toISOString().slice(2, 7).replace("-", "");
   const suffix = crypto.randomUUID().slice(0, 6).toUpperCase();
@@ -227,7 +232,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
       property_type: propertyType,
       status: "draft",
       list_price: priceValue,
-      commission_rate: Number.isFinite(commissionValue) ? commissionValue : null,
+      commission_rate: commissionValue,
       province_id: provinceId || null,
       district_id: districtId || null,
       neighborhood_id: neighborhoodId || null,
@@ -330,19 +335,27 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
   const lngVal = parseCoord(formData.get("lng"));
   const rooms = String(formData.get("rooms") ?? "").trim();
   const sqmValue = Number(String(formData.get("sqm") ?? "").replace(",", "."));
-  const rawPrice = String(formData.get("list_price") ?? "").replace(/[^\d.,]/g, "");
-  const priceValue = Number(rawPrice.replace(/\./g, "").replace(",", "."));
-  const commissionValue = Number(String(formData.get("commission_rate") ?? "").replace(",", "."));
-  const minRaw = String(formData.get("min_price") ?? "").replace(/[^\d.,]/g, "");
-  const minValue = minRaw ? Number(minRaw.replace(/\./g, "").replace(",", ".")) : null;
+  const priceResult = parseMoneyInput(formData.get("list_price"), { max: 1_000_000_000_000 });
+  const commissionResult = parseMoneyInput(formData.get("commission_rate"), { max: 100 });
+  const minResult = parseMoneyInput(formData.get("min_price"), { max: 1_000_000_000_000 });
   const parcelBlock = String(formData.get("parcel_block") ?? "").trim();
   const parcelLot = String(formData.get("parcel_lot") ?? "").trim();
 
   if (!title || !transactionType || !propertyType) {
     return { error: "Başlık, işlem türü ve portföy türü zorunlu." };
   }
-  if (!Number.isFinite(priceValue) || priceValue <= 0) {
+  if (!priceResult.ok || priceResult.value == null) {
     return { error: "Geçerli bir liste fiyatı girin." };
+  }
+  if (!commissionResult.ok || commissionResult.value == null) {
+    return { error: "Komisyon oranı 0'dan büyük, en fazla 100 ve en çok iki ondalık haneli olmalıdır." };
+  }
+  if (!minResult.ok) return { error: "Geçerli bir minimum fiyat girin." };
+  const priceValue = priceResult.value;
+  const commissionValue = commissionResult.value;
+  const minValue = minResult.value;
+  if (minValue != null && minValue > priceValue) {
+    return { error: "Minimum fiyat liste fiyatından yüksek olamaz." };
   }
 
   const supabase = await createClient();
@@ -388,8 +401,8 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
     transaction_type: transactionType,
     property_type: propertyType,
     list_price: priceValue,
-    min_price: minValue != null && Number.isFinite(minValue) ? minValue : null,
-    commission_rate: Number.isFinite(commissionValue) ? commissionValue : null,
+    min_price: minValue,
+    commission_rate: commissionValue,
     province_id: provinceId || null,
     district_id: districtId || null,
     neighborhood_id: neighborhoodId || null,
@@ -461,36 +474,21 @@ export async function setPropertyStatus(formData: FormData): Promise<void> {
 
   const id = String(formData.get("id") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
-  if (!id || !STATUSES.includes(status)) return;
+  if (!id || !MANUAL_STATUSES.includes(status)) return;
 
-  const supabase = await createClient();
-  const patch: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
-  // Gerçek yayın damgası: İLK kez live'a geçişte published_at set edilir.
-  // Zaten doluysa DOKUNMA — yeniden yayına almada (reserved→live gibi)
-  // orijinal yayın tarihi korunur ("Yeni" rozeti/cron sahte tazelenmesin).
-  if (status === "live") {
-    const { data: cur } = await supabase
-      .from("properties")
-      .select("published_at")
-      .eq("id", id)
-      .eq("tenant_id", gate.tenantId)
-      .maybeSingle();
-    if (cur && cur.published_at == null) patch.published_at = new Date().toISOString();
-  }
-  await supabase
-    .from("properties")
-    .update(patch)
-    .eq("id", id)
-    .eq("tenant_id", gate.tenantId);
-
-  await logActivity({
-    tenantId: gate.tenantId,
-    actorId: gate.userId,
-    action: "property.status",
-    entityType: "property",
-    entityId: id,
-    newValue: { status },
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("transition_property_status_atomic", {
+    p_tenant_id: gate.tenantId,
+    p_actor_id: gate.userId,
+    p_property_ids: [id],
+    p_status: status,
+    p_reason: "Portföy detayından güncelleme",
   });
+  const outcome = String((data as { outcome?: string } | null)?.outcome ?? "");
+  if (error || (outcome !== "applied" && outcome !== "replay")) {
+    console.error("setPropertyStatus atomic", { code: error?.code, outcome });
+    return;
+  }
 
   revalidatePath("/app/portfoyler");
   revalidatePath(`/app/portfoyler/${id}`);

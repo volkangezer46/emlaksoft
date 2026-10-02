@@ -7,14 +7,22 @@ import { ExportButton } from "@/components/admin/export-button";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card";
 import { moneyTRY } from "@/lib/admin-format";
-import { daysAgoIso, now as clockNow } from "@/lib/clock";
-import { CORE_MODULES, moduleForAction } from "@/app/admin/tenants/[id]/module-map";
+import { now as clockNow } from "@/lib/clock";
 import type { CSSProperties } from "react";
+import { planLabel as catalogPlanLabel, PLANS } from "@/lib/billing/plans";
+import { exactMrr, exactTrendMrr, type PlatformReportingAggregate } from "@/lib/reporting/platform";
+import { requireReportingData } from "@/lib/reporting/result";
 
-const planPrice: Record<string, number> = { advisor: 990, office: 2490, professional: 5990, enterprise: 12900 };
-const planLabel: Record<string, string> = { advisor: "Danışman", office: "Ofis", professional: "Profesyonel", enterprise: "Kurumsal" };
 const statusLabel: Record<string, string> = { trial: "Deneme", active: "Aktif", past_due: "Gecikmiş", suspended: "Askıda", cancelled: "İptal" };
 const statusColor: Record<string, string> = { trial: "bg-cyan-400", active: "bg-mint-500", past_due: "bg-amber-400", suspended: "bg-danger-500", cancelled: "bg-ink-950/25" };
+
+const ADOPTION_MODULES = [
+  ["customers", "Müşteriler"], ["demands", "Talepler"], ["properties", "Portföyler"],
+  ["deals", "Anlaşmalar"], ["tasks", "Görevler"], ["appointments", "Randevular"],
+  ["commissions", "Komisyon"], ["contracts", "Sözleşmeler"], ["rentals", "Kiralama"],
+  ["campaigns", "Kampanyalar"], ["automations", "Otomasyon"], ["valuations", "Değerleme"],
+  ["projects", "Projeler"], ["network", "Ofis ağı"],
+] as const;
 
 /** `?from=&to=` — yalnızca geçerli YYYY-AA-GG kabul edilir; bozuk değer yok sayılır. */
 function parseDateParam(raw: string | undefined): string | undefined {
@@ -37,63 +45,33 @@ export default async function AdminReportsPage({
 
   // Tarih aralığı verilirse metrikler o aralıkta OLUŞMUŞ kayıtlardan hesaplanır;
   // parametre yoksa mevcut davranış (tüm veri) korunur.
-  let tenantsQ = admin.from("tenants").select("id, name, plan, status, created_at").limit(500);
-  let subsQ = admin.from("subscriptions").select("status, amount_try, plan, created_at").limit(500);
-  let ticketsQ = admin.from("support_tickets").select("id, status, created_at").limit(1000);
-  if (from) {
-    tenantsQ = tenantsQ.gte("created_at", from);
-    subsQ = subsQ.gte("created_at", from);
-    ticketsQ = ticketsQ.gte("created_at", from);
-  }
-  if (to) {
-    const toEnd = `${to}T23:59:59.999`;
-    tenantsQ = tenantsQ.lte("created_at", toEnd);
-    subsQ = subsQ.lte("created_at", toEnd);
-    ticketsQ = ticketsQ.lte("created_at", toEnd);
-  }
-
-  // Modül benimseme — sabit son 30 gün penceresi (tarih filtresinden bağımsız);
-  // tek toplu sorgu, bellekte gruplanır. 10000 üstü kesilir — not gösterilir.
-  const ADOPTION_LIMIT = 10000;
-  const adoptionQ = admin
-    .from("audit_logs")
-    .select("tenant_id, action")
-    .gte("created_at", daysAgoIso(30))
-    .limit(ADOPTION_LIMIT);
-
-  const [{ data: tenants }, { data: subs }, { data: tickets }, { data: adoptionLogs }, { count: allTenantCount }] = await Promise.all([
-    tenantsQ,
-    subsQ,
-    ticketsQ,
-    adoptionQ,
-    admin.from("tenants").select("id", { count: "exact", head: true }),
-  ]);
-
-  const list = tenants ?? [];
-  const subRows = subs ?? [];
-  const ticketRows = tickets ?? [];
-
-  const active = list.filter((t) => t.status === "active").length;
-  const cancelled = list.filter((t) => t.status === "cancelled").length;
-  const mrr = subRows.filter((s) => s.status === "active").reduce((sum, s) => sum + Number(s.amount_try || 0), 0) ||
-    list.filter((t) => t.status === "active").reduce((sum, t) => sum + (planPrice[t.plan] ?? 0), 0);
-  const arpa = active ? Math.round(mrr / active) : 0;
-  const churnRate = list.length ? Math.round((cancelled / list.length) * 100) : 0;
-
-  // MRR trend — 12 ay kümülatif aktif abonelik geliri
   const now = new Date(clockNow());
+  const aggregateResult = await admin.rpc("platform_reporting_aggregates", {
+    p_from: from ?? null,
+    p_to: to ?? null,
+    p_as_of: now.toISOString(),
+  });
+  const aggregate = requireReportingData(
+    "platform-reporting-aggregates",
+    aggregateResult,
+  ) as unknown as PlatformReportingAggregate;
+
+  // Modül benimseme sabit son 30 gün penceresinde, DB'de tenant-distinct hesaplanır.
+  const summary = aggregate.summary;
+
+  const active = Number(summary.active_count);
+  const cancelled = Number(summary.cancelled_count);
+  const mrr = exactMrr(aggregate.plan_stats);
+  const arpa = active ? Math.round(mrr / active) : 0;
+  const tenantCount = Number(summary.tenant_count);
+  const churnRate = tenantCount ? Math.round((cancelled / tenantCount) * 100) : 0;
+
+  // Tarihsel durum tablosu olmadığı için seri, bugün aktif aboneliklerin başlangıç kohortudur.
   const months = Array.from({ length: 12 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
-    return { label: d.toLocaleDateString("tr-TR", { month: "short" }), cutoff: new Date(d.getFullYear(), d.getMonth() + 1, 0) };
+    return { label: d.toLocaleDateString("tr-TR", { month: "short" }) };
   });
-  const trend = months.map((m) =>
-    subRows
-      .filter((s) => (s.status === "active" || s.status === "trialing") && new Date(s.created_at) <= m.cutoff)
-      .reduce((sum, s) => sum + Number(s.amount_try || 0), 0),
-  );
-  const trendFallback = trend.every((v) => v === 0)
-    ? months.map((m) => list.filter((t) => t.status === "active" && new Date(t.created_at) <= m.cutoff).reduce((s, t) => s + (planPrice[t.plan] ?? 0), 0))
-    : trend;
+  const trendFallback = aggregate.mrr_trend.map(exactTrendMrr);
   const maxTrend = Math.max(1, ...trendFallback);
   const W = 560, H = 130;
   const pts = trendFallback.map((v, i) => ({ x: (i / 11) * W, y: H - (v / maxTrend) * (H - 16) - 8 }));
@@ -101,55 +79,51 @@ export default async function AdminReportsPage({
   const area = `0,${H} ${line} ${W},${H}`;
 
   // Plan geliri
-  const planRevenue = ["advisor", "office", "professional", "enterprise"].map((p) => ({
-    key: p, label: planLabel[p],
-    count: list.filter((t) => t.plan === p).length,
-    revenue: list.filter((t) => t.plan === p && t.status === "active").reduce((s) => s + planPrice[p]!, 0),
-  }));
+  const planRevenue = PLANS.map((plan) => {
+    const row = aggregate.plan_stats.find((item) => item.plan === plan.id);
+    return {
+      key: plan.id,
+      label: plan.name,
+      count: Number(row?.tenant_count ?? 0),
+      revenue: Number(row?.subscription_mrr ?? 0)
+        + Math.max(0, Number(row?.active_count ?? 0) - Number(row?.subscription_count ?? 0)) * plan.monthlyTry,
+    };
+  });
   const maxRev = Math.max(1, ...planRevenue.map((p) => p.revenue));
 
   // Durum dağılımı
   const statuses = ["trial", "active", "past_due", "suspended", "cancelled"].map((s) => ({
-    key: s, label: statusLabel[s], count: list.filter((t) => t.status === s).length,
+    key: s,
+    label: statusLabel[s],
+    count: Number(aggregate.status_stats.find((row) => row.status === s)?.tenant_count ?? 0),
   }));
-  const statusTotal = Math.max(1, list.length);
+  const statusTotal = Math.max(1, tenantCount);
 
   // Top tenant (plan değerine göre)
-  const topTenants = [...list]
-    .filter((t) => t.status === "active")
-    .map((t) => ({ ...t, value: planPrice[t.plan] ?? 0 }))
+  const topTenants = aggregate.top_tenants
+    .map((tenant) => ({ ...tenant, value: PLANS.find((plan) => plan.id === tenant.plan)?.monthlyTry ?? 0 }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 6);
 
   // Modül benimseme: her modülü son 30 günde en az 1 kez kullanan ofis oranı
-  const adoptionRows = adoptionLogs ?? [];
-  const adoptionTruncated = adoptionRows.length >= ADOPTION_LIMIT;
-  const tenantDenom = Math.max(1, allTenantCount ?? 0);
-  const moduleTenants = new Map<string, Set<string>>();
-  for (const r of adoptionRows) {
-    if (!r.tenant_id) continue;
-    const mod = moduleForAction(r.action);
-    const set = moduleTenants.get(mod) ?? new Set<string>();
-    set.add(r.tenant_id);
-    moduleTenants.set(mod, set);
-  }
-  const adoption = CORE_MODULES.map((mod) => ({
+  const tenantDenom = Math.max(1, Number(aggregate.all_tenant_count));
+  const adoption = ADOPTION_MODULES.map(([id, mod]) => ({
     mod,
-    offices: moduleTenants.get(mod)?.size ?? 0,
-    pct: Math.round(((moduleTenants.get(mod)?.size ?? 0) / tenantDenom) * 100),
+    offices: Number(aggregate.adoption.find((row) => row.module === id)?.offices ?? 0),
+    pct: Math.round((Number(aggregate.adoption.find((row) => row.module === id)?.offices ?? 0) / tenantDenom) * 100),
   })).sort((a, b) => b.pct - a.pct);
   // En düşük 2 modül → tanıtım fırsatı altyazısı
   const lowestMods = new Set(adoption.slice(-2).map((a) => a.mod));
 
-  const resolvedRate = ticketRows.length
-    ? Math.round((ticketRows.filter((t) => ["resolved", "closed"].includes(t.status)).length / ticketRows.length) * 100)
+  const resolvedRate = Number(summary.ticket_count)
+    ? Math.round((Number(summary.resolved_ticket_count) / Number(summary.ticket_count)) * 100)
     : 0;
 
   /*
    * Hiç ofis yoksa "%0 churn" / "₺0 ARPA" gibi sayılar bilgi değil gürültüdür —
    * kartlar boş duruma düşer (sahte sıfır basmak yasak).
    */
-  const hasData = list.length > 0;
+  const hasData = tenantCount > 0;
   const kpis: {
     label: string;
     href: string;
@@ -196,14 +170,14 @@ export default async function AdminReportsPage({
       </AdminPageHeader>
 
       {/* Tarih aralığı — metrikler seçili aralıktaki kayıtlardan hesaplanır */}
-      <form action="/admin/raporlar" className="flex flex-wrap items-end gap-3 rounded-[16px] border border-line bg-surface p-3">
+      <form action="/admin/raporlar" className="flex flex-wrap items-end gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3">
         <label className="text-xs font-semibold text-text-muted">
           Başlangıç
           <input
             type="date"
             name="from"
             defaultValue={from}
-            className="mt-1 block rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
+            className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
           />
         </label>
         <label className="text-xs font-semibold text-text-muted">
@@ -212,29 +186,30 @@ export default async function AdminReportsPage({
             type="date"
             name="to"
             defaultValue={to}
-            className="mt-1 block rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
+            className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
           />
         </label>
-        <button type="submit" className="focus-ring press rounded-[9px] bg-ink-950 px-3 py-2 text-xs font-semibold text-white">
+        <button type="submit" className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-3 py-2 text-xs font-semibold text-white">
           Uygula
         </button>
         {dateFiltered ? (
           <Link
             href="/admin/raporlar"
-            className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
+            className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
           >
             Tarih: {from ?? "…"} → {to ?? "…"} · temizle
           </Link>
         ) : (
-          <p className="ml-auto text-[11px] text-text-faint">Aralık seçilmezse tüm veri raporlanır.</p>
+          <p className="ml-auto text-xs text-text-faint">Aralık seçilmezse tüm veri raporlanır.</p>
         )}
       </form>
 
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
         <div className="flex items-center justify-between">
-          <p className="flex items-center gap-2 text-sm font-semibold text-ink-950"><LineChart className="h-4 w-4 text-brand-600" /> Aylık gelir trendi · 12 ay</p>
+          <p className="flex items-center gap-2 text-sm font-semibold text-ink-950"><LineChart className="h-4 w-4 text-brand-600" /> Aktif abonelik kohortu · 12 ay</p>
           <span className="rounded-full bg-mint-500/10 px-2.5 py-1 text-xs font-bold text-mint-600">{moneyTRY(trendFallback[11] ?? 0)}</span>
         </div>
+        <p className="mt-1 text-xs text-text-faint">Bugün aktif aboneliklerin başlangıç tarihine göre kümülatif MRR görünümü.</p>
         <svg viewBox={`0 0 ${W} ${H}`} className="mt-4 w-full overflow-visible" style={{ height: H }} preserveAspectRatio="none">
           <defs>
             <linearGradient id="repTrend" x1="0" y1="0" x2="0" y2="1">
@@ -251,18 +226,18 @@ export default async function AdminReportsPage({
             </circle>
           ))}
         </svg>
-        <div className="mt-1 flex justify-between text-[10px] text-text-faint">
+        <div className="mt-1 flex justify-between text-xs text-text-faint">
           {months.map((m, i) => <span key={i}>{m.label}</span>)}
         </div>
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* plan revenue */}
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-sm font-semibold text-ink-950"><Building2 className="h-4 w-4 text-amber-600" /> Plan geliri</p>
           <div className="mt-4 space-y-3">
             {planRevenue.map((p, i) => (
-              <Link key={p.key} href={`/admin/tenants?plan=${p.key}`} className="focus-ring group block rounded-[8px]">
+              <Link key={p.key} href={`/admin/tenants?plan=${p.key}`} className="focus-ring group block rounded-[var(--radius-control)]">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-ink-950 transition group-hover:text-brand-600">{p.label} <span className="text-text-faint">· {p.count} ofis</span></span>
                   <span className="tabular-nums text-text-muted">{moneyTRY(p.revenue)}</span>
@@ -276,7 +251,7 @@ export default async function AdminReportsPage({
         </section>
 
         {/* status distribution */}
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-sm font-semibold text-ink-950"><PieChart className="h-4 w-4 text-brand-600" /> Durum dağılımı</p>
           <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-ink-950/5">
             {statuses.map((s) => s.count > 0 ? (
@@ -285,7 +260,7 @@ export default async function AdminReportsPage({
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2">
             {statuses.map((s) => (
-              <Link key={s.key} href={`/admin/tenants?durum=${s.key}`} className="focus-ring group flex items-center justify-between rounded-[10px] border border-line bg-canvas/50 px-3 py-2 text-xs transition hover:border-brand-300">
+              <Link key={s.key} href={`/admin/tenants?durum=${s.key}`} className="focus-ring group flex items-center justify-between rounded-[var(--radius-control)] border border-line bg-canvas/50 px-3 py-2 text-xs transition hover:border-brand-300">
                 <span className="flex items-center gap-2 transition group-hover:text-brand-600"><span className={`h-2 w-2 rounded-full ${statusColor[s.key]}`} /> {s.label}</span>
                 <span className="font-bold tabular-nums text-ink-950">{s.count}</span>
               </Link>
@@ -302,19 +277,19 @@ export default async function AdminReportsPage({
       </div>
 
       {/* top tenants */}
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
-        <p className="flex items-center gap-2 text-sm font-semibold text-ink-950"><TrendingUp className="h-4 w-4 text-mint-600" /> En değerli ofisler</p>
+      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+        <p className="flex items-center gap-2 text-sm font-semibold text-ink-950"><TrendingUp className="h-4 w-4 text-mint-600" /> En değerli ofisler · ilk 6</p>
         <div className="mt-4 space-y-2">
           {topTenants.length === 0 ? (
             <p className="py-6 text-center text-sm text-text-muted">Aktif ofis yok.</p>
           ) : topTenants.map((t, i) => (
-            <Link key={t.id} href={`/admin/tenants/${t.id}`} className="focus-ring group flex items-center gap-3 rounded-[12px] border border-line bg-canvas/50 px-3 py-2.5 transition hover:border-brand-300">
+            <Link key={t.id} href={`/admin/tenants/${t.id}`} className="focus-ring group flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-2.5 transition hover:border-brand-300">
               <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-600/10 text-xs font-bold text-brand-600">{i + 1}</span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-ink-950 transition group-hover:text-brand-600">{t.name}</p>
-                <p className="text-[11px] text-text-faint">{planLabel[t.plan] ?? t.plan}</p>
+                <p className="text-xs text-text-faint">{catalogPlanLabel(t.plan)}</p>
               </div>
-              <span className="shrink-0 font-display text-sm font-extrabold tabular-nums text-ink-950">{moneyTRY(t.value)}<span className="text-[11px] font-normal text-text-faint">/ay</span></span>
+              <span className="shrink-0 font-display text-sm font-extrabold tabular-nums text-ink-950">{moneyTRY(t.value)}<span className="text-xs font-normal text-text-faint">/ay</span></span>
               <ArrowUpRight className="hover-action h-4 w-4 shrink-0 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
             </Link>
           ))}
@@ -322,23 +297,18 @@ export default async function AdminReportsPage({
       </section>
 
       {/* Modül benimseme — tüm ofislerde son 30 gün kullanım yaygınlığı */}
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="flex items-center gap-2 text-sm font-semibold text-ink-950">
             <LayoutGrid className="h-4 w-4 text-brand-600" /> Modül benimseme · son 30 gün
           </p>
-          <span className="text-[11px] text-text-faint">
-            {allTenantCount ?? 0} ofis üzerinden · en az 1 işlem yapan ofis oranı
+          <span className="text-xs text-text-faint">
+            {Number(aggregate.all_tenant_count)} ofis üzerinden · en az 1 işlem yapan ofis oranı
           </span>
         </div>
-        {adoptionTruncated ? (
-          <p className="mt-3 rounded-[10px] border border-amber-400/40 bg-amber-400/8 px-3 py-2 text-[11px] font-semibold text-amber-700">
-            Son 30 günde {ADOPTION_LIMIT}+ aktivite kaydı var; analiz ilk {ADOPTION_LIMIT} kayıtla sınırlı — oranlar alt sınırdır.
-          </p>
-        ) : null}
         <div className="mt-4 space-y-3">
           {adoption.map((a, i) => (
-            <Link key={a.mod} href="/admin/aktivite" className="focus-ring group block rounded-[8px]">
+            <Link key={a.mod} href="/admin/aktivite" className="focus-ring group block rounded-[var(--radius-control)]">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-ink-950 transition group-hover:text-brand-600">
                   {a.mod} <span className="text-text-faint">· {a.offices} ofis</span>
@@ -354,7 +324,7 @@ export default async function AdminReportsPage({
                 />
               </div>
               {lowestMods.has(a.mod) ? (
-                <p className="mt-1 text-[11px] font-semibold text-amber-700">
+                <p className="mt-1 text-xs font-semibold text-amber-700">
                   {a.mod} %{a.pct} — tanıtım fırsatı: ofislere bu modülü anlatan bir duyuru/eğitim planlayın.
                 </p>
               ) : null}

@@ -23,35 +23,64 @@ function allowlist(): string[] {
 }
 
 /** Ensure allowlisted emails are inserted into platform_staff on first access. */
-async function bootstrapIfAllowed(userId: string, email: string, fullName: string) {
+export async function bootstrapPlatformStaffIfAllowed(
+  userId: string,
+  email: string,
+  fullName: string,
+) {
   const list = allowlist();
   if (!list.includes(email.toLowerCase())) return null;
 
   const admin = createAdminClient();
+  const { data: existing, error: existingError } = await admin
+    .from("platform_staff")
+    .select("id, email, full_name, role, is_active")
+    .eq("id", userId)
+    .maybeSingle();
+  if (existingError) {
+    console.error("platform bootstrap lookup", existingError);
+    return null;
+  }
+  // An explicit deactivation is authoritative. The environment allowlist may
+  // bootstrap a never-seen identity, but must never reactivate or promote it.
+  if (existing) return existing.is_active ? (existing as PlatformStaff) : null;
+
   const { data, error } = await admin
     .from("platform_staff")
-    .upsert(
-      {
-        id: userId,
-        email: email.toLowerCase(),
-        full_name: fullName || email,
-        role: "super_admin",
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "id" },
-    )
+    .insert({
+      id: userId,
+      email: email.toLowerCase(),
+      full_name: fullName || email,
+      role: "super_admin",
+      is_active: true,
+      updated_at: new Date().toISOString(),
+    })
     .select("id, email, full_name, role, is_active")
     .single();
 
   if (error) {
+    // Concurrent first access may win the insert. Re-read without mutating;
+    // an inactive winner remains inactive and no role is overwritten.
+    if (error.code === "23505") {
+      const { data: raced } = await admin
+        .from("platform_staff")
+        .select("id, email, full_name, role, is_active")
+        .eq("id", userId)
+        .maybeSingle();
+      return raced?.is_active ? (raced as PlatformStaff) : null;
+    }
     console.error("platform bootstrap", error);
     return null;
   }
   return data as PlatformStaff;
 }
 
-export const getPlatformStaff = cache(async (): Promise<PlatformStaff | null> => {
+/**
+ * Active platform record before the mandatory AAL2 check. This is exported
+ * only for the MFA enrollment/challenge page; authorization must use
+ * `getPlatformStaffIdentity`, `getPlatformStaff` or `requirePlatform*`.
+ */
+export const getPlatformMfaCandidate = cache(async (): Promise<PlatformStaff | null> => {
   const user = await getRequestUser();
   if (!user?.email) return null;
 
@@ -69,7 +98,25 @@ export const getPlatformStaff = cache(async (): Promise<PlatformStaff | null> =>
     (user.user_metadata?.full_name as string | undefined) ??
     user.email.split("@")[0] ??
     "Staff";
-  return bootstrapIfAllowed(user.id, user.email, name);
+  return bootstrapPlatformStaffIfAllowed(user.id, user.email, name);
+});
+
+/** Active platform identity with a session-level Supabase AAL2 proof. */
+export const getPlatformStaffIdentity = cache(async (): Promise<PlatformStaff | null> => {
+  const staff = await getPlatformMfaCandidate();
+  if (!staff) return null;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (error || data.currentLevel !== "aal2") return null;
+  return staff;
+});
+
+/** Platform capability identity. Readonly impersonation never carries admin powers. */
+export const getPlatformStaff = cache(async (): Promise<PlatformStaff | null> => {
+  const user = await getRequestUser();
+  if (!user || user.app_metadata?.impersonating === true) return null;
+  return getPlatformStaffIdentity();
 });
 
 export async function requirePlatformStaff(): Promise<PlatformStaff> {
@@ -77,6 +124,10 @@ export async function requirePlatformStaff(): Promise<PlatformStaff> {
   if (!staff) {
     const user = await getRequestUser();
     if (!user) redirect("/giris?next=/admin");
+    const candidate = await getPlatformMfaCandidate();
+    if (candidate && user.app_metadata?.impersonating !== true) {
+      redirect("/giris/mfa?next=/admin");
+    }
     redirect("/app");
   }
   return staff;

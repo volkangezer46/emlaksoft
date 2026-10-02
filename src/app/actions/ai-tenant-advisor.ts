@@ -5,6 +5,12 @@ import { requirePermission } from "@/lib/require-permission";
 import { getOpenAiKey } from "@/lib/ai-advisor";
 import { computeLeadScore } from "@/lib/lead-score";
 import { checkRateLimit } from "@/lib/rate-limit";
+import {
+  externalErrorMetadata,
+  fetchExternal,
+  readExternalJson,
+  requireExternalSuccess,
+} from "@/lib/external-fetch";
 import { createTask } from "@/app/actions/tasks";
 
 // ---------------------------------------------------------------------------
@@ -33,6 +39,8 @@ export type AdvisorAction =
 const MAX_MESSAGES = 12;
 const MAX_LEN = 2000;
 const OPENAI_MODEL = "gpt-4o-mini";
+const OPENAI_TIMEOUT_MS = 45_000;
+const OPENAI_MAX_RESPONSE_BYTES = 1024 * 1024;
 
 const RATE_LIMIT_ERROR = "Çok fazla istek gönderildi. Lütfen bir dakika sonra tekrar deneyin.";
 
@@ -43,7 +51,11 @@ const RATE_LIMIT_ERROR = "Çok fazla istek gönderildi. Lütfen bir dakika sonra
  * aşımında 13 sorguluk bağlam derlemesinin maliyeti hiç ödenmez.
  */
 async function advisorRateLimited(userId: string): Promise<boolean> {
-  const { allowed } = await checkRateLimit(`ai-chat:${userId}`, { limit: 10, windowSec: 60 });
+  const { allowed } = await checkRateLimit(`ai-chat:${userId}`, {
+    limit: 10,
+    windowSec: 60,
+    failurePolicy: "deny",
+  });
   return !allowed;
 }
 
@@ -260,7 +272,7 @@ async function callOpenAI(
   messages: TenantAdvisorMessage[],
   context: TenantAdvisorContext,
 ): Promise<string> {
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  const res = await fetchExternal("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -276,13 +288,13 @@ async function callOpenAI(
         ...messages.map((m) => ({ role: m.role, content: m.content })),
       ],
     }),
-  });
+  }, { timeoutMs: OPENAI_TIMEOUT_MS });
 
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`OpenAI ${res.status}: ${errText.slice(0, 200)}`);
-  }
-  const json = await res.json();
+  await requireExternalSuccess(res);
+  const json = await readExternalJson<{ choices?: { message?: { content?: unknown } }[] }>(
+    res,
+    OPENAI_MAX_RESPONSE_BYTES,
+  );
   const content = json?.choices?.[0]?.message?.content;
   if (!content) throw new Error("OpenAI boş yanıt döndü.");
   return String(content).trim();
@@ -493,7 +505,7 @@ export async function askTenantAdvisor(
     try {
       result = { reply: await callOpenAI(apiKey, clean, context), usedAI: true };
     } catch (e) {
-      console.error("askTenantAdvisor:openai", e);
+      console.error("askTenantAdvisor:openai", externalErrorMetadata(e));
       result = { reply: fallbackTenantAdvisor(clean, context), usedAI: false };
     }
   } else {

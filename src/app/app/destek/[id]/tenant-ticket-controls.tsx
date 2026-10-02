@@ -52,7 +52,7 @@ export function TenantTicketControls({
           <button
             type="button"
             disabled={pending}
-            className={`focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border px-3.5 py-2 text-xs font-semibold transition disabled:opacity-50 ${terminal ? "border-brand-300 bg-brand-600/5 text-brand-700 hover:bg-brand-600/10" : "border-line text-text-muted hover:border-danger-500/40 hover:text-danger-600"}`}
+            className={`focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border px-3.5 py-2 text-xs font-semibold transition disabled:opacity-50 ${terminal ? "border-brand-300 bg-brand-600/5 text-brand-700 hover:bg-brand-600/10" : "border-line text-text-muted hover:border-danger-500/40 hover:text-danger-600"}`}
           >
             {terminal ? <RotateCcw className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
             {pending ? "İşleniyor…" : terminal ? "Talebi yeniden aç" : "Talebi kapat"}

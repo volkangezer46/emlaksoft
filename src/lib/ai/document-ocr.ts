@@ -1,4 +1,13 @@
 import "server-only";
+import {
+  discardExternalResponse,
+  externalErrorMetadata,
+  fetchExternal,
+  readExternalJson,
+} from "@/lib/external-fetch";
+
+const OPENAI_VISION_TIMEOUT_MS = 90_000;
+const OPENAI_MAX_RESPONSE_BYTES = 1024 * 1024;
 
 /**
  * Belge OCR (C8) — portföy medyasındaki görsel belgeden (tapu senedi /
@@ -126,7 +135,7 @@ export async function extractPropertyDocFields(input: {
   const model = process.env.OPENAI_VISION_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
 
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const res = await fetchExternal("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({
@@ -144,12 +153,16 @@ export async function extractPropertyDocFields(input: {
           },
         ],
       }),
-    });
+    }, { timeoutMs: OPENAI_VISION_TIMEOUT_MS });
     if (!res.ok) {
-      console.error("extractPropertyDocFields http", res.status, await res.text().catch(() => ""));
+      await discardExternalResponse(res);
+      console.error("extractPropertyDocFields http", { status: res.status });
       return { ok: false, error: "AI servisine ulaşılamadı. Lütfen tekrar deneyin." };
     }
-    const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const json = await readExternalJson<{ choices?: { message?: { content?: string } }[] }>(
+      res,
+      OPENAI_MAX_RESPONSE_BYTES,
+    );
     const raw = json.choices?.[0]?.message?.content?.trim() || "";
     // JSON modu dışına düşen modeller için kod bloğu temizliği
     const cleaned = raw.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
@@ -174,7 +187,7 @@ export async function extractPropertyDocFields(input: {
       },
     };
   } catch (e) {
-    console.error("extractPropertyDocFields", e);
+    console.error("extractPropertyDocFields", externalErrorMetadata(e));
     return { ok: false, error: "Belge okunamadı. Görselin net olduğundan emin olup tekrar deneyin." };
   }
 }

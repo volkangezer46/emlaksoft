@@ -9,7 +9,7 @@ import { googleCalendarAddUrl } from "@/lib/calendar";
 import { sanitizeTurkishPhoneInput, TR_MOBILE_PLACEHOLDER } from "@/lib/phone";
 
 const inputCls =
-  "w-full rounded-[12px] border border-line bg-canvas px-3.5 py-3 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400";
+  "w-full rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-3 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400";
 
 /**
  * Slot seçimi → bilgi formu → teşekkür ekranı (üç adım, tek bileşen).
@@ -88,7 +88,7 @@ export function BookingForm({
       endAt: new Date(start.getTime() + done.durationMin * 60_000),
     });
     return (
-      <div className="rounded-[14px] border border-mint-500/30 bg-mint-500/8 px-4 py-8 text-center">
+      <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/8 px-4 py-8 text-center">
         <span className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-mint-500/15 text-mint-600">
           <CheckCircle2 className="h-6 w-6" />
         </span>
@@ -102,7 +102,7 @@ export function BookingForm({
           href={calendarUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="focus-ring press mt-4 inline-flex items-center gap-2 rounded-[12px] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700"
+          className="focus-ring press mt-4 inline-flex items-center gap-2 rounded-[var(--radius-card)] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700"
         >
           <CalendarPlus className="h-4 w-4" /> Takviminize ekleyin
         </a>
@@ -113,7 +113,7 @@ export function BookingForm({
         {officePhone ? (
           <a
             href={`tel:${officePhone.replace(/\s/g, "")}`}
-            className="focus-ring press mt-2 inline-flex items-center gap-2 rounded-[11px] border border-line bg-surface px-3.5 py-2 text-xs font-bold text-ink-950 transition hover:border-brand-300"
+            className="focus-ring press mt-2 inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-xs font-bold text-ink-950 transition hover:border-brand-300"
           >
             <Phone className="h-3.5 w-3.5" /> {officePhone}
           </a>
@@ -136,13 +136,13 @@ export function BookingForm({
           className="absolute left-[-9999px] h-0 w-0 opacity-0"
         />
 
-        <div className="flex items-center justify-between gap-3 rounded-[12px] border border-brand-400/40 bg-brand-600/[0.06] px-4 py-3">
+        <div className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-brand-400/40 bg-brand-600/[0.06] px-4 py-3">
           <div className="min-w-0">
-            <p className="flex items-center gap-1.5 text-[11px] font-semibold text-brand-600">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-brand-600">
               <CalendarCheck2 className="h-3.5 w-3.5" /> Seçtiğiniz saat
             </p>
             <p className="mt-0.5 truncate text-sm font-bold text-ink-950">{fmtDateTime(slot)}</p>
-            <p className="text-[11px] text-text-muted">{slotMinutes} dakika</p>
+            <p className="text-xs text-text-muted">{slotMinutes} dakika</p>
           </div>
           <button
             type="button"
@@ -150,7 +150,7 @@ export function BookingForm({
               setSlot(null);
               setError(null);
             }}
-            className="focus-ring press inline-flex shrink-0 items-center gap-1 rounded-[9px] border border-line bg-surface px-2.5 py-1.5 text-[11px] font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+            className="focus-ring press inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
           >
             <ArrowLeft className="h-3 w-3" /> Değiştir
           </button>
@@ -216,7 +216,7 @@ export function BookingForm({
           />
         </div>
 
-        <label className="flex cursor-pointer items-start gap-2.5 rounded-[12px] border border-line bg-canvas/60 px-3.5 py-3 text-[12px] leading-relaxed text-text-muted transition hover:border-brand-300">
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-brand-300">
           <input
             type="checkbox"
             name="kvkk"
@@ -239,7 +239,7 @@ export function BookingForm({
 
         {error ? (
           <p
-            className="rounded-[10px] border border-danger-500/25 bg-danger-500/5 px-3 py-2 text-center text-xs font-semibold text-danger-500"
+            className="rounded-[var(--radius-control)] border border-danger-500/25 bg-danger-500/5 px-3 py-2 text-center text-xs font-semibold text-danger-500"
             role="alert"
           >
             {error}
@@ -249,7 +249,7 @@ export function BookingForm({
         <button
           type="submit"
           disabled={pending || !kvkk}
-          className="btn-shine focus-ring press inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-brand-600 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
+          className="btn-shine focus-ring press inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-brand-600 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarCheck2 className="h-4 w-4" />}
           Randevumu oluştur
@@ -274,16 +274,16 @@ export function BookingForm({
               type="button"
               onClick={() => setActiveDay(d.dateKey)}
               aria-pressed={active}
-              className={`focus-ring press flex min-w-[74px] shrink-0 flex-col items-center gap-0.5 rounded-[12px] border px-2.5 py-2 transition ${
+              className={`focus-ring press flex min-w-[74px] shrink-0 flex-col items-center gap-0.5 rounded-[var(--radius-card)] border px-2.5 py-2 transition ${
                 active
                   ? "border-brand-400 bg-brand-600/10 text-brand-600"
                   : "border-line bg-canvas text-text-muted hover:border-brand-300"
               }`}
             >
-              <span className="text-[10px] font-semibold uppercase tracking-[0.06em]">{weekday}</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.06em]">{weekday}</span>
               <span className="font-display text-lg font-extrabold tabular-nums text-ink-950">{dayNum}</span>
-              <span className="text-[10px]">{month}</span>
-              <span className="text-[10px] font-semibold opacity-70">{d.slots.length} saat</span>
+              <span className="text-xs">{month}</span>
+              <span className="text-xs font-semibold opacity-70">{d.slots.length} saat</span>
             </button>
           );
         })}
@@ -299,20 +299,20 @@ export function BookingForm({
               setSlot(s.startIso);
               setError(null);
             }}
-            className="focus-ring press grid h-11 place-items-center rounded-[11px] border border-line bg-canvas text-sm font-bold tabular-nums text-ink-950 transition hover:border-brand-400 hover:bg-brand-600/[0.06] hover:text-brand-600"
+            className="focus-ring press grid h-11 place-items-center rounded-[var(--radius-control)] border border-line bg-canvas text-sm font-bold tabular-nums text-ink-950 transition hover:border-brand-400 hover:bg-brand-600/[0.06] hover:text-brand-600"
           >
             {s.label}
           </button>
         ))}
       </div>
 
-      <p className="text-center text-[11px] text-text-faint">
+      <p className="text-center text-xs text-text-faint">
         Her randevu {slotMinutes} dakikadır. Saati seçtikten sonra iletişim bilgilerinizi alacağız.
       </p>
 
       {error ? (
         <p
-          className="rounded-[10px] border border-danger-500/25 bg-danger-500/5 px-3 py-2 text-center text-xs font-semibold text-danger-500"
+          className="rounded-[var(--radius-control)] border border-danger-500/25 bg-danger-500/5 px-3 py-2 text-center text-xs font-semibold text-danger-500"
           role="alert"
         >
           {error}

@@ -3,6 +3,8 @@
 import { headers } from "next/headers";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { logError } from "@/lib/error-log";
+import { parseClientErrorReport } from "@/lib/client-error-report";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
 /**
  * İstemci hata sınırlarının çağırdığı ince sarmalayıcı.
@@ -19,21 +21,27 @@ import { logError } from "@/lib/error-log";
  * kırpılıyor ve aynı parmak izi yeni satır değil sayaç artışı üretiyor.
  * Bu, kötü niyetli çağrının etkisini "bir sayacı şişirmek" ile sınırlıyor.
  */
-export async function reportClientError(input: {
-  message: string;
-  digest?: string;
-  stack?: string;
-  path?: string;
-}): Promise<void> {
+export async function reportClientError(input: unknown): Promise<void> {
+  const parsed = parseClientErrorReport(input);
+  if (!parsed) return;
+
+  const ip = await clientIp().catch(() => "unknown");
+  const rate = await checkRateLimit(`client-error:${ip}`, {
+    limit: 20,
+    windowSec: 300,
+    failurePolicy: "deny",
+  });
+  if (!rate.allowed) return;
+
   const user = await getRequestUser().catch(() => null);
   const h = await headers().catch(() => null);
 
   await logError({
     source: "client",
-    message: input.message,
-    digest: input.digest ?? null,
-    stack: input.stack ?? null,
-    path: input.path ?? null,
+    message: parsed.message,
+    digest: parsed.digest ?? null,
+    stack: parsed.stack ?? null,
+    path: parsed.path ?? null,
     userAgent: h?.get("user-agent") ?? null,
     // Kimlik yalnızca oturumdan — parametreden ASLA.
     tenantId: (user?.app_metadata?.tenant_id as string | undefined) ?? null,

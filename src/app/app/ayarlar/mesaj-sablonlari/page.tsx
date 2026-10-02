@@ -32,7 +32,7 @@ export default async function MessageTemplatesSettingsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-mint-500/30 blur-[80px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -48,20 +48,20 @@ export default async function MessageTemplatesSettingsPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="rounded-[14px] border border-white/12 bg-white/[0.05] px-5 py-3 text-center">
+            <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-5 py-3 text-center">
               <p className="font-display text-xl font-extrabold text-mint-300">{activeCount}</p>
-              <p className="text-[11px] text-white/55">aktif şablon</p>
+              <p className="text-xs text-white/55">aktif şablon</p>
             </div>
-            <div className="rounded-[14px] border border-white/12 bg-white/[0.05] px-5 py-3 text-center">
+            <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-5 py-3 text-center">
               <p className="font-display text-xl font-extrabold text-white">{totalUsage}</p>
-              <p className="text-[11px] text-white/55">toplam kullanım</p>
+              <p className="text-xs text-white/55">toplam kullanım</p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="flex flex-wrap items-center gap-3 rounded-[16px] border border-line bg-surface p-4 text-sm">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-amber-400/15 text-amber-600">
+      <section className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-4 text-sm">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-amber-400/15 text-amber-600">
           <Sparkles className="h-4 w-4" />
         </span>
         <p className="min-w-0 flex-1 text-xs leading-relaxed text-text-muted">

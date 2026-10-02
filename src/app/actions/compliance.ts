@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { checkAuthorityShield as runShield } from "@/lib/authority-shield";
@@ -24,20 +24,16 @@ export async function upsertIysConsent(formData: FormData): Promise<ComplianceRe
     return { error: "Geçersiz durum." };
   }
 
-  const supabase = await createClient();
-  const now = new Date().toISOString();
-  const { error } = await supabase.from("iys_consents").upsert(
-    {
-      tenant_id: gate.tenantId,
-      customer_id: customerId,
-      channel,
-      status,
-      source: "manual",
-      granted_at: status === "granted" ? now : null,
-      revoked_at: status === "denied" ? now : null,
-    },
-    { onConflict: "tenant_id,customer_id,channel" },
-  );
+  const admin = createAdminClient();
+  const { error } = await admin.rpc("transition_iys_consent", {
+    p_tenant_id: gate.tenantId,
+    p_customer_id: customerId,
+    p_channel: channel,
+    p_status: status,
+    p_source: "manual",
+    p_actor_id: gate.userId,
+    p_evidence: { entrypoint: "compliance_form" },
+  });
 
   if (error) {
     console.error("upsertIysConsent", error);

@@ -112,7 +112,7 @@ export function AddUnitsDialog({ projectId }: { projectId: string }) {
                 </FormField>
 
                 {error ? (
-                  <p className="rounded-[8px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
+                  <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
                     {error}
                   </p>
                 ) : null}
@@ -159,12 +159,12 @@ export function AddUnitsDialog({ projectId }: { projectId: string }) {
                 </p>
 
                 {error ? (
-                  <p className="rounded-[8px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
+                  <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
                     {error}
                   </p>
                 ) : null}
                 {info ? (
-                  <p className="rounded-[8px] bg-mint-500/10 px-3 py-2 text-sm font-medium text-mint-700" role="status">
+                  <p className="rounded-[var(--radius-control)] bg-mint-500/10 px-3 py-2 text-sm font-medium text-mint-700" role="status">
                     {info}
                   </p>
                 ) : null}

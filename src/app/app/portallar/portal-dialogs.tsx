@@ -4,6 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Combobox } from "@/components/ui/combobox";
 import { searchProperties } from "@/app/actions/lookup";
+import { searchCustomers } from "@/app/actions/lookup";
 import {
   Check,
   Link2,
@@ -25,7 +26,7 @@ import {
 type PropertyOption = { id: string; property_code: string; title: string | null };
 
 const inputClass =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
 export function NewPortalDialog({ properties }: { properties: PropertyOption[] }) {
   const [open, setOpen] = useState(false);
@@ -50,7 +51,7 @@ export function NewPortalDialog({ properties }: { properties: PropertyOption[] }
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} disabled={properties.length === 0} className="btn-shine inline-flex items-center gap-2 rounded-[11px] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 disabled:cursor-not-allowed disabled:opacity-50">
+      <button type="button" onClick={() => setOpen(true)} disabled={properties.length === 0} className="btn-shine inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 disabled:cursor-not-allowed disabled:opacity-50">
         <Plus className="h-4 w-4" /> Portal ilanı ekle
       </button>
       <DialogShell open={open} onOpenChange={setOpen} title="Portal ilanı bağla" description="Portföyü yayın ağına ekleyin." icon={RadioTower}>
@@ -129,7 +130,7 @@ export function ClosePortalDialog({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="rounded-[9px] border border-danger-500/20 px-3 py-2 text-xs font-semibold text-danger-500 transition hover:bg-danger-500/8">Kapat</button>
+      <button type="button" onClick={() => setOpen(true)} className="rounded-[var(--radius-control)] border border-danger-500/20 px-3 py-2 text-xs font-semibold text-danger-500 transition hover:bg-danger-500/8">Kapat</button>
       <DialogShell open={open} onOpenChange={setOpen} title="İlan kapanış formu" description={label} icon={Siren} danger>
           <form action={submit} className="grid gap-4 p-4 md:p-6">
             <input type="hidden" name="portal_listing_id" value={listingId} />
@@ -144,18 +145,35 @@ export function ClosePortalDialog({
               İşlem bedeli
               <input name="deal_amount" inputMode="decimal" className={`${inputClass} mt-1.5`} placeholder="6.750.000" />
             </label>
+            <div className="text-sm font-medium text-ink-950">
+              İşlem yapılan müşteri
+              <Combobox
+                className="mt-1.5"
+                name="customer_id"
+                aria-label="İşlem yapılan müşteri"
+                placeholder="Yalnız bizim kapanışımızda zorunlu"
+                searchPlaceholder="Ad veya telefon ile ara…"
+                emptyText="Aramak için en az 2 karakter yazın"
+                onSearch={searchCustomers}
+                options={[]}
+              />
+            </div>
             <div className="grid gap-2 sm:grid-cols-3">
               {[
                 ["deal_happened", "İşlem gerçekleşti"],
                 ["closed_by_us", "Biz kapattık"],
                 ["competitor_closed", "Rakip kapattı"],
               ].map(([name, text]) => (
-                <label key={name} className="flex items-center gap-2 rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-xs font-medium text-text-muted">
+                <label key={name} className="flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-xs font-medium text-text-muted">
                   <input type="checkbox" name={name} className="accent-brand-600" /> {text}
                 </label>
               ))}
             </div>
-            <div className="rounded-[11px] border border-danger-500/20 bg-danger-500/5 px-4 py-3 text-xs text-danger-500">Bu kayıt kayıp-kaçak analizine dahil edilir ve sonradan denetlenebilir.</div>
+            <label className="flex items-start gap-2 rounded-[var(--radius-control)] border border-mint-500/25 bg-mint-500/5 px-3 py-2.5 text-xs font-medium text-text-muted">
+              <input type="checkbox" name="has_authority" className="mt-0.5 accent-mint-600" />
+              <span><strong className="text-mint-700">Yazılı yetki / EİDS onaylı</strong><br />Bizim kapanışımızda müşteri seçimiyle birlikte zorunludur.</span>
+            </label>
+            <div className="rounded-[var(--radius-control)] border border-danger-500/20 bg-danger-500/5 px-4 py-3 text-xs text-danger-500">Bu kayıt kayıp-kaçak analizine dahil edilir ve sonradan denetlenebilir.</div>
             {error ? <p role="alert" className="text-sm text-danger-500">{error}</p> : null}
             <DialogActions pending={pending} submitLabel="Kapanışı kaydet" danger />
           </form>
@@ -215,11 +233,11 @@ function DialogActions({
   return (
     <div className="hairline-t flex justify-end gap-2 pt-4">
       <DialogClose asChild>
-        <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
+        <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
           Vazgeç
         </button>
       </DialogClose>
-      <button type="submit" disabled={pending} className={`btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60 ${danger ? "bg-danger-600" : "bg-brand-600"}`}>
+      <button type="submit" disabled={pending} className={`btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60 ${danger ? "bg-danger-600" : "bg-brand-600"}`}>
         {danger ? <Siren className="h-4 w-4" /> : <Check className="h-4 w-4" />} {pending ? "Kaydediliyor…" : submitLabel}
       </button>
     </div>

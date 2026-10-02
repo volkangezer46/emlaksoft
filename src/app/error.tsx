@@ -42,7 +42,7 @@ export default function RootError({
       <div className="pointer-events-none absolute left-1/2 top-[-140px] h-[360px] w-[360px] -translate-x-1/2 rounded-full bg-brand-600/12 blur-[100px]" />
 
       <main className="relative w-full max-w-md text-center">
-        <div className="mx-auto grid h-16 w-16 place-items-center rounded-[16px] border border-danger-500/15 bg-danger-500/10">
+        <div className="mx-auto grid h-16 w-16 place-items-center rounded-[var(--radius-card)] border border-danger-500/15 bg-danger-500/10">
           <AlertTriangle className="h-8 w-8 text-danger-500" aria-hidden="true" />
         </div>
 
@@ -60,7 +60,7 @@ export default function RootError({
         {error.digest ? (
           <p className="mt-3 text-xs text-text-muted">
             Hata kodu:{" "}
-            <code className="rounded-md border border-line bg-surface px-1.5 py-0.5 font-mono text-[11px] text-ink-950">
+            <code className="rounded-md border border-line bg-surface px-1.5 py-0.5 font-mono text-xs text-ink-950">
               {error.digest}
             </code>
           </p>
@@ -70,13 +70,13 @@ export default function RootError({
           <button
             type="button"
             onClick={() => unstable_retry()}
-            className="btn-shine inline-flex items-center gap-2 rounded-[11px] bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:bg-brand-700"
+            className="btn-shine inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:bg-brand-700"
           >
             <RotateCcw className="h-4 w-4" /> Tekrar dene
           </button>
           <Link
             href="/app"
-            className="inline-flex items-center gap-2 rounded-[11px] border border-line-strong bg-surface px-6 py-3 text-sm font-semibold text-ink-950 transition hover:border-brand-400"
+            className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line-strong bg-surface px-6 py-3 text-sm font-semibold text-ink-950 transition hover:border-brand-400"
           >
             <LayoutDashboard className="h-4 w-4 text-brand-600" /> Panele dön
           </Link>

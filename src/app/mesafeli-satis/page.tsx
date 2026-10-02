@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "Mesafeli Satış Sözleşmesi | EmlakSoft",
+  title: "Mesafeli Satış Sözleşmesi",
   description: "6502 sayılı Kanun ve Mesafeli Sözleşmeler Yönetmeliği kapsamında mesafeli satış sözleşmesi.",
   alternates: { canonical: "/mesafeli-satis" },
 };

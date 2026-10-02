@@ -3,8 +3,8 @@
  *
  * `npx tsx scripts/check-schema.ts` ile çalıştırılır. Salt-okunur — hiçbir şey
  * değiştirmez, yalnız beklenen tablo/kolon/fonksiyon/politikaları listeler.
- * Eksik çıkan varsa ilgili migration `npx tsx scripts/apply-one.ts <dosya>`
- * ile uygulanır.
+ * Eksik çıkan varsa dosyalar listelenir; uygulama ancak ledger/checksum kontrolü,
+ * salt-okunur dry-run ve restore edilebilir backup/PITR sonrasında yapılır.
  */
 import pg from "pg";
 import dotenv from "dotenv";
@@ -140,8 +140,13 @@ async function main() {
 
   const uniq = [...new Set(missing)];
   if (uniq.length) {
-    console.log("\nUYGULANMASI GEREKEN MIGRATIONLAR:");
-    for (const m of uniq) console.log("  npx tsx scripts/apply-one.ts supabase/migrations/" + m);
+    console.log("\nEKSIK SEMA BILESENLERI / ILGILI MIGRATIONLAR:");
+    for (const m of uniq) console.log("  " + m);
+    console.log("\nGuvenli uygulama sirasi:");
+    console.log("  npm run check:migrations -- --database");
+    console.log("  npm run db:migrate -- --dry-run");
+    console.log("  # Restore edilebilir backup/PITR dogrulandiktan sonra:");
+    console.log("  npm run db:migrate");
     process.exit(1);
   }
   console.log("\nTumu mevcut.");

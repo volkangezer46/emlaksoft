@@ -19,7 +19,7 @@ export function LatLngPicker({
   const [lat, setLat] = useState(defaultLat != null ? String(defaultLat) : "");
   const [lng, setLng] = useState(defaultLng != null ? String(defaultLng) : "");
   const [busy, setBusy] = useState(false);
-  const cls = fieldClass ?? "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400";
+  const cls = fieldClass ?? "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400";
 
   function useMyLocation() {
     if (!navigator.geolocation) return;
@@ -67,13 +67,13 @@ export function LatLngPicker({
           type="button"
           onClick={useMyLocation}
           disabled={busy}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-[10px] border border-line px-3 py-2.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300 disabled:opacity-60"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300 disabled:opacity-60"
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Crosshair className="h-3.5 w-3.5" />}
           Konumumu kullan
         </button>
       </div>
-      <a href={osmPick} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-[11px] font-semibold text-brand-600 hover:underline">
+      <a href={osmPick} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs font-semibold text-brand-600 hover:underline">
         Haritada bul / doğrula →
       </a>
     </div>

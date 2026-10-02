@@ -73,6 +73,8 @@ export default async function KampanyalarPage({
   const campaigns = await listCampaigns();
 
   const canCreate = perms.campaigns?.includes("create") ?? false;
+  const canSend = perms.campaigns?.includes("edit") ?? false;
+  const canDelete = perms.campaigns?.includes("delete") ?? false;
 
   const filtered = campaigns.filter(
     (c) => (!durum || c.status === durum) && (!kanal || c.channel === kanal),
@@ -107,7 +109,15 @@ export default async function KampanyalarPage({
   }));
 
   const campaignActions: Record<string, React.ReactNode> = Object.fromEntries(
-    filtered.map((c) => [c.id, <CampaignActions key={c.id} campaign={c} canSend={canCreate} />]),
+    filtered.map((c) => [
+      c.id,
+      <CampaignActions
+        key={c.id}
+        campaign={c}
+        canSend={canSend}
+        canDelete={canDelete}
+      />,
+    ]),
   );
 
   const total   = campaigns.length;
@@ -140,7 +150,7 @@ export default async function KampanyalarPage({
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-14 h-52 w-52 rounded-full bg-brand-500/25 blur-[90px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -152,7 +162,7 @@ export default async function KampanyalarPage({
               SMS &amp; WhatsApp Kampanyaları
             </h1>
             <p className="mt-1 max-w-lg text-sm text-white/75">
-              Müşterilerinize toplu SMS veya WhatsApp mesajı gönderin. Netgsm entegrasyonu ile İYS uyumlu.
+              Kampanyalar küçük partilerle işlenir; her teslimattan hemen önce sistemde kayıtlı kanal izni yeniden doğrulanır.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:flex">
@@ -165,11 +175,11 @@ export default async function KampanyalarPage({
               <Link
                 key={k.label}
                 href={k.href}
-                className="focus-ring press group relative block rounded-[14px] border border-white/12 bg-white/8 p-3 text-center transition hover:border-white/30"
+                className="focus-ring press group relative block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 text-center transition hover:border-white/30"
               >
                 <ArrowUpRight className="hover-action absolute right-2 top-2 h-3.5 w-3.5 text-white/50 opacity-0 transition group-hover:opacity-100" />
                 <p className="font-display text-2xl font-extrabold text-white">{k.value}</p>
-                <p className="text-[11px] text-white/70">{k.label}</p>
+                <p className="text-xs text-white/70">{k.label}</p>
               </Link>
             ))}
           </div>
@@ -180,7 +190,7 @@ export default async function KampanyalarPage({
       {campaigns.length > 0 ? (
         <div className="grid gap-4 lg:grid-cols-5">
           {/* Kanal dağılımı */}
-          <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] lg:col-span-3">
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] lg:col-span-3">
             <h2 className="flex items-center gap-2 font-display text-sm font-bold text-ink-950">
               <BarChart3 className="h-4 w-4 text-brand-600" /> Kanal dağılımı
             </h2>
@@ -201,7 +211,7 @@ export default async function KampanyalarPage({
                 <li key={c.value}>
                   <Link
                     href={filterHref("", c.value)}
-                    className="focus-ring group flex min-h-11 items-center gap-2.5 rounded-[10px] px-2 py-2 transition hover:bg-canvas"
+                    className="focus-ring group flex min-h-11 items-center gap-2.5 rounded-[var(--radius-control)] px-2 py-2 transition hover:bg-canvas"
                   >
                     <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${c.dot}`} />
                     <span className="text-sm font-semibold text-ink-950 group-hover:text-brand-600">{c.label}</span>
@@ -216,12 +226,12 @@ export default async function KampanyalarPage({
           </section>
 
           {/* Teslimat performansı */}
-          <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] lg:col-span-2">
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] lg:col-span-2">
             <h2 className="flex items-center gap-2 font-display text-sm font-bold text-ink-950">
               <Send className="h-4 w-4 text-mint-600" /> Teslimat performansı
             </h2>
             {deliveryRate === null ? (
-              <p className="mt-4 rounded-[12px] border border-dashed border-line-strong bg-canvas/50 px-3 py-6 text-center text-xs text-text-muted">
+              <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong bg-canvas/50 px-3 py-6 text-center text-xs text-text-muted">
                 Henüz sonuçlanmış gönderim yok — ilk kampanyanız gönderilince ulaşım oranı burada görünür.
               </p>
             ) : (
@@ -236,7 +246,7 @@ export default async function KampanyalarPage({
                 <div className="mt-4 space-y-1">
                   <Link
                     href="/app/kampanyalar?durum=done"
-                    className="focus-ring group flex min-h-11 items-center gap-2 rounded-[10px] px-2 py-2 transition hover:bg-canvas"
+                    className="focus-ring group flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-2 py-2 transition hover:bg-canvas"
                   >
                     <CheckCircle2 className="h-4 w-4 text-mint-600" />
                     <span className="text-sm text-text-muted group-hover:text-ink-950">Ulaşan mesaj</span>
@@ -244,7 +254,7 @@ export default async function KampanyalarPage({
                   </Link>
                   <Link
                     href="/app/kampanyalar?durum=failed"
-                    className="focus-ring group flex min-h-11 items-center gap-2 rounded-[10px] px-2 py-2 transition hover:bg-canvas"
+                    className="focus-ring group flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-2 py-2 transition hover:bg-canvas"
                   >
                     <MessageSquare className="h-4 w-4 text-danger-500" />
                     <span className="text-sm text-text-muted group-hover:text-ink-950">Ulaşmayan mesaj</span>
@@ -284,7 +294,7 @@ export default async function KampanyalarPage({
               <Link
                 key={`d-${f.value}`}
                 href={filterHref(f.value, kanal)}
-                className={`focus-ring rounded-[9px] px-2.5 py-1.5 text-xs font-semibold transition ${
+                className={`focus-ring rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs font-semibold transition ${
                   durum === f.value ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
                 }`}
               >
@@ -298,7 +308,7 @@ export default async function KampanyalarPage({
               <Link
                 key={`k-${f.value}`}
                 href={filterHref(durum, f.value)}
-                className={`focus-ring rounded-[9px] px-2.5 py-1.5 text-xs font-semibold transition ${
+                className={`focus-ring rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs font-semibold transition ${
                   kanal === f.value ? "bg-brand-600 text-white" : "border border-line text-text-muted hover:text-ink-950"
                 }`}
               >
@@ -337,13 +347,15 @@ export default async function KampanyalarPage({
       )}
 
       {/* Bilgi kutusu */}
-      <section className="rounded-[16px] border border-dashed border-line-strong bg-surface px-5 py-4 text-sm text-text-muted">
-        <p className="font-semibold text-ink-950">Netgsm &amp; WhatsApp API kurulumu</p>
+      <section className="rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface px-5 py-4 text-sm text-text-muted">
+        <p className="font-semibold text-ink-950">Sağlayıcı ve İYS kapsamı</p>
         <p className="mt-1">
           SMS göndermek için{" "}
           <Link href="/app/ayarlar" className="font-medium text-brand-600 hover:underline">Ayarlar</Link>
           {" "}sayfasından Netgsm kullanıcı kodu, şifre ve gönderici başlığını tanımlayın.
-          WhatsApp için API URL ve token gereklidir.
+          WhatsApp için API URL ve token gereklidir. Gönderim güvenliği, uygulamadaki yerel İYS izin kaydını
+          fail-closed kontrol eder: açık izin yoksa mesaj çıkmaz. Resmî İYS dış sistem senkronu, kurum
+          kimlik bilgileri bağlanana kadar otomatik değildir.
         </p>
       </section>
     </div>

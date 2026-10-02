@@ -8,7 +8,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 type Province = { id: string; name: string };
 
 const inputCls =
-  "w-full rounded-[12px] border border-white/12 bg-white/[0.04] px-3.5 py-3 text-sm text-white placeholder:text-white/35 outline-none transition focus:border-mint-400/50 focus:bg-white/[0.07]";
+  "w-full rounded-[var(--radius-card)] border border-white/12 bg-white/[0.04] px-3.5 py-3 text-sm text-white placeholder:text-white/35 outline-none transition focus:border-mint-400/50 focus:bg-white/[0.07]";
 
 export function LeadForm({
   token,
@@ -35,7 +35,6 @@ export function LeadForm({
       return;
     }
     delete payload.website;
-    delete payload.kvkk;
 
     setStatus("loading");
     setError(null);
@@ -44,7 +43,12 @@ export function LeadForm({
       const res = await fetch(`/api/leads/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, channel: "web_form", source: "web_form" }),
+        body: JSON.stringify({
+          ...payload,
+          request_id: crypto.randomUUID(),
+          channel: "web_form",
+          source: "web_form",
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -61,7 +65,7 @@ export function LeadForm({
 
   if (status === "done") {
     return (
-      <div className="mt-6 rounded-[16px] border border-mint-400/25 bg-mint-500/10 px-4 py-8 text-center">
+      <div className="mt-6 rounded-[var(--radius-card)] border border-mint-400/25 bg-mint-500/10 px-4 py-8 text-center">
         <CheckCircle2 className="mx-auto h-10 w-10 text-mint-400" />
         <p className="mt-3 text-base font-bold text-white">Talebiniz alındı</p>
         <p className="mt-1 text-sm text-white/60">Danışmanımız en kısa sürede sizi arayacak.</p>
@@ -123,7 +127,7 @@ export function LeadForm({
 
       <textarea name="message" rows={3} placeholder="Aradığınız mülkü kısaca anlatın (opsiyonel)" className={inputCls} />
 
-      <label className="flex cursor-pointer items-start gap-2.5 rounded-[12px] border border-white/12 bg-white/[0.04] px-3.5 py-3 text-[12px] leading-relaxed text-white/60 transition hover:border-mint-400/40">
+      <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-white/12 bg-white/[0.04] px-3.5 py-3 text-xs leading-relaxed text-white/60 transition hover:border-mint-400/40">
         <input
           type="checkbox"
           name="kvkk"
@@ -145,7 +149,7 @@ export function LeadForm({
       <button
         type="submit"
         disabled={status === "loading" || !kvkkAccepted}
-        className="btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-white px-4 py-3.5 text-sm font-bold text-ink-950 transition hover:bg-white/90 disabled:opacity-60"
+        className="btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-white px-4 py-3.5 text-sm font-bold text-ink-950 transition hover:bg-white/90 disabled:opacity-60"
       >
         {status === "loading" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         Talebimi gönder

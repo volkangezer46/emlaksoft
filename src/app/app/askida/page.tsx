@@ -17,17 +17,11 @@ import { getPlatformStaff } from "@/lib/platform";
 import { ButtonLink } from "@/components/ui/button";
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { planLabel } from "@/lib/billing/plans";
 
 const RING_C = 2 * Math.PI * 42;
 
 const nf = new Intl.NumberFormat("tr-TR");
-
-const planLabel: Record<string, string> = {
-  advisor: "Danışman",
-  office: "Ofis",
-  professional: "Profesyonel",
-  enterprise: "Kurumsal",
-};
 
 /**
  * Askıya alınmış / iptal edilmiş abonelik ekranı. Panel kilitliyken kullanıcıya
@@ -73,31 +67,31 @@ export default async function SuspendedPage() {
     ? [
         { icon: Mail, title: "1 · Bize yazın", desc: "destek@emlaksoft.com.tr adresine ofis adınızla kısa bir e-posta gönderin." },
         { icon: FileCheck2, title: "2 · Paketi seçin", desc: "Ekibimiz size uygun paketi ve geçiş adımlarını aynı gün iletir." },
-        { icon: ShieldCheck, title: "3 · Kaldığınız yerden", desc: "Hesap açılır açılmaz tüm verileriniz olduğu gibi yerinde olur." },
+        { icon: ShieldCheck, title: "3 · Kaldığınız yerden", desc: "Saklama politikası içindeki mevcut kayıtlarınıza hesap yeniden açıldığında erişirsiniz." },
       ]
     : [
         { icon: CreditCard, title: "1 · Ödemeyi tamamlayın", desc: "Abonelik sayfasından bekleyen ödemeyi kartla güvenle tamamlayın." },
         { icon: CalendarClock, title: "2 · Dakikalar içinde", desc: "Ödeme onaylanınca erişim otomatik açılır — beklemeye gerek yok." },
-        { icon: ShieldCheck, title: "3 · Kaldığınız yerden", desc: "Müşteri, portföy ve anlaşmalarınız olduğu gibi sizi bekliyor." },
+        { icon: ShieldCheck, title: "3 · Kaldığınız yerden", desc: "Saklama politikası içindeki müşteri, portföy ve anlaşma kayıtlarınıza yeniden erişin." },
       ];
 
   return (
     <div className="space-y-6">
       {/* Koyu hero — durum + kimlik */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-danger-500/25 blur-[80px]" />
         <div className="pointer-events-none absolute -left-16 bottom-0 h-44 w-44 rounded-full bg-amber-400/15 blur-[80px]" />
         <div className="relative grid gap-6 lg:grid-cols-[1.3fr_auto] lg:items-center">
           <div>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-500/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-danger-500">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-500/15 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-danger-500">
               <Lock className="h-3 w-3" /> Erişim kilitli
             </span>
             <h1 className="mt-3 font-display text-2xl font-extrabold md:text-3xl">Hesap erişimi kısıtlandı</h1>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/65">
               <span className="font-semibold text-white">{office?.name ?? "Ofisiniz"}</span> aboneliği şu an{" "}
               <span className="font-semibold text-danger-500">{isCancelled ? "iptal" : "askıda"}</span>. Panel erişimi
-              geçici olarak kapalı; verileriniz eksiksiz saklanıyor ve abonelik yenilendiğinde anında geri açılıyor.
+              geçici olarak kapalı; kayıtlar saklama politikası kapsamında korunur ve abonelik yenilendiğinde erişim yeniden değerlendirilir.
             </p>
 
             {/* Hesap kimlik şeridi */}
@@ -105,15 +99,15 @@ export default async function SuspendedPage() {
               {[
                 { label: "Ofis", value: office?.name ?? "—" },
                 { label: "Durum", value: isCancelled ? "İptal" : "Askıda", danger: true },
-                { label: "Paket", value: office?.plan ? planLabel[office.plan] ?? office.plan : "—" },
+                { label: "Paket", value: office?.plan ? planLabel(office.plan) : "—" },
               ].map((r) => (
                 <Link
                   key={r.label}
                   href="/app/abonelik"
-                  className="focus-ring press group relative rounded-[13px] border border-white/10 bg-white/5 px-3.5 py-2.5 transition hover:border-white/30"
+                  className="focus-ring press group relative rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3.5 py-2.5 transition hover:border-white/30"
                 >
                   <ArrowUpRight className="hover-action absolute right-2 top-2 h-3 w-3 text-white/50 opacity-0 transition group-hover:opacity-100" />
-                  <p className="text-[10px] uppercase tracking-[0.08em] text-white/45">{r.label}</p>
+                  <p className="text-xs uppercase tracking-[0.08em] text-white/45">{r.label}</p>
                   <p className={`truncate text-sm font-bold ${r.danger ? "text-danger-500" : "text-white"}`}>{r.value}</p>
                 </Link>
               ))}
@@ -127,7 +121,7 @@ export default async function SuspendedPage() {
               ) : null}
               <a
                 href="mailto:destek@emlaksoft.com.tr"
-                className={`inline-flex min-h-[42px] items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold transition ${
+                className={`inline-flex min-h-[42px] items-center gap-2 rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-semibold transition ${
                   isCancelled
                     ? "bg-brand-600 text-white hover:bg-brand-700"
                     : "border border-white/20 text-white/80 hover:border-white/40 hover:text-white"
@@ -138,7 +132,7 @@ export default async function SuspendedPage() {
               {staff ? (
                 <Link
                   href="/admin"
-                  className="inline-flex min-h-[42px] items-center rounded-[10px] border border-amber-400/40 px-4 py-2.5 text-sm font-semibold text-amber-300 transition hover:border-amber-400/70"
+                  className="inline-flex min-h-[42px] items-center rounded-[var(--radius-control)] border border-amber-400/40 px-4 py-2.5 text-sm font-semibold text-amber-300 transition hover:border-amber-400/70"
                 >
                   Ops paneline git
                 </Link>
@@ -146,7 +140,7 @@ export default async function SuspendedPage() {
               <form action={signOut}>
                 <button
                   type="submit"
-                  className="min-h-[42px] rounded-[10px] border border-white/15 px-4 py-2.5 text-sm font-semibold text-white/60 transition hover:border-white/30 hover:text-white"
+                  className="min-h-[42px] rounded-[var(--radius-control)] border border-white/15 px-4 py-2.5 text-sm font-semibold text-white/60 transition hover:border-white/30 hover:text-white"
                 >
                   Çıkış yap
                 </button>
@@ -175,7 +169,7 @@ export default async function SuspendedPage() {
                   style={{ "--circ": RING_C, "--dash": RING_C * 0.35 } as CSSProperties}
                 />
               </svg>
-              <span className="relative grid h-14 w-14 place-items-center rounded-[16px] bg-danger-500/15 text-danger-500">
+              <span className="relative grid h-14 w-14 place-items-center rounded-[var(--radius-card)] bg-danger-500/15 text-danger-500">
                 <ShieldAlert className="h-7 w-7" />
               </span>
             </div>
@@ -185,7 +179,7 @@ export default async function SuspendedPage() {
 
       <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
         {/* Geri dönüş adımları */}
-        <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="flex items-center gap-2 font-display text-sm font-bold text-ink-950">
             <CalendarClock className="h-4 w-4 text-brand-600" /> Erişimi geri açmak için
           </h2>
@@ -193,12 +187,12 @@ export default async function SuspendedPage() {
             {steps.map((s) => {
               const Icon = s.icon;
               return (
-                <div key={s.title} className="rounded-[14px] border border-line bg-canvas/60 p-3.5">
-                  <span className="grid h-9 w-9 place-items-center rounded-[11px] bg-brand-600/10 text-brand-600">
+                <div key={s.title} className="rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3.5">
+                  <span className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
                     <Icon className="h-4 w-4" />
                   </span>
                   <p className="mt-2.5 text-xs font-bold text-ink-950">{s.title}</p>
-                  <p className="mt-1 text-[11px] leading-relaxed text-text-muted">{s.desc}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-text-muted">{s.desc}</p>
                 </div>
               );
             })}
@@ -206,7 +200,7 @@ export default async function SuspendedPage() {
         </section>
 
         {/* Verileriniz güvende */}
-        <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="flex items-center gap-2 font-display text-sm font-bold text-ink-950">
             <Database className="h-4 w-4 text-mint-600" /> Verileriniz güvende
           </h2>
@@ -218,10 +212,10 @@ export default async function SuspendedPage() {
             <div className="mt-4 grid grid-cols-2 gap-2.5">
               <Link
                 href="/app/abonelik"
-                className="focus-ring press group relative rounded-[13px] border border-line bg-canvas/60 p-3.5 transition hover:border-brand-300"
+                className="focus-ring press group relative rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3.5 transition hover:border-brand-300"
               >
                 <ArrowUpRight className="hover-action absolute right-2 top-2 h-3 w-3 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                <span className="flex items-center gap-1.5 text-[11px] text-text-muted">
+                <span className="flex items-center gap-1.5 text-xs text-text-muted">
                   <Users className="h-3.5 w-3.5 text-brand-600" /> Korunan müşteri
                 </span>
                 <p className="numeric mt-1 font-display text-lg font-extrabold tabular-nums text-ink-950">
@@ -230,10 +224,10 @@ export default async function SuspendedPage() {
               </Link>
               <Link
                 href="/app/abonelik"
-                className="focus-ring press group relative rounded-[13px] border border-line bg-canvas/60 p-3.5 transition hover:border-brand-300"
+                className="focus-ring press group relative rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3.5 transition hover:border-brand-300"
               >
                 <ArrowUpRight className="hover-action absolute right-2 top-2 h-3 w-3 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                <span className="flex items-center gap-1.5 text-[11px] text-text-muted">
+                <span className="flex items-center gap-1.5 text-xs text-text-muted">
                   <Building2 className="h-3.5 w-3.5 text-mint-600" /> Korunan portföy
                 </span>
                 <p className="numeric mt-1 font-display text-lg font-extrabold tabular-nums text-ink-950">
@@ -242,7 +236,7 @@ export default async function SuspendedPage() {
               </Link>
             </div>
           ) : null}
-          <p className="mt-3 flex items-start gap-2 rounded-[11px] bg-mint-500/8 p-2.5 text-[11px] leading-relaxed text-text-muted">
+          <p className="mt-3 flex items-start gap-2 rounded-[var(--radius-control)] bg-mint-500/8 p-2.5 text-xs leading-relaxed text-text-muted">
             <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mint-600" />
             KVKK gereği verileriniz yalnız sizin kontrolünüzdedir; dilediğinizde dışa aktarım talep edebilirsiniz.
           </p>

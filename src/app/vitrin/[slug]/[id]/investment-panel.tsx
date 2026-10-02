@@ -72,7 +72,7 @@ export function InvestmentPanel({
   const rentStep = Math.max(250, Math.round(price / 20000));
 
   return (
-    <section className="mt-5 overflow-hidden rounded-[18px] border border-line bg-surface">
+    <section className="mt-5 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -80,7 +80,7 @@ export function InvestmentPanel({
         className="focus-ring flex w-full items-center justify-between gap-3 p-5 text-left transition hover:bg-mint-500/[0.04]"
       >
         <span className="flex items-center gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-mint-500/10 text-mint-600">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] bg-mint-500/10 text-mint-600">
             <TrendingUp className="h-5 w-5" />
           </span>
           <span>
@@ -123,7 +123,7 @@ export function InvestmentPanel({
           </div>
 
           {isEstimate && !rentTouched ? (
-            <p className="mt-3 rounded-[10px] border border-line bg-canvas/60 px-3 py-2 text-[11px] leading-relaxed text-text-muted">
+            <p className="mt-3 rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3 py-2 text-xs leading-relaxed text-text-muted">
               Bu ilan için kira verisi bulunmadığından başlangıç kirası, fiyatın binde{" "}
               {INVESTMENT_DEFAULTS.rentEstimatePerMille}&apos;ü olarak <strong>tahmin</strong> edildi. Bölgeyi biliyorsanız
               kaydırıcıyla kendi rakamınızı girin.
@@ -132,29 +132,29 @@ export function InvestmentPanel({
 
           {/* --- Sonuç ---------------------------------------------------- */}
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-[14px] border border-brand-600/20 bg-brand-600/6 p-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">Brüt kira getirisi</p>
+            <div className="rounded-[var(--radius-card)] border border-brand-600/20 bg-brand-600/6 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">Brüt kira getirisi</p>
               <p className="numeric mt-1 font-display text-2xl font-extrabold tabular-nums text-ink-950">
                 {formatPct(yieldRes.grossYieldPct)}
               </p>
-              <p className="mt-0.5 text-[11px] text-text-muted">
+              <p className="mt-0.5 text-xs text-text-muted">
                 Yıllık {formatTry(yieldRes.annualRent)} kira geliri
               </p>
             </div>
-            <div className="rounded-[14px] border border-cyan-400/25 bg-cyan-400/8 p-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-cyan-600">Amorti süresi</p>
+            <div className="rounded-[var(--radius-card)] border border-cyan-400/25 bg-cyan-400/8 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-cyan-600">Amorti süresi</p>
               <p className="numeric mt-1 font-display text-2xl font-extrabold tabular-nums text-ink-950">
                 {formatYears(yieldRes.netPaybackYears)}
               </p>
-              <p className="mt-0.5 text-[11px] text-text-muted">Giderler düşülmüş net kirayla</p>
+              <p className="mt-0.5 text-xs text-text-muted">Giderler düşülmüş net kirayla</p>
             </div>
             <div
-              className={`rounded-[14px] border p-4 ${
+              className={`rounded-[var(--radius-card)] border p-4 ${
                 positive ? "border-mint-500/25 bg-mint-500/8" : "border-amber-400/30 bg-amber-400/8"
               }`}
             >
               <p
-                className={`text-[11px] font-bold uppercase tracking-[0.08em] ${
+                className={`text-xs font-bold uppercase tracking-[0.08em] ${
                   positive ? "text-mint-600" : "text-amber-600"
                 }`}
               >
@@ -163,14 +163,14 @@ export function InvestmentPanel({
               <p className="numeric mt-1 font-display text-2xl font-extrabold tabular-nums text-ink-950">
                 {formatTry(cashFlow.monthlyCashFlow)}
               </p>
-              <p className="mt-0.5 text-[11px] text-text-muted">
+              <p className="mt-0.5 text-xs text-text-muted">
                 {positive ? "Taksit ve giderler sonrası cebinizde kalan" : "Her ay cebinizden koyacağınız tutar"}
               </p>
             </div>
           </div>
 
           {/* --- Döküm ---------------------------------------------------- */}
-          <ul className="mt-4 divide-y divide-line rounded-[14px] border border-line">
+          <ul className="mt-4 divide-y divide-line rounded-[var(--radius-card)] border border-line">
             <li className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
               <span className="text-text-muted">Tahsil edilen kira (boşluk sonrası)</span>
               <span className="numeric shrink-0 font-semibold tabular-nums text-ink-950">
@@ -203,14 +203,14 @@ export function InvestmentPanel({
             </li>
           </ul>
 
-          <p className="mt-4 flex items-start gap-2 rounded-[12px] border border-amber-400/30 bg-amber-400/8 px-3 py-2.5 text-[11px] leading-relaxed text-amber-700">
+          <p className="mt-4 flex items-start gap-2 rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/8 px-3 py-2.5 text-xs leading-relaxed text-amber-700">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {INVESTMENT_DISCLAIMER}
           </p>
 
           <a
             href={`#${leadAnchorId}`}
-            className="btn-shine mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-600/90"
+            className="btn-shine mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-600/90"
           >
             <ArrowDown className="h-4 w-4" /> Bölge kira verisi için bize ulaşın
           </a>

@@ -9,6 +9,9 @@ import {
   PublicTokenPage,
 } from "@/components/public/token-page";
 import { ConfirmButtons } from "./confirm-buttons";
+import { isPublicTenantActive } from "@/lib/public-tenant";
+
+export const dynamic = "force-dynamic";
 
 // Teyit linkleri kişiye özeldir → arama motorlarına kapalı (paylas/[token] deseni).
 export const metadata: Metadata = {
@@ -50,15 +53,16 @@ export default async function AppointmentConfirmPage({
   const { data: appt } = await admin
     .from("appointments")
     .select(
-      "id, appointment_type, scheduled_at, duration_min, status, customer_response, customer:customers(full_name), tenant:tenants(name, logo_url, brand_color)",
+      "id, appointment_type, scheduled_at, duration_min, status, customer_response, customer:customers(full_name), tenant:tenants(name, status, logo_url, brand_color)",
     )
     .eq("confirm_token", token)
     .maybeSingle();
 
   if (!appt) notFound();
 
-  type TenantShape = { name?: string; logo_url?: string | null; brand_color?: string | null };
+  type TenantShape = { name?: string; status?: string; logo_url?: string | null; brand_color?: string | null };
   const tenant = rel(appt.tenant as TenantShape | TenantShape[] | null);
+  if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
   const office = tenant?.name ?? "Emlak ofisi";
   const customerName = rel(appt.customer as { full_name?: string } | { full_name?: string }[] | null)?.full_name ?? null;
   const date = new Date(appt.scheduled_at);

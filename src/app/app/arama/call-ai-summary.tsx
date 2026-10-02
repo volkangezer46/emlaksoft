@@ -34,16 +34,16 @@ export function CallAiSummary({ callId }: { callId: string }) {
           type="button"
           onClick={run}
           disabled={pending}
-          className="focus-ring press inline-flex items-center gap-1.5 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-brand-600 transition hover:border-brand-300 disabled:opacity-60"
+          className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300 disabled:opacity-60"
         >
           {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
           {pending ? "Özetleniyor…" : "AI özet"}
         </button>
       ) : null}
-      {error ? <p className="mt-1.5 text-[11px] font-medium text-danger-500">{error}</p> : null}
+      {error ? <p className="mt-1.5 text-xs font-medium text-danger-500">{error}</p> : null}
       {result ? (
-        <div className="rounded-[12px] border border-brand-600/15 bg-brand-600/[0.04] px-3.5 py-2.5">
-          <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-brand-600">
+        <div className="rounded-[var(--radius-card)] border border-brand-600/15 bg-brand-600/[0.04] px-3.5 py-2.5">
+          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-brand-600">
             <Sparkles className="h-3 w-3" /> AI özet
           </p>
           <p className="mt-1 text-xs leading-relaxed text-ink-950">{result.summary}</p>

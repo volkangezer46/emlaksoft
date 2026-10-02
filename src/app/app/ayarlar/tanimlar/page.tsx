@@ -23,10 +23,14 @@ export default async function DefinitionsPage() {
   const { tenantId } = await requireModulePage("settings");
   const supabase = await createClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("definitions")
     .select("id, tenant_id, category, value, label, color, sort_order, is_active")
     .order("sort_order", { ascending: true });
+  if (error) {
+    console.error("definitions page load failed", { code: error.code || "unknown" });
+    throw new Error("Tanımlar güvenli şekilde yüklenemedi.");
+  }
 
   const rows = (data ?? []) as DefRow[];
   const byCat = new Map<string, DefRow[]>();
@@ -47,7 +51,7 @@ export default async function DefinitionsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlar
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="relative">
           <span className="flex items-center gap-2 text-xs font-semibold text-cyan-400"><ListTree className="h-4 w-4" /> Tanımlar</span>

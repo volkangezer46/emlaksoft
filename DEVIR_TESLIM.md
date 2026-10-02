@@ -1,8 +1,15 @@
 # EmlakSoft — Devir & Süreklilik Dosyası
 
-> **Son güncelleme:** 25 Temmuz 2026  
-> **Proje yolu:** `C:\Users\volka\Projects\emlaksoft`  
+> **Son güncelleme:** 10 Ağustos 2026
+> **Proje yolu:** `C:\Users\volka\Projects\emlaksoft`
 > **Amaç:** Cursor / VS Code’da yeni sohbette bu dosyayı okutup kaldığın yerden devam etmek.
+
+> [!IMPORTANT]
+> **Güncel operasyon kaydı:** `docs/DEVIR_2026-08-10_RELEASE_HARDENING.md`
+> Bu dosyanın aşağıdaki bölümleri tarihsel özellik geçmişidir. Dal durumu, secret olayı,
+> migration ledger ve yayın kararlarında 10 Ağustos belgesi üstündür. Eski `.env.local`
+> kopyalanmayacak; credential rotasyonu ve ledger uzlaştırması tamamlanmadan commit, push,
+> migration veya deploy yapılmayacak.
 
 ---
 
@@ -11,20 +18,22 @@
 Yeni Agent sohbetinde **şunu olduğu gibi yapıştır:**
 
 ```
-@DEVIR_TESLIM.md dosyasını oku. EmlakSoft projesinde kaldığımız yerden devam et.
-Tüm kuralları, sözlüğü, biten işleri ve sıradaki adımları uygula. Onay beklemeden devam et.
+@AGENTS.md, @PROJECT_CONTEXT.md ve @docs/DEVIR_2026-08-10_RELEASE_HARDENING.md
+dosyalarını tamamen oku. EmlakSoft projesinde kaldığımız yerden devam et. Mevcut çalışma
+ağacını koru; secret rotasyonu ve migration drift uzlaştırması tamamlanmadan commit, push,
+migration veya deploy yapma.
 ```
 
 İstersen daha kısa:
 
 ```
-@DEVIR_TESLIM.md oku ve devam et
+@docs/DEVIR_2026-08-10_RELEASE_HARDENING.md oku ve güvenli sıradan devam et
 ```
 
 ### Nasıl çalışır?
 1. Cursor’da bu proje klasörünü aç: `C:\Users\volka\Projects\emlaksoft`
 2. Yeni Agent sohbeti aç
-3. Yukarıdaki metni yapıştır (`@DEVIR_TESLIM.md` dosyayı bağlar)
+3. Yukarıdaki metni yapıştır (`@docs/DEVIR_2026-08-10_RELEASE_HARDENING.md` güncel kaydı bağlar)
 4. Agent dosyadaki geçmişi, kuralları ve sıradaki işleri yükler
 
 ---
@@ -71,8 +80,8 @@ Kullanıcıya görünen **tüm metinlerde** İngilizce ürün kelimesi yok. Kod/
 ## Mimari özet
 
 ### Roller
-**Platform personeli** (`platform_staff`): `super_admin`, `ops`, `support`, `billing`  
-Modül matrisi: `src/lib/platform-access.ts`  
+**Platform personeli** (`platform_staff`): `super_admin`, `ops`, `support`, `billing`
+Modül matrisi: `src/lib/platform-access.ts`
 Guard: `requirePlatformModule("...")`
 
 **Ofis kullanıcıları** (`profiles`): owner, manager, advisor vb. — tenant RBAC + `permissions`
@@ -91,8 +100,9 @@ Guard: `requirePlatformModule("...")`
 - `000038` — `campaign_channel` enum'a `email` eklendi ✅ production'a uygulandı
 - `000039` — `property_dues` (aidat takibi) ✅ production'a uygulandı
 
-Rehber: `MIGRATION_GUIDE.md`  
-Tek dosya uygula: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql`
+Rehber: `MIGRATION_GUIDE.md`
+Güvenli akış: `npm run check:migrations -- --database` → `npm run db:migrate -- --dry-run`
+→ restore edilebilir backup/PITR doğrulaması → `npm run db:migrate`.
 
 ---
 
@@ -419,10 +429,12 @@ Yüksek değerli sıradaki adaylar: gerçek WhatsApp Business API + inbox, harit
 - **`customer-portal.ts` şema uyumsuzluğu** — `admin.from("demands")` (tablo `customer_demands`), `demand_type` kolonu (gerçekte `transaction_type`/`property_type`), `matches` tablosu, `provinces` — bu fonksiyon eski/farklı şemaya göre yazılmış ve uçtan uca test edilmemiş görünüyor. Kör yeniden adlandırma yeni bug riski taşıdığından, ayrı bir düzeltme turunda şema eşlemesi doğrulanarak ele alınmalı
 - WhatsApp gönderimi: yapılandırılabilir (API url/token set edilirse çalışır) — bilinçli iskelet
 
-#### Deploy'da uygulanacak migration'lar
+#### Tarihsel deploy notu (güncel komut için `MIGRATION_GUIDE.md`)
 ```
-npx tsx scripts/apply-one.ts supabase/migrations/20260724000036_hotpath_indexes.sql
-npx tsx scripts/apply-one.ts supabase/migrations/20260724000037_rate_limits.sql
+npm run check:migrations -- --database
+npm run db:migrate -- --dry-run
+# Backup/PITR doğrulandıktan sonra:
+npm run db:migrate
 ```
 
 ---
@@ -457,7 +469,8 @@ npx tsx scripts/apply-one.ts supabase/migrations/20260724000037_rate_limits.sql
 - **Portal veri kaybı** — `mapToSahibinden`/`mapToHepsiemlak` artık `floorCount` + `buildingAge` maplıyor (sessiz veri kaybı giderildi)
 
 #### ⚠️ Deploy'da uygulanacak
-- **Migration 036** production'a uygulanmalı: `npx tsx scripts/apply-one.ts supabase/migrations/20260724000036_hotpath_indexes.sql`
+- **Migration 036 tarihsel notu:** uygulama durumu ledger'dan doğrulanmalı; checksum drift yoksa
+  backup/PITR sonrasında kontrollü `npm run db:migrate` kullanılmalı.
 - SMS imza bildirimi için Netgsm anahtarı gerekli (yoksa link üretilir ama SMS atılmaz — akış yine çalışır)
 
 #### Kalite denetiminden kalan düşük öncelikli notlar (bilinçli/ertelendi)
@@ -650,7 +663,8 @@ npx tsx scripts/apply-one.ts supabase/migrations/20260724000037_rate_limits.sql
 ### 2) Satış CRM
 - `/admin/satis` — demo talepleri, durum, atama, not
 - Demo formu → `demo_requests` + personel bildirimi
-- **Ofise dönüştür:** `convertDemoToTenant` — ofis + sahip kullanıcı + 14 gün deneme + geçici şifre
+- **Ofise dönüştür:** `convertDemoToTenant` — atomik ofis + sahip kullanıcı + 14 gün deneme;
+  sahip erişimi tek kullanımlık parola-belirleme davetiyle açılır, geçici parola personele gösterilmez.
 
 ### 3) Bildirim merkezi
 - Topbar zili + `/admin/bildirimler`
@@ -696,7 +710,8 @@ npm run dev
 npm run build
 ```
 
-Ortam: `.env.local` (Supabase, iyzico, isteğe bağlı `OPENAI_API_KEY`, `CRON_SECRET`, VAPID, Endeksa/Tapusor)
+Ortam: `.env.example` şablon alınır; yalnız döndürülmüş yeni değerlerle yerel `.env.local`
+oluşturulur. `.env.local` track edilmez, paylaşılmaz veya eski bilgisayardan kopyalanmaz.
 
 ---
 

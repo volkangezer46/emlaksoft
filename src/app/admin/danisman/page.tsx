@@ -19,7 +19,7 @@ export default async function AdvisorPage() {
 
   return (
     <div className="space-y-5">
-      <section className="theme-dark relative overflow-hidden rounded-[20px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-14 h-52 w-52 rounded-full bg-brand-500/25 blur-[90px]" />
         <div className="relative flex flex-wrap items-start justify-between gap-4">
@@ -36,7 +36,7 @@ export default async function AdvisorPage() {
           {staff.role === "super_admin" ? (
             <Link
               href="/admin/sistem"
-              className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/8 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/12"
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/8 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/12"
             >
               <Settings2 className="h-3.5 w-3.5" /> Yapay zeka ayarları
             </Link>
@@ -47,19 +47,19 @@ export default async function AdvisorPage() {
             <Link
               key={k.label}
               href={k.href}
-              className="focus-ring press group relative block rounded-[14px] border border-white/12 bg-white/8 p-3 backdrop-blur transition hover:border-white/25 hover:bg-white/12"
+              className="focus-ring press group relative block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 backdrop-blur transition hover:border-white/25 hover:bg-white/12"
             >
               <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:text-amber-300 group-hover:opacity-100" />
               <k.icon className={`h-4 w-4 ${k.tone}`} />
               <p className="mt-2 font-display text-xl font-extrabold text-white">{k.value}</p>
-              <p className="text-[11px] text-white/70">{k.label}</p>
+              <p className="text-xs text-white/70">{k.label}</p>
             </Link>
           ))}
         </div>
       </section>
 
       {!aiEnabled ? (
-        <div className="flex items-center gap-3 rounded-[14px] border border-amber-400/30 bg-amber-400/8 px-4 py-3">
+        <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/8 px-4 py-3">
           <CreditCard className="h-4 w-4 shrink-0 text-amber-600" />
           <p className="text-sm text-text-muted">
             OpenAI anahtarı tanımlı değil — danışman şu an <strong className="text-ink-950">akıllı yedek</strong> kipinde

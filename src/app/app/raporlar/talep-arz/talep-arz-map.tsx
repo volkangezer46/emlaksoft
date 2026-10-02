@@ -154,7 +154,7 @@ export function TalepArzMap({ markers }: { markers: TalepArzMarker[] }) {
   const activePoint = points.find((p) => p.id === activeId) ?? null;
 
   return (
-    <div className="overflow-hidden rounded-[16px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+    <div className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-xs)]">
       <div
         ref={boxRef}
         className="relative w-full cursor-grab touch-none select-none overflow-hidden bg-canvas active:cursor-grabbing"
@@ -199,7 +199,7 @@ export function TalepArzMap({ markers }: { markers: TalepArzMarker[] }) {
               aria-label={`${p.name} — ${p.demand} talep, ${p.supply} portföy`}
               title={`${p.name}: ${p.demand} talep · ${p.supply} portföy`}
             >
-              <span className="text-[11px] font-extrabold text-white drop-shadow-sm">{p.demand}</span>
+              <span className="text-xs font-extrabold text-white drop-shadow-sm">{p.demand}</span>
             </button>
           );
         })}
@@ -207,7 +207,7 @@ export function TalepArzMap({ markers }: { markers: TalepArzMarker[] }) {
         {activePoint ? (
           <div
             onPointerDown={(e) => e.stopPropagation()}
-            className="absolute z-20 w-[230px] -translate-x-1/2 -translate-y-full rounded-[12px] border border-line bg-surface p-3 shadow-[var(--shadow-card)]"
+            className="absolute z-20 w-[230px] -translate-x-1/2 -translate-y-full rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-card)]"
             style={{
               left: Math.min(Math.max(activePoint.wx * scale - originX, 120), Math.max(width - 120, 120)),
               top: Math.max(activePoint.wy * scale - originY - markerSize(activePoint.demand) / 2 - 8, 96),
@@ -217,7 +217,7 @@ export function TalepArzMap({ markers }: { markers: TalepArzMarker[] }) {
             <p className="mt-1 text-xs tabular-nums text-text-muted">
               {activePoint.demand} açık talep · {activePoint.supply} yayında portföy
             </p>
-            <p className={`mt-0.5 text-[11px] font-semibold ${TONE_CLS[activePoint.tone].text}`}>
+            <p className={`mt-0.5 text-xs font-semibold ${TONE_CLS[activePoint.tone].text}`}>
               {TONE_CLS[activePoint.tone].label}
             </p>
             <Link
@@ -229,7 +229,7 @@ export function TalepArzMap({ markers }: { markers: TalepArzMarker[] }) {
           </div>
         ) : null}
 
-        <div className="absolute right-3 top-3 z-20 flex flex-col overflow-hidden rounded-[10px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+        <div className="absolute right-3 top-3 z-20 flex flex-col overflow-hidden rounded-[var(--radius-control)] border border-line bg-surface shadow-[var(--shadow-xs)]">
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}

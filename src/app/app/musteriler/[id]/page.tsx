@@ -30,6 +30,7 @@ import type { TimelineItem } from "./customer-timeline-tab";
 import { COMM_CHANNELS } from "@/lib/comm-types";
 import { computeNextBestAction } from "./next-best-action";
 import { isPast, msSince, DAY_MS } from "@/lib/clock";
+import { getBaseUrl } from "@/lib/base-url";
 import { scoreSellerLikelihood, isOwnerCustomer, hasListingIntent } from "@/lib/seller-prediction";
 import { SellerPotentialCard } from "@/components/app/seller-potential-card";
 // Ortak tekil SMS dialogu — tek kopya gelen-kutusu'nda yaşar (Yanıtla da onu kullanır)
@@ -278,7 +279,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const audit = (auditData ?? []) as { id: string; action: string; created_at: string }[];
 
   // Memnuniyet & Paylaşımlar — public link tabanı sunum/anket sayfalarıyla aynı
-  const publicBase = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const publicBase = getBaseUrl();
 
   // Portföy öneri widget'ı için
   const activeDemands = demands
@@ -484,22 +485,22 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         <ArrowLeft className="h-4 w-4" /> Müşteri merkezine dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-brand-600/30 blur-[90px]" />
         <div className="relative grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-center">
           <div className="flex items-start gap-4">
-            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-[20px] bg-[image:var(--grad-brand)] font-display text-xl font-extrabold text-white shadow-[var(--shadow-glow-brand)]">
+            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-[var(--radius-panel)] bg-[image:var(--grad-brand)] font-display text-xl font-extrabold text-white shadow-[var(--shadow-glow-brand)]">
               {initials(customer.full_name)}
             </span>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-display text-2xl font-extrabold text-white md:text-3xl">{customer.full_name}</h1>
                 {customer.blacklist ? (
-                  <span className="rounded-full bg-danger-500/20 px-2 py-0.5 text-[11px] font-bold text-danger-400">Kara liste</span>
+                  <span className="rounded-full bg-danger-500/20 px-2 py-0.5 text-xs font-bold text-danger-400">Kara liste</span>
                 ) : (
                   <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 ring-inset ${leadTierCls(lead.tier)}`}
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${leadTierCls(lead.tier)}`}
                     title={lead.factors.map((f) => `${f.label}: ${f.points > 0 ? "+" : ""}${f.points}`).join(" · ")}
                   >
                     {lead.tier === "hot" ? "🔥" : lead.tier === "warm" ? "🌤️" : "❄️"} {lead.label} · {lead.score}
@@ -510,7 +511,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                   <Link
                     href="/app/yabanci-satis"
                     title="Yabancı uyruklu alıcı — zorunlu evraklar ve mevzuat için tıklayın"
-                    className="focus-ring inline-flex items-center gap-1 rounded-full bg-mint-500/20 px-2.5 py-0.5 text-[11px] font-bold text-mint-300 transition hover:bg-mint-500/30"
+                    className="focus-ring inline-flex items-center gap-1 rounded-full bg-mint-500/20 px-2.5 py-0.5 text-xs font-bold text-mint-300 transition hover:bg-mint-500/30"
                   >
                     🌍 Yabancı{customer.nationality ? ` · ${customer.nationality}` : ""}
                   </Link>
@@ -519,7 +520,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {types.length > 0 ? (
                   types.map((t) => (
-                    <span key={t} className="rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold text-white/80">{t}</span>
+                    <span key={t} className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-white/80">{t}</span>
                   ))
                 ) : (
                   <span className="text-xs text-white/40">Tür belirtilmedi</span>
@@ -552,7 +553,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {customer.phone ? (
-                  <a href={toTelHref(customer.phone) ?? "#"} className="btn-shine inline-flex items-center gap-1.5 rounded-[10px] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 transition hover:bg-white/90">
+                  <a href={toTelHref(customer.phone) ?? "#"} className="btn-shine inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 transition hover:bg-white/90">
                     <PhoneCall className="h-4 w-4" /> Ara
                   </a>
                 ) : null}
@@ -578,17 +579,17 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                 {/* vCard 3.0 indirme — route: ./vcard/route.ts */}
                 <a
                   href={`/app/musteriler/${customer.id}/vcard`}
-                  className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                  className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
                 >
                   <BookUser className="h-4 w-4" /> Rehbere ekle (.vcf)
                 </a>
-                <Link href={`/app/arama?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                <Link href={`/app/arama?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <PhoneCall className="h-4 w-4" /> Görüşme kaydet
                 </Link>
-                <Link href={`/app/randevular?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                <Link href={`/app/randevular?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <CalendarDays className="h-4 w-4" /> Randevu ver
                 </Link>
-                <Link href={`/app/eslestirme?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                <Link href={`/app/eslestirme?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <Target className="h-4 w-4" /> Eşleştir
                 </Link>
                 {canEdit ? (
@@ -634,7 +635,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               </svg>
               <div className="absolute text-center">
                 <p className="font-display text-2xl font-extrabold text-white">{score}</p>
-                <p className="text-[10px] text-white/55">Müşteri skoru</p>
+                <p className="text-xs text-white/55">Müşteri skoru</p>
               </div>
             </div>
             <div className="grid gap-2">
@@ -643,11 +644,11 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                   key={s.label}
                   href={`/app/musteriler/${customer.id}?tab=${s.tab}`}
                   scroll={false}
-                  className="focus-ring press group flex items-center gap-2.5 rounded-[12px] border border-white/10 bg-white/5 px-3 py-2 backdrop-blur transition hover:border-brand-300 hover:bg-white/10"
+                  className="focus-ring press group flex items-center gap-2.5 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-2 backdrop-blur transition hover:border-brand-300 hover:bg-white/10"
                 >
                   <s.icon className="h-4 w-4 text-mint-400" />
                   <span className="font-display text-lg font-extrabold text-white">{s.value}</span>
-                  <span className="text-[11px] text-white/50">{s.label}</span>
+                  <span className="text-xs text-white/50">{s.label}</span>
                   <ArrowUpRight className="hover-action ml-auto h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:opacity-100" />
                 </Link>
               ))}
@@ -657,28 +658,28 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
         {/* Sonraki en iyi aksiyon — tek öneri, tek buton; kural eşleşmezse kart yok */}
         {nba ? (
-          <div className="relative mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-mint-400/25 bg-white/[0.06] px-4 py-3 backdrop-blur">
+          <div className="relative mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-mint-400/25 bg-white/[0.06] px-4 py-3 backdrop-blur">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-mint-500/15 text-mint-400">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-mint-500/15 text-mint-400">
                 <Sparkles className="h-4 w-4" />
               </span>
               <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-mint-400">Sonraki en iyi aksiyon</p>
+                <p className="text-xs font-bold uppercase tracking-[0.08em] text-mint-400">Sonraki en iyi aksiyon</p>
                 <p className="truncate text-sm font-semibold text-white">{nba.title}</p>
-                <p className="truncate text-[11px] text-white/50">{nba.reason}</p>
+                <p className="truncate text-xs text-white/50">{nba.reason}</p>
               </div>
             </div>
             {nba.externalHref ? (
               <a
                 href={nba.externalHref}
-                className="btn-shine inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
+                className="btn-shine inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
               >
                 <PhoneCall className="h-4 w-4" /> {nba.action}
               </a>
             ) : nba.href ? (
               <Link
                 href={nba.href}
-                className="btn-shine inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
+                className="btn-shine inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
               >
                 {nba.action} <ArrowUpRight className="h-4 w-4" />
               </Link>

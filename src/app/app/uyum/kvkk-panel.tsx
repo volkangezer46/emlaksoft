@@ -100,7 +100,7 @@ export function KvkkPanel({ initialLog, canErase }: { initialLog: LogRow[]; canE
               type="button"
               onClick={temizle}
               disabled={pending}
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border border-hairline px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-amber-400 hover:text-amber-600 disabled:opacity-60"
+              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-amber-400 hover:text-amber-600 disabled:opacity-60"
             >
               <Trash2 className="h-3.5 w-3.5" /> Saklama süresi dolanları temizle
             </button>
@@ -109,7 +109,7 @@ export function KvkkPanel({ initialLog, canErase }: { initialLog: LogRow[]; canE
               <DialogTrigger asChild>
                 <button
                   type="button"
-                  className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-danger-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-danger-700"
+                  className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-danger-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-danger-700"
                 >
                   <Eraser className="h-3.5 w-3.5" /> Silme talebi işle
                 </button>
@@ -147,18 +147,18 @@ export function KvkkPanel({ initialLog, canErase }: { initialLog: LogRow[]; canE
                       id="kvkk-neden"
                       value={neden}
                       onChange={(e) => setNeden(e.target.value)}
-                      className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                      className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
                       placeholder="Örn. müşterinin yazılı silme talebi · 12.07.2026"
                     />
-                    <p className="mt-1.5 text-[11px] text-text-faint">
+                    <p className="mt-1.5 text-xs text-text-faint">
                       Denetimde bu gerekçe sorulur. Talebin tarihini ve geldiği kanalı yazın.
                     </p>
                   </div>
 
                   {/* Kullanicinin "sildim" sanmasi en kotu sonuc olurdu. */}
-                  <div className="rounded-[12px] border border-amber-400/35 bg-amber-400/[0.07] px-4 py-3">
+                  <div className="rounded-[var(--radius-card)] border border-amber-400/35 bg-amber-400/[0.07] px-4 py-3">
                     <p className="text-xs font-semibold text-ink-950">Ne olacak?</p>
-                    <ul className="mt-1.5 space-y-1 text-[11px] leading-relaxed text-text-muted">
+                    <ul className="mt-1.5 space-y-1 text-xs leading-relaxed text-text-muted">
                       <li>· Ad, telefon, e-posta, not, doğum tarihi <strong>maskelenir</strong></li>
                       <li>· Kampanya ve açık ev kayıtlarındaki <strong>kopyalar</strong> da temizlenir</li>
                       <li>· Görüşme metinleri ve çağrı numarası silinir</li>
@@ -178,7 +178,7 @@ export function KvkkPanel({ initialLog, canErase }: { initialLog: LogRow[]; canE
                     <DialogClose asChild>
                       <button
                         type="button"
-                        className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas"
+                        className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas"
                       >
                         Vazgeç
                       </button>
@@ -187,7 +187,7 @@ export function KvkkPanel({ initialLog, canErase }: { initialLog: LogRow[]; canE
                       type="button"
                       onClick={anonimlestir}
                       disabled={pending}
-                      className="btn-shine focus-ring press rounded-[10px] bg-danger-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-danger-700 disabled:opacity-60"
+                      className="btn-shine focus-ring press rounded-[var(--radius-control)] bg-danger-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-danger-700 disabled:opacity-60"
                     >
                       {pending ? "İşleniyor…" : "Anonimleştir (geri alınamaz)"}
                     </button>
@@ -200,12 +200,12 @@ export function KvkkPanel({ initialLog, canErase }: { initialLog: LogRow[]; canE
       </div>
 
       {sonuc ? (
-        <p className="mt-3 rounded-[12px] border border-mint-500/30 bg-mint-500/[0.06] px-4 py-2.5 text-sm text-mint-600" role="status">
+        <p className="mt-3 rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/[0.06] px-4 py-2.5 text-sm text-mint-600" role="status">
           Anonimleştirildi · kanıt referansı <strong className="numeric">{sonuc}</strong>
         </p>
       ) : null}
       {temizlikSonuc ? (
-        <p className="mt-3 rounded-[12px] border border-line bg-canvas px-4 py-2.5 text-sm text-ink-950" role="status">
+        <p className="mt-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5 text-sm text-ink-950" role="status">
           {temizlikSonuc}
         </p>
       ) : null}
@@ -214,16 +214,16 @@ export function KvkkPanel({ initialLog, canErase }: { initialLog: LogRow[]; canE
       <div className="mt-4">
         <h3 className="text-sm font-bold text-ink-950">Silme kanıtı</h3>
         {initialLog.length === 0 ? (
-          <p className="mt-2 rounded-[12px] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
+          <p className="mt-2 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
             Henüz işlenmiş silme talebi yok.
           </p>
         ) : (
           <ul className="mt-2 space-y-2">
             {initialLog.map((r) => (
-              <li key={r.id} className="rounded-[12px] border border-line bg-canvas px-4 py-2.5">
+              <li key={r.id} className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                   <p className="numeric text-sm font-semibold text-ink-950">{r.customer_ref}</p>
-                  <time className="numeric text-[11px] text-text-faint" dateTime={r.performed_at}>
+                  <time className="numeric text-xs text-text-faint" dateTime={r.performed_at}>
                     {tarih(r.performed_at)}
                   </time>
                 </div>
@@ -233,7 +233,7 @@ export function KvkkPanel({ initialLog, canErase }: { initialLog: LogRow[]; canE
                     {Object.entries(r.affected).map(([tablo, adet]) => (
                       <span
                         key={tablo}
-                        className="numeric rounded-full bg-surface px-2 py-0.5 text-[11px] font-semibold text-text-muted"
+                        className="numeric rounded-full bg-surface px-2 py-0.5 text-xs font-semibold text-text-muted"
                       >
                         {tablo} {adet}
                       </span>
@@ -246,7 +246,7 @@ export function KvkkPanel({ initialLog, canErase }: { initialLog: LogRow[]; canE
         )}
       </div>
 
-      <p className="mt-4 flex items-start gap-2 text-[11px] leading-relaxed text-text-faint">
+      <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-text-faint">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600" />
         <span>
           Kayıt <strong>silinmez, anonimleştirilir</strong>. Gerçek silme şemada mümkün değil: anlaşma

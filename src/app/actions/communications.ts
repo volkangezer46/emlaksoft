@@ -2,15 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
-import { normalizeTurkishPhone, formatTurkishPhone, isValidTurkishMobile } from "@/lib/phone";
-import { notifyTenant } from "@/lib/notify";
+import { normalizeTurkishPhone, isValidTurkishMobile } from "@/lib/phone";
 import { logActivity } from "@/lib/activity";
-import { getNetgsmConfig } from "@/lib/messaging/netgsm";
-// Tenant öncelikli Netgsm gönderimi — imza akışıyla AYNI yardımcı (yeniden yazılmadı):
-// tenant_integrations kaydı varsa onunla, yoksa platform varsayılanıyla gönderir.
-import { getTenantNetgsmConfig, sendSignerSms } from "@/app/imza/_lib/sms";
+import { isSignerSmsAvailable, sendSignerSms } from "@/app/imza/_lib/sms";
 
 export type CommResult = { ok?: boolean; error?: string; id?: string };
 
@@ -173,10 +168,8 @@ export async function sendCustomerSms(customerId: string, message: string): Prom
     return { error: "İYS onayı yok — Uyum sayfasından (/app/uyum) SMS iznini kaydedin." };
   }
 
-  // --- Yapılandırma ön kontrolü: tenant Netgsm kaydı VEYA platform varsayılanı ---
-  const hasConfig =
-    (await getTenantNetgsmConfig(gate.tenantId)) !== null ||
-    (await getNetgsmConfig()) !== null;
+  // Tenant provider is primary; platform fallback requires an explicit policy.
+  const hasConfig = await isSignerSmsAvailable(gate.tenantId, customer.phone);
   if (!hasConfig) {
     return { error: "SMS yapılandırması yok — Ayarlar → Entegrasyonlar bölümünden Netgsm bilgilerinizi girin." };
   }
@@ -216,136 +209,4 @@ export async function sendCustomerSms(customerId: string, message: string): Prom
   revalidatePath(`/app/musteriler/${customerId}`);
   revalidatePath("/app/gelen-kutusu");
   return { ok: true, id: comm?.id };
-}
-
-// ---------------------------------------------------------------------------
-// Gelen SMS ingest (webhook → service role)
-// ---------------------------------------------------------------------------
-
-export type IngestInboundSmsPayload = {
-  /**
-   * Webhook secret'ı (env NETGSM_WEBHOOK_SECRET) buraya da geçirilir ve
-   * fonksiyonun İÇİNDE doğrulanır. Neden: bu dosya `"use server"` taşıyor —
-   * export edilen her fonksiyon tarayıcıdan çağrılabilen bir uç nokta olur
-   * (bkz. lib/notify.ts'deki notifyTenant taşınma gerekçesi). Secret şartı
-   * olmadan herkes istediği kiracıya sahte SMS kaydı + bildirim yazdırabilirdi.
-   */
-  secret: string;
-  /** Gönderen numara (müşteri) — her format kabul, içeride normalize edilir. */
-  from: string;
-  /** Alıcı numara / mesaj başlığı — bugün tenant eşlemede kullanılamıyor, log için tutulur. */
-  to?: string;
-  message: string;
-};
-
-export type IngestResult = {
-  ok: boolean;
-  /** true → kayıt bilinçli olarak yazılmadı (tenant çözülemedi vb.) */
-  skipped?: boolean;
-  reason?: string;
-  id?: string;
-};
-
-/**
- * Netgsm (ve ileride diğer sağlayıcılar) üzerinden gelen SMS'i communications
- * tablosuna işler.
- *
- * TENANT ÇÖZÜMLEME KARARI:
- * Netgsm inbound payload'ında hangi ofise (tenant) ait olduğunu söyleyen bir
- * alan yok — tek elimizdeki gönderen telefon numarası. Bu yüzden:
- *   1. Yalnızca aktif Netgsm kaydı olan tenant'lar aday alınır
- *      (tenant_integrations.provider='netgsm', is_active) — SMS ancak
- *      Netgsm'i bağlamış bir ofise gelmiş olabilir.
- *   2. Bu adaylar içinde müşteri telefonu eşleşmesi aranır.
- *   3. Birden çok tenant'ta aynı numara varsa: kayıt yalnızca İLK eşleşen
- *      tenant'a (en eski müşteri kaydı) yazılır ve gövdeye belirsizlik notu
- *      eklenir — aynı SMS'i N ofise kopyalamak yanlış ofislere veri sızdırır.
- *   4. Hiç eşleşme yoksa kayıt ATLANIR ve loglanır: kiracısı belirsiz bir
- *      satırı "tahmini" bir tenant'a yazmak, hiç yazmamaktan daha kötüdür
- *      (yanlış ofisin gelen kutusunda yabancı bir numara belirir).
- */
-export async function ingestInboundSms(payload: IngestInboundSmsPayload): Promise<IngestResult> {
-  const secret = process.env.NETGSM_WEBHOOK_SECRET;
-  if (!secret || payload.secret !== secret) {
-    return { ok: false, skipped: true, reason: "unauthorized" };
-  }
-
-  const phone = normalizeTurkishPhone(payload.from);
-  const message = String(payload.message ?? "").trim().slice(0, 2000);
-  if (!isValidTurkishMobile(phone) || !message) {
-    console.warn("[gelen-sms] atlandı: geçersiz numara/boş mesaj", { from: payload.from });
-    return { ok: true, skipped: true, reason: "invalid_payload" };
-  }
-
-  const admin = createAdminClient();
-
-  // 1) Netgsm bağlı tenant adayları
-  const { data: integrations } = await admin
-    .from("tenant_integrations")
-    .select("tenant_id")
-    .eq("provider", "netgsm")
-    .eq("is_active", true);
-  const tenantIds = [...new Set((integrations ?? []).map((r) => String(r.tenant_id)))];
-  if (tenantIds.length === 0) {
-    console.warn("[gelen-sms] atlandı: aktif Netgsm entegrasyonu olan tenant yok", { phone });
-    return { ok: true, skipped: true, reason: "no_netgsm_tenant" };
-  }
-
-  // 2) Aday tenant'larda telefon eşleşmesi — en eski kayıt önce (deterministik "ilk")
-  const { data: matches } = await admin
-    .from("customers")
-    .select("id, tenant_id, full_name, assigned_to, created_at")
-    .eq("phone", phone)
-    .is("deleted_at", null)
-    .in("tenant_id", tenantIds)
-    .order("created_at", { ascending: true })
-    .limit(10);
-
-  const customer = (matches ?? [])[0];
-  if (!customer) {
-    // 4) Tenant çözülemedi → yazma, logla (yukarıdaki karar bloğuna bakın)
-    console.warn("[gelen-sms] atlandı: telefon hiçbir Netgsm'li tenant müşterisiyle eşleşmedi", {
-      phone: formatTurkishPhone(phone),
-      to: payload.to ?? null,
-    });
-    return { ok: true, skipped: true, reason: "no_customer_match" };
-  }
-
-  const otherTenants = new Set(
-    (matches ?? []).map((m) => String(m.tenant_id)).filter((t) => t !== String(customer.tenant_id)),
-  );
-  const ambiguityNote = otherTenants.size > 0
-    ? `\n\n[Sistem] Bu numara ${otherTenants.size + 1} farklı ofiste kayıtlı; mesaj ilk eşleşen ofise yazıldı.`
-    : "";
-
-  const { data: comm, error } = await admin
-    .from("communications")
-    .insert({
-      tenant_id:   customer.tenant_id,
-      customer_id: customer.id,
-      created_by:  null, // sistem kaydı — bir kullanıcı oluşturmadı
-      channel:     "sms",
-      direction:   "inbound",
-      subject:     "Gelen SMS",
-      body:        message + ambiguityNote,
-    })
-    .select("id")
-    .single();
-
-  if (error || !comm) {
-    console.error("[gelen-sms] communications insert hatası", error?.message);
-    return { ok: false, reason: "insert_failed" };
-  }
-
-  // 3) Bildirim — danışmanı varsa ona (push dahil), yoksa tüm ofise
-  await notifyTenant({
-    tenantId: String(customer.tenant_id),
-    userId: (customer.assigned_to as string | null) ?? null,
-    title: `Yeni SMS: ${customer.full_name || formatTurkishPhone(phone)}`,
-    body: message.slice(0, 120),
-    href: `/app/musteriler/${customer.id}`,
-    kind: "info",
-  });
-
-  return { ok: true, id: comm.id };
 }

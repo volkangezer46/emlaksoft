@@ -157,7 +157,7 @@ export function UnitsBoard({
   return (
     <section className="space-y-4">
       {expiredCount > 0 ? (
-        <div className="flex items-center gap-2 rounded-[14px] border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-700">
+        <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-700">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           {expiredCount} dairenin rezervasyon opsiyon süresi doldu — satışa çevirin ya da serbest bırakın.
         </div>
@@ -236,7 +236,7 @@ export function UnitsBoard({
       ) : (
         <div className="space-y-5">
           {grouped.map(({ blockName, floors }) => (
-            <div key={blockName} className="rounded-[20px] border border-line bg-surface p-5">
+            <div key={blockName} className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
               <h3 className="flex items-center gap-2 font-display text-sm font-bold text-ink-950">
                 <Building2 className="h-4 w-4 text-brand-600" />
                 {blockName === GENEL_BLOK ? "Blok belirtilmemiş" : `${blockName} Blok`}
@@ -244,7 +244,7 @@ export function UnitsBoard({
               <div className="mt-4 space-y-2.5">
                 {floors.map(({ floor, list }) => (
                   <div key={floor ?? "x"} className="flex items-start gap-3">
-                    <span className="numeric mt-1.5 w-14 shrink-0 text-right text-[11px] font-bold text-text-faint">
+                    <span className="numeric mt-1.5 w-14 shrink-0 text-right text-xs font-bold text-text-faint">
                       {floor == null ? "Kat —" : floor === 0 ? "Zemin" : `Kat ${floor}`}
                     </span>
                     <div className="flex flex-wrap gap-1.5">
@@ -257,12 +257,12 @@ export function UnitsBoard({
                             type="button"
                             onClick={() => openUnit(u.id)}
                             title={`Daire ${u.unit_no} — ${meta.label}${expired ? " (opsiyon doldu)" : ""}`}
-                            className={`focus-ring press relative rounded-[10px] border px-2.5 py-1.5 text-left transition ${meta.chip} ${
+                            className={`focus-ring press relative rounded-[var(--radius-control)] border px-2.5 py-1.5 text-left transition ${meta.chip} ${
                               expired ? "ring-2 ring-amber-400/70" : ""
                             }`}
                           >
                             <span className="numeric block text-xs font-bold">{u.unit_no}</span>
-                            <span className="block text-[10px] opacity-80">{u.rooms ?? "—"}</span>
+                            <span className="block text-xs opacity-80">{u.rooms ?? "—"}</span>
                             {expired ? (
                               <span
                                 className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-amber-400 text-white"
@@ -284,7 +284,7 @@ export function UnitsBoard({
       )}
 
       {/* Durum açıklaması (legend) */}
-      <div className="flex flex-wrap items-center gap-4 text-[11px] font-semibold text-text-muted">
+      <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-text-muted">
         {(Object.keys(STATUS_META) as UnitStatus[]).map((s) => (
           <span key={s} className="flex items-center gap-1.5">
             <span className={`h-2 w-2 rounded-full ${STATUS_META[s].dot}`} />
@@ -309,7 +309,7 @@ export function UnitsBoard({
                 }`}
               />
               <div className="space-y-4 p-6">
-                <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 rounded-[14px] border border-line bg-canvas p-4 text-sm">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 rounded-[var(--radius-card)] border border-line bg-canvas p-4 text-sm">
                   <dt className="text-text-muted">Kat</dt>
                   <dd className="text-right font-semibold text-ink-950">
                     {selected.floor == null ? "—" : selected.floor === 0 ? "Zemin" : selected.floor}
@@ -412,7 +412,7 @@ export function UnitsBoard({
                 ) : null}
 
                 {error ? (
-                  <p className="rounded-[8px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
+                  <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
                     {error}
                   </p>
                 ) : null}

@@ -68,7 +68,7 @@ export function TicketReplyForm({
 
   if (disabled) {
     return (
-      <p className="rounded-[12px] border border-line bg-canvas/70 px-4 py-3 text-sm text-text-muted">
+      <p className="rounded-[var(--radius-card)] border border-line bg-canvas/70 px-4 py-3 text-sm text-text-muted">
         Bu talep kapatıldı. Sorun devam ediyorsa talebi yeniden açabilirsiniz.
       </p>
     );
@@ -92,20 +92,20 @@ export function TicketReplyForm({
             event.currentTarget.form?.requestSubmit();
           }
         }}
-        className="w-full resize-y rounded-[12px] border border-line bg-canvas px-3 py-3 text-sm leading-relaxed outline-none transition focus:border-brand-400 focus:bg-surface"
+        className="w-full resize-y rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-3 text-sm leading-relaxed outline-none transition focus:border-brand-400 focus:bg-surface"
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <TicketAttachmentInput key={attachmentKey} id={`tenant-ticket-files-${ticketId}`} disabled={pending} compact />
         <button
           type="submit"
           disabled={pending || !requestId}
-          className="focus-ring press inline-flex items-center justify-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+          className="focus-ring press inline-flex items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
         >
           <Send className="h-3.5 w-3.5" aria-hidden />
           {pending ? "Gönderiliyor…" : "Yanıt gönder"}
         </button>
       </div>
-      <p className="text-[10px] text-text-faint sm:text-right">Hızlı gönderim: Ctrl/Command + Enter</p>
+      <p className="text-xs text-text-faint sm:text-right">Hızlı gönderim: Ctrl/Command + Enter</p>
       {state.error ? <p className="text-sm font-medium text-danger-600" role="alert">{state.error}</p> : null}
       {state.warning ? <p className="text-sm font-medium text-amber-700" role="status" aria-live="polite">{state.warning}</p> : null}
     </form>

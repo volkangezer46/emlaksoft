@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
+import { validateTenantReferences } from "@/lib/tenant-references";
 
 export type TargetResult = { ok?: boolean; error?: string; id?: string };
 
@@ -10,7 +11,7 @@ export async function upsertTarget(
   _prev: TargetResult,
   fd: FormData,
 ): Promise<TargetResult> {
-  const gate = await requirePermission("reports", "create");
+  const gate = await requirePermission("targets", "create");
   if (!gate.ok) return { error: gate.error };
 
   const profileId     = String(fd.get("profile_id")     ?? "").trim() || null;
@@ -20,6 +21,9 @@ export async function upsertTarget(
   const targetRevenue = parseFloat(String(fd.get("target_revenue") ?? "0"));
 
   if (!periodStart) return { error: "Dönem başlangıcı zorunludur." };
+
+  const references = await validateTenantReferences(gate.tenantId, { profileId });
+  if (!references.ok) return { error: references.error };
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -79,6 +83,11 @@ export async function createTarget(
   const f = parseTargetFields(fd);
   if (!f.periodStart) return { error: "Dönem başlangıcı zorunludur." };
 
+  const references = await validateTenantReferences(gate.tenantId, {
+    profileId: f.profileId,
+  });
+  if (!references.ok) return { error: references.error };
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("targets")
@@ -114,6 +123,11 @@ export async function updateTarget(
 
   const f = parseTargetFields(fd);
   if (!f.periodStart) return { error: "Dönem başlangıcı zorunludur." };
+
+  const references = await validateTenantReferences(gate.tenantId, {
+    profileId: f.profileId,
+  });
+  if (!references.ok) return { error: references.error };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -152,7 +166,7 @@ export async function deleteTarget(formData: FormData): Promise<void> {
 }
 
 export async function listTargets(period?: string) {
-  const gate = await requirePermission("reports", "view");
+  const gate = await requirePermission("targets", "view");
   if (!gate.ok) return [];
 
   const supabase = await createClient();
@@ -179,7 +193,7 @@ export async function createOpenHouse(
   _prev: OpenHouseResult,
   fd: FormData,
 ): Promise<OpenHouseResult> {
-  const gate = await requirePermission("appointments", "create");
+  const gate = await requirePermission("open_house", "create");
   if (!gate.ok) return { error: gate.error };
 
   const propertyId   = String(fd.get("property_id")   ?? "").trim();
@@ -191,16 +205,35 @@ export async function createOpenHouse(
 
   if (!propertyId)  return { error: "Portföy seçimi zorunludur." };
   if (!scheduledAt) return { error: "Tarih/saat zorunludur." };
+  const scheduledDate = new Date(scheduledAt);
+  if (!Number.isFinite(scheduledDate.getTime())) return { error: "Geçerli bir tarih/saat girin." };
+  if (!Number.isInteger(durationMin) || durationMin < 15 || durationMin > 1_440) {
+    return { error: "Süre 15-1440 dakika arasında olmalıdır." };
+  }
+  if (maxVisitors != null && (!Number.isInteger(maxVisitors) || maxVisitors < 1 || maxVisitors > 10_000)) {
+    return { error: "Ziyaretçi kapasitesi 1-10000 arasında olmalıdır." };
+  }
+  if (location && location.length > 500) return { error: "Konum en fazla 500 karakter olabilir." };
+  if (notes && notes.length > 5000) return { error: "Not en fazla 5000 karakter olabilir." };
 
   const supabase = await createClient();
+  const { data: property } = await supabase
+    .from("properties")
+    .select("id")
+    .eq("id", propertyId)
+    .eq("tenant_id", gate.tenantId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!property) return { error: "Portföy bulunamadı veya bu ofise ait değil." };
+
   const { data, error } = await supabase
     .from("open_houses")
     .insert({
       tenant_id:    gate.tenantId,
       property_id:  propertyId,
       created_by:   gate.userId,
-      scheduled_at: new Date(scheduledAt).toISOString(),
-      duration_min: isNaN(durationMin) ? 120 : durationMin,
+      scheduled_at: scheduledDate.toISOString(),
+      duration_min: durationMin,
       location,
       notes,
       max_visitors: maxVisitors,
@@ -219,21 +252,38 @@ export async function registerOpenHouseVisitor(
   openHouseId: string,
   visitor: { full_name: string; phone?: string; email?: string; notes?: string },
 ): Promise<OpenHouseResult> {
-  const gate = await requirePermission("appointments", "create");
+  const gate = await requirePermission("open_house", "create");
   if (!gate.ok) return { error: gate.error };
+
+  const fullName = String(visitor.full_name ?? "").trim();
+  const phone = String(visitor.phone ?? "").trim() || null;
+  const email = String(visitor.email ?? "").trim().toLowerCase() || null;
+  const notes = String(visitor.notes ?? "").trim() || null;
+  if (!fullName || fullName.length > 160) return { error: "Geçerli bir ad soyad girin." };
+  if (phone && (!/^\+?[0-9 ()-]{10,24}$/.test(phone))) return { error: "Geçerli bir telefon numarası girin." };
+  if (email && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 320)) {
+    return { error: "Geçerli bir e-posta adresi girin." };
+  }
+  if (notes && notes.length > 2000) return { error: "Not en fazla 2000 karakter olabilir." };
 
   const supabase = await createClient();
 
-  await supabase.from("open_house_visitors").insert({
-    open_house_id: openHouseId,
-    full_name:     visitor.full_name,
-    phone:         visitor.phone ?? null,
-    email:         visitor.email ?? null,
-    notes:         visitor.notes ?? null,
-  });
+  const { data: openHouse } = await supabase
+    .from("open_houses")
+    .select("id")
+    .eq("id", openHouseId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!openHouse) return { error: "Açık ev etkinliği bulunamadı." };
 
-  // Ziyaretçi sayısını artır
-  await supabase.rpc("increment_visitor_count", { open_house_id: openHouseId }).maybeSingle();
+  const { error: visitorError } = await supabase.from("open_house_visitors").insert({
+    open_house_id: openHouseId,
+    full_name:     fullName,
+    phone,
+    email,
+    notes,
+  });
+  if (visitorError) return { error: "Ziyaretçi kaydedilemedi." };
 
   revalidatePath("/app/acik-ev");
   revalidatePath(`/app/acik-ev/${openHouseId}`);
@@ -250,10 +300,18 @@ export async function registerOpenHouseVisitor(
  * lead listesi sistemde olu veriydi.
  */
 export async function listOpenHouseVisitors(openHouseId: string) {
-  const gate = await requirePermission("appointments", "view");
+  const gate = await requirePermission("open_house", "view");
   if (!gate.ok) return [];
 
   const supabase = await createClient();
+  const { data: openHouse } = await supabase
+    .from("open_houses")
+    .select("id")
+    .eq("id", openHouseId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!openHouse) return [];
+
   const { data } = await supabase
     .from("open_house_visitors")
     .select("id, full_name, phone, email, notes, created_customer_id, registered_at")
@@ -265,7 +323,7 @@ export async function listOpenHouseVisitors(openHouseId: string) {
 
 /** Tek bir acik ev kaydi (detay sayfasi icin). */
 export async function getOpenHouse(openHouseId: string) {
-  const gate = await requirePermission("appointments", "view");
+  const gate = await requirePermission("open_house", "view");
   if (!gate.ok) return null;
 
   const supabase = await createClient();
@@ -282,7 +340,7 @@ export async function getOpenHouse(openHouseId: string) {
 }
 
 export async function listOpenHouses() {
-  const gate = await requirePermission("appointments", "view");
+  const gate = await requirePermission("open_house", "view");
   if (!gate.ok) return [];
 
   const supabase = await createClient();

@@ -152,7 +152,7 @@ export function GeoSelect({
         ) : null}
       </div>
       {provinceId && !districtId ? (
-        <p className="mt-1.5 text-[11px] text-text-faint">
+        <p className="mt-1.5 text-xs text-text-faint">
           İlçe seçmek emsal karşılaştırma ve değerleme doğruluğunu belirgin şekilde artırır.
         </p>
       ) : null}

@@ -50,7 +50,7 @@ export function PurchaseCalculator({
   );
 
   return (
-    <section className="mt-5 overflow-hidden rounded-[18px] border border-line bg-surface">
+    <section className="mt-5 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -58,7 +58,7 @@ export function PurchaseCalculator({
         className="focus-ring flex w-full items-center justify-between gap-3 p-5 text-left transition hover:bg-brand-600/[0.03]"
       >
         <span className="flex items-center gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-brand-600/10 text-brand-600">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
             <Wallet className="h-5 w-5" />
           </span>
           <span>
@@ -111,23 +111,23 @@ export function PurchaseCalculator({
 
           {/* --- Sonuç ---------------------------------------------------- */}
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-[14px] border border-brand-600/20 bg-brand-600/6 p-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">Aylık taksit</p>
+            <div className="rounded-[var(--radius-card)] border border-brand-600/20 bg-brand-600/6 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">Aylık taksit</p>
               <p className="numeric mt-1 font-display text-2xl font-extrabold tabular-nums text-ink-950">
                 {loan.monthlyPayment > 0 ? formatTry(loan.monthlyPayment) : "Kredi yok"}
               </p>
-              <p className="mt-0.5 text-[11px] text-text-muted">
+              <p className="mt-0.5 text-xs text-text-muted">
                 {loan.monthlyPayment > 0
                   ? `${formatTry(costs.loanAmount)} kredi · ${months} ay`
                   : "Peşin alım varsayıldı"}
               </p>
             </div>
-            <div className="rounded-[14px] border border-mint-500/25 bg-mint-500/8 p-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-mint-600">Cepten çıkan toplam</p>
+            <div className="rounded-[var(--radius-card)] border border-mint-500/25 bg-mint-500/8 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-mint-600">Cepten çıkan toplam</p>
               <p className="numeric mt-1 font-display text-2xl font-extrabold tabular-nums text-ink-950">
                 {formatTry(costs.cashOutOfPocket)}
               </p>
-              <p className="mt-0.5 text-[11px] text-text-muted">
+              <p className="mt-0.5 text-xs text-text-muted">
                 {formatTry(costs.downPayment)} peşinat + {formatTry(costs.totalCosts)} masraf
               </p>
             </div>
@@ -135,7 +135,7 @@ export function PurchaseCalculator({
 
           {/* --- Masraf dökümü -------------------------------------------- */}
           {costs.lines.length > 0 ? (
-            <ul className="mt-4 divide-y divide-line rounded-[14px] border border-line">
+            <ul className="mt-4 divide-y divide-line rounded-[var(--radius-card)] border border-line">
               {costs.lines.map((l) => (
                 <li key={l.key} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
                   <span className="text-text-muted">{l.label}</span>
@@ -155,14 +155,14 @@ export function PurchaseCalculator({
             </ul>
           ) : null}
 
-          <p className="mt-4 flex items-start gap-2 rounded-[12px] border border-amber-400/30 bg-amber-400/8 px-3 py-2.5 text-[11px] leading-relaxed text-amber-700">
+          <p className="mt-4 flex items-start gap-2 rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/8 px-3 py-2.5 text-xs leading-relaxed text-amber-700">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {APPROX_DISCLAIMER} Taşınma, tadilat, aidat ve abonelik bedelleri dâhil değildir.
           </p>
 
           <a
             href={`#${leadAnchorId}`}
-            className="btn-shine mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-600/90"
+            className="btn-shine mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-600/90"
           >
             <ArrowDown className="h-4 w-4" /> Detaylı bilgi için bize ulaşın
           </a>

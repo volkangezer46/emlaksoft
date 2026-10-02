@@ -114,7 +114,7 @@ function initials(name: string) {
 
 function Avatar({ name, staff = false }: { name: string; staff?: boolean }) {
   return (
-    <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-[13px] text-xs font-extrabold", staff ? "bg-amber-400/15 text-amber-200" : "bg-white/10 text-white")} aria-hidden>
+    <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] text-xs font-extrabold", staff ? "bg-amber-400/15 text-amber-200" : "bg-white/10 text-white")} aria-hidden>
       {initials(name)}
     </span>
   );
@@ -160,7 +160,7 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
       .select("id, message_id, uploaded_by, uploaded_by_kind, visibility, file_name, mime_type, file_size, scan_status, created_at")
       .eq("ticket_id", id)
       .is("deleted_at", null)
-      .eq("scan_status", "verified")
+      .eq("scan_status", "signature_verified")
       .order("created_at", { ascending: true }),
     admin
       .from("platform_staff")
@@ -268,14 +268,14 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Destek kuyruğuna dön
       </Link>
 
-      <header className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-5 text-white sm:p-6">
+      <header className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white sm:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-brand-500/20 blur-[80px]" />
         <div className="relative flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="flex min-w-0 items-start gap-3">
             <Avatar name={tenantName} />
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-white/55">
+              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-white/55">
                 <span className="inline-flex items-center gap-1"><Hash className="h-3 w-3" />{ticket.ticket_no ?? ticket.id.slice(0, 8).toUpperCase()}</span>
                 <span aria-hidden>·</span>
                 <Link href={`/admin/tenants/${ticket.tenant_id}`} className="inline-flex items-center gap-1 text-cyan-200 transition hover:text-white"><Building2 className="h-3 w-3" />{tenantName}</Link>
@@ -288,12 +288,12 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <SlaBadge sla={ticketSla} />
-            <span className={cn("rounded-full px-2.5 py-1 text-[11px] font-bold", priorityCls[ticket.priority] ?? priorityCls.normal)}>{priorityLabel[ticket.priority] ?? ticket.priority}</span>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.07] px-2.5 py-1 text-[11px] font-bold text-white"><span className="h-2 w-2 rounded-full" style={{ background: statusColor[ticket.status] ?? "var(--brand-500)" }} />{statusLabel[ticket.status] ?? ticket.status}</span>
+            <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", priorityCls[ticket.priority] ?? priorityCls.normal)}>{priorityLabel[ticket.priority] ?? ticket.priority}</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.07] px-2.5 py-1 text-xs font-bold text-white"><span className="h-2 w-2 rounded-full" style={{ background: statusColor[ticket.status] ?? "var(--brand-500)" }} />{statusLabel[ticket.status] ?? ticket.status}</span>
           </div>
         </div>
 
-        <div className="relative mt-5 grid overflow-hidden rounded-[14px] border border-white/10 bg-white/[0.055] sm:grid-cols-2 xl:grid-cols-4">
+        <div className="relative mt-5 grid overflow-hidden rounded-[var(--radius-card)] border border-white/10 bg-white/[0.055] sm:grid-cols-2 xl:grid-cols-4">
           {[
             { icon: Timer, label: "İlk yanıt hedefi", value: relativeTarget(ticket.first_response_due_at, Boolean(ticket.first_response_at)), detail: ticket.first_response_at ? dt(ticket.first_response_at) : dt(ticket.first_response_due_at) },
             { icon: ShieldCheck, label: "Çözüm hedefi", value: relativeTarget(ticket.resolution_due_at, terminal), detail: dt(ticket.resolution_due_at) },
@@ -301,8 +301,8 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
             { icon: MessageSquareText, label: "Konuşma", value: `${rows.length} mesaj`, detail: `${internalCount} iç not · ${attachments.length} ek` },
           ].map((metric) => (
             <div key={metric.label} className="flex items-center gap-3 border-white/10 p-3.5 sm:[&:nth-child(even)]:border-l xl:[&:not(:first-child)]:border-l">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-white/10 text-cyan-200"><metric.icon className="h-4 w-4" /></span>
-              <span className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-[0.06em] text-white/40">{metric.label}</span><span className="block truncate text-sm font-bold text-white">{metric.value}</span><span className="block truncate text-[10px] text-white/40">{metric.detail}</span></span>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-white/10 text-cyan-200"><metric.icon className="h-4 w-4" /></span>
+              <span className="min-w-0"><span className="block text-xs font-semibold uppercase tracking-[0.06em] text-white/40">{metric.label}</span><span className="block truncate text-sm font-bold text-white">{metric.value}</span><span className="block truncate text-xs text-white/40">{metric.detail}</span></span>
             </div>
           ))}
         </div>
@@ -311,16 +311,16 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_350px]">
         <main className="min-w-0 space-y-4">
           {ticketAttachments.length ? (
-            <section className="rounded-[16px] border border-line bg-surface p-4">
+            <section className="rounded-[var(--radius-card)] border border-line bg-surface p-4">
               <TicketAttachmentList attachments={ticketAttachments} canDeleteAll label="Talep ekleri" />
             </section>
           ) : null}
 
           <TicketThread ticketId={ticket.id} initial={rows} names={names} attachments={attachments} audience="staff" currentUserId={viewer.id} />
 
-          <section className="rounded-[18px] border border-line bg-surface p-4 sm:p-5">
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 sm:p-5">
             <div className="flex items-start gap-2.5">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-brand-600/10 text-brand-700"><MessageSquareText className="h-4 w-4" /></span>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-700"><MessageSquareText className="h-4 w-4" /></span>
               <div><h2 className="font-display text-sm font-bold text-ink-950">Yanıt veya iç not ekle</h2><p className="mt-0.5 text-xs text-text-muted">Müşteri yanıtı bildirime gider; iç not yalnız destek ekibinde kalır.</p></div>
             </div>
             <div className="mt-4"><StaffReplyForm ticketId={ticket.id} closed={ticket.status === "closed"} macros={macros} version={ticket.version} /></div>
@@ -328,7 +328,7 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
         </main>
 
         <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
-          <section className="rounded-[16px] border border-line bg-surface p-4">
+          <section className="rounded-[var(--radius-card)] border border-line bg-surface p-4">
             <h2 className="mb-3 font-display text-sm font-bold text-ink-950">Ticket işlemleri</h2>
             <TicketDetailControls
               id={ticket.id}
@@ -343,7 +343,7 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
             />
           </section>
 
-          <section className="rounded-[16px] border border-line bg-surface p-4">
+          <section className="rounded-[var(--radius-card)] border border-line bg-surface p-4">
             <h2 className="font-display text-sm font-bold text-ink-950">Kayıt bilgileri</h2>
             <dl className="mt-1 divide-y divide-line">
               <Prop label="Ticket no"><span className="font-mono">{ticket.ticket_no ?? "—"}</span></Prop>
@@ -358,16 +358,16 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
           </section>
 
           {ticket.resolution_code || ticket.resolution_summary ? (
-            <section className="rounded-[16px] border border-mint-500/25 bg-mint-500/[0.06] p-4">
+            <section className="rounded-[var(--radius-card)] border border-mint-500/25 bg-mint-500/[0.06] p-4">
               <h2 className="flex items-center gap-2 font-display text-sm font-bold text-mint-800"><CheckCircle2 className="h-4 w-4" />Çözüm kaydı</h2>
-              <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.06em] text-mint-700">{ticket.resolution_code ?? "Çözüm"}</p>
+              <p className="mt-2 text-xs font-bold uppercase tracking-[0.06em] text-mint-700">{ticket.resolution_code ?? "Çözüm"}</p>
               {ticket.resolution_summary ? <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-ink-950/80">{ticket.resolution_summary}</p> : null}
-              <p className="mt-2 text-[10px] text-text-faint">{dt(ticket.resolved_at ?? ticket.closed_at)}</p>
+              <p className="mt-2 text-xs text-text-faint">{dt(ticket.resolved_at ?? ticket.closed_at)}</p>
             </section>
           ) : null}
 
           {csat ? (
-            <section className="rounded-[16px] border border-amber-400/25 bg-amber-400/[0.06] p-4">
+            <section className="rounded-[var(--radius-card)] border border-amber-400/25 bg-amber-400/[0.06] p-4">
               <h2 className="flex items-center gap-2 font-display text-sm font-bold text-amber-800">
                 <Star className="h-4 w-4 fill-current" />Müşteri değerlendirmesi
               </h2>
@@ -381,12 +381,12 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
                 <span className="ml-1.5 text-xs font-bold text-amber-800">{csat.score}/5</span>
               </div>
               {csat.comment ? <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-ink-950/80">{csat.comment}</p> : null}
-              <p className="mt-2 text-[10px] text-text-faint">{dt(csat.created_at)}</p>
+              <p className="mt-2 text-xs text-text-faint">{dt(csat.created_at)}</p>
             </section>
           ) : null}
 
-          <details open className="group rounded-[16px] border border-line bg-surface p-4">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-2"><span className="flex items-center gap-2 font-display text-sm font-bold text-ink-950"><History className="h-4 w-4 text-brand-600" />İşlem geçmişi</span><span className="text-[10px] font-semibold text-text-faint">{events.length} olay</span></summary>
+          <details open className="group rounded-[var(--radius-card)] border border-line bg-surface p-4">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2"><span className="flex items-center gap-2 font-display text-sm font-bold text-ink-950"><History className="h-4 w-4 text-brand-600" />İşlem geçmişi</span><span className="text-xs font-semibold text-text-faint">{events.length} olay</span></summary>
             <ol className="mt-3 max-h-[390px] space-y-0 overflow-y-auto pr-1">
               {events.map((event, index) => {
                 const actor = event.actor_kind === "cron" || event.actor_kind === "system" ? "Sistem" : names[event.actor_user_id ?? ""] ?? (event.actor_kind === "staff" ? "Destek personeli" : "Ofis kullanıcısı");
@@ -396,11 +396,11 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
                     <span className={cn("relative z-[1] grid h-7 w-7 shrink-0 place-items-center rounded-full", event.visibility === "internal" ? "bg-amber-400/15 text-amber-700" : "bg-brand-600/10 text-brand-700")}>
                       {event.visibility === "internal" ? <LockKeyhole className="h-3 w-3" /> : <Activity className="h-3 w-3" />}
                     </span>
-                    <div className="min-w-0 pt-0.5"><p className="text-xs font-semibold text-ink-950">{eventLabel[event.event_type] ?? event.event_type}</p><p className="mt-0.5 truncate text-[10px] text-text-muted">{actor} · {eventDetail(event)}</p><p className="mt-0.5 text-[10px] text-text-faint">{dt(event.created_at)}</p></div>
+                    <div className="min-w-0 pt-0.5"><p className="text-xs font-semibold text-ink-950">{eventLabel[event.event_type] ?? event.event_type}</p><p className="mt-0.5 truncate text-xs text-text-muted">{actor} · {eventDetail(event)}</p><p className="mt-0.5 text-xs text-text-faint">{dt(event.created_at)}</p></div>
                   </li>
                 );
               })}
-              {events.length === 0 ? <li className="rounded-[10px] border border-dashed border-line p-3 text-center text-xs text-text-faint">Henüz olay kaydı yok.</li> : null}
+              {events.length === 0 ? <li className="rounded-[var(--radius-control)] border border-dashed border-line p-3 text-center text-xs text-text-faint">Henüz olay kaydı yok.</li> : null}
             </ol>
           </details>
 

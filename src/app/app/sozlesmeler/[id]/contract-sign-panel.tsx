@@ -49,7 +49,7 @@ export function ContractSignPanel({
   }
 
   return (
-    <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
       <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
         <Send className="h-4 w-4 text-brand-600" /> İmzaya gönder
       </h2>
@@ -59,7 +59,7 @@ export function ContractSignPanel({
 
       <div className="mt-4 space-y-3">
         {signers.map((s, i) => (
-          <div key={i} className="rounded-[12px] border border-line bg-canvas/60 p-3 space-y-2">
+          <div key={i} className="rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-1.5 text-xs font-semibold text-ink-950">
                 <FileSignature className="h-3.5 w-3.5 text-brand-600" /> İmzalayan {i + 1}
@@ -80,7 +80,7 @@ export function ContractSignPanel({
               placeholder="Ad Soyad *"
               value={s.full_name}
               onChange={(e) => updateSigner(i, "full_name", e.target.value)}
-              className="w-full rounded-[9px] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400"
+              className="w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400"
               required
             />
             <div className="grid grid-cols-2 gap-2">
@@ -89,14 +89,14 @@ export function ContractSignPanel({
                 placeholder="E-posta (opsiyonel)"
                 value={s.email}
                 onChange={(e) => updateSigner(i, "email", e.target.value)}
-                className="rounded-[9px] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400"
+                className="rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400"
               />
               <input
                 type="tel"
                 placeholder="Telefon (opsiyonel)"
                 value={s.phone}
                 onChange={(e) => updateSigner(i, "phone", e.target.value)}
-                className="rounded-[9px] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400"
+                className="rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400"
               />
             </div>
           </div>
@@ -112,12 +112,12 @@ export function ContractSignPanel({
       </button>
 
       {result?.error && (
-        <p className="mt-3 rounded-[10px] bg-danger-500/8 px-3 py-2 text-sm text-danger-500">
+        <p className="mt-3 rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm text-danger-500">
           {result.error}
         </p>
       )}
       {result?.ok && (
-        <p className="mt-3 rounded-[10px] bg-mint-500/10 px-3 py-2 text-sm font-semibold text-mint-600">
+        <p className="mt-3 rounded-[var(--radius-control)] bg-mint-500/10 px-3 py-2 text-sm font-semibold text-mint-600">
           ✓ Sözleşme imzalamaya gönderildi.
         </p>
       )}
@@ -126,7 +126,7 @@ export function ContractSignPanel({
         type="button"
         onClick={send}
         disabled={pending || !!result?.ok}
-        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[11px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
       >
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         {pending ? "Gönderiliyor…" : "İmzaya gönder"}

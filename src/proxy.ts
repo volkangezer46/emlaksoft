@@ -9,5 +9,5 @@ export const config = {
   // Yalnızca kimlik-doğrulama mantığının gerektiği yollarda çalış.
   // Public/marketing/vitrin/token/api sayfaları her istekte gereksiz
   // getUser() ağ çağrısı yapmasın — public trafikte büyük gecikme kazancı.
-  matcher: ["/app/:path*", "/admin/:path*", "/giris", "/kayit"],
+  matcher: ["/app/:path*", "/admin/:path*", "/giris/:path*", "/kayit"],
 };

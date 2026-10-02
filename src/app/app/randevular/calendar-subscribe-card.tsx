@@ -60,9 +60,9 @@ export function CalendarSubscribeCard({ token }: { token: string }) {
   }
 
   return (
-    <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+    <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <div className="flex items-center gap-2">
-        <span className="grid h-9 w-9 place-items-center rounded-[11px] bg-brand-600/10 text-brand-600">
+        <span className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
           <CalendarSync className="h-4 w-4" />
         </span>
         <div>
@@ -76,8 +76,8 @@ export function CalendarSubscribeCard({ token }: { token: string }) {
       </p>
 
       {/* ICS linki + kopyala */}
-      <div className="mt-4 flex items-center gap-2 rounded-[11px] border border-line bg-canvas px-3 py-2">
-        <code className="min-w-0 flex-1 truncate text-[11px] text-text-muted" title={httpsUrl ?? undefined}>
+      <div className="mt-4 flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2">
+        <code className="min-w-0 flex-1 truncate text-xs text-text-muted" title={httpsUrl ?? undefined}>
           {httpsUrl ?? "…"}
         </code>
         <button
@@ -85,7 +85,7 @@ export function CalendarSubscribeCard({ token }: { token: string }) {
           disabled={!httpsUrl}
           onClick={() => httpsUrl && copy(httpsUrl, "https")}
           title="ICS linkini kopyala"
-          className="focus-ring press inline-flex shrink-0 items-center gap-1 rounded-[8px] border border-line bg-surface px-2 py-1.5 text-[11px] font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
+          className="focus-ring press inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-2 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
         >
           {copied === "https" ? <Check className="h-3 w-3 text-mint-600" /> : <Copy className="h-3 w-3" />}
           Kopyala
@@ -98,7 +98,7 @@ export function CalendarSubscribeCard({ token }: { token: string }) {
           type="button"
           disabled={!webcalUrl}
           onClick={() => webcalUrl && copy(webcalUrl, "webcal")}
-          className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
+          className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
         >
           {copied === "webcal" ? <Check className="h-3 w-3 text-mint-600" /> : <Copy className="h-3 w-3" />}
           webcal:// kopyala
@@ -108,7 +108,7 @@ export function CalendarSubscribeCard({ token }: { token: string }) {
             href={googleUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+            className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
           >
             <ExternalLink className="h-3 w-3" /> Google Takvim&apos;e ekle
           </a>
@@ -118,7 +118,7 @@ export function CalendarSubscribeCard({ token }: { token: string }) {
           onClick={regenerate}
           disabled={pending}
           title="Yeni link üretir; eski link artık çalışmaz"
-          className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-warn-500 transition hover:border-warn-500/40 disabled:opacity-50"
+          className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-warn-500 transition hover:border-warn-500/40 disabled:opacity-50"
         >
           <RefreshCw className={`h-3 w-3 ${pending ? "animate-spin" : ""}`} />
           {/* Aynı sayfada rezervasyon kartının da yenileme butonu var — isim ayırt edici olmalı */}

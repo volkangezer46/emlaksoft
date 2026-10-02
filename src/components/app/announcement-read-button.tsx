@@ -16,7 +16,7 @@ export function AnnouncementReadButton({ id }: { id: string }) {
 
   if (done) {
     return (
-      <span className="mt-1 inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-mint-600 opacity-70 transition-opacity">
+      <span className="mt-1 inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-mint-600 opacity-70 transition-opacity">
         <Check className="h-3.5 w-3.5" /> Okundu
       </span>
     );
@@ -35,7 +35,7 @@ export function AnnouncementReadButton({ id }: { id: string }) {
           }
         })
       }
-      className="focus-ring press mt-0.5 inline-flex shrink-0 items-center gap-1.5 rounded-[9px] border border-line bg-surface px-2.5 py-1.5 text-[11px] font-bold text-text-muted transition hover:border-mint-500/40 hover:text-mint-600 disabled:opacity-60"
+      className="focus-ring press mt-0.5 inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs font-bold text-text-muted transition hover:border-mint-500/40 hover:text-mint-600 disabled:opacity-60"
     >
       {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
       Okudum

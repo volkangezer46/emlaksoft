@@ -27,7 +27,7 @@ function DonutTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-[11px] border border-hairline bg-surface/95 px-3 py-2 shadow-[var(--inner-top),var(--elev-4)] backdrop-blur-sm">
+    <div className="rounded-[var(--radius-control)] border border-hairline bg-surface/95 px-3 py-2 shadow-[var(--inner-top),var(--elev-4)] backdrop-blur-sm">
       <p className="flex items-center gap-2 text-sm text-ink-950">
         <span
           className="h-2 w-2 shrink-0 rounded-full ring-2 ring-inset ring-white/40"
@@ -38,7 +38,7 @@ function DonutTooltip({
           {tryFormatter.format(Number(payload[0]?.value ?? 0))}
         </span>
       </p>
-      <p className="mt-1 text-[11px] text-text-faint">Kategoriye süzmek için tıklayın</p>
+      <p className="mt-1 text-xs text-text-faint">Kategoriye süzmek için tıklayın</p>
     </div>
   );
 }
@@ -79,7 +79,7 @@ export function CategoryDonut({ data, centerLabel }: { data: CategoryDatum[]; ce
           {tryFormatter.format(total)}
         </p>
         {centerLabel ? (
-          <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-text-faint">
+          <p className="text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">
             {centerLabel}
           </p>
         ) : null}

@@ -193,11 +193,11 @@ export default async function InvestmentPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark no-print relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark no-print relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-mint-400/20 blur-[80px]" />
         <div className="relative">
-          <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-mint-400">
+          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-mint-400">
             <LineChart className="h-3.5 w-3.5" /> Yatırımcı sorusu: &quot;kaç yılda kendini amorti eder?&quot;
           </p>
           <h1 className="mt-2 font-display text-3xl font-extrabold">Yatırım getirisi analizi</h1>
@@ -206,7 +206,7 @@ export default async function InvestmentPage({
             Amorti süresini, aylık cebe kalanı ve kredi bittikten sonraki sıçramayı yıl yıl gösterir — sonucu tek tıkla
             müşteriye link olarak gönderin.
           </p>
-          <p className="mt-4 inline-flex items-start gap-2 rounded-[12px] border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/70">
+          <p className="mt-4 inline-flex items-start gap-2 rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/70">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-mint-400" />
             Kira ve değer artışı varsayılanı, TÜFE 12 aylık ortalamasının en güncel ayından ({DEFAULT_GROWTH_SOURCE_MONTH})
             gelir — kira yenileme radarıyla aynı kaynak. Çıktı her hâlükârda{" "}
@@ -215,19 +215,19 @@ export default async function InvestmentPage({
           <div className="mt-4 flex flex-wrap gap-2 text-xs">
             <Link
               href="/app/hesaplayici"
-              className="focus-ring press rounded-[10px] border border-white/15 bg-white/5 px-3 py-2 font-semibold text-white/80 transition hover:border-white/35"
+              className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3 py-2 font-semibold text-white/80 transition hover:border-white/35"
             >
               Alım maliyeti hesaplayıcı →
             </Link>
             <Link
               href="/app/kira-artis"
-              className="focus-ring press rounded-[10px] border border-white/15 bg-white/5 px-3 py-2 font-semibold text-white/80 transition hover:border-white/35"
+              className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3 py-2 font-semibold text-white/80 transition hover:border-white/35"
             >
               Kira artış hesaplayıcı →
             </Link>
             <Link
               href="/app/bolge-analizi"
-              className="focus-ring press rounded-[10px] border border-white/15 bg-white/5 px-3 py-2 font-semibold text-white/80 transition hover:border-white/35"
+              className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3 py-2 font-semibold text-white/80 transition hover:border-white/35"
             >
               Bölge analizi →
             </Link>

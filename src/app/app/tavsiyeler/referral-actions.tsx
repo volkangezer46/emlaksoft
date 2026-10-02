@@ -26,10 +26,10 @@ export type CustomerOption = { id: string; full_name: string; phone: string | nu
 export type StaffOption = { id: string; full_name: string };
 
 const inputCls =
-  "w-full rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400";
 
 const SMALL_BTN =
-  "focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-hairline-strong bg-surface px-2.5 text-xs font-semibold text-ink-950 transition hover:bg-canvas disabled:pointer-events-none disabled:opacity-55";
+  "focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-2.5 text-xs font-semibold text-ink-950 transition hover:bg-canvas disabled:pointer-events-none disabled:opacity-55";
 
 /** Tavsiye linkini panoya kopyalar — 2 sn "Kopyalandı" (CopySurveyLinkButton deseni). */
 export function CopyReferralLinkButton({ url, label }: { url: string; label?: string }) {
@@ -73,7 +73,7 @@ export function ReferralStatusPills({ id, status }: { id: string; status: string
 
   return (
     <div className="flex flex-col items-start gap-1">
-      <div className="inline-flex flex-wrap gap-1 rounded-[10px] border border-hairline bg-canvas p-0.5">
+      <div className="inline-flex flex-wrap gap-1 rounded-[var(--radius-control)] border border-hairline bg-canvas p-0.5">
         {STATUS_OPTIONS.map((opt) => {
           const active = current === opt.value;
           return (
@@ -99,7 +99,7 @@ export function ReferralStatusPills({ id, status }: { id: string; status: string
                   router.refresh();
                 });
               }}
-              className={`focus-ring rounded-[8px] px-2 py-1 text-[11px] font-semibold transition ${
+              className={`focus-ring rounded-[var(--radius-control)] px-2 py-1 text-xs font-semibold transition ${
                 active
                   ? "bg-brand-600 text-white shadow-[var(--elev-1)]"
                   : "text-text-muted hover:bg-surface hover:text-ink-950"
@@ -111,7 +111,7 @@ export function ReferralStatusPills({ id, status }: { id: string; status: string
         })}
       </div>
       {error ? (
-        <span className="text-[11px] font-semibold text-danger-500" role="alert">
+        <span className="text-xs font-semibold text-danger-500" role="alert">
           {error}
         </span>
       ) : null}
@@ -127,7 +127,7 @@ export function ConvertReferralButton({ id, done }: { id: string; done: boolean 
   const [pending, startTransition] = useTransition();
 
   if (done && !message) {
-    return <span className="text-[11px] font-semibold text-mint-600">Müşteriye dönüştürüldü</span>;
+    return <span className="text-xs font-semibold text-mint-600">Müşteriye dönüştürüldü</span>;
   }
 
   return (
@@ -150,19 +150,19 @@ export function ConvertReferralButton({ id, done }: { id: string; done: boolean 
               router.refresh();
             });
           }}
-          className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-brand-600 px-2.5 text-xs font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
+          className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-2.5 text-xs font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
         >
           {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />}
           Müşteriye dönüştür
         </button>
       )}
       {message ? (
-        <span className="max-w-[240px] text-[11px] font-semibold leading-relaxed text-mint-600" role="status">
+        <span className="max-w-[240px] text-xs font-semibold leading-relaxed text-mint-600" role="status">
           {message}
         </span>
       ) : null}
       {error ? (
-        <span className="max-w-[240px] text-[11px] font-semibold text-danger-500" role="alert">
+        <span className="max-w-[240px] text-xs font-semibold text-danger-500" role="alert">
           {error}
         </span>
       ) : null}
@@ -218,7 +218,7 @@ export function ReferralNoteButton({ id }: { id: string }) {
               router.refresh();
             });
           }}
-          className="focus-ring press inline-flex h-7 items-center gap-1.5 rounded-[8px] bg-brand-600 px-2.5 text-[11px] font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
+          className="focus-ring press inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-2.5 text-xs font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
         >
           {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
           Kaydet
@@ -229,13 +229,13 @@ export function ReferralNoteButton({ id }: { id: string }) {
             setOpen(false);
             setError(null);
           }}
-          className="text-[11px] font-semibold text-text-muted transition hover:text-ink-950"
+          className="text-xs font-semibold text-text-muted transition hover:text-ink-950"
         >
           Vazgeç
         </button>
       </div>
       {error ? (
-        <p className="text-[11px] font-semibold text-danger-500" role="alert">
+        <p className="text-xs font-semibold text-danger-500" role="alert">
           {error}
         </p>
       ) : null}
@@ -286,7 +286,7 @@ export function ReferralLinkToggle({ id, active }: { id: string; active: boolean
         />
       </button>
       {error ? (
-        <span className="max-w-[160px] text-[11px] font-semibold text-danger-500" role="alert">
+        <span className="max-w-[160px] text-xs font-semibold text-danger-500" role="alert">
           {error}
         </span>
       ) : null}
@@ -329,7 +329,7 @@ export function ReferralLinkCreator({
   }, [customers, term]);
 
   return (
-    <div className="rounded-[16px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+    <div className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
       <h2 className="flex items-center gap-2 font-display text-sm font-bold text-ink-950">
         <Wand2 className="h-4 w-4 text-brand-600" />
         Tavsiye linki üret
@@ -345,7 +345,7 @@ export function ReferralLinkCreator({
             Tavsiye edecek müşteri *
           </label>
           {selected ? (
-            <div className="flex items-center justify-between gap-2 rounded-[11px] border border-brand-300/50 bg-brand-600/5 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2 rounded-[var(--radius-control)] border border-brand-300/50 bg-brand-600/5 px-3 py-2.5">
               <span className="truncate text-sm font-semibold text-ink-950">{selected.full_name}</span>
               <button
                 type="button"
@@ -353,7 +353,7 @@ export function ReferralLinkCreator({
                   setSelected(null);
                   setResult(null);
                 }}
-                className="shrink-0 text-[11px] font-semibold text-text-muted transition hover:text-danger-500"
+                className="shrink-0 text-xs font-semibold text-text-muted transition hover:text-danger-500"
               >
                 Değiştir
               </button>
@@ -369,7 +369,7 @@ export function ReferralLinkCreator({
                 className={`${inputCls} pl-9`}
               />
               {term.trim() ? (
-                <ul className="mt-1.5 max-h-56 space-y-1 overflow-y-auto rounded-[11px] border border-line bg-canvas p-1">
+                <ul className="mt-1.5 max-h-56 space-y-1 overflow-y-auto rounded-[var(--radius-control)] border border-line bg-canvas p-1">
                   {filtered.length === 0 ? (
                     <li className="px-2.5 py-2 text-xs text-text-muted">Eşleşen müşteri yok.</li>
                   ) : (
@@ -382,10 +382,10 @@ export function ReferralLinkCreator({
                             setTerm("");
                             setResult(null);
                           }}
-                          className="focus-ring flex w-full items-center justify-between gap-2 rounded-[8px] px-2.5 py-2 text-left text-xs transition hover:bg-surface"
+                          className="focus-ring flex w-full items-center justify-between gap-2 rounded-[var(--radius-control)] px-2.5 py-2 text-left text-xs transition hover:bg-surface"
                         >
                           <span className="truncate font-semibold text-ink-950">{c.full_name}</span>
-                          <span className="numeric shrink-0 text-[11px] text-text-faint">
+                          <span className="numeric shrink-0 text-xs text-text-faint">
                             {formatTurkishPhone(c.phone)}
                           </span>
                         </button>
@@ -453,7 +453,7 @@ export function ReferralLinkCreator({
               router.refresh();
             });
           }}
-          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[11px] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
+          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gift className="h-4 w-4" />}
           Link üret
@@ -465,7 +465,7 @@ export function ReferralLinkCreator({
               {result.existed ? "Bu müşterinin zaten aktif linki var" : "Link hazır"}
             </span>
             <CopyReferralLinkButton url={result.url} />
-            <code className="max-w-[320px] truncate rounded-[8px] bg-canvas px-2 py-1 text-[11px] text-text-muted">
+            <code className="max-w-[320px] truncate rounded-[var(--radius-control)] bg-canvas px-2 py-1 text-xs text-text-muted">
               {result.url}
             </code>
           </span>
@@ -500,7 +500,7 @@ export function SuggestedReferralButton({
   if (url) {
     return (
       <span className="inline-flex items-center gap-2">
-        <span className="text-[11px] font-semibold text-mint-600">Link hazır</span>
+        <span className="text-xs font-semibold text-mint-600">Link hazır</span>
         <CopyReferralLinkButton url={url} label="Kopyala" />
       </span>
     );
@@ -526,13 +526,13 @@ export function SuggestedReferralButton({
             router.refresh();
           });
         }}
-        className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-brand-600 px-3 text-xs font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
+        className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 text-xs font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
       >
         {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
         Link üret
       </button>
       {error ? (
-        <span className="text-[11px] font-semibold text-danger-500" role="alert">
+        <span className="text-xs font-semibold text-danger-500" role="alert">
           {error}
         </span>
       ) : null}

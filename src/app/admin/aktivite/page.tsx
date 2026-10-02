@@ -32,14 +32,14 @@ function DiffPanel({ oldValue, newValue }: { oldValue: unknown; newValue: unknow
 
   if (!oldObj && !newObj) {
     return (
-      <div className="grid gap-3 text-[11px] sm:grid-cols-2">
+      <div className="grid gap-3 text-xs sm:grid-cols-2">
         <div>
           <p className="mb-1 font-bold uppercase tracking-wide text-text-faint">Eski değer</p>
-          <pre className="numeric whitespace-pre-wrap break-all rounded-[8px] bg-danger-500/6 p-2 text-danger-600">{pretty(oldValue)}</pre>
+          <pre className="numeric whitespace-pre-wrap break-all rounded-[var(--radius-control)] bg-danger-500/6 p-2 text-danger-600">{pretty(oldValue)}</pre>
         </div>
         <div>
           <p className="mb-1 font-bold uppercase tracking-wide text-text-faint">Yeni değer</p>
-          <pre className="numeric whitespace-pre-wrap break-all rounded-[8px] bg-mint-500/8 p-2 text-mint-700">{pretty(newValue)}</pre>
+          <pre className="numeric whitespace-pre-wrap break-all rounded-[var(--radius-control)] bg-mint-500/8 p-2 text-mint-700">{pretty(newValue)}</pre>
         </div>
       </div>
     );
@@ -48,7 +48,7 @@ function DiffPanel({ oldValue, newValue }: { oldValue: unknown; newValue: unknow
   const keys = [...new Set([...Object.keys(oldObj ?? {}), ...Object.keys(newObj ?? {})])];
   return (
     <div className="overflow-x-auto">
-      <div className="grid min-w-[420px] grid-cols-[minmax(100px,auto)_1fr_1fr] gap-x-3 gap-y-1 text-[11px]">
+      <div className="grid min-w-[420px] grid-cols-[minmax(100px,auto)_1fr_1fr] gap-x-3 gap-y-1 text-xs">
         <span className="pb-1 font-bold uppercase tracking-wide text-text-faint">Alan</span>
         <span className="pb-1 font-bold uppercase tracking-wide text-text-faint">Eski değer</span>
         <span className="pb-1 font-bold uppercase tracking-wide text-text-faint">Yeni değer</span>
@@ -237,7 +237,7 @@ export default async function AdminActivityPage({
 
   return (
     <div className="space-y-5">
-      <section className="theme-dark relative overflow-hidden rounded-[20px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-14 h-52 w-52 rounded-full bg-brand-500/25 blur-[90px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -256,21 +256,21 @@ export default async function AdminActivityPage({
                 key={c.label}
                 href={c.href}
                 aria-current={c.active ? "page" : undefined}
-                className={`focus-ring press block rounded-[14px] border p-3 text-center transition ${
+                className={`focus-ring press block rounded-[var(--radius-card)] border p-3 text-center transition ${
                   c.active
                     ? "border-brand-400/60 bg-white/15"
                     : "border-white/12 bg-white/8 hover:border-white/25 hover:bg-white/12"
                 }`}
               >
                 <p className="font-display text-2xl font-extrabold text-white">{c.value}</p>
-                <p className="text-[11px] text-white/70">{c.label}</p>
+                <p className="text-xs text-white/70">{c.label}</p>
               </Link>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="dashboard-panel overflow-hidden rounded-[20px] border border-line bg-surface">
+      <section className="dashboard-panel overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <p className="flex items-center gap-2 text-sm font-semibold text-ink-950">
             <Activity className="h-4 w-4 text-brand-600" /> Hareketler
@@ -291,7 +291,7 @@ export default async function AdminActivityPage({
               return (
                 <details key={r.id} className="group">
                   <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-3 transition hover:bg-canvas/60 [&::-webkit-details-marker]:hidden">
-                    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-[10px] ${
+                    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] ${
                       r.isPlatform
                         ? "bg-cyan-400/15 text-cyan-600"
                         : r.action.startsWith("ops.")
@@ -306,7 +306,7 @@ export default async function AdminActivityPage({
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-ink-950">{auditActionLabel(r.action)}</p>
-                      <p className="truncate text-[11px] text-text-faint">
+                      <p className="truncate text-xs text-text-faint">
                         {r.actorLabel} · {r.scopeLabel}
                         {r.entityType ? ` · ${r.entityType}` : ""}
                       </p>
@@ -319,14 +319,14 @@ export default async function AdminActivityPage({
                         Ofis <ArrowUpRight className="h-3 w-3" />
                       </Link>
                     ) : null}
-                    <span className="shrink-0 text-[11px] text-text-faint">{relativeTimeTR(r.createdAt)}</span>
+                    <span className="shrink-0 text-xs text-text-faint">{relativeTimeTR(r.createdAt)}</span>
                     <ChevronDown className="h-4 w-4 shrink-0 text-text-faint transition group-open:rotate-180" />
                   </summary>
                   <div className="border-t border-line/60 bg-canvas/40 px-5 py-4 sm:pl-[68px]">
                     {hasDiff ? (
                       <DiffPanel oldValue={r.oldValue} newValue={r.newValue} />
                     ) : r.meta != null ? (
-                      <pre className="numeric overflow-x-auto whitespace-pre-wrap break-all rounded-[8px] bg-surface p-3 text-[11px] leading-relaxed text-text-muted">
+                      <pre className="numeric overflow-x-auto whitespace-pre-wrap break-all rounded-[var(--radius-control)] bg-surface p-3 text-xs leading-relaxed text-text-muted">
                         {pretty(r.meta)}
                       </pre>
                     ) : (

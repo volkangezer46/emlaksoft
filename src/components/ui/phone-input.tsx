@@ -21,6 +21,9 @@ type PhoneInputProps = (UncontrolledProps | ControlledProps) & {
   required?: boolean;
   className?: string;
   placeholder?: string;
+  autoComplete?: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean;
 };
 
 /**
@@ -29,7 +32,16 @@ type PhoneInputProps = (UncontrolledProps | ControlledProps) & {
  * Kontrollü kullanımda (`value`/`onValueChange`) dışarıya ham rakamlar bildirilir.
  */
 export function PhoneInput(props: PhoneInputProps) {
-  const { id, name, required, className, placeholder = TR_MOBILE_PLACEHOLDER } = props;
+  const {
+    id,
+    name,
+    required,
+    className,
+    placeholder = TR_MOBILE_PLACEHOLDER,
+    autoComplete = "tel",
+    "aria-describedby": ariaDescribedBy,
+    "aria-invalid": ariaInvalid,
+  } = props;
   const isControlled = props.value !== undefined;
 
   const [uncontrolledDisplay, setUncontrolledDisplay] = useState(() =>
@@ -40,7 +52,7 @@ export function PhoneInput(props: PhoneInputProps) {
 
   const inputClassName =
     className ??
-    "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400";
+    "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400";
 
   return (
     <input
@@ -48,7 +60,9 @@ export function PhoneInput(props: PhoneInputProps) {
       name={name}
       type="tel"
       inputMode="numeric"
-      autoComplete="tel"
+      autoComplete={autoComplete}
+      aria-describedby={ariaDescribedBy}
+      aria-invalid={ariaInvalid}
       required={required}
       value={display}
       onChange={(event) => {

@@ -1,0 +1,3 @@
+# Exact synthetic test fixture; do not broaden this to the file or rule.
+cbc6c113f44191af0dd76bf9b06634cc3904d7d8:src/app/kayit/registration-action.test.ts:generic-api-key:46
+

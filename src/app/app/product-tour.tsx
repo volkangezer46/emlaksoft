@@ -2,9 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, Sparkles, X } from "lucide-react";
+import {
+  Dialog,
+  DialogDescription,
+  DialogFullscreenContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 /**
- * İlk giriş ürün turu — kütüphanesiz spotlight.
+ * İlk giriş ürün turu — ölçümü yerel, modal davranışı ortak Radix altyapısında
+ * çalışan spotlight.
  *
  * NASIL: Hedef elementin getBoundingClientRect'i ölçülür; tam ekran overlay
  * içinde hedef boyutunda şeffaf bir "delik" div'i konumlanır ve devasa bir
@@ -154,45 +161,31 @@ export function ProductTour() {
     };
   }, [phase, index, activeSteps]);
 
-  // Klavye: Esc kapat, ok tuşları ileri/geri
-  useEffect(() => {
-    if (phase !== "run" && phase !== "final") return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        close();
-      } else if (phase === "run" && (e.key === "ArrowRight" || e.key === "Enter")) {
-        e.preventDefault();
-        next();
-      } else if (phase === "run" && e.key === "ArrowLeft") {
-        e.preventDefault();
-        prev();
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [phase, close, next, prev]);
-
   if (phase === "idle" || phase === "off") return null;
 
   // ---- Bitiş ekranı: delik yok, ortalanmış kart ----
   if (phase === "final") {
     return (
-      <div className="fixed inset-0 z-[95] grid place-items-center bg-[rgba(7,26,56,0.55)] p-4">
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Tur tamamlandı"
-          className="popover-in w-full max-w-sm rounded-[18px] border border-line bg-surface p-5 shadow-[var(--elev-5)]"
+      <Dialog open onOpenChange={(nextOpen) => !nextOpen && close()}>
+        <DialogFullscreenContent
+          overlayClassName="bg-[rgba(7,26,56,0.55)] backdrop-blur-none"
+          className="grid place-items-center bg-transparent p-4"
         >
-          <span className="grid h-10 w-10 place-items-center rounded-[12px] bg-brand-600/10 text-brand-600">
+        <div
+          className="popover-in w-full max-w-sm rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--elev-5)]"
+        >
+          <span className="grid h-10 w-10 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
             <Sparkles className="h-5 w-5" />
           </span>
-          <h2 className="mt-3 font-display text-lg font-bold text-ink-950">Hazırsınız!</h2>
-          <p className="mt-1 text-sm text-text-muted">
-            Tur tamamlandı — panel artık canlı ofis verinizle çalışıyor.
-          </p>
-          <p className="mt-3 rounded-[10px] bg-canvas px-3 py-2 text-xs text-text-muted">
+          <DialogTitle asChild>
+            <h2 className="mt-3 font-display text-lg font-bold text-ink-950">Hazırsınız!</h2>
+          </DialogTitle>
+          <DialogDescription asChild>
+            <p className="mt-1 text-sm text-text-muted">
+              Tur tamamlandı — panel artık canlı ofis verinizle çalışıyor.
+            </p>
+          </DialogDescription>
+          <p className="mt-3 rounded-[var(--radius-control)] bg-canvas px-3 py-2 text-xs text-text-muted">
             İstediğinde{" "}
             <kbd className="rounded-[5px] border border-line bg-surface px-1.5 py-0.5 font-semibold text-ink-950">?</kbd>{" "}
             klavye kısayollarını,{" "}
@@ -202,12 +195,13 @@ export function ProductTour() {
           <button
             type="button"
             onClick={close}
-            className="focus-ring press mt-4 w-full rounded-[11px] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700"
+            className="focus-ring press mt-4 w-full rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700"
           >
             Panele başla
           </button>
         </div>
-      </div>
+        </DialogFullscreenContent>
+      </Dialog>
     );
   }
 
@@ -246,10 +240,23 @@ export function ProductTour() {
   cardTop = Math.max(16, cardTop);
 
   return (
-    <div className="fixed inset-0 z-[95]" aria-hidden={false}>
+    <Dialog open onOpenChange={(nextOpen) => !nextOpen && close()}>
+      <DialogFullscreenContent
+        overlayClassName="bg-transparent backdrop-blur-none"
+        className="overflow-visible bg-transparent"
+        onKeyDown={(event) => {
+          if (event.key === "ArrowRight") {
+            event.preventDefault();
+            next();
+          } else if (event.key === "ArrowLeft") {
+            event.preventDefault();
+            prev();
+          }
+        }}
+      >
       {/* Spotlight deliği — dev box-shadow geri kalanı karartır */}
       <div
-        className="absolute rounded-[18px] transition-[top,left,width,height] duration-300 ease-out"
+        className="absolute rounded-[var(--radius-panel)] transition-[top,left,width,height] duration-300 ease-out"
         style={{
           top: hole.top,
           left: hole.left,
@@ -260,32 +267,33 @@ export function ProductTour() {
       />
       {/* Balon kart */}
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={step.title}
-        className="popover-in absolute rounded-[16px] border border-line bg-surface p-4 shadow-[var(--elev-5)] transition-[top,left] duration-300 ease-out"
+        className="popover-in absolute rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--elev-5)] transition-[top,left] duration-300 ease-out"
         style={{ top: cardTop, left: cardLeft, width: CARD_W, maxWidth: "calc(100vw - 32px)" }}
       >
         <div className="flex items-start justify-between gap-3">
-          <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-[11px] font-bold tabular-nums text-brand-600">
+          <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold tabular-nums text-brand-600">
             Adım {index + 1} / {activeSteps.length}
           </span>
           <button
             type="button"
             onClick={close}
             aria-label="Turu kapat"
-            className="focus-ring -mr-1 -mt-1 grid h-7 w-7 place-items-center rounded-[8px] text-text-faint transition hover:bg-canvas hover:text-ink-950"
+            className="focus-ring -mr-1 -mt-1 grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
-        <h2 className="mt-2 font-display text-base font-bold text-ink-950">{step.title}</h2>
-        <p className="mt-1 text-sm leading-relaxed text-text-muted">{step.desc}</p>
+        <DialogTitle asChild>
+          <h2 className="mt-2 font-display text-base font-bold text-ink-950">{step.title}</h2>
+        </DialogTitle>
+        <DialogDescription asChild>
+          <p className="mt-1 text-sm leading-relaxed text-text-muted">{step.desc}</p>
+        </DialogDescription>
         <div className="mt-4 flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={close}
-            className="focus-ring rounded-[9px] px-2 py-1.5 text-xs font-semibold text-text-faint transition hover:text-ink-950"
+            className="focus-ring rounded-[var(--radius-control)] px-2 py-1.5 text-xs font-semibold text-text-faint transition hover:text-ink-950"
           >
             Geç
           </button>
@@ -294,20 +302,21 @@ export function ProductTour() {
               type="button"
               onClick={prev}
               disabled={index === 0}
-              className="focus-ring press inline-flex items-center gap-1 rounded-[10px] border border-line bg-canvas px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 disabled:cursor-not-allowed disabled:opacity-40"
+              className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ArrowLeft className="h-3.5 w-3.5" /> Geri
             </button>
             <button
               type="button"
               onClick={next}
-              className="focus-ring press inline-flex items-center gap-1 rounded-[10px] bg-brand-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-700"
+              className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-700"
             >
               {index + 1 >= activeSteps.length ? "Bitir" : "İleri"} <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
       </div>
-    </div>
+      </DialogFullscreenContent>
+    </Dialog>
   );
 }

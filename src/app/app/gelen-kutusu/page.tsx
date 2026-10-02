@@ -103,9 +103,9 @@ function truncate(text: string, max = 120): string {
 }
 
 const PAGER_BTN =
-  "focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+  "focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
 const PAGER_BTN_DISABLED =
-  "inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
+  "inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
 export default async function InboxPage({
   searchParams,
@@ -308,7 +308,7 @@ export default async function InboxPage({
   return (
     <div className="space-y-6">
       {/* Hero + KPI */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/35 blur-[70px]" />
         <div className="relative flex flex-wrap items-start justify-between gap-5">
@@ -332,21 +332,21 @@ export default async function InboxPage({
             <Link
               key={item.label}
               href={item.href}
-              className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
+              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
             >
               <div className="flex items-start justify-between">
                 <item.icon className="h-4 w-4 text-mint-400" />
                 <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
               </div>
               <p className="mt-2 font-display text-xl font-extrabold text-white">{item.value.toLocaleString("tr-TR")}</p>
-              <p className="text-[11px] text-white/45 sm:text-xs">{item.label}</p>
+              <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
             </Link>
           ))}
         </div>
       </section>
 
       {/* Filtreler — GET formu (sayfa 1'e döner) + kanal çipleri link olarak */}
-      <div className="rounded-[16px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] space-y-3">
+      <div className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] space-y-3">
         <form className="flex flex-wrap items-center gap-3" action="/app/gelen-kutusu">
           {kanalF ? <input type="hidden" name="kanal" value={kanalF} /> : null}
           {yonF ? <input type="hidden" name="yon" value={yonF} /> : null}
@@ -358,7 +358,7 @@ export default async function InboxPage({
               defaultValue={q}
               aria-label="Müşteri adına göre ara"
               placeholder="Müşteri adı ara…"
-              className="w-full rounded-[11px] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+              className="w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
             />
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm text-text-muted">
@@ -367,17 +367,17 @@ export default async function InboxPage({
               name="from"
               type="date"
               defaultValue={fromF}
-              className="min-w-0 max-w-[150px] flex-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 sm:flex-none"
+              className="min-w-0 max-w-[150px] flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 sm:flex-none"
             />
             <span>—</span>
             <input
               name="to"
               type="date"
               defaultValue={toF}
-              className="min-w-0 max-w-[150px] flex-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 sm:flex-none"
+              className="min-w-0 max-w-[150px] flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 sm:flex-none"
             />
           </div>
-          <button type="submit" className="rounded-[10px] bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700">
+          <button type="submit" className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700">
             Filtrele
           </button>
           {hasAnyFilter ? (
@@ -445,7 +445,7 @@ export default async function InboxPage({
           action={hasAnyFilter ? { href: "/app/gelen-kutusu", label: "Filtreleri temizle" } : { href: "/app/musteriler", label: "Müşterilere git" }}
         />
       ) : (
-        <ul className="overflow-hidden rounded-[16px] border border-line bg-surface shadow-[var(--shadow-xs)] divide-y divide-hairline">
+        <ul className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-xs)] divide-y divide-hairline">
           {pageItems.map((item) => {
             const meta = CHANNEL_META[item.channel] ?? CHANNEL_META.note;
             const Icon = item.direction === "missed" ? PhoneMissed : meta.icon;
@@ -461,7 +461,7 @@ export default async function InboxPage({
                     aria-label={`${item.customerName ?? "Müşteri"} detayları`}
                   />
                 ) : null}
-                <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-[11px] ${item.direction === "missed" ? "bg-danger-500/10 text-danger-500" : meta.cls}`}>
+                <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] ${item.direction === "missed" ? "bg-danger-500/10 text-danger-500" : meta.cls}`}>
                   <Icon className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -470,7 +470,7 @@ export default async function InboxPage({
                       <span className="font-semibold text-ink-950">{item.customerName}</span>
                     ) : (
                       <>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-600">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600">
                           <UserX className="h-3 w-3" /> Eşleşmemiş
                         </span>
                         {item.phone ? (
@@ -478,19 +478,19 @@ export default async function InboxPage({
                         ) : null}
                       </>
                     )}
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.cls}`}>{meta.label}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.direction === "inbound" ? "bg-mint-500/12 text-mint-600" : item.direction === "missed" ? "bg-danger-500/10 text-danger-500" : "bg-ink-950/5 text-text-muted"}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${meta.cls}`}>{meta.label}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${item.direction === "inbound" ? "bg-mint-500/12 text-mint-600" : item.direction === "missed" ? "bg-danger-500/10 text-danger-500" : "bg-ink-950/5 text-text-muted"}`}>
                       {item.direction === "inbound" ? "Gelen" : item.direction === "missed" ? "Cevapsız" : item.direction === "internal" ? "Dahili" : "Giden"}
                     </span>
                     {/* Öncelik rozetleri — gerçek veriden türetilir (yön + tazelik) */}
                     {item.direction === "missed" && msSince(item.at) < 2 * DAY_MS ? (
-                      <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-600">Öncelikli</span>
+                      <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600">Öncelikli</span>
                     ) : null}
                     {item.direction === "inbound" && msSince(item.at) < DAY_MS ? (
-                      <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-[11px] font-bold text-brand-600">Yeni</span>
+                      <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold text-brand-600">Yeni</span>
                     ) : null}
                     {item.outcome ? (
-                      <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-medium text-text-muted">{item.outcome}</span>
+                      <span className="rounded-full border border-line px-2 py-0.5 text-xs font-medium text-text-muted">{item.outcome}</span>
                     ) : null}
                   </div>
                   <p className="mt-1 truncate text-sm text-text-muted">{item.summary}</p>
@@ -515,7 +515,7 @@ export default async function InboxPage({
                   {telHref ? (
                     <a
                       href={telHref}
-                      className="relative z-10 grid h-8 w-8 place-items-center rounded-[9px] text-text-faint transition hover:bg-brand-600/10 hover:text-brand-600"
+                      className="relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-brand-600/10 hover:text-brand-600"
                       aria-label="Numarayı ara"
                     >
                       <Phone className="h-4 w-4" />

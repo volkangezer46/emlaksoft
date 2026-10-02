@@ -5,12 +5,13 @@ import {
   TWO_FACTOR_COOKIE,
   twoFactorBindingFromClaims,
 } from "@/lib/two-factor";
+import { resolveSupabasePublicKey } from "@/lib/supabase/keys";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const key = resolveSupabasePublicKey();
   if (!url || !key) return supabaseResponse;
 
   const supabase = createServerClient(url, key, {
@@ -117,6 +118,18 @@ export async function updateSession(request: NextRequest) {
       const redirect = request.nextUrl.clone();
       redirect.pathname = "/app";
       redirect.search = "";
+      return NextResponse.redirect(redirect);
+    }
+
+    if (
+      isAdmin &&
+      canonicalPlatformStaff &&
+      claimsData?.claims?.aal !== "aal2"
+    ) {
+      const redirect = request.nextUrl.clone();
+      redirect.pathname = "/giris/mfa";
+      redirect.search = "";
+      redirect.searchParams.set("next", path);
       return NextResponse.redirect(redirect);
     }
 

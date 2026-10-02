@@ -41,6 +41,7 @@ const GATES = [
   "requirePlatformStaff",
   "requirePlatformModule",
   "getPlatformStaff",
+  "getPlatformStaffIdentity",
   "isPlatformStaff",
   // Ham oturum kontrolu
   "getRequestUser",
@@ -91,8 +92,6 @@ const MUAF: Record<string, string> = {
   // --- OTP ve webhook: kendi sirriyla korunanlar ---
   "contracts.ts::requestSignatureOtp": "E-imza OTP talebi; imza token'i uzerinden, kod SMS ile dogrulanir.",
   "contracts.ts::verifySignatureOtp": "OTP dogrulama; deneme sayaci ve sure siniri kendi icinde.",
-  "communications.ts::ingestInboundSms": "Netgsm gelen SMS webhook'u; NETGSM_WEBHOOK_SECRET ile dogrulanir (communications.ts:268).",
-
   // --- Acik referans verisi (kiraciya ozel deger icermez) ---
   "geo.ts::listDistricts": "Turkiye idari bolunusu; geo_* tablolari RLS'te herkese acik okunur.",
   "geo.ts::listNeighborhoods": "Ayni.",

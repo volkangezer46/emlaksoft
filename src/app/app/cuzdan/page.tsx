@@ -194,7 +194,7 @@ export default async function CuzdanPage() {
 
   return (
     <div className="space-y-6">
-      <section className="no-print theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="no-print theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-mint-400/20 blur-[80px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -210,36 +210,36 @@ export default async function CuzdanPage() {
         <div className="relative mt-6 grid gap-3 sm:grid-cols-[1.4fr_1fr_1fr]">
           <Link
             href="/app/komisyon?durum=bekleyen"
-            className="focus-ring press lift group block rounded-[16px] border border-mint-400/25 bg-white/8 p-4 backdrop-blur transition hover:border-mint-400/50"
+            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-mint-400/25 bg-white/8 p-4 backdrop-blur transition hover:border-mint-400/50"
           >
-            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-mint-300">
+            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.1em] text-mint-300">
               Bekleyen bakiye
               <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
             </p>
             <p className="numeric mt-1.5 font-display text-3xl font-extrabold text-white md:text-4xl">{money(pending)}</p>
-            <p className="mt-1 text-[11px] text-white/50">Tahsil edilmemiş hakediş toplamın</p>
+            <p className="mt-1 text-xs text-white/50">Tahsil edilmemiş hakediş toplamın</p>
           </Link>
           <Link
             href="/app/komisyon"
-            className="focus-ring press lift group block rounded-[16px] border border-white/12 bg-white/8 p-4 backdrop-blur transition hover:border-white/30"
+            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-4 backdrop-blur transition hover:border-white/30"
           >
-            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-white/50">
+            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.1em] text-white/50">
               Bu ay hakediş
               <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
             </p>
             <p className="numeric mt-1.5 font-display text-2xl font-extrabold text-white">{money(thisMonth)}</p>
-            <p className="mt-1 text-[11px] text-white/50">{donem} dönemi</p>
+            <p className="mt-1 text-xs text-white/50">{donem} dönemi</p>
           </Link>
           <Link
             href="/app/komisyon?durum=tahsil"
-            className="focus-ring press lift group block rounded-[16px] border border-white/12 bg-white/8 p-4 backdrop-blur transition hover:border-white/30"
+            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-4 backdrop-blur transition hover:border-white/30"
           >
-            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-white/50">
+            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.1em] text-white/50">
               Bu yıl tahsil
               <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
             </p>
             <p className="numeric mt-1.5 font-display text-2xl font-extrabold text-white">{money(paidThisYear)}</p>
-            <p className="mt-1 text-[11px] text-white/50">Ödemesi tamamlanan pay</p>
+            <p className="mt-1 text-xs text-white/50">Ödemesi tamamlanan pay</p>
           </Link>
         </div>
       </section>
@@ -249,7 +249,7 @@ export default async function CuzdanPage() {
       <article className="print-only print-sheet">
         <header className="hairline-b flex flex-wrap items-start justify-between gap-4 pb-5">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-600">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-600">
               {office?.name ?? "Emlak ofisi"}
             </p>
             <h1 className="mt-1 font-display text-2xl font-extrabold tracking-[-0.02em] text-ink-950">
@@ -276,7 +276,7 @@ export default async function CuzdanPage() {
         </header>
 
         {bordroItems.length === 0 ? (
-          <p className="mt-6 rounded-[12px] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
+          <p className="mt-6 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
             Bu dönemde hakediş kaydı bulunmuyor.
           </p>
         ) : (
@@ -304,7 +304,7 @@ export default async function CuzdanPage() {
                       <TD className="font-semibold text-ink-950">
                         {property?.title ?? "Komisyon kaydı"}
                         {property?.property_code ? (
-                          <span className="block text-[11px] font-normal text-text-faint">{property.property_code}</span>
+                          <span className="block text-xs font-normal text-text-faint">{property.property_code}</span>
                         ) : null}
                       </TD>
                       <TD align="right">{money(Number(row.gross_amount))}</TD>
@@ -327,14 +327,14 @@ export default async function CuzdanPage() {
             ["Tahsil edilen", money(bordroTahsil)],
             ["Bekleyen", money(bordroBekleyen)],
           ].map(([k, v]) => (
-            <div key={k} className="rounded-[12px] border border-line bg-canvas px-4 py-2.5">
-              <dt className="text-[11px] text-text-faint">{k}</dt>
+            <div key={k} className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
+              <dt className="text-xs text-text-faint">{k}</dt>
               <dd className="numeric text-sm font-bold text-ink-950">{v}</dd>
             </div>
           ))}
         </dl>
 
-        <p className="mt-4 text-[11px] leading-relaxed text-text-muted">
+        <p className="mt-4 text-xs leading-relaxed text-text-muted">
           Pay hesabı komisyon defterindeki paylaşım oranlarından üretilmiştir; bu belge bilgilendirme
           amaçlıdır, resmî ücret bordrosu yerine geçmez.
         </p>
@@ -342,10 +342,10 @@ export default async function CuzdanPage() {
         {/* Islak imza alanları */}
         <div className="mt-10 grid grid-cols-2 gap-12">
           <div>
-            <div className="hairline-t pt-1.5 text-[11px] text-text-muted">Danışman · {fullName ?? "ad, soyad"}</div>
+            <div className="hairline-t pt-1.5 text-xs text-text-muted">Danışman · {fullName ?? "ad, soyad"}</div>
           </div>
           <div>
-            <div className="hairline-t pt-1.5 text-[11px] text-text-muted">Ofis yetkilisi · ad, soyad, imza</div>
+            <div className="hairline-t pt-1.5 text-xs text-text-muted">Ofis yetkilisi · ad, soyad, imza</div>
           </div>
         </div>
       </article>
@@ -358,7 +358,7 @@ export default async function CuzdanPage() {
       </div>
 
       {hasTrendData ? (
-        <section className="no-print rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="no-print rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><TrendingUp className="h-4 w-4" /> Trend</p>
             <h2 className="mt-1 font-display font-bold text-ink-950">Son 6 ay hakediş</h2>
@@ -366,7 +366,7 @@ export default async function CuzdanPage() {
           <div className="mt-5 grid grid-cols-6 gap-2 sm:gap-4">
             {trendMonths.map((m, i) => (
               <div key={m.key} className="flex flex-col items-center">
-                <div className="flex h-32 w-full items-end justify-center rounded-[12px] bg-canvas px-2 pb-2 pt-4">
+                <div className="flex h-32 w-full items-end justify-center rounded-[var(--radius-card)] bg-canvas px-2 pb-2 pt-4">
                   <div
                     className="bar-live w-full max-w-[26px] rounded-t-[6px] bg-mint-500"
                     style={{ height: `${Math.max(m.amount > 0 ? 6 : 0, (m.amount / trendMax) * 100)}%`, animationDelay: `${i * 70}ms` }}
@@ -374,7 +374,7 @@ export default async function CuzdanPage() {
                   />
                 </div>
                 <p className="mt-2 text-center text-xs font-semibold text-ink-950">{m.label}</p>
-                <p className="text-center text-[10px] font-bold tabular-nums text-mint-600">
+                <p className="text-center text-xs font-bold tabular-nums text-mint-600">
                   {new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 }).format(m.amount)}
                 </p>
               </div>
@@ -394,10 +394,10 @@ export default async function CuzdanPage() {
           />
         </div>
       ) : (
-        <section className="no-print overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+        <section className="no-print overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
             <div><p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><ReceiptText className="h-4 w-4" /> Hakediş kayıtları</p><h2 className="mt-1 font-display font-bold text-ink-950">Hareket zaman çizelgesi</h2></div>
-            <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">{listed.length} kayıt</span>
+            <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">{listed.length} kayıt</span>
           </div>
           <div className="px-5 pt-3">
             <ListLimitNotice
@@ -413,10 +413,10 @@ export default async function CuzdanPage() {
             {timelineGroups.map((group) => (
               <div key={group.key}>
                 <div className="flex items-center justify-between gap-3 pb-2 pt-4">
-                  <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.1em] text-text-faint">
+                  <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.1em] text-text-faint">
                     <CalendarDays className="h-3.5 w-3.5 text-brand-600" /> {group.label}
                   </p>
-                  <span className="numeric rounded-full bg-mint-500/10 px-2.5 py-0.5 text-[11px] font-bold text-mint-700">
+                  <span className="numeric rounded-full bg-mint-500/10 px-2.5 py-0.5 text-xs font-bold text-mint-700">
                     {money(group.toplam)}
                   </span>
                 </div>
@@ -428,7 +428,7 @@ export default async function CuzdanPage() {
                     return (
                       <article
                         key={row.id}
-                        className="group relative grid gap-2 rounded-[12px] py-3 pl-5 pr-2 transition hover:bg-brand-600/[0.02] md:grid-cols-[1.4fr_.7fr_.7fr_auto] md:items-center"
+                        className="group relative grid gap-2 rounded-[var(--radius-card)] py-3 pl-5 pr-2 transition hover:bg-brand-600/[0.02] md:grid-cols-[1.4fr_.7fr_.7fr_auto] md:items-center"
                       >
                         {/* Zaman çizelgesi noktası — durum rengi */}
                         <span
@@ -448,16 +448,16 @@ export default async function CuzdanPage() {
                           <p className="mt-0.5 text-xs text-text-muted">{property?.property_code ?? (row.deal_id ? "Portföysüz anlaşma" : "Genel işlem")} · {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(row.created_at))}</p>
                         </div>
                         <div>
-                          <p className="text-[11px] text-text-faint">Brüt komisyon</p>
+                          <p className="text-xs text-text-faint">Brüt komisyon</p>
                           <p className="font-display text-sm font-bold text-ink-950">{money(Number(row.gross_amount))}</p>
                         </div>
                         <div>
-                          <p className="text-[11px] text-text-faint">Danışman payı</p>
+                          <p className="text-xs text-text-faint">Danışman payı</p>
                           <p className="font-display text-sm font-bold text-mint-700">{money(share.amount)}</p>
-                          <p className="mt-0.5 text-[11px] text-text-muted">{share.note}</p>
+                          <p className="mt-0.5 text-xs text-text-muted">{share.note}</p>
                         </div>
                         <div>
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${paid ? "bg-mint-500/10 text-mint-600" : "bg-amber-400/15 text-amber-500"}`}>
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${paid ? "bg-mint-500/10 text-mint-600" : "bg-amber-400/15 text-amber-500"}`}>
                             {paid ? "Tahsil edildi" : "Bekliyor"}
                           </span>
                         </div>
@@ -469,7 +469,7 @@ export default async function CuzdanPage() {
             ))}
           </div>
           {/* Metodoloji notu — pay hangi kaynaktan hesaplanıyor? */}
-          <div className="flex items-start gap-2 border-t border-line bg-canvas/60 px-5 py-3 text-[11px] text-text-muted">
+          <div className="flex items-start gap-2 border-t border-line bg-canvas/60 px-5 py-3 text-xs text-text-muted">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600" />
             <span>
               Pay hesabı: paylaşım satırında <strong>adınla birebir eşleşen</strong> etiketin oranı; adın yoksa ve anlaşma

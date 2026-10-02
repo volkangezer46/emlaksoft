@@ -3,6 +3,7 @@ import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { requirePlatformStaff } from "@/lib/platform";
 import { PLATFORM_ROLE_LABELS, platformModulesFor } from "@/lib/platform-access";
 import { getAdminBadges } from "@/lib/admin-badges";
+import { ThemeController } from "@/components/theme-controller";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const staff = await requirePlatformStaff();
@@ -15,6 +16,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex min-h-screen bg-canvas">
+      <ThemeController />
       <AdminSidebar staffName={staff.full_name} role={staff.role} roleLabel={roleLabel} badges={badges} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopbar roleLabel={roleLabel} modules={modules} />

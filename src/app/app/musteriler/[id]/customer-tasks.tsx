@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Clock, ListChecks, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { completeTask, createTask, deleteTask, reopenTask } from "@/app/actions/tasks";
 
 export type CustomerTaskRow = {
@@ -67,8 +68,24 @@ export function CustomerTasks({
     });
   }
 
+  async function removeTask(id: string) {
+    setError(null);
+    const fd = new FormData();
+    fd.set("id", id);
+    try {
+      const result = await deleteTask(fd);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Görev silinemedi. Lütfen tekrar deneyin.");
+    }
+  }
+
   return (
-    <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -80,7 +97,7 @@ export function CustomerTasks({
           <button
             type="button"
             onClick={() => setAdding((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded-[10px] bg-ink-950 px-3.5 py-2 text-xs font-semibold text-white hover:bg-ink-800"
+            className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-xs font-semibold text-white hover:bg-ink-800"
           >
             <Plus className="h-3.5 w-3.5" /> Görev ekle
           </button>
@@ -88,13 +105,13 @@ export function CustomerTasks({
       </div>
 
       {adding ? (
-        <form action={submit} className="mt-4 grid gap-2 rounded-[14px] border border-line bg-canvas p-3 sm:grid-cols-[1fr_auto_auto_auto]">
-          <input name="title" required placeholder="Görev başlığı" className="rounded-[9px] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400" />
-          <select name="kind" defaultValue="followup" className="rounded-[9px] border border-line bg-surface px-2 py-2 text-sm outline-none focus:border-brand-400">
+        <form action={submit} className="mt-4 grid gap-2 rounded-[var(--radius-card)] border border-line bg-canvas p-3 sm:grid-cols-[1fr_auto_auto_auto]">
+          <input name="title" required placeholder="Görev başlığı" className="rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400" />
+          <select name="kind" defaultValue="followup" className="rounded-[var(--radius-control)] border border-line bg-surface px-2 py-2 text-sm outline-none focus:border-brand-400">
             {Object.entries(KIND_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
-          <input name="due_at" type="datetime-local" className="rounded-[9px] border border-line bg-surface px-2 py-2 text-sm outline-none focus:border-brand-400" />
-          <button type="submit" className="rounded-[9px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">Ekle</button>
+          <input name="due_at" type="datetime-local" className="rounded-[var(--radius-control)] border border-line bg-surface px-2 py-2 text-sm outline-none focus:border-brand-400" />
+          <button type="submit" className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">Ekle</button>
           {error ? <p className="text-sm text-danger-500 sm:col-span-4">{error}</p> : null}
         </form>
       ) : null}
@@ -107,10 +124,10 @@ export function CustomerTasks({
           const isDone = t.status === "done";
           const overdue = !isDone && t.due_at && new Date(t.due_at).getTime() < nowTs;
           return (
-            <div key={t.id} className={`flex items-center gap-3 rounded-[12px] border px-3 py-2.5 ${isDone ? "border-line opacity-70" : "border-line"}`}>
+            <div key={t.id} className={`flex items-center gap-3 rounded-[var(--radius-card)] border px-3 py-2.5 ${isDone ? "border-line opacity-70" : "border-line"}`}>
               <span className="min-w-0 flex-1">
                 <span className={`text-sm font-semibold ${isDone ? "text-text-muted line-through" : "text-ink-950"}`}>{t.title}</span>
-                <span className="mt-0.5 flex items-center gap-2 text-[11px] text-text-muted">
+                <span className="mt-0.5 flex items-center gap-2 text-xs text-text-muted">
                   <span className="rounded-full bg-ink-950/6 px-2 py-0.5 font-bold">{KIND_LABEL[t.kind] ?? "Görev"}</span>
                   {t.due_at ? (
                     <span className={`flex items-center gap-1 ${overdue ? "text-danger-500" : ""}`}>
@@ -123,24 +140,30 @@ export function CustomerTasks({
               {canEdit ? (
                 isDone ? (
                   <Tip label="Yeniden aç">
-                    <button type="button" disabled={pending} onClick={() => act(reopenTask, t.id)} aria-label="Görevi yeniden aç" className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] border border-line text-text-muted transition hover:border-brand-300">
+                    <button type="button" disabled={pending} onClick={() => act(reopenTask, t.id)} aria-label="Görevi yeniden aç" className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300">
                       <RotateCcw className="h-3.5 w-3.5" />
                     </button>
                   </Tip>
                 ) : (
                   <Tip label="Tamamla">
-                    <button type="button" disabled={pending} onClick={() => act(completeTask, t.id)} aria-label="Görevi tamamla" className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] bg-mint-500/10 text-mint-600 transition hover:bg-mint-500/20">
+                    <button type="button" disabled={pending} onClick={() => act(completeTask, t.id)} aria-label="Görevi tamamla" className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-mint-500/10 text-mint-600 transition hover:bg-mint-500/20">
                       <CheckCircle2 className="h-3.5 w-3.5" />
                     </button>
                   </Tip>
                 )
               ) : null}
               {canDelete ? (
-                <Tip label="Sil">
-                  <button type="button" disabled={pending} onClick={() => act(deleteTask, t.id)} aria-label="Görevi sil" className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] border border-line text-danger-500 transition hover:border-danger-500/40">
+                <ConfirmDialog
+                  title="Görevi sil"
+                  description={`“${t.title}” kalıcı olarak silinecek. Bu işlem geri alınamaz.`}
+                  confirmLabel="Sil"
+                  onConfirm={() => removeTask(t.id)}
+                  trigger={
+                    <button type="button" disabled={pending} aria-label="Görevi sil" className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] border border-line text-danger-500 transition hover:border-danger-500/40">
                     <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </Tip>
+                    </button>
+                  }
+                />
               ) : null}
             </div>
           );

@@ -20,9 +20,9 @@
 - ✅ **Uyum paneli** · IYS · EİDS · KVKK · veri silme
 
 **Portal & Yayın**
-- 🌐 **Portal entegrasyonu** · sahibinden · hepsiemlak · zingat
-- 📊 **Portal performans** · görüntülenme · favorileme · listing takibi
-- 🔄 **Senkronizasyon** · otomatik ilan güncelleme · çoklu portal desteği
+- 🌐 **İlan takibi** · ilan no/URL · periyodik teyit · kapanış nedeni
+- 📊 **Portal performans kayıtları** · görüntülenme · favorileme · kaçak takibi
+- 🔌 **Yetkili API adaptörleri** · yalnız portalın kurumsal sözleşmesi, doğrulanmış base URL'si ve anahtarıyla etkinleşir
 
 **Ödemeler**
 - 💳 **iyzico entegrasyonu** · abonelik + ödeme linki · Checkout Form
@@ -53,15 +53,15 @@
 ## 📦 Kurulum
 
 ### 1) Gereksinimler
-- **Node.js 24 LTS** · minimum 22 (`@supabase/supabase-js` `engines: node >=22` şart koşuyor; Node 20'nin desteği Nisan 2026'da bitti)
+- **Node.js 24** · minimum 22; doğrulanan yerel sürüm 24.11.1
   - Sürüm `.nvmrc` dosyasında sabit. macOS/Linux: `nvm use`
   - **Windows:** nvm-windows `.nvmrc` okumaz, sürümü açıkça vermek gerekir:
     ```powershell
-    nvm install 24.12.0
-    nvm use 24.12.0
+    nvm install 24
+    nvm use 24
     ```
     PowerShell 5.1'de `&&` çalışmaz — komutları ayrı satırda veya `;` ile verin.
-- npm/pnpm/bun
+- **npm 11.6.2** (`packageManager` ve CI ile sabit)
 - Supabase projesi (eu-central-1 önerilir)
 - iyzico merchant hesabı (opsiyonel)
 
@@ -69,7 +69,7 @@
 ```bash
 git clone https://github.com/your-org/emlaksoft.git
 cd emlaksoft
-npm install
+npm ci
 ```
 
 ### 3) `.env.local` oluştur
@@ -80,10 +80,13 @@ cp .env.example .env.local
 `.env.local` içinde doldur:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=... # sb_publishable_...; legacy anon yalnız geçiş fallback'i
+SUPABASE_SECRET_KEY=... # sb_secret_...; legacy service_role yalnız geçiş fallback'i
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 CRON_SECRET=your-long-random-token
+OTP_HMAC_SECRET=your-independent-32-byte-minimum-otp-pepper
+TWO_FACTOR_COOKIE_SECRET=your-independent-32-character-2fa-cookie-secret
+PROPERTY_MEDIA_SIGNING_SECRET=your-independent-32-character-media-secret
 
 # iyzico (opsiyonel)
 IYZICO_API_KEY=...
@@ -92,14 +95,20 @@ IYZICO_BASE_URL=https://sandbox-api.iyzipay.com
 IYZICO_MERCHANT_ID=...
 ```
 
-### 4) Veritabanı migration'ları uygula
+### 4) Veritabanı migration'larını doğrula ve uygula
 
-**Supabase Dashboard SQL Editor'den çalıştır:**
+Migration dosyaları forward-only'dir ve `schema_migrations` tablosunda
+checksum ile izlenir:
+
 ```bash
-supabase/apply_premium_plus.sql
+npm run check:migrations
+npm run db:migrate -- --dry-run
+npm run db:migrate
 ```
 
-Detaylı adımlar için `MIGRATION_GUIDE.md` dosyasına bakın.
+Mevcut, daha önce migrate edilmiş bir veritabanını ledger'a ilk kez bağlamak
+için yalnızca kontrollü bakım penceresinde `--baseline` kullanın. Ayrıntılar ve
+checksum drift prosedürü için `MIGRATION_GUIDE.md` dosyasına bakın.
 
 ### 5) Supabase Storage ayarları
 
@@ -173,10 +182,16 @@ npx vercel link
 
 2. Environment variables ekle (Vercel Dashboard):
    - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   - `SUPABASE_SECRET_KEY` (tercih edilen, bağımsız döndürülebilir sunucu anahtarı)
+   - `OTP_HMAC_SECRET` (giriş ve imza OTP'leri için bağımsız, en az 32 byte HMAC pepper)
+   - `TWO_FACTOR_COOKIE_SECRET` (2FA oturum kanıtı için bağımsız, en az 32 karakter)
+   - `PROPERTY_MEDIA_SIGNING_SECRET` (bağımsız, en az 32 karakter)
    - `NEXT_PUBLIC_APP_URL`
    - `CRON_SECRET` ← **güçlü random token oluştur**
+   - `HEALTHCHECK_SECRET` (bağımsız, en az 32 karakter)
+   - `PLATFORM_ADMIN_EMAILS`
+   - `RELEASE_MIGRATION` + `RELEASE_MIGRATION_CHECKSUM` (`npm run check:migrations -- --release`)
    - iyzico keys (eğer varsa)
 
 3. Deploy:
@@ -186,18 +201,24 @@ npx vercel --prod
 
 ### Cron Jobs
 
-`vercel.json` içinde tanımlı cron'lar:
-- `/api/cron/gunluk-ozet` · her sabah 09:00
-- `/api/cron/randevu-hatirlatma` · her saat
-- `/api/cron/portal-listeleme-onay` · her saat
-- `/api/cron/abonelik-kontrol` · günde 1x
-- `/api/cron/leak-sla` · her gün 10:00
+Üretim zamanlamalarının tek deploy kaynağı `vercel.json` dosyasıdır. Route,
+zamanlama, yetki kapısı, heartbeat ve `/admin/sistem` izleme kapsamı şu kapıyla
+birlikte doğrulanır:
 
-Vercel Dashboard'dan `Authorization: Bearer <CRON_SECRET>` header'ı ile test et.
+```bash
+npm run check:cron
+APP_URL=https://app.example.com npm run cron:smoke -- --auth-only
+```
+
+`npm run cron:smoke` komutunun varsayılan modu `CRON_SECRET` ile tüm işleri
+gerçekten çalıştırır ve veri değiştirebilir; yalnızca bilinçli post-deploy
+kontrolünde kullanın. Güncel rota/sıklık listesi doğrudan `vercel.json` ve
+`/admin/sistem` ekranındadır.
 
 ### Deploy Checklist
 
-Detaylı adımlar için `DEPLOY_CHECKLIST.md` dosyasına bakın.
+Detaylı adımlar için `DEPLOY_CHECKLIST.md`; olay, rollback ve restore
+prosedürleri için `docs/runbooks/` dizinine bakın.
 
 ---
 

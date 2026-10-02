@@ -83,10 +83,10 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_1.35fr]">
       {/* Yeni duyuru / düzenleme formu */}
-      <section className="dashboard-panel h-fit rounded-[20px] border border-line bg-surface p-4 md:p-6">
+      <section className="dashboard-panel h-fit rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center justify-between gap-3 border-b border-line pb-4">
           <div className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-brand-600/10 text-brand-600">
+            <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
               {editing ? <Pencil className="h-5 w-5" /> : <Megaphone className="h-5 w-5" />}
             </span>
             <div>
@@ -100,7 +100,7 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
             <button
               type="button"
               onClick={() => { setEditing(null); setUpdateError(null); }}
-              className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+              className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
             >
               <X className="h-3.5 w-3.5" /> Vazgeç
             </button>
@@ -124,7 +124,7 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
               maxLength={200}
               defaultValue={editing?.title ?? ""}
               placeholder="Örn. Cuma ofis toplantısı 10:00"
-              className="focus-ring mt-1.5 w-full rounded-[11px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 placeholder:text-text-faint"
+              className="focus-ring mt-1.5 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 placeholder:text-text-faint"
             />
           </div>
 
@@ -138,7 +138,7 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
               rows={4}
               defaultValue={editing?.body ?? ""}
               placeholder="Detayları buraya yazın — ekip dashboard bandında görecek."
-              className="focus-ring mt-1.5 w-full resize-y rounded-[11px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 placeholder:text-text-faint"
+              className="focus-ring mt-1.5 w-full resize-y rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 placeholder:text-text-faint"
             />
           </div>
 
@@ -149,7 +149,7 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
                 id="ann-level"
                 name="level"
                 defaultValue={editing?.level ?? "info"}
-                className="focus-ring mt-1.5 w-full rounded-[11px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950"
+                className="focus-ring mt-1.5 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950"
               >
                 <option value="info">Bilgi</option>
                 <option value="warning">Uyarı</option>
@@ -163,12 +163,12 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
                 name="ends_at"
                 type="datetime-local"
                 defaultValue={toLocalInput(editing?.ends_at ?? null)}
-                className="focus-ring mt-1.5 w-full rounded-[11px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950"
+                className="focus-ring mt-1.5 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950"
               />
             </div>
           </div>
 
-          <label className="flex cursor-pointer items-center gap-2.5 rounded-[11px] border border-line bg-canvas px-3.5 py-2.5">
+          <label className="flex cursor-pointer items-center gap-2.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5">
             <input
               type="checkbox"
               name="pinned"
@@ -182,7 +182,7 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
           </label>
 
           {errorMsg ? (
-            <p className="rounded-[10px] border border-danger-500/25 bg-danger-500/8 px-3 py-2 text-xs font-semibold text-danger-500">
+            <p className="rounded-[var(--radius-control)] border border-danger-500/25 bg-danger-500/8 px-3 py-2 text-xs font-semibold text-danger-500">
               {errorMsg}
             </p>
           ) : null}
@@ -190,7 +190,7 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
           <button
             type="submit"
             disabled={pending}
-            className="focus-ring press inline-flex w-full items-center justify-center gap-2 rounded-[11px] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
+            className="focus-ring press inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
           >
             {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : editing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
             {editing ? "Değişiklikleri kaydet" : "Duyuruyu yayınla"}
@@ -199,7 +199,7 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
       </section>
 
       {/* Duyuru listesi */}
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-4 md:p-6">
+      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center justify-between border-b border-line pb-4">
           <div>
             <h2 className="font-display font-bold text-ink-950">Yayınlanan duyurular</h2>
@@ -224,7 +224,7 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
               const meta = LEVEL_META[a.level] ?? LEVEL_META.info;
               const LevelIcon = meta.icon;
               return (
-                <li key={a.id} className="rounded-[14px] border border-line bg-canvas p-4 transition hover:border-brand-300">
+                <li key={a.id} className="rounded-[var(--radius-card)] border border-line bg-canvas p-4 transition hover:border-brand-300">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="flex items-center gap-1.5 text-sm font-bold text-ink-950">
@@ -238,7 +238,7 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
                         type="button"
                         onClick={() => { setEditing(a); setUpdateError(null); }}
                         title="Düzenle"
-                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
@@ -247,7 +247,7 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
                           <button
                             type="button"
                             title="Sil"
-                            className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line text-text-muted transition hover:border-danger-500/40 hover:text-danger-500"
+                            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/40 hover:text-danger-500"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -260,7 +260,7 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
                       />
                     </div>
                   </div>
-                  <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px] text-text-faint">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-text-faint">
                     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-bold ${meta.badge}`}>
                       <LevelIcon className="h-3 w-3" /> {meta.label}
                     </span>

@@ -39,7 +39,7 @@ import { fetchLatestRates, formatFx, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 // Harita ağır bir client komponenti ve yalnız ?gorunum=harita'da görünür —
 // dynamic import ile liste görünümünün ilk yükünden çıkarılır (ayrı chunk).
 const MapView = dynamic(() => import("./map-view").then((m) => m.MapView), {
-  loading: () => <div className="h-[520px] animate-pulse rounded-[20px] border border-line bg-ink-950/8" />,
+  loading: () => <div className="h-[520px] animate-pulse rounded-[var(--radius-panel)] border border-line bg-ink-950/8" />,
 });
 
 type PropertyRow = {
@@ -135,14 +135,14 @@ function healthLabel(health: string | null): string {
 }
 
 const PAGER_BTN =
-  "focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+  "focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
 const PAGER_BTN_DISABLED =
-  "inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
+  "inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
 export default async function PropertiesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string; status?: string; saglik?: string; gorunum?: string; sayfa?: string; sirala?: string }>;
+  searchParams?: Promise<{ q?: string; status?: string; saglik?: string; gorunum?: string; sayfa?: string; sirala?: string; yeni?: string }>;
 }) {
   const { perms } = await requireModulePage("properties");
   const canCreate = (perms.properties ?? []).includes("create");
@@ -305,7 +305,7 @@ export default async function PropertiesPage({
   const fxTitle = fxRates ? `TCMB ${fxRates.rateDate} satış kuru — ${fxAgeLabel(fxRates.rateDate, now())}` : undefined;
 
   // Kapak görselleri — tek ek sorgu; property_id -> media id eşlemesi.
-  // Görsel /api/property-media/[id] üzerinden servis edilir (medya yöneticisiyle aynı yol).
+  // Görsel tenant/yetki kontrollü download ucu üzerinden servis edilir.
   const coverByProperty = new Map<string, string>();
   if (rows.length > 0) {
     const { data: covers } = await supabase
@@ -384,7 +384,7 @@ export default async function PropertiesPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-12 -top-20 h-60 w-60 rounded-full bg-mint-500/25 blur-[80px]" />
         <div className="relative flex flex-wrap items-start justify-between gap-5">
@@ -394,7 +394,7 @@ export default async function PropertiesPage({
             <p className="mt-1 text-sm text-white/60">Fiyat sağlığı, portal teyidi ve yetki durumu tek merkezde.</p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center overflow-hidden rounded-[11px] border border-white/12 bg-white/8 backdrop-blur">
+            <div className="flex items-center overflow-hidden rounded-[var(--radius-control)] border border-white/12 bg-white/8 backdrop-blur">
               {(
                 [
                   { label: "Liste", value: "liste", icon: LayoutGrid },
@@ -414,15 +414,15 @@ export default async function PropertiesPage({
                 </Link>
               ))}
             </div>
-            <Link href="/app/yabanci-satis" className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white">Yabancıya satış</Link>
-            <Link href="/app/portfoyler/sunumlar" className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white">Sunumlar &amp; portallar</Link>
-            <Link href="/app/portfoyler/anahtarlar" className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white">Anahtarlar</Link>
+            <Link href="/app/yabanci-satis" className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white">Yabancıya satış</Link>
+            <Link href="/app/portfoyler/sunumlar" className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white">Sunumlar &amp; portallar</Link>
+            <Link href="/app/portfoyler/anahtarlar" className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white">Anahtarlar</Link>
             <ExportCsvButton
               action={exportPropertiesCsv}
               label="Dışa aktar"
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
+              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
             />
-            {canCreate ? <NewPropertyDialog provinces={provinceList} branches={branchList} propertyTypes={propertyTypeOptions} transactionTypes={transactionTypeOptions} /> : null}
+            {canCreate ? <NewPropertyDialog key={params.yeni === "1" ? "new-property" : "property-dialog"} provinces={provinceList} branches={branchList} propertyTypes={propertyTypeOptions} transactionTypes={transactionTypeOptions} defaultOpen={params.yeni === "1"} /> : null}
           </div>
         </div>
         {/* Toplam portföy değeri + döviz karşılığı — kur yoksa satır hiç çizilmez */}
@@ -444,21 +444,21 @@ export default async function PropertiesPage({
               <Link
                 key={item.label}
                 href={item.href}
-                className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
+                className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
               >
                 <div className="flex items-start justify-between">
                   <item.icon className="h-4 w-4 text-mint-400" />
                   <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                 </div>
                 <p className="mt-2 font-display text-xl font-extrabold text-white">{item.value}</p>
-                <p className="text-[11px] text-white/45 sm:text-xs">{item.label}</p>
+                <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
               </Link>
             ))}
           </div>
-          <div className="rounded-[16px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
+          <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="flex items-center justify-between">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-white/75"><Gauge className="h-3.5 w-3.5 text-mint-400" /> Fiyat sağlığı dağılımı</p>
-              <span className="text-[11px] text-white/45">{healthKnownTotal} portföy</span>
+              <span className="text-xs text-white/45">{healthKnownTotal} portföy</span>
             </div>
             <div className="mt-4 flex h-3 gap-0.5 overflow-hidden rounded-full bg-white/10">
               {healthSegments.map((s) => (
@@ -470,14 +470,14 @@ export default async function PropertiesPage({
                 <Link
                   key={s.label}
                   href={saglikHref(s.param)}
-                  className={`focus-ring press group relative block rounded-[10px] border bg-white/[0.03] px-2 py-2 text-center transition hover:border-white/30 ${
+                  className={`focus-ring press group relative block rounded-[var(--radius-control)] border bg-white/[0.03] px-2 py-2 text-center transition hover:border-white/30 ${
                     saglikFilter === s.param ? "border-white/40" : "border-white/8"
                   }`}
                 >
                   <ArrowUpRight className="hover-action absolute right-1.5 top-1.5 h-3 w-3 text-white/50 opacity-0 transition group-hover:opacity-100" />
                   <span className={`mx-auto block h-1.5 w-1.5 rounded-full ${s.dot}`} />
                   <p className={`mt-1.5 font-display text-lg font-extrabold ${s.text}`}>{s.count}</p>
-                  <p className="text-[11px] text-white/45">{s.label}</p>
+                  <p className="text-xs text-white/45">{s.label}</p>
                 </Link>
               ))}
             </div>
@@ -485,7 +485,7 @@ export default async function PropertiesPage({
         </div>
       </section>
 
-      <form className="flex flex-wrap items-center justify-between gap-3 rounded-[16px] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]" action="/app/portfoyler">
+      <form className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]" action="/app/portfoyler">
         {/* Durum butonlarıyla submit edilince aktif sağlık filtresi kaybolmasın */}
         {saglikFilter ? <input type="hidden" name="saglik" value={saglikFilter} /> : null}
         {/* Arama/durum submit'inde aktif harita görünümü korunsun */}
@@ -497,7 +497,7 @@ export default async function PropertiesPage({
             defaultValue={q}
             aria-label="Portföy ara"
             placeholder="Kod, başlık, portal veya konum ara…"
-            className="w-full rounded-[11px] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+            className="w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
           />
         </div>
         <div className="flex gap-2">
@@ -507,7 +507,7 @@ export default async function PropertiesPage({
               type="submit"
               name="status"
               value={filter.value}
-              className={`hidden rounded-[9px] px-3 py-2 text-xs font-semibold transition sm:block ${statusFilter === filter.value ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"}`}
+              className={`hidden rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold transition sm:block ${statusFilter === filter.value ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"}`}
             >
               {filter.label}
             </button>
@@ -570,7 +570,7 @@ export default async function PropertiesPage({
       ) : (
         <>
         {/* Toplu düzenleme bölümü */}
-        <details className="group rounded-[16px] border border-line bg-surface">
+        <details className="group rounded-[var(--radius-card)] border border-line bg-surface">
           <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-text-muted transition hover:text-ink-950 [&::-webkit-details-marker]:hidden">
             <span>Toplu durum güncelle</span>
             <span className="rounded-full bg-canvas px-2 py-0.5 text-xs text-text-faint group-open:hidden">{rows.length} portföy</span>
@@ -608,6 +608,7 @@ export default async function PropertiesPage({
               title: `${property.title ?? property.property_code} · Fiyat sağlığı: ${healthLabel(property.price_health)}`,
               href: `/app/portfoyler/${property.id}`,
               coverId: coverId ?? null,
+              coverSrc: coverId ? `/api/property-media/${coverId}/download` : null,
               price: property.list_price != null ? Number(property.list_price) : null,
               tx: property.transaction_type,
               rooms: feat.rooms ?? null,
@@ -633,12 +634,12 @@ export default async function PropertiesPage({
               >
               <Link
                 href={`/app/portfoyler/${property.id}`}
-                className="group overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)] transition hover:-translate-y-1 hover:border-brand-300 hover:shadow-[var(--shadow-card)]"
+                className="group overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)] transition hover:-translate-y-1 hover:border-brand-300 hover:shadow-[var(--shadow-card)]"
               >
                 <div className="relative flex h-36 items-center justify-center overflow-hidden bg-[image:var(--grad-brand-soft)]">
                   {coverId ? (
                     <Image
-                      src={`/api/property-media/${coverId}`}
+                      src={`/api/property-media/${coverId}/download`}
                       alt={property.title ?? property.property_code}
                       fill
                       sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
@@ -652,24 +653,24 @@ export default async function PropertiesPage({
                     </>
                   )}
                   <span className="absolute left-4 top-4 flex items-center gap-1.5">
-                    <span className="rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-bold text-ink-950 shadow-[var(--shadow-xs)] backdrop-blur">{property.property_code}</span>
+                    <span className="rounded-full bg-white/85 px-2.5 py-1 text-xs font-bold text-ink-950 shadow-[var(--shadow-xs)] backdrop-blur">{property.property_code}</span>
                     {/* Son 7 günde yayına giren portföy — published_at gerçek yayın damgası (vitrindeki rozetle aynı kural) */}
                     {property.published_at != null && msSince(property.published_at) < 7 * DAY_MS ? (
-                      <span className="rounded-full bg-mint-500 px-2 py-0.5 text-[10px] font-bold uppercase text-white shadow-[var(--shadow-xs)]">Yeni</span>
+                      <span className="rounded-full bg-mint-500 px-2 py-0.5 text-xs font-bold uppercase text-white shadow-[var(--shadow-xs)]">Yeni</span>
                     ) : null}
                   </span>
-                  <span className={`absolute right-4 top-4 rounded-full px-2.5 py-1 text-[11px] font-bold ${healthGood ? "bg-mint-500/15 text-mint-600" : "bg-amber-400/20 text-amber-500"}`}>
+                  <span className={`absolute right-4 top-4 rounded-full px-2.5 py-1 text-xs font-bold ${healthGood ? "bg-mint-500/15 text-mint-600" : "bg-amber-400/20 text-amber-500"}`}>
                     Fiyat {property.price_health ?? "bekliyor"}
                   </span>
                 </div>
                 <div className="p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">{property.transaction_type} · {property.property_type}</p>
+                      <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">{property.transaction_type} · {property.property_type}</p>
                       <h2 className="mt-1 font-display text-lg font-bold text-ink-950">{property.title ?? property.property_code}</h2>
                       <p className="mt-1 flex items-center gap-1.5 text-xs text-text-muted"><MapPin className="h-3.5 w-3.5" />{locationLabel(property)}</p>
                     </div>
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-canvas text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600" aria-hidden><ArrowUpRight className="h-4 w-4" /></span>
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-canvas text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600" aria-hidden><ArrowUpRight className="h-4 w-4" /></span>
                   </div>
                   <p className="mt-4 font-display text-2xl font-extrabold text-ink-950">{formatPrice(property.list_price, property.transaction_type)}</p>
                   <div className="mt-4 grid grid-cols-2 gap-2 border-t border-line pt-4">

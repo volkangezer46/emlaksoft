@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
+import { getBaseUrl } from "@/lib/base-url";
 
 /**
  * Referans (tavsiye) programı — panel action'ları (/app/tavsiyeler).
@@ -42,7 +43,7 @@ const STATUSES = ["yeni", "iletisim", "musteri", "kazanildi", "kayip"] as const;
 type ReferralStatus = (typeof STATUSES)[number];
 
 function appBase() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return getBaseUrl();
 }
 
 /** Public tavsiye sayfasının tam adresi — panelde kopyalanır (SMS yok, İYS kapsam dışı). */
@@ -77,6 +78,17 @@ export async function createReferralLink(fd: FormData): Promise<ReferralLinkResu
     .is("deleted_at", null)
     .maybeSingle();
   if (!customer) return { error: "Müşteri bulunamadı." };
+
+  if (staffId) {
+    const { data: staff } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", staffId)
+      .eq("tenant_id", gate.tenantId)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (!staff) return { error: "Danışman bulunamadı veya bu ofise ait değil." };
+  }
 
   const { data: existing } = await supabase
     .from("referral_links")

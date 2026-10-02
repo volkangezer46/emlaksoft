@@ -18,7 +18,7 @@ type Province = { id: string; name: string };
 const initial: DemandResult = {};
 
 const fieldClass =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
 const DEFAULT_TRANSACTION_TYPES = ["Satılık", "Kiralık"];
 const DEFAULT_PROPERTY_TYPES = ["Daire", "Villa", "Arsa", "İşyeri", "Müstakil ev", "Bina"];
@@ -68,7 +68,7 @@ export function NewDemandDialog({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700"
+          className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700"
         >
           <Plus className="h-3.5 w-3.5" /> Talep ekle
         </button>
@@ -131,14 +131,14 @@ export function NewDemandDialog({
 
               <div className="hairline-t sm:col-span-2 flex justify-end gap-2 pt-4">
                 <DialogClose asChild>
-                  <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
+                  <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
                     Vazgeç
                   </button>
                 </DialogClose>
                 <button
                   type="submit"
                   disabled={pending}
-                  className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                  className="btn-shine focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
                 >
                   {pending ? "Kaydediliyor…" : "Talebi kaydet"}
                 </button>

@@ -87,7 +87,7 @@ export function MatchFeedback({
           İlgilenmiyorum
         </button>
       </div>
-      {error && <p className="mt-2 text-[11px] font-semibold text-danger-600">{error}</p>}
+      {error && <p className="mt-2 text-xs font-semibold text-danger-600">{error}</p>}
     </div>
   );
 }

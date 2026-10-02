@@ -39,7 +39,7 @@ export function EditContractForm({ id, title, body }: { id: string; title: strin
           type="text"
           required
           defaultValue={title}
-          className="w-full rounded-[10px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300"
+          className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300"
         />
       </div>
 
@@ -53,12 +53,12 @@ export function EditContractForm({ id, title, body }: { id: string; title: strin
           required
           rows={18}
           defaultValue={body}
-          className="w-full resize-y rounded-[10px] border border-line bg-canvas px-3.5 py-2.5 font-mono text-xs leading-relaxed text-ink-950 outline-none focus:border-brand-300"
+          className="w-full resize-y rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 font-mono text-xs leading-relaxed text-ink-950 outline-none focus:border-brand-300"
         />
       </div>
 
       {error ? (
-        <p className="rounded-[8px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
+        <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
           {error}
         </p>
       ) : null}

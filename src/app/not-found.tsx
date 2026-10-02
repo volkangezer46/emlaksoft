@@ -21,7 +21,7 @@ export default function NotFound() {
       <div className="pointer-events-none absolute left-1/2 top-[-120px] h-[380px] w-[380px] -translate-x-1/2 rounded-full bg-brand-600/30 blur-[110px]" />
 
       <main className="relative w-full max-w-xl text-center">
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-cyan-300">
+        <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-cyan-300">
           <Compass className="h-3.5 w-3.5" /> Hata 404
         </span>
 
@@ -40,13 +40,13 @@ export default function NotFound() {
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link
             href="/"
-            className="btn-shine glow-brand inline-flex items-center gap-2 rounded-[12px] bg-brand-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-700"
+            className="btn-shine glow-brand inline-flex items-center gap-2 rounded-[var(--radius-card)] bg-brand-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-700"
           >
             <Home className="h-4 w-4" /> Ana sayfa
           </Link>
           <Link
             href="/app"
-            className="inline-flex items-center gap-2 rounded-[12px] border border-white/15 bg-white/8 px-6 py-3 text-sm font-semibold text-white backdrop-blur transition hover:border-cyan-400/40 hover:bg-white/12"
+            className="inline-flex items-center gap-2 rounded-[var(--radius-card)] border border-white/15 bg-white/8 px-6 py-3 text-sm font-semibold text-white backdrop-blur transition hover:border-cyan-400/40 hover:bg-white/12"
           >
             <LayoutDashboard className="h-4 w-4 text-cyan-300" /> Panele dön
           </Link>
@@ -54,7 +54,7 @@ export default function NotFound() {
 
         {/* Popüler bağlantılar */}
         <nav aria-label="Popüler bağlantılar" className="mt-12 text-left">
-          <p className="text-center text-[11px] font-bold uppercase tracking-[0.14em] text-white/40">
+          <p className="text-center text-xs font-bold uppercase tracking-[0.14em] text-white/40">
             Popüler bağlantılar
           </p>
           <ul className="mt-4 grid gap-2.5 sm:grid-cols-3">
@@ -62,9 +62,9 @@ export default function NotFound() {
               <li key={l.href}>
                 <Link
                   href={l.href}
-                  className="group flex h-full items-start gap-3 rounded-[14px] border border-white/10 bg-white/[0.05] p-4 backdrop-blur transition hover:border-cyan-400/35 hover:bg-white/10"
+                  className="group flex h-full items-start gap-3 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.05] p-4 backdrop-blur transition hover:border-cyan-400/35 hover:bg-white/10"
                 >
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] border border-white/10 bg-white/6 text-cyan-300">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] border border-white/10 bg-white/6 text-cyan-300">
                     <l.icon className="h-4 w-4" />
                   </span>
                   <span className="min-w-0">

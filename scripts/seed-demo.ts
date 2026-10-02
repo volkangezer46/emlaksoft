@@ -13,13 +13,20 @@
  */
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
+import { deriveDemoPassword } from "../src/lib/demo-credentials";
+import {
+  buildDemoCommissionRow,
+  buildMissingWonCommissionRows,
+  findDemoProjectUnitInvariantViolations,
+  findDemoWonInvariantViolations,
+} from "../src/lib/demo-seed-invariants";
 
 dotenv.config({ path: ".env.local" });
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const key = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !key) {
-  console.error("NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY eksik (.env.local)");
+  console.error("NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SECRET_KEY eksik (.env.local)");
   process.exit(1);
 }
 
@@ -40,8 +47,7 @@ if (!isLocalDb && process.env.SEED_CONFIRM !== "1") {
 
 const admin = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 
-// demo-login.ts ile birebir aynı sabitler (src/app/actions/demo-login.ts)
-const DEMO_PASSWORD = "Demo1234!";
+const DEMO_LOGIN_SECRET = process.env.DEMO_LOGIN_SECRET?.trim() || key;
 const DEMO_TENANT_SLUG = "demo-ofis";
 const DEMO_TENANT_NAME = "Demo Emlak Ofisi";
 
@@ -160,11 +166,12 @@ async function ensureTenant(): Promise<string> {
 
 async function ensureProfile(tenantId: string, persona: (typeof PERSONAS)[number]): Promise<string> {
   const meta = { tenant_id: tenantId, role: persona.role };
+  const password = deriveDemoPassword(DEMO_LOGIN_SECRET, persona.email);
   let userId: string | null = null;
 
   const { data, error } = await admin.auth.admin.createUser({
     email: persona.email,
-    password: DEMO_PASSWORD,
+    password,
     email_confirm: true,
     user_metadata: { full_name: persona.label },
     app_metadata: meta,
@@ -177,7 +184,7 @@ async function ensureProfile(tenantId: string, persona: (typeof PERSONAS)[number
     userId = await findAuthUserIdByEmail(persona.email);
     if (!userId) throw new Error(`Auth kullanıcısı bulunamadı: ${persona.email}`);
     const { error: updErr } = await admin.auth.admin.updateUserById(userId, {
-      password: DEMO_PASSWORD,
+      password,
       email_confirm: true,
       app_metadata: meta,
     });
@@ -326,7 +333,7 @@ async function main() {
   const customers = customersData;
   const custByName = (name: string) => customers.find((c) => c.full_name === name)?.id ?? customers[0].id;
 
-  // ---------------- Portföyler (~15, lat/lng + fiyat geçmişi) ----------------
+  // ---------------- Portföyler (19, lat/lng + fiyat geçmişi) ----------------
   type PropSeed = {
     code: string; title: string; tx: "Satılık" | "Kiralık"; type: string; status: string;
     price: number; lat: number; lng: number; district: string; rooms: string; m2: number;
@@ -350,6 +357,12 @@ async function main() {
     { code: "DEMO-013", title: "Kadıköy Caferağa'da satılık 1+1", tx: "Satılık", type: "Daire", status: "reserved", price: 6900000, lat: 40.9861, lng: 29.0228, district: "kadikoy", rooms: "1+1", m2: 68, floor: 1, heating: "Kombi (Doğalgaz)", age: 30, health: "yellow" },
     { code: "DEMO-014", title: "Maltepe'de satılan 2+1 (referans)", tx: "Satılık", type: "Daire", status: "sold", price: 6400000, lat: 40.9401, lng: 29.1385, district: "maltepe", rooms: "2+1", m2: 105, floor: 3, heating: "Kombi (Doğalgaz)", age: 18, health: "green" },
     { code: "DEMO-015", title: "Beşiktaş Ortaköy'de kiraya verilen 2+1", tx: "Kiralık", type: "Daire", status: "rented", price: 55000, lat: 41.0553, lng: 29.0268, district: "besiktas", rooms: "2+1", m2: 100, floor: 5, heating: "Merkezi", age: 7, health: "green" },
+    // Aylık ciro trendindeki her kapanış ayrı bir referans portföye bağlıdır.
+    // Aktif ilanları geçmiş satışlara bağlamak hem vitrini hem emsal verisini bozar.
+    { code: "DEMO-016", title: "Fenerbahçe'de satılan yenilenmiş 2+1 (referans)", tx: "Satılık", type: "Daire", status: "sold", price: 9600000, lat: 40.9708, lng: 29.0470, district: "kadikoy", rooms: "2+1", m2: 108, floor: 3, heating: "Kombi (Doğalgaz)", age: 9, health: "green" },
+    { code: "DEMO-017", title: "Maltepe sahilde satılan 3+1 (referans)", tx: "Satılık", type: "Daire", status: "sold", price: 7300000, lat: 40.9227, lng: 29.1262, district: "maltepe", rooms: "3+1", m2: 132, floor: 4, heating: "Kombi (Doğalgaz)", age: 14, health: "green" },
+    { code: "DEMO-018", title: "Onikişubat'ta satılan 4+1 (referans)", tx: "Satılık", type: "Daire", status: "sold", price: 5400000, lat: 37.5810, lng: 36.9045, district: "onikisubat", rooms: "4+1", m2: 180, floor: 6, heating: "Kombi (Doğalgaz)", age: 4, health: "green" },
+    { code: "DEMO-019", title: "Dulkadiroğlu'nda satılan imarlı arsa (referans)", tx: "Satılık", type: "Arsa", status: "sold", price: 11200000, lat: 37.5930, lng: 36.9690, district: "dulkadiroglu", rooms: "-", m2: 920, health: "green" },
   ];
   // Uygulamanın okuduğu KANONİK feature anahtarları (portal-publish/broşür/
   // property-health ile aynı): rooms, sqm, net_sqm, floor, heating, building_age.
@@ -366,7 +379,7 @@ async function main() {
     k === "kadikoy" ? geo.kadikoyId : k === "besiktas" ? geo.besiktasId : k === "maltepe" ? geo.maltepeId : k === "onikisubat" ? geo.onikisubatId : geo.dulkadirogluId;
   const provinceOf = (k: string) => (k === "onikisubat" || k === "dulkadiroglu" ? geo.marasId : geo.istanbulId);
 
-  await section("Portföyler", "properties", tenantId, PROPS.length, async () => {
+  {
     const { data: existing } = await admin.from("properties").select("property_code").eq("tenant_id", tenantId);
     const seen = new Set((existing ?? []).map((p) => p.property_code));
     let created = 0;
@@ -409,15 +422,16 @@ async function main() {
         if (updErr) throw new Error(`fiyat güncelleme ${p.code}: ${updErr.message}`);
       }
     }
-    return created;
-  });
+    console.log(`✓ Portföyler: ${created} eksik kayıt üretildi`);
+  }
 
-  const { data: propsData, error: propErr } = await admin
+  const { data: initialPropsData, error: propErr } = await admin
     .from("properties")
-    .select("id, property_code, status, list_price")
+    .select("id, property_code, status, list_price, commission_rate")
     .eq("tenant_id", tenantId);
-  if (propErr || !propsData?.length) throw new Error(`properties okunamadı: ${propErr?.message}`);
-  const propByCode = (code: string) => propsData.find((p) => p.property_code === code)?.id ?? propsData[0].id;
+  if (propErr || !initialPropsData?.length) throw new Error(`properties okunamadı: ${propErr?.message}`);
+  const propertyIdByCode = new Map(initialPropsData.map((property) => [property.property_code, property.id]));
+  const propByCode = (code: string) => propertyIdByCode.get(code) ?? initialPropsData[0].id;
 
   // ---- Zenginleştirme (idempotent) -----------------------------------------
   // Daha önce eski anahtarlarla (oda/brut_m2) ve price_health=null ile
@@ -426,12 +440,17 @@ async function main() {
   // yazar; yeni insert edilen kayıtlar için no-op'tur.
   {
     let enriched = 0;
+    const terminalDemoCodes = new Set(["DEMO-014", "DEMO-015", "DEMO-016", "DEMO-017", "DEMO-018", "DEMO-019"]);
     for (const p of PROPS) {
-      const propId = propsData.find((row) => row.property_code === p.code)?.id;
+      const propId = initialPropsData.find((row) => row.property_code === p.code)?.id;
       if (!propId) continue;
       const { error: enrichErr } = await admin
         .from("properties")
-        .update({ features: featuresOf(p), price_health: p.health ?? null })
+        .update({
+          features: featuresOf(p),
+          price_health: p.health ?? null,
+          ...(terminalDemoCodes.has(p.code) ? { status: p.status } : {}),
+        })
         .eq("id", propId)
         .eq("tenant_id", tenantId);
       if (enrichErr) throw new Error(`properties zenginleştirme ${p.code}: ${enrichErr.message}`);
@@ -439,6 +458,18 @@ async function main() {
     }
     console.log(`  Portföy zenginleştirme: ${enriched} kayıt (features + price_health)`);
   }
+
+  // Terminal fixture durumları zenginleştirme adımında değişebilir. Bundan
+  // sonraki deal/commission/postcondition hesapları eski pre-update snapshot'ı
+  // değil, veritabanındaki authoritative son durumu kullanır.
+  const { data: refreshedPropsData, error: refreshedPropsError } = await admin
+    .from("properties")
+    .select("id, property_code, status, list_price, commission_rate")
+    .eq("tenant_id", tenantId);
+  if (refreshedPropsError || !refreshedPropsData?.length) {
+    throw new Error(`properties zenginleştirme sonrası okunamadı: ${refreshedPropsError?.message}`);
+  }
+  const propsData = refreshedPropsData;
 
   // ---------------- Talepler (9) ----------------
   const DEMANDS = [
@@ -529,23 +560,49 @@ async function main() {
   }
 
   // Aylık kazanılan ciro trendi için backdate'li kazanılan anlaşmalar (geçmiş aylar).
-  // Idempotent: 40+ gün önce güncellenmiş won anlaşma var mı marker'ı.
+  // Her kapanışın ayrı, kapalı referans portföyü vardır. Eski seed sürümünün
+  // aktif ilanlara bağladığı satırlar değer marker'ıyla güvenle yeniden bağlanır.
   {
-    const { data: oldWon } = await admin
+    const extra = [
+      { prop: "DEMO-016", cust: "Ayşe Kaya", value: 9_600_000, daysAgo: 135 },
+      { prop: "DEMO-017", cust: "Ali Koç", value: 7_300_000, daysAgo: 100 },
+      { prop: "DEMO-018", cust: "Zeynep Aydın", value: 5_400_000, daysAgo: 70 },
+      { prop: "DEMO-019", cust: "Mustafa Çelik", value: 11_200_000, daysAgo: 45 },
+    ];
+    const { data: existingTrendWon, error: trendMarkerError } = await admin
       .from("deals")
-      .select("id, updated_at")
+      .select("id, property_id, deal_value")
       .eq("tenant_id", tenantId)
       .eq("stage", "won")
-      .lte("updated_at", iso(daysFromNow(-40, 12)))
-      .limit(1);
-    if (!(oldWon && oldWon.length)) {
-      const extra = [
-        { prop: "DEMO-002", cust: "Ayşe Kaya", value: 9_600_000, daysAgo: 135 },
-        { prop: "DEMO-009", cust: "Ali Koç", value: 7_300_000, daysAgo: 100 },
-        { prop: "DEMO-010", cust: "Zeynep Aydın", value: 5_400_000, daysAgo: 70 },
-        { prop: "DEMO-011", cust: "Mustafa Çelik", value: 11_200_000, daysAgo: 45 },
-      ];
-      const rows = extra.map((d) => ({
+      .in("deal_value", extra.map((deal) => deal.value));
+    if (trendMarkerError) throw new Error(`Trend anlaşma marker sorgusu: ${trendMarkerError.message}`);
+    const byValue = new Map<number, NonNullable<typeof existingTrendWon>[number]>();
+    for (const deal of existingTrendWon ?? []) {
+      const value = Number(deal.deal_value);
+      if (byValue.has(value)) {
+        throw new Error(`Trend anlaşma marker'ı tekil değil: ${value}`);
+      }
+      byValue.set(value, deal);
+    }
+
+    let relinked = 0;
+    for (const spec of extra) {
+      const existing = byValue.get(spec.value);
+      const expectedPropertyId = propByCode(spec.prop);
+      if (!existing || existing.property_id === expectedPropertyId) continue;
+      const { error: relinkError } = await admin
+        .from("deals")
+        .update({ property_id: expectedPropertyId })
+        .eq("id", existing.id)
+        .eq("tenant_id", tenantId)
+        .eq("stage", "won");
+      if (relinkError) throw new Error(`Trend anlaşma yeniden bağlama: ${relinkError.message}`);
+      relinked += 1;
+    }
+
+    const missing = extra.filter((deal) => !byValue.has(deal.value));
+    if (missing.length) {
+      const rows = missing.map((d) => ({
         tenant_id: tenantId,
         property_id: propByCode(d.prop),
         customer_id: custByName(d.cust),
@@ -562,11 +619,12 @@ async function main() {
     } else {
       console.log("✓ Ek kazanılan anlaşmalar: mevcut (atlandı)");
     }
+    if (relinked) console.log(`  ✓ Eski trend anlaşmaları: ${relinked} referans portföye yeniden bağlandı`);
   }
 
   const { data: dealsData } = await admin
     .from("deals")
-    .select("id, stage, deal_value, deal_type, property_id")
+    .select("id, stage, deal_value, deal_type, property_id, project_unit_id, customer_id, created_at, updated_at")
     .eq("tenant_id", tenantId);
   const deals = dealsData ?? [];
 
@@ -586,14 +644,71 @@ async function main() {
       },
     ]);
     const negotiating = offers[0].id as string;
+    const accepted = offers[1].id as string;
     await insertRows("offer_rounds", [
       { tenant_id: tenantId, offer_id: negotiating, round_no: 1, side: "buyer", amount: 11000000, note: "İlk teklif", created_by: advisorId },
       { tenant_id: tenantId, offer_id: negotiating, round_no: 2, side: "seller", amount: 12200000, note: "Satıcı karşı teklifi", created_by: advisorId },
       { tenant_id: tenantId, offer_id: negotiating, round_no: 3, side: "buyer", amount: 11500000, note: "Alıcı yükseltti", created_by: advisorId },
+      { tenant_id: tenantId, offer_id: negotiating, round_no: 4, side: "seller", amount: 12000000, note: "Güncel satıcı karşı teklifi", created_by: advisorId },
+      { tenant_id: tenantId, offer_id: accepted, round_no: 1, side: "buyer", amount: 6400000, note: "Kabul edilen teklif", created_by: advisorId },
     ]);
-    console.log("  ✓ Pazarlık turları: 3 kayıt");
+    const acceptedDeal = deals.find((deal) => deal.stage === "won" && deal.property_id === propByCode("DEMO-014"));
+    if (!acceptedDeal) throw new Error("DEMO-014 kabul edilen teklif için won anlaşma bulunamadı");
+    const { error: linkError } = await admin.from("offers")
+      .update({ deal_id: acceptedDeal.id })
+      .eq("id", accepted)
+      .eq("tenant_id", tenantId);
+    if (linkError) throw new Error(`DEMO-014 teklif bağlantısı: ${linkError.message}`);
+    console.log("  ✓ Pazarlık turları: 5 kayıt");
     return offers.length;
   });
+
+  // Eski demo seed sürümlerindeki iki kesin teklif fixture'ını tahmin yapmadan
+  // uzlaştır: DEMO-001'in mevcut counter_amount'ını yeni seller turu yap; kabul
+  // edilen DEMO-014'ü aynı portföyün tek won anlaşmasına bağla.
+  {
+    const { data: demoOffers, error: demoOfferError } = await admin
+      .from("offers")
+      .select("id, property_id, status, amount, counter_amount, deal_id")
+      .eq("tenant_id", tenantId)
+      .in("property_id", [propByCode("DEMO-001"), propByCode("DEMO-014")]);
+    if (demoOfferError) throw new Error(`Demo teklif uzlaştırma sorgusu: ${demoOfferError.message}`);
+    for (const offer of demoOffers ?? []) {
+      const { data: rounds, error: roundsError } = await admin.from("offer_rounds")
+        .select("round_no, side, amount")
+        .eq("tenant_id", tenantId)
+        .eq("offer_id", offer.id)
+        .order("round_no", { ascending: true });
+      if (roundsError) throw new Error(`Demo teklif turu sorgusu: ${roundsError.message}`);
+      if (offer.property_id === propByCode("DEMO-001") && offer.status === "countered") {
+        const counter = Number(offer.counter_amount);
+        const last = rounds?.at(-1);
+        if (!Number.isFinite(counter) || counter <= 0) throw new Error("DEMO-001 counter_amount geçersiz");
+        if (!last || last.side !== "seller" || Number(last.amount) !== counter) {
+          await insertRows("offer_rounds", [{
+            tenant_id: tenantId, offer_id: offer.id,
+            round_no: (last?.round_no ?? 0) + 1, side: "seller", amount: counter,
+            note: "Demo fixture güncel satıcı karşı teklifi", created_by: advisorId,
+          }]);
+        }
+      }
+      if (offer.property_id === propByCode("DEMO-014") && offer.status === "accepted") {
+        if (!rounds?.length) {
+          await insertRows("offer_rounds", [{
+            tenant_id: tenantId, offer_id: offer.id, round_no: 1, side: "buyer",
+            amount: offer.amount, note: "Kabul edilen demo teklif", created_by: advisorId,
+          }]);
+        }
+        const candidates = deals.filter((deal) => deal.stage === "won" && deal.property_id === offer.property_id);
+        if (candidates.length !== 1) throw new Error(`DEMO-014 won anlaşma adedi ${candidates.length}; otomatik bağlanmadı`);
+        const { error: linkError } = await admin.from("offers")
+          .update({ deal_id: candidates[0].id })
+          .eq("id", offer.id)
+          .eq("tenant_id", tenantId);
+        if (linkError) throw new Error(`DEMO-014 teklif uzlaştırma: ${linkError.message}`);
+      }
+    }
+  }
 
   // ---------------- Sözleşmeler (1 taslak + 1 imza bekleyen) ----------------
   await section("Sözleşmeler", "contracts", tenantId, 2, async () => {
@@ -617,29 +732,74 @@ async function main() {
     return contracts.length;
   });
 
-  // ---------------- Komisyonlar (tahsil + bekleyen, splits) ----------------
-  await section("Komisyonlar", "commissions", tenantId, 2, async () => {
-    const wonSale = deals.find((d) => d.stage === "won" && d.deal_type === "sale");
-    const negotiation = deals.find((d) => d.stage === "negotiation");
-    if (!wonSale || !negotiation) throw new Error("Komisyon için anlaşma bulunamadı");
-    const rows = [
-      {
-        tenant_id: tenantId, deal_id: wonSale.id, gross_amount: 256000, vat_amount: 51200, status: "paid",
-        splits: [
-          { profile_id: advisorId, name: "Danışman", pct: 50, amount: 128000 },
-          { profile_id: ownerId, name: "Ofis", pct: 50, amount: 128000 },
-        ],
-      },
-      {
-        tenant_id: tenantId, deal_id: negotiation.id, gross_amount: 240000, vat_amount: 48000, status: "calculated",
-        splits: [
-          { profile_id: advisorId, name: "Danışman", pct: 60, amount: 144000 },
-          { profile_id: ownerId, name: "Ofis", pct: 40, amount: 96000 },
-        ],
-      },
-    ];
-    return (await insertRows("commissions", rows)).length;
-  });
+  // ---------------- Komisyonlar (her won + 1 bekleyen örnek) ----------------
+  // Count tabanlı section() burada güvenli değildir: ilk iki komisyon varken
+  // sonraki kazanılmış anlaşmalar sessizce komisyonsuz kalabiliyordu.
+  {
+    // Önceki demo sürümü pipeline'daki negotiation kaydına örnek komisyon
+    // ekliyordu. Bu tenant yalnız deterministik fixture içerir; won olmayan demo
+    // anlaşmalarının finansal ledger satırları yeni invariantta yer almamalı.
+    const nonWonDealIds = deals.filter((deal) => deal.stage !== "won").map((deal) => deal.id);
+    if (nonWonDealIds.length) {
+      const { error: cleanupError } = await admin.from("commissions")
+        .delete()
+        .eq("tenant_id", tenantId)
+        .in("deal_id", nonWonDealIds);
+      if (cleanupError) throw new Error(`Demo won-olmayan komisyon temizliği: ${cleanupError.message}`);
+    }
+    const { data: existingCommissions, error: existingCommissionError } = await admin
+      .from("commissions")
+      .select("deal_id")
+      .eq("tenant_id", tenantId);
+    if (existingCommissionError) {
+      throw new Error(`commissions sorgu: ${existingCommissionError.message}`);
+    }
+    const existingDealIds = new Set(
+      (existingCommissions ?? []).map((commission) => commission.deal_id).filter(Boolean),
+    );
+    const rows = buildMissingWonCommissionRows({
+      tenantId,
+      deals,
+      properties: propsData,
+      existingCommissionDealIds: existingDealIds,
+    });
+
+    const created = (await insertRows("commissions", rows)).length;
+    console.log(`✓ Komisyonlar: ${created} eksik kayıt üretildi`);
+
+    // Fail closed postcondition: seed başarı mesajı, her won anlaşması hem
+    // komisyona hem de işlem türüne uygun kapalı portföy durumuna sahipken verilir.
+    // A partially completed scaffold run may already have inserted a project
+    // unit deal but not its commission. Leave those rows for the explicit unit
+    // reconciliation below; otherwise a rerun would fail before it can repair
+    // the missing unit commission.
+    const propertyStageDeals = deals.filter((deal) => !deal.project_unit_id);
+    const wonDealIds = propertyStageDeals
+      .filter((deal) => deal.stage === "won")
+      .map((deal) => deal.id);
+    const { data: wonCommissions, error: wonCommissionError } = await admin
+      .from("commissions")
+      .select("deal_id")
+      .eq("tenant_id", tenantId)
+      .in("deal_id", wonDealIds);
+    if (wonCommissionError) throw new Error(`Won komisyon doğrulama: ${wonCommissionError.message}`);
+
+    const violations = findDemoWonInvariantViolations({
+      deals: propertyStageDeals,
+      properties: propsData,
+      commissionDealIds: new Set((wonCommissions ?? []).map((commission) => commission.deal_id)),
+    });
+    if (violations.missingCommissionDealIds.length
+        || violations.missingAssetDealIds.length
+        || violations.propertyStatusMismatches.length) {
+      throw new Error(
+        `Demo won invariant ihlali: komisyonsuz=${violations.missingCommissionDealIds.length}, ` +
+          `varlıksız=${violations.missingAssetDealIds.length}, ` +
+          `portföy durumu uyumsuz=${violations.propertyStatusMismatches.length}`,
+      );
+    }
+    console.log(`  ✓ Won invariantları: ${wonDealIds.length} anlaşma doğrulandı`);
+  }
 
   // ---------------- Görevler (bugün + geciken) ----------------
   await section("Görevler", "tasks", tenantId, 6, async () => {
@@ -964,6 +1124,204 @@ async function main() {
     return project.length;
   });
 
+  // ---------------- Core workflow scaffold uzlaştırması ----------------
+  // 120000 scaffold uygulandıysa eski demo fixture'larını yeni atomik ledger'a
+  // taşır. Yalnız demo tenant ve açıkça tanımlı ilişkiler kullanılır; birden
+  // fazla aday varsa tahmin etmek yerine durur.
+  {
+    const { error: scaffoldError } = await admin.from("deals")
+      .select("closure_active, project_unit_id")
+      .eq("tenant_id", tenantId)
+      .limit(1);
+    if (scaffoldError) {
+      console.warn("  Core workflow uzlaştırması atlandı: önce 20260812000000 scaffold uygulanmalı.");
+    } else {
+      const { data: currentWon, error: wonError } = await admin.from("deals")
+        .select("id, stage, deal_value, deal_type, property_id, project_unit_id, customer_id, created_at, updated_at")
+        .eq("tenant_id", tenantId)
+        .eq("stage", "won")
+        .not("property_id", "is", null);
+      if (wonError) throw new Error(`Demo won uzlaştırma sorgusu: ${wonError.message}`);
+      for (const deal of currentWon ?? []) {
+        const property = propsData.find((row) => row.id === deal.property_id);
+        if (!property) throw new Error("Demo won anlaşmanın portföyü bulunamadı");
+        const expected = deal.deal_type === "rent" ? "rented" : "sold";
+        if (property.status !== expected) {
+          // Interrupted rental reconciliation can leave the won rent deal in
+          // place immediately before the property status write. Defer that
+          // exact, provable case to the active-rental repair below; all other
+          // mismatches remain fail-closed here and the final fresh snapshot
+          // validates the repaired state.
+          if (deal.deal_type === "rent" && deal.customer_id) {
+            const { data: repairableRental, error: repairableRentalError } = await admin
+              .from("rentals")
+              .select("id")
+              .eq("tenant_id", tenantId)
+              .eq("property_id", deal.property_id)
+              .eq("renter_customer_id", deal.customer_id)
+              .eq("status", "active")
+              .limit(1)
+              .maybeSingle();
+            if (repairableRentalError) {
+              throw new Error(`Demo kira kesinti uzlaştırma sorgusu: ${repairableRentalError.message}`);
+            }
+            if (repairableRental) continue;
+          }
+          throw new Error(`Demo won portföy durumu uzlaştırılmamış: beklenen=${expected}`);
+        }
+        const { error: closeError } = await admin.from("deals")
+          .update({ closure_active: true, prev_property_status: "live" })
+          .eq("tenant_id", tenantId)
+          .eq("id", deal.id)
+          .eq("stage", "won");
+        if (closeError) throw new Error(`Demo won closure uzlaştırma: ${closeError.message}`);
+      }
+
+      const { data: activeRentals, error: rentalsError } = await admin.from("rentals")
+        .select("id, property_id, renter_customer_id, monthly_rent, status, deal_id")
+        .eq("tenant_id", tenantId)
+        .eq("status", "active");
+      if (rentalsError) throw new Error(`Demo kira uzlaştırma sorgusu: ${rentalsError.message}`);
+      for (const rental of activeRentals ?? []) {
+        const property = propsData.find((row) => row.id === rental.property_id);
+        if (!property) throw new Error("Demo aktif kiranın portföyü bulunamadı");
+        const { data: candidates, error: candidateError } = await admin.from("deals")
+          .select("id, stage, deal_value, deal_type, property_id, project_unit_id, customer_id, created_at, updated_at")
+          .eq("tenant_id", tenantId)
+          .eq("property_id", rental.property_id)
+          .eq("customer_id", rental.renter_customer_id)
+          .eq("deal_type", "rent")
+          .eq("stage", "won");
+        if (candidateError) throw new Error(`Demo kira anlaşma sorgusu: ${candidateError.message}`);
+        if ((candidates?.length ?? 0) > 1) throw new Error("Demo kira için birden fazla won anlaşma var; otomatik uzlaştırılmadı");
+        let deal = candidates?.[0];
+        if (!deal) {
+          const { data: inserted, error: insertError } = await admin.from("deals").insert({
+            tenant_id: tenantId,
+            property_id: rental.property_id,
+            customer_id: rental.renter_customer_id,
+            deal_type: "rent",
+            stage: "won",
+            deal_value: rental.monthly_rent,
+            probability: 100,
+            assigned_to: advisorId,
+            prev_property_status: "live",
+            closure_active: true,
+          }).select("id, stage, deal_value, deal_type, property_id, project_unit_id, customer_id, created_at, updated_at").single();
+          if (insertError || !inserted) throw new Error(`Demo kira anlaşması: ${insertError?.message}`);
+          deal = inserted;
+        } else {
+          const { error: dealUpdateError } = await admin.from("deals")
+            .update({ closure_active: true, prev_property_status: "live" })
+            .eq("tenant_id", tenantId)
+            .eq("id", deal.id);
+          if (dealUpdateError) throw new Error(`Demo kira closure: ${dealUpdateError.message}`);
+        }
+        const { data: commission } = await admin.from("commissions")
+          .select("id").eq("tenant_id", tenantId).eq("deal_id", deal.id).maybeSingle();
+        if (!commission) {
+          await insertRows("commissions", [buildDemoCommissionRow({
+            tenantId, deal, property, status: "paid", createdAt: deal.updated_at ?? deal.created_at,
+          })]);
+        }
+        const { error: rentalUpdateError } = await admin.from("rentals")
+          .update({ deal_id: deal.id, prev_property_status: "live" })
+          .eq("tenant_id", tenantId).eq("id", rental.id).eq("status", "active");
+        if (rentalUpdateError) throw new Error(`Demo kira bağlantısı: ${rentalUpdateError.message}`);
+        const { error: propertyUpdateError } = await admin.from("properties")
+          .update({ status: "rented" }).eq("tenant_id", tenantId).eq("id", rental.property_id);
+        if (propertyUpdateError) throw new Error(`Demo kira portföy durumu: ${propertyUpdateError.message}`);
+        const customer = customers.find((row) => row.id === rental.renter_customer_id);
+        const types = Array.isArray(customer?.customer_types) ? customer.customer_types : [];
+        if (!types.includes("Kiracı")) {
+          const { error: tagError } = await admin.from("customers")
+            .update({ customer_types: [...types, "Kiracı"] })
+            .eq("tenant_id", tenantId).eq("id", rental.renter_customer_id);
+          if (tagError) throw new Error(`Demo kiracı etiketi: ${tagError.message}`);
+        }
+      }
+
+      const { data: soldUnits, error: unitsError } = await admin.from("project_units")
+        .select("id, project_id, customer_id, list_price, status, sold_at")
+        .eq("tenant_id", tenantId).eq("status", "sold");
+      if (unitsError) throw new Error(`Demo proje satışı sorgusu: ${unitsError.message}`);
+      for (const unit of soldUnits ?? []) {
+        if (!unit.customer_id || !unit.sold_at || Number(unit.list_price) <= 0) {
+          throw new Error("Demo sold proje dairesinin müşteri/tutar/tarih bilgisi eksik");
+        }
+        const { data: candidates, error: candidateError } = await admin.from("deals")
+          .select("id, stage, deal_value, deal_type, property_id, project_unit_id, customer_id, created_at, updated_at")
+          .eq("tenant_id", tenantId).eq("project_unit_id", unit.id).eq("stage", "won");
+        if (candidateError) throw new Error(`Demo proje anlaşma sorgusu: ${candidateError.message}`);
+        if ((candidates?.length ?? 0) > 1) throw new Error("Demo proje dairesi için birden fazla won anlaşma var");
+        let deal = candidates?.[0];
+        if (!deal) {
+          const { data: inserted, error: insertError } = await admin.from("deals").insert({
+            tenant_id: tenantId, project_unit_id: unit.id, property_id: null,
+            customer_id: unit.customer_id, deal_type: "sale", stage: "won",
+            deal_value: unit.list_price, probability: 100, assigned_to: advisorId,
+            closure_active: true,
+          }).select("id, stage, deal_value, deal_type, property_id, project_unit_id, customer_id, created_at, updated_at").single();
+          if (insertError || !inserted) throw new Error(`Demo proje anlaşması: ${insertError?.message}`);
+          deal = inserted;
+        }
+        const { data: commission } = await admin.from("commissions")
+          .select("id").eq("tenant_id", tenantId).eq("deal_id", deal.id).maybeSingle();
+        if (!commission) {
+          await insertRows("commissions", [buildDemoCommissionRow({
+            tenantId,
+            deal,
+            property: { id: unit.id, status: "sold", list_price: unit.list_price, commission_rate: 3 },
+            status: "paid",
+            createdAt: unit.sold_at,
+          })]);
+        }
+      }
+
+      // Re-read after inserts so a second seed run and the first run validate
+      // the same authoritative ledger instead of an earlier deal snapshot.
+      const { data: finalDeals, error: finalDealsError } = await admin.from("deals")
+        .select("id, stage, deal_value, deal_type, property_id, project_unit_id, customer_id, created_at, updated_at")
+        .eq("tenant_id", tenantId);
+      const { data: finalCommissions, error: finalCommissionsError } = await admin.from("commissions")
+        .select("deal_id").eq("tenant_id", tenantId);
+      const { data: finalProperties, error: finalPropertiesError } = await admin.from("properties")
+        .select("id, property_code, status, list_price, commission_rate")
+        .eq("tenant_id", tenantId);
+      if (finalDealsError || finalCommissionsError || finalPropertiesError) {
+        throw new Error(
+          `Demo core postcondition okunamadı: ${finalDealsError?.message
+            ?? finalCommissionsError?.message
+            ?? finalPropertiesError?.message}`,
+        );
+      }
+      const finalCommissionDealIds = new Set((finalCommissions ?? []).map((row) => row.deal_id));
+      const wonViolations = findDemoWonInvariantViolations({
+        deals: finalDeals ?? [], properties: finalProperties ?? [], commissionDealIds: finalCommissionDealIds,
+      });
+      const unitViolations = findDemoProjectUnitInvariantViolations({
+        units: soldUnits ?? [], deals: finalDeals ?? [], commissionDealIds: finalCommissionDealIds,
+      });
+      if (wonViolations.missingCommissionDealIds.length
+          || wonViolations.missingAssetDealIds.length
+          || wonViolations.propertyStatusMismatches.length
+          || unitViolations.unitDealCountMismatches.length
+          || unitViolations.customerMismatches.length
+          || unitViolations.financialMismatches.length
+          || unitViolations.dealUnitMismatches.length
+          || unitViolations.missingCommissionDealIds.length) {
+        throw new Error(
+          `Demo core invariant ihlali: won_commission=${wonViolations.missingCommissionDealIds.length}, ` +
+          `won_asset=${wonViolations.missingAssetDealIds.length}, property=${wonViolations.propertyStatusMismatches.length}, ` +
+          `unit_deal=${unitViolations.unitDealCountMismatches.length}, unit_customer=${unitViolations.customerMismatches.length}, ` +
+          `unit_financial=${unitViolations.financialMismatches.length}, unit_reverse=${unitViolations.dealUnitMismatches.length}, ` +
+          `unit_commission=${unitViolations.missingCommissionDealIds.length}`,
+        );
+      }
+      console.log("  ✓ Core workflow demo fixture'ları scaffold üzerinde uzlaştırıldı");
+    }
+  }
+
   // ---------------- Hedefler (bu ay: danışman + ofis) ----------------
   await section("Hedefler", "targets", tenantId, 2, async () => {
     const rows = [
@@ -1260,7 +1618,8 @@ async function main() {
 
   console.log("— Demo veri üretimi tamamlandı —");
   console.log(`Tenant: ${DEMO_TENANT_NAME} (${DEMO_TENANT_SLUG}) · ${tenantId}`);
-  console.log(`Giriş: ${PERSONAS.map((p) => p.email).join(" / ")} · parola: ${DEMO_PASSWORD}`);
+  console.log(`Giriş kimlikleri hazır: ${PERSONAS.map((p) => p.email).join(" / ")}`);
+  console.log("Parola gösterilmez; tek-tuş demo girişi veya aynı sunucu sırrı kullanılır.");
   void gmId; // gm profili giriş için hazırlanır; veri üretiminde doğrudan kullanılmaz
 }
 

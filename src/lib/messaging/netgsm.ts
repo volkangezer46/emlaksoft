@@ -9,6 +9,22 @@
  */
 
 import { getPlatformSetting } from "@/lib/platform-settings";
+import {
+  discardExternalResponse,
+  fetchExternal,
+  readExternalJson,
+  readExternalText,
+} from "@/lib/external-fetch";
+import {
+  normalizeProviderBaseUrl,
+  providerAllowedHosts,
+} from "@/lib/integrations/provider-url";
+import { isAmbiguousWhatsAppHttpStatus } from "@/lib/messaging/whatsapp-contract";
+
+const PROVIDER_TIMEOUT_MS = 10_000;
+const WHATSAPP_MAX_RESPONSE_BYTES = 256 * 1024;
+const NETGSM_MAX_RESPONSE_BYTES = 64 * 1024;
+const WHATSAPP_GRAPH_ORIGIN = "https://graph.facebook.com";
 
 export type NetgsmConfig = {
   usercode: string;
@@ -68,6 +84,15 @@ export async function sendSms(to: string, text: string): Promise<SmsSendResult> 
   const cfg = await getNetgsmConfig();
   if (!cfg) return { ok: false, error: "Netgsm yapılandırılmamış." };
 
+  return sendSmsWithConfig(cfg, to, text);
+}
+
+/** Server-only tenant callers can provide an already isolated Netgsm config. */
+export async function sendSmsWithConfig(
+  cfg: NetgsmConfig,
+  to: string,
+  text: string,
+): Promise<SmsSendResult> {
   const phone = normalizePhone(to);
   if (!phone) return { ok: false, error: "Geçersiz telefon numarası." };
 
@@ -109,7 +134,71 @@ export type WhatsAppSendResult = {
   ok: boolean;
   messageId?: string;
   error?: string;
+  code?: string;
 };
+
+export type WhatsAppTemplateMessage = {
+  name: string;
+  language: string;
+  /** A campaign template may expose at most one text parameter in its body. */
+  bodyParameter?: string;
+};
+
+export type WhatsAppConfig = {
+  apiUrl: string;
+  apiToken: string;
+};
+
+function configuredWhatsAppOrigins(): Set<string> {
+  const origins = new Set([WHATSAPP_GRAPH_ORIGIN]);
+  for (const raw of (process.env.WHATSAPP_ALLOWED_API_ORIGINS ?? "").split(",")) {
+    const candidate = raw.trim();
+    if (!candidate) continue;
+    try {
+      const parsed = new URL(candidate);
+      const normalized = normalizeProviderBaseUrl(
+        candidate,
+        providerAllowedHosts([parsed.hostname]),
+      );
+      if (normalized === parsed.origin) origins.add(parsed.origin.toLowerCase());
+    } catch {
+      // Invalid deployment allow-list entries fail closed.
+    }
+  }
+  return origins;
+}
+
+export function normalizeAllowedWhatsAppApiUrl(rawUrl: string): string | null {
+  try {
+    const origins = configuredWhatsAppOrigins();
+    const normalized = normalizeProviderBaseUrl(
+      rawUrl,
+      providerAllowedHosts([...origins].map((origin) => new URL(origin).hostname)),
+    );
+    if (!normalized) return null;
+    return origins.has(new URL(normalized).origin) ? normalized : null;
+  } catch {
+    return null;
+  }
+}
+
+export function isAllowedWhatsAppApiUrl(rawUrl: string): boolean {
+  return normalizeAllowedWhatsAppApiUrl(rawUrl) != null;
+}
+
+export async function getWhatsAppConfig(): Promise<WhatsAppConfig | null> {
+  const [apiUrl, apiToken] = await Promise.all([
+    getPlatformSetting("whatsapp_api_url"),
+    getPlatformSetting("whatsapp_api_token"),
+  ]);
+
+  const url = apiUrl ?? process.env.WHATSAPP_API_URL ?? "";
+  const token = apiToken ?? process.env.WHATSAPP_API_TOKEN ?? "";
+  const normalizedUrl = normalizeAllowedWhatsAppApiUrl(url);
+  return normalizedUrl && token
+    ? { apiUrl: normalizedUrl, apiToken: token }
+    : null;
+}
 
 /**
  * WhatsApp mesajı gönderir.
@@ -120,45 +209,169 @@ export async function sendWhatsApp(
   to: string,
   text: string,
 ): Promise<WhatsAppSendResult> {
-  const [apiUrl, apiToken] = await Promise.all([
-    getPlatformSetting("whatsapp_api_url"),
-    getPlatformSetting("whatsapp_api_token"),
-  ]);
-
-  const url = apiUrl ?? process.env.WHATSAPP_API_URL ?? "";
-  const token = apiToken ?? process.env.WHATSAPP_API_TOKEN ?? "";
-
-  if (!url || !token) {
+  const config = await getWhatsAppConfig();
+  if (!config) {
     return { ok: false, error: "WhatsApp API yapılandırılmamış." };
   }
 
+  return sendWhatsAppWithConfig(config, to, text);
+}
+
+export async function sendWhatsAppWithConfig(
+  config: WhatsAppConfig,
+  to: string,
+  text: string,
+): Promise<WhatsAppSendResult> {
   const phone = normalizePhone(to);
   if (!phone) return { ok: false, error: "Geçersiz telefon numarası." };
+  const apiUrl = normalizeAllowedWhatsAppApiUrl(config.apiUrl);
+  if (!apiUrl) {
+    return { ok: false, code: "provider_config_invalid", error: "WhatsApp API adresi geçersiz." };
+  }
 
+  let res: Response;
   try {
-    const res = await fetch(url, {
+    res = await fetchExternal(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${config.apiToken}`,
       },
       body: JSON.stringify({
         to: `90${phone}`,  // Uluslararası format
         type: "text",
         text: { body: text },
       }),
-    });
+      redirect: "error",
+    }, { timeoutMs: PROVIDER_TIMEOUT_MS });
 
     if (!res.ok) {
-      const body = await res.text();
-      return { ok: false, error: `API hatası: ${res.status} ${body.slice(0, 100)}` };
+      await discardExternalResponse(res);
+      if (isAmbiguousWhatsAppHttpStatus(res.status)) {
+        return {
+          ok: false,
+          code: "unknown_provider_outcome",
+          error: "WhatsApp gönderim sonucu belirsiz; manuel mutabakat gerekli.",
+        };
+      }
+      return { ok: false, code: `http_${res.status}`, error: `WhatsApp sağlayıcısı HTTP ${res.status} hatası döndürdü.` };
     }
 
-    const data = await res.json() as { messages?: { id: string }[] };
-    return { ok: true, messageId: data.messages?.[0]?.id };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Bağlantı hatası." };
+    const data = await readExternalJson<{ messages?: Array<{ id?: unknown }> }>(
+      res,
+      WHATSAPP_MAX_RESPONSE_BYTES,
+    );
+    const messageId = data.messages?.[0]?.id;
+    return typeof messageId === "string" && messageId.length <= 2_048
+      ? { ok: true, messageId }
+      : {
+          ok: false,
+          code: "unknown_provider_outcome",
+          error: "WhatsApp kabul yanıtı teslimat kimliği içermedi; manuel mutabakat gerekli.",
+        };
+  } catch {
+    return {
+      ok: false,
+      code: "unknown_provider_outcome",
+      error: "WhatsApp gönderim sonucu belirsiz; otomatik tekrar güvenli değil.",
+    };
   }
+}
+
+export function isValidWhatsAppTemplateMessage(
+  template: WhatsAppTemplateMessage,
+): boolean {
+  return /^[a-z0-9_]{1,512}$/.test(template.name) &&
+    /^[a-z]{2,3}(?:_[A-Z]{2})?$/.test(template.language) &&
+    (template.bodyParameter === undefined || template.bodyParameter.length <= 612);
+}
+
+/**
+ * Sends a business-initiated WhatsApp message through Meta's approved-template
+ * contract. Campaign code must use this path and must never downgrade to text.
+ */
+export async function sendWhatsAppTemplateWithConfig(
+  config: WhatsAppConfig,
+  to: string,
+  template: WhatsAppTemplateMessage,
+): Promise<WhatsAppSendResult> {
+  const phone = normalizePhone(to);
+  if (!phone) return { ok: false, code: "invalid_phone", error: "Geçersiz telefon numarası." };
+  const apiUrl = normalizeAllowedWhatsAppApiUrl(config.apiUrl);
+  if (!apiUrl) {
+    return { ok: false, code: "provider_config_invalid", error: "WhatsApp API adresi geçersiz." };
+  }
+  if (!isValidWhatsAppTemplateMessage(template)) {
+    return {
+      ok: false,
+      code: "whatsapp_template_invalid",
+      error: "WhatsApp kampanya şablonu geçersiz.",
+    };
+  }
+
+  const components = template.bodyParameter
+    ? [{
+        type: "body",
+        parameters: [{ type: "text", text: template.bodyParameter }],
+      }]
+    : undefined;
+
+  let res: Response;
+  try {
+    res = await fetchExternal(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.apiToken}`,
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: `90${phone}`,
+        type: "template",
+        template: {
+          name: template.name,
+          language: { code: template.language },
+          ...(components ? { components } : {}),
+        },
+      }),
+      redirect: "error",
+    }, { timeoutMs: PROVIDER_TIMEOUT_MS });
+  } catch {
+    return {
+      ok: false,
+      code: "unknown_provider_outcome",
+      error: "WhatsApp gönderim sonucu belirsiz; otomatik tekrar güvenli değil.",
+    };
+  }
+
+  if (!res.ok) {
+    await discardExternalResponse(res);
+    if (isAmbiguousWhatsAppHttpStatus(res.status)) {
+      return {
+        ok: false,
+        code: "unknown_provider_outcome",
+        error: "WhatsApp gönderim sonucu belirsiz; manuel mutabakat gerekli.",
+      };
+    }
+    return {
+      ok: false,
+      code: `http_${res.status}`,
+      error: `WhatsApp sağlayıcısı HTTP ${res.status} hatası döndürdü.`,
+    };
+  }
+
+  const data = await readExternalJson<{
+    messages?: Array<{ id?: string }>;
+  }>(res, WHATSAPP_MAX_RESPONSE_BYTES).catch(() => null);
+  const messageId = data?.messages?.[0]?.id;
+  return messageId && messageId.length <= 2_048
+    ? { ok: true, messageId }
+    : {
+        ok: false,
+        code: "unknown_provider_outcome",
+        error: "WhatsApp kabul yanıtı teslimat kimliği içermedi; manuel mutabakat gerekli.",
+      };
 }
 
 // ---------------------------------------------------------------------------
@@ -204,13 +417,18 @@ function buildSingleXml(cfg: NetgsmConfig, phones: string[], text: string): stri
 
 async function postXml(xml: string): Promise<SmsSendResult> {
   try {
-    const res = await fetch("https://api.netgsm.com.tr/sms/send/xml", {
+    const res = await fetchExternal("https://api.netgsm.com.tr/sms/send/xml", {
       method: "POST",
       headers: { "Content-Type": "text/xml; charset=UTF-8" },
       body: xml,
-    });
+      redirect: "error",
+    }, { timeoutMs: PROVIDER_TIMEOUT_MS });
 
-    const text = await res.text();
+    if (!res.ok) {
+      await discardExternalResponse(res);
+      return { ok: false, code: `http_${res.status}`, error: `Netgsm HTTP ${res.status} hatası döndürdü.` };
+    }
+    const text = await readExternalText(res, NETGSM_MAX_RESPONSE_BYTES);
     // Netgsm başarılı yanıt: "00 JOBID" veya sadece "00"
     // Hata yanıtları: "20", "30", "40", "50", "51", "70", "85"
     const parts = text.trim().split(" ");
@@ -221,8 +439,8 @@ async function postXml(xml: string): Promise<SmsSendResult> {
     }
 
     return { ok: false, code, error: netgsmErrorMessage(code) };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Bağlantı hatası." };
+  } catch {
+    return { ok: false, code: "transport_error", error: "Netgsm sağlayıcısına erişilemedi." };
   }
 }
 

@@ -1,13 +1,11 @@
-# gitleaks yapılandırması — varsayılan kural setini kullanır, yalnızca bilinen
-# yanlış-pozitif gürültüyü eler. Amaç: gerçek API anahtarı/secret koda sızarsa
-# CI'ı kırmak; lock dosyası entropi gürültüsünde kırmamak.
+title = "EmlakSoft secret scanning"
 
 [extend]
 useDefault = true
 
-[allowlist]
-description = "Bilinen yanlış-pozitifler"
-paths = [
-  '''package-lock\.json''',
-  '''.*\.lock''',
-]
+[[rules]]
+id = "database-connection-url"
+description = "Database connection URL assigned in an environment file"
+regex = '''(?i)DATABASE(_POOLER)?_URL[ \t]*=[ \t]*["']?([^[:space:]"'#]+)'''
+secretGroup = 2
+keywords = ["DATABASE_URL", "DATABASE_POOLER_URL"]

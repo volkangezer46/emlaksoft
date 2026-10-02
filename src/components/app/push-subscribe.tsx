@@ -83,10 +83,10 @@ export function PushSubscribeToggle() {
       type="button"
       disabled={pending}
       onClick={toggle}
-      className="flex w-full items-center gap-3 rounded-[12px] border border-dashed border-line-strong bg-canvas/50 px-3 py-3 text-left transition hover:border-brand-300 disabled:opacity-60"
+      className="flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-dashed border-line-strong bg-canvas/50 px-3 py-3 text-left transition hover:border-brand-300 disabled:opacity-60"
     >
       <span
-        className={`grid h-9 w-9 place-items-center rounded-[10px] ${
+        className={`grid h-9 w-9 place-items-center rounded-[var(--radius-control)] ${
           subscribed ? "bg-mint-500/12 text-mint-600" : "bg-brand-600/10 text-brand-600"
         }`}
       >
@@ -96,7 +96,7 @@ export function PushSubscribeToggle() {
         <span className="block text-sm font-semibold text-ink-950">
           {subscribed ? "Bu cihazda push açık" : "Bu cihazda push bildirimi aç"}
         </span>
-        <span className="block text-[11px] text-text-muted">
+        <span className="block text-xs text-text-muted">
           Tarayıcı kapalıyken de anlık bildirim al (PWA)
         </span>
       </span>

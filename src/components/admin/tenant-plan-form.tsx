@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { setTenantPlanStatus } from "@/app/actions/platform";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { updateTenantPlanStatus } from "@/app/actions/platform";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const selectCls =
-  "rounded-[9px] border border-line bg-canvas px-2 py-1.5 text-xs font-semibold outline-none focus:border-brand-400";
+  "rounded-[var(--radius-control)] border border-line bg-canvas px-2 py-1.5 text-xs font-semibold outline-none focus:border-brand-400";
 const submitCls =
-  "rounded-[9px] bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-ink-800";
+  "rounded-[var(--radius-control)] bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-ink-800";
 
 /** Erişimi kesen durum geçişleri — onaysız kaydedilemez. */
 const DESTRUCTIVE_STATUS: Record<string, { title: string; description: string; confirmLabel: string }> = {
@@ -44,8 +45,30 @@ export function TenantPlanForm({
 }) {
   const [plan, setPlan] = useState(currentPlan);
   const [status, setStatus] = useState(currentStatus);
+  const [feedback, setFeedback] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
 
   const destructive = status !== currentStatus ? DESTRUCTIVE_STATUS[status] : undefined;
+
+  async function saveSelection() {
+    setFeedback(null);
+    const formData = new FormData();
+    formData.set("id", tenantId);
+    formData.set("plan", plan);
+    formData.set("status", status);
+    try {
+      const result = await updateTenantPlanStatus(formData);
+      if (!result.ok) {
+        setFeedback({ kind: "error", text: result.error ?? "Abonelik güncellenemedi." });
+        return;
+      }
+      setFeedback({ kind: "success", text: "Paket ve abonelik durumu güncellendi." });
+      router.refresh();
+    } catch {
+      setFeedback({ kind: "error", text: "İşlem sırasında bağlantı kesildi. Lütfen tekrar deneyin." });
+    }
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -79,19 +102,27 @@ export function TenantPlanForm({
           title={destructive.title}
           description={`${tenantName} — ${destructive.description}`}
           confirmLabel={destructive.confirmLabel}
-          formAction={setTenantPlanStatus}
-          hiddenFields={{ id: tenantId, plan, status }}
+          onConfirm={saveSelection}
         />
       ) : (
-        <form action={setTenantPlanStatus}>
-          <input type="hidden" name="id" value={tenantId} />
-          <input type="hidden" name="plan" value={plan} />
-          <input type="hidden" name="status" value={status} />
-          <button type="submit" className={submitCls}>
-            Kaydet
-          </button>
-        </form>
+        <button
+          type="button"
+          className={submitCls}
+          disabled={pending}
+          onClick={() => startTransition(saveSelection)}
+        >
+          {pending ? "Kaydediliyor…" : "Kaydet"}
+        </button>
       )}
+      {feedback ? (
+        <p
+          className={`w-full text-xs font-semibold ${feedback.kind === "error" ? "text-danger-500" : "text-mint-600"}`}
+          role={feedback.kind === "error" ? "alert" : "status"}
+          aria-live="polite"
+        >
+          {feedback.text}
+        </p>
+      ) : null}
     </div>
   );
 }

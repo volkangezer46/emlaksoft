@@ -37,7 +37,7 @@ export function AiContentPanel({ propertyId }: { propertyId: string }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+    <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
         <div>
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -46,7 +46,7 @@ export function AiContentPanel({ propertyId }: { propertyId: string }) {
           <p className="text-xs text-text-muted">İlan, WhatsApp, sosyal medya ve e-posta metnini tek tıkla üret.</p>
         </div>
         {source ? (
-          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${source === "ai" ? "bg-cyan-400/12 text-cyan-600" : "bg-ink-950/8 text-text-muted"}`}>
+          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${source === "ai" ? "bg-cyan-400/12 text-cyan-600" : "bg-ink-950/8 text-text-muted"}`}>
             {source === "ai" ? "AI üretti" : "Akıllı şablon"}
           </span>
         ) : null}
@@ -60,7 +60,7 @@ export function AiContentPanel({ propertyId }: { propertyId: string }) {
               type="button"
               onClick={() => run(t.key)}
               disabled={pending}
-              className={`inline-flex items-center gap-1.5 rounded-[10px] border px-3 py-2 text-xs font-semibold transition disabled:opacity-60 ${
+              className={`inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border px-3 py-2 text-xs font-semibold transition disabled:opacity-60 ${
                 tab === t.key ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-700" : "border-line bg-canvas text-ink-950 hover:border-brand-300"
               }`}
             >
@@ -79,7 +79,7 @@ export function AiContentPanel({ propertyId }: { propertyId: string }) {
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={10}
-              className="w-full rounded-[12px] border border-line bg-canvas p-4 text-sm leading-relaxed text-ink-950 outline-none focus:border-cyan-400"
+              className="w-full rounded-[var(--radius-card)] border border-line bg-canvas p-4 text-sm leading-relaxed text-ink-950 outline-none focus:border-cyan-400"
             />
             <button
               type="button"
@@ -88,14 +88,14 @@ export function AiContentPanel({ propertyId }: { propertyId: string }) {
                 setCopied(true);
                 setTimeout(() => setCopied(false), 1500);
               }}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-[10px] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-800"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-800"
             >
               {copied ? <Check className="h-4 w-4 text-mint-400" /> : <Copy className="h-4 w-4" />}
               {copied ? "Kopyalandı" : "Kopyala"}
             </button>
           </div>
         ) : (
-          <p className="mt-4 rounded-[12px] border border-dashed border-line bg-canvas/50 px-4 py-8 text-center text-sm text-text-muted">
+          <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line bg-canvas/50 px-4 py-8 text-center text-sm text-text-muted">
             Bir içerik türü seçin, portföy bilgilerinden otomatik metin üretelim.
           </p>
         )}

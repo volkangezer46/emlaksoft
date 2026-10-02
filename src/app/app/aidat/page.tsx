@@ -28,9 +28,9 @@ const DONEM_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const PAGE_SIZE = 50;
 
 const PAGER_BTN =
-  "focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+  "focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
 const PAGER_BTN_DISABLED =
-  "inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
+  "inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
 /** ?donem=YYYY-MM için sonraki ayın ilk gününü döndürür (period aralığı için). */
 function nextMonthFirst(ym: string): string {
@@ -106,15 +106,21 @@ export default async function AidatPage({
   // ---- KPI toplamları: DB'de TAM SUM (aidat_kpi RPC) — önceki 2000-satır havuz
   //      yaklaşıktı ve büyük ofiste eksik sayardı. Geciken ŞERİDİ için ayrı odaklı
   //      sorgu (en yakın vadeli ilk 20 geciken); tüm havuzu çekmeye gerek yok.
-  const overdueStripQuery = supabase
+  let overdueStripQuery = supabase
     .from("property_dues")
     .select("id, title, amount, period, due_date, status, property:properties(id, property_code, title)")
     .neq("status", "paid")
     .lte("due_date", todayStr)
     .order("due_date", { ascending: true })
     .limit(20);
+  if (tenantId) overdueStripQuery = overdueStripQuery.eq("tenant_id", tenantId);
 
-  const [{ data: listData, count: listCount }, kpiRes, { data: overdueStripData }, { data: propData }] = await Promise.all([
+  const [
+    { data: listData, count: listCount, error: listError },
+    kpiRes,
+    { data: overdueStripData, error: overdueStripError },
+    { data: propData, error: propertiesError },
+  ] = await Promise.all([
     listQuery,
     supabase.rpc("aidat_kpi"),
     overdueStripQuery,
@@ -125,6 +131,14 @@ export default async function AidatPage({
       .order("created_at", { ascending: false })
       .limit(300),
   ]);
+
+  const readFailures = [listError, kpiRes.error, overdueStripError, propertiesError].filter(Boolean);
+  if (readFailures.length > 0) {
+    console.error("aidat page data load failed", {
+      codes: readFailures.map((error) => error?.code || "unknown"),
+    });
+    throw new Error("Aidat verileri güvenli şekilde yüklenemedi.");
+  }
 
   const filteredDues = (listData ?? []) as unknown as DueLite[];
   const properties = (propData ?? []).map((p) => ({ id: p.id as string, property_code: p.property_code as string, title: p.title as string | null }));
@@ -154,7 +168,7 @@ export default async function AidatPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-amber-400/20 blur-[70px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -168,7 +182,7 @@ export default async function AidatPage({
             <Link
               href={href({ durum: "paid" })}
               aria-current={durumF === "paid" ? "page" : undefined}
-              className={`focus-ring press lift group block rounded-[14px] border p-3 text-center transition hover:border-white/30 ${
+              className={`focus-ring press lift group block rounded-[var(--radius-card)] border p-3 text-center transition hover:border-white/30 ${
                 durumF === "paid" ? "border-white/35 bg-white/12" : "border-white/12 bg-white/8"
               }`}
             >
@@ -177,7 +191,7 @@ export default async function AidatPage({
                 %{collectionRate}
                 <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
               </p>
-              <p className="text-[11px] text-white/60">Tahsilat oranı</p>
+              <p className="text-xs text-white/60">Tahsilat oranı</p>
               {/* Mini ilerleme çubuğu — tutar bazlı tahsilat */}
               <div className="mx-auto mt-1.5 h-1 w-full max-w-[72px] overflow-hidden rounded-full bg-white/15">
                 <div className="h-full rounded-full bg-mint-400" style={{ width: `${collectionRate}%` }} />
@@ -185,7 +199,7 @@ export default async function AidatPage({
             </Link>
             <Link
               href={href({ durum: null })}
-              className={`focus-ring press lift group block rounded-[14px] border p-3 text-center transition hover:border-white/30 ${
+              className={`focus-ring press lift group block rounded-[var(--radius-card)] border p-3 text-center transition hover:border-white/30 ${
                 durumF === "" ? "border-white/35 bg-white/12" : "border-white/12 bg-white/8"
               }`}
             >
@@ -194,12 +208,12 @@ export default async function AidatPage({
                 {money(total)}
                 <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
               </p>
-              <p className="text-[11px] text-white/60">Toplam</p>
+              <p className="text-xs text-white/60">Toplam</p>
             </Link>
             <Link
               href={href({ durum: "unpaid" })}
               aria-current={durumF === "unpaid" ? "page" : undefined}
-              className={`focus-ring press lift group block rounded-[14px] border p-3 text-center transition hover:border-white/30 ${
+              className={`focus-ring press lift group block rounded-[var(--radius-card)] border p-3 text-center transition hover:border-white/30 ${
                 durumF === "unpaid" ? "border-white/35 bg-white/12" : "border-white/12 bg-white/8"
               }`}
             >
@@ -208,12 +222,12 @@ export default async function AidatPage({
                 {money(unpaid)}
                 <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
               </p>
-              <p className="text-[11px] text-white/60">Bekleyen</p>
+              <p className="text-xs text-white/60">Bekleyen</p>
             </Link>
             <Link
               href={href({ durum: "overdue" })}
               aria-current={durumF === "overdue" ? "page" : undefined}
-              className={`focus-ring press lift group block rounded-[14px] border p-3 text-center transition hover:border-white/30 ${
+              className={`focus-ring press lift group block rounded-[var(--radius-card)] border p-3 text-center transition hover:border-white/30 ${
                 durumF === "overdue" ? "border-white/35 bg-white/12" : "border-white/12 bg-white/8"
               }`}
             >
@@ -222,7 +236,7 @@ export default async function AidatPage({
                 {overdue}
                 <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
               </p>
-              <p className="text-[11px] text-white/60">Gecikmiş</p>
+              <p className="text-xs text-white/60">Gecikmiş</p>
             </Link>
           </div>
         </div>
@@ -231,17 +245,17 @@ export default async function AidatPage({
       {/* Geciken ödemeler şeridi — vadesi geçmiş kayıtlar, en eski vade önce.
           Kart portföye (varsa) gider; başlık linki listeyi ?durum=overdue süzer. */}
       {overdue > 0 ? (
-        <section className="overflow-hidden rounded-[18px] border border-danger-500/25 bg-danger-50/60 shadow-[var(--shadow-xs)]">
+        <section className="overflow-hidden rounded-[var(--radius-panel)] border border-danger-500/25 bg-danger-50/60 shadow-[var(--shadow-xs)]">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-danger-500/15 px-4 py-3">
             <p className="flex items-center gap-2 text-sm font-bold text-danger-600">
               <AlertTriangle className="h-4 w-4" /> Geciken ödemeler
-              <span className="rounded-full bg-danger-500/10 px-2 py-0.5 text-[11px] font-bold text-danger-600">
+              <span className="rounded-full bg-danger-500/10 px-2 py-0.5 text-xs font-bold text-danger-600">
                 {overdue} kayıt · {money(overdueTotal)}
               </span>
             </p>
             <Link
               href={href({ durum: "overdue" })}
-              className="focus-ring inline-flex items-center gap-1 rounded-[8px] text-xs font-semibold text-danger-600 transition hover:text-danger-700 hover:underline"
+              className="focus-ring inline-flex items-center gap-1 rounded-[var(--radius-control)] text-xs font-semibold text-danger-600 transition hover:text-danger-700 hover:underline"
             >
               Tümünü listede gör <ArrowUpRight className="h-3.5 w-3.5" />
             </Link>
@@ -255,18 +269,18 @@ export default async function AidatPage({
                 <Link
                   key={d.id}
                   href={target}
-                  className="focus-ring press lift group block min-w-[210px] shrink-0 rounded-[14px] border border-danger-500/20 bg-surface p-3 transition hover:border-danger-500/40"
+                  className="focus-ring press lift group block min-w-[210px] shrink-0 rounded-[var(--radius-card)] border border-danger-500/20 bg-surface p-3 transition hover:border-danger-500/40"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className="truncate text-sm font-semibold text-ink-950">{d.title}</p>
                     <ArrowUpRight className="hover-action h-3.5 w-3.5 shrink-0 text-text-faint opacity-0 transition group-hover:text-danger-500 group-hover:opacity-100" />
                   </div>
-                  <p className="mt-0.5 truncate text-[11px] text-text-muted">
+                  <p className="mt-0.5 truncate text-xs text-text-muted">
                     {prop ? (prop.title ?? prop.property_code) : "Portföysüz kayıt"}
                   </p>
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <span className="numeric font-display text-sm font-extrabold text-ink-950">{money(Number(d.amount))}</span>
-                    <span className="rounded-full bg-danger-500/10 px-2 py-0.5 text-[10px] font-bold text-danger-600">
+                    <span className="rounded-full bg-danger-500/10 px-2 py-0.5 text-xs font-bold text-danger-600">
                       {gecikmeGun} gün gecikti
                     </span>
                   </div>
@@ -278,7 +292,7 @@ export default async function AidatPage({
       ) : null}
 
       {/* Dönem (ay) filtresi — GET formu (?donem=YYYY-MM); ?durum= korunur */}
-      <form action="/app/aidat" className="flex flex-wrap items-center gap-2 rounded-[16px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+      <form action="/app/aidat" className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
         {durumF ? <input type="hidden" name="durum" value={durumF} /> : null}
         <span className="flex items-center gap-1.5 text-xs font-semibold text-text-muted"><CalendarRange className="h-3.5 w-3.5" /> Dönem:</span>
         <input
@@ -286,13 +300,13 @@ export default async function AidatPage({
           type="month"
           defaultValue={donemF}
           aria-label="Dönem (ay) filtresi"
-          className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
+          className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
         />
-        <button type="submit" className="rounded-[9px] bg-brand-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-brand-700">
+        <button type="submit" className="rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700">
           Filtrele
         </button>
         {donemF ? (
-          <Link href={href({ donem: null })} className="text-[11px] font-semibold text-text-muted hover:text-danger-500">
+          <Link href={href({ donem: null })} className="text-xs font-semibold text-text-muted hover:text-danger-500">
             Dönemi temizle
           </Link>
         ) : null}

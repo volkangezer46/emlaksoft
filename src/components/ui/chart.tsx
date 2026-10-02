@@ -84,7 +84,7 @@ export function ChartFrame({
             {title}
           </h3>
           {subtitle ? (
-            <p className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.04em] text-text-faint">
+            <p className="mt-0.5 text-xs font-medium uppercase tracking-[0.04em] text-text-faint">
               {subtitle}
             </p>
           ) : null}
@@ -123,9 +123,9 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-[11px] border border-hairline bg-surface/95 px-3 py-2 shadow-[var(--inner-top),var(--elev-4)] backdrop-blur-sm">
+    <div className="rounded-[var(--radius-control)] border border-hairline bg-surface/95 px-3 py-2 shadow-[var(--inner-top),var(--elev-4)] backdrop-blur-sm">
       {label != null ? (
-        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-text-faint">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-faint">
           {label}
         </p>
       ) : null}
@@ -314,7 +314,7 @@ export function DonutSplit({
           {formatValue(total, format)}
         </p>
         {centerLabel ? (
-          <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-text-faint">
+          <p className="text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">
             {centerLabel}
           </p>
         ) : null}

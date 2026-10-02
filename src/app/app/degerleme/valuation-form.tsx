@@ -25,21 +25,26 @@ export function ValuationForm({
   const router = useRouter();
   const { push } = useToast();
   const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState("");
 
   async function onSubmit(formData: FormData) {
     setPending(true);
+    setMessage("");
     const res = await createValuation(formData);
     setPending(false);
     if (res.ok) {
+      setMessage("Değerleme oluşturuldu.");
       push("Değerleme oluşturuldu", "ok");
       router.refresh();
       return;
     }
-    push(res.error ?? "Hata", "err");
+    const error = res.error ?? "Değerleme oluşturulamadı.";
+    setMessage(error);
+    push(error, "err");
   }
 
   return (
-    <form action={onSubmit} className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+    <form action={onSubmit} aria-busy={pending} aria-describedby="valuation-form-status" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
       <h2 className="font-display font-bold text-ink-950">Yeni değerleme</h2>
       <div className="mt-4 space-y-3">
         <div>
@@ -62,17 +67,17 @@ export function ValuationForm({
           />
         </div>
         <div>
-          <label className="mb-1.5 block text-sm text-text-muted">Başlık</label>
-          <input name="title" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm" placeholder="Onikişubat 3+1 değerleme" />
+          <label htmlFor="valuation-title" className="mb-1.5 block text-sm text-text-muted">Başlık</label>
+          <input id="valuation-title" name="title" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm" placeholder="Onikişubat 3+1 değerleme" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-sm text-text-muted">Liste fiyatı</label>
-            <input name="list_price" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm" placeholder="6.750.000" />
+            <label htmlFor="valuation-list-price" className="mb-1.5 block text-sm text-text-muted">Liste fiyatı</label>
+            <input id="valuation-list-price" name="list_price" inputMode="decimal" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm" placeholder="6.750.000" />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm text-text-muted">m²</label>
-            <input name="sqm" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm" placeholder="135" />
+            <label htmlFor="valuation-sqm" className="mb-1.5 block text-sm text-text-muted">m²</label>
+            <input id="valuation-sqm" name="sqm" inputMode="decimal" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm" placeholder="135" />
           </div>
         </div>
         {/* Onceden il ADI + serbest metin "Ilce ipucu" aliniyordu. Serbest metin
@@ -81,15 +86,15 @@ export function ValuationForm({
         <GeoSelect provinces={provinces} withNeighborhood={false} />
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-sm text-text-muted">Portföy türü</label>
-            <select name="property_type" defaultValue="" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm">
+            <label htmlFor="valuation-property-type" className="mb-1.5 block text-sm text-text-muted">Portföy türü</label>
+            <select id="valuation-property-type" name="property_type" defaultValue="" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm">
               <option value="">Fark etmez</option>
               {PROPERTY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           <div>
-            <label className="mb-1.5 block text-sm text-text-muted">İşlem türü</label>
-            <select name="transaction_type" defaultValue="" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm">
+            <label htmlFor="valuation-transaction-type" className="mb-1.5 block text-sm text-text-muted">İşlem türü</label>
+            <select id="valuation-transaction-type" name="transaction_type" defaultValue="" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm">
               <option value="">Fark etmez</option>
               <option value="Satılık">Satılık</option>
               <option value="Kiralık">Kiralık</option>
@@ -98,22 +103,23 @@ export function ValuationForm({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-sm text-text-muted">Ada (opsiyonel)</label>
-            <input name="ada" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm" placeholder="1245" />
+            <label htmlFor="valuation-block" className="mb-1.5 block text-sm text-text-muted">Ada (opsiyonel)</label>
+            <input id="valuation-block" name="ada" inputMode="numeric" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm" placeholder="1245" />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm text-text-muted">Parsel (opsiyonel)</label>
-            <input name="parsel" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm" placeholder="7" />
+            <label htmlFor="valuation-parcel" className="mb-1.5 block text-sm text-text-muted">Parsel (opsiyonel)</label>
+            <input id="valuation-parcel" name="parsel" inputMode="numeric" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm" placeholder="7" />
           </div>
         </div>
-        <p className="text-[11px] leading-relaxed text-text-faint">
+        <p className="text-xs leading-relaxed text-text-faint">
           İlçe seçilirse kendi portföy ve satış verinizden gerçek emsal analizi çalışır.
           Endeksa &amp; Tapusor anahtarları tanımlandıysa onlar da kaynak olarak eklenir.
         </p>
+        <p id="valuation-form-status" role="status" aria-live="polite" className="sr-only">{message}</p>
         <button
           type="submit"
           disabled={pending}
-          className="btn-shine w-full rounded-[11px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+          className="btn-shine w-full rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
         >
           {pending ? "Hesaplanıyor…" : "Değerle"}
         </button>

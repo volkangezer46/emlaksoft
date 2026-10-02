@@ -42,7 +42,7 @@ export type WizardInitial = {
 };
 
 const fieldClass =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400";
 const labelClass = "mb-1.5 block text-sm text-text-muted";
 
 const STEPS = [
@@ -211,7 +211,7 @@ export function AutomationWizard({
               <div key={s.label} className="flex items-center gap-2">
                 {i > 0 && <span className="h-px w-6 bg-line" />}
                 <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
                     current
                       ? "bg-brand-600 text-white"
                       : done
@@ -237,7 +237,7 @@ export function AutomationWizard({
                     key={t.value}
                     type="button"
                     onClick={() => selectTrigger(t.value)}
-                    className={`focus-ring press rounded-[12px] border p-3 text-left transition ${
+                    className={`focus-ring press rounded-[var(--radius-card)] border p-3 text-left transition ${
                       triggerType === t.value
                         ? "border-brand-400 bg-brand-600/5 ring-1 ring-brand-400"
                         : "border-line bg-surface hover:border-brand-300"
@@ -247,7 +247,7 @@ export function AutomationWizard({
                       <Bolt className={`h-3.5 w-3.5 ${triggerType === t.value ? "text-brand-600" : "text-text-faint"}`} />
                       {t.label}
                     </p>
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">{t.description}</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-text-muted">{t.description}</p>
                   </button>
                 ))}
               </div>
@@ -290,13 +290,13 @@ export function AutomationWizard({
               </p>
 
               {conditionFields.length === 0 ? (
-                <div className="rounded-[12px] border border-dashed border-line bg-canvas p-4 text-sm text-text-muted">
+                <div className="rounded-[var(--radius-card)] border border-dashed border-line bg-canvas p-4 text-sm text-text-muted">
                   Bu tetikleyici için filtrelenebilir alan bulunmuyor — kural, tetiklendiği her kayıtta çalışır.
                 </div>
               ) : (
                 <>
                   {conds.map((c, i) => (
-                    <div key={i} className="flex flex-wrap items-center gap-2 rounded-[12px] border border-line bg-canvas p-3">
+                    <div key={i} className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas p-3">
                       <select
                         value={c.field}
                         onChange={(e) => setConds((prev) => prev.map((p, j) => (j === i ? { ...p, field: e.target.value } : p)))}
@@ -330,7 +330,7 @@ export function AutomationWizard({
                         type="button"
                         onClick={() => setConds((prev) => prev.filter((_, j) => j !== i))}
                         aria-label="Koşulu kaldır"
-                        className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[8px] border border-line text-text-faint transition hover:border-danger-500/30 hover:text-danger-500"
+                        className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line text-text-faint transition hover:border-danger-500/30 hover:text-danger-500"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -345,7 +345,7 @@ export function AutomationWizard({
                           { field: conditionFields[0]?.value ?? "", op: "eq", value: "" },
                         ])
                       }
-                      className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border border-dashed border-brand-300/60 px-3 py-2 text-sm font-semibold text-brand-600 transition hover:bg-brand-600/5"
+                      className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-dashed border-brand-300/60 px-3 py-2 text-sm font-semibold text-brand-600 transition hover:bg-brand-600/5"
                     >
                       <Plus className="h-3.5 w-3.5" /> Koşul ekle
                     </button>
@@ -364,7 +364,7 @@ export function AutomationWizard({
                     key={a.value}
                     type="button"
                     onClick={() => setActionType(a.value)}
-                    className={`focus-ring press rounded-[12px] border p-3 text-left transition ${
+                    className={`focus-ring press rounded-[var(--radius-card)] border p-3 text-left transition ${
                       actionType === a.value
                         ? "border-mint-500 bg-mint-500/5 ring-1 ring-mint-500"
                         : "border-line bg-surface hover:border-mint-500/50"
@@ -374,7 +374,7 @@ export function AutomationWizard({
                       <Zap className={`h-3.5 w-3.5 ${actionType === a.value ? "text-mint-600" : "text-text-faint"}`} />
                       {a.label}
                     </p>
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">{a.description}</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-text-muted">{a.description}</p>
                   </button>
                 ))}
               </div>
@@ -405,7 +405,7 @@ export function AutomationWizard({
                 <div>
                   <label className={labelClass}>{actionType === "send_sms" ? "SMS metni" : "WhatsApp metni"} *</label>
                   <textarea value={messageText} onChange={(e) => setMessageText(e.target.value)} rows={3} placeholder="Sayın {{name}}, …" className={fieldClass} />
-                  <p className="mt-1 text-[11px] text-text-faint">{"{{name}}"} yer tutucusu müşteri adıyla değiştirilir.</p>
+                  <p className="mt-1 text-xs text-text-faint">{"{{name}}"} yer tutucusu müşteri adıyla değiştirilir.</p>
                 </div>
               )}
 
@@ -468,7 +468,7 @@ export function AutomationWizard({
         {/* Alt bar */}
         <div className="flex items-center justify-between gap-2 border-t border-line px-6 py-4">
           <DialogClose asChild>
-            <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
+            <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
               Vazgeç
             </button>
           </DialogClose>
@@ -477,7 +477,7 @@ export function AutomationWizard({
               <button
                 type="button"
                 onClick={() => setStep((s) => s - 1)}
-                className="focus-ring press inline-flex items-center gap-1 rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-canvas"
+                className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-canvas"
               >
                 <ChevronLeft className="h-4 w-4" /> Geri
               </button>
@@ -487,7 +487,7 @@ export function AutomationWizard({
                 type="button"
                 disabled={!stepValid()}
                 onClick={() => setStep((s) => s + 1)}
-                className="btn-shine focus-ring press inline-flex items-center gap-1 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                className="btn-shine focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
               >
                 İleri <ChevronRight className="h-4 w-4" />
               </button>
@@ -496,7 +496,7 @@ export function AutomationWizard({
                 type="button"
                 disabled={!stepValid() || pending}
                 onClick={save}
-                className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
               >
                 {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 {initial ? "Güncelle" : "Kaydet"}

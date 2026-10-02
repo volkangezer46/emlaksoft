@@ -120,7 +120,7 @@ export function MapView({
 
   if (points.length === 0) {
     return (
-      <div className="rounded-[16px] border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
+      <div className="rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
         <MapPinOff className="mx-auto h-8 w-8 text-text-faint" />
         <h2 className="mt-4 font-display text-lg font-bold text-ink-950">Haritada gösterilecek portföy yok</h2>
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-text-muted">
@@ -161,7 +161,7 @@ export function MapView({
   const activePoint = points.find((p) => p.id === activeId) ?? null;
 
   return (
-    <div className="overflow-hidden rounded-[16px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+    <div className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-xs)]">
       <div
         ref={boxRef}
         className="relative w-full cursor-grab touch-none select-none overflow-hidden bg-canvas active:cursor-grabbing"
@@ -217,7 +217,7 @@ export function MapView({
         {activePoint ? (
           <div
             onPointerDown={(e) => e.stopPropagation()}
-            className="absolute z-20 w-[230px] -translate-x-1/2 -translate-y-full rounded-[12px] border border-line bg-surface p-3 shadow-[var(--shadow-card)]"
+            className="absolute z-20 w-[230px] -translate-x-1/2 -translate-y-full rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-card)]"
             style={{
               left: Math.min(Math.max(activePoint.wx * scale - originX, 120), Math.max(width - 120, 120)),
               top: Math.max(activePoint.wy * scale - originY - 40, 96),
@@ -234,7 +234,7 @@ export function MapView({
           </div>
         ) : null}
 
-        <div className="absolute right-3 top-3 z-20 flex flex-col overflow-hidden rounded-[10px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+        <div className="absolute right-3 top-3 z-20 flex flex-col overflow-hidden rounded-[var(--radius-control)] border border-line bg-surface shadow-[var(--shadow-xs)]">
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}

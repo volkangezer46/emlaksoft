@@ -10,6 +10,7 @@ import {
   PublicTokenPage,
 } from "@/components/public/token-page";
 import { ReferralForm } from "./referral-form";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 // Tavsiye linkleri kişiye özeldir → arama motorlarına kapalı (anket deseni).
 export const metadata: Metadata = {
@@ -47,7 +48,7 @@ export default async function ReferralPage({
   const { data: link } = await admin
     .from("referral_links")
     .select(
-      "id, is_active, reward_note, customer:customers(full_name), tenant:tenants(name, phone, logo_url, brand_color)",
+      "id, tenant_id, customer_id, is_active, reward_note, tenant:tenants(name, status, phone, logo_url, brand_color)",
     )
     .eq("public_token", token)
     .maybeSingle();
@@ -56,15 +57,25 @@ export default async function ReferralPage({
 
   type TenantShape = {
     name?: string;
+    status?: string;
     phone?: string | null;
     logo_url?: string | null;
     brand_color?: string | null;
   };
   const tenant = rel(link.tenant as TenantShape | TenantShape[] | null);
+  if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
+  const { data: customer } = await admin
+    .from("customers")
+    .select("full_name")
+    .eq("id", link.customer_id)
+    .eq("tenant_id", link.tenant_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!customer) notFound();
   const office = tenant?.name ?? "Emlak ofisi";
   const officePhone = tenant?.phone ?? null;
   const telHref = toTelHref(officePhone);
-  const referrer = rel(link.customer as { full_name?: string } | { full_name?: string }[] | null)?.full_name ?? "Bir müşterimiz";
+  const referrer = customer.full_name ?? "Bir müşterimiz";
   const firstName = referrer.split(" ")[0] || referrer;
   const active = link.is_active !== false;
   const reward = String(link.reward_note ?? "").trim();
@@ -90,7 +101,7 @@ export default async function ReferralPage({
     >
       {active ? (
         <>
-          <ul className="space-y-2 text-[12px] leading-relaxed text-text-muted">
+          <ul className="space-y-2 text-xs leading-relaxed text-text-muted">
             {[
               "Aynı gün içinde arar, ne aradığını dinleriz.",
               "Baskı yok — uygun portföy yoksa açıkça söyleriz.",
@@ -98,7 +109,7 @@ export default async function ReferralPage({
             ].map((t) => (
               <li
                 key={t}
-                className="flex items-start gap-2 rounded-[12px] border border-line bg-canvas/60 px-3.5 py-2.5"
+                className="flex items-start gap-2 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3.5 py-2.5"
               >
                 <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mint-600" aria-hidden="true" />
                 <span>{t}</span>
@@ -108,7 +119,7 @@ export default async function ReferralPage({
 
           {reward ? (
             <p
-              className="mt-3 flex items-start gap-2 rounded-[12px] border px-3.5 py-2.5 text-[12px] font-semibold leading-relaxed"
+              className="mt-3 flex items-start gap-2 rounded-[var(--radius-card)] border px-3.5 py-2.5 text-xs font-semibold leading-relaxed"
               style={{
                 borderColor: "var(--pb-edge)",
                 backgroundColor: "var(--pb-veil)",

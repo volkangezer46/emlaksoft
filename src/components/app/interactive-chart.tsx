@@ -130,7 +130,7 @@ export function InteractiveChart({
   if (n === 0) {
     return (
       <div className={className}>
-        <div className="grid place-items-center rounded-[12px] bg-canvas/60 text-xs text-text-faint" style={{ height }}>
+        <div className="grid place-items-center rounded-[var(--radius-card)] bg-canvas/60 text-xs text-text-faint" style={{ height }}>
           Henüz veri yok
         </div>
       </div>
@@ -271,10 +271,10 @@ export function InteractiveChart({
             {/* Tooltip balonu — surface-card dili, takip eder */}
             {hover !== null && active ? (
               <div
-                className="pointer-events-none absolute z-10 min-w-[140px] -translate-x-1/2 -translate-y-full rounded-[11px] border border-hairline bg-surface/95 px-3 py-2 shadow-[var(--inner-top),var(--elev-4)] backdrop-blur-sm"
+                className="pointer-events-none absolute z-10 min-w-[140px] -translate-x-1/2 -translate-y-full rounded-[var(--radius-control)] border border-hairline bg-surface/95 px-3 py-2 shadow-[var(--inner-top),var(--elev-4)] backdrop-blur-sm"
                 style={{ left: tipLeft, top: tipTop, transition: "left 120ms ease-out, top 120ms ease-out" }}
               >
-                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-text-faint">{active.label}</p>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-text-faint">{active.label}</p>
                 {seriesRows.map((row) => (
                   <p key={row.label} className="flex items-center gap-2 text-xs text-ink-950">
                     <span className="h-2 w-2 shrink-0 rounded-full ring-2 ring-inset ring-white/40" style={{ background: row.color }} />
@@ -311,7 +311,7 @@ export function InteractiveChart({
             return (
               <span
                 key={`${d.label}-${i}`}
-                className={`absolute top-0 whitespace-nowrap text-[10px] font-semibold transition-colors ${
+                className={`absolute top-0 whitespace-nowrap text-xs font-semibold transition-colors ${
                   hover === i ? "text-ink-950" : "text-text-muted"
                 }`}
                 style={{ left: px, transform: `translateX(${edgeShift})` }}

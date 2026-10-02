@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useActionState } from "react";
 import { Plus } from "lucide-react";
@@ -14,6 +14,7 @@ import {
 import { GeoSelect } from "@/components/app/geo-select";
 import { createCustomer, type CustomerResult } from "@/app/actions/customers";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { useQueryDialog } from "@/components/app/use-query-dialog";
 
 type Province = { id: string; name: string };
 type Branch = { id: string; name: string };
@@ -26,12 +27,14 @@ export function NewCustomerDialog({
   provinces,
   branches = [],
   types = DEFAULT_TYPES,
+  defaultOpen = false,
 }: {
   provinces: Province[];
   branches?: Branch[];
   types?: string[];
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useQueryDialog(defaultOpen);
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   // Başarı sonrası kapat + formu sıfırla + listeyi yenile: efekt gövdesinde
@@ -61,7 +64,7 @@ export function NewCustomerDialog({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
         >
           <Plus className="h-4 w-4" />
           Yeni müşteri
@@ -83,7 +86,7 @@ export function NewCustomerDialog({
                   id="full_name"
                   name="full_name"
                   required
-                  className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                  className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
                   placeholder="Örn. Ali Kaya"
                 />
               </div>
@@ -101,7 +104,7 @@ export function NewCustomerDialog({
                   id="email"
                   name="email"
                   type="email"
-                  className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                  className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
                 />
               </div>
               <div>
@@ -111,7 +114,7 @@ export function NewCustomerDialog({
                 <select
                   id="type"
                   name="type"
-                  className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                  className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
                   defaultValue="Alıcı"
                 >
                   {types.map((t) => (
@@ -134,7 +137,7 @@ export function NewCustomerDialog({
                   <select
                     id="branch_id"
                     name="branch_id"
-                    className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                    className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
                     defaultValue=""
                   >
                     <option value="">Şube atanmadı</option>
@@ -155,7 +158,7 @@ export function NewCustomerDialog({
                   name="birth_date"
                   type="date"
                   max="2100-12-31"
-                  className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                  className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
                 />
               </div>
               <div>
@@ -167,7 +170,7 @@ export function NewCustomerDialog({
                   name="anniversary_date"
                   type="date"
                   max="2100-12-31"
-                  className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                  className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
                 />
               </div>
               <div className="sm:col-span-2">
@@ -177,7 +180,7 @@ export function NewCustomerDialog({
                 <input
                   id="anniversary_note"
                   name="anniversary_note"
-                  className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                  className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
                   placeholder="Örn. İlk ev alımı, 3 yıllık kiracı"
                 />
               </div>
@@ -189,7 +192,7 @@ export function NewCustomerDialog({
                   id="notes"
                   name="notes"
                   rows={3}
-                  className="w-full resize-none rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                  className="w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
                   placeholder="Talep, bütçe, tercih vb."
                 />
               </div>
@@ -204,7 +207,7 @@ export function NewCustomerDialog({
             <DialogClose asChild>
               <button
                 type="button"
-                className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas"
+                className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas"
               >
                 Vazgeç
               </button>
@@ -212,7 +215,7 @@ export function NewCustomerDialog({
             <button
               type="submit"
               disabled={pending}
-              className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+              className="btn-shine focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
             >
               {pending ? "Kaydediliyor…" : "Kaydet"}
             </button>

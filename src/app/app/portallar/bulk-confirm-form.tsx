@@ -83,11 +83,11 @@ export function BulkConfirmForm({
               <button
                 type="button"
                 onClick={toggleAll}
-                className="focus-ring text-[11px] font-semibold text-text-muted underline-offset-2 transition hover:text-brand-600 hover:underline"
+                className="focus-ring text-xs font-semibold text-text-muted underline-offset-2 transition hover:text-brand-600 hover:underline"
               >
                 {selected === selectableCount ? "Seçimi bırak" : "Tümünü seç"}
               </button>
-              <span className="text-[11px] tabular-nums text-text-faint">
+              <span className="text-xs tabular-nums text-text-faint">
                 {selected > 0 ? `${selected} ilan seçildi` : `${selectableCount} canlı ilan`}
               </span>
             </div>
@@ -95,7 +95,7 @@ export function BulkConfirmForm({
               type="button"
               onClick={submitBulk}
               disabled={pending || selected === 0}
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[9px] bg-mint-500/12 px-3 py-1.5 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/20 disabled:opacity-45"
+              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-mint-500/12 px-3 py-1.5 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/20 disabled:opacity-45"
             >
               {pending ? (
                 <>

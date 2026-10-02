@@ -30,9 +30,8 @@ const roleOptions: { value: string; label: string }[] = [
 
 function randomPassword() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-  let out = "";
-  for (let i = 0; i < 12; i++) out += chars[Math.floor(Math.random() * chars.length)];
-  return out;
+  const values = globalThis.crypto.getRandomValues(new Uint32Array(16));
+  return Array.from(values, (value) => chars[value % chars.length]).join("");
 }
 
 export function AddMemberDialog({ branches }: { branches: Branch[] }) {
@@ -73,7 +72,7 @@ export function AddMemberDialog({ branches }: { branches: Branch[] }) {
       <DialogTrigger asChild>
         <button
           type="button"
-          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
+          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
         >
           <UserPlus className="h-4 w-4" /> Ekip üyesi ekle
         </button>
@@ -84,11 +83,11 @@ export function AddMemberDialog({ branches }: { branches: Branch[] }) {
         <form ref={formRef} action={action} className="grid gap-4 p-4 sm:grid-cols-2 md:p-6">
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="full_name">Ad soyad *</label>
-                <input id="full_name" name="full_name" required className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" placeholder="Örn. Merve Akın" />
+                <input id="full_name" name="full_name" required className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" placeholder="Örn. Merve Akın" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="email">E-posta *</label>
-                <input id="email" name="email" type="email" required className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" placeholder="danisman@ofis.com" />
+                <input id="email" name="email" type="email" required className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" placeholder="danisman@ofis.com" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="phone">Telefon</label>
@@ -96,13 +95,13 @@ export function AddMemberDialog({ branches }: { branches: Branch[] }) {
               </div>
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="role">Rol</label>
-                <select id="role" name="role" defaultValue="advisor" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
+                <select id="role" name="role" defaultValue="advisor" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
                   {roleOptions.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
               </div>
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="branch_id">Şube</label>
-                <select id="branch_id" name="branch_id" defaultValue="" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
+                <select id="branch_id" name="branch_id" defaultValue="" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
                   <option value="">Şube atanmadı</option>
                   {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
@@ -110,19 +109,19 @@ export function AddMemberDialog({ branches }: { branches: Branch[] }) {
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="password">Geçici şifre *</label>
                 <div className="flex gap-2">
-                  <input id="password" name="password" value={pw} onChange={(e) => setPw(e.target.value)} className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm tabular-nums outline-none focus:border-brand-400" />
-                  <button type="button" onClick={() => setPw(randomPassword())} className="inline-flex shrink-0 items-center gap-1.5 rounded-[10px] border border-line px-3 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600" aria-label="Yeni şifre üret"><RefreshCw className="h-3.5 w-3.5" /> Üret</button>
+                  <input id="password" name="password" value={pw} onChange={(e) => setPw(e.target.value)} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm tabular-nums outline-none focus:border-brand-400" />
+                  <button type="button" onClick={() => setPw(randomPassword())} className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600" aria-label="Yeni şifre üret"><RefreshCw className="h-3.5 w-3.5" /> Üret</button>
                 </div>
-                <p className="mt-1.5 text-[11px] text-text-faint">Bu şifreyi üyeye iletin; ilk girişte değiştirmesini önerin.</p>
+                <p className="mt-1.5 text-xs text-text-faint">Bu şifreyi üyeye iletin; ilk girişte değiştirmesini önerin.</p>
               </div>
 
           {state.error ? <p className="text-sm font-medium text-danger-600 sm:col-span-2" role="alert">{state.error}</p> : null}
 
           <div className="hairline-t flex justify-end gap-2 pt-4 sm:col-span-2">
             <DialogClose asChild>
-              <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">Vazgeç</button>
+              <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">Vazgeç</button>
             </DialogClose>
-            <button type="submit" disabled={pending} className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60">{pending ? "Ekleniyor…" : "Üyeyi ekle"}</button>
+            <button type="submit" disabled={pending} className="btn-shine focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60">{pending ? "Ekleniyor…" : "Üyeyi ekle"}</button>
           </div>
         </form>
       </DialogContent>
@@ -150,7 +149,7 @@ export function AddBranchDialog({ provinces }: { provinces: Province[] }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button type="button" className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border border-hairline px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+        <button type="button" className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
           <Building2 className="h-3.5 w-3.5" /> Şube ekle
         </button>
       </DialogTrigger>
@@ -160,11 +159,11 @@ export function AddBranchDialog({ provinces }: { provinces: Province[] }) {
         <form ref={formRef} action={action} className="grid gap-4 p-4 md:p-6">
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="branch_name">Şube adı *</label>
-                <input id="branch_name" name="name" required className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" placeholder="Örn. Merkez Şube" />
+                <input id="branch_name" name="name" required className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" placeholder="Örn. Merkez Şube" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="province_id">İl</label>
-                <select id="province_id" name="province_id" defaultValue="" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
+                <select id="province_id" name="province_id" defaultValue="" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
                   <option value="">Seçiniz</option>
                   {provinces.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
@@ -172,9 +171,9 @@ export function AddBranchDialog({ provinces }: { provinces: Province[] }) {
           {state.error ? <p className="text-sm font-medium text-danger-600" role="alert">{state.error}</p> : null}
           <div className="hairline-t flex justify-end gap-2 pt-4">
             <DialogClose asChild>
-              <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">Vazgeç</button>
+              <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">Vazgeç</button>
             </DialogClose>
-            <button type="submit" disabled={pending} className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60">{pending ? "Ekleniyor…" : "Şubeyi ekle"}</button>
+            <button type="submit" disabled={pending} className="btn-shine focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60">{pending ? "Ekleniyor…" : "Şubeyi ekle"}</button>
           </div>
         </form>
       </DialogContent>

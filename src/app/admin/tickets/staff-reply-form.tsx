@@ -98,7 +98,7 @@ export function StaffReplyForm({
       <div
         role="tablist"
         aria-label="Mesaj görünürlüğü"
-        className="inline-flex rounded-[10px] border border-line bg-canvas/70 p-1"
+        className="inline-flex rounded-[var(--radius-control)] border border-line bg-canvas/70 p-1"
       >
         <button
           type="button"
@@ -129,7 +129,7 @@ export function StaffReplyForm({
         </button>
       </div>
 
-      <p className={cn("text-[11px]", effectiveVisibility === "internal" ? "font-medium text-amber-700" : "text-text-muted")}>
+      <p className={cn("text-xs", effectiveVisibility === "internal" ? "font-medium text-amber-700" : "text-text-muted")}>
         {effectiveVisibility === "internal"
           ? closed
             ? "Kapalı ticket için yalnız operasyon iç notu eklenebilir; ofise bildirim gitmez."
@@ -153,7 +153,7 @@ export function StaffReplyForm({
             }
           }}
           className={cn(
-            "w-full resize-y rounded-[12px] border bg-canvas px-3 py-3 pr-32 text-sm leading-relaxed outline-none transition focus:bg-surface",
+            "w-full resize-y rounded-[var(--radius-card)] border bg-canvas px-3 py-3 pr-32 text-sm leading-relaxed outline-none transition focus:bg-surface",
             effectiveVisibility === "internal" ? "border-amber-400/35 focus:border-amber-500" : "border-line focus:border-brand-400",
           )}
         />
@@ -162,7 +162,7 @@ export function StaffReplyForm({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="focus-ring absolute right-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-semibold text-text-muted shadow-[var(--shadow-xs)] transition hover:border-brand-300 hover:text-brand-600"
+                className="focus-ring absolute right-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-text-muted shadow-[var(--shadow-xs)] transition hover:border-brand-300 hover:text-brand-600"
               >
                 <Sparkles className="h-3 w-3" /> Hazır yanıt
               </button>
@@ -188,7 +188,7 @@ export function StaffReplyForm({
           {pending ? "Kaydediliyor…" : effectiveVisibility === "internal" ? "İç not ekle" : "Yanıtı gönder"}
         </Button>
       </div>
-      <p className="text-[10px] text-text-faint sm:text-right">Hızlı gönderim: Ctrl/Command + Enter</p>
+      <p className="text-xs text-text-faint sm:text-right">Hızlı gönderim: Ctrl/Command + Enter</p>
       {state.error ? <p className="text-sm font-medium text-danger-600" role="alert">{state.error}</p> : null}
       {state.warning ? <p className="text-sm font-medium text-amber-700" role="status" aria-live="polite">{state.warning}</p> : null}
     </form>

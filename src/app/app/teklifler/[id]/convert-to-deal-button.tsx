@@ -36,7 +36,7 @@ export function ConvertToDealButton({ offerId }: { offerId: string }) {
     return (
       <Link
         href={`/app/anlasmalar/${result.dealId}`}
-        className="focus-ring press inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+        className="focus-ring press inline-flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
       >
         {result.linked ? "Bağlanan anlaşmayı aç" : "Anlaşmayı aç"}
         <ArrowUpRight className="h-4 w-4" />
@@ -50,7 +50,7 @@ export function ConvertToDealButton({ offerId }: { offerId: string }) {
         type="button"
         disabled={pending}
         onClick={run}
-        className="btn-shine focus-ring press inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+        className="btn-shine focus-ring press inline-flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
       >
         <Handshake className="h-4 w-4" />
         {pending ? "Anlaşma hazırlanıyor…" : "Anlaşma oluştur"}

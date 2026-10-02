@@ -113,7 +113,7 @@ export default async function HedeflerPage() {
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-500/25 blur-[80px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -137,14 +137,14 @@ export default async function HedeflerPage() {
               <Link
                 key={k.label}
                 href={k.href}
-                className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3.5 backdrop-blur transition hover:border-brand-300"
+                className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3.5 backdrop-blur transition hover:border-brand-300"
               >
                 <div className="flex items-start justify-between">
                   <k.icon className={`h-4 w-4 ${k.tone}`} />
                   <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                 </div>
                 <p className="numeric mt-2 font-display text-xl font-extrabold">{k.value}</p>
-                <p className="text-[11px] text-white/50">{k.label}</p>
+                <p className="text-xs text-white/50">{k.label}</p>
               </Link>
             ))}
           </div>
@@ -153,12 +153,12 @@ export default async function HedeflerPage() {
 
       {/* Takım kıyası — aynı dönemdeki hedefler ilerlemeye göre yarış şeridinde */}
       {showRace ? (
-        <section id="takim-kiyas" className="scroll-mt-24 rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section id="takim-kiyas" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">
               <Users className="h-4 w-4 text-brand-600" /> Takım kıyası · {racePeriodLabel}
             </h2>
-            <span className="text-[11px] text-text-faint">En iyi ilerleme yüzdesine göre</span>
+            <span className="text-xs text-text-faint">En iyi ilerleme yüzdesine göre</span>
           </div>
           <div className="mt-4 space-y-2.5">
             {raceSorted.map((e, i) => {
@@ -169,10 +169,10 @@ export default async function HedeflerPage() {
                 <Link
                   key={e.t.id}
                   href={pid ? `/app/ekip/${pid}` : "/app/raporlar"}
-                  className="focus-ring group flex items-center gap-3 rounded-[12px] px-1.5 py-1.5 transition hover:bg-canvas"
+                  className="focus-ring group flex items-center gap-3 rounded-[var(--radius-card)] px-1.5 py-1.5 transition hover:bg-canvas"
                 >
                   <span
-                    className={`numeric grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-extrabold ${
+                    className={`numeric grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold ${
                       i === 0 ? "bg-amber-400/20 text-amber-600" : "bg-canvas text-text-muted"
                     }`}
                   >
@@ -219,10 +219,10 @@ export default async function HedeflerPage() {
               profile_id:     profId,
             };
             return (
-              <div key={t.id} className="group relative rounded-[20px] border border-line bg-surface p-5 transition hover:border-brand-400/40">
+              <div key={t.id} className="group relative rounded-[var(--radius-panel)] border border-line bg-surface p-5 transition hover:border-brand-400/40">
                 <Link
                   href={profId ? `/app/ekip/${profId}` : "/app/raporlar"}
-                  className="absolute inset-0 rounded-[20px]"
+                  className="absolute inset-0 rounded-[var(--radius-panel)]"
                   aria-label={profId ? `${profileLabel(t.profile)} danışman detayı` : "Ofis geneli raporlar"}
                 />
                 <div className="flex items-start justify-between">
@@ -233,12 +233,12 @@ export default async function HedeflerPage() {
                       <p className="text-xs font-semibold text-text-muted">{period}</p>
                       <p className="mt-0.5 font-display font-bold text-ink-950 group-hover:text-brand-600">{profileLabel(t.profile)}</p>
                       {done ? (
-                        <p className="mt-0.5 text-[11px] font-bold text-mint-600">Hedef tamamlandı</p>
+                        <p className="mt-0.5 text-xs font-bold text-mint-600">Hedef tamamlandı</p>
                       ) : null}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="rounded-full bg-brand-600/10 px-2 py-1 text-[11px] font-bold text-brand-600">
+                    <span className="rounded-full bg-brand-600/10 px-2 py-1 text-xs font-bold text-brand-600">
                       {t.period === "monthly" ? "Aylık" : t.period === "quarterly" ? "Çeyrek" : "Yıllık"}
                     </span>
                     {canEdit ? <TargetFormDialog members={memberList} target={formValues} /> : null}
@@ -248,7 +248,7 @@ export default async function HedeflerPage() {
                           <button
                             type="button"
                             aria-label="Hedefi sil"
-                            className="focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[9px] border border-hairline bg-surface text-danger-500 transition hover:border-danger-500/40"
+                            className="focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline bg-surface text-danger-500 transition hover:border-danger-500/40"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -278,7 +278,7 @@ export default async function HedeflerPage() {
                         style={{ width: `${dealPct}%` }}
                       />
                     </div>
-                    <p className="mt-0.5 text-right text-[11px] text-text-faint">%{dealPct}</p>
+                    <p className="mt-0.5 text-right text-xs text-text-faint">%{dealPct}</p>
                   </div>
 
                   {/* Gelir hedefi */}
@@ -295,12 +295,12 @@ export default async function HedeflerPage() {
                         style={{ width: `${revPct}%` }}
                       />
                     </div>
-                    <p className="mt-0.5 text-right text-[11px] text-text-faint">%{revPct}</p>
+                    <p className="mt-0.5 text-right text-xs text-text-faint">%{revPct}</p>
                   </div>
 
                   {/* Tempo: dönemin geçen kısmı vs hedef ilerlemesi */}
                   <div className="border-t border-hairline pt-2.5">
-                    <div className="mb-1 flex justify-between text-[11px]">
+                    <div className="mb-1 flex justify-between text-xs">
                       <span className="text-text-muted">Tempo · dönemin %{elapsed}&apos;i geçti</span>
                       <span className={`font-semibold ${behind ? "text-amber-600" : "text-mint-600"}`}>İlerleme %{progress}</span>
                     </div>
@@ -313,13 +313,13 @@ export default async function HedeflerPage() {
                       <div className="absolute inset-y-0 w-0.5 bg-ink-950/40" style={{ left: `${elapsed}%` }} />
                     </div>
                     {behind ? (
-                      <p className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-amber-600">
+                      <p className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-amber-600">
                         <AlertTriangle className="h-3.5 w-3.5" />
                         Tempo geride: dönemin %{elapsed}&apos;i geçti, ilerleme %{progress}.
                       </p>
                     ) : null}
                     {projDeals != null || projRevenue != null ? (
-                      <p className="mt-1.5 text-[11px] text-text-muted">
+                      <p className="mt-1.5 text-xs text-text-muted">
                         Bu hızla dönem sonunda{" "}
                         {projDeals != null ? (
                           <span className="font-bold text-ink-950">~{Math.round(projDeals)} anlaşma</span>

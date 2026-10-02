@@ -14,7 +14,7 @@ export default async function KiraArtisPage() {
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-mint-500/25 blur-[70px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -27,10 +27,10 @@ export default async function KiraArtisPage() {
               12 aylık ortalama TÜFE’ye göre yasal tavanı otomatik uygular; yeni kirayı, aylık ve yıllık farkı anında gösterir.
             </p>
           </div>
-          <div className="flex items-center gap-2 rounded-[14px] border border-white/12 bg-white/8 px-4 py-3">
+          <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/12 bg-white/8 px-4 py-3">
             <Scale className="h-5 w-5 text-cyan-400" />
             <div>
-              <p className="text-[11px] text-white/60">TBK m.344</p>
+              <p className="text-xs text-white/60">TBK m.344</p>
               <p className="text-sm font-semibold text-white">Yasal tavan uyumlu</p>
             </div>
           </div>
@@ -39,7 +39,7 @@ export default async function KiraArtisPage() {
 
       <RentCalculator months={months} latestMonth={latest} />
 
-      <section className="flex items-start gap-3 rounded-[16px] border border-line bg-surface p-4 text-sm text-text-muted shadow-[var(--shadow-xs)]">
+      <section className="flex items-start gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-4 text-sm text-text-muted shadow-[var(--shadow-xs)]">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-mint-600" />
         <p>
           Konut kiralarında artış, önceki kira yılındaki 12 aylık ortalama TÜFE oranını aşamaz. Bu araç TÜİK referans

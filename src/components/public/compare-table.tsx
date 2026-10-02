@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
 import Image from "next/image";
 import { Building2, Check, X } from "lucide-react";
+import {
+  Dialog,
+  DialogDescription,
+  DialogFullscreenContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 /**
  * Karşılaştırma tablosunda gösterilen ilan verisi — vitrin kartı ve
@@ -13,6 +18,8 @@ export type CompareItem = {
   title: string;
   href?: string | null;
   coverId?: string | null;
+  /** Authorized/signed media URL. Public vitrin items can omit it. */
+  coverSrc?: string | null;
   price?: number | null;
   /** transaction_type — kira ise fiyata "/ay" eklenir */
   tx?: string | null;
@@ -125,43 +132,32 @@ export function CompareTable({
   onClose: () => void;
   onRemove?: (id: string) => void;
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    // Arkadaki sayfa kaymasın
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [onClose]);
-
   const rows = buildRows(items);
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="İlan karşılaştırma"
-      className="fixed inset-0 z-[80] flex flex-col bg-ink-950/60 p-3 backdrop-blur-sm sm:p-6"
-      onClick={onClose}
-    >
+    <Dialog open onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogFullscreenContent
+        overlayClassName="bg-ink-950/60 backdrop-blur-sm"
+        className="flex flex-col p-3 sm:p-6"
+        onClick={onClose}
+      >
       <div
-        className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col overflow-hidden rounded-[20px] border border-line bg-surface shadow-xl"
+        className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
           <div>
-            <h2 className="font-display text-base font-extrabold text-ink-950 sm:text-lg">
-              Karşılaştırma ({items.length})
-            </h2>
-            <p className="text-[11px] text-text-muted">
-              <span className="mr-1 inline-block h-2 w-2 rounded-full bg-mint-500 align-middle" />
-              Mint hücre o satırdaki en avantajlı değeri gösterir.
-            </p>
+            <DialogTitle asChild>
+              <h2 className="font-display text-base font-extrabold text-ink-950 sm:text-lg">
+                Karşılaştırma ({items.length})
+              </h2>
+            </DialogTitle>
+            <DialogDescription asChild>
+              <p className="text-xs text-text-muted">
+                <span className="mr-1 inline-block h-2 w-2 rounded-full bg-mint-500 align-middle" />
+                Mint hücre o satırdaki en avantajlı değeri gösterir.
+              </p>
+            </DialogDescription>
           </div>
           <button
             type="button"
@@ -178,7 +174,7 @@ export function CompareTable({
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr>
-                <th className="sticky left-0 top-0 z-30 w-28 min-w-28 border-b border-line bg-surface p-3 text-left text-[11px] font-bold uppercase tracking-wide text-text-faint">
+                <th className="sticky left-0 top-0 z-30 w-28 min-w-28 border-b border-line bg-surface p-3 text-left text-xs font-bold uppercase tracking-wide text-text-faint">
                   Özellik
                 </th>
                 {items.map((it) => (
@@ -186,13 +182,14 @@ export function CompareTable({
                     key={it.id}
                     className="sticky top-0 z-20 min-w-[160px] border-b border-l border-line bg-surface p-3 text-left align-top"
                   >
-                    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[10px] bg-ink-950/5">
-                      {it.coverId ? (
+                    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[var(--radius-control)] bg-ink-950/5">
+                      {it.coverId || it.coverSrc ? (
                         <Image
-                          src={`/api/property-media/${it.coverId}`}
+                          src={it.coverSrc ?? `/api/property-media/${it.coverId}`}
                           alt={it.title}
                           fill
                           sizes="200px"
+                          unoptimized
                           className="object-cover"
                         />
                       ) : (
@@ -208,7 +205,7 @@ export function CompareTable({
                       {it.href ? (
                         <a
                           href={it.href}
-                          className="text-[11px] font-semibold text-brand-600 underline-offset-2 hover:underline"
+                          className="text-xs font-semibold text-brand-600 underline-offset-2 hover:underline"
                         >
                           İlanı aç
                         </a>
@@ -217,7 +214,7 @@ export function CompareTable({
                         <button
                           type="button"
                           onClick={() => onRemove(it.id)}
-                          className="text-[11px] font-semibold text-text-faint transition hover:text-red-500"
+                          className="text-xs font-semibold text-text-faint transition hover:text-red-500"
                         >
                           Çıkar
                         </button>
@@ -254,6 +251,7 @@ export function CompareTable({
           </table>
         </div>
       </div>
-    </div>
+      </DialogFullscreenContent>
+    </Dialog>
   );
 }

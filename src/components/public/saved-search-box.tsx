@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { BellRing, CheckCircle2, Loader2 } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
@@ -8,7 +8,7 @@ import { createVitrinSavedSearch } from "@/app/actions/vitrin";
 import { listPublicDistricts, type PublicGeoOption } from "@/app/actions/public-valuation";
 
 const inputCls =
-  "w-full rounded-[12px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400";
+  "w-full rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400";
 
 /**
  * Vitrin "Aramamı kaydet" kutusu: ziyaretçi kriter + telefon + KVKK onayı
@@ -30,6 +30,11 @@ export function SavedSearchBox({
   const [kvkkAccepted, setKvkkAccepted] = useState(false);
   const [districts, setDistricts] = useState<PublicGeoOption[]>([]);
   const [districtLoading, setDistrictLoading] = useState(false);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
 
   async function onProvinceChange(provinceId: string) {
     setDistricts([]);
@@ -76,7 +81,7 @@ export function SavedSearchBox({
 
   if (status === "done") {
     return (
-      <section className="mt-10 rounded-[20px] border border-mint-500/30 bg-mint-500/8 px-5 py-10 text-center">
+      <section className="mt-10 rounded-[var(--radius-panel)] border border-mint-500/30 bg-mint-500/8 px-5 py-10 text-center" role="status" aria-live="polite">
         <CheckCircle2 className="mx-auto h-10 w-10 text-mint-600" />
         <p className="mt-3 font-display text-lg font-extrabold text-ink-950">Aramanız kaydedildi</p>
         <p className="mt-1 text-sm text-text-muted">
@@ -87,9 +92,9 @@ export function SavedSearchBox({
   }
 
   return (
-    <section className="mt-10 rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] sm:p-6">
+    <section className="mt-10 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] sm:p-6">
       <div className="flex items-start gap-3">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px] bg-brand-600/10 text-brand-600">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
           <BellRing className="h-5 w-5" />
         </span>
         <div>
@@ -100,7 +105,7 @@ export function SavedSearchBox({
         </div>
       </div>
 
-      <form onSubmit={onSubmit} className="mt-4 space-y-3">
+      <form onSubmit={onSubmit} className="mt-4 space-y-3" aria-busy={status === "loading"}>
         {/* Honeypot — gerçek kullanıcılar görmez; botlar doldurursa kayıt sessizce reddedilir */}
         <input
           type="text"
@@ -112,17 +117,24 @@ export function SavedSearchBox({
         />
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <input name="name" placeholder="Ad soyad (opsiyonel)" className={inputCls} />
-          <PhoneInput name="phone" required className={inputCls} placeholder="Cep telefonu (05XX XXX XX XX) *" />
+          <div>
+            <label htmlFor="saved-search-name" className="sr-only">Ad soyad (opsiyonel)</label>
+            <input id="saved-search-name" name="name" autoComplete="name" placeholder="Ad soyad (opsiyonel)" className={inputCls} />
+          </div>
+          <div>
+            <label htmlFor="saved-search-phone" className="sr-only">Cep telefonu</label>
+            <PhoneInput id="saved-search-phone" name="phone" required autoComplete="tel" aria-describedby="saved-search-consent" className={inputCls} placeholder="Cep telefonu (05XX XXX XX XX) *" />
+          </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <select name="tx_type" required defaultValue="" className={inputCls} aria-label="İşlem türü">
+          <select id="saved-search-tx" name="tx_type" required defaultValue="" className={inputCls} aria-label="İşlem türü">
             <option value="" disabled>İşlem türü *</option>
             <option value="satilik">Satılık</option>
             <option value="kiralik">Kiralık</option>
           </select>
           <select
+            id="saved-search-province"
             name="province_id"
             required
             defaultValue=""
@@ -137,7 +149,7 @@ export function SavedSearchBox({
               </option>
             ))}
           </select>
-          <select name="district_id" defaultValue="" className={inputCls} aria-label="İlçe">
+          <select id="saved-search-district" name="district_id" defaultValue="" className={inputCls} aria-label="İlçe" aria-busy={districtLoading}>
             <option value="">{districtLoading ? "İlçeler yükleniyor…" : "İlçe (tümü)"}</option>
             {districts.map((d) => (
               <option key={d.id} value={d.id}>
@@ -148,9 +160,9 @@ export function SavedSearchBox({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <input name="min_price" inputMode="numeric" placeholder="Min fiyat ₺" className={inputCls} />
-          <input name="max_price" inputMode="numeric" placeholder="Max fiyat ₺" className={inputCls} />
-          <select name="rooms" defaultValue="" className={inputCls} aria-label="Oda sayısı">
+          <input id="saved-search-min-price" name="min_price" inputMode="numeric" aria-label="Minimum fiyat" placeholder="Min fiyat ₺" className={inputCls} />
+          <input id="saved-search-max-price" name="max_price" inputMode="numeric" aria-label="Maksimum fiyat" placeholder="Max fiyat ₺" className={inputCls} />
+          <select id="saved-search-rooms" name="rooms" defaultValue="" className={inputCls} aria-label="Oda sayısı">
             <option value="">Oda (fark etmez)</option>
             {roomOptions.map((r) => (
               <option key={r} value={r}>
@@ -160,8 +172,9 @@ export function SavedSearchBox({
           </select>
         </div>
 
-        <label className="flex cursor-pointer items-start gap-2.5 rounded-[12px] border border-line bg-canvas px-3.5 py-3 text-[12px] leading-relaxed text-text-muted transition hover:border-brand-300">
+        <label id="saved-search-consent" htmlFor="saved-search-kvkk" className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-brand-300">
           <input
+            id="saved-search-kvkk"
             type="checkbox"
             name="kvkk"
             required
@@ -177,12 +190,12 @@ export function SavedSearchBox({
           </span>
         </label>
 
-        {error ? <p className="text-sm font-medium text-danger-500">{error}</p> : null}
+        {error ? <p ref={errorRef} tabIndex={-1} role="alert" aria-live="assertive" className="text-sm font-medium text-danger-500">{error}</p> : null}
 
         <button
           type="submit"
           disabled={status === "loading" || !kvkkAccepted}
-          className="btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-600/90 disabled:opacity-60 sm:w-auto"
+          className="btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-600/90 disabled:opacity-60 sm:w-auto"
         >
           {status === "loading" ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellRing className="h-4 w-4" />}
           Aramamı kaydet

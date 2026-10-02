@@ -5,21 +5,33 @@ import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
+import { getBaseUrl } from "@/lib/base-url";
 
 export type ShareResult = { error?: string; ok?: boolean; url?: string };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function appUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return getBaseUrl();
 }
 
 export async function createPropertyShareLink(formData: FormData): Promise<ShareResult> {
   const gate = await requirePermission("properties", "edit");
   if (!gate.ok) return { error: gate.error };
   const propertyId = String(formData.get("property_id") ?? "").trim();
-  if (!propertyId) return { error: "Portföy zorunlu." };
+  if (!UUID_RE.test(propertyId)) return { error: "Geçerli bir portföy seçin." };
+
+  const supabase = await createClient();
+  const { data: property } = await supabase
+    .from("properties")
+    .select("id")
+    .eq("id", propertyId)
+    .eq("tenant_id", gate.tenantId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!property) return { error: "Portföy bulunamadı." };
 
   const token = randomBytes(12).toString("hex");
-  const supabase = await createClient();
   const { error } = await supabase.from("share_links").insert({
     tenant_id: gate.tenantId,
     token,

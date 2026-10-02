@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import {
   publishToPortal,
@@ -100,7 +101,8 @@ export async function publishPropertyToPortal(
 
   // portal_listings kaydını güncelle / oluştur
   const now = new Date().toISOString();
-  await supabase.from("portal_listings").upsert(
+  const admin = createAdminClient();
+  const { error: localError } = await admin.from("portal_listings").upsert(
     {
       tenant_id:         gate.tenantId,
       property_id:       propertyId,
@@ -114,6 +116,14 @@ export async function publishPropertyToPortal(
     },
     { onConflict: "tenant_id,property_id,portal_name" },
   );
+  if (localError) {
+    console.error("publishPropertyToPortal local ledger", { code: localError.code });
+    return {
+      error: `${portalName} yayını başarılı oldu ancak yerel kayıt güncellenemedi. Dış ilan: ${result.externalId ?? "kimlik alınamadı"}. Operasyon ekibine bildirin.`,
+      externalId: result.externalId,
+      externalUrl: result.externalUrl,
+    };
+  }
 
   revalidatePath("/app/portallar");
   revalidatePath(`/app/portfoyler/${propertyId}`);
@@ -154,14 +164,27 @@ export async function updatePropertyOnPortal(
   const result = await updateOnPortal(portalName, externalId, toPayload(property as PropertyRow));
   if (!result.ok) return { error: result.error };
 
-  await supabase
+  const admin = createAdminClient();
+  const { data: updated, error: localError } = await admin
     .from("portal_listings")
     .update({
       last_confirmed_at: new Date().toISOString(),
       portal_url: result.externalUrl ?? undefined,
     })
     .eq("id", listingId)
-    .eq("tenant_id", gate.tenantId);
+    .eq("tenant_id", gate.tenantId)
+    .eq("property_id", propertyId)
+    .eq("portal_name", portalName)
+    .eq("status", "live")
+    .select("id")
+    .maybeSingle();
+  if (localError || !updated) {
+    return {
+      error: `${portalName} güncellendi ancak yerel senkron damgası yazılamadı. Operasyon ekibine bildirin.`,
+      externalId: result.externalId,
+      externalUrl: result.externalUrl,
+    };
+  }
 
   revalidatePath("/app/portallar");
   revalidatePath(`/app/portfoyler/${propertyId}`);
@@ -180,6 +203,11 @@ export async function unpublishPropertyFromPortal(
   const gate = await requirePermission("portals", "edit");
   if (!gate.ok) return { error: gate.error };
 
+  if (!isPortalSupported(portalName)) {
+    return { error: `${portalName} için yayın entegrasyonu henüz mevcut değil.` };
+  }
+  if (!externalId) return { error: "Portal ilan kimliği yok; ilan kaldırılamaz." };
+
   const configured = await isPortalConfigured(portalName);
   if (!configured) {
     return { error: `${portalName} API anahtarı tanımlanmamış.` };
@@ -188,8 +216,8 @@ export async function unpublishPropertyFromPortal(
   const result = await unpublishFromPortal(portalName, externalId);
   if (!result.ok) return { error: result.error };
 
-  const supabase = await createClient();
-  await supabase
+  const admin = createAdminClient();
+  const { data: updated, error: localError } = await admin
     .from("portal_listings")
     .update({
       status:      "removed",
@@ -197,7 +225,15 @@ export async function unpublishPropertyFromPortal(
       removal_reason: "API ile kaldırıldı",
     })
     .eq("id", listingId)
-    .eq("tenant_id", gate.tenantId);
+    .eq("tenant_id", gate.tenantId)
+    .eq("portal_name", portalName)
+    .eq("portal_listing_id", externalId)
+    .eq("status", "live")
+    .select("id")
+    .maybeSingle();
+  if (localError || !updated) {
+    return { error: `${portalName} ilanı kaldırıldı ancak yerel kayıt kapanamadı. Operasyon ekibine bildirin.` };
+  }
 
   revalidatePath("/app/portallar");
   return { ok: true };

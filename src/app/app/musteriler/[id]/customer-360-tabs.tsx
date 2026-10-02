@@ -249,7 +249,7 @@ export function Customer360Tabs({
       </TabsContent>
 
       <TabsContent value="talepler">
-        <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <Target className="h-4 w-4 text-brand-600" /> Talepler
@@ -265,19 +265,19 @@ export function Customer360Tabs({
             />
           </div>
           {demands.length === 0 ? (
-            <p className="mt-4 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+            <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
               Bu müşteri için henüz talep tanımlanmadı.
             </p>
           ) : (
             <div className="mt-4 space-y-3">
               {demands.map((d) => (
-                <div key={d.id} className="rounded-[14px] border border-line bg-canvas/60 p-4">
+                <div key={d.id} className="rounded-[var(--radius-card)] border border-line bg-canvas/60 p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">
+                    <span className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">
                       {d.transaction_type}{d.property_type ? ` · ${d.property_type}` : ""}
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-mint-500/10 px-2 py-0.5 text-[11px] font-bold text-mint-600">
+                      <span className="rounded-full bg-mint-500/10 px-2 py-0.5 text-xs font-bold text-mint-600">
                         {demandStatus[d.status] ?? d.status}
                       </span>
                       <EditDemandDialog demand={d} provinces={provinces} customerId={customerId} />
@@ -301,7 +301,7 @@ export function Customer360Tabs({
       </TabsContent>
 
       <TabsContent value="anlasmalar">
-        <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <Handshake className="h-4 w-4 text-amber-500" /> Anlaşmalar
@@ -311,7 +311,7 @@ export function Customer360Tabs({
             </Link>
           </div>
           {deals.length === 0 ? (
-            <p className="mt-4 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+            <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
               Bu müşteriye bağlı anlaşma yok.
             </p>
           ) : (
@@ -320,13 +320,13 @@ export function Customer360Tabs({
                 <Link
                   key={d.id}
                   href={`/app/anlasmalar/${d.id}`}
-                  className="focus-ring group flex items-center justify-between gap-3 rounded-[12px] border border-line bg-canvas/50 px-3 py-3 transition hover:border-brand-300"
+                  className="focus-ring group flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-3 transition hover:border-brand-300"
                 >
                   <div>
                     <p className="text-sm font-semibold text-ink-950">
                       {d.deal_type === "rent" ? "Kiralama" : "Satış"} · {stageLabel[d.stage] ?? d.stage}
                     </p>
-                    <p className="text-[11px] text-text-muted">{dateTime(d.updated_at)}</p>
+                    <p className="text-xs text-text-muted">{dateTime(d.updated_at)}</p>
                   </div>
                   <span className="flex items-center gap-2">
                     <span className="font-display text-sm font-extrabold text-brand-600">
@@ -352,7 +352,7 @@ export function Customer360Tabs({
       <TabsContent value="dosyalar"><CustomerFilesTab customerId={customerId} files={files ?? []} /></TabsContent>
 
       <TabsContent value="izinler">
-        <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <ShieldCheck className="h-4 w-4 text-mint-600" /> İYS izinleri
@@ -362,7 +362,7 @@ export function Customer360Tabs({
             </Link>
           </div>
           {consents.length === 0 ? (
-            <p className="mt-4 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+            <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
               Kayıtlı ticari ileti izni yok.
             </p>
           ) : (
@@ -371,12 +371,12 @@ export function Customer360Tabs({
                 <Link
                   key={c.id}
                   href="/app/uyum"
-                  className="focus-ring group flex items-center justify-between rounded-[12px] border border-line bg-canvas/50 px-3 py-2.5 text-sm transition hover:border-brand-300"
+                  className="focus-ring group flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-2.5 text-sm transition hover:border-brand-300"
                 >
                   <span className="font-semibold text-ink-950">{channelLabel[c.channel] ?? c.channel}</span>
                   <span className="flex items-center gap-2">
                     <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                      className={`rounded-full px-2 py-0.5 text-xs font-bold ${
                         c.status === "granted" ? "bg-mint-500/10 text-mint-600" : c.status === "denied" ? "bg-danger-500/10 text-danger-500" : "bg-amber-400/15 text-amber-600"
                       }`}
                     >
@@ -392,26 +392,26 @@ export function Customer360Tabs({
       </TabsContent>
 
       <TabsContent value="aktivite">
-        <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <PhoneCall className="h-4 w-4 text-mint-600" /> Aktivite akışı
           </h2>
           {activity.length === 0 ? (
-            <p className="mt-4 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+            <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
               Henüz çağrı veya randevu kaydı yok.
             </p>
           ) : (
             <div className="mt-4 space-y-3">
               {activity.map((a) => (
-                <div key={a.key} className="flex items-start gap-3 rounded-[12px] border border-line bg-canvas/50 px-3 py-3">
-                  <span className={`mt-0.5 grid h-8 w-8 place-items-center rounded-[9px] ${a.tone}`}>
+                <div key={a.key} className="flex items-start gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-3">
+                  <span className={`mt-0.5 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] ${a.tone}`}>
                     <CalendarDays className="h-4 w-4" />
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-ink-950">{a.title}</p>
                     <p className="text-xs text-text-muted">{a.sub}</p>
                   </div>
-                  <span className="shrink-0 text-[11px] text-text-faint">{dateTime(a.time)}</span>
+                  <span className="shrink-0 text-xs text-text-faint">{dateTime(a.time)}</span>
                 </div>
               ))}
             </div>
@@ -422,7 +422,7 @@ export function Customer360Tabs({
       <TabsContent value="notlar">
         <div className="space-y-4">
           {tags.length > 0 ? (
-            <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
                 <Tag className="h-4 w-4 text-cyan-500" /> Etiketler
               </h2>
@@ -433,7 +433,7 @@ export function Customer360Tabs({
               </div>
             </section>
           ) : null}
-          <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <Sparkles className="h-4 w-4 text-amber-500" /> Notlar
             </h2>
@@ -455,20 +455,20 @@ export function Customer360Tabs({
       </TabsContent>
 
       <TabsContent value="gecmis">
-        <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <FileText className="h-4 w-4 text-brand-600" /> İşlem geçmişi
           </h2>
           {audit.length === 0 ? (
-            <p className="mt-4 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+            <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
               Henüz denetim kaydı yok. Yeni düzenlemeler burada görünecek.
             </p>
           ) : (
             <div className="mt-4 space-y-2">
               {audit.map((a) => (
-                <div key={a.id} className="flex items-center justify-between rounded-[12px] border border-line bg-canvas/50 px-3 py-2.5 text-sm">
+                <div key={a.id} className="flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-2.5 text-sm">
                   <span className="font-medium text-ink-950">{a.action}</span>
-                  <span className="text-[11px] text-text-faint">{dateTime(a.created_at)}</span>
+                  <span className="text-xs text-text-faint">{dateTime(a.created_at)}</span>
                 </div>
               ))}
             </div>

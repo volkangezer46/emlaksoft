@@ -98,7 +98,7 @@ export function CustomerTimelineTab({ items }: { items: TimelineItem[] }) {
   }
 
   return (
-    <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
           <History className="h-4 w-4 text-brand-600" /> Zaman tüneli
@@ -110,7 +110,7 @@ export function CustomerTimelineTab({ items }: { items: TimelineItem[] }) {
               type="button"
               onClick={() => setFilter(f.id)}
               aria-pressed={filter === f.id}
-              className={`focus-ring rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+              className={`focus-ring rounded-full border px-3 py-1 text-xs font-semibold transition ${
                 filter === f.id
                   ? "border-brand-600 bg-brand-600 text-white"
                   : "border-line bg-canvas text-text-muted hover:border-brand-400"
@@ -123,7 +123,7 @@ export function CustomerTimelineTab({ items }: { items: TimelineItem[] }) {
       </div>
 
       {visible.length === 0 ? (
-        <p className="mt-4 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+        <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
           {filter === "all" ? "Henüz zaman tüneli kaydı yok." : "Bu tipte kayıt bulunamadı."}
         </p>
       ) : (
@@ -131,7 +131,7 @@ export function CustomerTimelineTab({ items }: { items: TimelineItem[] }) {
           {groups.map((g) => (
             <div key={g.label}>
               <div className="flex items-center gap-3">
-                <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">{g.label}</span>
+                <span className="text-xs font-bold uppercase tracking-[0.08em] text-text-faint">{g.label}</span>
                 <span className="h-px flex-1 bg-line" />
               </div>
               <div className="mt-2 space-y-2">
@@ -141,20 +141,20 @@ export function CustomerTimelineTab({ items }: { items: TimelineItem[] }) {
                   const inner = (
                     <>
                       <span className={`mt-3 h-2 w-2 shrink-0 rounded-full ${meta.dot}`} aria-hidden />
-                      <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[9px] ${meta.tone}`}>
+                      <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] ${meta.tone}`}>
                         <Icon className="h-4 w-4" />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold text-ink-950">{item.title}</span>
                         {item.sub ? <span className="block truncate text-xs text-text-muted">{item.sub}</span> : null}
                       </span>
-                      <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-text-faint">
+                      <span className="flex shrink-0 items-center gap-1.5 text-xs text-text-faint">
                         {relTime(item.time)}
                         {item.href ? <ArrowUpRight className="hover-action h-3.5 w-3.5 opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" /> : null}
                       </span>
                     </>
                   );
-                  const cls = "flex items-start gap-3 rounded-[12px] border border-line bg-canvas/50 px-3 py-3";
+                  const cls = "flex items-start gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-3";
                   return item.href ? (
                     <Link key={item.key} href={item.href} className={`focus-ring group ${cls} transition hover:border-brand-300`}>
                       {inner}
@@ -167,7 +167,7 @@ export function CustomerTimelineTab({ items }: { items: TimelineItem[] }) {
             </div>
           ))}
           {hasMore ? (
-            <p className="rounded-[12px] border border-dashed border-line px-4 py-3 text-center text-xs text-text-faint">
+            <p className="rounded-[var(--radius-card)] border border-dashed border-line px-4 py-3 text-center text-xs text-text-faint">
               Son {MAX_ITEMS} kayıt gösteriliyor — daha eski kayıtlar ilgili sekmelerde.
             </p>
           ) : null}

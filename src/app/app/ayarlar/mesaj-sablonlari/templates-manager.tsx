@@ -108,10 +108,10 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
       {/* Form */}
-      <section className="dashboard-panel h-fit rounded-[20px] border border-line bg-surface p-4 md:p-6">
+      <section className="dashboard-panel h-fit rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center justify-between gap-3 border-b border-line pb-4">
           <div className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-mint-500/12 text-mint-600">
+            <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-mint-500/12 text-mint-600">
               {editing ? <Pencil className="h-5 w-5" /> : <MessageSquareText className="h-5 w-5" />}
             </span>
             <div>
@@ -125,7 +125,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
             <button
               type="button"
               onClick={cancelEdit}
-              className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+              className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
             >
               <X className="h-3.5 w-3.5" /> Vazgeç
             </button>
@@ -150,7 +150,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
                 maxLength={TEMPLATE_TITLE_MAX}
                 defaultValue={editing?.title ?? ""}
                 placeholder="Örn. Randevu teyidi"
-                className="focus-ring mt-1.5 w-full rounded-[11px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 placeholder:text-text-faint"
+                className="focus-ring mt-1.5 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 placeholder:text-text-faint"
               />
             </div>
             <div>
@@ -159,7 +159,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
                 id="tpl-category"
                 name="category"
                 defaultValue={editing?.category ?? "genel"}
-                className="focus-ring mt-1.5 w-full rounded-[11px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950"
+                className="focus-ring mt-1.5 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950"
               >
                 {TEMPLATE_CATEGORIES.map((c) => (
                   <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
@@ -171,7 +171,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
           <div>
             <div className="flex items-end justify-between gap-2">
               <label htmlFor="tpl-body" className="text-xs font-bold text-text-muted">Mesaj metni</label>
-              <span className={`numeric text-[11px] ${bodyDraft.length > TEMPLATE_BODY_MAX - 60 ? "text-amber-600" : "text-text-faint"}`}>
+              <span className={`numeric text-xs ${bodyDraft.length > TEMPLATE_BODY_MAX - 60 ? "text-amber-600" : "text-text-faint"}`}>
                 {bodyDraft.length}/{TEMPLATE_BODY_MAX}
               </span>
             </div>
@@ -185,7 +185,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
               value={bodyDraft}
               onChange={(e) => setBodyDraft(e.target.value)}
               placeholder={"Merhaba {musteri}, ben {ofis}'ten {danisman}…"}
-              className="focus-ring mt-1.5 w-full resize-y rounded-[11px] border border-line bg-canvas px-3.5 py-2.5 text-sm leading-relaxed text-ink-950 placeholder:text-text-faint"
+              className="focus-ring mt-1.5 w-full resize-y rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm leading-relaxed text-ink-950 placeholder:text-text-faint"
             />
           </div>
 
@@ -199,7 +199,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
                   type="button"
                   title={v.desc}
                   onClick={() => insertToken(v.token)}
-                  className="focus-ring press rounded-full border border-line bg-canvas px-2.5 py-1 text-[11px] font-semibold text-brand-600 transition hover:border-brand-300 hover:bg-brand-600/8"
+                  className="focus-ring press rounded-full border border-line bg-canvas px-2.5 py-1 text-xs font-semibold text-brand-600 transition hover:border-brand-300 hover:bg-brand-600/8"
                 >
                   {v.label}
                 </button>
@@ -216,15 +216,15 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
               min={0}
               max={9999}
               defaultValue={editing?.sort_order ?? 0}
-              className="focus-ring mt-1.5 w-28 rounded-[11px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950"
+              className="focus-ring mt-1.5 w-28 rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950"
             />
           </div>
 
           {/* Canlı önizleme — örnek verilerle gerçek render */}
-          <div className="rounded-[14px] border border-line bg-canvas p-3.5">
-            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">Önizleme (örnek verilerle)</p>
+          <div className="rounded-[var(--radius-card)] border border-line bg-canvas p-3.5">
+            <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Önizleme (örnek verilerle)</p>
             {preview ? (
-              <p className="mt-2 whitespace-pre-wrap rounded-[11px] bg-mint-500/8 px-3 py-2.5 text-sm leading-relaxed text-ink-950">
+              <p className="mt-2 whitespace-pre-wrap rounded-[var(--radius-control)] bg-mint-500/8 px-3 py-2.5 text-sm leading-relaxed text-ink-950">
                 {preview}
               </p>
             ) : (
@@ -233,7 +233,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
           </div>
 
           {errorMsg ? (
-            <p className="rounded-[10px] border border-danger-500/25 bg-danger-500/8 px-3 py-2 text-xs font-semibold text-danger-500">
+            <p className="rounded-[var(--radius-control)] border border-danger-500/25 bg-danger-500/8 px-3 py-2 text-xs font-semibold text-danger-500">
               {errorMsg}
             </p>
           ) : null}
@@ -241,7 +241,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
           <button
             type="submit"
             disabled={pending}
-            className="focus-ring press inline-flex w-full items-center justify-center gap-2 rounded-[11px] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
+            className="focus-ring press inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
           >
             {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : editing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
             {editing ? "Değişiklikleri kaydet" : "Şablonu kaydet"}
@@ -250,7 +250,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
       </section>
 
       {/* Liste */}
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-4 md:p-6">
+      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center justify-between gap-3 border-b border-line pb-4">
           <div>
             <h2 className="font-display font-bold text-ink-950">Şablon kütüphanesi</h2>
@@ -278,7 +278,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
                   router.refresh();
                 })
               }
-              className="focus-ring press inline-flex items-center gap-2 rounded-[11px] bg-ink-950 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-ink-800 disabled:opacity-60"
+              className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-ink-800 disabled:opacity-60"
             >
               {rowPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
               Varsayılan şablonları ekle
@@ -291,7 +291,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
               return (
                 <li
                   key={t.id}
-                  className={`rounded-[14px] border border-line bg-canvas p-4 transition hover:border-brand-300 ${t.is_active ? "" : "opacity-60"}`}
+                  className={`rounded-[var(--radius-card)] border border-line bg-canvas p-4 transition hover:border-brand-300 ${t.is_active ? "" : "opacity-60"}`}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
@@ -309,7 +309,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
                             router.refresh();
                           })
                         }
-                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
+                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
                       >
                         {t.is_active ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                       </button>
@@ -317,7 +317,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
                         type="button"
                         title="Düzenle"
                         onClick={() => startEdit(t)}
-                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
@@ -326,7 +326,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
                           <button
                             type="button"
                             title="Sil"
-                            className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line text-text-muted transition hover:border-danger-500/40 hover:text-danger-500"
+                            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/40 hover:text-danger-500"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -339,7 +339,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
                       />
                     </div>
                   </div>
-                  <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px] text-text-faint">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-text-faint">
                     <span className={`rounded-full px-2 py-0.5 font-bold ${badge}`}>
                       {CATEGORY_LABELS[t.category as TemplateCategory] ?? "Genel"}
                     </span>
@@ -368,7 +368,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
                   router.refresh();
                 })
               }
-              className="focus-ring press inline-flex items-center gap-2 rounded-[10px] border border-line bg-canvas px-3.5 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-300 disabled:opacity-60"
+              className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-300 disabled:opacity-60"
             >
               {rowPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
               Eksik varsayılan şablonları ekle

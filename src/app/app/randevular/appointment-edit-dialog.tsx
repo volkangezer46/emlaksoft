@@ -77,7 +77,7 @@ export function AppointmentEditDialog({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-text-muted transition hover:border-brand-300"
+          className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-canvas px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300"
         >
           <CalendarClock className="h-3 w-3" /> Ertele
         </button>
@@ -90,7 +90,7 @@ export function AppointmentEditDialog({
                 <select
                   name="appointment_type"
                   defaultValue={appointment.appointment_type}
-                  className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                  className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                 >
                   {types.map((t) => (
                     <option key={t.value} value={t.value}>
@@ -106,7 +106,7 @@ export function AppointmentEditDialog({
                       type="date"
                       required
                       defaultValue={date}
-                      className="mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                      className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                     />
                   </label>
                   <label className="text-xs font-semibold text-text-muted">
@@ -116,7 +116,7 @@ export function AppointmentEditDialog({
                       type="time"
                       required
                       defaultValue={time}
-                      className="mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                      className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                     />
                   </label>
                 </div>
@@ -128,13 +128,13 @@ export function AppointmentEditDialog({
                     step="5"
                     defaultValue={appointment.duration_min ?? ""}
                     placeholder="Süre (dk)"
-                    className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                    className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                   />
                   <input
                     name="location"
                     defaultValue={appointment.location ?? ""}
                     placeholder="Konum"
-                    className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                    className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                   />
                 </div>
                 <textarea
@@ -142,12 +142,12 @@ export function AppointmentEditDialog({
                   rows={2}
                   defaultValue={appointment.notes ?? ""}
                   placeholder="Not (opsiyonel)"
-                  className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                  className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                 />
           {/* Çakışma freni bandı — kayıt yapılmadı, ikinci gönderim confirm_conflict ile geçer */}
           {conflictWarning && (
             <div
-              className="flex items-start gap-2.5 rounded-[12px] border border-amber-400/50 bg-amber-400/10 px-4 py-3 text-xs font-medium leading-relaxed text-amber-700"
+              className="flex items-start gap-2.5 rounded-[var(--radius-card)] border border-amber-400/50 bg-amber-400/10 px-4 py-3 text-xs font-medium leading-relaxed text-amber-700"
               role="alert"
             >
               <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
@@ -166,7 +166,7 @@ export function AppointmentEditDialog({
             <DialogClose asChild>
               <button
                 type="button"
-                className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+                className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
               >
                 Vazgeç
               </button>
@@ -174,7 +174,7 @@ export function AppointmentEditDialog({
             <button
               type="submit"
               disabled={pending}
-              className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+              className="btn-shine focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
             >
               {pending ? "Kaydediliyor…" : conflictWarning ? "Yine de kaydet" : "Kaydet"}
             </button>

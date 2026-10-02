@@ -1,6 +1,13 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformSetting } from "@/lib/platform-settings";
+import { getPlan } from "@/lib/billing/plans";
+import {
+  externalErrorMetadata,
+  fetchExternal,
+  readExternalJson,
+  requireExternalSuccess,
+} from "@/lib/external-fetch";
 
 export type AdvisorMessage = { role: "user" | "assistant"; content: string };
 
@@ -21,6 +28,8 @@ export type AdvisorContext = {
 };
 
 export const OPENAI_MODEL = "gpt-4o-mini";
+const OPENAI_TIMEOUT_MS = 45_000;
+const OPENAI_MAX_RESPONSE_BYTES = 1024 * 1024;
 
 /** DB ayarı öncelikli, yoksa ortam değişkeni. */
 export async function getOpenAiKey(): Promise<string | null> {
@@ -131,21 +140,20 @@ async function callOpenAI(apiKey: string, messages: AdvisorMessage[], context: A
     ],
   };
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  const res = await fetchExternal("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(payload),
-  });
+  }, { timeoutMs: OPENAI_TIMEOUT_MS });
 
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`OpenAI ${res.status}: ${errText.slice(0, 200)}`);
-  }
-
-  const json = await res.json();
+  await requireExternalSuccess(res);
+  const json = await readExternalJson<{ choices?: { message?: { content?: unknown } }[] }>(
+    res,
+    OPENAI_MAX_RESPONSE_BYTES,
+  );
   const content = json?.choices?.[0]?.message?.content;
   if (!content) throw new Error("OpenAI boş yanıt döndü.");
   return String(content).trim();
@@ -168,14 +176,14 @@ export function fallbackAdvisor(messages: AdvisorMessage[], c: AdvisorContext): 
     insights.push(
       `**Gelir:** Aylık yinelenen gelir ${money(c.mrr)} · yıllık tahmin ${money(c.mrr * 12)} · ofis başına ${money(c.arpa)}.` +
         (c.tenantsTrial > 0
-          ? ` ${c.tenantsTrial} deneme ofisi ücretliye dönerse aylık +${money(c.tenantsTrial * (c.arpa || 2490))} potansiyel var.`
+          ? ` ${c.tenantsTrial} deneme ofisi ücretliye dönerse aylık +${money(c.tenantsTrial * (c.arpa || getPlan("office").monthlyTry))} potansiyel var.`
           : ""),
     );
   }
   if (topic.churn || !focused) {
     if (c.tenantsPastDue > 0) {
       insights.push(
-        `**Müşteri kaybı riski:** ${c.tenantsPastDue} ofis ödemesi gecikmiş/askıda. Bugün tahsilat araması yapın; ~${money(c.tenantsPastDue * (c.arpa || 2490))} aylık gelir risk altında.`,
+        `**Müşteri kaybı riski:** ${c.tenantsPastDue} ofis ödemesi gecikmiş/askıda. Bugün tahsilat araması yapın; ~${money(c.tenantsPastDue * (c.arpa || getPlan("office").monthlyTry))} aylık gelir risk altında.`,
       );
     } else {
       insights.push(`**Müşteri kaybı riski:** Şu an ödemesi geciken ofis yok — sağlıklı. Deneme bitişlerini takip ederek koruyun.`);
@@ -220,7 +228,7 @@ export async function runAdvisor(messages: AdvisorMessage[]): Promise<AdvisorRes
       const reply = await callOpenAI(apiKey, messages, context);
       return { reply, usedAI: true };
     } catch (e) {
-      console.error("runAdvisor:openai", e);
+      console.error("runAdvisor:openai", externalErrorMetadata(e));
       // Anahtar geçersiz/limit → fallback'e düş
       return { reply: fallbackAdvisor(messages, context), usedAI: false };
     }

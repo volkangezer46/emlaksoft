@@ -80,7 +80,7 @@ export function ChargesPanel({
   }
 
   return (
-    <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
           <Receipt className="h-4 w-4 text-brand-600" /> Kira tahakkukları
@@ -93,7 +93,7 @@ export function ChargesPanel({
               value={month}
               onChange={(e) => setMonth(e.target.value)}
               aria-label="Tahakkuk dönemi"
-              className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
+              className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
             />
             <Button size="sm" onClick={createCharge} loading={busy === "create"} className="gap-1.5">
               <CalendarPlus className="h-3.5 w-3.5" /> Dönem tahakkuku oluştur
@@ -103,7 +103,7 @@ export function ChargesPanel({
       </div>
 
       {charges.length === 0 ? (
-        <p className="mt-4 rounded-[12px] border border-dashed border-line-strong p-6 text-center text-sm text-text-muted">
+        <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong p-6 text-center text-sm text-text-muted">
           Henüz tahakkuk yok. Aylık tahakkuklar vade gününde otomatik oluşturulur; yukarıdan elle de açabilirsiniz.
         </p>
       ) : (
@@ -137,7 +137,7 @@ export function ChargesPanel({
                             type="button"
                             onClick={() => toggle(c.id, !paid)}
                             disabled={busy === c.id}
-                            className="focus-ring press inline-flex items-center gap-1 rounded-[8px] border border-hairline bg-surface px-2 py-1 text-[11px] font-semibold text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas disabled:opacity-50"
+                            className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2 py-1 text-xs font-semibold text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas disabled:opacity-50"
                           >
                             {busy === c.id ? (
                               <Loader2 className="h-3 w-3 animate-spin" />

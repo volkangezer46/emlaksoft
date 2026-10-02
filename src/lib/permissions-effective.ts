@@ -11,6 +11,20 @@ export function isOverrideActive(row: Pick<UserOverrideRow, "expires_at">, now =
   return !row.expires_at || new Date(row.expires_at).getTime() > now;
 }
 
+const READONLY_CEILING = Object.freeze(
+  Object.fromEntries(
+    Object.entries(DEFAULT_MATRIX.readonly).map(([mod, actions]) => [
+      mod,
+      Object.freeze([...(actions ?? [])]),
+    ]),
+  ),
+) as EffectivePermissions;
+
+/** Readonly is a security ceiling: tenant/user overrides can never add writes. */
+export function immutableReadonlyPermissions(): EffectivePermissions {
+  return READONLY_CEILING;
+}
+
 /**
  * Etkin izin haritası — üç katmanın birleşimi, alttan üste:
  *   1. varsayılan matris (`DEFAULT_MATRIX`)
@@ -29,14 +43,23 @@ export const getEffectivePermissions = cache(async function getEffectivePermissi
   role: string | null | undefined,
   userId?: string | null,
 ): Promise<EffectivePermissions> {
-  const r = (role || "advisor") as AppRole;
-  const defaults = DEFAULT_MATRIX[r] ?? {};
+  const r = role as AppRole;
+  const defaults = DEFAULT_MATRIX[r];
+
+  // Missing and unknown identities fail closed. Authentication/bootstrap code
+  // must establish a canonical role instead of silently inheriting advisor.
+  if (!defaults) return {};
+
+  // Readonly is used by platform impersonation. Returning before any database
+  // override query prevents a target tenant from granting the support identity
+  // create/edit/delete powers through role or cross-tenant user overrides.
+  if (r === "readonly") return immutableReadonlyPermissions();
 
   if (!tenantId) return defaults;
 
   try {
     const supabase = await createClient();
-    const [{ data: overrides }, userOverrides] = await Promise.all([
+    const [roleOverrideResult, userOverrideResult] = await Promise.all([
       supabase
         .from("tenant_role_permissions")
         .select("module, action, allowed")
@@ -51,9 +74,17 @@ export const getEffectivePermissions = cache(async function getEffectivePermissi
             .select("module, actions, expires_at")
             .eq("tenant_id", tenantId)
             .eq("user_id", userId)
-            .then(({ data }) => (data ?? []) as UserOverrideRow[])
-        : Promise.resolve([] as UserOverrideRow[]),
+        : Promise.resolve({ data: [] as UserOverrideRow[], error: null }),
     ]);
+    if (roleOverrideResult.error || userOverrideResult.error) {
+      console.error(
+        "getEffectivePermissions query",
+        roleOverrideResult.error ?? userOverrideResult.error,
+      );
+      return {};
+    }
+    const overrides = roleOverrideResult.data;
+    const userOverrides = (userOverrideResult.data ?? []) as UserOverrideRow[];
 
     const merged: Partial<Record<AppModule, Set<AppAction>>> = {};
     for (const mod of Object.keys(defaults) as AppModule[]) {
@@ -80,7 +111,7 @@ export const getEffectivePermissions = cache(async function getEffectivePermissi
     return result;
   } catch (e) {
     console.error("getEffectivePermissions", e);
-    return defaults;
+    return {};
   }
 });
 

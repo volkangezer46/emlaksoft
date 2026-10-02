@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "Çerez Politikası | EmlakSoft",
+  title: "Çerez Politikası",
   description: "EmlakSoft'un kullandığı çerezler ve yönetim seçenekleri.",
   alternates: { canonical: "/cerez-politikasi" },
 };
@@ -21,7 +21,7 @@ export default function CerezPolitikasiPage() {
       </LegalSection>
 
       <LegalSection no="2." title="Kullandığımız Çerezler">
-        <div className="overflow-x-auto rounded-[14px] border border-line">
+        <div className="overflow-x-auto rounded-[var(--radius-card)] border border-line">
           <table className="w-full min-w-[520px] text-left text-sm">
             <thead className="bg-canvas text-xs text-text-muted">
               <tr>

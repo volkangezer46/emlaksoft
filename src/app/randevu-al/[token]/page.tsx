@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CalendarClock, CalendarX2, UserRound } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 import {
   PublicBrandButton,
   PublicStateBox,
@@ -54,9 +55,16 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
   if (!setting) notFound();
 
   const [{ data: tenant }, { data: staff }] = await Promise.all([
-    admin.from("tenants").select("name, logo_url, brand_color, phone").eq("id", setting.tenant_id).maybeSingle(),
-    admin.from("profiles").select("full_name").eq("id", setting.staff_id).maybeSingle(),
+    admin.from("tenants").select("name, status, logo_url, brand_color, phone").eq("id", setting.tenant_id).maybeSingle(),
+    admin
+      .from("profiles")
+      .select("full_name")
+      .eq("id", setting.staff_id)
+      .eq("tenant_id", setting.tenant_id)
+      .eq("is_active", true)
+      .maybeSingle(),
   ]);
+  if (!tenant || !isPublicTenantActive(tenant.status) || !staff) notFound();
 
   const office = tenant?.name ?? "Emlak ofisi";
   const officePhone = (tenant?.phone as string | null) ?? null;
@@ -133,7 +141,7 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
       width="lg"
     >
       {setting.note ? (
-        <p className="mb-4 rounded-[12px] border border-line bg-canvas/60 px-4 py-3 text-xs leading-relaxed text-text-muted">
+        <p className="mb-4 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-4 py-3 text-xs leading-relaxed text-text-muted">
           {setting.note}
         </p>
       ) : null}

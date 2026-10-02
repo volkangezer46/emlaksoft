@@ -13,6 +13,18 @@
  */
 
 import { getPlatformSetting } from "@/lib/platform-settings";
+import {
+  normalizeProviderBaseUrl,
+  providerAllowedHosts,
+  PROVIDER_REQUEST_TIMEOUT_MS,
+} from "@/lib/integrations/provider-url";
+import {
+  discardExternalResponse,
+  externalErrorMetadata,
+  fetchExternal,
+  readExternalJson,
+  readExternalText,
+} from "@/lib/external-fetch";
 
 // ---------------------------------------------------------------------------
 // Ortak tipler
@@ -24,7 +36,7 @@ export type PortalPublishConfig = {
   apiKey: string;
   apiSecret?: string;
   agencyId?: string;
-  baseUrl?: string;
+  baseUrl: string;
 };
 
 export type PropertyPayload = {
@@ -66,14 +78,22 @@ export async function getPortalConfig(portal: PortalName): Promise<PortalPublish
     getPlatformSetting(`${portal}_base_url`),
   ]);
 
-  const key = apiKey ?? process.env[`${portal.toUpperCase()}_API_KEY`] ?? "";
-  if (!key) return null;
+  const key = (apiKey ?? process.env[`${portal.toUpperCase()}_API_KEY`] ?? "").trim();
+  const configuredBaseUrl = (
+    baseUrl ?? process.env[`${portal.toUpperCase()}_BASE_URL`] ?? ""
+  ).trim();
+  // Portal API'leri kapalı kurumsal sözleşmelere bağlıdır. Yalnızca anahtarın
+  // bulunması yayın yetkisini kanıtlamaz; sağlayıcının verdiği uç açıkça
+  // yapılandırılmadan tahmini bir URL'ye istek gönderme.
+  if (!key || !configuredBaseUrl) return null;
+  const resolvedBaseUrl = normalizePortalBaseUrl(portal, configuredBaseUrl);
+  if (!resolvedBaseUrl) return null;
 
   return {
     apiKey:    key,
     apiSecret: apiSecret ?? process.env[`${portal.toUpperCase()}_API_SECRET`] ?? undefined,
     agencyId:  agencyId  ?? process.env[`${portal.toUpperCase()}_AGENCY_ID`]  ?? undefined,
-    baseUrl:   baseUrl   ?? undefined,
+    baseUrl:   resolvedBaseUrl,
   };
 }
 
@@ -90,7 +110,7 @@ export async function isPortalConfigured(portal: PortalName): Promise<boolean> {
 
 type PortalSpec = {
   label:    string;
-  base:     string;
+  allowedHosts: readonly string[];
   collectionPath: string;
   headers:  (cfg: PortalPublishConfig) => Record<string, string>;
   map:      (p: PropertyPayload) => Record<string, unknown>;
@@ -101,7 +121,7 @@ type PortalSpec = {
 const PORTAL_SPECS: Record<PortalName, PortalSpec> = {
   sahibinden: {
     label: "Sahibinden",
-    base: "https://api.sahibinden.com/v1",
+    allowedHosts: ["api.sahibinden.com"],
     collectionPath: "/listings",
     headers: (cfg) => ({
       "Content-Type": "application/json",
@@ -115,7 +135,7 @@ const PORTAL_SPECS: Record<PortalName, PortalSpec> = {
   },
   hepsiemlak: {
     label: "Hepsiemlak",
-    base: "https://api.hepsiemlak.com/v2",
+    allowedHosts: ["api.hepsiemlak.com"],
     collectionPath: "/adverts",
     headers: (cfg) => ({
       "Content-Type": "application/json",
@@ -127,7 +147,7 @@ const PORTAL_SPECS: Record<PortalName, PortalSpec> = {
   },
   zingat: {
     label: "Zingat",
-    base: "https://api.zingat.com/v1",
+    allowedHosts: ["api.zingat.com"],
     collectionPath: "/listings",
     headers: (cfg) => ({
       "Content-Type": "application/json",
@@ -140,7 +160,7 @@ const PORTAL_SPECS: Record<PortalName, PortalSpec> = {
   },
   emlakjet: {
     label: "Emlakjet",
-    base: "https://api.emlakjet.com/v1",
+    allowedHosts: ["api.emlakjet.com"],
     collectionPath: "/ilan",
     headers: (cfg) => ({
       "Content-Type": "application/json",
@@ -153,6 +173,31 @@ const PORTAL_SPECS: Record<PortalName, PortalSpec> = {
   },
 };
 
+const PORTAL_MAX_RESPONSE_BYTES = 512 * 1024;
+
+function portalTransportFailure(spec: PortalSpec, error: unknown): PortalPublishResult {
+  console.error("portal provider request failed", {
+    provider: spec.label,
+    ...externalErrorMetadata(error),
+  });
+  return { ok: false, error: `${spec.label} sağlayıcısına erişilemedi.` };
+}
+
+export function isPortalName(value: string): value is PortalName {
+  return Object.hasOwn(PORTAL_SPECS, value);
+}
+
+export function normalizePortalBaseUrl(portal: PortalName, raw: string): string | null {
+  const spec = PORTAL_SPECS[portal];
+  return normalizeProviderBaseUrl(
+    raw,
+    providerAllowedHosts(
+      spec.allowedHosts,
+      process.env[`${portal.toUpperCase()}_ALLOWED_HOSTS`],
+    ),
+  );
+}
+
 /** Publish/update için gerçek yayın adaptörü tanımlı portallar. */
 export const SUPPORTED_PORTALS = Object.keys(PORTAL_SPECS) as PortalName[];
 export function isPortalSupported(portal: PortalName): boolean {
@@ -160,53 +205,63 @@ export function isPortalSupported(portal: PortalName): boolean {
 }
 
 async function restCreate(spec: PortalSpec, property: PropertyPayload, cfg: PortalPublishConfig): Promise<PortalPublishResult> {
-  const base = cfg.baseUrl ?? spec.base;
+  const base = cfg.baseUrl;
   try {
-    const res = await fetch(`${base}${spec.collectionPath}`, {
+    const res = await fetchExternal(`${base}${spec.collectionPath}`, {
       method: "POST",
+      redirect: "error",
       headers: spec.headers(cfg),
       body: JSON.stringify(spec.map(property)),
-    });
+    }, { timeoutMs: PROVIDER_REQUEST_TIMEOUT_MS });
     if (!res.ok) {
-      const body = await res.text();
-      return { ok: false, error: `${spec.label} API hatası: ${res.status}`, errorCode: body.slice(0, 80) };
+      await discardExternalResponse(res);
+      return { ok: false, error: `${spec.label} API hatası: ${res.status}`, errorCode: `http_${res.status}` };
     }
-    const data = (await res.json()) as Record<string, unknown>;
+    const data = await readExternalJson<Record<string, unknown>>(
+      res,
+      PORTAL_MAX_RESPONSE_BYTES,
+    );
     return { ok: true, externalId: spec.parseId(data), externalUrl: spec.parseUrl(data) };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Bağlantı hatası." };
+    return portalTransportFailure(spec, e);
   }
 }
 
 async function restUpdate(spec: PortalSpec, externalId: string, property: PropertyPayload, cfg: PortalPublishConfig): Promise<PortalPublishResult> {
-  const base = cfg.baseUrl ?? spec.base;
+  const base = cfg.baseUrl;
   try {
-    const res = await fetch(`${base}${spec.collectionPath}/${externalId}`, {
+    const res = await fetchExternal(`${base}${spec.collectionPath}/${encodeURIComponent(externalId)}`, {
       method: "PUT",
+      redirect: "error",
       headers: spec.headers(cfg),
       body: JSON.stringify(spec.map(property)),
-    });
+    }, { timeoutMs: PROVIDER_REQUEST_TIMEOUT_MS });
     if (!res.ok) {
-      const body = await res.text();
-      return { ok: false, error: `${spec.label} API hatası: ${res.status}`, errorCode: body.slice(0, 80) };
+      await discardExternalResponse(res);
+      return { ok: false, error: `${spec.label} API hatası: ${res.status}`, errorCode: `http_${res.status}` };
     }
-    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const responseText = await readExternalText(res, PORTAL_MAX_RESPONSE_BYTES);
+    const data = responseText.trim()
+      ? JSON.parse(responseText) as Record<string, unknown>
+      : {};
     return { ok: true, externalId: spec.parseId(data) || externalId, externalUrl: spec.parseUrl(data) };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Bağlantı hatası." };
+    return portalTransportFailure(spec, e);
   }
 }
 
 async function restDelete(spec: PortalSpec, externalId: string, cfg: PortalPublishConfig): Promise<PortalPublishResult> {
-  const base = cfg.baseUrl ?? spec.base;
+  const base = cfg.baseUrl;
   try {
-    const res = await fetch(`${base}${spec.collectionPath}/${externalId}`, {
+    const res = await fetchExternal(`${base}${spec.collectionPath}/${encodeURIComponent(externalId)}`, {
       method: "DELETE",
+      redirect: "error",
       headers: spec.headers(cfg),
-    });
+    }, { timeoutMs: PROVIDER_REQUEST_TIMEOUT_MS });
+    await discardExternalResponse(res);
     return { ok: res.ok, error: res.ok ? undefined : `${spec.label} API hatası: HTTP ${res.status}` };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Bağlantı hatası." };
+    return portalTransportFailure(spec, e);
   }
 }
 
@@ -218,7 +273,7 @@ export async function publishToPortal(portal: PortalName, property: PropertyPayl
   const spec = PORTAL_SPECS[portal];
   if (!spec) return { ok: false, error: `${portal} entegrasyonu desteklenmiyor.` };
   const cfg = await getPortalConfig(portal);
-  if (!cfg) return { ok: false, error: `${spec.label} API anahtarı tanımlanmamış.` };
+  if (!cfg) return { ok: false, error: `${spec.label} yetkili API anahtarı ve base URL tanımlanmamış.` };
   return restCreate(spec, property, cfg);
 }
 
@@ -227,7 +282,7 @@ export async function updateOnPortal(portal: PortalName, externalId: string, pro
   if (!spec) return { ok: false, error: `${portal} entegrasyonu desteklenmiyor.` };
   if (!externalId) return { ok: false, error: "Güncellenecek ilan kimliği yok." };
   const cfg = await getPortalConfig(portal);
-  if (!cfg) return { ok: false, error: `${spec.label} API anahtarı tanımlanmamış.` };
+  if (!cfg) return { ok: false, error: `${spec.label} yetkili API anahtarı ve base URL tanımlanmamış.` };
   return restUpdate(spec, externalId, property, cfg);
 }
 
@@ -235,7 +290,7 @@ export async function unpublishFromPortal(portal: PortalName, externalId: string
   const spec = PORTAL_SPECS[portal];
   if (!spec) return { ok: false, error: `${portal} entegrasyonu desteklenmiyor.` };
   const cfg = await getPortalConfig(portal);
-  if (!cfg) return { ok: false, error: `${spec.label} API anahtarı tanımlanmamış.` };
+  if (!cfg) return { ok: false, error: `${spec.label} yetkili API anahtarı ve base URL tanımlanmamış.` };
   return restDelete(spec, externalId, cfg);
 }
 

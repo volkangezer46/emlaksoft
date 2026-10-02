@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "İptal & İade Politikası | EmlakSoft",
+  title: "İptal & İade Politikası",
   description: "Abonelik iptali, cayma hakkı ve iade koşulları.",
   alternates: { canonical: "/iptal-iade" },
 };

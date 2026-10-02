@@ -40,7 +40,7 @@ export function OfferEditDialog({ offer }: { offer: Offer }) {
       <DialogTrigger asChild>
         <button
           type="button"
-          className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-text-muted transition hover:bg-canvas"
+          className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-text-muted transition hover:bg-canvas"
         >
           <Pencil className="h-4 w-4" /> Teklifi düzenle
         </button>
@@ -59,7 +59,7 @@ export function OfferEditDialog({ offer }: { offer: Offer }) {
                     step="1000"
                     required
                     defaultValue={offer.amount}
-                    className="mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                    className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                   />
                 </label>
                 <label className="text-xs font-semibold text-text-muted">
@@ -68,7 +68,7 @@ export function OfferEditDialog({ offer }: { offer: Offer }) {
                     name="valid_until"
                     type="date"
                     defaultValue={offer.valid_until?.slice(0, 10) ?? ""}
-                    className="mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                    className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                   />
                 </label>
                 <textarea
@@ -76,7 +76,7 @@ export function OfferEditDialog({ offer }: { offer: Offer }) {
                   rows={3}
                   defaultValue={offer.notes ?? ""}
                   placeholder="Not (opsiyonel)"
-                  className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                  className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                 />
           {/* Palet dışı red-600 → danger-600, role="alert" eklendi */}
           {state.error && (
@@ -86,7 +86,7 @@ export function OfferEditDialog({ offer }: { offer: Offer }) {
             <DialogClose asChild>
               <button
                 type="button"
-                className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+                className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
               >
                 Vazgeç
               </button>
@@ -94,7 +94,7 @@ export function OfferEditDialog({ offer }: { offer: Offer }) {
             <button
               type="submit"
               disabled={pending}
-              className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+              className="btn-shine focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
             >
               {pending ? "Kaydediliyor…" : "Kaydet"}
             </button>

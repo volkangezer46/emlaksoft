@@ -44,7 +44,7 @@ export function NewDealDialog({ properties, customers }: { properties: Prop[]; c
       <DialogTrigger asChild>
         <button
           type="button"
-          className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[10px] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950"
+          className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950"
         >
           <Plus className="h-4 w-4" /> Yeni anlaşma
         </button>
@@ -93,14 +93,14 @@ export function NewDealDialog({ properties, customers }: { properties: Prop[]; c
             <div className="grid grid-cols-2 gap-2">
               <label className="block text-xs font-medium text-text-muted">
                 Tür
-                <select name="deal_type" defaultValue="sale" className="mt-1.5 w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
+                <select name="deal_type" defaultValue="sale" className="mt-1.5 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
                   <option value="sale">Satış</option>
                   <option value="rent">Kiralama</option>
                 </select>
               </label>
               <label className="block text-xs font-medium text-text-muted">
                 Aşama
-                <select name="stage" defaultValue="new" className="mt-1.5 w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
+                <select name="stage" defaultValue="new" className="mt-1.5 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
                   <option value="new">Yeni</option>
                   <option value="qualified">Nitelikli</option>
                   <option value="negotiation">Müzakere</option>
@@ -109,9 +109,9 @@ export function NewDealDialog({ properties, customers }: { properties: Prop[]; c
             </div>
             <label className="block text-xs font-medium text-text-muted">
               Tutar (₺)
-              <input name="deal_value" inputMode="decimal" placeholder="örn. 4.500.000" className="mt-1.5 w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" />
+              <input name="deal_value" inputMode="decimal" placeholder="örn. 4.500.000" className="mt-1.5 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" />
             </label>
-            <label className="flex items-start gap-2 rounded-[10px] border border-mint-500/25 bg-mint-500/5 px-3 py-2.5 text-xs">
+            <label className="flex items-start gap-2 rounded-[var(--radius-control)] border border-mint-500/25 bg-mint-500/5 px-3 py-2.5 text-xs">
               <input type="checkbox" name="has_authority" value="1" className="mt-0.5 accent-mint-600" />
               <span>
                 <span className="font-bold text-mint-700">Yazılı yetki / EİDS onaylı</span>
@@ -120,11 +120,11 @@ export function NewDealDialog({ properties, customers }: { properties: Prop[]; c
             </label>
             <div className="hairline-t flex justify-end gap-2 pt-4">
               <DialogClose asChild>
-                <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas">
+                <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas">
                   Vazgeç
                 </button>
               </DialogClose>
-              <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[10px] bg-ink-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+              <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                 {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Kaydet
               </button>

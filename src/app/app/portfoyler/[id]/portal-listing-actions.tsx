@@ -70,7 +70,7 @@ export function PortalListingActions({
         type="button"
         onClick={runUpdate}
         disabled={pending}
-        className="focus-ring press inline-flex items-center gap-1.5 rounded-[9px] border border-line px-3 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
+        className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
       >
         {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
         Portalda güncelle
@@ -79,7 +79,7 @@ export function PortalListingActions({
         trigger={
           <button
             type="button"
-            className="focus-ring press inline-flex items-center gap-1.5 rounded-[9px] border border-danger-500/20 px-3 py-2 text-xs font-semibold text-danger-500 transition hover:bg-danger-500/8"
+            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-danger-500/20 px-3 py-2 text-xs font-semibold text-danger-500 transition hover:bg-danger-500/8"
           >
             <Trash2 className="h-3.5 w-3.5" /> Portaldan kaldır
           </button>
@@ -90,11 +90,11 @@ export function PortalListingActions({
         onConfirm={runUnpublish}
       />
       {okMsg ? (
-        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-mint-600">
+        <span className="inline-flex items-center gap-1 text-xs font-semibold text-mint-600">
           <CheckCircle2 className="h-3.5 w-3.5" /> {okMsg}
         </span>
       ) : null}
-      {error ? <span className="max-w-[220px] truncate text-[11px] text-danger-500">{error}</span> : null}
+      {error ? <span className="max-w-[220px] truncate text-xs text-danger-500">{error}</span> : null}
     </div>
   );
 }

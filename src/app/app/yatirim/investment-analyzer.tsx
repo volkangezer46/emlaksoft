@@ -78,7 +78,7 @@ function parseNumber(raw: string): number {
 }
 
 const fieldCls =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 outline-none transition focus:border-brand-400";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 outline-none transition focus:border-brand-400";
 const labelCls = "mb-1.5 block text-sm text-text-muted";
 
 function MoneyField({
@@ -110,7 +110,7 @@ function MoneyField({
         />
         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-text-faint">₺</span>
       </div>
-      {hint ? <p className="mt-1 text-[11px] leading-relaxed text-text-faint">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-xs leading-relaxed text-text-faint">{hint}</p> : null}
     </div>
   );
 }
@@ -146,7 +146,7 @@ function PctField({
         />
         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-text-faint">%</span>
       </div>
-      {hint ? <p className="mt-1 text-[11px] leading-relaxed text-text-faint">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-xs leading-relaxed text-text-faint">{hint}</p> : null}
     </div>
   );
 }
@@ -420,20 +420,20 @@ export function InvestmentAnalyzer({
         {/* ---------------------------- KPI şeridi -------------------------- */}
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {kpis.map((k) => (
-            <div key={k.key} className={`print-avoid-break rounded-[16px] border p-4 ${toneCls[k.tone]}`}>
-              <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.08em]">
+            <div key={k.key} className={`print-avoid-break rounded-[var(--radius-card)] border p-4 ${toneCls[k.tone]}`}>
+              <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em]">
                 <k.icon className="h-3.5 w-3.5" /> {k.label}
               </p>
               <p className="numeric mt-1.5 font-display text-2xl font-extrabold tabular-nums text-ink-950">
                 {k.value}
               </p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">{k.hint}</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-text-muted">{k.hint}</p>
             </div>
           ))}
         </div>
 
         {/* ---------------------------- Girdiler ---------------------------- */}
-        <section className="no-print rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="no-print rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <PiggyBank className="h-4 w-4 text-brand-600" /> Yatırım girdileri
           </h2>
@@ -455,7 +455,7 @@ export function InvestmentAnalyzer({
                 }))}
               />
               {selected?.sqm ? (
-                <p className="mt-1 text-[11px] text-text-faint">
+                <p className="mt-1 text-xs text-text-faint">
                   {selected.label} · {selected.sqm} m²
                   {selected.suggestedRentSample >= 3
                     ? ` · ilçede ${selected.suggestedRentSample} kiralık ilan referans alındı`
@@ -543,7 +543,7 @@ export function InvestmentAnalyzer({
               />
               <PctField id="vergi" label="Kira geliri vergisi" value={taxPct} onChange={setTaxPct} />
             </div>
-            <p className="rounded-[10px] border border-line bg-canvas/60 px-3 py-2 text-[11px] leading-relaxed text-text-muted">
+            <p className="rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3 py-2 text-xs leading-relaxed text-text-muted">
               {RENT_TAX_NOTE}
             </p>
 
@@ -567,7 +567,7 @@ export function InvestmentAnalyzer({
         </section>
 
         {/* ------------------------- Aylık nakit akışı ---------------------- */}
-        <section className="print-avoid-break rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="print-avoid-break rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <Banknote className="h-4 w-4 text-mint-600" /> Aylık nakit akışı
           </h2>
@@ -576,7 +576,7 @@ export function InvestmentAnalyzer({
           </p>
 
           {price <= 0 || monthlyRent <= 0 ? (
-            <p className="mt-4 rounded-[12px] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
+            <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
               Alış bedeli ve aylık kirayı girin — nakit akışı dökümü burada oluşur.
             </p>
           ) : (
@@ -593,7 +593,7 @@ export function InvestmentAnalyzer({
                     <tr key={l.key}>
                       <td className="py-2.5 pr-3">
                         <p className="text-ink-950">{l.label}</p>
-                        <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">{l.note}</p>
+                        <p className="mt-0.5 text-xs leading-relaxed text-text-muted">{l.note}</p>
                       </td>
                       <td className="numeric whitespace-nowrap py-2.5 text-right align-top tabular-nums text-text-muted">
                         −{formatTry(l.amount)}
@@ -604,7 +604,7 @@ export function InvestmentAnalyzer({
                     <tr>
                       <td className="py-2.5 pr-3">
                         <p className="text-ink-950">Kredi taksiti ({months} ay)</p>
-                        <p className="mt-0.5 text-[11px] text-text-muted">
+                        <p className="mt-0.5 text-xs text-text-muted">
                           {formatTry(cashFlow.loanAmount)} kredi · aylık %{monthlyRatePct}
                         </p>
                       </td>
@@ -616,7 +616,7 @@ export function InvestmentAnalyzer({
                   <tr className="bg-canvas/60">
                     <td className="py-3 pr-3 font-display font-extrabold text-ink-950">
                       Aylık net nakit akışı
-                      <span className="ml-2 text-[11px] font-semibold text-text-muted">
+                      <span className="ml-2 text-xs font-semibold text-text-muted">
                         peşinata göre nakit getirisi {formatPct(cashFlow.cashOnCashPct)}
                       </span>
                     </td>
@@ -631,7 +631,7 @@ export function InvestmentAnalyzer({
                   <tr>
                     <td className="py-2.5 pr-3 text-text-muted">
                       Başabaş kira
-                      <span className="ml-2 text-[11px]">
+                      <span className="ml-2 text-xs">
                         bu kiranın altında her ay cebinizden para koyarsınız
                       </span>
                     </td>
@@ -679,7 +679,7 @@ export function InvestmentAnalyzer({
 
         {/* ------------------------ 10 yıllık tablo ------------------------- */}
         {price > 0 && monthlyRent > 0 ? (
-          <section className="print-avoid-break rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <section className="print-avoid-break rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <TrendingUp className="h-4 w-4 text-brand-600" /> {projection.years.length} yıllık projeksiyon
             </h2>
@@ -689,7 +689,7 @@ export function InvestmentAnalyzer({
             <div className="mt-4 overflow-x-auto">
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
-                  <tr className="border-b border-line text-left text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
+                  <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
                     <th className="py-2.5 pr-3">Yıl</th>
                     <th className="py-2.5 pr-3 text-right">Kira geliri</th>
                     <th className="py-2.5 pr-3 text-right">Gider</th>
@@ -737,14 +737,14 @@ export function InvestmentAnalyzer({
                 </tbody>
               </table>
             </div>
-            <p className="mt-3 text-[11px] leading-relaxed text-text-faint">{IRR_METHOD_NOTE}</p>
+            <p className="mt-3 text-xs leading-relaxed text-text-faint">{IRR_METHOD_NOTE}</p>
           </section>
         ) : null}
       </div>
 
       {/* ============================ SAĞ: yapışkan özet ==================== */}
       <div className="lg:sticky lg:top-6 lg:self-start">
-        <section className="print-avoid-break rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="print-avoid-break rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <Sparkles className="h-4 w-4 text-mint-600" /> Yatırım özeti
           </h2>
@@ -777,18 +777,18 @@ export function InvestmentAnalyzer({
                 s: "Satış varsayımlı yaklaşık IRR",
               },
             ].map((row) => (
-              <div key={row.k} className="rounded-[12px] border border-line bg-canvas/50 p-3">
-                <dt className="text-[11px] font-bold uppercase tracking-[0.06em] text-text-faint">{row.k}</dt>
+              <div key={row.k} className="rounded-[var(--radius-card)] border border-line bg-canvas/50 p-3">
+                <dt className="text-xs font-bold uppercase tracking-[0.06em] text-text-faint">{row.k}</dt>
                 <dd className="numeric mt-1 font-display text-lg font-extrabold tabular-nums text-ink-950">
                   {row.v}
                 </dd>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">{row.s}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-text-muted">{row.s}</p>
               </div>
             ))}
           </dl>
 
           {fx && fxLine(price) ? (
-            <p className="mt-3 rounded-[12px] border border-line bg-canvas/50 px-3 py-2.5 text-[11px] leading-relaxed text-text-muted">
+            <p className="mt-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-2.5 text-xs leading-relaxed text-text-muted">
               <span className="font-semibold text-ink-950">Döviz karşılığı:</span> alış bedeli {fxLine(price)}
               {fxLine(cashFlow.monthlyCashFlow) ? (
                 <>
@@ -804,7 +804,7 @@ export function InvestmentAnalyzer({
             <button
               type="button"
               onClick={copyShareLink}
-              className="btn-shine focus-ring press inline-flex items-center justify-center gap-2 rounded-[11px] bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-600/90"
+              className="btn-shine focus-ring press inline-flex items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-600/90"
             >
               {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
               {copied ? "Kopyalandı" : "Müşteriye gönder"}
@@ -812,16 +812,16 @@ export function InvestmentAnalyzer({
             <button
               type="button"
               onClick={() => window.print()}
-              className="focus-ring press inline-flex items-center justify-center gap-2 rounded-[11px] border border-line bg-canvas px-4 py-3 text-sm font-bold text-ink-950 transition hover:border-line-strong"
+              className="focus-ring press inline-flex items-center justify-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-4 py-3 text-sm font-bold text-ink-950 transition hover:border-line-strong"
             >
               <Printer className="h-4 w-4" /> Yazdır
             </button>
           </div>
-          <p className="no-print mt-2 text-center text-[11px] text-text-faint">
+          <p className="no-print mt-2 text-center text-xs text-text-faint">
             Link bu analizin tüm parametrelerini taşır — müşteri açtığında aynı sonucu görür.
           </p>
 
-          <p className="mt-4 flex items-start gap-2 rounded-[12px] border border-amber-400/30 bg-amber-400/8 px-3 py-2.5 text-[11px] leading-relaxed text-amber-700">
+          <p className="mt-4 flex items-start gap-2 rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/8 px-3 py-2.5 text-xs leading-relaxed text-amber-700">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {INVESTMENT_DISCLAIMER}
           </p>

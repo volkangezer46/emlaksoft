@@ -60,7 +60,7 @@ export function VisitorForm({ openHouseId }: { openHouseId: string }) {
           name="full_name"
           required
           autoComplete="off"
-          className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400"
+          className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400"
           placeholder="Örn. Ayşe Yıldız"
         />
       </div>
@@ -79,7 +79,7 @@ export function VisitorForm({ openHouseId }: { openHouseId: string }) {
           name="email"
           type="email"
           autoComplete="off"
-          className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400"
+          className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400"
         />
       </div>
       <div className="sm:col-span-2">
@@ -89,7 +89,7 @@ export function VisitorForm({ openHouseId }: { openHouseId: string }) {
         <input
           id="visitor-notes"
           name="notes"
-          className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400"
+          className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400"
           placeholder="İlgilendiği daire, bütçe, geri dönüş isteği…"
         />
       </div>
@@ -109,7 +109,7 @@ export function VisitorForm({ openHouseId }: { openHouseId: string }) {
         <button
           type="submit"
           disabled={pending}
-          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
         >
           <UserPlus className="h-4 w-4" /> {pending ? "Kaydediliyor…" : "Ziyaretçiyi kaydet"}
         </button>

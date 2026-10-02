@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
-import { getEffectivePermissions, effectiveHasPermission } from "@/lib/permissions-effective";
+import {
+  effectiveHasPermission,
+  getEffectivePermissions,
+  immutableReadonlyPermissions,
+} from "@/lib/permissions-effective";
 import { logActivity } from "@/lib/activity";
 import { notifyTenant } from "@/lib/notify";
 import { asLeaveKind, leaveDaysCount, LEAVE_KIND_LABELS } from "@/lib/leave-utils";
@@ -26,7 +30,9 @@ const MAX_LEAVE_DAYS = 366;
 async function leaveGate() {
   const gate = await requirePermission("team", "view");
   if (!gate.ok) return gate;
-  const perms = await getEffectivePermissions(gate.tenantId, gate.role, gate.userId);
+  const perms = gate.impersonating
+    ? immutableReadonlyPermissions()
+    : await getEffectivePermissions(gate.tenantId, gate.role, gate.userId);
   return { ...gate, canManage: effectiveHasPermission(perms, "team", "edit") };
 }
 

@@ -56,16 +56,16 @@ export default async function AdminLeadDetailPage({ params }: { params: Promise<
         <ArrowLeft className="h-4 w-4" /> Satış CRM
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-amber-300">Aday · {lead.source}</p>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-amber-300">Aday · {lead.source}</p>
             <h1 className="mt-2 font-display text-3xl font-extrabold">{lead.full_name}</h1>
             <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-white/70">
-              <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold">{STATUS_LABELS[lead.status] ?? lead.status}</span>
+              <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-semibold">{STATUS_LABELS[lead.status] ?? lead.status}</span>
               {convertedTenant ? (
-                <Link href={`/admin/tenants/${convertedTenant.id}`} className="rounded-full bg-mint-500/20 px-2.5 py-0.5 text-[11px] font-bold text-mint-300 hover:bg-mint-500/30">
+                <Link href={`/admin/tenants/${convertedTenant.id}`} className="rounded-full bg-mint-500/20 px-2.5 py-0.5 text-xs font-bold text-mint-300 hover:bg-mint-500/30">
                   Ofise dönüştürüldü: {convertedTenant.name} →
                 </Link>
               ) : null}
@@ -73,7 +73,7 @@ export default async function AdminLeadDetailPage({ params }: { params: Promise<
           </div>
           <div className="flex gap-2">
             {lead.phone ? (
-              <a href={`tel:${lead.phone}`} className="rounded-[10px] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950">Ara</a>
+              <a href={`tel:${lead.phone}`} className="rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950">Ara</a>
             ) : null}
           </div>
         </div>
@@ -83,11 +83,11 @@ export default async function AdminLeadDetailPage({ params }: { params: Promise<
               <>
                 <f.icon className="h-4 w-4 text-cyan-400" />
                 <p className="mt-1.5 truncate text-sm font-semibold text-white" title={f.value}>{f.value}</p>
-                <p className="text-[11px] text-white/45">{f.label}</p>
+                <p className="text-xs text-white/45">{f.label}</p>
               </>
             );
             const linkedCls =
-              "focus-ring group block rounded-[14px] border border-white/10 bg-white/5 p-3 transition hover:border-white/25 hover:bg-white/10";
+              "focus-ring group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 transition hover:border-white/25 hover:bg-white/10";
             if (f.href?.startsWith("/")) {
               return (
                 <Link key={f.label} href={f.href} className={linkedCls}>
@@ -103,7 +103,7 @@ export default async function AdminLeadDetailPage({ params }: { params: Promise<
               );
             }
             return (
-              <div key={f.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3">
+              <div key={f.label} className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3">
                 {inner}
               </div>
             );
@@ -112,7 +112,7 @@ export default async function AdminLeadDetailPage({ params }: { params: Promise<
       </section>
 
       {lead.message ? (
-        <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="mb-2 text-sm font-bold text-ink-950">Talep mesajı</h2>
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-800">{lead.message}</p>
         </section>

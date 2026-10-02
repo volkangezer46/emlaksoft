@@ -48,12 +48,12 @@ export function PublicBrandBand({
           alt=""
           width={24}
           height={24}
-          className="h-6 w-6 rounded-[8px] object-contain"
+          className="h-6 w-6 rounded-[var(--radius-control)] object-contain"
         />
       ) : (
         <span
           aria-hidden="true"
-          className="grid h-6 w-6 shrink-0 place-items-center rounded-[8px] text-[11px] font-bold"
+          className="grid h-6 w-6 shrink-0 place-items-center rounded-[var(--radius-control)] text-xs font-bold"
           style={{ backgroundColor: "var(--pb-soft)", color: "var(--pb-ink)" }}
         >
           {office.slice(0, 1).toLocaleUpperCase("tr-TR")}
@@ -77,7 +77,7 @@ export function PublicFooterNote({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="mt-6 space-y-2 text-center text-[11px] leading-relaxed text-text-faint">
+    <div className="mt-6 space-y-2 text-center text-xs leading-relaxed text-text-faint">
       <p>
         <Building2 className="mr-1 inline h-3 w-3 align-[-1px]" aria-hidden="true" />
         {purpose} ·{" "}
@@ -132,7 +132,7 @@ function PublicCardHeader({
       <div className="relative">
         <span
           aria-hidden="true"
-          className="mx-auto grid h-12 w-12 place-items-center rounded-[14px]"
+          className="mx-auto grid h-12 w-12 place-items-center rounded-[var(--radius-card)]"
           style={{ backgroundColor: "var(--pb-soft)" }}
         >
           <Icon className="h-6 w-6" style={{ color: "var(--pb-ink)" }} />
@@ -190,7 +190,7 @@ export function PublicTokenPage({
       >
         <PublicBrandBand office={office} logoUrl={logoUrl} className="mb-5" />
 
-        <main className="surface-card overflow-hidden rounded-[22px]">
+        <main id="main-content" className="surface-card overflow-hidden rounded-[var(--radius-panel)]">
           <PublicCardHeader icon={icon} title={title} subtitle={subtitle} />
           <div className="px-5 py-5 sm:px-6">{children}</div>
         </main>
@@ -238,7 +238,7 @@ export function PublicStateBox({
   const t = TONE[tone];
   return (
     <div
-      className={`rounded-[14px] border px-4 py-8 text-center ${t.box} ${className}`}
+      className={`rounded-[var(--radius-card)] border px-4 py-8 text-center ${t.box} ${className}`}
       role="status"
     >
       <span
@@ -278,7 +278,7 @@ export function PublicDetailList({
       {items.map(({ label, value, icon: Icon }) => (
         <div
           key={label}
-          className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-[12px] border border-line bg-canvas/60 px-4 py-2.5"
+          className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-4 py-2.5"
         >
           <dt className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-text-muted">
             {Icon ? <Icon className="h-3.5 w-3.5" aria-hidden="true" /> : null}
@@ -304,7 +304,7 @@ export function PublicBrandButton({
   return (
     <a
       href={href}
-      className={`focus-ring press inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-5 text-sm font-bold transition hover:brightness-95 ${className}`}
+      className={`focus-ring press inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-card)] px-5 text-sm font-bold transition hover:brightness-95 ${className}`}
       style={{ backgroundColor: "var(--pb-brand)", color: "var(--pb-on-brand)" }}
       {...rest}
     >
@@ -323,7 +323,7 @@ export function PublicGhostButton({
   return (
     <a
       href={href}
-      className={`focus-ring press inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] border border-hairline-strong bg-surface px-5 text-sm font-bold text-ink-950 transition hover:bg-canvas ${className}`}
+      className={`focus-ring press inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-card)] border border-hairline-strong bg-surface px-5 text-sm font-bold text-ink-950 transition hover:bg-canvas ${className}`}
       {...rest}
     >
       {children}

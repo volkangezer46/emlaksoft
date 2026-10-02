@@ -82,9 +82,9 @@ export function NotificationPrefsPanel({ initial }: { initial?: NotifPrefs }) {
   }
 
   return (
-    <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
       <div className="flex items-center gap-3">
-        <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-brand-600/10 text-brand-600">
+        <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
           {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : <BellRing className="h-5 w-5" />}
         </span>
         <div>
@@ -99,7 +99,7 @@ export function NotificationPrefsPanel({ initial }: { initial?: NotifPrefs }) {
             type="button"
             disabled={pending}
             onClick={() => toggle(row.key)}
-            className="flex w-full items-center gap-3 rounded-[12px] border border-line bg-canvas/50 px-3 py-3 text-left transition hover:border-brand-300 disabled:opacity-60"
+            className="flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-3 text-left transition hover:border-brand-300 disabled:opacity-60"
           >
             <span
               className={`grid h-5 w-5 place-items-center rounded-[6px] border ${
@@ -110,7 +110,7 @@ export function NotificationPrefsPanel({ initial }: { initial?: NotifPrefs }) {
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold text-ink-950">{row.label}</span>
-              <span className="block text-[11px] text-text-muted">{row.desc}</span>
+              <span className="block text-xs text-text-muted">{row.desc}</span>
             </span>
           </button>
         ))}

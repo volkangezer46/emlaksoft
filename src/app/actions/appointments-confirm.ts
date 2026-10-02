@@ -1,24 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
-import { isPast } from "@/lib/clock";
-import { notifyTenant } from "@/lib/notify";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type ConfirmResponse = "coming" | "cancelled";
-
 export type ConfirmResult = { ok?: boolean; error?: string; response?: ConfirmResponse };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Müşterinin randevu teyidi (/randevu-teyit/[token] public sayfası).
- *
- * Auth YOK — confirm_token yeterli (submitMatchFeedbackByToken deseni).
- * RLS anon'a açılmadığı için service role ile yazılır; token unique index'le
- * tek kaydı bulur. 'cancelled' yanıtı randevu durumunu da iptale çeker ve
- * danışmana bildirim düşer — danışman sabah takvimine bakmadan öğrenir.
+ * Teyit yanıtı, audit ve bildirim niyeti atomik RPC içinde kalıcılaşır.
+ * Exact replay aynı intent'i idempotent biçimde onarır; farklı yanıt reddedilir.
  */
 export async function respondToAppointmentByToken(fd: FormData): Promise<ConfirmResult> {
   const token = String(fd.get("token") ?? "").trim();
@@ -30,59 +23,43 @@ export async function respondToAppointmentByToken(fd: FormData): Promise<Confirm
   }
   const response = responseRaw as ConfirmResponse;
 
-  // Token tahmini / spam koruması — IP başına dakikada 20 istek
   const ip = await clientIp();
-  const { allowed } = await checkRateLimit(`randevu-teyit:${ip}`, { limit: 20, windowSec: 60 });
+  const { allowed } = await checkRateLimit(`randevu-teyit:${ip}`, {
+    limit: 20,
+    windowSec: 60,
+    failurePolicy: "deny",
+  });
   if (!allowed) return { error: "Çok fazla istek. Lütfen biraz sonra tekrar deneyin." };
 
   const admin = createAdminClient();
-  const { data: appt } = await admin
-    .from("appointments")
-    .select("id, tenant_id, scheduled_at, status, customer_response, assigned_to, customer:customers(full_name)")
-    .eq("confirm_token", token)
-    .maybeSingle();
-
-  if (!appt) return { error: "Bağlantı geçersiz veya randevu bulunamadı." };
-  if (isPast(appt.scheduled_at)) return { error: "Bu randevunun tarihi geçmiş." };
-  // Aynı yanıt tekrar gelirse sessiz başarı — çift tıklama/yeniden yükleme
-  // ikinci bildirim üretmesin.
-  if (appt.customer_response === response) return { ok: true, response };
-
-  const patch: Record<string, unknown> = {
-    customer_response: response,
-    responded_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-  if (response === "cancelled") patch.status = "cancelled";
-
-  const { error } = await admin.from("appointments").update(patch).eq("id", appt.id);
-  if (error) {
-    console.error("respondToAppointmentByToken", error);
+  const { data: transitionData, error: transitionError } = await admin.rpc(
+    "respond_appointment_confirmation_atomic",
+    {
+      p_confirm_token: token,
+      p_response: response,
+    },
+  );
+  if (transitionError) {
+    console.error("respondToAppointmentByToken atomic transition", { code: transitionError.code });
     return { error: "Yanıt kaydedilemedi. Lütfen tekrar deneyin." };
   }
 
-  // Danışmana bildirim — fire-and-forget değil: yanıtın ulaştığından emin olmak
-  // müşteri deneyiminden önemli değil, ama hata teşekkür ekranını düşürmesin.
-  const cust = appt.customer as { full_name?: string } | { full_name?: string }[] | null;
-  const customerName = (Array.isArray(cust) ? cust[0]?.full_name : cust?.full_name) ?? "Müşteri";
-  const saat = new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(
-    new Date(appt.scheduled_at),
-  );
-  try {
-    await notifyTenant({
-      tenantId: String(appt.tenant_id),
-      userId: (appt.assigned_to as string | null) ?? null,
-      title: response === "coming" ? "Randevu onaylandı" : "Randevu iptal edildi",
-      body:
-        response === "coming"
-          ? `${customerName} randevuyu onayladı (${saat}).`
-          : `${customerName} randevuyu iptal etti (${saat}).`,
-      href: "/app/randevular",
-      kind: response === "coming" ? "success" : "warning",
-      prefKey: "appointment",
-    });
-  } catch (e) {
-    console.error("appointment confirm notify", e);
+  const transition = transitionData && typeof transitionData === "object" && !Array.isArray(transitionData)
+    ? transitionData as Record<string, unknown>
+    : null;
+  const outcome = typeof transition?.outcome === "string" ? transition.outcome : "invalid_result";
+  if (outcome === "already_responded") {
+    return { error: "Bu randevu için daha önce farklı bir yanıt verilmiş." };
+  }
+  if (outcome === "appointment_past") return { error: "Bu randevunun tarihi geçmiş." };
+  if (outcome === "appointment_closed") {
+    return { error: "Bu randevu artık yanıt kabul etmiyor." };
+  }
+  if (outcome === "invalid_link") {
+    return { error: "Bağlantı geçersiz veya randevu bulunamadı." };
+  }
+  if (outcome !== "applied" && outcome !== "replay") {
+    return { error: "Yanıt kaydedilemedi. Lütfen tekrar deneyin." };
   }
 
   revalidatePath("/app/randevular");

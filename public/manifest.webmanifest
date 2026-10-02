@@ -1,12 +1,18 @@
 {
+  "id": "/",
   "name": "EmlakSoft",
   "short_name": "EmlakSoft",
-  "description": "Türkiye’nin emlak işletim sistemi — Command Center",
+  "description": "Türkiye'nin profesyonel emlak işletim sistemi",
   "start_url": "/app",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
   "background_color": "#041127",
   "theme_color": "#071a38",
   "lang": "tr",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
   "icons": [
     {
       "src": "/icon.svg",
@@ -19,6 +25,26 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Portföyler",
+      "short_name": "Portföyler",
+      "url": "/app/portfoyler",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Müşteriler",
+      "short_name": "Müşteriler",
+      "url": "/app/musteriler",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Görevler",
+      "short_name": "Görevler",
+      "url": "/app/gorevler",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
     }
   ]
 }

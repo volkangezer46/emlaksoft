@@ -26,7 +26,7 @@ export function PropertyHealthCard({ health }: { health: PropertyHealthScore }) 
   const dash = RING_C * (1 - health.score / 100);
 
   return (
-    <section className="rounded-[20px] border border-line bg-surface p-5">
+    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
           <Shield className="h-4 w-4 text-brand-600" /> Portföy sağlık skoru
@@ -86,7 +86,7 @@ export function PropertyHealthCard({ health }: { health: PropertyHealthScore }) 
         </summary>
         <div className="mt-3 space-y-1.5">
           {health.items.map((item) => (
-            <div key={item.key} className={`flex items-start gap-2 rounded-[8px] px-2.5 py-2 text-xs ${item.passed ? "bg-mint-500/8" : item.weight === 3 ? "bg-red-50" : "bg-amber-50/60"}`}>
+            <div key={item.key} className={`flex items-start gap-2 rounded-[var(--radius-control)] px-2.5 py-2 text-xs ${item.passed ? "bg-mint-500/8" : item.weight === 3 ? "bg-red-50" : "bg-amber-50/60"}`}>
               {item.passed
                 ? <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mint-600" />
                 : item.weight === 3
@@ -96,7 +96,7 @@ export function PropertyHealthCard({ health }: { health: PropertyHealthScore }) 
               <div>
                 <p className={`font-medium ${item.passed ? "text-ink-950" : "text-text-muted"}`}>{item.label}</p>
                 {!item.passed && item.tip && (
-                  <p className="mt-0.5 text-[11px] text-text-faint">{item.tip}</p>
+                  <p className="mt-0.5 text-xs text-text-faint">{item.tip}</p>
                 )}
               </div>
             </div>
@@ -116,7 +116,7 @@ export function ListingQualityCard({ quality }: { quality: ListingQualityScore }
   const failing = quality.items.filter((i) => !i.passed);
 
   return (
-    <section className="rounded-[20px] border border-line bg-surface p-5">
+    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
           <AlertTriangle className="h-4 w-4 text-amber-500" /> İlan kalite puanı
@@ -134,11 +134,11 @@ export function ListingQualityCard({ quality }: { quality: ListingQualityScore }
         <div className="mt-3 space-y-2">
           <p className="text-xs text-text-muted">Puan artırmak için:</p>
           {failing.map((item) => (
-            <div key={item.key} className="flex items-start gap-2 rounded-[8px] bg-canvas/60 px-3 py-2 text-xs">
+            <div key={item.key} className="flex items-start gap-2 rounded-[var(--radius-control)] bg-canvas/60 px-3 py-2 text-xs">
               <AlertTriangle className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${item.weight >= 3 ? "text-red-500" : "text-amber-500"}`} />
               <div>
                 <p className="font-medium text-ink-950">{item.label}</p>
-                {item.tip && <p className="mt-0.5 text-[11px] text-text-faint">{item.tip}</p>}
+                {item.tip && <p className="mt-0.5 text-xs text-text-faint">{item.tip}</p>}
               </div>
             </div>
           ))}

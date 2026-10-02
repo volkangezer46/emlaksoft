@@ -75,7 +75,7 @@ export function CommissionSimulator() {
   };
 
   return (
-    <section className="dashboard-panel overflow-hidden rounded-[20px] border border-line bg-surface">
+    <section className="dashboard-panel overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
         <div>
           <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Calculator className="h-4 w-4" /> Canlı hesaplama</p>
@@ -110,7 +110,7 @@ export function CommissionSimulator() {
             İşlem bedeli
             <div className="relative mt-1.5">
               <Wallet className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-600" />
-              <input value={dealValue} onChange={(event) => setDealValue(event.target.value)} inputMode="decimal" className="w-full rounded-[11px] border border-line bg-canvas py-3 pl-10 pr-12 text-lg font-bold tabular-nums text-ink-950 outline-none transition focus:border-brand-400 focus:bg-surface" />
+              <input value={dealValue} onChange={(event) => setDealValue(event.target.value)} inputMode="decimal" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas py-3 pl-10 pr-12 text-lg font-bold tabular-nums text-ink-950 outline-none transition focus:border-brand-400 focus:bg-surface" />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-text-faint">₺</span>
             </div>
           </label>
@@ -118,14 +118,14 @@ export function CommissionSimulator() {
             <label className="text-sm font-medium text-ink-950">
               Komisyon oranı
               <div className="relative mt-1.5">
-                <input value={rate} onChange={(event) => setRate(event.target.value)} inputMode="decimal" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 pr-9 text-sm font-semibold outline-none focus:border-brand-400" />
+                <input value={rate} onChange={(event) => setRate(event.target.value)} inputMode="decimal" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 pr-9 text-sm font-semibold outline-none focus:border-brand-400" />
                 <Percent className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
               </div>
             </label>
             <label className="text-sm font-medium text-ink-950">
               Danışman payı
               <div className="relative mt-1.5">
-                <input value={advisorShare} onChange={(event) => setAdvisorShare(event.target.value)} inputMode="decimal" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 pr-9 text-sm font-semibold outline-none focus:border-brand-400" />
+                <input value={advisorShare} onChange={(event) => setAdvisorShare(event.target.value)} inputMode="decimal" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 pr-9 text-sm font-semibold outline-none focus:border-brand-400" />
                 <Percent className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
               </div>
             </label>
@@ -134,17 +134,17 @@ export function CommissionSimulator() {
             <label className="text-sm font-medium text-ink-950">
               Stopaj
               <div className="relative mt-1.5">
-                <input value={withholdingRate} onChange={(event) => setWithholdingRate(event.target.value)} inputMode="decimal" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 pr-9 text-sm font-semibold outline-none focus:border-brand-400" />
+                <input value={withholdingRate} onChange={(event) => setWithholdingRate(event.target.value)} inputMode="decimal" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 pr-9 text-sm font-semibold outline-none focus:border-brand-400" />
                 <Percent className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
               </div>
             </label>
             <label className="text-sm font-medium text-ink-950">
               Diğer kesinti
-              <input value={otherDeductions} onChange={(event) => setOtherDeductions(event.target.value)} inputMode="decimal" placeholder="₺" className="mt-1.5 w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm font-semibold tabular-nums outline-none focus:border-brand-400" />
+              <input value={otherDeductions} onChange={(event) => setOtherDeductions(event.target.value)} inputMode="decimal" placeholder="₺" className="mt-1.5 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm font-semibold tabular-nums outline-none focus:border-brand-400" />
             </label>
           </div>
-          <div className="rounded-[13px] border border-brand-300/35 bg-brand-600/5 p-4">
-            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">Komisyon (KDV hariç)</p>
+          <div className="rounded-[var(--radius-card)] border border-brand-300/35 bg-brand-600/5 p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">Komisyon (KDV hariç)</p>
             <p className="mt-1 font-display text-3xl font-extrabold tabular-nums text-ink-950">{money(result.gross)}</p>
             <p className="mt-1 text-xs text-text-muted">
               {money(result.deal)} bedel üzerinden %{rate}
@@ -186,7 +186,7 @@ export function CommissionSimulator() {
                 />
               </svg>
               <div className="relative grid h-24 w-24 place-items-center rounded-full bg-surface text-center shadow-[0_8px_24px_-10px_rgba(15,23,42,0.4)]">
-                <div><p className="text-[11px] text-text-faint">Dağıtılacak</p><p className="font-display text-base font-extrabold tabular-nums text-ink-950">{money(result.gross)}</p></div>
+                <div><p className="text-xs text-text-faint">Dağıtılacak</p><p className="font-display text-base font-extrabold tabular-nums text-ink-950">{money(result.gross)}</p></div>
               </div>
             </div>
             <div className="space-y-3">
@@ -195,9 +195,9 @@ export function CommissionSimulator() {
                 { icon: Building2, label: `Ofis payı · %${100 - result.advisorRate}`, value: result.office, color: "text-mint-600", bg: "bg-mint-500/10" },
                 { icon: ReceiptText, label: "Hesaplanan KDV", value: result.vat, color: "text-amber-500", bg: "bg-amber-400/12" },
               ].map((item) => (
-                <div key={item.label} className="flex items-center gap-3 rounded-[12px] border border-line bg-canvas/60 p-3">
-                  <span className={`grid h-9 w-9 place-items-center rounded-[10px] ${item.bg} ${item.color}`}><item.icon className="h-4 w-4" /></span>
-                  <div className="min-w-0 flex-1"><p className="text-[11px] text-text-muted">{item.label}</p><p className="font-display text-base font-bold tabular-nums text-ink-950">{money(item.value)}</p></div>
+                <div key={item.label} className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3">
+                  <span className={`grid h-9 w-9 place-items-center rounded-[var(--radius-control)] ${item.bg} ${item.color}`}><item.icon className="h-4 w-4" /></span>
+                  <div className="min-w-0 flex-1"><p className="text-xs text-text-muted">{item.label}</p><p className="font-display text-base font-bold tabular-nums text-ink-950">{money(item.value)}</p></div>
                 </div>
               ))}
             </div>
@@ -205,10 +205,10 @@ export function CommissionSimulator() {
 
           {/* X7'nin asil sorusu: "elime ne gececek". Onceki hali yalnizca brut
               payi gosteriyordu. */}
-          <div className="mt-4 rounded-[13px] border border-mint-500/30 bg-mint-500/[0.07] p-4">
+          <div className="mt-4 rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/[0.07] p-4">
             <div className="flex flex-wrap items-end justify-between gap-2">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-mint-600">
+                <p className="text-xs font-bold uppercase tracking-[0.08em] text-mint-600">
                   Danışmanın eline geçen
                 </p>
                 <p className="mt-0.5 font-display text-2xl font-extrabold tabular-nums text-mint-600">
@@ -223,7 +223,7 @@ export function CommissionSimulator() {
             </div>
           </div>
 
-          <p className="mt-3 text-[11px] leading-relaxed text-text-muted">
+          <p className="mt-3 text-xs leading-relaxed text-text-muted">
             Paylaşım <strong>KDV hariç</strong> tutar üzerinden yapılır — KDV devlete gider, ofis ya da
             danışmanın geliri değildir. Stopaj ve diğer kesintiler sizin girdiğiniz oranlardır;
             danışmanın vergi statüsüne göre değiştiği için varsayılanları sıfırdır. Bu araç aritmetik

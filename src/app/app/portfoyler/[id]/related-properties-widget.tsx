@@ -108,7 +108,7 @@ export async function RelatedPropertiesWidget({
   if (related.length === 0) return null;
 
   return (
-    <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
           <Building2 className="h-4 w-4 text-brand-600" /> Benzer portföyler
@@ -126,13 +126,13 @@ export async function RelatedPropertiesWidget({
           <Link
             key={p.id}
             href={`/app/portfoyler/${p.id}`}
-            className="group flex flex-col gap-2 rounded-[14px] border border-line bg-canvas/60 p-3 transition hover:border-brand-300 hover:bg-surface"
+            className="group flex flex-col gap-2 rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3 transition hover:border-brand-300 hover:bg-surface"
           >
             <div className="flex items-start justify-between gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">
+              <span className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">
                 {p.transaction_type}{p.property_type ? ` · ${p.property_type}` : ""}
               </span>
-              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${statusCls[p.status] ?? "bg-zinc-100 text-zinc-500"}`}>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${statusCls[p.status] ?? "bg-zinc-100 text-zinc-500"}`}>
                 {statusLabel[p.status] ?? p.status}
               </span>
             </div>
@@ -149,7 +149,7 @@ export async function RelatedPropertiesWidget({
             </div>
 
             {provinceName(p.province) && (
-              <p className="flex items-center gap-1 text-[11px] text-text-faint">
+              <p className="flex items-center gap-1 text-xs text-text-faint">
                 <MapPin className="h-3 w-3" />
                 {provinceName(p.province)}
               </p>

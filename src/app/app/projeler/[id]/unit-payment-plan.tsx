@@ -136,7 +136,7 @@ export function UnitPaymentPlan({
   };
 
   return (
-    <div className="rounded-[14px] border border-line bg-canvas p-4">
+    <div className="rounded-[var(--radius-card)] border border-line bg-canvas p-4">
       <h4 className="flex items-center gap-2 text-xs font-bold text-ink-950">
         <Wallet className="h-4 w-4 text-brand-600" /> Ödeme planı
       </h4>
@@ -227,7 +227,7 @@ export function UnitPaymentPlan({
                 </div>
 
                 {previewOk ? (
-                  <div className="rounded-[10px] border border-brand-600/20 bg-brand-600/5 px-3 py-2 text-xs text-text-muted">
+                  <div className="rounded-[var(--radius-control)] border border-brand-600/20 bg-brand-600/5 px-3 py-2 text-xs text-text-muted">
                     Önizleme: peşinat <strong className="numeric text-ink-950">{money(pesinatTutar)}</strong>
                     {araToplam > 0 ? (
                       <>
@@ -243,13 +243,13 @@ export function UnitPaymentPlan({
                     <strong className="numeric text-ink-950">{money(price)}</strong>
                   </div>
                 ) : baseOk && kalan <= 0 ? (
-                  <p className="rounded-[8px] bg-danger-500/8 px-3 py-2 text-xs font-medium text-danger-600" role="alert">
+                  <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-xs font-medium text-danger-600" role="alert">
                     Peşinat ve ara ödemeler liste fiyatını aşıyor — taksite tutar kalmadı.
                   </p>
                 ) : null}
 
                 {error ? (
-                  <p className="rounded-[8px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
+                  <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
                     {error}
                   </p>
                 ) : null}
@@ -294,7 +294,7 @@ export function UnitPaymentPlan({
           </div>
 
           {/* Satırlar */}
-          <ul className="divide-y divide-line overflow-hidden rounded-[10px] border border-line bg-surface">
+          <ul className="divide-y divide-line overflow-hidden rounded-[var(--radius-control)] border border-line bg-surface">
             {rows.map((p) => {
               const late = isLate(p);
               return (
@@ -332,7 +332,7 @@ export function UnitPaymentPlan({
           </ul>
 
           {error ? (
-            <p className="rounded-[8px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
+            <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
               {error}
             </p>
           ) : null}

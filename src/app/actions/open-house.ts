@@ -2,32 +2,60 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
-import { logActivity } from "@/lib/activity";
-import { normalizeTurkishPhone } from "@/lib/phone";
 
 export type OpenHouseActionResult = { ok?: boolean; error?: string; id?: string };
 
 const OPEN_HOUSE_STATUSES = ["planned", "active", "completed", "cancelled"] as const;
+type OpenHouseStatus = (typeof OPEN_HOUSE_STATUSES)[number];
+
+const OPEN_HOUSE_TRANSITIONS: Record<OpenHouseStatus, readonly OpenHouseStatus[]> = {
+  planned: ["active", "cancelled"],
+  active: ["completed", "cancelled"],
+  completed: [],
+  cancelled: [],
+};
+
+function isOpenHouseStatus(value: string): value is OpenHouseStatus {
+  return (OPEN_HOUSE_STATUSES as readonly string[]).includes(value);
+}
 
 /** Açık ev etkinliğinin durumunu değiştirir (planned → active → completed / cancelled). */
 export async function updateOpenHouseStatus(
   openHouseId: string,
   status: string,
 ): Promise<OpenHouseActionResult> {
-  const gate = await requirePermission("appointments", "edit");
+  const gate = await requirePermission("open_house", "edit");
   if (!gate.ok) return { error: gate.error };
-  if (!(OPEN_HOUSE_STATUSES as readonly string[]).includes(status)) {
+  if (!isOpenHouseStatus(status)) {
     return { error: "Geçersiz durum." };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: current, error: readError } = await supabase
+    .from("open_houses")
+    .select("status")
+    .eq("id", openHouseId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (readError) return { error: "Etkinlik durumu okunamadı." };
+  if (!current || !isOpenHouseStatus(current.status)) return { error: "Açık ev etkinliği bulunamadı." };
+  if (current.status === status) return { ok: true };
+  if (!OPEN_HOUSE_TRANSITIONS[current.status].includes(status)) {
+    return { error: "Bu durum geçişine izin verilmiyor." };
+  }
+
+  const { data: updated, error } = await supabase
     .from("open_houses")
     .update({ status })
     .eq("id", openHouseId)
-    .eq("tenant_id", gate.tenantId);
+    .eq("tenant_id", gate.tenantId)
+    .eq("status", current.status)
+    .select("id")
+    .maybeSingle();
   if (error) return { error: "Durum güncellenemedi." };
+  if (!updated) return { error: "Etkinlik durumu başka bir işlemde değişti. Sayfayı yenileyip tekrar deneyin." };
 
   revalidatePath("/app/acik-ev");
   revalidatePath(`/app/acik-ev/${openHouseId}`);
@@ -46,69 +74,25 @@ export async function convertVisitorToCustomer(
   const gate = await requirePermission("customers", "create");
   if (!gate.ok) return { error: gate.error };
 
-  const supabase = await createClient();
-  const { data: visitor } = await supabase
-    .from("open_house_visitors")
-    .select("id, full_name, phone, email, notes, created_customer_id")
-    .eq("id", visitorId)
-    .maybeSingle();
-  if (!visitor) return { error: "Ziyaretçi bulunamadı." };
-  if (visitor.created_customer_id) return { error: "Bu ziyaretçi zaten müşteriye dönüştürülmüş." };
-
-  const phone = visitor.phone ? normalizeTurkishPhone(visitor.phone) : "";
-  let customerId: string | null = null;
-
-  if (phone) {
-    const { data: existing } = await supabase
-      .from("customers")
-      .select("id")
-      .eq("tenant_id", gate.tenantId)
-      .eq("phone", phone)
-      .is("deleted_at", null)
-      .limit(1)
-      .maybeSingle();
-    customerId = existing?.id ?? null;
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("convert_open_house_visitor_atomic", {
+    p_tenant_id: gate.tenantId,
+    p_actor_id: gate.userId,
+    p_open_house_id: openHouseId,
+    p_visitor_id: visitorId,
+  });
+  if (error) {
+    console.error("convertVisitorToCustomer", error);
+    return { error: "Ziyaretçi müşteriye dönüştürülemedi." };
   }
-
-  if (!customerId) {
-    const { data: created, error } = await supabase
-      .from("customers")
-      .insert({
-        tenant_id: gate.tenantId,
-        full_name: visitor.full_name,
-        phone: phone || null,
-        email: visitor.email || null,
-        customer_types: ["Alıcı"],
-        notes: visitor.notes ? `Açık ev notu: ${visitor.notes}` : null,
-        lead_source: "open_house",
-        assigned_to: gate.userId,
-        created_by: gate.userId,
-      })
-      .select("id")
-      .single();
-    if (error || !created) {
-      console.error("convertVisitorToCustomer", error);
-      return { error: "Müşteri oluşturulamadı." };
-    }
-    customerId = created.id;
-
-    await logActivity({
-      tenantId: gate.tenantId,
-      actorId: gate.userId,
-      action: "customer.create",
-      entityType: "customer",
-      entityId: customerId,
-      newValue: { full_name: visitor.full_name, source: "open_house" },
-    });
+  const result = (data ?? {}) as { outcome?: string; customer_id?: string };
+  if (result.outcome === "not_found") return { error: "Ziyaretçi bu açık ev etkinliğinde bulunamadı." };
+  if (result.outcome === "invalid_visitor") return { error: "Ziyaretçi bilgileri müşteri kaydı için geçersiz." };
+  if (!["created", "linked", "replay"].includes(result.outcome ?? "") || !result.customer_id) {
+    return { error: "Ziyaretçi müşteriye dönüştürülemedi." };
   }
-
-  const { error: linkError } = await supabase
-    .from("open_house_visitors")
-    .update({ created_customer_id: customerId })
-    .eq("id", visitorId);
-  if (linkError) return { error: "Müşteri oluşturuldu ama ziyaretçiye bağlanamadı." };
 
   revalidatePath(`/app/acik-ev/${openHouseId}`);
   revalidatePath("/app/musteriler");
-  return { ok: true, id: customerId ?? undefined };
+  return { ok: true, id: result.customer_id };
 }

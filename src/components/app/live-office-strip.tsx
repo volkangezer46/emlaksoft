@@ -22,7 +22,7 @@ export function LiveOfficeStrip({ tenantId }: { tenantId: string | null }) {
   const score = data?.officeScore;
 
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[14px] border border-line bg-surface/80 px-3 py-2 text-[11px] shadow-[var(--shadow-xs)] backdrop-blur">
+    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface/80 px-3 py-2 text-xs shadow-[var(--shadow-xs)] backdrop-blur">
       <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-500" />
       <span className="font-bold text-ink-950">Canlı önbellek</span>
       {loading && !data ? <span className="text-text-faint">yükleniyor…</span> : null}

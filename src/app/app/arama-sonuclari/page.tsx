@@ -78,7 +78,7 @@ export default async function AramaSonuclariPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/30 blur-[80px]" />
         <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-cyan-400/15 blur-[70px]" />
@@ -108,14 +108,14 @@ export default async function AramaSonuclariPage({
                 defaultValue={q}
                 placeholder="En az 2 karakter — ad, telefon, ilan no…"
                 aria-label="Arama sorgusu"
-                className="w-full rounded-[11px] border border-white/15 bg-white/8 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/40 outline-none backdrop-blur transition focus:border-white/40"
+                className="w-full rounded-[var(--radius-control)] border border-white/15 bg-white/8 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/40 outline-none backdrop-blur transition focus:border-white/40"
               />
             </div>
             {/* Aktif tür filtresi formda korunur */}
             {tur ? <input type="hidden" name="tur" value={tur} /> : null}
             <button
               type="submit"
-              className="focus-ring press min-h-[42px] rounded-[11px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+              className="focus-ring press min-h-[42px] rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
             >
               Ara
             </button>
@@ -156,8 +156,8 @@ export default async function AramaSonuclariPage({
 
       {/* İçgörü şeridi — sonuç dağılımı özeti */}
       {q.length >= 2 && topGroup ? (
-        <section className="flex flex-wrap items-center gap-3 rounded-[16px] border border-line bg-surface px-4 py-3 text-sm shadow-[var(--shadow-xs)]">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-amber-400/15 text-amber-600">
+        <section className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 text-sm shadow-[var(--shadow-xs)]">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-amber-400/15 text-amber-600">
             <Sparkles className="h-4 w-4" />
           </span>
           <p className="min-w-0 flex-1 text-text-muted">
@@ -167,7 +167,7 @@ export default async function AramaSonuclariPage({
           </p>
           <Link
             href={buildHref(q, tur === topGroup.kind ? null : topGroup.kind)}
-            className="focus-ring press inline-flex min-h-[36px] items-center gap-1 rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
+            className="focus-ring press inline-flex min-h-[36px] items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
           >
             {tur === topGroup.kind ? "Filtreyi kaldır" : `Yalnız ${topGroup.title.toLocaleLowerCase("tr-TR")}`}
             <ArrowUpRight className="h-3.5 w-3.5" />
@@ -191,7 +191,7 @@ export default async function AramaSonuclariPage({
           />
           {/* Hızlı arama önerileri — boş durumda yönlendirme */}
           {q.length < 2 ? (
-            <section className="rounded-[16px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+            <section className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
               <p className="flex items-center gap-2 text-xs font-semibold text-text-muted">
                 <Lightbulb className="h-3.5 w-3.5 text-amber-600" /> Örnek aramalar
               </p>
@@ -214,10 +214,10 @@ export default async function AramaSonuclariPage({
           {sections.map((s) => {
             const Icon = s.icon;
             return (
-              <section key={s.kind} className="overflow-hidden rounded-[20px] border border-line bg-surface">
+              <section key={s.kind} className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
                 <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
                   <h2 className="flex items-center gap-2 font-display text-sm font-bold text-ink-950">
-                    <span className={`grid h-7 w-7 place-items-center rounded-[8px] ${s.tone}`}>
+                    <span className={`grid h-7 w-7 place-items-center rounded-[var(--radius-control)] ${s.tone}`}>
                       <Icon className="h-3.5 w-3.5" />
                     </span>
                     {s.title}
@@ -225,7 +225,7 @@ export default async function AramaSonuclariPage({
                   <Link
                     href={buildHref(q, tur === s.kind ? null : s.kind)}
                     title={tur === s.kind ? "Filtreyi kaldır" : `Yalnız ${s.title.toLocaleLowerCase("tr-TR")} göster`}
-                    className={`focus-ring press rounded-full px-2 py-0.5 text-[11px] font-bold transition ${s.tone} hover:opacity-80`}
+                    className={`focus-ring press rounded-full px-2 py-0.5 text-xs font-bold transition ${s.tone} hover:opacity-80`}
                   >
                     {s.items.length}
                   </Link>
@@ -252,8 +252,8 @@ export default async function AramaSonuclariPage({
             );
           })}
           <p className="px-1 text-xs text-text-muted">
-            İpucu: <kbd className="rounded-[5px] border border-hairline bg-canvas px-1 py-0.5 text-[10px]">Ctrl</kbd>+
-            <kbd className="rounded-[5px] border border-hairline bg-canvas px-1 py-0.5 text-[10px]">K</kbd> ile her
+            İpucu: <kbd className="rounded-[5px] border border-hairline bg-canvas px-1 py-0.5 text-xs">Ctrl</kbd>+
+            <kbd className="rounded-[5px] border border-hairline bg-canvas px-1 py-0.5 text-xs">K</kbd> ile her
             sayfadan hızlı arama açabilirsiniz.
           </p>
         </div>

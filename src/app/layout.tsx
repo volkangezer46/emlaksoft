@@ -2,12 +2,12 @@ import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter, Manrope } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/app/sw-register";
 import { getBaseUrl } from "@/lib/base-url";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 const manrope = Manrope({
   variable: "--font-manrope",
-  subsets: ["latin"],
-  weight: ["600", "700", "800"],
+  subsets: ["latin", "latin-ext"],
   display: "swap",
   preload: true,
   fallback: ["system-ui", "sans-serif"],
@@ -15,8 +15,7 @@ const manrope = Manrope({
 
 const inter = Inter({
   variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  subsets: ["latin", "latin-ext"],
   display: "swap",
   preload: true,
   fallback: ["system-ui", "sans-serif"],
@@ -33,7 +32,7 @@ const geistMono = Geist_Mono({
 const SITE_NAME = "EmlakSoft";
 const SITE_TITLE = "EmlakSoft — Türkiye’nin emlak işletim sistemi";
 const SITE_DESC =
-  "Müşteriden tapuya, ilandan komisyona kadar emlak ofisinizi tek platformda yönetin. İYS/EİDS uyumlu, yapay zeka destekli emlak CRM.";
+  "Müşteriden tapuya, ilandan komisyona kadar emlak ofisinizi tek platformda yönetin. İYS/EİDS hazırlık süreçleri ve yapay zeka destekli emlak CRM.";
 
 export const metadata: Metadata = {
   title: {
@@ -44,10 +43,14 @@ export const metadata: Metadata = {
   applicationName: SITE_NAME,
   metadataBase: new URL(getBaseUrl()),
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: "/icon.svg",
+  },
   keywords: [
     "emlak CRM", "emlak yazılımı", "emlak ofis yönetimi", "portföy yönetimi",
-    "İYS uyum", "EİDS", "emlak komisyon", "gayrimenkul CRM", "emlak danışmanı yazılımı",
-    "sahibinden entegrasyon", "hepsiemlak", "kira artış hesaplama",
+    "İYS süreç yönetimi", "EİDS hazırlığı", "emlak komisyon", "gayrimenkul CRM", "emlak danışmanı yazılımı",
+    "sahibinden ilan takibi", "hepsiemlak ilan takibi", "kira artış hesaplama",
   ],
   authors: [{ name: "EmlakSoft" }],
   creator: "EmlakSoft",
@@ -97,9 +100,13 @@ export default function RootLayout({
   return (
     <html
       lang="tr"
+      suppressHydrationWarning
       data-scroll-behavior="smooth"
       className={`${manrope.variable} ${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col font-[family-name:var(--font-inter)]">
         <a href="#main-content" className="skip-link">İçeriğe atla</a>
         <ServiceWorkerRegister />

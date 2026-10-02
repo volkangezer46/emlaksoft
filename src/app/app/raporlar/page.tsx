@@ -90,7 +90,7 @@ function TrendBadge({ trend }: { trend: TrendInfo }) {
         ? "text-mint-300"
         : "text-danger-400";
   return (
-    <span className={`flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums ${cls}`}>
+    <span className={`flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold tabular-nums ${cls}`}>
       <Icon className="h-3 w-3" /> {trend.label}
     </span>
   );
@@ -223,23 +223,23 @@ export default async function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-cyan-400">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-cyan-400">
               <BarChart3 className="h-3.5 w-3.5" /> Rapor merkezi
             </p>
             <h1 className="mt-2 font-display text-3xl font-extrabold">Ofis sağlık & performans</h1>
             <p className="mt-2 text-sm text-white/60">Gerçek toplulaştırma · sahte satış hattı yok.</p>
           </div>
-          <details className="rounded-[16px] border border-white/10 bg-white/5">
-            <summary className="focus-ring cursor-pointer list-none rounded-[16px] px-5 py-4 text-center transition hover:bg-white/5 [&::-webkit-details-marker]:hidden">
+          <details className="rounded-[var(--radius-card)] border border-white/10 bg-white/5">
+            <summary className="focus-ring cursor-pointer list-none rounded-[var(--radius-card)] px-5 py-4 text-center transition hover:bg-white/5 [&::-webkit-details-marker]:hidden">
               <p className="font-display text-3xl font-extrabold text-mint-400">{office.score}</p>
               <p className="text-xs text-white/55">{office.label} ofis skoru · bileşenler ▾</p>
             </summary>
             <div className="border-t border-white/10 px-5 py-4 text-left">
-              <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-white/45">
+              <p className="text-xs font-bold uppercase tracking-[0.1em] text-white/45">
                 Skor nasıl hesaplanır? Baz 42 puan
               </p>
               <ul className="mt-2 space-y-1.5 text-xs">
@@ -271,7 +271,7 @@ export default async function ReportsPage() {
             <Link
               key={k.label}
               href={k.href}
-              className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-4 hover:border-white/30"
+              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-4 hover:border-white/30"
             >
               <span className="flex items-start justify-between">
                 <k.icon className={`h-4 w-4 ${k.tone}`} />
@@ -285,20 +285,20 @@ export default async function ReportsPage() {
                 </span>
               </span>
               <p className="mt-2 font-display text-xl font-extrabold">{k.value}</p>
-              <p className="text-[11px] text-white/45">{k.label}</p>
+              <p className="text-xs text-white/45">{k.label}</p>
             </Link>
           ))}
         </div>
       </section>
 
-      <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <h2 className="font-display font-bold text-ink-950">Hacim dağılımı</h2>
         <div className="mt-5 grid gap-4 sm:grid-cols-4">
           {bars.map((b, i) => (
-            <Link key={b.label} href={b.href} className="focus-ring press group block rounded-[14px] p-1 -m-1">
-              <div className="flex h-36 items-end rounded-[12px] bg-canvas px-3 pb-2 pt-4 transition group-hover:ring-1 group-hover:ring-brand-300">
+            <Link key={b.label} href={b.href} className="focus-ring press group block rounded-[var(--radius-card)] p-1 -m-1">
+              <div className="flex h-36 items-end rounded-[var(--radius-card)] bg-canvas px-3 pb-2 pt-4 transition group-hover:ring-1 group-hover:ring-brand-300">
                 <div
-                  className="bar-live w-full rounded-t-[8px] bg-[image:var(--grad-brand)]"
+                  className="bar-live w-full rounded-t-[var(--radius-control)] bg-[image:var(--grad-brand)]"
                   style={{ height: `${Math.max(8, (b.value / b.max) * 100)}%`, animationDelay: `${i * 80}ms` }}
                 />
               </div>
@@ -312,7 +312,7 @@ export default async function ReportsPage() {
         </div>
       </section>
 
-      <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center gap-2">
           <ICONS.komisyon className="h-4 w-4 text-brand-600" />
           <h2 className="font-display font-bold text-ink-950">Gelir & gider · son 6 ay</h2>
@@ -325,22 +325,22 @@ export default async function ReportsPage() {
         {hasTrendData ? (
           <>
             <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              <Link href="/app/komisyon" className="focus-ring press lift group block rounded-[12px] border border-line bg-canvas p-3 hover:border-brand-300">
-                <p className="flex items-center gap-1.5 text-[11px] font-semibold text-text-muted">
+              <Link href="/app/komisyon" className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-canvas p-3 hover:border-brand-300">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
                   <TrendingUp className="h-3.5 w-3.5 text-mint-600" /> Toplam gelir
                   <ArrowUpRight className="hover-action ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                 </p>
                 <p className="mt-1 font-display text-lg font-extrabold text-mint-600">{money(trendIncomeTotal)}</p>
               </Link>
-              <Link href="/app/giderler" className="focus-ring press lift group block rounded-[12px] border border-line bg-canvas p-3 hover:border-brand-300">
-                <p className="flex items-center gap-1.5 text-[11px] font-semibold text-text-muted">
+              <Link href="/app/giderler" className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-canvas p-3 hover:border-brand-300">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
                   <TrendingDown className="h-3.5 w-3.5 text-danger-500" /> Toplam gider
                   <ArrowUpRight className="hover-action ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                 </p>
                 <p className="mt-1 font-display text-lg font-extrabold text-danger-500">{money(trendExpenseTotal)}</p>
               </Link>
-              <Link href="/app/komisyon" className="focus-ring press lift group block rounded-[12px] border border-line bg-canvas p-3 hover:border-brand-300">
-                <p className="flex items-center gap-1.5 text-[11px] font-semibold text-text-muted">
+              <Link href="/app/komisyon" className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-canvas p-3 hover:border-brand-300">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
                   <ICONS.komisyon className="h-3.5 w-3.5 text-brand-600" /> Net
                   <ArrowUpRight className="hover-action ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                 </p>
@@ -399,7 +399,7 @@ export default async function ReportsPage() {
       </section>
 
       {sourceBars.length > 0 ? (
-        <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center gap-2">
             <PieChart className="h-4 w-4 text-brand-600" />
             <h2 className="font-display font-bold text-ink-950">Müşteri kaynak dağılımı</h2>
@@ -410,7 +410,7 @@ export default async function ReportsPage() {
               <Link
                 key={b.label}
                 href={b.value ? `/app/musteriler?source=${encodeURIComponent(b.value)}` : "/app/musteriler"}
-                className="focus-ring group block rounded-[10px] p-1 -m-1"
+                className="focus-ring group block rounded-[var(--radius-control)] p-1 -m-1"
               >
                 <div className="mb-1 flex items-center justify-between text-xs">
                   <span className="flex items-center gap-1 font-semibold text-ink-950">
@@ -437,7 +437,7 @@ export default async function ReportsPage() {
       ) : null}
 
       {/* Kaynak ROI — hangi kaynak gerçekten kazandırıyor? */}
-      <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center gap-2">
           <Trophy className="h-4 w-4 text-brand-600" />
           <h2 className="font-display font-bold text-ink-950">Kaynak ROI · kazanılan anlaşmalar</h2>
@@ -459,13 +459,13 @@ export default async function ReportsPage() {
               return (
                 <div
                   key={r.source}
-                  className={`rounded-[12px] p-2 ${best ? "bg-brand-600/[0.05] ring-1 ring-brand-400/40" : ""}`}
+                  className={`rounded-[var(--radius-card)] p-2 ${best ? "bg-brand-600/[0.05] ring-1 ring-brand-400/40" : ""}`}
                 >
                   <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-xs">
                     <span className="flex items-center gap-1.5 font-semibold text-ink-950">
                       {sourceLabel(r.source)}
                       {best ? (
-                        <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-[10px] font-bold text-brand-600">
+                        <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold text-brand-600">
                           En değerli kaynak
                         </span>
                       ) : null}
@@ -492,7 +492,7 @@ export default async function ReportsPage() {
       </section>
 
       {/* Kayıp nedeni raporu — kaybedilen anlaşmaların neden dağılımı */}
-      <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center gap-2">
           <TrendingDown className="h-4 w-4 text-danger-500" />
           <h2 className="font-display font-bold text-ink-950">Kayıp nedeni analizi</h2>
@@ -513,7 +513,7 @@ export default async function ReportsPage() {
               <Link
                 key={r.reason}
                 href="/app/anlasmalar"
-                className="focus-ring group block rounded-[10px] p-1 -m-1"
+                className="focus-ring group block rounded-[var(--radius-control)] p-1 -m-1"
               >
                 <div className="mb-1 flex items-center justify-between gap-3 text-xs">
                   <span className="flex min-w-0 items-center gap-1 font-semibold text-ink-950">
@@ -540,37 +540,37 @@ export default async function ReportsPage() {
       </section>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Link href="/app/raporlar/talep-arz" className="lift rounded-[16px] border border-line bg-surface p-4 hover:border-brand-400">
+        <Link href="/app/raporlar/talep-arz" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
           <MapIcon className="h-4 w-4 text-brand-600" />
           <p className="mt-2 font-display font-bold">Talep-Arz Haritası</p>
           <p className="text-xs text-text-muted">İlçe bazlı talep-arz dengesi</p>
         </Link>
-        <Link href="/app/raporlar/memnuniyet" className="lift rounded-[16px] border border-line bg-surface p-4 hover:border-brand-400">
+        <Link href="/app/raporlar/memnuniyet" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
           <Smile className="h-4 w-4 text-mint-600" />
           <p className="mt-2 font-display font-bold">Memnuniyet (NPS)</p>
           <p className="text-xs text-text-muted">Kapanış sonrası anket skoru</p>
         </Link>
-        <Link href="/app/kayip-kacak" className="lift rounded-[16px] border border-line bg-surface p-4 hover:border-brand-400">
+        <Link href="/app/kayip-kacak" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
           <ICONS.alarm className="h-4 w-4 text-danger-500" />
           <p className="mt-2 font-display font-bold">Kayıp-kaçak</p>
           <p className="text-xs text-text-muted">Teyit ve kapanış analizi</p>
         </Link>
-        <Link href="/app/eslestirme" className="lift rounded-[16px] border border-line bg-surface p-4 hover:border-brand-400">
+        <Link href="/app/eslestirme" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
           <ICONS.eslestirme className="h-4 w-4 text-brand-600" />
           <p className="mt-2 font-display font-bold">Eşleştirme</p>
           <p className="text-xs text-text-muted">Talep × portföy skorları</p>
         </Link>
-        <Link href="/app/degerleme" className="lift rounded-[16px] border border-line bg-surface p-4 hover:border-brand-400">
+        <Link href="/app/degerleme" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
           <Gauge className="h-4 w-4 text-cyan-600" />
           <p className="mt-2 font-display font-bold">Değerleme</p>
           <p className="text-xs text-text-muted">Endeksa · Tapusor</p>
         </Link>
-        <Link href="/app/musteriler" className="lift rounded-[16px] border border-line bg-surface p-4 hover:border-brand-400">
+        <Link href="/app/musteriler" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
           <ICONS.musteri className="h-4 w-4 text-mint-600" />
           <p className="mt-2 font-display font-bold">Müşteri merkezi</p>
           <p className="text-xs text-text-muted">360 görünüm</p>
         </Link>
-        <Link href="/app/franchise" className="lift rounded-[16px] border border-line bg-surface p-4 hover:border-brand-400">
+        <Link href="/app/franchise" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
           {/* İkonografi: şube/franchise, portföy binası (Building2) ile aynı
               ikonu paylaşıyordu; ayrı kavram → ICONS.sube. */}
           <ICONS.sube className="h-4 w-4 text-amber-500" />

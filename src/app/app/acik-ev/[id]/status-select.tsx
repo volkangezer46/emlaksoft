@@ -12,10 +12,19 @@ const OPTIONS = [
   { value: "cancelled", label: "İptal" },
 ];
 
+const NEXT_STATUSES: Record<string, readonly string[]> = {
+  planned: ["active", "cancelled"],
+  active: ["completed", "cancelled"],
+  completed: [],
+  cancelled: [],
+};
+
 export function StatusSelect({ openHouseId, status }: { openHouseId: string; status: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const nextStatuses = NEXT_STATUSES[status] ?? [];
+  const visibleOptions = OPTIONS.filter((option) => option.value === status || nextStatuses.includes(option.value));
 
   function onChange(next: string) {
     if (next === status) return;
@@ -38,11 +47,11 @@ export function StatusSelect({ openHouseId, status }: { openHouseId: string; sta
       <select
         id="oh-status"
         value={status}
-        disabled={pending}
+        disabled={pending || nextStatuses.length === 0}
         onChange={(e) => onChange(e.target.value)}
-        className="focus-ring rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink-950 outline-none transition hover:border-brand-300 disabled:opacity-60"
+        className="focus-ring rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink-950 outline-none transition hover:border-brand-300 disabled:opacity-60"
       >
-        {OPTIONS.map((o) => (
+        {visibleOptions.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>

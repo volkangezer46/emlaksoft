@@ -2,12 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { checkAuthorityShield } from "@/lib/authority-shield";
 import { notifyTenant } from "@/lib/notify";
-import { buildSplits, calculateCommission } from "@/lib/commission";
-import { wonDealPropertyStatus } from "@/lib/deal-outcome";
+import { parseMoneyInput } from "@/lib/money-input";
+import { validateTenantReferences } from "@/lib/tenant-references";
 
 export type WorkflowResult = { error?: string; ok?: boolean; dealId?: string; commissionId?: string };
 
@@ -30,115 +31,81 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
     const propertyId = String(formData.get("property_id") ?? "").trim();
     const customerId = String(formData.get("customer_id") ?? "").trim() || null;
     const dealType = String(formData.get("deal_type") ?? "sale").trim() === "rent" ? "rent" : "sale";
-    const amountRaw = String(formData.get("deal_value") ?? "").replace(/[^\d.,]/g, "");
-    const dealValue = amountRaw ? Number(amountRaw.replace(/\./g, "").replace(",", ".")) : null;
-    const advisorShare = Number(String(formData.get("advisor_share") ?? "50")) || 50;
+    const amountResult = parseMoneyInput(formData.get("deal_value"), { max: 100_000_000_000 });
+    if (!amountResult.ok) return { error: "Geçerli bir anlaşma tutarı girin." };
+    const advisorShare = Number(String(formData.get("advisor_share") ?? "50"));
+    if (!Number.isFinite(advisorShare) || advisorShare < 0 || advisorShare > 100) {
+      return { error: "Danışman payı 0-100 arasında olmalı." };
+    }
     const hasAuthority = String(formData.get("has_authority") ?? "") === "1";
 
     if (!propertyId) return { error: "Portföy zorunlu." };
+    if (!customerId) return { error: "Kapanış için işlem yapılan müşteriyi seçin." };
+    if (dealType === "rent") {
+      return { error: "Kiralama kapanışı; kira sözleşmesi, komisyon ve portföy tek işlemde oluşsun diye Kiralama ekranından tamamlanmalıdır." };
+    }
 
     const shield = checkAuthorityShield({ hasWrittenAuthority: hasAuthority });
     if (!shield.ok) return { error: shield.warning ?? "Yetki belgesi gerekli." };
 
-    const { data: property } = await supabase
+    const references = await validateTenantReferences(gate.tenantId, {
+      propertyId,
+      customerId,
+    });
+    if (!references.ok) return { error: references.error };
+
+    const { data: property, error: propertyError } = await supabase
       .from("properties")
-      .select("id, list_price, commission_rate, transaction_type, assigned_to, title, property_code")
+      .select("id, list_price, transaction_type, title, property_code")
       .eq("id", propertyId)
       .eq("tenant_id", gate.tenantId)
       .maybeSingle();
 
-    if (!property) return { error: "Portföy bulunamadı." };
+    if (propertyError || !property) return { error: "Portföy bulunamadı." };
+    const value = amountResult.value ?? Number(property.list_price);
+    if (!Number.isFinite(value) || value <= 0) return { error: "Kapanış için geçerli anlaşma tutarı girin." };
 
-    // Idempotency: bu portföy için zaten kazanılan anlaşma varsa çift komisyonu engelle
-    const { data: existingDeal } = await supabase
-      .from("deals")
-      .select("id")
-      .eq("property_id", propertyId)
-      .eq("tenant_id", gate.tenantId)
-      .eq("stage", "won")
-      .limit(1)
-      .maybeSingle();
-    if (existingDeal) return { error: "Bu portföy zaten anlaşmaya dönüştürülmüş." };
-
-    const value = dealValue && Number.isFinite(dealValue) ? dealValue : Number(property.list_price) || 0;
-    // Sabit %20 KDV ve %3 oran buradan kaldirildi — bkz. lib/commission.ts
-    const calc = calculateCommission({
-      amount: value,
-      rate: Number(property.commission_rate) || undefined,
-      advisorShare,
+    const admin = createAdminClient();
+    const { data: closeData, error: closeError } = await admin.rpc("create_won_deal_atomic", {
+      p_tenant_id: gate.tenantId,
+      p_actor_id: gate.userId,
+      p_property_id: propertyId,
+      p_customer_id: customerId,
+      p_deal_type: dealType,
+      p_deal_value: value,
+      p_advisor_share: advisorShare,
     });
-    const gross = calc.net;
-    const vat = calc.vat;
-
-    const { data: deal, error: dealErr } = await supabase
-      .from("deals")
-      .insert({
-        tenant_id: gate.tenantId,
-        property_id: propertyId,
-        customer_id: customerId,
-        deal_type: dealType,
-        stage: "won",
-        deal_value: value,
-        probability: 100,
-        assigned_to: property.assigned_to ?? gate.userId,
-      })
-      .select("id")
-      .single();
-
-    if (dealErr || !deal) {
-      console.error("convert deal", dealErr);
-      return { error: "Deal oluşturulamadı." };
+    if (closeError) {
+      console.error("convertWorkflow atomic close", { code: closeError.code });
+      return { error: "Anlaşma, komisyon ve portföy durumu birlikte oluşturulamadı." };
     }
-
-    // Ofis payi cikarma ile hesaplaniyor: iki ayri carpimin toplami
-    // yuvarlama yuzunden matrahi tutturmayabiliyordu (or. %33/%67).
-    const splits = buildSplits(gross, advisorShare);
-
-    const { data: commission, error: cErr } = await supabase
-      .from("commissions")
-      .insert({
-        tenant_id: gate.tenantId,
-        deal_id: deal.id,
-        gross_amount: gross,
-        vat_amount: vat,
-        status: "calculated",
-        splits,
-      })
-      .select("id")
-      .single();
-
-    if (cErr) {
-      console.error("convert commission", cErr);
-      return { error: "Komisyon kaydı oluşturulamadı." };
+    const close = closeData && typeof closeData === "object" && !Array.isArray(closeData)
+      ? closeData as Record<string, unknown>
+      : null;
+    if (close?.outcome === "property_already_closed") {
+      return { error: "Bu portföy zaten kazanılmış bir anlaşmaya bağlı." };
     }
+    if (close?.outcome === "commission_rate_required") {
+      return { error: "Kapanıştan önce portföyde 0'dan büyük, en çok iki ondalık haneli geçerli bir komisyon oranı tanımlayın." };
+    }
+    if (close?.outcome !== "created" || typeof close.deal_id !== "string" || typeof close.commission_id !== "string") {
+      return { error: "Kapanış kaydı oluşturulamadı." };
+    }
+    const dealId = close.deal_id;
+    const commissionId = close.commission_id;
+    const kapanisBasligi = "Satış kapandı · komisyon hesaplandı";
 
-    // Kira anlaşmasında portföy SATILDI olamaz (denetim P0) — bkz. lib/deal-outcome.ts
-    const nextStatus = wonDealPropertyStatus(dealType);
-    const kapanisBasligi =
-      dealType === "rent" ? "Kiralama kapandı · komisyon hesaplandı" : "Satış kapandı · komisyon hesaplandı";
-
-    // property update + logActivity + notifyTenant birbirinden bağımsız → paralel
-    await Promise.all([
-      supabase
-        .from("properties")
-        .update({ status: nextStatus, updated_at: new Date().toISOString() })
-        .eq("id", propertyId),
-      logActivity({
-        tenantId: gate.tenantId,
-        actorId: gate.userId,
-        action: "workflow.deal_won",
-        entityType: "deal",
-        entityId: deal.id,
-        newValue: { property_id: propertyId, gross, splits, deal_type: dealType, property_status: nextStatus },
-      }),
-      notifyTenant({
+    try {
+      await notifyTenant({
         tenantId: gate.tenantId,
         title: kapanisBasligi,
-        body: `${property.property_code}: ${gross.toLocaleString("tr-TR")} ₺ brüt`,
+        body: `${property.property_code}: kapanış ve komisyon kaydı hazır`,
         href: "/app/komisyon",
         kind: "success",
-      }),
-    ]);
+      });
+    } catch (notificationError) {
+      console.error("convertWorkflow notification", notificationError);
+    }
 
     revalidatePath("/app/komisyon");
     revalidatePath("/app/anlasmalar");
@@ -146,18 +113,22 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
     revalidatePath(`/app/portfoyler/${propertyId}`);
     revalidatePath("/app/raporlar");
     revalidatePath("/app");
-    return { ok: true, dealId: deal.id, commissionId: commission?.id };
+    return { ok: true, dealId, commissionId };
   }
 
   if (action === "mark_commission_paid") {
     const id = String(formData.get("commission_id") ?? "").trim();
     if (!id) return { error: "Komisyon bulunamadı." };
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("commissions")
       .update({ status: "paid" })
       .eq("id", id)
-      .eq("tenant_id", gate.tenantId);
+      .eq("tenant_id", gate.tenantId)
+      .not("status", "in", "(paid,collected)")
+      .select("id")
+      .maybeSingle();
     if (error) return { error: "Durum güncellenemedi." };
+    if (!updated) return { error: "Komisyon bulunamadı veya zaten tahsil edilmiş." };
     await logActivity({
       tenantId: gate.tenantId,
       actorId: gate.userId,

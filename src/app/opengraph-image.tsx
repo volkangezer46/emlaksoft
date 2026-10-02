@@ -68,7 +68,7 @@ export default async function OpengraphImage() {
         </div>
 
         <div style={{ display: "flex", gap: 14 }}>
-          {["İYS/EİDS uyumlu", "Yapay zeka destekli", "Portal entegrasyonu"].map((t) => (
+          {["İYS/EİDS hazırlık akışları", "Yapay zeka destekli", "Portal operasyonları"].map((t) => (
             <div
               key={t}
               style={{

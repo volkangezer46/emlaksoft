@@ -1,141 +1,146 @@
 /**
- * Bağımlılık açığı kapısı (Q3).
+ * Production dependency vulnerability gate.
  *
- * ============================================================================
- * NEDEN DÜZ `npm audit` DEĞİL
- * ============================================================================
- * CI'da adım `continue-on-error` ile duruyordu, yani hiçbir şeyi bloklamıyordu.
- * Düz `npm audit --audit-level=high` eklemek CI'ı KALICI KIRMIZI yapardı ve
- * kırmızı bir CI hiçbir şey söylemez — herkes görmezden gelmeye başlar.
- *
- * Sebep şu (canlı olarak doğrulandı):
- *
- *   npm audit          → 12 high
- *   npm audit --omit=dev →  3 high
- *
- * Yani 9 tanesi DEV-ONLY (eslint → minimatch/brace-expansion DoS); üretime
- * hiç gitmiyor. Kalan 3'ü Next 16.2.11'in KENDİ iç bağımlılıklarında
- * (`postcss`, `sharp`) ve npm'in önerdiği "düzeltme" şu:
- *
- *   fixAvailable: { name: "next", version: "9.3.3", isSemVerMajor: true }
- *
- * Next 16 → 9.3.3 DÜŞÜRMEK. Uygulamayı yok eder. Next 16.2.12 de aynı
- * `postcss 8.4.31`i taşıyor, yani ileri doğru bir düzeltme henüz yok.
- *
- * ============================================================================
- * BU KAPININ YAPTIĞI
- * ============================================================================
- * Üretim bağımlılıklarındaki high/critical açıkları kontrol eder ve
- * BELGELENMİŞ İSTİSNALAR dışında kalan her şeyde CI'ı kırar. Böylece:
- *
- *   · bugünkü çözümsüz durum CI'ı kalıcı kırmızıya çevirmez
- *   · YENİ bir açık eklendiği anda CI kırılır
- *   · istisnalar gerekçesiyle ve çıkış koşuluyla burada yazılı
- *
- * Çalıştırma:  npm run audit:deps
+ * High/critical findings fail by default. A temporary exception must be tied
+ * to the exact package, advisory identifiers, affected audit range and
+ * installed versions, and must name an owner and expiry date. This prevents a
+ * package-name-only allowlist from silently accepting a future vulnerability.
  */
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
-/**
- * Bilinçli istisnalar.
- *
- * Her giriş: paket adı → neden bekletiliyor + bu satırın NE ZAMAN silineceği.
- * Bir istisna eklemek bilinçli bir karar olmalı; süresiz kalmamalı.
- */
-const ISTISNALAR: Record<string, string> = {
-  next:
-    "Next 16.2.11'in kendi ic bagimliliklari (postcss, sharp). Ileri dogru " +
-    "duzeltme yok; npm'in onerdigi 'fix' Next 9.3.3'e dusurmek. Next bu " +
-    "paketleri bump ettiginde bu satir silinecek.",
-  postcss:
-    "next tarafindan nested olarak geliyor (8.4.31). Dogrudan bagimlilik " +
-    "degil; `overrides` ile zorlamak CI'da `npm ci`yi kirdi (bkz. ROADMAP F3). " +
-    "Next kendi surumunu yukselttiginde cikacak.",
-  sharp:
-    "next tarafindan nested olarak geliyor (0.34.5) — libvips CVE'leri. " +
-    "Dogrudan bagimlilik olarak eklemek nested kopyayi degistirmiyor " +
-    "(dogrulandi). Next bump edene kadar bekliyor.",
+type ViaAdvisory = {
+  source?: number;
+  url?: string;
+  title?: string;
+  range?: string;
 };
 
 type Advisory = {
   name: string;
   severity: string;
-  isDirect?: boolean;
+  range?: string;
+  nodes?: string[];
+  via?: Array<string | ViaAdvisory>;
   fixAvailable?: boolean | { name: string; version: string; isSemVerMajor?: boolean };
 };
 
-function audit(): { vulnerabilities: Record<string, Advisory>; metadata?: { vulnerabilities?: Record<string, number> } } {
-  /*
-   * `npm audit` acik bulundugunda SIFIR OLMAYAN cikis kodu veriyor, bu yuzden
-   * execFileSync throw eder. Hata nesnesinin `stdout`u yine gecerli JSON —
-   * onu kullaniyoruz. Yakalamadan gecmek betigi acik VARKEN cokertirdi.
-   */
+type AuditReport = {
+  vulnerabilities?: Record<string, Advisory>;
+  metadata?: { vulnerabilities?: Record<string, number> };
+};
+
+type AuditException = {
+  package: string;
+  advisoryIds: readonly string[];
+  affectedRange: string;
+  installedVersions: readonly string[];
+  owner: string;
+  expiresOn: `${number}-${number}-${number}`;
+  reason: string;
+  exitCondition: string;
+};
+
+/**
+ * Keep this empty whenever possible. Example fields are intentionally strict:
+ * advisoryIds use GHSA IDs (or npm:<source>/via:<package> when unavailable),
+ * and installedVersions must list every vulnerable version found in nodes.
+ */
+const EXCEPTIONS: readonly AuditException[] = [];
+
+function runAudit(): AuditReport {
   try {
-    const out = execFileSync("npm", ["audit", "--omit=dev", "--json"], {
+    const output = execFileSync("npm", ["audit", "--omit=dev", "--json"], {
       encoding: "utf8",
       maxBuffer: 32 * 1024 * 1024,
       shell: process.platform === "win32",
     });
-    return JSON.parse(out);
-  } catch (e) {
-    const stdout = (e as { stdout?: string }).stdout;
-    if (!stdout) throw e;
-    return JSON.parse(stdout);
+    return JSON.parse(output) as AuditReport;
+  } catch (error) {
+    const stdout = (error as { stdout?: string }).stdout;
+    if (!stdout) throw error;
+    return JSON.parse(stdout) as AuditReport;
   }
 }
 
-const rapor = audit();
-const hepsi = Object.entries(rapor.vulnerabilities ?? {});
-const ozet = rapor.metadata?.vulnerabilities ?? {};
+function advisoryIds(advisory: Advisory): string[] {
+  return [...new Set((advisory.via ?? []).map((via) => {
+    if (typeof via === "string") return `via:${via}`;
+    const ghsa = via.url?.match(/GHSA-[0-9a-z-]+/i)?.[0]?.toUpperCase();
+    if (ghsa) return ghsa;
+    return via.source ? `npm:${via.source}` : `title:${via.title ?? "unknown"}`;
+  }))].sort();
+}
 
-console.log(`uretim bagimliliklari (dev haric): ${JSON.stringify(ozet)}`);
+function installedVersions(advisory: Advisory): string[] {
+  const versions = new Set<string>();
+  for (const node of advisory.nodes ?? []) {
+    try {
+      const manifest = JSON.parse(readFileSync(resolve(process.cwd(), node, "package.json"), "utf8")) as { version?: string };
+      if (manifest.version) versions.add(manifest.version);
+    } catch {
+      versions.add("<unresolved>");
+    }
+  }
+  return [...versions].sort();
+}
 
-/*
- * KAPSAM KORUMASI: `vulnerabilities` anahtari hic yoksa ya rapor bicimi
- * degismis ya npm hata vermis demektir. Bu durumda "temiz" demek YANLIS bir
- * guven verir — bu projede daha once iki denetim tam bu sekilde sessizce
- * gecmisti.
- */
-if (!rapor.vulnerabilities) {
-  console.error("KAPI GUVENILMEZ: npm audit ciktisinda `vulnerabilities` yok. Rapor bicimi degismis olabilir.");
+function sameSet(left: readonly string[], right: readonly string[]): boolean {
+  return [...left].sort().join("\0") === [...right].sort().join("\0");
+}
+
+function exceptionProblem(exception: AuditException, advisory?: Advisory): string | null {
+  const expiry = Date.parse(`${exception.expiresOn}T23:59:59Z`);
+  if (!Number.isFinite(expiry)) return "geçersiz expiry tarihi";
+  if (expiry < Date.now()) return `istisna süresi doldu (${exception.expiresOn})`;
+  if (!exception.owner.trim()) return "owner eksik";
+  if (!exception.reason.trim() || !exception.exitCondition.trim()) return "gerekçe veya çıkış koşulu eksik";
+  if (exception.advisoryIds.length === 0 || exception.installedVersions.length === 0) return "advisory veya sürüm kapsamı boş";
+  if (!advisory) return "bulgu çözüldü; istisna kaldırılmalı";
+  if ((advisory.range ?? "") !== exception.affectedRange) return `audit aralığı değişti (${advisory.range ?? "<yok>"})`;
+  const ids = advisoryIds(advisory);
+  if (!sameSet(ids, exception.advisoryIds)) return `advisory kapsamı değişti (${ids.join(", ")})`;
+  const versions = installedVersions(advisory);
+  if (!sameSet(versions, exception.installedVersions)) return `kurulu sürüm kapsamı değişti (${versions.join(", ")})`;
+  return null;
+}
+
+const report = runAudit();
+if (!report.vulnerabilities) {
+  console.error("KAPI GÜVENİLMEZ: npm audit çıktısında vulnerabilities alanı yok.");
   process.exit(2);
 }
 
-const ciddi = hepsi.filter(([, a]) => a.severity === "high" || a.severity === "critical");
-const istisnali = ciddi.filter(([ad]) => ad in ISTISNALAR);
-const yeni = ciddi.filter(([ad]) => !(ad in ISTISNALAR));
+const serious = Object.entries(report.vulnerabilities).filter(([, advisory]) =>
+  advisory.severity === "high" || advisory.severity === "critical",
+);
+const exceptionByPackage = new Map(EXCEPTIONS.map((entry) => [entry.package, entry]));
+const failures: string[] = [];
 
-if (istisnali.length > 0) {
-  console.log(`\n[BEKLETILEN] ${istisnali.length} belgelenmis istisna:`);
-  for (const [ad, a] of istisnali) {
-    console.log(`  ${ad} (${a.severity})`);
-    console.log(`     ${ISTISNALAR[ad]}`);
+for (const [packageName, advisory] of serious) {
+  const exception = exceptionByPackage.get(packageName);
+  if (!exception) {
+    failures.push(`${packageName} (${advisory.severity}) · ${advisoryIds(advisory).join(", ") || "advisory bilinmiyor"}`);
+    continue;
   }
+  const problem = exceptionProblem(exception, advisory);
+  if (problem) failures.push(`${packageName}: ${problem}`);
+  else console.log(`[GEÇİCİ İSTİSNA] ${packageName} · owner ${exception.owner} · son ${exception.expiresOn}`);
 }
 
-// Artik gecerli olmayan istisnalar: listeyi temiz tutar.
-const cozulmus = Object.keys(ISTISNALAR).filter((ad) => !ciddi.some(([n]) => n === ad));
-if (cozulmus.length > 0) {
-  console.log(`\n[ARTIK GEREKSIZ] ${cozulmus.length} istisna cozulmus, ISTISNALAR listesinden silinebilir:`);
-  cozulmus.forEach((ad) => console.log(`  ${ad}`));
+for (const exception of EXCEPTIONS) {
+  if (serious.some(([packageName]) => packageName === exception.package)) continue;
+  failures.push(`${exception.package}: ${exceptionProblem(exception)}`);
 }
 
-if (yeni.length === 0) {
-  console.log("\nYENI high/critical acik YOK.");
+console.log(`Üretim bağımlılıkları: ${JSON.stringify(report.metadata?.vulnerabilities ?? {})}`);
+if (failures.length === 0) {
+  console.log("Yeni veya süresi dolmuş high/critical bulgu yok.");
   process.exit(0);
 }
 
-console.log(`\n[YENI ACIK] ${yeni.length} paket — CI kirildi:`);
-for (const [ad, a] of yeni) {
-  const fix =
-    typeof a.fixAvailable === "object"
-      ? `${a.fixAvailable.name}@${a.fixAvailable.version}${a.fixAvailable.isSemVerMajor ? " (MAJOR)" : ""}`
-      : a.fixAvailable
-        ? "var"
-        : "yok";
-  console.log(`  ${ad} (${a.severity}) · duzeltme: ${fix}`);
-}
-console.log("");
-console.log("Ya duzeltmeyi uygulayin, ya scripts/audit-gate.ts icindeki");
-console.log("ISTISNALAR listesine GEREKCE ve CIKIS KOSULU ile ekleyin.");
+console.error(`Bağımlılık güvenlik kapısı başarısız (${failures.length}):`);
+for (const failure of failures) console.error(`  - ${failure}`);
+console.error("Düzeltin veya advisory+sürüm+owner+expiry içeren süreli bir istisna ekleyin.");
 process.exit(1);

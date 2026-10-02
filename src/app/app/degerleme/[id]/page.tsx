@@ -172,12 +172,12 @@ export default async function ValuationReportPage({
           {valuation.shared_at ? (
             <span
               title={`Paylaşıldı: ${tarih(valuation.shared_at)}`}
-              className="inline-flex items-center gap-1.5 rounded-[10px] border border-mint-500/30 bg-mint-500/10 px-3 py-2 text-xs font-bold text-mint-700"
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-mint-500/30 bg-mint-500/10 px-3 py-2 text-xs font-bold text-mint-700"
             >
               <Share2 className="h-3.5 w-3.5" /> Paylaşıldı · {tarih(valuation.shared_at)}
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-[10px] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-text-muted">
+            <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-text-muted">
               <Share2 className="h-3.5 w-3.5" /> Henüz paylaşılmadı
             </span>
           )}
@@ -190,7 +190,7 @@ export default async function ValuationReportPage({
         {/* Rapor başlığı — çıktıda ofis adı belgenin üst bandı oluyor. */}
         <header className="hairline-b flex flex-wrap items-start justify-between gap-4 pb-5">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-600">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-600">
               {office?.name ?? "Emlak ofisi"}
             </p>
             <h1 className="mt-1 font-display text-2xl font-extrabold tracking-[-0.02em] text-ink-950">
@@ -238,11 +238,11 @@ export default async function ValuationReportPage({
             ].map((x) => (
               <div
                 key={x.label}
-                className={`rounded-[14px] border px-4 py-3 ${
+                className={`rounded-[var(--radius-card)] border px-4 py-3 ${
                   x.big ? "border-brand-300/50 bg-brand-600/5" : "border-line bg-canvas"
                 }`}
               >
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-text-faint">{x.label}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-text-faint">{x.label}</p>
                 <p className={`numeric mt-1 font-display font-extrabold ${x.tone} ${x.big ? "text-2xl" : "text-lg"}`}>
                   {x.value}
                 </p>
@@ -251,20 +251,20 @@ export default async function ValuationReportPage({
           </div>
 
           <dl className="mt-3 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-[12px] border border-line bg-canvas px-4 py-2.5">
-              <dt className="text-[11px] text-text-faint">m² birim değeri</dt>
+            <div className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
+              <dt className="text-xs text-text-faint">m² birim değeri</dt>
               <dd className="numeric text-sm font-bold text-ink-950">
                 {sqmPrice != null ? money(sqmPrice) : "m² bilgisi girilmemiş"}
               </dd>
             </div>
-            <div className="rounded-[12px] border border-line bg-canvas px-4 py-2.5">
-              <dt className="text-[11px] text-text-faint">Güven düzeyi</dt>
+            <div className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
+              <dt className="text-xs text-text-faint">Güven düzeyi</dt>
               <dd className="numeric text-sm font-bold text-ink-950">
                 {confidencePct != null ? `%${confidencePct}` : "—"}
               </dd>
             </div>
-            <div className="rounded-[12px] border border-line bg-canvas px-4 py-2.5">
-              <dt className="text-[11px] text-text-faint">Liste fiyatı farkı</dt>
+            <div className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
+              <dt className="text-xs text-text-faint">Liste fiyatı farkı</dt>
               <dd className="numeric text-sm font-bold text-ink-950">
                 {listDelta == null
                   ? "—"
@@ -316,7 +316,7 @@ export default async function ValuationReportPage({
             <Scale className="h-4 w-4 text-brand-600" /> Değere katkı veren kaynaklar
           </h2>
           {priceSources.length === 0 ? (
-            <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
+            <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
               Bu değerlemede ağırlıklı bir fiyat kaynağı kaydedilmemiş.
             </p>
           ) : (
@@ -349,7 +349,7 @@ export default async function ValuationReportPage({
               <h3 className="mt-5 flex items-center gap-2 text-sm font-bold text-ink-950">
                 <TrendingUp className="h-3.5 w-3.5 text-mint-600" /> Bilgi amaçlı göstergeler
               </h3>
-              <p className="mt-1 text-[11px] text-text-faint">
+              <p className="mt-1 text-xs text-text-faint">
                 Aşağıdakiler değer hesabına <strong>girmez</strong>; yalnızca bağlam sunar.
               </p>
               <ul className="mt-2 space-y-1.5">
@@ -370,7 +370,7 @@ export default async function ValuationReportPage({
             <h2 className="flex items-center gap-2 font-display text-base font-bold text-ink-950">
               <Building2 className="h-4 w-4 text-brand-600" /> Kullanılan emsaller
             </h2>
-            <p className="mt-1 text-[11px] text-text-faint">
+            <p className="mt-1 text-xs text-text-faint">
               Emsal motoru bu kayıtlara dayandı — aynı ilçe/tip, m² bandı ±%30, son 18 ay.
               ₺/m², hedefin kat/yaş/ısıtma/cephe farkına göre düzeltilmiştir; ham değerden
               farklıysa altında küçük yazıyla gösterilir.
@@ -412,7 +412,7 @@ export default async function ValuationReportPage({
                           <>
                             <div>{money(c.adjusted_price_per_sqm)}</div>
                             {c.price_per_sqm != null && c.price_per_sqm !== c.adjusted_price_per_sqm ? (
-                              <div className="text-[10px] font-normal text-text-faint">
+                              <div className="text-xs font-normal text-text-faint">
                                 ham: {money(c.price_per_sqm)}
                               </div>
                             ) : null}
@@ -430,7 +430,7 @@ export default async function ValuationReportPage({
               </Table>
             </TableFrame>
             {comparablesRecomputed ? (
-              <p className="mt-2 text-[11px] text-text-faint">
+              <p className="mt-2 text-xs text-text-faint">
                 Bu kayıtta emsal listesi saklanmadığı için emsaller görüntüleme anında aynı
                 parametrelerle yeniden hesaplandı; sonuç, rapor tarihindeki kümeden farklı olabilir.
               </p>
@@ -447,7 +447,7 @@ export default async function ValuationReportPage({
 
         {/* Yasal çerçeve — belge elden verildiği için burada olması şart. */}
         <footer className="hairline-t mt-8 pt-5">
-          <p className="flex items-start gap-2 text-[11px] leading-relaxed text-text-muted">
+          <p className="flex items-start gap-2 text-xs leading-relaxed text-text-muted">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600" />
             <span>
               Bu rapor bir <strong>ön değer tahminidir</strong>; SPK lisanslı gayrimenkul değerleme
@@ -460,10 +460,10 @@ export default async function ValuationReportPage({
           {/* Islak imza alanı yalnızca çıktıda — ekranda yer kaplamasın. */}
           <div className="print-only mt-10 grid grid-cols-2 gap-12">
             <div>
-              <div className="hairline-t pt-1.5 text-[11px] text-text-muted">Hazırlayan · {author?.full_name ?? ""}</div>
+              <div className="hairline-t pt-1.5 text-xs text-text-muted">Hazırlayan · {author?.full_name ?? ""}</div>
             </div>
             <div>
-              <div className="hairline-t pt-1.5 text-[11px] text-text-muted">Teslim alan · ad, soyad, tarih</div>
+              <div className="hairline-t pt-1.5 text-xs text-text-muted">Teslim alan · ad, soyad, tarih</div>
             </div>
           </div>
         </footer>

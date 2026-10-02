@@ -138,11 +138,11 @@ export default async function CompliancePage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-mint-500/20 blur-[80px]" />
         <div className="relative">
-          <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-mint-400">
+          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-mint-400">
             <ShieldCheck className="h-3.5 w-3.5" /> İYS / EİDS kalkanı
           </p>
           <h1 className="mt-2 font-display text-3xl font-extrabold">Uyum merkezi</h1>
@@ -154,14 +154,14 @@ export default async function CompliancePage({
               <a
                 key={k.label}
                 href={k.href}
-                className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-white/30"
+                className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-white/30"
               >
                 <span className="flex items-start justify-between">
                   <k.icon className={`h-4 w-4 ${k.tone}`} />
                   <ArrowUpRight className="h-4 w-4 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
                 </span>
                 <p className="numeric mt-2 font-display text-xl font-extrabold text-white">{k.value}</p>
-                <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+                <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
               </a>
             ))}
           </div>
@@ -169,12 +169,12 @@ export default async function CompliancePage({
       </section>
 
       {channelRisk.length > 0 ? (
-        <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <p className="flex items-center gap-2 text-xs font-semibold text-amber-700">
             <ShieldAlert className="h-4 w-4" /> Kanal risk haritası
           </p>
           <h2 className="mt-1 font-display font-bold text-ink-950">İzin kapsaması kanal bazında</h2>
-          <p className="mt-0.5 text-[11px] text-text-muted">
+          <p className="mt-0.5 text-xs text-text-muted">
             Kapsam = izinli kayıt / o kanaldaki tüm kayıtlar. Düşük kapsamlı kanalda toplu ileti göndermek İYS riski doğurur.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -190,16 +190,16 @@ export default async function CompliancePage({
                 <Link
                   key={r.channel}
                   href={`/app/uyum?kanal=${r.channel}`}
-                  className="focus-ring press lift group block rounded-[14px] border border-line bg-canvas/60 p-4 transition hover:border-brand-300"
+                  className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-canvas/60 p-4 transition hover:border-brand-300"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-ink-950 group-hover:text-brand-600">
                       {channelLabel[r.channel]}
                     </p>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${risk.chip}`}>{risk.label}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${risk.chip}`}>{risk.label}</span>
                   </div>
                   <p className="numeric mt-2 font-display text-2xl font-extrabold text-ink-950">%{cov}</p>
-                  <p className="text-[11px] text-text-muted">
+                  <p className="text-xs text-text-muted">
                     {r.granted}/{r.total} kayıt izinli
                   </p>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-950/8">
@@ -214,13 +214,13 @@ export default async function CompliancePage({
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
         <IysForm customers={customers ?? []} />
-        <section className="rounded-[20px] border border-line bg-surface p-5">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <ShieldAlert className="h-4 w-4 text-amber-500" /> Kayıtlı izinler
             </h2>
             {kanal || durum ? (
-              <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
                 {kanal ? (
                   <span className="rounded-full bg-brand-600/10 px-2 py-0.5 font-semibold text-brand-600">{channelLabel[kanal]}</span>
                 ) : null}
@@ -234,7 +234,7 @@ export default async function CompliancePage({
             ) : null}
           </div>
           {filteredConsents.length === 0 ? (
-            <p className="mt-6 rounded-[12px] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
+            <p className="mt-6 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
               {(consents ?? []).length === 0 ? "Henüz İYS kaydı yok." : "Filtreye uyan izin kaydı yok."}
             </p>
           ) : (
@@ -245,9 +245,9 @@ export default async function CompliancePage({
                 const name = custRow?.full_name;
                 const custId = custRow?.id;
                 return (
-                  <div key={c.id} className="group relative flex items-center justify-between rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5 text-sm">
+                  <div key={c.id} className="group relative flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5 text-sm">
                     {custId ? (
-                      <Link href={`/app/musteriler/${custId}`} className="absolute inset-0 rounded-[12px]" aria-label={`${name ?? "Müşteri"} kaydını aç`} />
+                      <Link href={`/app/musteriler/${custId}`} className="absolute inset-0 rounded-[var(--radius-card)]" aria-label={`${name ?? "Müşteri"} kaydını aç`} />
                     ) : null}
                     <div>
                       <p className="font-semibold text-ink-950">{name ?? "Müşteri"}</p>
@@ -263,7 +263,7 @@ export default async function CompliancePage({
                     <Link
                       href={consentFilterHref({ kanal, durum }, { durum: c.status })}
                       title={`${statusLabel[c.status] ?? c.status} durumuna göre filtrele`}
-                      className={`relative z-10 rounded-full px-2 py-0.5 text-[11px] font-bold transition hover:ring-1 hover:ring-brand-300 ${
+                      className={`relative z-10 rounded-full px-2 py-0.5 text-xs font-bold transition hover:ring-1 hover:ring-brand-300 ${
                         c.status === "granted" ? "bg-mint-500/10 text-mint-600" : c.status === "denied" ? "bg-danger-500/10 text-danger-500" : "bg-amber-400/15 text-amber-600"
                       } ${durum === c.status ? "ring-1 ring-brand-400" : ""}`}
                     >
@@ -278,12 +278,12 @@ export default async function CompliancePage({
       </div>
 
       {timeline.length > 0 ? (
-        <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
             <History className="h-4 w-4" /> Zaman çizelgesi
           </p>
           <h2 className="mt-1 font-display font-bold text-ink-950">Son uyum olayları</h2>
-          <p className="mt-0.5 text-[11px] text-text-muted">İzin kayıtları ve KVKK imha işlemleri, tek kronolojik akışta.</p>
+          <p className="mt-0.5 text-xs text-text-muted">İzin kayıtları ve KVKK imha işlemleri, tek kronolojik akışta.</p>
           <ol className="relative mt-5 space-y-0 border-l-2 border-line pl-0">
             {timeline.map((t, i) => {
               const inner = (
@@ -294,7 +294,7 @@ export default async function CompliancePage({
                   />
                   <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
                     <p className="text-sm font-semibold text-ink-950">{t.title}</p>
-                    <time className="text-[11px] font-semibold tabular-nums text-text-faint">{dtf.format(new Date(t.at))}</time>
+                    <time className="text-xs font-semibold tabular-nums text-text-faint">{dtf.format(new Date(t.at))}</time>
                   </div>
                   <p className="mt-0.5 text-xs text-text-muted">{t.detail}</p>
                 </>
@@ -303,7 +303,7 @@ export default async function CompliancePage({
               return (
                 <li key={t.id} className="relative">
                   {t.href ? (
-                    <Link href={t.href} className={`${rowCls} focus-ring rounded-[10px] transition hover:bg-brand-600/[0.03]`}>
+                    <Link href={t.href} className={`${rowCls} focus-ring rounded-[var(--radius-control)] transition hover:bg-brand-600/[0.03]`}>
                       {inner}
                     </Link>
                   ) : (
@@ -340,12 +340,12 @@ export default async function CompliancePage({
             eksikler dahil.
           </p>
         </div>
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-canvas text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-canvas text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
           <ArrowUpRight className="h-4 w-4" />
         </span>
       </Link>
 
-      <section className="rounded-[20px] border border-amber-400/30 bg-amber-400/5 p-5">
+      <section className="rounded-[var(--radius-panel)] border border-amber-400/30 bg-amber-400/5 p-5">
         <h2 className="font-display font-bold text-ink-950">EİDS / yetki kalkanı</h2>
         <p className="mt-2 text-sm text-text-muted">
           Yazılı yetki belgesi olmadan kapora, pazarlık ve sözleşme adımlarında sistem uyarı üretir.

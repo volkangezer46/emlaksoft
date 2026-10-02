@@ -149,10 +149,10 @@ export function FillFieldsDialog({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="focus-ring press inline-flex items-center gap-1.5 rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-600/5"
+          className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-600/5"
         >
           <Wand2 className="h-3.5 w-3.5" /> Alanları doldur
-          <span className="rounded-full bg-brand-600/10 px-1.5 text-[10px] font-bold">{fields.length}</span>
+          <span className="rounded-full bg-brand-600/10 px-1.5 text-xs font-bold">{fields.length}</span>
         </button>
       </DialogTrigger>
 
@@ -182,13 +182,13 @@ export function FillFieldsDialog({
                   value={values[f.index] ?? ""}
                   onChange={(e) => setValues((v) => ({ ...v, [f.index]: e.target.value }))}
                   placeholder="Boş bırak — değiştirme"
-                  className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm text-ink-950 outline-none focus:border-brand-300"
+                  className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm text-ink-950 outline-none focus:border-brand-300"
                 />
                 {f.suggestion && (values[f.index] ?? "") !== f.suggestion ? (
                   <button
                     type="button"
                     onClick={() => setValues((v) => ({ ...v, [f.index]: f.suggestion }))}
-                    className="shrink-0 text-[11px] font-semibold text-brand-600 hover:underline"
+                    className="shrink-0 text-xs font-semibold text-brand-600 hover:underline"
                     title={`Öneri: ${f.suggestion}`}
                   >
                     Öneriyi al
@@ -199,7 +199,7 @@ export function FillFieldsDialog({
           ))}
 
           {error ? (
-            <p className="rounded-[8px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
+            <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
               {error}
             </p>
           ) : null}

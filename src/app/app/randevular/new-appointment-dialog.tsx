@@ -21,11 +21,12 @@ import {
   DialogHeader,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useQueryDialog } from "@/components/app/use-query-dialog";
 
 type Option = { id: string; label: string };
 
 const fieldClass =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
 const DEFAULT_TYPE_OPTIONS = [
   { value: "showing", label: "Yer gösterme" },
@@ -40,6 +41,7 @@ export function NewAppointmentDialog({
   typeOptions = DEFAULT_TYPE_OPTIONS,
   defaultCustomerId,
   defaultPropertyId,
+  defaultOpen = false,
 }: {
   customers: Option[];
   properties: Option[];
@@ -48,8 +50,9 @@ export function NewAppointmentDialog({
   defaultCustomerId?: string;
   /** ?property= ile gelindiğinde (eşleştirme → "Randevu ver") ön seçim. */
   defaultPropertyId?: string;
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useQueryDialog(defaultOpen);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Sunucu çakışma bulduğunda uyarı metni gelir; kayıt YAPILMAMIŞTIR.
@@ -87,7 +90,7 @@ export function NewAppointmentDialog({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[11px] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 shadow-[var(--elev-2)]"
+          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 shadow-[var(--elev-2)]"
         >
           <Plus className="h-4 w-4" /> Yeni randevu
         </button>
@@ -163,7 +166,7 @@ export function NewAppointmentDialog({
                 <textarea id="appointment-notes" name="notes" rows={2} className={`${fieldClass} resize-none`} placeholder="Talep, hazırlık, dikkat edilecekler…" />
               </div>
 
-              <div className="sm:col-span-2 rounded-[12px] border border-brand-300/40 bg-brand-600/5 px-4 py-3">
+              <div className="sm:col-span-2 rounded-[var(--radius-card)] border border-brand-300/40 bg-brand-600/5 px-4 py-3">
                 <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Sparkles className="h-4 w-4" /> Randevu “teyit bekliyor” olarak açılır; onaylayıp tamamlandığında komisyon akışına kaynak olur.</p>
               </div>
 
@@ -174,7 +177,7 @@ export function NewAppointmentDialog({
                   kullanıcı ısrar edip tekrar gönderirse kayıt geçer. */}
               {conflictWarning ? (
                 <div
-                  className="sm:col-span-2 flex items-start gap-2.5 rounded-[12px] border border-amber-400/50 bg-amber-400/10 px-4 py-3 text-xs font-medium leading-relaxed text-amber-700"
+                  className="sm:col-span-2 flex items-start gap-2.5 rounded-[var(--radius-card)] border border-amber-400/50 bg-amber-400/10 px-4 py-3 text-xs font-medium leading-relaxed text-amber-700"
                   role="alert"
                 >
                   <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
@@ -188,11 +191,11 @@ export function NewAppointmentDialog({
 
               <div className="hairline-t sm:col-span-2 flex items-center justify-end gap-2 pt-4">
                 <DialogClose asChild>
-                  <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
+                  <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
                     Vazgeç
                   </button>
                 </DialogClose>
-                <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+                <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
                   <Check className="h-4 w-4" /> {pending ? "Planlanıyor…" : conflictWarning ? "Yine de kaydet" : "Randevuyu planla"}
                 </button>
               </div>

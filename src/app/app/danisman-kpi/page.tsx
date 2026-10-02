@@ -17,7 +17,7 @@ import { PrintButton } from "./print-button";
 // import ile sayfanın ilk JS yükünden çıkarılır; ChartFrame yüksekliğini
 // dolduran iskelet gösterilir.
 const RevenueChart = dynamic(() => import("./revenue-chart").then((m) => m.RevenueChart), {
-  loading: () => <div className="h-full w-full animate-pulse rounded-[12px] bg-ink-950/8" />,
+  loading: () => <div className="h-full w-full animate-pulse rounded-[var(--radius-card)] bg-ink-950/8" />,
 });
 
 /**
@@ -413,7 +413,7 @@ export default async function DanismanKpiPage({
   return (
     <div className="space-y-6">
       {/* Hero — çıktıda yok; kâğıttaki başlık aşağıdaki print-only bant. */}
-      <section className="no-print theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="no-print theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -429,7 +429,7 @@ export default async function DanismanKpiPage({
             <div className="mt-3 flex items-center gap-1">
               <Link
                 href={prevHref}
-                className="focus-ring grid h-8 w-8 place-items-center rounded-[8px] border border-white/15 text-white/70 transition hover:bg-white/10 hover:text-white"
+                className="focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-white/15 text-white/70 transition hover:bg-white/10 hover:text-white"
                 aria-label="Önceki ay"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -440,14 +440,14 @@ export default async function DanismanKpiPage({
               {nextHref ? (
                 <Link
                   href={nextHref}
-                  className="focus-ring grid h-8 w-8 place-items-center rounded-[8px] border border-white/15 text-white/70 transition hover:bg-white/10 hover:text-white"
+                  className="focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-white/15 text-white/70 transition hover:bg-white/10 hover:text-white"
                   aria-label="Sonraki ay"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Link>
               ) : (
                 <span
-                  className="grid h-8 w-8 cursor-not-allowed place-items-center rounded-[8px] border border-white/8 text-white/25"
+                  className="grid h-8 w-8 cursor-not-allowed place-items-center rounded-[var(--radius-control)] border border-white/8 text-white/25"
                   aria-hidden="true"
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -456,7 +456,7 @@ export default async function DanismanKpiPage({
               {!isCurrentMonth ? (
                 <Link
                   href="/app/danisman-kpi"
-                  className="focus-ring ml-1 rounded-[8px] border border-white/15 px-2.5 py-1.5 text-[11px] font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
+                  className="focus-ring ml-1 rounded-[var(--radius-control)] border border-white/15 px-2.5 py-1.5 text-xs font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
                 >
                   Bu ay
                 </Link>
@@ -465,7 +465,7 @@ export default async function DanismanKpiPage({
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <PrintButton />
               {/* Karne parayı ölçer, lig davranışı — puan/rozet/seri için /app/lig */}
-              <Link href={`/app/lig?donem=${ayParam(monthStart)}`} className="focus-ring inline-flex items-center gap-1.5 rounded-[9px] border border-white/15 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"><Trophy className="h-3.5 w-3.5" /> Lig tablosu</Link>
+              <Link href={`/app/lig?donem=${ayParam(monthStart)}`} className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"><Trophy className="h-3.5 w-3.5" /> Lig tablosu</Link>
             </div>
           </div>
           <div className="flex gap-3">
@@ -477,13 +477,13 @@ export default async function DanismanKpiPage({
               <Link
                 key={k.label}
                 href={k.href}
-                className="focus-ring press lift group block rounded-[14px] border border-white/12 bg-white/8 p-3 text-center hover:border-white/30"
+                className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 text-center hover:border-white/30"
               >
                 <p className="flex items-center justify-center gap-1 font-display text-xl font-extrabold text-white">
                   {k.value}
                   <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
                 </p>
-                <p className="text-[11px] text-white/70">{k.label}</p>
+                <p className="text-xs text-white/70">{k.label}</p>
               </Link>
             ))}
           </div>
@@ -492,7 +492,7 @@ export default async function DanismanKpiPage({
 
       {/* ── Liderlik podyumu: skoru olan ilk üç danışman (ekran, çıktı dışı) ── */}
       {podium.length > 0 ? (
-        <section className="no-print dashboard-panel relative overflow-hidden rounded-[22px] border border-line bg-surface p-6">
+        <section className="no-print dashboard-panel relative overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface p-6">
           <div className="pointer-events-none absolute -left-10 -top-16 h-48 w-48 rounded-full bg-amber-400/15 blur-[70px]" />
           <div className="relative">
             <p className="flex items-center gap-2 text-xs font-semibold text-amber-600">
@@ -514,7 +514,7 @@ export default async function DanismanKpiPage({
                   <Link
                     key={a.id}
                     href={`/app/ekip/${a.id}`}
-                    className={`focus-ring press lift group flex flex-col rounded-[18px] border border-line bg-canvas/40 p-4 text-center transition hover:border-brand-300 ${stil.order}`}
+                    className={`focus-ring press lift group flex flex-col rounded-[var(--radius-panel)] border border-line bg-canvas/40 p-4 text-center transition hover:border-brand-300 ${stil.order}`}
                     aria-label={`${sira}. sıra: ${a.full_name} — skor ${a.score}`}
                   >
                     <span className={`mx-auto grid h-12 w-12 place-items-center rounded-full font-display text-sm font-extrabold ${stil.ring}`}>
@@ -523,11 +523,11 @@ export default async function DanismanKpiPage({
                     <p className="mt-2 flex items-center justify-center gap-1 truncate font-display text-sm font-bold text-ink-950 group-hover:text-brand-600">
                       <span aria-hidden="true">{stil.medal}</span> {a.full_name}
                     </p>
-                    <p className="text-[11px] text-text-muted">
+                    <p className="text-xs text-text-muted">
                       Skor <span className="numeric font-bold text-ink-950">{a.score}</span>
                       {a.revenue > 0 ? ` · ${money(a.revenue)}` : ""} · {a.dealCount} satış
                     </p>
-                    <div className={`mt-3 w-full rounded-t-[10px] ${stil.bar}`} aria-hidden="true" />
+                    <div className={`mt-3 w-full rounded-t-[var(--radius-control)] ${stil.bar}`} aria-hidden="true" />
                   </Link>
                 );
               })}
@@ -583,16 +583,16 @@ export default async function DanismanKpiPage({
               <Link
                 key={r.ad}
                 href={`/app/ekip/${r.sahip.id}`}
-                className="focus-ring press lift surface-card flex items-center gap-3 rounded-[14px] px-4 py-3"
+                className="focus-ring press lift surface-card flex items-center gap-3 rounded-[var(--radius-card)] px-4 py-3"
                 aria-label={`${r.ad}: ${r.sahip.full_name}`}
               >
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-400/15 text-base" aria-hidden="true">
                   {r.emoji}
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-[10px] font-bold uppercase tracking-[0.1em] text-text-faint">{r.ad}</span>
+                  <span className="block text-xs font-bold uppercase tracking-[0.1em] text-text-faint">{r.ad}</span>
                   <span className="block truncate text-sm font-bold text-ink-950">{r.sahip.full_name}</span>
-                  <span className="block text-[11px] text-text-muted">{r.aciklama}</span>
+                  <span className="block text-xs text-text-muted">{r.aciklama}</span>
                 </span>
               </Link>
             ))}
@@ -601,7 +601,7 @@ export default async function DanismanKpiPage({
             <p className="flex flex-wrap items-center gap-2 px-1 text-xs text-text-muted">
               Geçen ayın lideri: <span className="font-semibold text-ink-950">{prevLeader.full_name}</span>
               {yeniLider ? (
-                <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-[11px] font-bold text-brand-700">
+                <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold text-brand-700">
                   Yeni lider!
                 </span>
               ) : null}
@@ -619,7 +619,7 @@ export default async function DanismanKpiPage({
           <CoachPanel actions={coachActions} adSoyad={ben?.full_name ?? null} />
         </div>
       ) : (
-        <p className="no-print rounded-[14px] border border-line bg-canvas px-4 py-3 text-xs text-text-muted">
+        <p className="no-print rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-xs text-text-muted">
           Koç önerileri yalnız içinde bulunulan ay için gösterilir — geçmiş dönem karnesinde gizlenir.
         </p>
       )}
@@ -627,7 +627,7 @@ export default async function DanismanKpiPage({
       {/* Karne başlığı — yalnızca çıktıda: ofis adı + dönem (değerleme
           raporundaki başlık bandı deseni). */}
       <header className="print-only hairline-b pb-5">
-        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-600">
+        <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-600">
           {office?.name ?? "Emlak ofisi"}
         </p>
         <div className="mt-1 flex flex-wrap items-end justify-between gap-4">
@@ -707,12 +707,12 @@ export default async function DanismanKpiPage({
                     <p className="font-semibold text-ink-950 group-hover:text-brand-600">
                       {a.full_name}
                       {(rozetByUid.get(a.id) ?? []).map((r) => (
-                        <span key={r.ad} className="no-print ml-1 text-[12px]" title={r.ad} aria-label={r.ad}>
+                        <span key={r.ad} className="no-print ml-1 text-xs" title={r.ad} aria-label={r.ad}>
                           {r.emoji}
                         </span>
                       ))}
                     </p>
-                    <p className="text-[11px] text-text-faint capitalize">{a.role}</p>
+                    <p className="text-xs text-text-faint capitalize">{a.role}</p>
                   </TD>
                   {/* Hücre drill-down'ları: relative z-10 ile satır overlay linkinin üstünde */}
                   <TD align="right" className="text-text-muted">
@@ -777,10 +777,10 @@ export default async function DanismanKpiPage({
       {/* Islak imza alanı yalnızca çıktıda — değerleme raporundaki desen. */}
       <footer className="print-only mt-10 grid grid-cols-2 gap-12">
         <div>
-          <div className="hairline-t pt-1.5 text-[11px] text-text-muted">Hazırlayan · ad, soyad, tarih</div>
+          <div className="hairline-t pt-1.5 text-xs text-text-muted">Hazırlayan · ad, soyad, tarih</div>
         </div>
         <div>
-          <div className="hairline-t pt-1.5 text-[11px] text-text-muted">Ofis yetkilisi · ad, soyad, imza</div>
+          <div className="hairline-t pt-1.5 text-xs text-text-muted">Ofis yetkilisi · ad, soyad, imza</div>
         </div>
       </footer>
     </div>

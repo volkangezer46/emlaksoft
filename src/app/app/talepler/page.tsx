@@ -137,9 +137,9 @@ const PAGE_SIZE = 50;
 const POOL_LIMIT = 500;
 
 const PAGER_BTN =
-  "focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+  "focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
 const PAGER_BTN_DISABLED =
-  "inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
+  "inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
 export default async function DemandsPage({
   searchParams,
@@ -340,12 +340,12 @@ export default async function DemandsPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-brand-600/25 blur-[80px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-cyan-400">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-cyan-400">
               <Target className="h-3.5 w-3.5" /> Talep merkezi
             </p>
             <h1 className="mt-2 font-display text-3xl font-extrabold text-white">Müşteri talepleri</h1>
@@ -356,34 +356,34 @@ export default async function DemandsPage({
           <div className="flex flex-wrap gap-3">
             <Link
               href="/app/talepler"
-              className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 px-4 py-3 text-center transition hover:border-brand-300"
+              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-3 text-center transition hover:border-brand-300"
             >
               <p className="flex items-center justify-center gap-1 font-display text-2xl font-extrabold">
                 {openCount}
                 <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
               </p>
-              <p className="text-[11px] text-white/50">Listelenen</p>
+              <p className="text-xs text-white/50">Listelenen</p>
             </Link>
             <Link
               href={demandHref({ aciliyet: "high,urgent" })}
-              className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 px-4 py-3 text-center transition hover:border-brand-300"
+              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-3 text-center transition hover:border-brand-300"
             >
               <p className="flex items-center justify-center gap-1 font-display text-2xl font-extrabold text-amber-300">
                 {urgentCount}
                 <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
               </p>
-              <p className="text-[11px] text-white/50">Acil / yüksek</p>
+              <p className="text-xs text-white/50">Acil / yüksek</p>
             </Link>
             {/* Eşleşme hazır: portföy havuzunda en az 1 güçlü eşleşmesi olan talepler */}
             <Link
               href="/app/eslestirme"
-              className="focus-ring press lift group block rounded-[14px] border border-mint-500/25 bg-mint-500/10 px-4 py-3 text-center transition hover:border-mint-400/60"
+              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-mint-500/25 bg-mint-500/10 px-4 py-3 text-center transition hover:border-mint-400/60"
             >
               <p className="flex items-center justify-center gap-1 font-display text-2xl font-extrabold text-mint-300">
                 {matchReadyCount}
                 <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-mint-300 group-hover:opacity-100" />
               </p>
-              <p className="text-[11px] text-white/50">Eşleşme hazır</p>
+              <p className="text-xs text-white/50">Eşleşme hazır</p>
             </Link>
           </div>
         </div>
@@ -393,9 +393,9 @@ export default async function DemandsPage({
       {agingCount > 0 && !yasF ? (
         <Link
           href={demandHref({ yas: String(AGING_DAYS) })}
-          className="focus-ring press group flex min-h-[44px] items-center gap-3 rounded-[16px] border border-amber-400/40 bg-amber-400/10 px-4 py-3 transition hover:border-amber-500/60"
+          className="focus-ring press group flex min-h-[44px] items-center gap-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 transition hover:border-amber-500/60"
         >
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-amber-400/20 text-amber-600">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-amber-400/20 text-amber-600">
             <AlarmClock className="h-4.5 w-4.5" />
           </span>
           <span className="min-w-0 flex-1 text-sm">
@@ -408,7 +408,7 @@ export default async function DemandsPage({
         </Link>
       ) : null}
       {yasF ? (
-        <p className="flex flex-wrap items-center gap-2 rounded-[14px] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-xs font-semibold text-amber-700">
+        <p className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-xs font-semibold text-amber-700">
           <AlarmClock className="h-3.5 w-3.5" /> Yalnız {AGING_DAYS}+ gündür açık talepler gösteriliyor.
           <Link href={demandHref({ yas: "" })} className="focus-ring rounded-full underline-offset-2 hover:underline">
             Filtreyi kaldır ✕
@@ -462,7 +462,7 @@ export default async function DemandsPage({
         <div className="ml-auto flex items-center gap-2">
           <Link
             href="/app/eslestirme"
-            className="inline-flex items-center gap-1.5 rounded-[10px] border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-400"
+            className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-400"
           >
             <Crosshair className="h-3.5 w-3.5 text-brand-600" /> Eşleştirme motoru
           </Link>
@@ -484,11 +484,11 @@ export default async function DemandsPage({
 
       {/* ── Segmentasyon şeridi: bütçe bantları + en yoğun iller (açık talepler) ── */}
       {bandCounts.size > 0 || topProvinces.length > 0 ? (
-        <section className="dashboard-panel rounded-[18px] border border-line bg-surface px-4 py-3.5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface px-4 py-3.5">
           <div className="flex flex-col gap-2.5">
             {bandCounts.size > 0 ? (
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="mr-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
+                <span className="mr-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
                   <Wallet className="h-3.5 w-3.5 text-brand-600" /> Bütçe
                 </span>
                 {BUDGET_BANDS.filter((b) => (bandCounts.get(b.key) ?? 0) > 0).map((b) => {
@@ -505,7 +505,7 @@ export default async function DemandsPage({
                       }`}
                     >
                       {b.label}
-                      <span className={`numeric rounded-full px-1.5 text-[10px] font-bold ${active ? "bg-white/20" : "bg-brand-600/10 text-brand-700"}`}>
+                      <span className={`numeric rounded-full px-1.5 text-xs font-bold ${active ? "bg-white/20" : "bg-brand-600/10 text-brand-700"}`}>
                         {bandCounts.get(b.key)}
                       </span>
                     </Link>
@@ -515,7 +515,7 @@ export default async function DemandsPage({
             ) : null}
             {topProvinces.length > 0 ? (
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="mr-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
+                <span className="mr-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
                   <MapPin className="h-3.5 w-3.5 text-mint-600" /> Bölge
                 </span>
                 {topProvinces.map(([id, { name, count }]) => {
@@ -532,7 +532,7 @@ export default async function DemandsPage({
                       }`}
                     >
                       {name}
-                      <span className={`numeric rounded-full px-1.5 text-[10px] font-bold ${active ? "bg-white/20" : "bg-mint-500/12 text-mint-700"}`}>
+                      <span className={`numeric rounded-full px-1.5 text-xs font-bold ${active ? "bg-white/20" : "bg-mint-500/12 text-mint-700"}`}>
                         {count}
                       </span>
                     </Link>
@@ -542,7 +542,7 @@ export default async function DemandsPage({
             ) : null}
           </div>
           {poolLimited ? (
-            <p className="mt-2 text-[11px] text-text-faint">
+            <p className="mt-2 text-xs text-text-faint">
               Segment sayıları filtrelenmiş listenin ilk {POOL_LIMIT.toLocaleString("tr-TR")} kaydından hesaplanır
               (yaklaşık). Filtre uygulandığında liste tamamı sunucuda doğru daraltılır.
             </p>
@@ -551,7 +551,7 @@ export default async function DemandsPage({
       ) : null}
 
       {rows.length === 0 ? (
-        <div className="rounded-[20px] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
+        <div className="rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
           <Target className="mx-auto h-8 w-8 text-text-faint" />
           <p className="mt-3 font-display text-lg font-bold text-ink-950">Bu filtrede talep yok</p>
           <p className="mt-1 text-sm text-text-muted">
@@ -573,21 +573,21 @@ export default async function DemandsPage({
             return (
               <article
                 key={d.id}
-                className="group relative rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] transition hover:border-brand-400/40 hover:shadow-[var(--shadow-sm)]"
+                className="group relative rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] transition hover:border-brand-400/40 hover:shadow-[var(--shadow-sm)]"
               >
                 {/* Kart artık talebin KENDİ detayına gider; müşteri linki ikincil (z-10) kalır. */}
-                <Link href={`/app/talepler/${d.id}`} className="absolute inset-0 rounded-[18px]" aria-label={customer ? `${customer.full_name} talebinin detayını aç` : "Talep detayını aç"} />
+                <Link href={`/app/talepler/${d.id}`} className="absolute inset-0 rounded-[var(--radius-panel)]" aria-label={customer ? `${customer.full_name} talebinin detayını aç` : "Talep detayını aç"} />
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">
+                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">
                         {d.transaction_type}{d.property_type ? ` · ${d.property_type}` : ""}
                       </span>
-                      <span className="rounded-full bg-mint-500/10 px-2 py-0.5 text-[11px] font-bold text-mint-600">
+                      <span className="rounded-full bg-mint-500/10 px-2 py-0.5 text-xs font-bold text-mint-600">
                         {statusLabel[d.status] ?? d.status}
                       </span>
                       {d.urgency ? (
-                        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-600">
+                        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-600">
                           {urgencyLabel[d.urgency] ?? d.urgency}
                         </span>
                       ) : null}
@@ -596,7 +596,7 @@ export default async function DemandsPage({
                         <Link
                           href={`/app/eslestirme?demand=${d.id}`}
                           title={`En iyi skor ${match.best} · eşleştirmede aç`}
-                          className={`relative z-10 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold transition ${
+                          className={`relative z-10 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold transition ${
                             match.strong > 0
                               ? "bg-mint-500/12 text-mint-600 hover:bg-mint-500/25"
                               : "bg-brand-600/10 text-brand-600 hover:bg-brand-600/20"
@@ -608,7 +608,7 @@ export default async function DemandsPage({
                             : `${match.good} iyi eşleşme`}
                         </Link>
                       ) : match ? (
-                        <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-semibold text-text-faint" title="Portföy havuzunda skor ≥ 55 aday yok">
+                        <span className="rounded-full bg-canvas px-2 py-0.5 text-xs font-semibold text-text-faint" title="Portföy havuzunda skor ≥ 55 aday yok">
                           Eşleşme adayı yok
                         </span>
                       ) : null}
@@ -634,14 +634,14 @@ export default async function DemandsPage({
                     {customer ? (
                       <Link
                         href={`/app/musteriler/${customer.id}`}
-                        className="inline-flex items-center gap-1.5 rounded-[10px] border border-line bg-surface px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-400 hover:text-brand-600"
+                        className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-400 hover:text-brand-600"
                       >
                         <Users className="h-3.5 w-3.5" /> Müşteri kartı
                       </Link>
                     ) : null}
                     <Link
                       href={`/app/eslestirme?demand=${d.id}`}
-                      className="inline-flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-3 py-2 text-xs font-semibold text-white hover:bg-brand-700"
+                      className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 py-2 text-xs font-semibold text-white hover:bg-brand-700"
                     >
                       <Crosshair className="h-3.5 w-3.5" /> Eşleştir
                     </Link>

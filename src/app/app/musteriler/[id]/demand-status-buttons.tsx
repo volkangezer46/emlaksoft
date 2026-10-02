@@ -35,7 +35,7 @@ export function DemandStatusButtons({
         type="button"
         disabled={pending}
         onClick={() => setStatus("active")}
-        className="text-[11px] font-semibold text-mint-600 hover:underline disabled:opacity-50"
+        className="text-xs font-semibold text-mint-600 hover:underline disabled:opacity-50"
       >
         Yeniden aç
       </button>
@@ -47,7 +47,7 @@ export function DemandStatusButtons({
       type="button"
       disabled={pending}
       onClick={() => setStatus("closed")}
-      className="text-[11px] font-semibold text-text-muted hover:text-danger-500 hover:underline disabled:opacity-50"
+      className="text-xs font-semibold text-text-muted hover:text-danger-500 hover:underline disabled:opacity-50"
     >
       Kapat
     </button>

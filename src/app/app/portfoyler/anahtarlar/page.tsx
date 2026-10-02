@@ -180,7 +180,7 @@ export default async function PropertyKeysBoardPage({
         </Link>
       </div>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-mint-500/20 blur-[80px]" />
         <div className="relative">
@@ -209,7 +209,7 @@ export default async function PropertyKeysBoardPage({
 
       <form
         action="/app/portfoyler/anahtarlar"
-        className="flex flex-wrap items-center gap-3 rounded-[16px] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]"
+        className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]"
       >
         {durum ? <input type="hidden" name="durum" value={durum} /> : null}
         <div className="relative min-w-[240px] flex-1">
@@ -219,7 +219,7 @@ export default async function PropertyKeysBoardPage({
             defaultValue={query}
             aria-label="Anahtar ara"
             placeholder="Portföy kodu, başlık, etiket veya kişi ara…"
-            className="w-full rounded-[11px] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+            className="w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
           />
         </div>
         <label className="text-xs font-semibold text-text-muted">
@@ -227,7 +227,7 @@ export default async function PropertyKeysBoardPage({
           <select
             name="danisman"
             defaultValue={danisman}
-            className="rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm font-semibold outline-none focus:border-brand-400"
+            className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm font-semibold outline-none focus:border-brand-400"
           >
             <option value="">Tüm danışmanlar</option>
             {staff.map((s) => (
@@ -239,7 +239,7 @@ export default async function PropertyKeysBoardPage({
         </label>
         <button
           type="submit"
-          className="focus-ring press rounded-[10px] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-ink-800"
+          className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-ink-800"
         >
           Filtrele
         </button>
@@ -254,7 +254,7 @@ export default async function PropertyKeysBoardPage({
           action={{ href: "/app/portfoyler", label: "Portföylere git" }}
         />
       ) : (
-        <div className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+        <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
             <div>
               <h2 className="font-display font-bold text-ink-950">Anahtarlar</h2>
@@ -268,7 +268,7 @@ export default async function PropertyKeysBoardPage({
                 <Link
                   key={f.value || "all"}
                   href={href({ durum: f.value, sayfa: 1 })}
-                  className={`focus-ring rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
+                  className={`focus-ring rounded-full px-2.5 py-1 text-xs font-bold transition ${
                     durum === f.value
                       ? "bg-ink-950 text-white"
                       : "border border-line text-text-muted hover:text-ink-950"
@@ -281,7 +281,7 @@ export default async function PropertyKeysBoardPage({
                 <Link
                   href={href({ danisman: "", sayfa: 1 })}
                   aria-label="Danışman filtresini kaldır"
-                  className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/20"
+                  className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/20"
                 >
                   {activeStaff.full_name ?? "Danışman"} <X className="h-3 w-3" />
                 </Link>
@@ -290,7 +290,7 @@ export default async function PropertyKeysBoardPage({
                 <Link
                   href={href({ q: "", sayfa: 1 })}
                   aria-label="Aramayı temizle"
-                  className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/20"
+                  className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/20"
                 >
                   “{query}” <X className="h-3 w-3" />
                 </Link>
@@ -358,16 +358,16 @@ export default async function PropertyKeysBoardPage({
                         {row.label}
                       </p>
                       {row.key_code ? (
-                        <p className="mt-0.5 text-[11px] text-text-faint">#{row.key_code}</p>
+                        <p className="mt-0.5 text-xs text-text-faint">#{row.key_code}</p>
                       ) : null}
                     </div>
 
                     <div>
-                      <span className={`inline-block rounded-full px-2.5 py-1 text-[11px] font-bold ${keyStatusTone(row.status)}`}>
+                      <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-bold ${keyStatusTone(row.status)}`}>
                         {keyStatusLabel(row.status)}
                       </span>
                       {overdueDays > 0 ? (
-                        <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-danger-600">
+                        <p className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-danger-600">
                           <AlertTriangle className="h-3 w-3" /> {overdueDays} gün gecikmiş
                         </p>
                       ) : null}
@@ -392,7 +392,7 @@ export default async function PropertyKeysBoardPage({
                           <input type="hidden" name="key_id" value={row.id} />
                           <button
                             type="submit"
-                            className="focus-ring press inline-flex items-center gap-1.5 rounded-[9px] bg-mint-500/12 px-3 py-2 text-xs font-semibold text-mint-700 transition hover:bg-mint-500/20"
+                            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-mint-500/12 px-3 py-2 text-xs font-semibold text-mint-700 transition hover:bg-mint-500/20"
                           >
                             <Undo2 className="h-3.5 w-3.5" /> İade al
                           </button>
@@ -410,12 +410,12 @@ export default async function PropertyKeysBoardPage({
               {page > 1 ? (
                 <Link
                   href={href({ sayfa: page - 1 })}
-                  className="focus-ring press rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                  className="focus-ring press rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
                 >
                   ← Önceki
                 </Link>
               ) : (
-                <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">
+                <span className="rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">
                   ← Önceki
                 </span>
               )}
@@ -425,12 +425,12 @@ export default async function PropertyKeysBoardPage({
               {page < totalPages ? (
                 <Link
                   href={href({ sayfa: page + 1 })}
-                  className="focus-ring press rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                  className="focus-ring press rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
                 >
                   Sonraki →
                 </Link>
               ) : (
-                <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">
+                <span className="rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">
                   Sonraki →
                 </span>
               )}

@@ -71,7 +71,7 @@ export function MatchingWeightsForm({ initial }: { initial: MatchingWeights | nu
     >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {MATCHING_WEIGHT_KEYS.map((key) => (
-          <div key={key} className="rounded-[14px] border border-line bg-canvas p-4">
+          <div key={key} className="rounded-[var(--radius-card)] border border-line bg-canvas p-4">
             <div className="flex items-center justify-between gap-2">
               <label htmlFor={`weight-${key}`} className="text-sm font-semibold text-ink-950">
                 {MATCHING_WEIGHT_LABELS[key]}
@@ -85,7 +85,7 @@ export function MatchingWeightsForm({ initial }: { initial: MatchingWeights | nu
                   step={1}
                   value={values[key]}
                   onChange={(e) => setValue(key, e.target.value)}
-                  className="w-16 rounded-[8px] border border-line bg-surface px-2 py-1 text-right text-sm font-bold text-ink-950 outline-none transition focus:border-brand-400"
+                  className="w-16 rounded-[var(--radius-control)] border border-line bg-surface px-2 py-1 text-right text-sm font-bold text-ink-950 outline-none transition focus:border-brand-400"
                 />
                 <span className="text-xs font-semibold text-text-muted">%</span>
               </div>
@@ -100,17 +100,17 @@ export function MatchingWeightsForm({ initial }: { initial: MatchingWeights | nu
               aria-label={`${MATCHING_WEIGHT_LABELS[key]} ağırlığı`}
               className="mt-3 w-full accent-[var(--brand-600,#2563eb)]"
             />
-            <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{CRITERIA_DESC[key]}</p>
+            <p className="mt-2 text-xs leading-relaxed text-text-muted">{CRITERIA_DESC[key]}</p>
           </div>
         ))}
 
         {/* Toplam göstergesi */}
-        <div className={`flex flex-col justify-center rounded-[14px] border p-4 ${total === 100 ? "border-mint-500/30 bg-mint-500/8" : "border-amber-400/40 bg-amber-400/10"}`}>
-          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted">Toplam</p>
+        <div className={`flex flex-col justify-center rounded-[var(--radius-card)] border p-4 ${total === 100 ? "border-mint-500/30 bg-mint-500/8" : "border-amber-400/40 bg-amber-400/10"}`}>
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-muted">Toplam</p>
           <p className={`font-display text-2xl font-extrabold ${total === 100 ? "text-mint-600" : "text-amber-600"}`}>
             %{total}
           </p>
-          <p className="mt-1 text-[11px] leading-relaxed text-text-muted">
+          <p className="mt-1 text-xs leading-relaxed text-text-muted">
             {total === 100
               ? "Ağırlıklar dengeli — toplam %100."
               : `Toplam %100'den ${total > 100 ? "fazla" : "az"}; kayıtta oransal olarak %100'e normalize edilir.`}
@@ -134,14 +134,14 @@ export function MatchingWeightsForm({ initial }: { initial: MatchingWeights | nu
           type="button"
           onClick={() => submit(true)}
           disabled={pending}
-          className="focus-ring press inline-flex items-center gap-2 rounded-[10px] border border-line bg-canvas px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:border-brand-300 disabled:opacity-60"
+          className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:border-brand-300 disabled:opacity-60"
         >
           <RotateCcw className="h-4 w-4" /> Varsayılana dön
         </button>
         <button
           type="submit"
           disabled={pending}
-          className="btn-shine inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+          className="btn-shine inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
         >
           <Save className="h-4 w-4" /> {pending ? "Kaydediliyor…" : "Ağırlıkları kaydet"}
         </button>

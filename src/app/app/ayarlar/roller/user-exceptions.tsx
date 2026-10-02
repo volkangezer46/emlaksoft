@@ -174,7 +174,7 @@ export function UserExceptions({
   const overrideCount = Array.from(localOverrides.values()).filter(isActive).length;
 
   return (
-    <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+    <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -191,7 +191,7 @@ export function UserExceptions({
             type="button"
             onClick={clearAll}
             disabled={busyKey === "all"}
-            className="inline-flex items-center gap-1.5 rounded-[10px] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <RotateCcw className="h-3.5 w-3.5" /> {busyKey === "all" ? "Temizleniyor…" : "Tüm istisnaları kaldır"}
           </button>
@@ -200,7 +200,7 @@ export function UserExceptions({
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto] lg:items-end">
         <div>
-          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-text-faint">
             Ekip üyesi
           </label>
           <Combobox
@@ -216,7 +216,7 @@ export function UserExceptions({
         {!readOnly ? (
           <>
             <div>
-              <label htmlFor="exception-expiry" className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">
+              <label htmlFor="exception-expiry" className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-text-faint">
                 <CalendarClock className="h-3.5 w-3.5" /> Bitiş tarihi (opsiyonel)
               </label>
               <input
@@ -225,14 +225,14 @@ export function UserExceptions({
                 value={expiresAt}
                 min={minExpiry}
                 onChange={(e) => setExpiresAt(e.target.value)}
-                className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm text-ink-950 outline-none focus:border-brand-400"
+                className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm text-ink-950 outline-none focus:border-brand-400"
               />
             </div>
             <div className="flex items-center gap-1.5 pb-0.5">
               <button
                 type="button"
                 onClick={quick30}
-                className="rounded-full border border-line px-3 py-1.5 text-[11px] font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
               >
                 30 gün
               </button>
@@ -240,7 +240,7 @@ export function UserExceptions({
                 <button
                   type="button"
                   onClick={() => setExpiresAt("")}
-                  className="rounded-full border border-line px-3 py-1.5 text-[11px] font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                  className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
                 >
                   Süresiz
                 </button>
@@ -251,7 +251,7 @@ export function UserExceptions({
       </div>
 
       {!readOnly && expiresAt && selected ? (
-        <p className="mt-2 text-[11px] text-amber-600">
+        <p className="mt-2 text-xs text-amber-600">
           Geçici yetki modu: bundan sonra tıkladığınız hücreler <strong>{fmtDate(`${expiresAt}T12:00:00`)}</strong>{" "}
           gününün sonunda otomatik sona erer.
         </p>
@@ -260,7 +260,7 @@ export function UserExceptions({
       {error ? <p className="mt-3 text-sm text-danger-500" role="alert">{error}</p> : null}
 
       {!selected ? (
-        <p className="mt-5 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+        <p className="mt-5 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
           İstisnalarını görmek için yukarıdan bir ekip üyesi seçin.
         </p>
       ) : (
@@ -269,7 +269,7 @@ export function UserExceptions({
             <span className="font-semibold text-ink-950">{selected.full_name}</span> · rol:{" "}
             <span className="font-semibold">{selected.roleLabel}</span>
             {overrideCount > 0 ? (
-              <span className="ml-2 rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-600">
+              <span className="ml-2 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600">
                 {overrideCount} modülde istisna
               </span>
             ) : null}
@@ -278,7 +278,7 @@ export function UserExceptions({
           <div className="mt-3 overflow-x-auto">
             <table className="w-full min-w-[620px] border-collapse text-sm">
               <thead>
-                <tr className="border-b border-line text-left text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
+                <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
                   <th className="py-2 pr-3">Modül</th>
                   {ACTIONS.map((a) => (
                     <th key={a.value} className="px-2 py-2 text-center">{a.label}</th>
@@ -296,12 +296,12 @@ export function UserExceptions({
                       <td className="py-2.5 pr-3 text-sm font-medium text-ink-950">
                         {moduleLabels[mod]}
                         {override?.expires_at ? (
-                          <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-bold text-amber-600">
+                          <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600">
                             <CalendarClock className="h-3 w-3" /> {fmtDate(override.expires_at)}
                           </span>
                         ) : null}
                         {expired ? (
-                          <span className="ml-1.5 rounded-full bg-ink-950/8 px-2 py-0.5 text-[10px] font-semibold text-text-muted">
+                          <span className="ml-1.5 rounded-full bg-ink-950/8 px-2 py-0.5 text-xs font-semibold text-text-muted">
                             Süresi doldu
                           </span>
                         ) : null}
@@ -323,7 +323,7 @@ export function UserExceptions({
                                     ? "Rolünden geliyor"
                                     : undefined
                               }
-                              className={`relative grid h-7 w-7 place-items-center rounded-[8px] border transition ${
+                              className={`relative grid h-7 w-7 place-items-center rounded-[var(--radius-control)] border transition ${
                                 allowed
                                   ? override
                                     ? "border-amber-400/60 bg-amber-400/15 text-amber-600"
@@ -347,12 +347,12 @@ export function UserExceptions({
                             type="button"
                             onClick={() => removeModule(mod)}
                             disabled={busyKey === `${mod}:row`}
-                            className="rounded-[8px] border border-line px-2 py-1 text-[11px] font-semibold text-text-muted transition hover:border-danger-500/40 hover:text-danger-500 disabled:opacity-50"
+                            className="rounded-[var(--radius-control)] border border-line px-2 py-1 text-xs font-semibold text-text-muted transition hover:border-danger-500/40 hover:text-danger-500 disabled:opacity-50"
                           >
                             Kaldır
                           </button>
                         ) : (
-                          <span className="text-[11px] text-text-faint">{override ? "İstisna" : "—"}</span>
+                          <span className="text-xs text-text-faint">{override ? "İstisna" : "—"}</span>
                         )}
                       </td>
                     </tr>
@@ -362,7 +362,7 @@ export function UserExceptions({
             </table>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-4 text-[11px] text-text-faint">
+          <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-text-faint">
             <span className="flex items-center gap-1.5">
               <span className="grid h-4 w-4 place-items-center rounded-[5px] border border-mint-500/30 bg-mint-500/8"><Check className="h-3 w-3 text-mint-600/60" /></span>
               rolünden geliyor (soluk)

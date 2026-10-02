@@ -27,12 +27,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const admin = createAdminClient();
     const { data: tenants } = await admin
       .from("tenants")
-      .select("slug, updated_at")
-      .in("status", ["trial", "active"])
+      .select("id, slug, updated_at")
+      .in("status", ["trial", "active", "past_due"])
       .order("updated_at", { ascending: false })
       .limit(1000);
+    const publicTenantIds = new Set<string>();
 
     for (const t of tenants ?? []) {
+      publicTenantIds.add(t.id);
       if (!t.slug) continue;
       entries.push({
         url: `${BASE_URL}/vitrin/${t.slug}`,
@@ -47,14 +49,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // yorumu): danışmanın adıyla bulunabilirliği ürünün amacı.
     const { data: agents } = await admin
       .from("profiles")
-      .select("public_slug")
+      .select("public_slug, tenant_id")
       .eq("is_public", true)
       .eq("is_active", true)
       .not("public_slug", "is", null)
       .limit(5000);
 
     for (const a of agents ?? []) {
-      if (!a.public_slug) continue;
+      if (!a.public_slug || !publicTenantIds.has(a.tenant_id)) continue;
       entries.push({
         url: `${BASE_URL}/danisman/${a.public_slug}`,
         lastModified: new Date(),

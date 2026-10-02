@@ -46,35 +46,38 @@ export function DistrictRow({ district }: { district: DistrictRowData }) {
         <input type="hidden" name="province_id" value={district.province_id} />
         <input
           name="name"
+          aria-label="İlçe adı"
           defaultValue={district.name}
           required
-          className="rounded-[9px] border border-line bg-surface px-2.5 py-1.5 text-sm font-semibold outline-none focus:border-brand-400"
+          className="rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-sm font-semibold outline-none focus:border-brand-400"
         />
         <input
           name="lat"
+          aria-label={`${district.name} enlem`}
           defaultValue={district.lat ?? ""}
           placeholder="Enlem"
-          className="w-24 rounded-[9px] border border-line bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
+          className="w-24 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
         />
         <input
           name="lng"
+          aria-label={`${district.name} boylam`}
           defaultValue={district.lng ?? ""}
           placeholder="Boylam"
-          className="w-24 rounded-[9px] border border-line bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
+          className="w-24 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
         />
         <label className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
           <input type="checkbox" name="is_active" defaultChecked={district.is_active} className="h-3.5 w-3.5" />
           Aktif
         </label>
         <div className="flex items-center gap-2">
-          <button type="submit" disabled={pending} className="rounded-[9px] bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-ink-800 disabled:opacity-60">
-            {pending ? "..." : "Kaydet"}
+          <button type="submit" disabled={pending} className="rounded-[var(--radius-control)] bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-ink-800 disabled:opacity-60">
+            {pending ? "Kaydediliyor…" : "Kaydet"}
           </button>
-          <button type="button" onClick={() => setEditing(false)} className="grid h-8 w-8 place-items-center rounded-[9px] text-text-muted hover:bg-canvas">
+          <button type="button" aria-label={`${district.name} düzenlemesini iptal et`} onClick={() => setEditing(false)} className="focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-canvas">
             <X className="h-4 w-4" />
           </button>
         </div>
-        {state.error ? <p className="text-xs text-danger-500 lg:col-span-5">{state.error}</p> : null}
+        {state.error ? <p role="alert" className="text-xs text-danger-500 lg:col-span-5">{state.error}</p> : null}
       </form>
     );
   }
@@ -88,7 +91,7 @@ export function DistrictRow({ district }: { district: DistrictRowData }) {
         >
           {district.name}
         </Link>
-        <p className="mt-0.5 text-[11px] text-text-muted">
+        <p className="mt-0.5 text-xs text-text-muted">
           <Link
             href={`/admin/geo/${district.province_id}/${district.id}`}
             className="transition hover:text-brand-600 hover:underline"
@@ -99,11 +102,11 @@ export function DistrictRow({ district }: { district: DistrictRowData }) {
         </p>
       </div>
       {!district.is_active ? (
-        <span className="rounded-full bg-danger-500/10 px-2 py-1 text-[11px] font-bold text-danger-500">Pasif</span>
+        <span className="rounded-full bg-danger-500/10 px-2 py-1 text-xs font-bold text-danger-500">Pasif</span>
       ) : (
         <span />
       )}
-      <button onClick={() => setEditing(true)} className="grid h-8 w-8 place-items-center rounded-[9px] text-text-muted hover:bg-canvas">
+      <button type="button" aria-label={`${district.name} ilçesini düzenle`} onClick={() => setEditing(true)} className="focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-canvas">
         <Pencil className="h-3.5 w-3.5" />
       </button>
       {confirmingDelete ? (
@@ -116,25 +119,25 @@ export function DistrictRow({ district }: { district: DistrictRowData }) {
         >
           <input type="hidden" name="id" value={district.id} />
           <input type="hidden" name="province_id" value={district.province_id} />
-          <button type="submit" disabled={delPending} className="rounded-[8px] bg-danger-500 px-2.5 py-1.5 text-[11px] font-bold text-white disabled:opacity-60">
+          <button type="submit" disabled={delPending} className="rounded-[var(--radius-control)] bg-danger-500 px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-60">
             Onayla
           </button>
-          <button type="button" onClick={() => setConfirmingDelete(false)} className="rounded-[8px] border border-line px-2 py-1.5 text-[11px] text-text-muted">
+          <button type="button" onClick={() => setConfirmingDelete(false)} className="rounded-[var(--radius-control)] border border-line px-2 py-1.5 text-xs text-text-muted">
             Vazgeç
           </button>
         </form>
       ) : (
-        <button onClick={() => setConfirmingDelete(true)} className="grid h-8 w-8 place-items-center rounded-[9px] text-text-muted hover:bg-danger-500/10 hover:text-danger-500">
+        <button type="button" aria-label={`${district.name} ilçesini sil`} onClick={() => setConfirmingDelete(true)} className="focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-danger-500/10 hover:text-danger-500">
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       )}
       <Link
         href={`/admin/geo/${district.province_id}/${district.id}`}
-        className="inline-flex items-center gap-1 rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600"
+        className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600"
       >
         Mahalleler <ChevronRight className="h-3.5 w-3.5" />
       </Link>
-      {delState.error ? <p className="text-xs text-danger-500 lg:col-span-5">{delState.error}</p> : null}
+      {delState.error ? <p role="alert" className="text-xs text-danger-500 lg:col-span-5">{delState.error}</p> : null}
     </div>
   );
 }

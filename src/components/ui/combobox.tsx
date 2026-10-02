@@ -220,7 +220,7 @@ export function Combobox({
             aria-label={ariaLabel}
             disabled={disabled || loading}
             className={cn(
-              "focus-ring flex w-full items-center justify-between gap-2 rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-left text-sm outline-none transition",
+              "focus-ring flex w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-left text-sm outline-none transition",
               "hover:border-brand-300 data-[state=open]:border-brand-400 data-[state=open]:bg-surface",
               "disabled:cursor-not-allowed disabled:opacity-60",
               selected ? "text-ink-950" : "text-text-faint",
@@ -260,7 +260,7 @@ export function Combobox({
             // Dialog içinde kullanıldığında da doğru yere oturması için
             // çarpışma algılama Radix'e bırakılıyor.
             collisionPadding={12}
-            className="popover-in z-[80] w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-[12px] border border-line bg-surface shadow-[var(--inner-top),var(--elev-4)]"
+            className="popover-in z-[80] w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--inner-top),var(--elev-4)]"
             // Odak arama kutusuna gitsin: Radix varsayılanı ilk odaklanabilir
             // öğeye gider, o da temizleme düğmesi olabilirdi.
             onOpenAutoFocus={(e) => {
@@ -306,7 +306,7 @@ export function Combobox({
                     onClick={() => !opt.disabled && commit(opt.value)}
                     onMouseMove={() => setActive(i)}
                     className={cn(
-                      "flex cursor-pointer items-center gap-2 rounded-[8px] px-3 py-2 text-sm transition",
+                      "flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] px-3 py-2 text-sm transition",
                       i === active ? "bg-brand-600/[0.07] text-brand-700" : "text-ink-950",
                       opt.disabled && "pointer-events-none opacity-50",
                     )}
@@ -314,7 +314,7 @@ export function Combobox({
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{opt.label}</span>
                       {opt.hint ? (
-                        <span className="block truncate text-[11px] text-text-faint">{opt.hint}</span>
+                        <span className="block truncate text-xs text-text-faint">{opt.hint}</span>
                       ) : null}
                     </span>
                     {opt.value === value ? <Check className="h-4 w-4 shrink-0 text-brand-600" /> : null}
@@ -326,13 +326,13 @@ export function Combobox({
             {/* Sunucu aramasi varken "x / y kayit" yaniltici olur: y sayfa
                 acilisinda gelen kisitli listedir, tum veri degil. */}
             {onSearch ? (
-              <p className="hairline-t px-3 py-1.5 text-[11px] text-text-faint">
+              <p className="hairline-t px-3 py-1.5 text-xs text-text-faint">
                 {query.trim().length >= minSearchLength
                   ? `${filtered.length} sonuç`
                   : "Yazmaya başlayın — tüm kayıtlarda aranır"}
               </p>
             ) : pool.length > 12 ? (
-              <p className="hairline-t px-3 py-1.5 text-[11px] text-text-faint">
+              <p className="hairline-t px-3 py-1.5 text-xs text-text-faint">
                 {filtered.length} / {pool.length} kayıt
               </p>
             ) : null}

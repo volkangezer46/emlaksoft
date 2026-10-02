@@ -26,6 +26,9 @@ import { PurchaseCalculator } from "./purchase-calculator";
 import { InvestmentPanel } from "./investment-panel";
 import { DAY_MS, msSince, now } from "@/lib/clock";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
+import { isPublicTenantActive } from "@/lib/public-tenant";
+import { getBaseUrl } from "@/lib/base-url";
+import { normalizeExternalHref } from "@/lib/external-href";
 
 // Lightbox etkileşimli client komponenti — dynamic import ile ayrı chunk'a
 // alınır, galeri alanı yüklenene dek en-boy oranını koruyan iskelet görünür.
@@ -35,9 +38,9 @@ const GalleryLightbox = dynamicImport(
 );
 
 // ISR: vitrin herkese acik — CDN onbellekli, 2 dk tazelenir (jet hiz)
-export const revalidate = 120;
+export const revalidate = 60;
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const BASE_URL = getBaseUrl();
 
 function money(n: number | null, tx?: string | null) {
   if (n == null) return "Fiyat için sorun";
@@ -86,7 +89,7 @@ export async function generateMetadata({
   const admin = createAdminClient();
 
   const [{ data: tenant }, { data: cover }] = await Promise.all([
-    admin.from("tenants").select("id, name").eq("slug", slug).maybeSingle(),
+    admin.from("tenants").select("id, name, status").eq("slug", slug).maybeSingle(),
     admin
       .from("property_media")
       .select("id")
@@ -97,7 +100,7 @@ export async function generateMetadata({
       .limit(1)
       .maybeSingle(),
   ]);
-  if (!tenant) return { title: "İlan bulunamadı" };
+  if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "İlan bulunamadı" };
 
   const { data: property } = await admin
     .from("properties")
@@ -150,7 +153,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
   const [{ data: tenant }, { data: mediaRows }, { data: provinces }] = await Promise.all([
     admin
       .from("tenants")
-      .select("id, name, phone, lead_capture_token, lead_capture_enabled")
+      .select("id, name, status, phone, lead_capture_token, lead_capture_enabled")
       .eq("slug", slug)
       .maybeSingle(),
     admin
@@ -161,7 +164,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
       .order("sort_order", { ascending: true }),
     admin.from("geo_provinces").select("id, name").eq("is_active", true).order("name"),
   ]);
-  if (!tenant) notFound();
+  if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
 
   const { data: property } = await admin
     .from("properties")
@@ -236,7 +239,12 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
 
   const media = mediaRows ?? [];
   const images = media.filter((m) => m.kind === "image");
-  const tours = media.filter((m) => m.kind !== "image");
+  const tours = media.flatMap((item) => {
+    const externalUrl = normalizeExternalHref(item.external_url);
+    return item.kind !== "image" && externalUrl
+      ? [{ ...item, external_url: externalUrl }]
+      : [];
+  });
 
   const feat = (property.features ?? {}) as Feat;
   const loc = buildLoc(property);
@@ -300,7 +308,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
         // JSON-LD: arama motorları için yapılandırılmış ilan verisi ("<" kaçışı script kırılmasını önler)
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
-      <div className="mx-auto max-w-5xl px-4 py-8">
+      <main id="main-content" className="mx-auto max-w-5xl px-4 py-8">
         <div className="flex items-center justify-between gap-3">
           <Link href={`/vitrin/${slug}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600">
             <ArrowLeft className="h-4 w-4" /> Tüm portföyler
@@ -312,7 +320,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
         <div className="mt-4 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
           <div>
             {images.length > 0 ? (
-              <div className="overflow-hidden rounded-[18px] border border-line bg-surface">
+              <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
                 <GalleryLightbox
                   images={images.map((m) => ({ id: m.id }))}
                   alt={property.title || property.property_code || "Portföy"}
@@ -323,7 +331,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                 />
               </div>
             ) : (
-              <div className="grid aspect-[16/10] place-items-center rounded-[18px] border border-line bg-surface text-text-faint">
+              <div className="grid aspect-[16/10] place-items-center rounded-[var(--radius-panel)] border border-line bg-surface text-text-faint">
                 <Building2 className="h-12 w-12" />
               </div>
             )}
@@ -333,7 +341,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                 {tours.map((m) => (
                   <a
                     key={m.id}
-                    href={m.external_url ?? "#"}
+                    href={m.external_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 rounded-full border border-brand-300 bg-brand-600/5 px-4 py-2 text-xs font-bold text-brand-600 transition hover:bg-brand-600/10"
@@ -344,15 +352,15 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
               </div>
             ) : null}
 
-            <div className="mt-5 rounded-[18px] border border-line bg-surface p-5">
+            <div className="mt-5 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-1.5">
-                  <span className="rounded-full bg-mint-500/12 px-2.5 py-1 text-[11px] font-bold uppercase text-mint-600">
+                  <span className="rounded-full bg-mint-500/12 px-2.5 py-1 text-xs font-bold uppercase text-mint-600">
                     {property.transaction_type}
                   </span>
                   {/* Son 7 günde yayına giren ilan — published_at gerçek yayın damgası */}
                   {property.published_at != null && msSince(property.published_at) < 7 * DAY_MS ? (
-                    <span className="rounded-full bg-mint-500 px-2.5 py-1 text-[11px] font-bold uppercase text-white">
+                    <span className="rounded-full bg-mint-500 px-2.5 py-1 text-xs font-bold uppercase text-white">
                       Yeni
                     </span>
                   ) : null}
@@ -397,7 +405,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
               <p className="mt-1 text-xs text-text-muted">{property.property_type}</p>
 
               {specs.length > 0 ? (
-                <div className="mt-4 grid grid-cols-3 divide-x divide-line rounded-[14px] border border-line bg-canvas py-3 text-center">
+                <div className="mt-4 grid grid-cols-3 divide-x divide-line rounded-[var(--radius-card)] border border-line bg-canvas py-3 text-center">
                   {specs.map((s) => (
                     <span key={s.label} className="flex items-center justify-center gap-1.5 text-sm font-medium text-ink-950">
                       <s.icon className="h-4 w-4 text-brand-600" /> {s.label}
@@ -408,7 +416,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
             </div>
 
             {description ? (
-              <div className="mt-5 rounded-[18px] border border-line bg-surface p-5">
+              <div className="mt-5 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
                 <h2 className="font-display text-base font-extrabold text-ink-950">İlan açıklaması</h2>
                 <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-text-muted">{description}</p>
               </div>
@@ -430,7 +438,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
 
           {/* Lead form — id: hesaplayıcının "bize ulaşın" düğmesi buraya kaydırır */}
           <div id="talep-formu" className="scroll-mt-6 lg:sticky lg:top-6 lg:self-start">
-            <div className="overflow-hidden rounded-[18px] border border-line">
+            <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line">
               <div className="theme-dark bg-[#071a38] p-6">
                 <Link
                   href={`/vitrin/${slug}`}
@@ -447,7 +455,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                     {officeTel ? (
                       <a
                         href={officeTel}
-                        className="btn-shine inline-flex items-center justify-center gap-2 rounded-[12px] bg-white px-4 py-3 text-sm font-bold text-ink-950 transition hover:bg-white/90"
+                        className="btn-shine inline-flex items-center justify-center gap-2 rounded-[var(--radius-card)] bg-white px-4 py-3 text-sm font-bold text-ink-950 transition hover:bg-white/90"
                       >
                         <Phone className="h-4 w-4" /> Ara
                       </a>
@@ -457,7 +465,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                         href={officeWhatsApp}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center gap-2 rounded-[12px] border border-mint-400/30 bg-mint-500/10 px-4 py-3 text-sm font-bold text-mint-300 transition hover:bg-mint-500/20"
+                        className="inline-flex items-center justify-center gap-2 rounded-[var(--radius-card)] border border-mint-400/30 bg-mint-500/10 px-4 py-3 text-sm font-bold text-mint-300 transition hover:bg-mint-500/20"
                       >
                         <MessageCircle className="h-4 w-4" /> WhatsApp
                       </a>
@@ -468,7 +476,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                 {tenant.lead_capture_enabled !== false && tenant.lead_capture_token ? (
                   <LeadForm token={tenant.lead_capture_token} provinces={provinces ?? []} vitrinSlug={slug} />
                 ) : (
-                  <p className="mt-4 rounded-[12px] border border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-white/60">
+                  <p className="mt-4 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-white/60">
                     Talep formu şu anda kapalı.
                   </p>
                 )}
@@ -509,7 +517,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                   >
                   <Link
                     href={`/vitrin/${slug}/${p.id}`}
-                    className="lift group block overflow-hidden rounded-[18px] border border-line bg-surface transition hover:border-brand-300"
+                    className="lift group block overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface transition hover:border-brand-300"
                   >
                     <div className="relative aspect-[4/3] overflow-hidden bg-ink-950/5">
                       {sCover ? (
@@ -518,6 +526,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                           alt={p.title || "Portföy"}
                           fill
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                          unoptimized
                           className="object-cover transition group-hover:scale-105"
                         />
                       ) : (
@@ -525,7 +534,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                           <Building2 className="h-10 w-10" />
                         </div>
                       )}
-                      <span className="absolute left-3 top-3 rounded-full bg-ink-950/80 px-2.5 py-1 text-[11px] font-bold uppercase text-white">
+                      <span className="absolute left-3 top-3 rounded-full bg-ink-950/80 px-2.5 py-1 text-xs font-bold uppercase text-white">
                         {p.transaction_type}
                       </span>
                     </div>
@@ -543,7 +552,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                       </p>
                       {(() => {
                         const line = fxApproxLine(p.list_price != null ? Number(p.list_price) : null, fxRates);
-                        return line ? <p className="mt-0.5 text-[11px] text-text-faint" title={fxTitle}>{line}</p> : null;
+                        return line ? <p className="mt-0.5 text-xs text-text-faint" title={fxTitle}>{line}</p> : null;
                       })()}
                     </div>
                   </Link>
@@ -554,13 +563,13 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
           </section>
         ) : null}
 
-        <p className="mt-8 text-center text-[11px] text-text-faint">
+        <p className="mt-8 text-center text-xs text-text-faint">
           <Link href="/" className="font-semibold underline-offset-2 transition hover:text-brand-600 hover:underline">
             Powered by EmlakSoft
           </Link>{" "}
           — Türkiye&apos;nin emlak işletim sistemi
         </p>
-      </div>
+      </main>
     </div>
   );
 }

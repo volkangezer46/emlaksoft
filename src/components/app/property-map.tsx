@@ -26,7 +26,7 @@ export function PropertyMap({
     const osmLink = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`;
     const gmapsLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
     return (
-      <div className="overflow-hidden rounded-[16px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+      <div className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <iframe
           title={label ? `${label} konumu` : "Konum haritası"}
           src={embed}
@@ -54,10 +54,10 @@ export function PropertyMap({
   if (addressQuery) {
     const gmaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressQuery)}`;
     return (
-      <div className="rounded-[16px] border border-dashed border-line-strong bg-surface p-5 text-center">
+      <div className="rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface p-5 text-center">
         <MapPin className="mx-auto h-7 w-7 text-text-faint" />
         <p className="mt-2 text-sm text-text-muted">Bu portföy için harita koordinatı girilmemiş.</p>
-        <a href={gmaps} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 rounded-[10px] border border-line px-4 py-2 text-sm font-semibold text-brand-600 transition hover:border-brand-300">
+        <a href={gmaps} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-4 py-2 text-sm font-semibold text-brand-600 transition hover:border-brand-300">
           Adresi Google Maps’te ara <ExternalLink className="h-3.5 w-3.5" />
         </a>
       </div>

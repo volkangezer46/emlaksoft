@@ -156,19 +156,19 @@ export function SavedViews({
               <X className="h-2.5 w-2.5" />
             </button>
             {confirmId === view.id ? (
-              <span className="absolute right-0 top-full z-20 mt-1.5 flex items-center gap-1.5 whitespace-nowrap rounded-[10px] border border-line bg-surface px-2.5 py-1.5 shadow-[var(--shadow-card)]">
-                <span className="text-[11px] font-semibold text-ink-950">Silinsin mi?</span>
+              <span className="absolute right-0 top-full z-20 mt-1.5 flex items-center gap-1.5 whitespace-nowrap rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 shadow-[var(--shadow-card)]">
+                <span className="text-xs font-semibold text-ink-950">Silinsin mi?</span>
                 <button
                   type="button"
                   onClick={() => onDelete(view.id)}
-                  className="rounded-[7px] bg-danger-500 px-2 py-0.5 text-[11px] font-bold text-white transition hover:opacity-90"
+                  className="rounded-[7px] bg-danger-500 px-2 py-0.5 text-xs font-bold text-white transition hover:opacity-90"
                 >
                   Sil
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmId(null)}
-                  className="rounded-[7px] border border-line px-2 py-0.5 text-[11px] font-semibold text-text-muted transition hover:text-ink-950"
+                  className="rounded-[7px] border border-line px-2 py-0.5 text-xs font-semibold text-text-muted transition hover:text-ink-950"
                 >
                   Vazgeç
                 </button>
@@ -191,9 +191,9 @@ export function SavedViews({
           {open ? (
             <form
               onSubmit={onSave}
-              className="absolute left-0 top-full z-20 mt-2 w-64 space-y-2 rounded-[14px] border border-line bg-surface p-3 shadow-[var(--shadow-card)]"
+              className="absolute left-0 top-full z-20 mt-2 w-64 space-y-2 rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-card)]"
             >
-              <label className="block text-[11px] font-semibold text-text-muted" htmlFor={`saved-view-name-${route}`}>
+              <label className="block text-xs font-semibold text-text-muted" htmlFor={`saved-view-name-${route}`}>
                 Görünüm adı
               </label>
               <input
@@ -203,20 +203,20 @@ export function SavedViews({
                 maxLength={60}
                 autoFocus
                 placeholder="Ör. Sıcak alıcılar"
-                className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+                className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
               />
               <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="rounded-[9px] px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:text-ink-950"
+                  className="rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:text-ink-950"
                 >
                   Vazgeç
                 </button>
                 <button
                   type="submit"
                   disabled={busy || !name.trim()}
-                  className="inline-flex items-center gap-1.5 rounded-[9px] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
                 >
                   {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} Kaydet
                 </button>

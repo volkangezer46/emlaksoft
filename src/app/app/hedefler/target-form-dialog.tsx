@@ -40,7 +40,7 @@ const PERIODS = [
 
 // Kısa listede native <select> tercih edildi (bkz. gorevler/new-task-dialog).
 const selectClass =
-  "w-full appearance-none rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
+  "w-full appearance-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
 /**
  * Hedef oluşturma + düzenleme dialogu.
@@ -80,14 +80,14 @@ export function TargetFormDialog({
             type="button"
             aria-label="Hedefi düzenle"
             // relative z-10: kartı kaplayan overlay linkin üstünde kalması için
-            className="focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[9px] border border-hairline bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+            className="focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
           >
             <Pencil className="h-4 w-4" />
           </button>
         ) : triggerVariant === "hero" ? (
           <button
             type="button"
-            className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[11px] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 shadow-[var(--elev-2)]"
+            className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 shadow-[var(--elev-2)]"
           >
             <Plus className="h-4 w-4" /> Yeni hedef
           </button>

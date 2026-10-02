@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getEndeksaValuation, isEndeksaConfigured } from "@/lib/integrations/endeksa";
-import { getTapusorParcelInsight, isTapusorConfigured } from "@/lib/integrations/tapusor";
+import { getEndeksaValuation, isEndeksaConfiguredFull } from "@/lib/integrations/endeksa";
+import { getTapusorParcelInsight, isTapusorConfiguredFull } from "@/lib/integrations/tapusor";
 import { estimateFromComparables, type ComparableEstimate } from "@/lib/comparables";
 
 export type ValuationSource = {
@@ -20,6 +20,34 @@ export type MultiSourceValuation = {
   investmentScore: number | null;
   legalFlags: string[];
 };
+
+type ComparableConfidence = ComparableEstimate["confidence"] | null;
+
+/**
+ * This is an evidence score, not a statistical probability. A seller's list
+ * price is only a weak anchor; independent provider data and comparable sales
+ * increase the score. Keeping the calculation explicit prevents source count
+ * alone from making a single asking price look trustworthy.
+ */
+export function valuationEvidenceConfidence(input: {
+  hasListPrice: boolean;
+  comparableConfidence: ComparableConfidence;
+  hasEndeksa: boolean;
+  hasTapusor: boolean;
+}): number {
+  const hasComparable = input.comparableConfidence != null && input.comparableConfidence !== "yetersiz";
+  const evidenceCount = Number(hasComparable) + Number(input.hasEndeksa) + Number(input.hasTapusor);
+  if (!input.hasListPrice && evidenceCount === 0) return 0;
+
+  let score = 0.15 + (input.hasListPrice ? 0.1 : 0);
+  if (input.comparableConfidence === "yüksek") score += 0.55;
+  else if (input.comparableConfidence === "orta") score += 0.4;
+  else if (input.comparableConfidence === "düşük") score += 0.25;
+  if (input.hasEndeksa) score += 0.2;
+  if (input.hasTapusor) score += 0.15;
+  if (evidenceCount >= 2) score += 0.05;
+  return Math.min(0.95, Math.round(score * 100) / 100);
+}
 
 export async function estimateMultiSourceValue(input: {
   listPrice: number | null;
@@ -45,6 +73,7 @@ export async function estimateMultiSourceValue(input: {
   targetFacade?: string | null;
 }): Promise<MultiSourceValuation> {
   const sources: ValuationSource[] = [];
+  const providerWarnings: string[] = [];
   const list = input.listPrice && input.listPrice > 0 ? input.listPrice : null;
   const sqm = input.sqm && input.sqm > 0 ? input.sqm : null;
 
@@ -94,26 +123,34 @@ export async function estimateMultiSourceValue(input: {
   }
 
   // Endeksa — canlı bölge endeksi + AVM
-  if (isEndeksaConfigured() && input.provinceName) {
+  if (input.provinceName) {
     try {
-      const ev = await getEndeksaValuation({
-        provinceName: input.provinceName,
-        districtName: input.districtHint,
-        sqm,
-      });
-      if (ev.valueAvg > 0) {
-        sources.push({
-          name: "Endeksa bölge endeksi",
-          weight: 0.4,
-          value: ev.valueAvg,
-          note:
-            ev.priceChange12m != null
-              ? `12 aylık değişim %${ev.priceChange12m} · canlı API`
-              : "Endeksa canlı veri",
+      if (await isEndeksaConfiguredFull()) {
+        const ev = await getEndeksaValuation({
+          provinceName: input.provinceName,
+          districtName: input.districtHint,
+          sqm,
         });
+        if (ev.valueAvg > 0) {
+          sources.push({
+            name: "Endeksa bölge endeksi",
+            weight: 0.4,
+            value: ev.valueAvg,
+            note:
+              ev.priceChange12m != null
+                ? `12 aylık değişim %${ev.priceChange12m} · canlı API`
+                : "Endeksa canlı veri",
+          });
+        } else {
+          providerWarnings.push("Endeksa geçerli bir değer döndürmedi");
+        }
       }
     } catch (e) {
-      console.error("endeksa valuation", e);
+      console.error("valuation provider unavailable", {
+        provider: "endeksa",
+        errorType: e instanceof Error ? e.name : "UnknownError",
+      });
+      providerWarnings.push("Endeksa verisi alınamadı");
     }
   }
 
@@ -121,35 +158,59 @@ export async function estimateMultiSourceValue(input: {
   let legalFlags: string[] = [];
 
   // Tapusor — EDİ yapay zeka değerlemesi + yatırım puanı + hukuki uyarı
-  if (isTapusorConfigured() && input.provinceName) {
+  if (input.provinceName) {
     try {
-      const ti = await getTapusorParcelInsight({
-        provinceName: input.provinceName,
-        districtName: input.districtHint,
-        ada: input.ada,
-        parsel: input.parsel,
-      });
-      if (ti.estimatedValue) {
-        sources.push({
-          name: "Tapusor EDİ değerleme",
-          weight: 0.3,
-          value: ti.estimatedValue,
-          note: "Yapay zeka destekli parsel değerlemesi",
+      if (await isTapusorConfiguredFull()) {
+        const ti = await getTapusorParcelInsight({
+          provinceName: input.provinceName,
+          districtName: input.districtHint,
+          ada: input.ada,
+          parsel: input.parsel,
         });
-      }
-      investmentScore = ti.investmentScore;
-      legalFlags = ti.legalFlags;
-      if (investmentScore != null) {
-        sources.push({
-          name: "Tapusor yatırım puanı",
-          weight: 0,
-          value: investmentScore,
-          note: legalFlags.length ? legalFlags.join(", ") : "Hukuki/teknik uyarı yok",
-        });
+        if (ti.estimatedValue) {
+          sources.push({
+            name: "Tapusor EDİ değerleme",
+            weight: 0.3,
+            value: ti.estimatedValue,
+            note: "Yapay zeka destekli parsel değerlemesi",
+          });
+        } else {
+          providerWarnings.push("Tapusor geçerli bir değer döndürmedi");
+        }
+        investmentScore = ti.investmentScore;
+        legalFlags = ti.legalFlags;
+        if (investmentScore != null) {
+          sources.push({
+            name: "Tapusor yatırım puanı",
+            weight: 0,
+            value: investmentScore,
+            note: legalFlags.length ? legalFlags.join(", ") : "Hukuki/teknik uyarı yok",
+          });
+        } else if (legalFlags.length > 0) {
+          sources.push({
+            name: "Tapusor hukuki/teknik uyarıları",
+            weight: 0,
+            value: 0,
+            note: legalFlags.join(", "),
+          });
+        }
       }
     } catch (e) {
-      console.error("tapusor insight", e);
+      console.error("valuation provider unavailable", {
+        provider: "tapusor",
+        errorType: e instanceof Error ? e.name : "UnknownError",
+      });
+      providerWarnings.push("Tapusor verisi alınamadı");
     }
+  }
+
+  if (providerWarnings.length > 0) {
+    sources.push({
+      name: "Kaynak kullanılabilirlik uyarısı",
+      weight: 0,
+      value: 0,
+      note: `${providerWarnings.join("; ")}. Sonuç bu kaynaklar hesaba katılmadan üretildi.`,
+    });
   }
 
   // NOT — buradan iki "kaynak" kaldırıldı: "Makro endeks bandı" (= liste × 0,97)
@@ -164,9 +225,9 @@ export async function estimateMultiSourceValue(input: {
       low: null,
       mid: null,
       high: null,
-      confidence: 0.2,
+      confidence: 0,
       sources,
-      notes: "Yeterli girdi yok — liste fiyatı veya m² girin.",
+      notes: "Yeterli fiyat kanıtı yok — liste fiyatı girin veya konum, m² ve yeterli emsal sağlayın.",
       investmentScore,
       legalFlags,
     };
@@ -175,24 +236,34 @@ export async function estimateMultiSourceValue(input: {
   const totalW = priceSources.reduce((s, x) => s + x.weight, 0);
   const mid = Math.round(priceSources.reduce((s, x) => s + x.value * x.weight, 0) / totalW);
 
-  // Aralık: emsal yayılımı biliniyorsa ONU kullan (gerçek veri), yoksa ±%8
-  // varsayılanı. Sabit ±%8 her zaman aynı genişlikte bant üretiyordu — emsaller
-  // birbirine çok yakınken bile "geniş belirsizlik" gösteriyordu.
+  // Aralık yalnız gözlemlenebilir bir yayılım olduğunda üretilir: ya emsal
+  // kümesinin gerçek yayılımı ya da en az iki fiyat kaynağının anlaşmazlığı.
+  // Tek liste fiyatının etrafında yapay bir ±% bandı göstermek güven yanılsaması
+  // üretirdi; bu durumda alt/üst sınırlar bilinçli olarak null kalır.
   const spread = comparables?.spreadPct ?? null;
-  const band = spread !== null && spread > 0 ? Math.min(Math.max(spread / 200, 0.03), 0.2) : 0.08;
-  const low = Math.round(mid * (1 - band));
-  const high = Math.round(mid * (1 + band));
+  const observedBand = spread !== null && spread >= 0
+    ? spread / 200
+    : priceSources.length >= 2
+      ? (Math.max(...priceSources.map((source) => source.value)) - Math.min(...priceSources.map((source) => source.value))) / (2 * mid)
+      : null;
+  const band = observedBand === null ? null : Math.min(Math.max(observedBand, 0.03), 0.2);
+  const low = band === null ? null : Math.round(mid * (1 - band));
+  const high = band === null ? null : Math.round(mid * (1 + band));
 
-  // Güven: kaynak sayısı + emsal motorunun kendi güveni birlikte
-  let confidence = Math.min(0.9, 0.4 + priceSources.length * 0.12);
-  if (comparables) {
-    if (comparables.confidence === "yüksek") confidence = Math.min(0.95, confidence + 0.15);
-    else if (comparables.confidence === "yetersiz") confidence = Math.max(0.25, confidence - 0.15);
-  }
+  const hasEndeksa = priceSources.some((source) => source.name === "Endeksa bölge endeksi");
+  const hasTapusor = priceSources.some((source) => source.name === "Tapusor EDİ değerleme");
+  const confidence = valuationEvidenceConfidence({
+    hasListPrice: list !== null,
+    comparableConfidence: comparables?.confidence ?? null,
+    hasEndeksa,
+    hasTapusor,
+  });
 
   const notes = comparables && comparables.confidence !== "yetersiz"
     ? `${comparables.compCount} emsal üzerinden hesaplandı (${comparables.wonCount} gerçekleşen satış). İnsan onayı önerilir.`
-    : "Emsal bulunamadı; tahmin liste fiyatı ve varsa dış kaynaklara dayanıyor. İnsan onayı gerekli.";
+    : priceSources.length === 1 && priceSources[0]?.name === "Ofis liste fiyatı"
+      ? "Bağımsız emsal bulunamadı; orta değer yalnız ofis liste fiyatıdır ve güvenilir bir piyasa bandı üretilemez. İnsan onayı gerekli."
+      : "Emsal bulunamadı; tahmin mevcut bağımsız dış kaynaklara ve varsa liste fiyatına dayanıyor. İnsan onayı gerekli.";
 
   return {
     low,

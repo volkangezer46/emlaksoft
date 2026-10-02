@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { signOut } from "@/app/actions/auth";
 import { CommandPalette } from "@/components/admin/command-palette";
 import { NotificationBell } from "@/components/admin/notification-bell";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Building2,
   CreditCard,
@@ -67,8 +68,15 @@ export function AdminTopbar({
     const onClick = (e: MouseEvent) => {
       if (quickRef.current && !quickRef.current.contains(e.target as Node)) setQuickOpen(false);
     };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setQuickOpen(false);
+    };
     document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, []);
 
   const seg = pathname.split("/").filter(Boolean);
@@ -79,12 +87,12 @@ export function AdminTopbar({
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-line/80 bg-surface/85 pl-16 pr-4 backdrop-blur-xl md:px-6">
       {/* Sol: logo + başlık — sabit genişlik */}
-      <div className="flex w-52 shrink-0 items-center gap-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-amber-400/15 text-amber-600">
+      <div className="hidden w-52 shrink-0 items-center gap-3 sm:flex">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-amber-400/15 text-amber-600">
           <Radio className="h-4 w-4" />
         </span>
         <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-amber-600">
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-amber-600">
             EmlakSoft · {roleLabel}
           </p>
           <p className="truncate text-sm font-semibold text-ink-950">
@@ -94,7 +102,7 @@ export function AdminTopbar({
       </div>
 
       {/* Orta: arama — flex-1 ile tüm boş alanı kapla */}
-      <div className="hidden flex-1 md:block">
+      <div className="min-w-0 flex-1">
         <CommandPalette modules={modules} />
       </div>
 
@@ -104,20 +112,24 @@ export function AdminTopbar({
             <button
               type="button"
               onClick={() => setQuickOpen((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-[10px] bg-[image:var(--grad-brand)] px-3 py-2 text-xs font-bold text-white shadow-[0_8px_20px_-8px_rgba(20,99,255,0.7)] transition hover:brightness-105"
+              aria-expanded={quickOpen}
+              aria-haspopup="menu"
+              aria-controls="admin-quick-menu"
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] px-3 py-2 text-xs font-bold text-white shadow-[0_8px_20px_-8px_rgba(20,99,255,0.7)] transition hover:brightness-105"
             >
               <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Hızlı erişim</span>
             </button>
             {quickOpen ? (
-              <div className="absolute right-0 top-11 w-56 overflow-hidden rounded-[14px] border border-line bg-surface p-1.5 shadow-[0_24px_50px_-20px_rgba(10,34,71,0.5)]">
+              <div id="admin-quick-menu" role="menu" className="absolute right-0 top-11 w-56 overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface p-1.5 shadow-[0_24px_50px_-20px_rgba(10,34,71,0.5)]">
                 {quickItems.map((q) => (
                   <Link
                     key={q.href}
                     href={q.href}
+                    role="menuitem"
                     onClick={() => setQuickOpen(false)}
-                    className="flex items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-sm text-ink-950 transition hover:bg-canvas"
+                    className="flex items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 py-2 text-sm text-ink-950 transition hover:bg-canvas"
                   >
-                    <span className="grid h-7 w-7 place-items-center rounded-[8px] bg-canvas text-brand-600">
+                    <span className="grid h-7 w-7 place-items-center rounded-[var(--radius-control)] bg-canvas text-brand-600">
                       <q.icon className="h-3.5 w-3.5" />
                     </span>
                     {q.label}
@@ -128,16 +140,18 @@ export function AdminTopbar({
           </div>
         ) : null}
 
-        <span className="hidden items-center gap-1.5 rounded-full bg-mint-500/10 px-2.5 py-1 text-[11px] font-bold text-mint-600 lg:inline-flex">
+        <span className="hidden items-center gap-1.5 rounded-full bg-mint-500/10 px-2.5 py-1 text-xs font-bold text-mint-600 lg:inline-flex">
           <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-500" /> {clock}
         </span>
+
+        <ThemeToggle />
 
         <NotificationBell />
 
         <form action={signOut}>
           <button
             type="submit"
-            className="inline-flex items-center gap-2 rounded-[10px] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-danger-500/40 hover:text-danger-500"
+            className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-danger-500/40 hover:text-danger-500"
           >
             <LogOut className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Çıkış</span>
           </button>

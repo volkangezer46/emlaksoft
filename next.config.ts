@@ -1,4 +1,28 @@
 import type { NextConfig } from "next";
+import { assertProductionEnvironment } from "./src/lib/deployment-env";
+
+// Config is loaded by both `next build` and `next start`; fail before the app
+// can be built or served with any production demo escape hatch enabled.
+assertProductionEnvironment(process.env);
+
+const isDevelopment = process.env.NODE_ENV === "development";
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https://*.supabase.co https://api.qrserver.com https://tile.openstreetmap.org",
+  "font-src 'self' data:",
+  `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.qrserver.com${isDevelopment ? " ws: wss:" : ""}`,
+  "media-src 'self' data: blob: https://*.supabase.co",
+  "frame-src 'self' https://www.openstreetmap.org",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'",
+  ...(isDevelopment ? [] : ["upgrade-insecure-requests"]),
+].join("; ");
 
 const nextConfig: NextConfig = {
   compress: true,
@@ -31,10 +55,12 @@ const nextConfig: NextConfig = {
   },
 
   experimental: {
-    // React <ViewTransition> entegrasyonu (docs: 01-next-config-js/viewTransition.md).
-    // Navigasyonlarda tarayıcının View Transitions API'si devreye girer;
-    // desteklemeyen tarayıcıda hiçbir şey değişmez (progressive enhancement).
-    viewTransition: true,
+    // Large customer/property files use signed direct-to-Storage uploads. The
+    // remaining logo/profile-photo actions are capped at 2/3 MB; 4 MB leaves
+    // multipart overhead without exposing every action to a 16 MB body.
+    serverActions: { bodySizeLimit: "4mb" },
+    // Next 16.3+: React <ViewTransition> yapılandırma gerektirmez (docs: 02-guides/view-transitions.md);
+    // eski `experimental.viewTransition` seçeneği kaldırıldı.
     // Next 15+'ta dinamik sayfaların istemci router cache TTL'i varsayılan 0sn
     // (docs: 01-next-config-js/staleTimes.md) — /app ve /admin'in tamamı auth/cookie
     // gerektirdiği için "dinamik" sayılıyor, yani her tık (geri/ileri dahil) sunucuya
@@ -58,10 +84,24 @@ const nextConfig: NextConfig = {
 
   async headers() {
     return [
+      // The worker is security-sensitive executable code. Every check must hit
+      // the origin so an old controller cannot survive behind a browser/CDN cache.
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
+          { key: "CDN-Cache-Control", value: "no-store" },
+          { key: "Vercel-CDN-Cache-Control", value: "no-store" },
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
       // Güvenlik başlıkları — tüm yollar
       {
         source: "/:path*",
         headers: [
+          { key: "Content-Security-Policy", value: contentSecurityPolicy },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
@@ -70,6 +110,17 @@ const nextConfig: NextConfig = {
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
           // Gereksiz güçlü API'leri kapat
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self), interest-cohort=()" },
+        ],
+      },
+      // The catch-all policy above also matches the worker. Re-apply a narrower
+      // executable-resource policy last so inline page allowances never reach it.
+      {
+        source: "/sw.js",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: "default-src 'self'; script-src 'self'; object-src 'none'",
+          },
         ],
       },
       // API route'ları — cache yok

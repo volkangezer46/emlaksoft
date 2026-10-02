@@ -19,12 +19,13 @@ import {
 } from "@/components/ui/dialog";
 import { LatLngPicker } from "@/components/app/lat-lng-picker";
 import { GeoSelect } from "@/components/app/geo-select";
+import { useQueryDialog } from "@/components/app/use-query-dialog";
 
 type Province = { id: string; name: string };
 type Branch = { id: string; name: string };
 
 const fieldClass =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
 const DEFAULT_PROPERTY_TYPES = ["Daire", "Villa", "Arsa", "İşyeri", "Müstakil ev", "Bina"];
 const DEFAULT_TRANSACTION_TYPES = ["Satılık", "Kiralık"];
@@ -48,13 +49,15 @@ export function NewPropertyDialog({
   branches = [],
   propertyTypes = DEFAULT_PROPERTY_TYPES,
   transactionTypes = DEFAULT_TRANSACTION_TYPES,
+  defaultOpen = false,
 }: {
   provinces: Province[];
   branches?: Branch[];
   propertyTypes?: string[];
   transactionTypes?: string[];
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useQueryDialog(defaultOpen);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -81,7 +84,7 @@ export function NewPropertyDialog({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[11px] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 shadow-[var(--elev-2)]"
+          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 shadow-[var(--elev-2)]"
         >
           <Plus className="h-4 w-4" /> Yeni portföy
         </button>
@@ -122,7 +125,7 @@ export function NewPropertyDialog({
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="commission-rate">Komisyon oranı (%)</label>
-                <input id="commission-rate" name="commission_rate" inputMode="decimal" className={fieldClass} placeholder="2" />
+                <input id="commission-rate" name="commission_rate" inputMode="decimal" required min="0.01" max="100" step="0.01" className={fieldClass} placeholder="3" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="rooms">Oda</label>
@@ -136,7 +139,7 @@ export function NewPropertyDialog({
               {/* Detay bilgiler: features jsonb'ye portal/broşürle AYNI anahtarlarla
                   yazılır (floor, heating, building_age, facade) + tapu ada/parsel.
                   <details> ile katlanır — temel akışın hızını bozmaz. */}
-              <details className="sm:col-span-2 rounded-[12px] border border-line bg-canvas/60 px-4 py-3 open:bg-surface">
+              <details className="sm:col-span-2 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-4 py-3 open:bg-surface">
                 <summary className="cursor-pointer select-none text-sm font-semibold text-ink-950">
                   Detay bilgiler <span className="font-normal text-text-muted">(kat, ısınma, bina yaşı, tapu…)</span>
                 </summary>
@@ -201,7 +204,7 @@ export function NewPropertyDialog({
                 </div>
               ) : null}
 
-              <div className="sm:col-span-2 rounded-[12px] border border-brand-300/40 bg-brand-600/5 px-4 py-3">
+              <div className="sm:col-span-2 rounded-[var(--radius-card)] border border-brand-300/40 bg-brand-600/5 px-4 py-3">
                 <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Sparkles className="h-4 w-4" /> Portföy taslak olarak açılır; fiyat sağlığı ve portal akışı sonraki adımda tamamlanır.</p>
               </div>
 
@@ -209,11 +212,11 @@ export function NewPropertyDialog({
 
               <div className="hairline-t sm:col-span-2 flex items-center justify-end gap-2 pt-4">
                 <DialogClose asChild>
-                  <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
+                  <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
                     Vazgeç
                   </button>
                 </DialogClose>
-                <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+                <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
                   <Check className="h-4 w-4" /> {pending ? "Oluşturuluyor…" : "Portföyü oluştur"}
                 </button>
               </div>

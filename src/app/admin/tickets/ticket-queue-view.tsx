@@ -71,7 +71,7 @@ const priorityTone: Record<string, string> = {
 
 function TicketStatusBadge({ status }: { status: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-bold", statusTone[status] ?? statusTone.closed)}>
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-bold", statusTone[status] ?? statusTone.closed)}>
       <span className={cn("h-1.5 w-1.5 rounded-full", statusDot[status] ?? statusDot.closed)} aria-hidden />
       {TICKET_STATUS_LABEL[status] ?? status}
     </span>
@@ -80,7 +80,7 @@ function TicketStatusBadge({ status }: { status: string }) {
 
 function TicketPriorityBadge({ priority }: { priority: string }) {
   return (
-    <span className={cn("inline-flex rounded-[7px] border px-2 py-1 text-[10px] font-bold", priorityTone[priority] ?? priorityTone.low)}>
+    <span className={cn("inline-flex rounded-[7px] border px-2 py-1 text-xs font-bold", priorityTone[priority] ?? priorityTone.low)}>
       {TICKET_PRIORITY_LABEL[priority] ?? priority}
     </span>
   );
@@ -112,13 +112,13 @@ function TicketTitle({ row }: { row: TicketQueueRow }) {
       <div className="flex min-w-0 items-center gap-2">
         <Link
           href={`/admin/tickets/${row.id}`}
-          className="focus-ring rounded-[5px] font-mono text-[10px] font-bold tracking-[0.04em] text-brand-600 transition hover:text-brand-700 hover:underline"
+          className="focus-ring rounded-[5px] font-mono text-xs font-bold tracking-[0.04em] text-brand-600 transition hover:text-brand-700 hover:underline"
           aria-label={`${row.subject} destek talebini aç`}
         >
           {row.ticketNo || shortTicketId(row.id)}
         </Link>
         {row.priority === "urgent" ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-danger-500/[0.08] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.05em] text-danger-600">
+          <span className="inline-flex items-center gap-1 rounded-full bg-danger-500/[0.08] px-1.5 py-0.5 text-xs font-bold uppercase tracking-[0.05em] text-danger-600">
             <AlertTriangle className="h-2.5 w-2.5" aria-hidden /> Acil
           </span>
         ) : null}
@@ -129,7 +129,7 @@ function TicketTitle({ row }: { row: TicketQueueRow }) {
       >
         {row.subject}
       </Link>
-      <div className="mt-1 flex min-w-0 items-center gap-2 text-[11px] text-text-faint">
+      <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-text-faint">
         <span className="max-w-[250px] truncate">{row.body || "Açıklama eklenmedi"}</span>
         <span aria-hidden>·</span>
         <span className="inline-flex shrink-0 items-center gap-1">
@@ -171,7 +171,7 @@ function SortHeader({
 function EmptyQueue({ filtered }: { filtered: boolean }) {
   return (
     <div className="grid place-items-center px-6 py-16 text-center">
-      <span className="grid h-14 w-14 place-items-center rounded-[16px] bg-brand-600/[0.07] text-brand-600">
+      <span className="grid h-14 w-14 place-items-center rounded-[var(--radius-card)] bg-brand-600/[0.07] text-brand-600">
         <MessageSquareText className="h-6 w-6" aria-hidden />
       </span>
       <h2 className="mt-4 font-display text-base font-extrabold text-ink-950">
@@ -224,7 +224,7 @@ export function TicketQueueView({
 
   if (rows.length === 0) {
     return (
-      <section className="surface-card overflow-hidden rounded-[18px]">
+      <section className="surface-card overflow-hidden rounded-[var(--radius-panel)]">
         <EmptyQueue filtered={filtered} />
       </section>
     );
@@ -252,7 +252,7 @@ export function TicketQueueView({
   return (
     <>
       {notice ? (
-        <div role="status" className="flex items-center justify-between gap-3 rounded-[12px] border border-mint-500/20 bg-mint-500/[0.08] px-4 py-3 text-sm font-semibold text-mint-700">
+        <div role="status" className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-mint-500/20 bg-mint-500/[0.08] px-4 py-3 text-sm font-semibold text-mint-700">
           <span>{notice}</span>
           <button type="button" onClick={() => setNotice(undefined)} className="focus-ring rounded-[7px] p-1 text-mint-700/70 transition hover:bg-mint-500/10" aria-label="Bildirimi kapat">
             ×
@@ -260,12 +260,12 @@ export function TicketQueueView({
         </div>
       ) : null}
 
-      <section aria-label="Destek kuyruğu" className="surface-card overflow-hidden rounded-[18px]">
+      <section aria-label="Destek kuyruğu" className="surface-card overflow-hidden rounded-[var(--radius-panel)]">
       {/* Geniş ekran: hizalı operasyon tablosu. */}
       <div className="hidden max-w-full overflow-x-auto xl:block">
         <table className="w-full min-w-[1120px] table-fixed text-left text-xs">
           <caption className="sr-only">Seçilebilir destek talepleri; durum, SLA ve personel işlemleri</caption>
-          <thead className="border-b border-hairline bg-canvas/75 text-[10px] font-bold uppercase tracking-[0.06em] text-text-faint">
+          <thead className="border-b border-hairline bg-canvas/75 text-xs font-bold uppercase tracking-[0.06em] text-text-faint">
             <tr>
               <th scope="col" className="w-[4%] px-3 py-3 text-center">
                 <input
@@ -326,24 +326,24 @@ export function TicketQueueView({
                   )}
                 </td>
                 <td className="px-3 py-3.5">
-                  <span className="inline-flex rounded-[7px] border border-line bg-canvas px-2 py-1 text-[10px] font-bold text-ink-950">
+                  <span className="inline-flex rounded-[7px] border border-line bg-canvas px-2 py-1 text-xs font-bold text-ink-950">
                     {categoryLabels[row.category] ?? row.category}
                   </span>
                   <div className="mt-1.5"><TicketPriorityBadge priority={row.priority} /></div>
                 </td>
                 <td className="px-3 py-3.5">
-                  <span className="flex items-start gap-1.5 text-[11px] font-semibold leading-relaxed text-ink-950">
+                  <span className="flex items-start gap-1.5 text-xs font-semibold leading-relaxed text-ink-950">
                     <CalendarClock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-text-faint" aria-hidden />
                     {dt(row.createdAt)}
                   </span>
-                  <p className="mt-1 text-[10px] text-text-faint">Son hareket {dt(row.updatedAt)}</p>
+                  <p className="mt-1 text-xs text-text-faint">Son hareket {dt(row.updatedAt)}</p>
                 </td>
                 <td className="px-3 py-3.5">
                   <div className="flex flex-col items-start gap-1.5">
                     <TicketStatusBadge status={row.status} />
                     <SlaBadge sla={row.sla} />
                     {!row.sla.tracked && row.assignedStaffName ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-text-muted">
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-text-muted">
                         <UserRound className="h-3 w-3" aria-hidden /> {row.assignedStaffName}
                       </span>
                     ) : null}
@@ -383,7 +383,7 @@ export function TicketQueueView({
           />
           Sayfadakileri seç
         </label>
-        {selectedIds.length > 0 ? <span className="numeric text-[11px] font-semibold text-brand-700">{selectedIds.length}/50</span> : null}
+        {selectedIds.length > 0 ? <span className="numeric text-xs font-semibold text-brand-700">{selectedIds.length}/50</span> : null}
       </div>
       <ul className="divide-y divide-hairline xl:hidden" role="list">
         {rows.map((row) => (
@@ -405,23 +405,23 @@ export function TicketQueueView({
 
               <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
                 <div className="min-w-0">
-                  <dt className="text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Ofis</dt>
+                  <dt className="text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Ofis</dt>
                   <dd className="mt-1 truncate text-xs font-semibold text-ink-950">{row.tenantName}</dd>
                 </div>
                 <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Kategori</dt>
+                  <dt className="text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Kategori</dt>
                   <dd className="mt-1 text-xs font-semibold text-ink-950">{categoryLabels[row.category] ?? row.category}</dd>
                 </div>
                 <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Oluşturma</dt>
+                  <dt className="text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Oluşturma</dt>
                   <dd className="mt-1 text-xs font-semibold text-ink-950">{dt(row.createdAt)}</dd>
                 </div>
                 <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Atanan</dt>
+                  <dt className="text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Atanan</dt>
                   <dd className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-ink-950">
                     {row.assignedStaffName ? (
                       <>
-                        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-cyan-400/12 text-[9px] font-extrabold text-ink-800" aria-hidden>
+                        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-cyan-400/12 text-xs font-extrabold text-ink-800" aria-hidden>
                           {initials(row.assignedStaffName)}
                         </span>
                         <span className="truncate">{row.assignedStaffName}</span>

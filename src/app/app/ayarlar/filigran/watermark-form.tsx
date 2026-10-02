@@ -108,7 +108,7 @@ export function WatermarkForm({
       };
       // 404 (taslak portföy) veya ağ hatası → yerleşik örnek görsel kullanılır
       img.onerror = () => {};
-      img.src = `/api/property-media/${sampleMediaId}`;
+      img.src = `/api/property-media/${sampleMediaId}/download`;
     }
     return () => {
       alive = false;
@@ -172,7 +172,7 @@ export function WatermarkForm({
 
       {/* --- Sol: ayarlar --- */}
       <div className="space-y-5">
-        <label className="flex cursor-pointer items-start justify-between gap-4 rounded-[16px] border border-line bg-canvas p-4">
+        <label className="flex cursor-pointer items-start justify-between gap-4 rounded-[var(--radius-card)] border border-line bg-canvas p-4">
           <span>
             <span className="block font-display font-bold text-ink-950">Filigran açık</span>
             <span className="mt-0.5 block text-xs text-text-muted">
@@ -205,7 +205,7 @@ export function WatermarkForm({
                 key={m}
                 type="button"
                 onClick={() => patch({ mode: m })}
-                className={`rounded-[10px] border px-3.5 py-2 text-sm font-semibold transition ${
+                className={`rounded-[var(--radius-control)] border px-3.5 py-2 text-sm font-semibold transition ${
                   settings.mode === m
                     ? "border-brand-400 bg-brand-600/10 text-brand-600"
                     : "border-line bg-canvas text-text-muted hover:border-brand-300"
@@ -216,7 +216,7 @@ export function WatermarkForm({
             ))}
           </div>
           {logoMissing ? (
-            <p className="mt-2 flex items-start gap-1.5 rounded-[10px] bg-amber-400/12 px-3 py-2 text-xs font-medium text-amber-700">
+            <p className="mt-2 flex items-start gap-1.5 rounded-[var(--radius-control)] bg-amber-400/12 px-3 py-2 text-xs font-medium text-amber-700">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               {logoUrl
                 ? "Ofis logosu tarayıcıya yüklenemedi (erişim/CORS). Filigran otomatik olarak METİN moduna düşer."
@@ -227,7 +227,7 @@ export function WatermarkForm({
 
         <fieldset>
           <legend className="text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Konum</legend>
-          <div className="mt-2 grid w-[168px] grid-cols-3 gap-1.5 rounded-[12px] border border-line bg-canvas p-1.5">
+          <div className="mt-2 grid w-[168px] grid-cols-3 gap-1.5 rounded-[var(--radius-card)] border border-line bg-canvas p-1.5">
             {POSITION_GRID.map((p, i) =>
               p ? (
                 <button
@@ -237,7 +237,7 @@ export function WatermarkForm({
                   aria-label={WATERMARK_POSITION_LABEL[p]}
                   aria-pressed={settings.position === p}
                   onClick={() => patch({ position: p })}
-                  className={`grid h-12 place-items-center rounded-[9px] border transition ${
+                  className={`grid h-12 place-items-center rounded-[var(--radius-control)] border transition ${
                     settings.position === p
                       ? "border-brand-400 bg-brand-600/12"
                       : "border-line-strong/40 bg-surface hover:border-brand-300"
@@ -309,9 +309,9 @@ export function WatermarkForm({
             onChange={(e) => setSettings((prev) => ({ ...prev, text: e.target.value.slice(0, 80) }))}
             placeholder={officeName || "Ofis adı"}
             maxLength={80}
-            className="mt-2 block w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm font-semibold normal-case tracking-normal text-ink-950 outline-none focus:border-brand-400"
+            className="mt-2 block w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm font-semibold normal-case tracking-normal text-ink-950 outline-none focus:border-brand-400"
           />
-          <span className="mt-1 block text-[11px] font-medium normal-case tracking-normal text-text-muted">
+          <span className="mt-1 block text-xs font-medium normal-case tracking-normal text-text-muted">
             Boş bırakılırsa ofis adı kullanılır: <strong>{officeName || "—"}</strong>
           </span>
         </label>
@@ -320,7 +320,7 @@ export function WatermarkForm({
           <button
             type="submit"
             disabled={pending}
-            className="btn-shine inline-flex items-center gap-1.5 rounded-[10px] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-ink-800 disabled:opacity-60"
+            className="btn-shine inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-ink-800 disabled:opacity-60"
           >
             {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Ayarı kaydet
@@ -328,7 +328,7 @@ export function WatermarkForm({
           <button
             type="button"
             onClick={() => setSettings({ ...DEFAULT_WATERMARK, enabled: settings.enabled })}
-            className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:text-ink-950"
+            className="rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:text-ink-950"
           >
             Varsayılana dön
           </button>
@@ -347,11 +347,11 @@ export function WatermarkForm({
           <h3 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <Droplets className="h-4 w-4 text-brand-600" /> Canlı önizleme
           </h3>
-          <span className="rounded-full bg-ink-950/6 px-2.5 py-1 text-[11px] font-bold text-text-muted">
+          <span className="rounded-full bg-ink-950/6 px-2.5 py-1 text-xs font-bold text-text-muted">
             {sceneImg ? "Gerçek ilan fotoğrafı" : "Örnek görsel"}
           </span>
         </div>
-        <div className="overflow-hidden rounded-[16px] border border-line bg-canvas">
+        <div className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas">
           <canvas
             ref={canvasRef}
             width={PREVIEW_W}

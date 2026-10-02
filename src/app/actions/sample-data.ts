@@ -4,10 +4,31 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+import { effectiveHasPermission, getEffectivePermissions } from "@/lib/permissions-effective";
+import type { AppAction, AppModule } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity";
 import { now, DAY_MS } from "@/lib/clock";
 
 export type SampleDataResult = { error?: string; ok?: boolean };
+
+const SAMPLE_DATA_MODULES = [
+  "customers",
+  "properties",
+  "demands",
+  "tasks",
+  "appointments",
+  "commissions",
+] as const satisfies readonly AppModule[];
+
+async function canMutateEverySampleModule(input: {
+  tenantId: string;
+  role: string;
+  userId: string;
+  action: AppAction;
+}) {
+  const perms = await getEffectivePermissions(input.tenantId, input.role, input.userId);
+  return SAMPLE_DATA_MODULES.every((mod) => effectiveHasPermission(perms, mod, input.action));
+}
 
 /**
  * Örnek veri onboarding'i — yeni ofis boş panel yerine tek tıkla küçük,
@@ -26,6 +47,11 @@ function todayAtIso(hour: number, minute = 0, dayOffset = 0): string {
 export async function seedSampleData(): Promise<SampleDataResult> {
   const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return { error: gate.error };
+  if (!(await canMutateEverySampleModule({ ...gate, action: "create" }))) {
+    return {
+      error: "Örnek veri yüklemek için müşteri, portföy, talep, görev, randevu ve anlaşma oluşturma yetkileri gerekir.",
+    };
+  }
   const tenantId = gate.tenantId;
   const userId = gate.userId;
 
@@ -249,6 +275,11 @@ export async function seedSampleData(): Promise<SampleDataResult> {
 export async function clearSampleData(): Promise<SampleDataResult> {
   const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return { error: gate.error };
+  if (!(await canMutateEverySampleModule({ ...gate, action: "delete" }))) {
+    return {
+      error: "Örnek verileri temizlemek için ilgili tüm modüllerde silme yetkisi gerekir.",
+    };
+  }
   const tenantId = gate.tenantId;
 
   const supabase = await createClient();

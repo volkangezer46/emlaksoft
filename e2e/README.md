@@ -1,8 +1,10 @@
 # E2E Testleri (Playwright)
 
 ```bash
-npx tsx scripts/e2e-user.ts   # bir kez: e2e test kullanicisini hazirla (idempotent)
-npm run test:e2e              # tum e2e testlerini calistirir (dev server otomatik ayaga kalkar)
+npm run test:e2e:public       # her ortamda güvenli, salt-okunur public smoke
+# Oturumlu testler için benzersiz kimlik bilgileri ve açık mutasyon izni verin:
+# E2E_MUTATION_ALLOWED=true E2E_USER_EMAIL=... E2E_USER_PASSWORD=... npx tsx scripts/e2e-user.ts
+# Aynı env değişkenleriyle npm run test:e2e
 npx playwright test --ui      # UI modunda debug
 ```
 
@@ -18,13 +20,14 @@ npx playwright test --ui      # UI modunda debug
 
 ## Test kullanicisi (scripts/e2e-user.ts)
 
-- `e2e-test@emlaksoft.local` — sabit sifre script icinde (sadece test hesabi).
-- Service role ile calisir (`.env.local`: `SUPABASE_SERVICE_ROLE_KEY`); kullaniciyi
+- Test e-postası ve en az 16 karakterlik benzersiz parola yalnız
+  `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` ortam değişkenlerinden alınır.
+- Sunucu secret key ile çalışır (`.env.local`: `SUPABASE_SECRET_KEY`); kullanıcıyı
   olusturur/bulur, `e2e-test` slug'li tenant'a **owner** profili baglar,
   `two_factor_sms=false` garanti eder ve anon login ile dogrular. Idempotent —
   her calistirmada sifreyi/metadata'yi bilinen duruma resetler.
-- Farkli kimlik gerekiyorsa `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` env degiskenleri
-  `auth.setup.ts`'i override eder.
+- Oturumlu projeler ancak `E2E_MUTATION_ALLOWED=true` iken çalışır. Hosted
+  Supabase kullanıcı hazırlığı ayrıca `SEED_CONFIRM=1` ister.
 
 ## Oturumlu testler (app-flows.spec.ts)
 

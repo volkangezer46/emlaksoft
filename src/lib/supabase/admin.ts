@@ -1,11 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
 
+/** Prefer independently rotatable Supabase secret keys; legacy JWT is fallback only. */
+export function resolveSupabaseAdminKey(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): string | undefined {
+  return env.SUPABASE_SECRET_KEY?.trim() || env.SUPABASE_SERVICE_ROLE_KEY?.trim() || undefined;
+}
+
 export function createAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = resolveSupabaseAdminKey();
 
   if (!url || !key) {
-    throw new Error("Supabase admin env eksik (URL / SERVICE_ROLE_KEY)");
+    throw new Error("Supabase admin env eksik (URL / SECRET_KEY)");
   }
 
   return createClient(url, key, {

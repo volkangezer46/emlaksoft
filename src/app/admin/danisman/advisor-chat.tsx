@@ -118,16 +118,16 @@ function SessionSidebar({
           type="button"
           onClick={onNew}
           aria-label="Yeni sohbet başlat"
-          className="focus-ring press grid h-7 w-7 place-items-center rounded-[8px] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-600"
+          className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-600"
         >
           <MessageSquarePlus className="h-4 w-4" />
         </button>
       </div>
       <div className="flex-1 overflow-y-auto py-1">
         {loading ? (
-          <p className="px-3 py-6 text-center text-[11px] text-text-faint">Yükleniyor…</p>
+          <p className="px-3 py-6 text-center text-xs text-text-faint">Yükleniyor…</p>
         ) : sessions.length === 0 ? (
-          <p className="px-3 py-6 text-center text-[11px] text-text-faint">Henüz sohbet yok</p>
+          <p className="px-3 py-6 text-center text-xs text-text-faint">Henüz sohbet yok</p>
         ) : (
           sessions.map((s) => (
             // Seçim ayrı bir buton: dialog portalından köpüren tıklamalar
@@ -150,7 +150,7 @@ function SessionSidebar({
                 >
                   {s.title ?? "Sohbet"}
                 </p>
-                <p className="flex items-center gap-1 text-[11px] text-text-faint">
+                <p className="flex items-center gap-1 text-xs text-text-faint">
                   <Clock className="h-2.5 w-2.5" /> {relativeTime(s.updated_at)}
                 </p>
               </button>
@@ -407,7 +407,7 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
   }, []);
 
   return (
-    <div className="flex h-[calc(100vh-11rem)] min-h-[520px] overflow-hidden rounded-[18px] border border-line bg-surface">
+    <div className="flex h-[calc(100vh-11rem)] min-h-[520px] overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
       {/* Sidebar */}
       <SessionSidebar
         sessions={sessions}
@@ -423,7 +423,7 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
         {/* Başlık */}
         <div className="flex items-center justify-between border-b border-line px-5 py-3">
           <p className="flex items-center gap-2 text-sm font-semibold text-ink-950">
-            <span className="grid h-7 w-7 place-items-center rounded-[9px] bg-[image:var(--grad-brand)] text-white">
+            <span className="grid h-7 w-7 place-items-center rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] text-white">
               <Sparkles className="h-4 w-4" />
             </span>
             Yapay zeka iş danışmanı
@@ -434,12 +434,12 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
               onClick={newChat}
               title="Yeni sohbet başlat"
               aria-label="Yeni sohbet başlat"
-              className="focus-ring press grid h-8 w-8 shrink-0 place-items-center rounded-[8px] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-600 md:hidden"
+              className="focus-ring press grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-600 md:hidden"
             >
               <MessageSquarePlus className="h-4 w-4" />
             </button>
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
                 aiEnabled ? "bg-mint-500/12 text-mint-600" : "bg-amber-400/15 text-amber-600"
               }`}
             >
@@ -454,7 +454,7 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
                   const activeSession = sessions.find((s) => s.id === sessionId);
                   exportChatAsTxt(messages, activeSession?.title);
                 }}
-                className="grid h-7 w-7 place-items-center rounded-[8px] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-600"
+                className="grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-600"
                 aria-label="Sohbeti indir"
               >
                 <Download className="h-4 w-4" />
@@ -484,7 +484,7 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
                     key={s}
                     type="button"
                     onClick={() => send(s)}
-                    className="rounded-[12px] border border-line bg-canvas/50 px-4 py-2.5 text-left text-sm text-ink-950 transition hover:border-brand-300 hover:bg-canvas"
+                    className="rounded-[var(--radius-card)] border border-line bg-canvas/50 px-4 py-2.5 text-left text-sm text-ink-950 transition hover:border-brand-300 hover:bg-canvas"
                   >
                     {s}
                   </button>
@@ -495,14 +495,14 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
             messages.map((m, i) => (
               <div key={i} className={`flex gap-3 ${m.role === "user" ? "flex-row-reverse" : ""}`}>
                 <span
-                  className={`grid h-8 w-8 shrink-0 place-items-center rounded-[10px] ${
+                  className={`grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] ${
                     m.role === "user" ? "bg-ink-950 text-white" : "bg-[image:var(--grad-brand)] text-white"
                   }`}
                 >
                   {m.role === "user" ? <User className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
                 </span>
                 <div
-                  className={`max-w-[78%] rounded-[14px] px-4 py-2.5 text-sm ${
+                  className={`max-w-[78%] rounded-[var(--radius-card)] px-4 py-2.5 text-sm ${
                     m.role === "user"
                       ? "bg-ink-950 text-white"
                       : "border border-line bg-canvas/60 text-text-muted"
@@ -518,10 +518,10 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
 
           {phase === "thinking" ? (
             <div className="flex gap-3">
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[image:var(--grad-brand)] text-white">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] text-white">
                 <Sparkles className="h-4 w-4" />
               </span>
-              <div className="flex items-center gap-1.5 rounded-[14px] border border-line bg-canvas/60 px-4 py-3">
+              <div className="flex items-center gap-1.5 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-4 py-3">
                 <span className="h-2 w-2 animate-bounce rounded-full bg-brand-400 [animation-delay:-0.2s]" />
                 <span className="h-2 w-2 animate-bounce rounded-full bg-brand-400 [animation-delay:-0.1s]" />
                 <span className="h-2 w-2 animate-bounce rounded-full bg-brand-400" />
@@ -530,12 +530,12 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
           ) : null}
 
           {error ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-danger-500/30 bg-danger-500/8 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/8 px-4 py-3">
               <p className="text-sm text-danger-500">{error}</p>
               <button
                 type="button"
                 onClick={retry}
-                className="focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-[10px] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
+                className="focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
               >
                 <RotateCcw className="h-3.5 w-3.5" /> Yeniden dene
               </button>
@@ -557,14 +557,14 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
               }}
               rows={1}
               placeholder="Bir soru sorun… (örn. gelirimi nasıl artırırım?)"
-              className="max-h-32 flex-1 resize-none rounded-[12px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300"
+              className="max-h-32 flex-1 resize-none rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300"
             />
             {pending ? (
               <button
                 type="button"
                 onClick={cancel}
                 title="Yanıtı durdur"
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-ink-950 text-white transition hover:opacity-85"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] bg-ink-950 text-white transition hover:opacity-85"
                 aria-label="Yanıtı durdur"
               >
                 <Square className="h-3.5 w-3.5 fill-current" />
@@ -574,7 +574,7 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
                 type="button"
                 onClick={() => send(input)}
                 disabled={!input.trim()}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-brand-600 text-white transition hover:bg-brand-700 disabled:opacity-40"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] bg-brand-600 text-white transition hover:bg-brand-700 disabled:opacity-40"
                 aria-label="Gönder"
               >
                 <ArrowUp className="h-4 w-4" />

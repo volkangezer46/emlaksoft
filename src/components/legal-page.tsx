@@ -17,7 +17,7 @@ export function LegalPage({
   children: React.ReactNode;
 }) {
   return (
-    <main className="min-h-screen bg-canvas">
+    <main id="main-content" className="min-h-screen bg-canvas">
       {/* Kurumsal başlık bandı */}
       <section className="theme-dark relative overflow-hidden bg-[image:var(--grad-ink)] text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-25" />
@@ -29,7 +29,7 @@ export function LegalPage({
             </Link>
             <Link href="/" className="font-display text-lg font-extrabold text-white">EmlakSoft</Link>
           </div>
-          <span className="mt-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-cyan-300">
+          <span className="mt-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-cyan-300">
             <FileText className="h-3.5 w-3.5" /> Yasal metin
           </span>
           <h1 className="mt-3 font-display text-3xl font-extrabold sm:text-4xl">{title}</h1>
@@ -42,15 +42,15 @@ export function LegalPage({
       <section className="mx-auto max-w-3xl px-6 py-12">
         <article className="legal-body space-y-8">{children}</article>
 
-        <div className="mt-14 flex flex-wrap items-center justify-between gap-4 rounded-[16px] border border-line bg-surface p-5">
+        <div className="mt-14 flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-card)] border border-line bg-surface p-5">
           <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-[12px] bg-brand-600/10 text-brand-600"><ShieldCheck className="h-5 w-5" /></span>
+            <span className="grid h-10 w-10 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600"><ShieldCheck className="h-5 w-5" /></span>
             <div>
               <p className="text-sm font-bold text-ink-950">Sorunuz mu var?</p>
               <p className="text-xs text-text-muted">Yasal metinlerle ilgili tüm sorularınız için bize yazın.</p>
             </div>
           </div>
-          <a href="mailto:destek@emlaksoft.app" className="rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700">
+          <a href="mailto:destek@emlaksoft.app" className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700">
             destek@emlaksoft.app
           </a>
         </div>

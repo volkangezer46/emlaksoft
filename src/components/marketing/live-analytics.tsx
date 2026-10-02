@@ -61,24 +61,24 @@ export function LiveAnalytics() {
 
         <div className="mt-10 grid gap-5 lg:grid-cols-[1.55fr_1fr]">
           {/* MAIN ANIMATED AREA CHART */}
-          <Reveal variant="scale" className="relative overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur">
+          <Reveal variant="scale" className="relative overflow-hidden rounded-[var(--radius-hero)] border border-white/10 bg-white/[0.04] p-6 backdrop-blur">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="flex items-center gap-2 text-xs font-semibold text-cyan-400"><BarChart3 className="h-4 w-4" /> Aylık hakediş akışı</p>
                 <div className="mt-1 flex items-end gap-2">
                   <span className="font-display text-3xl font-extrabold text-white">₺<CountUp to={2.4} decimals={1} />M</span>
-                  <span className="mb-1 flex items-center gap-1 rounded-full bg-mint-400/15 px-2 py-0.5 text-[11px] font-bold text-mint-400"><TrendingUp className="h-3 w-3" /> +18%</span>
+                  <span className="mb-1 flex items-center gap-1 rounded-full bg-mint-400/15 px-2 py-0.5 text-xs font-bold text-mint-400"><TrendingUp className="h-3 w-3" /> +18%</span>
                 </div>
               </div>
               <div className="flex gap-4 text-right">
-                <div><p className="text-[10px] uppercase tracking-wide text-white/40">Tahsil</p><p className="font-display text-lg font-bold text-white">₺2,1M</p></div>
-                <div><p className="text-[10px] uppercase tracking-wide text-white/40">Bekleyen</p><p className="font-display text-lg font-bold text-amber-400">₺186B</p></div>
+                <div><p className="text-xs uppercase tracking-wide text-white/40">Tahsil</p><p className="font-display text-lg font-bold text-white">₺2,1M</p></div>
+                <div><p className="text-xs uppercase tracking-wide text-white/40">Bekleyen</p><p className="font-display text-lg font-bold text-amber-400">₺186B</p></div>
               </div>
             </div>
 
             <div className="relative mt-6">
               {/* scanning gridline */}
-              <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[14px]">
+              <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[var(--radius-card)]">
                 <div className="grid-scan absolute inset-y-0 w-24 bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent" />
               </div>
 
@@ -124,7 +124,7 @@ export function LiveAnalytics() {
               </svg>
 
               {/* moving sheen */}
-              <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[14px]">
+              <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[var(--radius-card)]">
                 <div className="area-sheen absolute inset-y-0 -left-1/4 w-1/3 skew-x-12 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent)]" />
               </div>
 
@@ -136,11 +136,11 @@ export function LiveAnalytics() {
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-7 text-center text-[10px] text-white/40">
+            <div className="mt-3 grid grid-cols-7 text-center text-xs text-white/40">
               {bars.map((b) => <span key={b.m}>{b.m}</span>)}
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-4 border-t border-white/8 pt-4 text-[11px]">
+            <div className="mt-4 flex flex-wrap gap-4 border-t border-white/8 pt-4 text-xs">
               <span className="flex items-center gap-1.5 text-white/60"><span className="legend-blink h-2 w-2 rounded-full bg-cyan-400" /> Tahsil edilen</span>
               <span className="flex items-center gap-1.5 text-white/60"><span className="legend-blink h-2 w-2 rounded-full bg-mint-400" style={{ animationDelay: "0.6s" }} /> Hedef çizgisi</span>
               <span className="flex items-center gap-1.5 text-white/60"><span className="legend-blink h-2 w-2 rounded-full bg-amber-400" style={{ animationDelay: "1.1s" }} /> Bekleyen</span>
@@ -150,7 +150,7 @@ export function LiveAnalytics() {
           {/* RIGHT: gauge + bars */}
           <div className="grid gap-5">
             {/* radial gauge */}
-            <Reveal variant="scale" className="relative overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur">
+            <Reveal variant="scale" className="relative overflow-hidden rounded-[var(--radius-hero)] border border-white/10 bg-white/[0.04] p-6 backdrop-blur">
               <div className="flex items-center justify-between">
                 <p className="flex items-center gap-2 text-xs font-semibold text-mint-400"><Gauge className="h-4 w-4" /> Ofis sağlık skoru</p>
                 <span className="status-pulse h-2 w-2 rounded-full bg-mint-400" />
@@ -179,18 +179,18 @@ export function LiveAnalytics() {
                 </svg>
                 <div className="absolute grid place-items-center text-center">
                   <span className="font-display text-4xl font-extrabold text-white"><CountUp to={78} /></span>
-                  <span className="text-[10px] uppercase tracking-wide text-white/45">/ 100 puan</span>
+                  <span className="text-xs uppercase tracking-wide text-white/45">/ 100 puan</span>
                 </div>
               </div>
               <div className="mt-2 grid grid-cols-3 gap-2 text-center">
                 {[{ l: "Teyit", v: "%92" }, { l: "Dönüşüm", v: "%8,3" }, { l: "Kaçak", v: "-8%" }].map((x) => (
-                  <div key={x.l} className="rounded-[11px] border border-white/8 bg-white/5 py-2"><p className="font-display text-sm font-bold text-white">{x.v}</p><p className="text-[10px] text-white/40">{x.l}</p></div>
+                  <div key={x.l} className="rounded-[var(--radius-control)] border border-white/8 bg-white/5 py-2"><p className="font-display text-sm font-bold text-white">{x.v}</p><p className="text-xs text-white/40">{x.l}</p></div>
                 ))}
               </div>
             </Reveal>
 
             {/* animated bars + donut */}
-            <Reveal variant="scale" className="relative overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur">
+            <Reveal variant="scale" className="relative overflow-hidden rounded-[var(--radius-hero)] border border-white/10 bg-white/[0.04] p-6 backdrop-blur">
               <p className="flex items-center gap-2 text-xs font-semibold text-brand-300"><Wallet className="h-4 w-4" /> Haftalık kapanış ritmi</p>
               <div className="mt-4 flex h-24 items-end justify-between gap-2">
                 {bars.map((b, i) => (
@@ -201,7 +201,7 @@ export function LiveAnalytics() {
                         style={{ height: `${b.v}%`, animationDelay: `${i * 90}ms, ${i * 200}ms` }}
                       />
                     </div>
-                    <span className="text-[10px] text-white/40">{b.m}</span>
+                    <span className="text-xs text-white/40">{b.m}</span>
                   </div>
                 ))}
               </div>
@@ -221,7 +221,7 @@ export function LiveAnalytics() {
                 </div>
                 <div className="flex-1 space-y-1.5">
                   {donut.map((d) => (
-                    <div key={d.label} className="flex items-center justify-between text-[11px]">
+                    <div key={d.label} className="flex items-center justify-between text-xs">
                       <span className="flex items-center gap-1.5 text-white/60"><span className="h-2 w-2 rounded-full" style={{ background: d.color }} /> {d.label}</span>
                       <span className="font-semibold text-white">%{d.value}</span>
                     </div>
@@ -233,7 +233,7 @@ export function LiveAnalytics() {
         </div>
 
         <Reveal className="mt-6 flex justify-center">
-          <a href="/kayit" className="btn-shine inline-flex items-center gap-2 rounded-[12px] bg-white px-6 py-3 text-sm font-bold text-ink-950">
+          <a href="/kayit" className="btn-shine inline-flex items-center gap-2 rounded-[var(--radius-card)] bg-white px-6 py-3 text-sm font-bold text-ink-950">
             Canlı paneli deneyin <ArrowUpRight className="h-4 w-4" />
           </a>
         </Reveal>

@@ -79,7 +79,7 @@ export function SmsDialog({
       // Gelen kutusu satırı: overlay linkin üstünde kalmalı → relative z-10
       <button
         type="button"
-        className="focus-ring press relative z-10 inline-flex items-center gap-1 rounded-[9px] px-2 py-1.5 text-xs font-semibold text-text-faint transition hover:bg-cyan-500/10 hover:text-cyan-600"
+        className="focus-ring press relative z-10 inline-flex items-center gap-1 rounded-[var(--radius-control)] px-2 py-1.5 text-xs font-semibold text-text-faint transition hover:bg-cyan-500/10 hover:text-cyan-600"
         aria-label={`${customerName} kişisine SMS ile yanıt ver`}
       >
         <Reply className="h-3.5 w-3.5" /> Yanıtla
@@ -88,7 +88,7 @@ export function SmsDialog({
       // Müşteri 360 hero'su: Ara/WhatsApp butonlarıyla aynı görsel dil
       <button
         type="button"
-        className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+        className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
       >
         <MessageSquare className="h-4 w-4" /> SMS
       </button>
@@ -111,7 +111,7 @@ export function SmsDialog({
               <ShieldCheck className="h-3.5 w-3.5" /> İYS SMS onayı kayıtlı
             </p>
           ) : (
-            <div className="rounded-[10px] border border-amber-400/40 bg-amber-400/10 px-3.5 py-3 text-sm" role="alert">
+            <div className="rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3.5 py-3 text-sm" role="alert">
               <p className="flex items-center gap-1.5 font-semibold text-amber-600">
                 <ShieldAlert className="h-4 w-4" /> İYS onayı yok
               </p>
@@ -145,20 +145,20 @@ export function SmsDialog({
               onChange={(e) => setMessage(e.target.value)}
               disabled={!consentGranted}
               placeholder="Mesajınızı buraya yazın…"
-              className="w-full resize-none rounded-[10px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300 disabled:opacity-50"
+              className="w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300 disabled:opacity-50"
             />
             {charCount > 0 && charCount <= 160 && (
-              <p className="mt-1 text-[11px] text-text-faint">1 SMS kredisi kullanılacak</p>
+              <p className="mt-1 text-xs text-text-faint">1 SMS kredisi kullanılacak</p>
             )}
             {charCount > 160 && (
-              <p className="mt-1 text-[11px] text-amber-600">
+              <p className="mt-1 text-xs text-amber-600">
                 {Math.ceil(charCount / 153)} SMS kredisi kullanılacak (uzun mesaj)
               </p>
             )}
           </div>
 
           {error && (
-            <p className="rounded-[8px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
+            <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
               {error}
             </p>
           )}
@@ -167,7 +167,7 @@ export function SmsDialog({
             <DialogClose asChild>
               <button
                 type="button"
-                className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+                className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
               >
                 Vazgeç
               </button>
@@ -175,7 +175,7 @@ export function SmsDialog({
             <button
               type="submit"
               disabled={!canSend}
-              className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+              className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
             >
               <Send className="h-4 w-4" /> {pending ? "Gönderiliyor…" : "Gönder"}
             </button>

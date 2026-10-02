@@ -28,46 +28,38 @@ import {
   moneyTRY,
   relativeTimeTR,
   todayTR,
-  weekBuckets,
 } from "@/lib/admin-format";
 import type { CSSProperties } from "react";
-import { msUntil } from "@/lib/clock";
+import { planLabel as catalogPlanLabel, PLANS } from "@/lib/billing/plans";
+import { exactMrr, type PlatformReportingAggregate } from "@/lib/reporting/platform";
+import { requireReportingData } from "@/lib/reporting/result";
 
 const RING_C = 2 * Math.PI * 42;
 
 /**
- * Kontrol paneli ağır okumaları (tenants≤2000, subs≤5000, ticket/audit/count) —
- * platform geneli, saniye-taze olması gerekmez. 60 sn `unstable_cache`: art arda
- * gezinmelerde bu 6 sorgu tekrar koşmaz, panel önbellekten anında gelir. Zaman
- * bağımlı hesaplar (msUntil, weekBuckets) sayfada per-request çalışmaya devam eder.
+ * Kontrol paneli KPI'ları tam kapsamlı SQL aggregate, yalnız son ofis/hareket
+ * listeleri sırasıyla 5/10 satırdır. 60 sn `unstable_cache`: art arda
+ * gezinmelerde bu sorgular tekrar koşmaz, panel önbellekten anında gelir. Zaman
+ * bağımlı "yakında bitiyor" ve haftalık seriler de RPC içinde tek snapshot'tan üretilir.
  */
 const getAdminDashboardData = unstable_cache(
   async () => {
     const admin = createAdminClient();
-    const [{ data: tenants }, { count: memberCount }, { data: tickets }, { data: subs }, { data: audit }, { count: newDemos }] =
-      await Promise.all([
-        admin.from("tenants").select("id, name, plan, status, created_at, trial_ends_at").order("created_at", { ascending: false }).limit(2000),
-        admin.from("profiles").select("id", { count: "exact", head: true }),
-        admin.from("support_tickets").select("id, status, priority, created_at").order("created_at", { ascending: false }).limit(80),
-        admin.from("subscriptions").select("status, amount_try, plan, created_at").limit(5000),
-        admin.from("audit_logs").select("action, entity_type, actor_id, tenant_id, created_at, tenant:tenants(name)").order("created_at", { ascending: false }).limit(10),
-        admin.from("demo_requests").select("id", { count: "exact", head: true }).eq("status", "new"),
-      ]);
+    const [aggregateResult, tenantsResult, auditResult] = await Promise.all([
+      admin.rpc("platform_reporting_aggregates", { p_from: null, p_to: null, p_as_of: new Date().toISOString() }),
+      admin.from("tenants").select("id, name, plan, status, created_at, trial_ends_at").order("created_at", { ascending: false }).limit(5),
+      admin.from("audit_logs").select("action, entity_type, actor_id, tenant_id, created_at, tenant:tenants(name)").order("created_at", { ascending: false }).limit(10),
+    ]);
     return {
-      tenants: tenants ?? [],
-      memberCount: memberCount ?? 0,
-      tickets: tickets ?? [],
-      subs: subs ?? [],
-      audit: audit ?? [],
-      newDemos: newDemos ?? 0,
+      aggregate: requireReportingData("platform-dashboard-aggregates", aggregateResult) as unknown as PlatformReportingAggregate,
+      tenants: requireReportingData("platform-recent-tenants", tenantsResult),
+      audit: requireReportingData("platform-recent-activity", auditResult),
     };
   },
   ["admin-dashboard-v1"],
   { revalidate: 60, tags: ["admin-dashboard"] },
 );
 
-const planPrice: Record<string, number> = { advisor: 990, office: 2490, professional: 5990, enterprise: 12900 };
-const planLabel: Record<string, string> = { advisor: "Danışman", office: "Ofis", professional: "Profesyonel", enterprise: "Kurumsal" };
 const statusLabel: Record<string, string> = { trial: "Deneme", active: "Aktif", past_due: "Gecikmiş", suspended: "Askıda", cancelled: "İptal" };
 
 export default async function AdminHomePage() {
@@ -77,38 +69,33 @@ export default async function AdminHomePage() {
   if (staff.role === "billing") return <BillingHome staffName={staff.full_name} />;
   if (staff.role === "support") return <SupportHome staffName={staff.full_name} />;
 
-  const { tenants, memberCount, tickets, subs, audit, newDemos } = await getAdminDashboardData();
+  const { tenants, aggregate, audit } = await getAdminDashboardData();
 
   const list = tenants;
-  const ticketRows = tickets;
-  const subRows = subs;
   const auditRows = audit;
+  const summary = aggregate.summary;
 
-  const active = list.filter((t) => t.status === "active").length;
-  const trial = list.filter((t) => t.status === "trial").length;
-  const risk = list.filter((t) => t.status === "suspended" || t.status === "past_due").length;
-  const openTickets = ticketRows.filter((t) => ["open", "in_progress", "waiting"].includes(t.status)).length;
-  const urgentTickets = ticketRows.filter((t) => t.priority === "urgent" && !["resolved", "closed"].includes(t.status)).length;
+  const active = Number(summary.active_count);
+  const trial = Number(summary.trial_count);
+  const risk = Number(summary.risk_count);
+  const openTickets = Number(summary.open_ticket_count);
+  const urgentTickets = Number(summary.urgent_ticket_count);
 
-  const mrr = subRows.filter((s) => s.status === "active").reduce((sum, s) => sum + Number(s.amount_try || 0), 0);
-  const displayMrr = mrr || list.filter((t) => t.status === "active").reduce((sum, t) => sum + (planPrice[t.plan] ?? 0), 0);
+  const displayMrr = exactMrr(aggregate.plan_stats);
   const arr = displayMrr * 12;
 
-  const healthRate = list.length ? active / list.length : 0;
-  const conversion = list.length ? Math.round((active / list.length) * 100) : 0;
+  const totalTenants = Number(summary.tenant_count);
+  const healthRate = totalTenants ? active / totalTenants : 0;
+  const conversion = totalTenants ? Math.round((active / totalTenants) * 100) : 0;
 
   // Trial'ı 7 gün içinde biten tenant'lar
-  const soon = list.filter((t) => {
-    if (t.status !== "trial" || !t.trial_ends_at) return false;
-    const diff = msUntil(t.trial_ends_at);
-    return diff > 0 && diff < 7 * 86_400_000;
-  }).length;
+  const soon = Number(summary.trials_ending_7d);
 
   // Sparkline serileri (8 hafta)
-  const tenantSeries = weekBuckets(list.map((t) => t.created_at));
-  const activeSeries = weekBuckets(subRows.filter((s) => s.status === "active").map((s) => s.created_at));
-  const trialSeries = weekBuckets(list.filter((t) => t.status === "trial").map((t) => t.created_at));
-  const ticketSeries = weekBuckets(ticketRows.map((t) => t.created_at));
+  const tenantSeries = aggregate.weekly.map((row) => Number(row.tenants));
+  const activeSeries = aggregate.weekly.map((row) => Number(row.active_subscriptions));
+  const trialSeries = aggregate.weekly.map((row) => Number(row.trials));
+  const ticketSeries = aggregate.weekly.map((row) => Number(row.tickets));
 
   // Büyüme grafiği (8 hafta, kümülatif his için tenant kovaları)
   const buckets = tenantSeries;
@@ -118,21 +105,21 @@ export default async function AdminHomePage() {
   const growthArea = `0,80 ${growthLine} 280,80`;
   const growthLast = growthPts[growthPts.length - 1]!;
 
-  const planCounts = ["advisor", "office", "professional", "enterprise"].map((p) => ({
-    key: p,
-    label: planLabel[p],
-    count: list.filter((t) => t.plan === p).length,
+  const planCounts = PLANS.map((plan) => ({
+    key: plan.id,
+    label: plan.name,
+    count: Number(aggregate.plan_stats.find((row) => row.plan === plan.id)?.tenant_count ?? 0),
   }));
   const maxPlan = Math.max(1, ...planCounts.map((p) => p.count));
 
   const kpis = [
-    { label: "Toplam ofis", href: "/admin/tenants", value: list.length, sub: `+${buckets[7]} bu hafta`, icon: Building2, tone: "text-amber-500", stroke: "var(--amber-400)", fill: "rgba(242,184,75,0.14)", series: tenantSeries },
+    { label: "Toplam ofis", href: "/admin/tenants", value: totalTenants, sub: `+${buckets[7]} bu hafta`, icon: Building2, tone: "text-amber-500", stroke: "var(--amber-400)", fill: "rgba(242,184,75,0.14)", series: tenantSeries },
     { label: "Aktif abone", href: "/admin/tenants?durum=active", value: active, sub: `%${conversion} dönüşüm`, icon: TrendingUp, tone: "text-mint-600", stroke: "var(--mint-500)", fill: "rgba(16,185,163,0.14)", series: activeSeries },
     { label: "Deneme", href: "/admin/tenants?durum=trial", value: trial, sub: soon > 0 ? `${soon} yakında bitiyor` : "aktif deneme", icon: Sparkles, tone: "text-cyan-500", stroke: "var(--cyan-400)", fill: "rgba(34,211,238,0.14)", series: trialSeries },
     { label: "Açık talep", href: "/admin/tickets?durum=open", value: openTickets, sub: urgentTickets > 0 ? `${urgentTickets} acil` : "kuyruk sakin", icon: LifeBuoy, tone: "text-danger-500", stroke: "var(--danger-500)", fill: "rgba(229,72,77,0.12)", series: ticketSeries },
   ];
 
-  const demoCount = newDemos ?? 0;
+  const demoCount = Number(summary.new_demo_count);
 
   const alerts = [
     demoCount > 0 ? { href: "/admin/satis", tone: "brand", icon: Handshake, text: `${demoCount} yeni demo talebi yanıt bekliyor — satış fırsatı.` } : null,
@@ -142,7 +129,7 @@ export default async function AdminHomePage() {
   ].filter(Boolean) as { href: string; tone: string; icon: typeof AlertTriangle; text: string }[];
 
   const funnel = [
-    { label: "Toplam kayıt", href: "/admin/tenants", value: list.length, tone: "bg-brand-500" },
+    { label: "Toplam kayıt", href: "/admin/tenants", value: totalTenants, tone: "bg-brand-500" },
     { label: "Deneme", href: "/admin/tenants?durum=trial", value: trial, tone: "bg-cyan-400" },
     { label: "Aktif abone", href: "/admin/tenants?durum=active", value: active, tone: "bg-mint-500" },
   ];
@@ -184,7 +171,7 @@ export default async function AdminHomePage() {
             <Link
               key={i}
               href={a.href}
-              className={`group flex items-center gap-3 rounded-[14px] border px-4 py-3 text-sm transition ${
+              className={`group flex items-center gap-3 rounded-[var(--radius-card)] border px-4 py-3 text-sm transition ${
                 a.tone === "danger"
                   ? "border-danger-500/25 bg-danger-500/[0.06] text-danger-600 hover:bg-danger-500/10"
                   : a.tone === "amber"
@@ -203,12 +190,12 @@ export default async function AdminHomePage() {
       {/* KPI cards with sparklines */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((k) => (
-          <Link key={k.label} href={k.href} className="dashboard-panel focus-ring press lift group relative block overflow-hidden rounded-[18px] border border-line bg-surface p-4 transition hover:border-brand-300">
+          <Link key={k.label} href={k.href} className="dashboard-panel focus-ring press lift group relative block overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface p-4 transition hover:border-brand-300">
             <div className="flex items-start justify-between">
-              <span className={`grid h-9 w-9 place-items-center rounded-[11px] bg-canvas ${k.tone}`}>
+              <span className={`grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-canvas ${k.tone}`}>
                 <k.icon className="h-4.5 w-4.5" />
               </span>
-              <span className="flex items-center gap-1 text-[11px] font-semibold text-text-faint">
+              <span className="flex items-center gap-1 text-xs font-semibold text-text-faint">
                 8 hafta
                 <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
               </span>
@@ -220,14 +207,14 @@ export default async function AdminHomePage() {
             <div className="mt-2 h-9">
               <Sparkline data={k.series} stroke={k.stroke} fill={k.fill} height={36} />
             </div>
-            <p className="mt-1 text-[11px] font-medium text-text-faint">{k.sub}</p>
+            <p className="mt-1 text-xs font-medium text-text-faint">{k.sub}</p>
           </Link>
         ))}
       </div>
 
       {/* finance card + funnel */}
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <section className="theme-dark relative overflow-hidden rounded-[20px] bg-[image:var(--grad-ink)] p-6 text-white">
+        <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
           <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
           <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-mint-500/20 blur-[90px]" />
           <div className="relative grid gap-6 md:grid-cols-[1.1fr_1fr] md:items-center">
@@ -235,7 +222,7 @@ export default async function AdminHomePage() {
               <p className="flex items-center gap-2 text-xs font-semibold text-mint-400">
                 <Zap className="h-3.5 w-3.5" /> Gelir motoru
               </p>
-              <Link href="/admin/billing" className="focus-ring group mt-2 block w-fit rounded-[10px]">
+              <Link href="/admin/billing" className="focus-ring group mt-2 block w-fit rounded-[var(--radius-control)]">
                 <p className="font-display text-4xl font-extrabold tabular-nums text-white">
                   <CountUp value={displayMrr} money />
                 </p>
@@ -245,14 +232,14 @@ export default async function AdminHomePage() {
                 </p>
               </Link>
               <div className="mt-5 grid grid-cols-2 gap-3">
-                <Link href="/admin/billing" className="focus-ring group relative block rounded-[12px] border border-white/12 bg-white/8 p-3 transition hover:border-white/25 hover:bg-white/12">
+                <Link href="/admin/billing" className="focus-ring group relative block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 transition hover:border-white/25 hover:bg-white/12">
                   <p className="font-display text-lg font-extrabold text-white">{moneyTRY(arr)}</p>
-                  <p className="text-[11px] text-white/70">Yıllık yinelenen gelir</p>
+                  <p className="text-xs text-white/70">Yıllık yinelenen gelir</p>
                   <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:opacity-100" />
                 </Link>
-                <Link href="/admin/members" className="focus-ring group relative block rounded-[12px] border border-white/12 bg-white/8 p-3 transition hover:border-white/25 hover:bg-white/12">
-                  <p className="font-display text-lg font-extrabold text-white">{memberCount ?? 0}</p>
-                  <p className="text-[11px] text-white/70">Toplam kullanıcı</p>
+                <Link href="/admin/members" className="focus-ring group relative block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 transition hover:border-white/25 hover:bg-white/12">
+                  <p className="font-display text-lg font-extrabold text-white">{Number(summary.member_count)}</p>
+                  <p className="text-xs text-white/70">Toplam kullanıcı</p>
                   <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:opacity-100" />
                 </Link>
               </div>
@@ -273,7 +260,7 @@ export default async function AdminHomePage() {
                 </svg>
                 <div className="absolute text-center">
                   <p className="font-display text-xl font-extrabold text-white">%{Math.round(healthRate * 100)}</p>
-                  <p className="text-[10px] text-white/70">sağlık</p>
+                  <p className="text-xs text-white/70">sağlık</p>
                 </div>
               </div>
               <div className="space-y-2 text-xs text-white/85">
@@ -286,14 +273,14 @@ export default async function AdminHomePage() {
         </section>
 
         {/* funnel */}
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
             <TrendingUp className="h-4 w-4" /> Kazanım hunisi
           </p>
           <h2 className="mt-1 font-display font-bold text-ink-950">Kayıt → Aktif dönüşüm</h2>
           <div className="mt-5 space-y-3">
             {funnel.map((f, i) => (
-              <Link key={f.label} href={f.href} className="focus-ring group block rounded-[8px]">
+              <Link key={f.label} href={f.href} className="focus-ring group block rounded-[var(--radius-control)]">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-ink-950 transition group-hover:text-brand-600">{f.label}</span>
                   <span className="tabular-nums text-text-muted">{f.value}</span>
@@ -304,9 +291,9 @@ export default async function AdminHomePage() {
               </Link>
             ))}
           </div>
-          <Link href="/admin/tenants?durum=active" className="focus-ring group mt-5 block rounded-[12px] border border-line bg-canvas/60 p-3 text-center transition hover:border-brand-300">
+          <Link href="/admin/tenants?durum=active" className="focus-ring group mt-5 block rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3 text-center transition hover:border-brand-300">
             <p className="font-display text-2xl font-extrabold text-mint-600">%{conversion}</p>
-            <p className="text-[11px] text-text-muted">Aktif abonelik dönüşüm oranı</p>
+            <p className="text-xs text-text-muted">Aktif abonelik dönüşüm oranı</p>
           </Link>
         </section>
       </div>
@@ -316,12 +303,12 @@ export default async function AdminHomePage() {
         <p className="mb-2 text-xs font-bold uppercase tracking-wider text-text-faint">Hızlı erişim</p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           {quickActions.map((card) => (
-            <Link key={card.title} href={card.href} className="lift group relative overflow-hidden rounded-[16px] border border-line bg-surface p-4 transition hover:border-brand-300">
-              <span className={`grid h-10 w-10 place-items-center rounded-[12px] ${card.tone}`}>
+            <Link key={card.title} href={card.href} className="lift group relative overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface p-4 transition hover:border-brand-300">
+              <span className={`grid h-10 w-10 place-items-center rounded-[var(--radius-card)] ${card.tone}`}>
                 <card.icon className="h-5 w-5" />
               </span>
               <p className="mt-3 text-sm font-display font-bold text-ink-950">{card.title}</p>
-              <p className="mt-0.5 text-[11px] text-text-muted">{card.desc}</p>
+              <p className="mt-0.5 text-xs text-text-muted">{card.desc}</p>
               <ArrowUpRight className="absolute right-3 top-3 h-4 w-4 text-text-faint transition group-hover:text-brand-600" />
             </Link>
           ))}
@@ -330,12 +317,12 @@ export default async function AdminHomePage() {
 
       {/* growth + plan mix + recent */}
       <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr_1fr]">
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <div className="flex items-center justify-between">
             <p className="flex items-center gap-1.5 text-xs font-semibold text-brand-600">
               <Activity className="h-3.5 w-3.5" /> Ofis büyümesi · 8 hafta
             </p>
-            <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-[11px] font-bold text-brand-600">+{buckets[7]} bu hafta</span>
+            <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold text-brand-600">+{buckets[7]} bu hafta</span>
           </div>
           <svg viewBox="0 0 280 80" className="mt-4 h-28 w-full overflow-visible" preserveAspectRatio="none">
             <defs>
@@ -349,28 +336,28 @@ export default async function AdminHomePage() {
             <circle cx={growthLast.x} cy={growthLast.y} r="3.5" fill="var(--brand-500)" opacity="0.3" className="glow-halo" />
             <circle cx={growthLast.x} cy={growthLast.y} r="3" fill="#fff" stroke="var(--brand-500)" strokeWidth="1.5" />
           </svg>
-          <div className="mt-1 flex justify-between text-[10px] text-text-faint">
+          <div className="mt-1 flex justify-between text-xs text-text-faint">
             {["−7h", "−6h", "−5h", "−4h", "−3h", "−2h", "−1h", "bu"].map((l) => <span key={l}>{l}</span>)}
           </div>
         </section>
 
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-xs font-semibold text-amber-600"><Building2 className="h-4 w-4" /> Paket dağılımı</p>
           <h2 className="mt-1 font-display font-bold text-ink-950">Plan karışımı</h2>
           <div className="mt-5 flex h-28 items-end gap-3">
             {planCounts.map((p, i) => (
-              <Link key={p.key} href={`/admin/tenants?plan=${p.key}`} className="focus-ring group flex flex-1 flex-col items-center gap-1.5 rounded-[8px]">
-                <span className="text-[11px] font-bold tabular-nums text-ink-950">{p.count}</span>
+              <Link key={p.key} href={`/admin/tenants?plan=${p.key}`} className="focus-ring group flex flex-1 flex-col items-center gap-1.5 rounded-[var(--radius-control)]">
+                <span className="text-xs font-bold tabular-nums text-ink-950">{p.count}</span>
                 <div className="flex h-full w-full items-end justify-center">
                   <div className="bar-live w-full max-w-[28px] rounded-t-[5px] bg-[image:var(--grad-brand)] shadow-[0_0_12px_-2px_rgba(20,99,255,0.45)] transition group-hover:brightness-110" style={{ height: `${Math.max((p.count / maxPlan) * 100, 8)}%`, animationDelay: `${i * 0.1}s` }} />
                 </div>
-                <span className="text-[10px] text-text-muted transition group-hover:text-brand-600">{p.label}</span>
+                <span className="text-xs text-text-muted transition group-hover:text-brand-600">{p.label}</span>
               </Link>
             ))}
           </div>
         </section>
 
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold text-mint-600"><Users className="h-4 w-4" /> Canlı kayıtlar</p>
@@ -380,10 +367,10 @@ export default async function AdminHomePage() {
           </div>
           <div className="mt-4 space-y-2.5">
             {list.slice(0, 5).map((t) => (
-              <Link key={t.id} href={`/admin/tenants/${t.id}`} className="focus-ring group flex items-center justify-between gap-2 rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5 transition hover:border-brand-300">
+              <Link key={t.id} href={`/admin/tenants/${t.id}`} className="focus-ring group flex items-center justify-between gap-2 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5 transition hover:border-brand-300">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink-950 transition group-hover:text-brand-600">{t.name}</p>
-                  <p className="text-[11px] text-text-faint">{planLabel[t.plan] ?? t.plan} · {statusLabel[t.status] ?? t.status}</p>
+                  <p className="text-xs text-text-faint">{catalogPlanLabel(t.plan)} · {statusLabel[t.status] ?? t.status}</p>
                 </div>
                 <span className="flex shrink-0 items-center gap-1.5">
                   <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
@@ -397,7 +384,7 @@ export default async function AdminHomePage() {
       </div>
 
       {/* activity feed */}
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
         <div className="flex items-center justify-between">
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Activity className="h-4 w-4" /> Son hareketler</p>
@@ -412,15 +399,15 @@ export default async function AdminHomePage() {
             auditRows.map((a, i) => {
               const tenantName = Array.isArray(a.tenant) ? a.tenant[0]?.name : (a.tenant as { name?: string } | null)?.name;
               return (
-                <Link key={i} href={a.tenant_id ? `/admin/tenants/${a.tenant_id}` : "/admin/aktivite"} className="focus-ring group flex items-center gap-3 rounded-[10px] px-2 py-2 transition hover:bg-canvas">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-brand-600/8 text-brand-600">
+                <Link key={i} href={a.tenant_id ? `/admin/tenants/${a.tenant_id}` : "/admin/aktivite"} className="focus-ring group flex items-center gap-3 rounded-[var(--radius-control)] px-2 py-2 transition hover:bg-canvas">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/8 text-brand-600">
                     <Activity className="h-3.5 w-3.5" />
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-ink-950 transition group-hover:text-brand-600">{auditActionLabel(a.action)}</p>
-                    <p className="truncate text-[11px] text-text-faint">{tenantName ?? "Platform"} · {a.entity_type ?? "sistem"}</p>
+                    <p className="truncate text-xs text-text-faint">{tenantName ?? "Platform"} · {a.entity_type ?? "sistem"}</p>
                   </div>
-                  <span className="shrink-0 text-[11px] text-text-faint">{relativeTimeTR(a.created_at)}</span>
+                  <span className="shrink-0 text-xs text-text-faint">{relativeTimeTR(a.created_at)}</span>
                 </Link>
               );
             })

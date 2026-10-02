@@ -1,8 +1,16 @@
 import "server-only";
 import { getOpenAiKey } from "@/lib/ai-advisor";
 import type { BriefingItem } from "@/lib/briefing";
+import {
+  discardExternalResponse,
+  externalErrorMetadata,
+  fetchExternal,
+  readExternalJson,
+} from "@/lib/external-fetch";
 
 const OPENAI_MODEL = "gpt-4o-mini";
+const OPENAI_TIMEOUT_MS = 30_000;
+const OPENAI_MAX_RESPONSE_BYTES = 256 * 1024;
 
 /**
  * Opsiyonel AI cilası — brifing maddelerinden tek cümlelik motive edici özet.
@@ -22,7 +30,7 @@ export async function generateBriefingSummary(items: BriefingItem[]): Promise<st
   if (!apiKey) return null;
 
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const res = await fetchExternal("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -47,13 +55,19 @@ export async function generateBriefingSummary(items: BriefingItem[]): Promise<st
           },
         ],
       }),
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    }, { timeoutMs: OPENAI_TIMEOUT_MS });
+    if (!res.ok) {
+      await discardExternalResponse(res);
+      return null;
+    }
+    const json = await readExternalJson<{ choices?: { message?: { content?: string } }[] }>(
+      res,
+      OPENAI_MAX_RESPONSE_BYTES,
+    );
     const text = json.choices?.[0]?.message?.content?.trim();
     return text || null;
   } catch (e) {
-    console.error("generateBriefingSummary", e);
+    console.error("generateBriefingSummary", externalErrorMetadata(e));
     return null;
   }
 }

@@ -108,7 +108,7 @@ export default async function SupportTicketDetailPage({ params }: { params: Prom
       .select("id, message_id, uploaded_by, uploaded_by_kind, visibility, file_name, mime_type, file_size, scan_status, created_at")
       .eq("ticket_id", id)
       .eq("visibility", "public")
-      .eq("scan_status", "verified")
+      .eq("scan_status", "signature_verified")
       .is("deleted_at", null)
       .order("created_at", { ascending: true }),
     supabase
@@ -163,12 +163,12 @@ export default async function SupportTicketDetailPage({ params }: { params: Prom
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Destek taleplerine dön
       </Link>
 
-      <header className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-5 text-white sm:p-6">
+      <header className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white sm:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-cyan-400/15 blur-[75px]" />
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-white/50">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-white/50">
               <span className="inline-flex items-center gap-1"><Hash className="h-3 w-3" />{ticket.ticket_no ?? ticket.id.slice(0, 8).toUpperCase()}</span>
               <span aria-hidden>·</span>
               <span className="inline-flex items-center gap-1"><Building2 className="h-3 w-3" />EmlakSoft Destek</span>
@@ -177,21 +177,21 @@ export default async function SupportTicketDetailPage({ params }: { params: Prom
             <p className="mt-2 text-xs text-white/45">Açılış {dt(ticket.created_at)} · Son hareket {dt(updatedAt)}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <span className={cn("rounded-full px-2.5 py-1 text-[11px] font-bold", statusCls[ticket.status] ?? statusCls.open)}>{statusLabel[ticket.status] ?? ticket.status}</span>
-            <span className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white/70">{categoryLabel[ticket.category] ?? ticket.category}</span>
-            <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-[11px] font-bold text-amber-200">{priorityLabel[ticket.priority] ?? ticket.priority}</span>
+            <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", statusCls[ticket.status] ?? statusCls.open)}>{statusLabel[ticket.status] ?? ticket.status}</span>
+            <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-bold text-white/70">{categoryLabel[ticket.category] ?? ticket.category}</span>
+            <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-200">{priorityLabel[ticket.priority] ?? ticket.priority}</span>
           </div>
         </div>
 
-        <div className="relative mt-5 grid overflow-hidden rounded-[14px] border border-white/10 bg-white/[0.055] sm:grid-cols-3">
+        <div className="relative mt-5 grid overflow-hidden rounded-[var(--radius-card)] border border-white/10 bg-white/[0.055] sm:grid-cols-3">
           {[
             { icon: Timer, label: "İlk yanıt", value: relativeTime(ticket.first_response_due_at, firstResponseDone), detail: firstResponseDone ? dt(ticket.first_response_at) : dt(ticket.first_response_due_at) },
             { icon: ShieldCheck, label: "Çözüm hedefi", value: relativeTime(ticket.resolution_due_at, terminal), detail: dt(ticket.resolution_due_at) },
             { icon: MessageSquareText, label: "Konuşma", value: `${rows.length} mesaj`, detail: `${attachments.length} güvenli dosya` },
           ].map((metric) => (
             <div key={metric.label} className="flex items-center gap-3 border-white/10 p-3.5 sm:[&:not(:first-child)]:border-l">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-white/10 text-cyan-200"><metric.icon className="h-4 w-4" /></span>
-              <span className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-[0.06em] text-white/40">{metric.label}</span><span className="block truncate text-sm font-bold text-white">{metric.value}</span><span className="block truncate text-[10px] text-white/40">{metric.detail}</span></span>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-white/10 text-cyan-200"><metric.icon className="h-4 w-4" /></span>
+              <span className="min-w-0"><span className="block text-xs font-semibold uppercase tracking-[0.06em] text-white/40">{metric.label}</span><span className="block truncate text-sm font-bold text-white">{metric.value}</span><span className="block truncate text-xs text-white/40">{metric.detail}</span></span>
             </div>
           ))}
         </div>
@@ -199,12 +199,12 @@ export default async function SupportTicketDetailPage({ params }: { params: Prom
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
         <main className="min-w-0 space-y-4">
-          {ticketAttachments.length ? <section className="rounded-[16px] border border-line bg-surface p-4"><TicketAttachmentList attachments={ticketAttachments} currentUserId={gate.userId} label="Talep ekleri" /></section> : null}
+          {ticketAttachments.length ? <section className="rounded-[var(--radius-card)] border border-line bg-surface p-4"><TicketAttachmentList attachments={ticketAttachments} currentUserId={gate.userId} label="Talep ekleri" /></section> : null}
 
           <TicketThread ticketId={ticket.id} initial={rows} names={names} attachments={attachments} audience="tenant" currentUserId={gate.userId} />
 
           {!terminal ? (
-            <section className="rounded-[18px] border border-line bg-surface p-4 sm:p-5">
+            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div><h2 className="font-display font-bold text-ink-950">Destek ekibine yanıt ver</h2><p className="mt-1 text-xs text-text-muted">Ayrıntı ve güvenli dosya ekleyerek konuşmayı sürdürebilirsiniz.</p></div>
                 <TenantTicketControls ticketId={ticket.id} status={ticket.status} version={ticket.version} />
@@ -212,7 +212,7 @@ export default async function SupportTicketDetailPage({ params }: { params: Prom
               <div className="mt-4"><TicketReplyForm ticketId={ticket.id} version={ticket.version} /></div>
             </section>
           ) : (
-            <section className="flex flex-wrap items-center justify-between gap-3 rounded-[16px] border border-line bg-canvas/60 px-5 py-4">
+            <section className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-5 py-4">
               <div><p className="text-sm font-semibold text-ink-950">Bu talep {ticket.status === "closed" ? "kapatıldı" : "çözüldü"}.</p><p className="mt-0.5 text-xs text-text-muted">Sorun devam ediyorsa talebi yeniden açıp konuşmayı sürdürebilirsiniz.</p></div>
               <TenantTicketControls ticketId={ticket.id} status={ticket.status} version={ticket.version} />
             </section>
@@ -221,32 +221,32 @@ export default async function SupportTicketDetailPage({ params }: { params: Prom
 
         <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
           {ticket.resolution_code || ticket.resolution_summary ? (
-            <section className="rounded-[16px] border border-mint-500/25 bg-mint-500/[0.06] p-4">
+            <section className="rounded-[var(--radius-card)] border border-mint-500/25 bg-mint-500/[0.06] p-4">
               <h2 className="flex items-center gap-2 font-display text-sm font-bold text-mint-800"><CheckCircle2 className="h-4 w-4" />Çözüm özeti</h2>
               {ticket.resolution_summary ? <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-ink-950/80">{ticket.resolution_summary}</p> : <p className="mt-2 text-xs text-text-muted">Talep sonuçlandırıldı.</p>}
-              <p className="mt-2 text-[10px] text-text-faint">{dt(ticket.resolved_at ?? ticket.closed_at)}</p>
+              <p className="mt-2 text-xs text-text-faint">{dt(ticket.resolved_at ?? ticket.closed_at)}</p>
             </section>
           ) : null}
 
           {terminal ? <TicketCsatForm ticketId={ticket.id} existing={csatResult.data} /> : null}
 
-          <section className="rounded-[16px] border border-line bg-surface p-4">
+          <section className="rounded-[var(--radius-card)] border border-line bg-surface p-4">
             <h2 className="flex items-center gap-2 font-display text-sm font-bold text-ink-950"><History className="h-4 w-4 text-brand-600" />Talep geçmişi</h2>
             <ol className="mt-3 space-y-0">
               {events.map((event, index) => (
                 <li key={event.id} className="relative flex gap-2.5 pb-3 last:pb-0">
                   {index < events.length - 1 ? <span className="absolute bottom-0 left-[13px] top-7 w-px bg-line" aria-hidden /> : null}
                   <span className="relative z-[1] grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-600/10 text-brand-700"><Activity className="h-3 w-3" /></span>
-                  <div className="min-w-0 pt-0.5"><p className="text-xs font-semibold text-ink-950">{lifecycleLabel[event.event_type] ?? "Talep güncellendi"}</p><p className="mt-0.5 text-[10px] text-text-faint">{dt(event.created_at)}</p></div>
+                  <div className="min-w-0 pt-0.5"><p className="text-xs font-semibold text-ink-950">{lifecycleLabel[event.event_type] ?? "Talep güncellendi"}</p><p className="mt-0.5 text-xs text-text-faint">{dt(event.created_at)}</p></div>
                 </li>
               ))}
-              {events.length === 0 ? <li className="rounded-[10px] border border-dashed border-line p-3 text-center text-xs text-text-faint">Geçmiş kaydı henüz yok.</li> : null}
+              {events.length === 0 ? <li className="rounded-[var(--radius-control)] border border-dashed border-line p-3 text-center text-xs text-text-faint">Geçmiş kaydı henüz yok.</li> : null}
             </ol>
           </section>
 
-          <section className="rounded-[16px] border border-line bg-canvas/65 p-4">
+          <section className="rounded-[var(--radius-card)] border border-line bg-canvas/65 p-4">
             <p className="flex items-center gap-2 text-xs font-bold text-ink-950"><LifeBuoy className="h-4 w-4 text-brand-600" />Güvenli destek kanalı</p>
-            <p className="mt-1.5 text-[11px] leading-relaxed text-text-muted">Mesajlar yalnız yetkili ofis kullanıcıları ve EmlakSoft destek ekibi tarafından görülebilir. Dosyalar private depoda doğrulanır.</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-text-muted">Mesajlar yalnız yetkili ofis kullanıcıları ve EmlakSoft destek ekibi tarafından görülebilir. Dosyalar private depoda doğrulanır.</p>
           </section>
         </aside>
       </div>

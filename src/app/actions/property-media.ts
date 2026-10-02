@@ -2,105 +2,115 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { verifyImageFile } from "@/lib/file-validation";
+import { isSafeTenantObjectPath } from "@/lib/file-validation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { extractPropertyDocFields, type PropertyDocFields } from "@/lib/ai/document-ocr";
+import {
+  finalizeDirectFileUpload,
+  prepareDirectFileUpload,
+} from "@/lib/direct-file-upload-server";
+import type {
+  DirectFileUploadFinalizeResult,
+  DirectFileUploadPrepareResult,
+} from "@/lib/direct-file-uploads";
 
 export type { PropertyDocFields } from "@/lib/ai/document-ocr";
 
 export type MediaResult = { error?: string; ok?: boolean; id?: string };
 
-const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15 MB
-const ALLOWED_IMAGE = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export async function uploadPropertyMedia(formData: FormData): Promise<MediaResult> {
-  const gate = await requirePermission("properties", "edit");
-  if (!gate.ok) return { error: gate.error };
+export type PreparePropertyMediaUploadInput = {
+  propertyId: string;
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  hasWatermark?: boolean;
+};
 
-  const propertyId = String(formData.get("property_id") ?? "").trim();
-  const file = formData.get("file") as File | null;
-  if (!propertyId) return { error: "Portföy bulunamadı." };
-  if (!file) return { error: "Dosya seçilmedi." };
-  if (file.size > MAX_FILE_SIZE) return { error: "Dosya çok büyük (max 15 MB)." };
-  // İçerik imzası doğrulaması — bildirilen MIME'a güvenmez (spoof + SVG-XSS engeli).
-  const verifiedMedia = await verifyImageFile(file, ALLOWED_IMAGE);
-  if (!verifiedMedia.ok) return { error: verifiedMedia.error };
-
+async function propertyBelongsToTenant(propertyId: string, tenantId: string) {
   const supabase = await createClient();
-  // Portföy tenant'a ait mi?
-  const { data: prop } = await supabase
+  const { data, error } = await supabase
     .from("properties")
     .select("id")
     .eq("id", propertyId)
-    .eq("tenant_id", gate.tenantId)
+    .eq("tenant_id", tenantId)
     .maybeSingle();
-  if (!prop) return { error: "Portföy bu ofise ait değil." };
+  if (error) console.error("property direct upload ownership", { code: error.code });
+  return !error && Boolean(data);
+}
 
-  const admin = createAdminClient();
-  const ext = file.name.split(".").pop() || "jpg";
-  const storagePath = `${gate.tenantId}/${propertyId}/${Date.now()}.${ext}`;
+/** Creates a private one-object Storage write token; no image body enters Next. */
+export async function preparePropertyMediaUpload(
+  input: PreparePropertyMediaUploadInput,
+): Promise<DirectFileUploadPrepareResult> {
+  const gate = await requirePermission("properties", "edit");
+  if (!gate.ok) return { error: gate.error };
 
-  const { error: upErr } = await admin.storage
-    .from("property-media")
-    .upload(storagePath, file, { cacheControl: "31536000", upsert: false });
-  if (upErr) {
-    console.error("uploadPropertyMedia storage", upErr);
-    return { error: "Görsel yüklenemedi." };
+  const propertyId = String(input?.propertyId ?? "").trim();
+  if (!UUID_RE.test(propertyId)) return { error: "Geçerli bir portföy seçin." };
+  if (!(await propertyBelongsToTenant(propertyId, gate.tenantId))) {
+    return { error: "Portföy bu ofise ait değil." };
   }
 
-  // Sıralama için toplam medya sayısı
-  const { count } = await supabase
-    .from("property_media")
-    .select("id", { count: "exact", head: true })
-    .eq("property_id", propertyId);
+  return prepareDirectFileUpload(
+    {
+      kind: "property_media",
+      tenantId: gate.tenantId,
+      parentId: propertyId,
+      userId: gate.userId,
+    },
+    {
+      parentId: propertyId,
+      fileName: input.fileName,
+      fileSize: input.fileSize,
+      fileType: input.fileType,
+      hasWatermark: input.hasWatermark === true,
+    },
+  );
+}
 
-  // İlk GÖRSELSE kapak yap — video/tur bağlantıları sayılmaz; önce video
-  // eklenmiş bir portföyde ilk fotoğrafın kapak olması garanti edilir.
-  const { count: imageCount } = await supabase
-    .from("property_media")
-    .select("id", { count: "exact", head: true })
-    .eq("property_id", propertyId)
-    .eq("kind", "image");
-
-  const { data, error } = await supabase
-    .from("property_media")
-    .insert({
-      tenant_id: gate.tenantId,
-      property_id: propertyId,
-      kind: "image",
-      storage_path: storagePath,
-      file_name: file.name,
-      file_type: file.type,
-      file_size: file.size,
-      is_cover: (imageCount ?? 0) === 0,
-      sort_order: count ?? 0,
-      // Filigran istemcide (canvas) basılır; bayrak yalnızca izlenebilirlik için
-      // taşınır — sunucu görselin içeriğini değiştirmez.
-      has_watermark: String(formData.get("has_watermark") ?? "") === "1",
-      uploaded_by: gate.userId,
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    await admin.storage.from("property-media").remove([storagePath]);
-    console.error("uploadPropertyMedia db", error);
-    return { error: "Görsel kaydedilemedi." };
+/** Verifies stored bytes and atomically creates gallery metadata. */
+export async function finalizePropertyMediaUpload(
+  propertyIdValue: string,
+  sessionIdValue: string,
+): Promise<DirectFileUploadFinalizeResult> {
+  const gate = await requirePermission("properties", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const propertyId = String(propertyIdValue ?? "").trim();
+  const sessionId = String(sessionIdValue ?? "").trim();
+  if (!UUID_RE.test(propertyId) || !UUID_RE.test(sessionId)) {
+    return { error: "Yükleme oturumu geçersiz." };
+  }
+  if (!(await propertyBelongsToTenant(propertyId, gate.tenantId))) {
+    return { error: "Portföy bu ofise ait değil." };
   }
 
-  await logActivity({
-    tenantId: gate.tenantId,
-    actorId: gate.userId,
-    action: "property_media.upload",
-    entityType: "property",
-    entityId: propertyId,
-    newValue: { file_name: file.name },
-  });
+  const result = await finalizeDirectFileUpload(
+    {
+      kind: "property_media",
+      tenantId: gate.tenantId,
+      parentId: propertyId,
+      userId: gate.userId,
+    },
+    sessionId,
+  );
+  if (!result.ok) return result;
 
+  if (result.created) {
+    await logActivity({
+      tenantId: gate.tenantId,
+      actorId: gate.userId,
+      action: "property_media.upload",
+      entityType: "property",
+      entityId: propertyId,
+      newValue: { media_id: result.id, upload_mode: "signed_direct" },
+    });
+  }
   revalidatePath(`/app/portfoyler/${propertyId}`);
-  return { ok: true, id: data.id };
+  return result;
 }
 
 export async function addPropertyMediaUrl(_prev: MediaResult, formData: FormData): Promise<MediaResult> {
@@ -154,24 +164,35 @@ export async function deletePropertyMedia(formData: FormData): Promise<void> {
   const gate = await requirePermission("properties", "edit");
   if (!gate.ok) return;
   const id = String(formData.get("id") ?? "").trim();
-  const propertyId = String(formData.get("property_id") ?? "").trim();
   if (!id) return;
 
   const supabase = await createClient();
   const { data: media } = await supabase
     .from("property_media")
-    .select("id, storage_path")
+    .select("id, property_id, storage_path")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
   if (!media) return;
 
-  if (media.storage_path) {
-    const admin = createAdminClient();
-    await admin.storage.from("property-media").remove([media.storage_path]);
+  if (
+    media.storage_path &&
+    !isSafeTenantObjectPath(media.storage_path, gate.tenantId, media.property_id)
+  ) {
+    console.error("deletePropertyMedia unsafe storage path", { id });
+    return;
   }
-  await supabase.from("property_media").delete().eq("id", id).eq("tenant_id", gate.tenantId);
-  revalidatePath(`/app/portfoyler/${propertyId}`);
+  // DB metadata removal and outbox insertion are one trigger-backed transaction.
+  const { error } = await supabase
+    .from("property_media")
+    .delete()
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId);
+  if (error) {
+    console.error("deletePropertyMedia", error);
+    return;
+  }
+  revalidatePath(`/app/portfoyler/${media.property_id}`);
 }
 
 export async function setCoverPropertyMedia(formData: FormData): Promise<void> {
@@ -262,7 +283,7 @@ export async function reorderPropertyMedia(
 }
 
 /**
- * Seçili görselleri toplu siler (storage + kayıt).
+ * Seçili görsellerin metadata kayıtlarını ve storage outbox işlerini atomik siler.
  * Silinenler arasında kapak varsa, kalan ilk görsel otomatik kapak yapılır —
  * portföy asla kapaksız kalmaz.
  */
@@ -287,11 +308,12 @@ export async function bulkDeletePropertyMedia(
     .in("id", owned);
 
   const paths = (rows ?? []).map((r) => r.storage_path).filter(Boolean) as string[];
-  if (paths.length > 0) {
-    const admin = createAdminClient();
-    await admin.storage.from("property-media").remove(paths);
+  if (paths.some((path) => !isSafeTenantObjectPath(path, gate.tenantId, pid))) {
+    console.error("bulkDeletePropertyMedia unsafe storage path", { propertyId: pid });
+    return { error: "Medya yolu güvenlik doğrulamasından geçemedi." };
   }
-
+  // Each deleted row fires the same transactional outbox trigger. The worker
+  // performs bounded, retryable and idempotent storage deletion afterwards.
   const { error } = await supabase
     .from("property_media")
     .delete()

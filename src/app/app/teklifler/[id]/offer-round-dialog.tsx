@@ -29,7 +29,7 @@ export function OfferRoundDialog({ offerId }: { offerId: string }) {
       <DialogTrigger asChild>
         <button
           type="button"
-          className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border border-hairline px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:bg-canvas"
+          className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:bg-canvas"
         >
           <Plus className="h-3.5 w-3.5" /> Tur ekle
         </button>
@@ -45,7 +45,7 @@ export function OfferRoundDialog({ offerId }: { offerId: string }) {
               name="side"
               required
               defaultValue="buyer"
-              className="mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+              className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
             >
               <option value="buyer">Alıcı</option>
               <option value="seller">Satıcı</option>
@@ -60,14 +60,14 @@ export function OfferRoundDialog({ offerId }: { offerId: string }) {
               step="1000"
               required
               placeholder="Tur tutarı"
-              className="mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+              className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
             />
           </label>
           <textarea
             name="note"
             rows={3}
             placeholder="Not (opsiyonel)"
-            className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+            className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
           />
           {state.error && (
             <p className="text-xs font-semibold text-danger-600" role="alert">{state.error}</p>
@@ -76,7 +76,7 @@ export function OfferRoundDialog({ offerId }: { offerId: string }) {
             <DialogClose asChild>
               <button
                 type="button"
-                className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+                className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
               >
                 Vazgeç
               </button>
@@ -84,7 +84,7 @@ export function OfferRoundDialog({ offerId }: { offerId: string }) {
             <button
               type="submit"
               disabled={pending}
-              className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+              className="btn-shine focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
             >
               {pending ? "Kaydediliyor…" : "Kaydet"}
             </button>

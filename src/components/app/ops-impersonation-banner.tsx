@@ -12,7 +12,7 @@ export function OpsImpersonationBanner({ tenantName }: { tenantName: string }) {
       <form action={stopImpersonation}>
         <button
           type="submit"
-          className="rounded-[8px] bg-amber-300 px-3 py-1.5 text-[11px] font-bold text-ink-950 transition hover:bg-amber-200"
+          className="rounded-[var(--radius-control)] bg-amber-300 px-3 py-1.5 text-xs font-bold text-ink-950 transition hover:bg-amber-200"
         >
           Önizlemeyi bitir
         </button>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "KVKK Aydınlatma Metni | EmlakSoft",
+  title: "KVKK Aydınlatma Metni",
   description: "6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında aydınlatma metni.",
   alternates: { canonical: "/kvkk-aydinlatma" },
 };

@@ -50,7 +50,7 @@ type Props = {
 };
 
 const field =
-  "mt-1.5 w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400";
+  "mt-1.5 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400";
 
 const DEFAULT_TRANSACTION_TYPES = ["Satılık", "Kiralık", "sale", "rent"];
 const DEFAULT_PROPERTY_TYPES = ["Daire", "Villa", "Arsa", "İşyeri", "Diğer"];
@@ -87,7 +87,7 @@ export function EditPropertyDialog({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+          className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
         >
           <Pencil className="h-4 w-4" /> Düzenle
         </button>
@@ -127,7 +127,7 @@ export function EditPropertyDialog({
               </label>
               <label className="text-xs font-medium text-text-muted">
                 Komisyon %
-                <input name="commission_rate" defaultValue={property.commission_rate ?? ""} className={field} />
+                <input name="commission_rate" inputMode="decimal" required min="0.01" max="100" step="0.01" defaultValue={property.commission_rate ?? ""} className={field} />
               </label>
               <label className="text-xs font-medium text-text-muted">
                 Oda
@@ -139,7 +139,7 @@ export function EditPropertyDialog({
               </label>
               {/* Detay bilgiler — features anahtarları portal/broşürle aynı;
                   tapu ada/parsel OCR'ın doldurduğu kolonların manuel karşılığı. */}
-              <details className="sm:col-span-2 rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5" open={Boolean(property.features.floor ?? property.features.heating ?? property.features.building_age ?? property.parcel_block)}>
+              <details className="sm:col-span-2 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5" open={Boolean(property.features.floor ?? property.features.heating ?? property.features.building_age ?? property.parcel_block)}>
                 <summary className="cursor-pointer select-none text-xs font-semibold text-ink-950">
                   Detay bilgiler <span className="font-normal text-text-muted">(kat, ısınma, bina yaşı, tapu…)</span>
                 </summary>
@@ -197,11 +197,11 @@ export function EditPropertyDialog({
             </div>
             <div className="hairline-t mt-4 flex justify-end gap-2 pt-4">
               <DialogClose asChild>
-                <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas">
+                <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas">
                   Vazgeç
                 </button>
               </DialogClose>
-              <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[10px] bg-ink-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+              <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                 {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Kaydet
               </button>

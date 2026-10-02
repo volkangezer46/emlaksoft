@@ -20,6 +20,8 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { PrintButton } from "./print-button";
+import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 // Sunum linkleri kişiye özeldir → arama motorlarına kapalı (degerleme-raporu deseni).
 export const metadata: Metadata = {
@@ -84,7 +86,7 @@ export default async function PublicPresentationPage({
   const propertyIds = (pres.property_ids ?? []) as string[];
 
   const [{ data: tenant }, { data: advisor }, { data: propertyData }] = await Promise.all([
-    admin.from("tenants").select("name, phone, logo_url, brand_color").eq("id", pres.tenant_id).maybeSingle(),
+    admin.from("tenants").select("name, status, phone, logo_url, brand_color").eq("id", pres.tenant_id).maybeSingle(),
     pres.created_by
       ? admin.from("profiles").select("full_name, phone").eq("id", pres.created_by).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -99,6 +101,7 @@ export default async function PublicPresentationPage({
           .is("deleted_at", null)
       : Promise.resolve({ data: [] }),
   ]);
+  if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
 
   // Sunum sonrası taslağa çekilen/silinen portföyler linke sızmasın
   // (public medya API'siyle aynı çizgi); seçim sırası korunur.
@@ -114,10 +117,10 @@ export default async function PublicPresentationPage({
     .eq("kind", "image")
     .order("is_cover", { ascending: false })
     .order("sort_order", { ascending: true });
-  const mediaByProperty = new Map<string, string[]>();
+  const mediaByProperty = new Map<string, { id: string; src: string }[]>();
   for (const m of mediaRows ?? []) {
     const list = mediaByProperty.get(m.property_id) ?? [];
-    list.push(m.id);
+    list.push({ id: m.id, src: createShortLivedPropertyMediaUrl(m.id, "presentation") });
     mediaByProperty.set(m.property_id, list);
   }
 
@@ -179,11 +182,11 @@ export default async function PublicPresentationPage({
                   <img
                     src={tenant.logo_url}
                     alt={`${officeName} logosu`}
-                    className="h-11 w-11 shrink-0 rounded-[10px] bg-white object-contain p-1"
+                    className="h-11 w-11 shrink-0 rounded-[var(--radius-control)] bg-white object-contain p-1"
                   />
                 ) : (
                   <span
-                    className="grid h-11 w-11 shrink-0 place-items-center rounded-[10px] font-display text-lg font-extrabold text-white"
+                    className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-control)] font-display text-lg font-extrabold text-white"
                     style={{ backgroundColor: brand }}
                   >
                     {officeName[0]}
@@ -191,7 +194,7 @@ export default async function PublicPresentationPage({
                 )}
                 <div>
                   <p className="font-display text-base font-extrabold leading-tight">{officeName}</p>
-                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/50">Portföy sunumu</p>
+                  <p className="text-xs uppercase tracking-[0.14em] text-white/50">Portföy sunumu</p>
                 </div>
               </div>
 
@@ -205,7 +208,7 @@ export default async function PublicPresentationPage({
                 </p>
               ) : null}
               {pres.note ? (
-                <p className="mt-4 max-w-xl whitespace-pre-line rounded-[14px] border border-white/10 bg-white/5 px-4 py-3 text-sm leading-relaxed text-white/75">
+                <p className="mt-4 max-w-xl whitespace-pre-line rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-3 text-sm leading-relaxed text-white/75">
                   {pres.note}
                 </p>
               ) : null}
@@ -240,7 +243,7 @@ export default async function PublicPresentationPage({
         {properties.map((property, index) => {
           const feat = (property.features ?? {}) as Feat;
           const images = mediaByProperty.get(property.id as string) ?? [];
-          const coverId = images[0] ?? null;
+          const cover = images[0] ?? null;
           const gallery = images.slice(1, 7);
           const loc = [relName(property.district as Rel), relName(property.province as Rel)]
             .filter(Boolean)
@@ -264,9 +267,9 @@ export default async function PublicPresentationPage({
             >
               {/* Kapak fotoğrafı */}
               <div className="relative aspect-[16/9] w-full overflow-hidden bg-[image:var(--grad-brand-soft)]">
-                {coverId ? (
+                {cover ? (
                   <Image
-                    src={`/api/property-media/${coverId}`}
+                    src={cover.src}
                     alt={(property.title as string | null) ?? (property.property_code as string)}
                     fill
                     sizes="(max-width: 768px) 100vw, 768px"
@@ -279,11 +282,11 @@ export default async function PublicPresentationPage({
                     <Building2 className="h-14 w-14" />
                   </div>
                 )}
-                <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[11px] font-bold text-ink-950 shadow-[var(--shadow-xs)] backdrop-blur">
+                <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink-950 shadow-[var(--shadow-xs)] backdrop-blur">
                   {index + 1} / {properties.length}
                 </span>
                 <span
-                  className="absolute right-4 top-4 rounded-full px-3 py-1 text-[11px] font-bold uppercase text-white shadow-[var(--shadow-xs)]"
+                  className="absolute right-4 top-4 rounded-full px-3 py-1 text-xs font-bold uppercase text-white shadow-[var(--shadow-xs)]"
                   style={{ backgroundColor: brand }}
                 >
                   {property.transaction_type as string}
@@ -293,7 +296,7 @@ export default async function PublicPresentationPage({
               <div className="p-6 sm:p-8">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: brand }}>
+                    <p className="text-xs font-bold uppercase tracking-[0.08em]" style={{ color: brand }}>
                       {property.property_type as string} · {property.property_code as string}
                     </p>
                     <h2 className="mt-1 font-display text-xl font-extrabold text-ink-950 sm:text-2xl">
@@ -330,10 +333,10 @@ export default async function PublicPresentationPage({
 
                 {gallery.length > 0 ? (
                   <div className="print-avoid-break mt-5 grid grid-cols-3 gap-2">
-                    {gallery.map((mid) => (
-                      <div key={mid} className="relative aspect-[4/3] overflow-hidden rounded-[10px] border border-line bg-canvas">
+                    {gallery.map((media) => (
+                      <div key={media.id} className="relative aspect-[4/3] overflow-hidden rounded-[var(--radius-control)] border border-line bg-canvas">
                         <Image
-                          src={`/api/property-media/${mid}`}
+                          src={media.src}
                           alt="Portföy fotoğrafı"
                           fill
                           sizes="(max-width: 768px) 33vw, 240px"
@@ -352,7 +355,7 @@ export default async function PublicPresentationPage({
         {/* ============ İLETİŞİM CTA ============ */}
         <article className="print-sheet surface-card overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-lg)] print:break-before-page">
           <div className="px-6 py-8 text-center sm:px-10">
-            <span className="mx-auto grid h-12 w-12 place-items-center rounded-[14px]" style={{ backgroundColor: `${brand}1a` }}>
+            <span className="mx-auto grid h-12 w-12 place-items-center rounded-[var(--radius-card)]" style={{ backgroundColor: `${brand}1a` }}>
               <Phone className="h-6 w-6" style={{ color: brand }} />
             </span>
             <h2 className="mt-4 font-display text-xl font-extrabold text-ink-950">Beğendiğiniz portföy oldu mu?</h2>
@@ -370,7 +373,7 @@ export default async function PublicPresentationPage({
                 {telHref ? (
                   <a
                     href={telHref}
-                    className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[12px] px-5 py-3 text-sm font-bold text-white"
+                    className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-card)] px-5 py-3 text-sm font-bold text-white"
                     style={{ backgroundColor: brand }}
                   >
                     <Phone className="h-4 w-4" /> Hemen ara
@@ -381,7 +384,7 @@ export default async function PublicPresentationPage({
                     href={waHref}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="focus-ring press inline-flex items-center gap-2 rounded-[12px] border border-mint-500/40 bg-mint-500/10 px-5 py-3 text-sm font-bold text-mint-600 transition hover:bg-mint-500/20"
+                    className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-card)] border border-mint-500/40 bg-mint-500/10 px-5 py-3 text-sm font-bold text-mint-600 transition hover:bg-mint-500/20"
                   >
                     <MessageCircle className="h-4 w-4" /> WhatsApp&apos;tan yaz
                   </a>
@@ -391,7 +394,7 @@ export default async function PublicPresentationPage({
           </div>
         </article>
 
-        <p className="no-print text-center text-[11px] text-text-faint">
+        <p className="no-print text-center text-xs text-text-faint">
           Bu sayfa size özel bir sunum linkidir ·{" "}
           <Link href="/" className="font-semibold underline-offset-2 transition hover:text-text-muted hover:underline">
             Powered by EmlakSoft

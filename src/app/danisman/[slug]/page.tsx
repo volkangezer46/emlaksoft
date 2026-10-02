@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
+import { cache } from "react";
 import {
   ArrowRight,
   BedDouble,
@@ -22,6 +23,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { agentInitials, shortenCustomerName } from "@/lib/agent-profile";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { AgentShareCard } from "./agent-share-card";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 /**
  * Danışman dijital kartviziti — PUBLIC mini profil sitesi.
@@ -40,7 +42,7 @@ import { AgentShareCard } from "./agent-share-card";
  * (vitrin/anket deseni). Yayın kapalıysa veya slug yoksa → notFound().
  */
 
-export const revalidate = 300;
+export const revalidate = 60;
 
 const MAX_LISTINGS = 6;
 
@@ -73,7 +75,7 @@ type AgentRecord = {
 };
 
 /** Yayındaki danışmanı slug'dan çözer; kapalı/pasif profil null döner. */
-async function loadAgent(slug: string): Promise<AgentRecord | null> {
+const loadAgent = cache(async function loadAgent(slug: string): Promise<AgentRecord | null> {
   if (!SLUG_RE.test(slug)) return null;
   const admin = createAdminClient();
   const { data } = await admin
@@ -84,8 +86,14 @@ async function loadAgent(slug: string): Promise<AgentRecord | null> {
   // Pasifleştirilmiş üyenin kartviziti de kapanır — ofisten ayrılan kişi
   // "aktif danışman" gibi görünmesin.
   if (!data || data.is_public !== true || data.is_active !== true) return null;
+  const { data: tenant, error: tenantError } = await admin
+    .from("tenants")
+    .select("status")
+    .eq("id", data.tenant_id)
+    .maybeSingle();
+  if (tenantError || !tenant || !isPublicTenantActive(tenant.status)) return null;
   return data as AgentRecord;
-}
+});
 
 export async function generateMetadata({
   params,
@@ -139,6 +147,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
       admin
         .from("booking_settings")
         .select("public_token")
+        .eq("tenant_id", agent.tenant_id)
         .eq("staff_id", agent.id)
         .eq("is_active", true)
         .maybeSingle(),
@@ -156,7 +165,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
         .limit(MAX_LISTINGS),
       admin
         .from("surveys")
-        .select("score, comment, answered_at, customer:customers(full_name)")
+        .select("customer_id, score, comment, answered_at")
         .eq("tenant_id", agent.tenant_id)
         .eq("agent_id", agent.id)
         .eq("status", "answered")
@@ -197,22 +206,32 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
    * "destekleyen" (>=9) ve yorumu dolu olan son 3 kayıt çıkar. Müşteri adı
    * kısaltılır — public sayfada tam ad gösterilmez.
    */
-  type CustomerRel = { full_name?: string } | { full_name?: string }[] | null;
   const answered = (surveyRows ?? []) as {
+    customer_id: string;
     score: number | null;
     comment: string | null;
     answered_at: string | null;
-    customer: CustomerRel;
   }[];
-  const scores = answered.map((s) => Number(s.score)).filter((n) => Number.isFinite(n));
+  const surveyCustomerIds = [...new Set(answered.map((s) => s.customer_id).filter(Boolean))];
+  const { data: surveyCustomers } = surveyCustomerIds.length
+    ? await admin
+        .from("customers")
+        .select("id, full_name")
+        .eq("tenant_id", agent.tenant_id)
+        .is("deleted_at", null)
+        .in("id", surveyCustomerIds)
+    : { data: [] as { id: string; full_name: string | null }[] };
+  const surveyCustomerNames = new Map((surveyCustomers ?? []).map((c) => [c.id, c.full_name]));
+  const tenantBoundAnswers = answered.filter((s) => surveyCustomerNames.has(s.customer_id));
+  const scores = tenantBoundAnswers.map((s) => Number(s.score)).filter((n) => Number.isFinite(n));
   const avgScore = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
-  const testimonials = answered
+  const testimonials = tenantBoundAnswers
     .filter((s) => Number(s.score) >= 9 && String(s.comment ?? "").trim().length > 0)
     .slice(0, 3)
-    .map((s) => {
-      const c = Array.isArray(s.customer) ? s.customer[0] : s.customer;
-      return { comment: String(s.comment).trim(), who: shortenCustomerName(c?.full_name ?? null) };
-    });
+    .map((s) => ({
+      comment: String(s.comment).trim(),
+      who: shortenCustomerName(surveyCustomerNames.get(s.customer_id) ?? null),
+    }));
 
   const telHref = toTelHref(agent.phone);
   const waHref = toWhatsAppLink(agent.phone);
@@ -249,17 +268,17 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
           {officeSlug ? (
             <Link
               href={`/vitrin/${officeSlug}`}
-              className="focus-ring flex w-fit items-center gap-2.5 rounded-[14px] transition hover:opacity-90"
+              className="focus-ring flex w-fit items-center gap-2.5 rounded-[var(--radius-card)] transition hover:opacity-90"
             >
               <span
-                className="grid h-9 w-9 place-items-center rounded-[11px] text-sm font-extrabold text-white"
+                className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] text-sm font-extrabold text-white"
                 style={{ background: brand }}
               >
                 {office[0]}
               </span>
               <span>
                 <span className="block text-sm font-bold">{office}</span>
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-mint-400">
+                <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-mint-400">
                   Portföy vitrinine git
                 </span>
               </span>
@@ -267,7 +286,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
           ) : (
             <span className="flex w-fit items-center gap-2.5">
               <span
-                className="grid h-9 w-9 place-items-center rounded-[11px] text-sm font-extrabold text-white"
+                className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] text-sm font-extrabold text-white"
                 style={{ background: brand }}
               >
                 {office[0]}
@@ -280,7 +299,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
             {/* Portre veya monogram */}
             <div className="relative shrink-0">
               <span
-                className="absolute -inset-1 rounded-[28px] opacity-60 blur-lg"
+                className="absolute -inset-1 rounded-[var(--radius-hero)] opacity-60 blur-lg"
                 style={{ background: brand }}
                 aria-hidden
               />
@@ -291,11 +310,11 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
                   width={144}
                   height={144}
                   priority
-                  className="relative h-32 w-32 rounded-[26px] border border-white/20 object-cover sm:h-36 sm:w-36"
+                  className="relative h-32 w-32 rounded-[var(--radius-hero)] border border-white/20 object-cover sm:h-36 sm:w-36"
                 />
               ) : (
                 <span
-                  className="relative grid h-32 w-32 place-items-center rounded-[26px] border border-white/20 font-display text-4xl font-extrabold text-white sm:h-36 sm:w-36"
+                  className="relative grid h-32 w-32 place-items-center rounded-[var(--radius-hero)] border border-white/20 font-display text-4xl font-extrabold text-white sm:h-36 sm:w-36"
                   style={{ background: `linear-gradient(140deg, ${brand}, rgba(255,255,255,0.08))` }}
                 >
                   {agentInitials(agent.full_name)}
@@ -359,13 +378,13 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl space-y-10 px-4 py-10">
+      <main id="main-content" className="mx-auto max-w-5xl space-y-10 px-4 py-10">
         {/* -------------------------------------------------------- Memnuniyet */}
         {avgScore != null ? (
-          <section className="rounded-[22px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] sm:p-6">
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] sm:p-6">
             <div className="flex flex-wrap items-center gap-5">
               <div className="flex items-center gap-3">
-                <span className="grid h-12 w-12 place-items-center rounded-[15px] bg-amber-400/15 text-amber-500">
+                <span className="grid h-12 w-12 place-items-center rounded-[var(--radius-card)] bg-amber-400/15 text-amber-500">
                   <Star className="h-6 w-6" />
                 </span>
                 <div>
@@ -387,7 +406,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
             {testimonials.length > 0 ? (
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
                 {testimonials.map((t, i) => (
-                  <figure key={i} className="rounded-[16px] border border-line bg-canvas p-4">
+                  <figure key={i} className="rounded-[var(--radius-card)] border border-line bg-canvas p-4">
                     <Quote className="h-4 w-4 text-brand-600" />
                     <blockquote className="mt-2 text-sm leading-relaxed text-ink-950">{t.comment}</blockquote>
                     <figcaption className="mt-3 text-xs font-semibold text-text-muted">{t.who}</figcaption>
@@ -436,6 +455,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
                           alt={p.title || "Portföy"}
                           fill
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                          unoptimized
                           className="object-cover transition group-hover:scale-105"
                         />
                       ) : (
@@ -443,7 +463,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
                           <Building2 className="h-10 w-10" />
                         </div>
                       )}
-                      <span className="absolute left-3 top-3 rounded-full bg-ink-950/80 px-2.5 py-1 text-[11px] font-bold uppercase text-white">
+                      <span className="absolute left-3 top-3 rounded-full bg-ink-950/80 px-2.5 py-1 text-xs font-bold uppercase text-white">
                         {p.transaction_type}
                       </span>
                     </div>
@@ -474,14 +494,14 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
                   <Link
                     key={p.id}
                     href={href}
-                    className="lift group overflow-hidden rounded-[18px] border border-line bg-surface transition hover:border-brand-300"
+                    className="lift group overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface transition hover:border-brand-300"
                   >
                     {card}
                   </Link>
                 ) : (
                   <article
                     key={p.id}
-                    className="group overflow-hidden rounded-[18px] border border-line bg-surface"
+                    className="group overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface"
                   >
                     {card}
                   </article>
@@ -492,7 +512,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
         ) : null}
 
         {/* -------------------------------------------------------- İletişim CTA */}
-        <section className="theme-dark overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white sm:p-8">
+        <section className="theme-dark overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white sm:p-8">
           <h2 className="font-display text-xl font-extrabold">Aradığınızı bulamadınız mı?</h2>
           <p className="mt-2 max-w-lg text-sm text-white/60">
             {agent.full_name.split(" ")[0]} size uygun portföyleri bulup yerinde inceleme planlasın.
@@ -523,7 +543,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
             <a
               key={a.key}
               href={a.href}
-              className={`focus-ring press flex flex-1 flex-col items-center gap-1 rounded-[12px] px-1 py-2 text-[10px] font-bold transition ${
+              className={`focus-ring press flex flex-1 flex-col items-center gap-1 rounded-[var(--radius-card)] px-1 py-2 text-xs font-bold transition ${
                 a.primary ? "bg-brand-600 text-white" : "text-text-muted hover:text-brand-600"
               }`}
             >
@@ -535,7 +555,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
         </div>
       </div>
 
-      <footer className="border-t border-line py-6 text-center text-[11px] text-text-faint">
+      <footer className="border-t border-line py-6 text-center text-xs text-text-faint">
         <Link href="/" className="font-semibold underline-offset-2 transition hover:text-brand-600 hover:underline">
           Powered by EmlakSoft
         </Link>{" "}

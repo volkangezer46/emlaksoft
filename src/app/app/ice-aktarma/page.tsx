@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
+import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { createClient } from "@/lib/supabase/server";
 import { daysAgoIso } from "@/lib/clock";
 import { ImportWizard } from "./import-wizard";
@@ -32,7 +33,8 @@ const nf = new Intl.NumberFormat("tr-TR");
  * hedef sayfalar bu ekranın alanı dışında olduğundan parametresiz link verilir.
  */
 export default async function ImportPage() {
-  await requireModulePage("customers");
+  const { perms } = await requireModulePage("customers");
+  const canImportProperties = effectiveHasPermission(perms, "properties", "create");
   const supabase = await createClient();
   const since30 = daysAgoIso(30);
 
@@ -131,7 +133,7 @@ export default async function ImportPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/35 blur-[80px]" />
         <div className="pointer-events-none absolute -left-20 bottom-0 h-44 w-44 rounded-full bg-mint-500/20 blur-[80px]" />
@@ -144,7 +146,7 @@ export default async function ImportPage() {
             Eski programınızdan veya Excel&apos;den aldığınız müşteri ve portföy listelerini üç
             adımda EmlakSoft&apos;a taşıyın: dosya yükleyin, kolonları eşleyin, sonucu görün.
           </p>
-          <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-white/70">
+          <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/70">
             <FileSpreadsheet className="h-3.5 w-3.5 text-mint-400" />
             Excel dosyanızı &quot;Farklı Kaydet → CSV&quot; ile kaydedin — .xlsx doğrudan desteklenmez.
           </p>
@@ -157,10 +159,10 @@ export default async function ImportPage() {
                 <Link
                   key={k.label}
                   href={k.href}
-                  className="focus-ring press group relative block rounded-[14px] border border-white/10 bg-white/5 p-3.5 transition hover:border-white/30"
+                  className="focus-ring press group relative block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3.5 transition hover:border-white/30"
                 >
                   <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/50 opacity-0 transition group-hover:opacity-100" />
-                  <span className="flex items-center gap-1.5 text-[11px] text-white/50">
+                  <span className="flex items-center gap-1.5 text-xs text-white/50">
                     <Icon className="h-3.5 w-3.5" /> {k.label}
                   </span>
                   <p className={`numeric mt-1.5 font-display text-xl font-extrabold tabular-nums ${k.accent}`}>
@@ -180,9 +182,9 @@ export default async function ImportPage() {
           return (
             <div
               key={s.title}
-              className="lift rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]"
+              className="lift rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]"
             >
-              <span className="grid h-10 w-10 place-items-center rounded-[12px] bg-brand-600/10 text-brand-600">
+              <span className="grid h-10 w-10 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
                 <Icon className="h-5 w-5" />
               </span>
               <p className="mt-3 font-display text-sm font-bold text-ink-950">{s.title}</p>
@@ -192,16 +194,16 @@ export default async function ImportPage() {
         })}
       </section>
 
-      <ImportWizard />
+      <ImportWizard canImportProperties={canImportProperties} />
 
       {/* Güvence kartları — aktarımın teknik garantileri */}
       <section className="grid gap-3 md:grid-cols-3">
         {guarantees.map((g) => {
           const Icon = g.icon;
           return (
-            <div key={g.title} className="rounded-[16px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+            <div key={g.title} className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
               <div className="flex items-start gap-3">
-                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-[11px] ${g.tone}`}>
+                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] ${g.tone}`}>
                   <Icon className="h-4.5 w-4.5" />
                 </span>
                 <div>

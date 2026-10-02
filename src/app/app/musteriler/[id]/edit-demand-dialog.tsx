@@ -17,7 +17,7 @@ type Province = { id: string; name: string };
 
 const initial: DemandResult = {};
 const fieldClass =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400";
 
 export function EditDemandDialog({
   demand,
@@ -59,7 +59,7 @@ export function EditDemandDialog({
     /* Radix Dialog: focus trap + Esc (öncesinde yoktu) + scroll lock + ARIA. */
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button type="button" className="focus-ring rounded-[6px] text-[11px] font-semibold text-brand-700 hover:underline">
+        <button type="button" className="focus-ring rounded-[6px] text-xs font-semibold text-brand-700 hover:underline">
           <span className="inline-flex items-center gap-0.5"><Pencil className="h-3 w-3" /> Düzenle</span>
         </button>
       </DialogTrigger>
@@ -129,11 +129,11 @@ export function EditDemandDialog({
               ) : null}
               <div className="hairline-t sm:col-span-2 flex justify-end gap-2 pt-4">
                 <DialogClose asChild>
-                  <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
+                  <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
                     Vazgeç
                   </button>
                 </DialogClose>
-                <button type="submit" disabled={pending} className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+                <button type="submit" disabled={pending} className="btn-shine focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
                   {pending ? "Kaydediliyor…" : "Kaydet"}
                 </button>
               </div>

@@ -2,7 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+
+const MANUAL_STATUSES = [
+  "draft", "pending_docs", "pending_auth", "photo_needed", "ready", "active",
+  "live", "passive", "reserved", "deposit", "in_progress", "withdrawn",
+  "auth_expired", "archived",
+] as const;
 
 export type PropertyActionResult = { ok?: boolean; error?: string };
 
@@ -17,40 +24,25 @@ export async function changePropertyStatus(
 ): Promise<PropertyActionResult> {
   const gate = await requirePermission("properties", "edit");
   if (!gate.ok) return { error: gate.error };
+  if (!(MANUAL_STATUSES as readonly string[]).includes(newStatus)) {
+    return { error: "Satıldı/kiralandı durumları yalnız anlaşma ve kiralama akışından seçilebilir." };
+  }
 
-  const supabase = await createClient();
-
-  // Mevcut durumu al
-  const { data: prop } = await supabase
-    .from("properties")
-    .select("status, published_at")
-    .eq("id", propertyId)
-    .eq("tenant_id", gate.tenantId)
-    .maybeSingle();
-
-  if (!prop) return { error: "Portföy bulunamadı." };
-
-  // Durumu güncelle — İLK live geçişinde published_at damgalanır; zaten
-  // doluysa DOKUNMA (yeniden yayına almada orijinal yayın tarihi korunur).
-  const patch: Record<string, unknown> = { status: newStatus, updated_at: new Date().toISOString() };
-  if (newStatus === "live" && prop.published_at == null) patch.published_at = new Date().toISOString();
-  const { error } = await supabase
-    .from("properties")
-    .update(patch)
-    .eq("id", propertyId)
-    .eq("tenant_id", gate.tenantId);
-
-  if (error) return { error: "Durum güncellenemedi." };
-
-  // Geçmiş kaydı yaz
-  await supabase.from("property_status_history").insert({
-    property_id: propertyId,
-    tenant_id:   gate.tenantId,
-    old_status:  prop.status ?? null,
-    new_status:  newStatus,
-    reason:      reason?.trim() || null,
-    changed_by:  gate.userId,
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("transition_property_status_atomic", {
+    p_tenant_id: gate.tenantId,
+    p_actor_id: gate.userId,
+    p_property_ids: [propertyId],
+    p_status: newStatus,
+    p_reason: reason?.trim() || null,
   });
+  if (error) return { error: "Durum güncellenemedi." };
+  const outcome = String((data as { outcome?: string } | null)?.outcome ?? "");
+  if (outcome === "not_found") return { error: "Portföy bulunamadı." };
+  if (outcome === "terminal_requires_workflow") {
+    return { error: "Satılmış veya kiralanmış portföy yalnız ilgili anlaşma/kiralama iş akışından yeniden açılabilir." };
+  }
+  if (outcome !== "applied" && outcome !== "replay") return { error: "Durum güncellenemedi." };
 
   revalidatePath(`/app/portfoyler/${propertyId}`);
   revalidatePath("/app/portfoyler");

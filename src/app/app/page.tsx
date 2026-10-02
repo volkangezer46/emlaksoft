@@ -42,6 +42,7 @@ import { TvAutoRefresh, TvClock } from "./tv-mode";
 import { ProductTour } from "./product-tour";
 import { DashboardWidgetProvider, Widget, WidgetEditToggle } from "./dashboard-widgets";
 import { AnnouncementsBanner } from "@/components/app/announcements-banner";
+import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 
 type Kpi = {
   label: string;
@@ -55,6 +56,42 @@ type Kpi = {
 };
 
 type TrendInfo = { label: string; dir: "up" | "down" | "flat" | "new"; good?: boolean };
+
+const DASHBOARD_QUERY_LABELS = [
+  "customer-count",
+  "latest-customers",
+  "property-count",
+  "live-listings",
+  "month-closures",
+  "recent-closures",
+  "commissions",
+  "calls-today",
+  "call-trend",
+  "demands",
+  "deals",
+  "profiles",
+  "customer-trend",
+  "expiring-authority",
+  "recent-customers",
+  "recent-calls",
+  "recent-appointments",
+  "recent-properties",
+  "today-appointments",
+  "customers-this-month",
+  "customers-previous-month",
+  "calls-yesterday",
+  "previous-month-closures",
+  "tasks-due-today",
+  "tasks-overdue",
+  "briefing-customers",
+  "lead-signals",
+  "open-tasks",
+  "tenant",
+  "office-target",
+  "active-rentals",
+  "rent-charges",
+  "projects",
+] as const;
 
 /**
  * Dönem karşılaştırma rozeti — "%+12" / "%-8" / "%0"; önceki dönem 0 ise
@@ -179,7 +216,7 @@ async function BriefingAiLine({ items }: { items: BriefingItem[] }) {
   const summary = await generateBriefingSummary(items);
   if (!summary) return null;
   return (
-    <p className="mt-3 flex items-start gap-2 rounded-[10px] bg-brand-600/[0.06] px-3 py-2 text-xs font-medium text-brand-600">
+    <p className="mt-3 flex items-start gap-2 rounded-[var(--radius-control)] bg-brand-600/[0.06] px-3 py-2 text-xs font-medium text-brand-600">
       <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
       <span>{summary}</span>
     </p>
@@ -232,41 +269,7 @@ export default async function AppHomePage({
 
   const last24h = daysAgoIso(1);
 
-  const [
-    { count },
-    { data: latest },
-    { count: propertyCount },
-    { data: liveListings },
-    { data: monthClosures },
-    { data: recentClosures },
-    { data: commissions },
-    { count: callsToday },
-    { data: callDates },
-    { data: demandRows },
-    { data: dealRows },
-    { data: profiles },
-    { data: customerDates },
-    { data: expiringAuthority },
-    { data: recentCustomers24h },
-    { data: recentCalls24h },
-    { data: recentAppts24h },
-    { data: recentProperties24h },
-    { data: todayAppts, count: todayApptsTotal },
-    { count: customersThisMonth },
-    { count: customersPrevMonth },
-    { count: callsYesterday },
-    { data: prevMonthClosures },
-    { count: tasksDueToday },
-    { count: tasksOverdue },
-    { data: briefCustomers },
-    { data: leadSignals },
-    { data: openTasks },
-    { data: tenantRow },
-    { data: officeTarget },
-    { count: activeRentals },
-    { data: rentCharges },
-    { data: projectRows },
-  ] = await Promise.all([
+  const dashboardResults = await Promise.all([
     supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
     supabase
       .from("customers")
@@ -411,6 +414,44 @@ export default async function AppHomePage({
       ? supabase.from("projects").select("id, status, units:project_units(status)").limit(200)
       : Promise.resolve({ data: null }),
   ]);
+
+  assertQueryBatchSucceeded(dashboardResults, DASHBOARD_QUERY_LABELS, "Ana panel");
+
+  const [
+    { count },
+    { data: latest },
+    { count: propertyCount },
+    { data: liveListings },
+    { data: monthClosures },
+    { data: recentClosures },
+    { data: commissions },
+    { count: callsToday },
+    { data: callDates },
+    { data: demandRows },
+    { data: dealRows },
+    { data: profiles },
+    { data: customerDates },
+    { data: expiringAuthority },
+    { data: recentCustomers24h },
+    { data: recentCalls24h },
+    { data: recentAppts24h },
+    { data: recentProperties24h },
+    { data: todayAppts, count: todayApptsTotal },
+    { count: customersThisMonth },
+    { count: customersPrevMonth },
+    { count: callsYesterday },
+    { data: prevMonthClosures },
+    { count: tasksDueToday },
+    { count: tasksOverdue },
+    { data: briefCustomers },
+    { data: leadSignals },
+    { data: openTasks },
+    { data: tenantRow },
+    { data: officeTarget },
+    { count: activeRentals },
+    { data: rentCharges },
+    { data: projectRows },
+  ] = dashboardResults;
 
   const customerCount = count ?? 0;
   const overdueListings = (liveListings ?? []).filter((r) => daysSince(r.last_confirmed_at) >= 7);
@@ -801,7 +842,7 @@ export default async function AppHomePage({
       {tvMode && (
         <>
           <TvAutoRefresh intervalMs={60_000} />
-          <div className="theme-dark flex flex-wrap items-center justify-between gap-3 rounded-[16px] bg-[image:var(--grad-ink)] px-5 py-3.5">
+          <div className="theme-dark flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] px-5 py-3.5">
             <div className="flex items-center gap-3">
               <span className="status-pulse h-2.5 w-2.5 rounded-full bg-mint-400" />
               <p className="font-display text-lg font-bold text-white">{officeName}</p>
@@ -813,7 +854,7 @@ export default async function AppHomePage({
               <TvClock />
               <Link
                 href="/app"
-                className="focus-ring press rounded-[9px] border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
+                className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
               >
                 Çık
               </Link>
@@ -824,7 +865,7 @@ export default async function AppHomePage({
 
       {/* Örnek veri yüklüyken ince amber bilgi şeridi — temizleme kalıcıdır, onaylı */}
       {!tvMode && sampleSeededAt && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-amber-400/40 bg-amber-400/[0.08] px-4 py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/[0.08] px-4 py-2.5">
           <p className="flex items-center gap-2 text-xs font-semibold text-amber-700">
             <Sparkles className="h-3.5 w-3.5 shrink-0" />
             Örnek verilerle geziyorsunuz — hazır olduğunuzda temizleyip kendi kayıtlarınızı ekleyin.
@@ -833,7 +874,7 @@ export default async function AppHomePage({
             trigger={
               <button
                 type="button"
-                className="focus-ring press shrink-0 rounded-[8px] border border-amber-400/50 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-700 transition hover:bg-amber-400/20"
+                className="focus-ring press shrink-0 rounded-[var(--radius-control)] border border-amber-400/50 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-700 transition hover:bg-amber-400/20"
               >
                 Temizle
               </button>
@@ -848,8 +889,8 @@ export default async function AppHomePage({
 
       {/* Yetki belgesi uyarı kartı — sadece yaklaşan kayıt varsa görünür */}
       {expiringList.length > 0 && (
-        <div className="flex flex-wrap items-start gap-3 rounded-[16px] border border-amber-400/40 bg-amber-400/[0.06] p-4">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-amber-400/20 text-amber-600">
+        <div className="flex flex-wrap items-start gap-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/[0.06] p-4">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-amber-400/20 text-amber-600">
             <AlertTriangle className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
@@ -882,7 +923,7 @@ export default async function AppHomePage({
           </div>
           <Link
             href="/app/portfoyler"
-            className="shrink-0 rounded-[9px] border border-amber-400/50 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-400/20"
+            className="shrink-0 rounded-[var(--radius-control)] border border-amber-400/50 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-400/20"
           >
             Portföylere git
           </Link>
@@ -891,7 +932,7 @@ export default async function AppHomePage({
 
       {/* Günaydın brifingi — kural tabanlı günün özeti; madde yoksa gizli */}
       {briefingItems.length > 0 && (
-        <section data-tour="brifing" className="surface-card rounded-[18px] p-5">
+        <section data-tour="brifing" className="surface-card rounded-[var(--radius-panel)] p-5">
           <div className="flex items-center justify-between">
             <h2 className="font-display font-bold text-ink-950">
               {fullName ? `Günaydın, ${firstName}` : "Günaydın"} — bugünün özeti
@@ -907,9 +948,9 @@ export default async function AppHomePage({
               <li key={item.href} className="min-w-0">
                 <Link
                   href={item.href}
-                  className="focus-ring group flex items-center gap-3 rounded-[12px] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
+                  className="focus-ring group flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
                 >
-                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[9px] text-base ${toneBg[item.tone]}`}>
+                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-base ${toneBg[item.tone]}`}>
                     {item.icon}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink-950">{item.text}</span>
@@ -930,8 +971,8 @@ export default async function AppHomePage({
       {/* Hero — katmanlı derinlik: aurora + noise + grid + gradient hairline çerçeve.
           data-tour="brifing" burada yedek hedef: brifing kartı koşullu render edilir,
           yoksa tur ilk adımda hero'yu spotlar (querySelector ilk görüneni alır). */}
-      <div data-tour="brifing" className="premium-ring rounded-[26px]">
-        <div className="theme-dark relative overflow-hidden rounded-[26px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <div data-tour="brifing" className="premium-ring rounded-[var(--radius-hero)]">
+        <div className="theme-dark relative overflow-hidden rounded-[var(--radius-hero)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
           <div className="hero-aurora" style={{ inset: "-45% -10%", height: "220%", opacity: 0.4 }} />
           <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-40" />
           <div className="noise pointer-events-none absolute inset-0 opacity-[0.05] mix-blend-overlay" />
@@ -948,16 +989,16 @@ export default async function AppHomePage({
             <div className="flex flex-wrap items-center gap-3">
               <Link
                 href="/app/raporlar"
-                className="focus-ring press block rounded-[14px] border border-white/10 bg-white/5 px-4 py-2.5 text-center backdrop-blur transition hover:border-white/25 hover:bg-white/10"
+                className="focus-ring press block rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-2.5 text-center backdrop-blur transition hover:border-white/25 hover:bg-white/10"
               >
                 <p className="font-display text-2xl font-extrabold text-mint-400">{officeScore.score}</p>
-                <p className="text-[11px] text-white/60">Ofis skoru · {officeScore.label}</p>
+                <p className="text-xs text-white/60">Ofis skoru · {officeScore.label}</p>
               </Link>
               {!tvMode && (
                 <>
                   <Link
                     href="/app/musteriler"
-                    className="btn-shine inline-flex items-center gap-2 rounded-[10px] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
+                    className="btn-shine inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
                   >
                     <Plus className="h-4 w-4" /> Müşteri
                   </Link>
@@ -967,7 +1008,7 @@ export default async function AppHomePage({
                       href="/app?tv=1"
                       title="TV modu — büyük ekran görünümü"
                       aria-label="TV modunu aç"
-                      className="focus-ring press grid h-9 w-9 place-items-center rounded-[10px] border border-white/15 bg-white/5 text-white/75 transition hover:bg-white/10 hover:text-white"
+                      className="focus-ring press grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-white/15 bg-white/5 text-white/75 transition hover:bg-white/10 hover:text-white"
                     >
                       <Tv className="h-4 w-4" />
                     </Link>
@@ -983,7 +1024,7 @@ export default async function AppHomePage({
       {showTargetCard && (
         <Link
           href="/app/hedefler"
-          className="surface-card focus-ring group block rounded-[18px] p-5 transition hover:border-brand-300"
+          className="surface-card focus-ring group block rounded-[var(--radius-panel)] p-5 transition hover:border-brand-300"
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
@@ -1058,10 +1099,10 @@ export default async function AppHomePage({
           <Link
             key={kpi.label}
             href={kpi.href}
-            className={`focus-ring press tilt-card kpi-glow kpi-glow-${kpi.tone ?? "brand"} group block rounded-[18px] border border-line bg-surface p-5 hover:border-brand-300`}
+            className={`focus-ring press tilt-card kpi-glow kpi-glow-${kpi.tone ?? "brand"} group block rounded-[var(--radius-panel)] border border-line bg-surface p-5 hover:border-brand-300`}
           >
             <div className="flex items-start justify-between">
-              <span className={`kpi-chip-shine grid h-10 w-10 place-items-center rounded-[12px] ${toneBg[kpi.tone ?? "brand"]}`}>
+              <span className={`kpi-chip-shine grid h-10 w-10 place-items-center rounded-[var(--radius-card)] ${toneBg[kpi.tone ?? "brand"]}`}>
                 <kpi.icon className="h-5 w-5" />
               </span>
               <span className="flex items-center gap-2">
@@ -1116,7 +1157,7 @@ export default async function AppHomePage({
       {(showRentalCard || showProjectCard) && (
         <div className="grid gap-4 sm:grid-cols-2">
           {showRentalCard && (
-            <section className="surface-card rounded-[18px] p-5">
+            <section className="surface-card rounded-[var(--radius-panel)] p-5">
               <div className="flex items-center justify-between">
                 <p className="flex items-center gap-2 text-xs font-semibold text-cyan-600">
                   <KeyRound className="h-4 w-4" /> Kiralama
@@ -1128,25 +1169,25 @@ export default async function AppHomePage({
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <Link
                   href="/app/kiralama"
-                  className="focus-ring group block rounded-[12px] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
+                  className="focus-ring group block rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
                 >
                   <p className="font-display text-xl font-extrabold tabular-nums text-ink-950">
                     {activeRentalCount}
                   </p>
-                  <p className="text-[11px] text-text-muted">Aktif sözleşme</p>
+                  <p className="text-xs text-text-muted">Aktif sözleşme</p>
                 </Link>
                 <Link
                   href="/app/kiralama?durum=pending"
-                  className="focus-ring group block rounded-[12px] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
+                  className="focus-ring group block rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
                 >
                   <p className="font-display text-xl font-extrabold tabular-nums text-ink-950">
                     {moneyTry(rentPendingThisMonth)}
                   </p>
-                  <p className="text-[11px] text-text-muted">Bu ay tahsil edilecek</p>
+                  <p className="text-xs text-text-muted">Bu ay tahsil edilecek</p>
                 </Link>
                 <Link
                   href="/app/kiralama?durum=overdue"
-                  className={`focus-ring group block rounded-[12px] border px-3 py-2.5 transition hover:border-brand-300 ${
+                  className={`focus-ring group block rounded-[var(--radius-card)] border px-3 py-2.5 transition hover:border-brand-300 ${
                     rentOverdueRows.length > 0
                       ? "border-danger-500/30 bg-danger-500/5"
                       : "border-line bg-canvas hover:bg-surface"
@@ -1159,7 +1200,7 @@ export default async function AppHomePage({
                   >
                     {moneyTry(rentOverdueSum)}
                   </p>
-                  <p className="text-[11px] text-text-muted">
+                  <p className="text-xs text-text-muted">
                     Gecikmiş{rentOverdueRows.length > 0 ? ` · ${rentOverdueRows.length} tahakkuk` : ""}
                   </p>
                 </Link>
@@ -1168,7 +1209,7 @@ export default async function AppHomePage({
           )}
 
           {showProjectCard && (
-            <section className="surface-card rounded-[18px] p-5">
+            <section className="surface-card rounded-[var(--radius-panel)] p-5">
               <div className="flex items-center justify-between">
                 <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
                   <Layers className="h-4 w-4" /> Projeler
@@ -1180,30 +1221,30 @@ export default async function AppHomePage({
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <Link
                   href="/app/projeler?durum=aktif"
-                  className="focus-ring group block rounded-[12px] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
+                  className="focus-ring group block rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
                 >
                   <p className="font-display text-xl font-extrabold tabular-nums text-ink-950">
                     {activeProjectCount}
                   </p>
-                  <p className="text-[11px] text-text-muted">Aktif proje</p>
+                  <p className="text-xs text-text-muted">Aktif proje</p>
                 </Link>
                 <Link
                   href="/app/projeler?durum=aktif"
-                  className="focus-ring group block rounded-[12px] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
+                  className="focus-ring group block rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
                 >
                   <p className="font-display text-xl font-extrabold tabular-nums text-mint-600">
                     {soldUnitCount}
                   </p>
-                  <p className="text-[11px] text-text-muted">Satılan birim</p>
+                  <p className="text-xs text-text-muted">Satılan birim</p>
                 </Link>
                 <Link
                   href="/app/projeler?durum=selling"
-                  className="focus-ring group block rounded-[12px] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
+                  className="focus-ring group block rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
                 >
                   <p className="font-display text-xl font-extrabold tabular-nums text-ink-950">
                     {remainingUnitCount}
                   </p>
-                  <p className="text-[11px] text-text-muted">Kalan birim</p>
+                  <p className="text-xs text-text-muted">Kalan birim</p>
                 </Link>
               </div>
             </section>
@@ -1213,7 +1254,7 @@ export default async function AppHomePage({
 
       <div className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
         <Widget id="komisyon" className="h-full">
-        <section className="dashboard-panel surface-card relative h-full overflow-hidden rounded-[20px] p-5 md:p-6">
+        <section className="dashboard-panel surface-card relative h-full overflow-hidden rounded-[var(--radius-panel)] p-5 md:p-6">
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
@@ -1225,18 +1266,18 @@ export default async function AppHomePage({
             <div className="flex gap-2">
               <Link
                 href="/app/komisyon?durum=tahsil"
-                className="focus-ring press block rounded-[11px] bg-mint-500/10 px-3 py-2 text-right transition hover:bg-mint-500/20"
+                className="focus-ring press block rounded-[var(--radius-control)] bg-mint-500/10 px-3 py-2 text-right transition hover:bg-mint-500/20"
               >
-                <p className="text-[11px] font-semibold text-mint-600">TAHSİL</p>
+                <p className="text-xs font-semibold text-mint-600">TAHSİL</p>
                 <p className="font-display text-lg font-extrabold text-ink-950">
                   <OdometerNumber value={moneyTry(paidCommission)} />
                 </p>
               </Link>
               <Link
                 href="/app/komisyon?durum=bekleyen"
-                className="focus-ring press block rounded-[11px] bg-amber-400/12 px-3 py-2 text-right transition hover:bg-amber-400/25"
+                className="focus-ring press block rounded-[var(--radius-control)] bg-amber-400/12 px-3 py-2 text-right transition hover:bg-amber-400/25"
               >
-                <p className="text-[11px] font-semibold text-amber-500">BEKLEYEN</p>
+                <p className="text-xs font-semibold text-amber-500">BEKLEYEN</p>
                 <p className="font-display text-lg font-extrabold text-ink-950">
                   <OdometerNumber value={moneyTry(pendingCommission)} />
                 </p>
@@ -1245,7 +1286,7 @@ export default async function AppHomePage({
           </div>
           <div className="relative mt-5">
             {monthTotals.every((v) => v === 0) ? (
-              <div className="grid h-56 place-items-center rounded-[14px] border border-dashed border-line-strong text-sm text-text-muted">
+              <div className="grid h-56 place-items-center rounded-[var(--radius-card)] border border-dashed border-line-strong text-sm text-text-muted">
                 Henüz komisyon serisi yok — ilk anlaşma kapanınca grafik dolacak.
               </div>
             ) : (
@@ -1275,7 +1316,7 @@ export default async function AppHomePage({
                     </>
                   )}
                 </svg>
-                <div className="grid grid-cols-6 text-center text-[11px] text-text-faint">
+                <div className="grid grid-cols-6 text-center text-xs text-text-faint">
                   {monthLabels.map((m) => (
                     <span key={m}>{m}</span>
                   ))}
@@ -1287,7 +1328,7 @@ export default async function AppHomePage({
         </Widget>
 
         <Widget id="huni" className="h-full">
-        <section className="dashboard-panel surface-card h-full rounded-[20px] p-5 md:p-6">
+        <section className="dashboard-panel surface-card h-full rounded-[var(--radius-panel)] p-5 md:p-6">
           <div className="flex items-start justify-between">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
@@ -1304,7 +1345,7 @@ export default async function AppHomePage({
               <Link
                 key={stage.label}
                 href={stage.href}
-                className="focus-ring group -mx-1 block rounded-[10px] px-1 py-0.5 transition hover:bg-brand-600/[0.04]"
+                className="focus-ring group -mx-1 block rounded-[var(--radius-control)] px-1 py-0.5 transition hover:bg-brand-600/[0.04]"
               >
                 <div className="mb-1.5 flex items-center justify-between text-xs">
                   <span className="font-medium text-text-muted transition group-hover:text-brand-600">{stage.label}</span>
@@ -1323,12 +1364,12 @@ export default async function AppHomePage({
             ))}
           </div>
           <div className="mt-6 grid grid-cols-2 gap-3 border-t border-line pt-4">
-            <Link href="/app/anlasmalar" className="focus-ring group block rounded-[10px] p-1 -m-1 transition hover:bg-brand-600/[0.04]">
-              <p className="text-[11px] text-text-faint transition group-hover:text-brand-600">Kazanma oranı</p>
+            <Link href="/app/anlasmalar" className="focus-ring group block rounded-[var(--radius-control)] p-1 -m-1 transition hover:bg-brand-600/[0.04]">
+              <p className="text-xs text-text-faint transition group-hover:text-brand-600">Kazanma oranı</p>
               <p className="font-display text-xl font-extrabold text-ink-950">%{conversion}</p>
             </Link>
-            <Link href="/app/anlasmalar" className="focus-ring group block rounded-[10px] p-1 -m-1 transition hover:bg-brand-600/[0.04]">
-              <p className="text-[11px] text-text-faint transition group-hover:text-brand-600">Açık anlaşma</p>
+            <Link href="/app/anlasmalar" className="focus-ring group block rounded-[var(--radius-control)] p-1 -m-1 transition hover:bg-brand-600/[0.04]">
+              <p className="text-xs text-text-faint transition group-hover:text-brand-600">Açık anlaşma</p>
               <p className="font-display text-xl font-extrabold text-ink-950">{openDeals}</p>
             </Link>
           </div>
@@ -1340,7 +1381,7 @@ export default async function AppHomePage({
         {/* Görevler + randevular aynı grid hücresinde — 4 kolonlu düzen bozulmaz */}
         <div className="space-y-4">
           <Widget id="gorevler">
-          <section data-tour="aksiyonlar" className="surface-card rounded-[18px] p-5">
+          <section data-tour="aksiyonlar" className="surface-card rounded-[var(--radius-panel)] p-5">
             <div className="flex items-center justify-between">
               <h2 className="font-display font-bold text-ink-950">Bugünkü görevler</h2>
               <span className="flex items-center gap-2">
@@ -1357,10 +1398,10 @@ export default async function AppHomePage({
               {dueTasks.map((task) => (
                 <li key={task.id}>
                   <TaskQuickRow id={task.id} showAction={!tvMode}>
-                    <div className="relative flex items-start gap-3 rounded-[12px] border border-line bg-canvas px-3 py-2.5 transition group-hover/task:border-brand-300 group-hover/task:bg-surface">
+                    <div className="relative flex items-start gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition group-hover/task:border-brand-300 group-hover/task:bg-surface">
                       <Link
                         href="/app/gorevler"
-                        className="focus-ring absolute inset-0 rounded-[12px]"
+                        className="focus-ring absolute inset-0 rounded-[var(--radius-card)]"
                         aria-label={task.title}
                       />
                       <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${task.urgent ? "bg-danger-500" : "bg-brand-600"}`} />
@@ -1378,7 +1419,7 @@ export default async function AppHomePage({
                 <li key={task.t}>
                   <Link
                     href={task.href}
-                    className="focus-ring group flex items-start gap-3 rounded-[12px] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
+                    className="focus-ring group flex items-start gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
                   >
                     <span
                       className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
@@ -1398,7 +1439,7 @@ export default async function AppHomePage({
           </Widget>
 
           <Widget id="randevular">
-          <section className="surface-card rounded-[18px] p-5">
+          <section className="surface-card rounded-[var(--radius-panel)] p-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CalendarDays className="h-4 w-4 text-amber-500" />
@@ -1409,20 +1450,20 @@ export default async function AppHomePage({
               </Link>
             </div>
             {todayAppointments.length === 0 ? (
-              <p className="mt-4 rounded-[12px] border border-dashed border-line-strong px-3 py-6 text-center text-sm text-text-muted">
+              <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-3 py-6 text-center text-sm text-text-muted">
                 Bugün planlı randevu yok.
               </p>
             ) : (
               <ul className="mt-4 space-y-2.5">
                 {todayAppointments.map((appt) => (
                   <li key={appt.id} className="group relative">
-                    <div className="flex items-center gap-3 rounded-[12px] border border-line bg-canvas px-3 py-2.5 transition group-hover:border-brand-300 group-hover:bg-surface">
+                    <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition group-hover:border-brand-300 group-hover:bg-surface">
                       <Link
                         href="/app/randevular"
-                        className="focus-ring absolute inset-0 z-0 rounded-[12px]"
+                        className="focus-ring absolute inset-0 z-0 rounded-[var(--radius-card)]"
                         aria-label={`${appt.time} — ${appt.type}`}
                       />
-                      <span className="shrink-0 rounded-[8px] bg-amber-400/15 px-2 py-1 text-xs font-bold tabular-nums text-amber-600">
+                      <span className="shrink-0 rounded-[var(--radius-control)] bg-amber-400/15 px-2 py-1 text-xs font-bold tabular-nums text-amber-600">
                         {appt.time}
                       </span>
                       <span className="min-w-0 flex-1">
@@ -1438,7 +1479,7 @@ export default async function AppHomePage({
                               href={`tel:${appt.customerPhone}`}
                               title="Müşteriyi ara"
                               aria-label="Müşteriyi ara"
-                              className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] border border-line bg-surface text-mint-600 transition hover:border-mint-500/50 hover:bg-mint-500/10"
+                              className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-mint-600 transition hover:border-mint-500/50 hover:bg-mint-500/10"
                             >
                               <Phone className="h-3.5 w-3.5" />
                             </a>
@@ -1456,7 +1497,7 @@ export default async function AppHomePage({
         </div>
 
         <Widget id="kayip">
-        <section className="surface-card h-full rounded-[18px] p-5">
+        <section className="surface-card h-full rounded-[var(--radius-panel)] p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Radar className="h-4 w-4 text-danger-500" />
@@ -1470,18 +1511,18 @@ export default async function AppHomePage({
             {overdueListings.length > 0 ? (
               <Link
                 href="/app/portallar?durum=teyit"
-                className="focus-ring group block rounded-[12px] border border-warn-500/30 bg-warn-500/5 px-3 py-3 transition hover:border-warn-500/50 hover:bg-warn-500/10"
+                className="focus-ring group block rounded-[var(--radius-card)] border border-warn-500/30 bg-warn-500/5 px-3 py-3 transition hover:border-warn-500/50 hover:bg-warn-500/10"
               >
                 <p className="flex items-center justify-between gap-2 font-semibold text-ink-950">
                   {overdueListings.length} ilanda 7+ gün teyit yok
-                  <span className="hover-action shrink-0 text-[11px] font-bold text-brand-600 opacity-0 transition group-hover:opacity-100">
+                  <span className="hover-action shrink-0 text-xs font-bold text-brand-600 opacity-0 transition group-hover:opacity-100">
                     İncele →
                   </span>
                 </p>
                 <p className="mt-1 text-text-muted">Portal Kontrol’den teyit edin</p>
               </Link>
             ) : (
-              <div className="flex items-center gap-2 rounded-[12px] border border-mint-500/30 bg-mint-500/5 px-3 py-3">
+              <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/5 px-3 py-3">
                 <Bell className="h-4 w-4 text-mint-600" />
                 <p className="font-semibold text-mint-600">Teyit kuyruğu temiz</p>
               </div>
@@ -1495,11 +1536,11 @@ export default async function AppHomePage({
                   <Link
                     key={c.id}
                     href={`/app/kayip-kacak?neden=${encodeURIComponent(c.reason ?? "")}`}
-                    className="focus-ring group block rounded-[12px] border border-danger-500/30 bg-danger-500/5 px-3 py-3 transition hover:border-danger-500/50 hover:bg-danger-500/10"
+                    className="focus-ring group block rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 px-3 py-3 transition hover:border-danger-500/50 hover:bg-danger-500/10"
                   >
                     <p className="flex items-center justify-between gap-2 font-semibold text-ink-950">
                       {c.reason}
-                      <span className="hover-action shrink-0 text-[11px] font-bold text-brand-600 opacity-0 transition group-hover:opacity-100">
+                      <span className="hover-action shrink-0 text-xs font-bold text-brand-600 opacity-0 transition group-hover:opacity-100">
                         İncele →
                       </span>
                     </p>
@@ -1517,43 +1558,43 @@ export default async function AppHomePage({
 
         {!tvMode && (
           <Widget id="hizli">
-          <section className="surface-card h-full rounded-[18px] p-5">
+          <section className="surface-card h-full rounded-[var(--radius-panel)] p-5">
             <div className="flex items-center justify-between">
               <h2 className="font-display font-bold text-ink-950">Hızlı aksiyonlar</h2>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <Link
                 href="/app/musteriler"
-                className="group flex flex-col items-center gap-2 rounded-[12px] border border-line bg-canvas px-3 py-4 transition hover:border-brand-300 hover:bg-surface"
+                className="group flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-4 transition hover:border-brand-300 hover:bg-surface"
               >
-                <div className="grid h-10 w-10 place-items-center rounded-[10px] bg-brand-600/10 text-brand-600 transition group-hover:bg-brand-600 group-hover:text-white">
+                <div className="grid h-10 w-10 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600 transition group-hover:bg-brand-600 group-hover:text-white">
                   <ICONS.musteri className="h-5 w-5" />
                 </div>
                 <span className="text-xs font-semibold text-ink-950">Müşteri</span>
               </Link>
               <Link
                 href="/app/portfoyler"
-                className="group flex flex-col items-center gap-2 rounded-[12px] border border-line bg-canvas px-3 py-4 transition hover:border-brand-300 hover:bg-surface"
+                className="group flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-4 transition hover:border-brand-300 hover:bg-surface"
               >
-                <div className="grid h-10 w-10 place-items-center rounded-[10px] bg-mint-500/10 text-mint-600 transition group-hover:bg-mint-500 group-hover:text-white">
+                <div className="grid h-10 w-10 place-items-center rounded-[var(--radius-control)] bg-mint-500/10 text-mint-600 transition group-hover:bg-mint-500 group-hover:text-white">
                   <ICONS.portfoy className="h-5 w-5" />
                 </div>
                 <span className="text-xs font-semibold text-ink-950">Portföy</span>
               </Link>
               <Link
                 href="/app/arama"
-                className="group flex flex-col items-center gap-2 rounded-[12px] border border-line bg-canvas px-3 py-4 transition hover:border-brand-300 hover:bg-surface"
+                className="group flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-4 transition hover:border-brand-300 hover:bg-surface"
               >
-                <div className="grid h-10 w-10 place-items-center rounded-[10px] bg-cyan-500/10 text-cyan-600 transition group-hover:bg-cyan-500 group-hover:text-white">
+                <div className="grid h-10 w-10 place-items-center rounded-[var(--radius-control)] bg-cyan-500/10 text-cyan-600 transition group-hover:bg-cyan-500 group-hover:text-white">
                   <PhoneIncoming className="h-5 w-5" />
                 </div>
                 <span className="text-xs font-semibold text-ink-950">Arama</span>
               </Link>
               <Link
                 href="/app/randevular"
-                className="group flex flex-col items-center gap-2 rounded-[12px] border border-line bg-canvas px-3 py-4 transition hover:border-brand-300 hover:bg-surface"
+                className="group flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-4 transition hover:border-brand-300 hover:bg-surface"
               >
-                <div className="grid h-10 w-10 place-items-center rounded-[10px] bg-amber-400/10 text-amber-600 transition group-hover:bg-amber-400 group-hover:text-white">
+                <div className="grid h-10 w-10 place-items-center rounded-[var(--radius-control)] bg-amber-400/10 text-amber-600 transition group-hover:bg-amber-400 group-hover:text-white">
                   <Bell className="h-5 w-5" />
                 </div>
                 <span className="text-xs font-semibold text-ink-950">Randevu</span>
@@ -1564,7 +1605,7 @@ export default async function AppHomePage({
         )}
 
         <Widget id="musteriler">
-        <section className="surface-card h-full rounded-[18px] p-5">
+        <section className="surface-card h-full rounded-[var(--radius-panel)] p-5">
           <div className="flex items-center justify-between">
             <h2 className="font-display font-bold text-ink-950">Son müşteriler</h2>
             <Link href="/app/musteriler" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600">
@@ -1577,7 +1618,7 @@ export default async function AppHomePage({
                 <li key={c.id}>
                   <Link
                     href={`/app/musteriler/${c.id}`}
-                    className="group flex items-center gap-3 rounded-[12px] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
+                    className="group flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
                   >
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ink-800 text-xs font-bold text-white">
                       {initials(c.full_name)}
@@ -1594,7 +1635,7 @@ export default async function AppHomePage({
               ))}
             </ul>
           ) : (
-            <div className="mt-4 rounded-[12px] border border-dashed border-line-strong px-3 py-8 text-center">
+            <div className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-3 py-8 text-center">
               <p className="text-sm text-text-muted">Henüz müşteri yok</p>
               <Link href="/app/musteriler" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-brand-600">
                 <Plus className="h-4 w-4" /> İlk müşteriyi ekle
@@ -1607,7 +1648,7 @@ export default async function AppHomePage({
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_1fr_1fr]">
         <Widget id="portal" className="h-full">
-        <section className="dashboard-panel surface-card h-full rounded-[20px] p-5">
+        <section className="dashboard-panel surface-card h-full rounded-[var(--radius-panel)] p-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
@@ -1615,13 +1656,13 @@ export default async function AppHomePage({
               </p>
               <h2 className="mt-1 font-display font-bold text-ink-950">Portal sağlığı</h2>
             </div>
-            <Link href="/app/portallar" className="focus-ring rounded-[8px] font-display text-2xl font-extrabold text-mint-600 transition hover:text-mint-500">
+            <Link href="/app/portallar" className="focus-ring rounded-[var(--radius-control)] font-display text-2xl font-extrabold text-mint-600 transition hover:text-mint-500">
               %{portalHealthPct}
             </Link>
           </div>
           <div className="mt-5 space-y-3">
             {portalHealthRows.length === 0 ? (
-              <p className="rounded-[12px] border border-dashed border-line-strong px-3 py-8 text-center text-sm text-text-muted">
+              <p className="rounded-[var(--radius-card)] border border-dashed border-line-strong px-3 py-8 text-center text-sm text-text-muted">
                 Canlı portal kaydı yok.
               </p>
             ) : (
@@ -1629,7 +1670,7 @@ export default async function AppHomePage({
                 <Link
                   key={portal.name}
                   href={`/app/portallar?portal=${encodeURIComponent(portal.name)}`}
-                  className="focus-ring group block rounded-[11px] border border-line bg-canvas/60 px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
+                  className="focus-ring group block rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface"
                 >
                   <div className="flex items-center justify-between text-xs">
                     <span className="flex items-center gap-2 font-semibold text-ink-950">
@@ -1655,7 +1696,7 @@ export default async function AppHomePage({
         </Widget>
 
         <Widget id="ekip" className="h-full">
-        <section className="dashboard-panel surface-card h-full rounded-[20px] p-5">
+        <section className="dashboard-panel surface-card h-full rounded-[var(--radius-panel)] p-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold text-amber-500">
@@ -1663,45 +1704,45 @@ export default async function AppHomePage({
               </p>
               <h2 className="mt-1 font-display font-bold text-ink-950">Anlaşma değeri liderliği</h2>
             </div>
-            <Link href="/app/ekip" className="text-[11px] font-semibold text-brand-600">
+            <Link href="/app/ekip" className="text-xs font-semibold text-brand-600">
               Ekip
             </Link>
           </div>
           <div className="mt-5 space-y-3">
             {team.length === 0 ? (
-              <p className="rounded-[12px] border border-dashed border-line-strong px-3 py-8 text-center text-sm text-text-muted">
+              <p className="rounded-[var(--radius-card)] border border-dashed border-line-strong px-3 py-8 text-center text-sm text-text-muted">
                 Atanmış anlaşma yok — satış hattından anlaşma ekleyin.
               </p>
             ) : (
               team.map((member, index) => (
                 <div
                   key={member.id}
-                  className="group relative flex items-center gap-3 rounded-[12px] border border-line bg-canvas/60 p-3 transition hover:border-brand-300 hover:bg-surface"
+                  className="group relative flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3 transition hover:border-brand-300 hover:bg-surface"
                 >
                   <Link
                     href={`/app/ekip/${member.id}`}
-                    className="focus-ring absolute inset-0 z-0 rounded-[12px]"
+                    className="focus-ring absolute inset-0 z-0 rounded-[var(--radius-card)]"
                     aria-label={member.name}
                   />
                   <span
-                    className={`grid h-6 w-6 place-items-center rounded-full text-[11px] font-extrabold ${
+                    className={`grid h-6 w-6 place-items-center rounded-full text-xs font-extrabold ${
                       index === 0 ? "bg-amber-400 text-ink-950" : "bg-ink-950/5 text-text-muted"
                     }`}
                   >
                     {index + 1}
                   </span>
-                  <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-[image:var(--grad-brand)] text-[11px] font-bold text-white">
+                  <span className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] text-xs font-bold text-white">
                     {member.initials}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-semibold text-ink-950">{member.name}</p>
-                    <p className="truncate text-[11px] text-text-faint">{member.role}</p>
+                    <p className="truncate text-xs text-text-faint">{member.role}</p>
                   </div>
                   <p className="hover-action-hide text-xs font-bold text-ink-950 transition group-hover:opacity-0">{moneyTry(member.value)}</p>
                   {!tvMode && (
                     <Link
                       href="/app/danisman-kpi"
-                      className="hover-action focus-ring absolute right-3 z-10 rounded-[8px] bg-brand-600/10 px-2 py-1 text-xs font-bold text-brand-600 opacity-0 transition hover:bg-brand-600/20 group-hover:opacity-100"
+                      className="hover-action focus-ring absolute right-3 z-10 rounded-[var(--radius-control)] bg-brand-600/10 px-2 py-1 text-xs font-bold text-brand-600 opacity-0 transition hover:bg-brand-600/20 group-hover:opacity-100"
                     >
                       KPI →
                     </Link>
@@ -1714,7 +1755,7 @@ export default async function AppHomePage({
         </Widget>
 
         <Widget id="akis" className="h-full">
-        <section className="dashboard-panel surface-card h-full rounded-[20px] p-5">
+        <section className="dashboard-panel surface-card h-full rounded-[var(--radius-panel)] p-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
@@ -1722,7 +1763,7 @@ export default async function AppHomePage({
               </p>
               <h2 className="mt-1 font-display font-bold text-ink-950">Son 24 saat</h2>
             </div>
-            <Link href="/app/denetim" className="text-[11px] font-semibold text-brand-600">
+            <Link href="/app/denetim" className="text-xs font-semibold text-brand-600">
               Denetim
             </Link>
           </div>
@@ -1734,10 +1775,10 @@ export default async function AppHomePage({
                 <div key={item.key} className="group relative flex items-center gap-3">
                   <Link
                     href={item.href}
-                    className="focus-ring absolute inset-0 z-0 rounded-[9px]"
+                    className="focus-ring absolute inset-0 z-0 rounded-[var(--radius-control)]"
                     aria-label={item.text}
                   />
-                  <span className="pointer-events-none z-10 grid h-8 w-8 shrink-0 place-items-center rounded-[9px] border border-line bg-surface text-base transition group-hover:border-brand-300">
+                  <span className="pointer-events-none z-10 grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-base transition group-hover:border-brand-300">
                     {item.icon}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -1772,7 +1813,7 @@ export default async function AppHomePage({
                           <Link
                             key={a.key}
                             href={a.href}
-                            className="focus-ring rounded-[7px] text-[11px] font-bold text-brand-600 hover:underline"
+                            className="focus-ring rounded-[7px] text-xs font-bold text-brand-600 hover:underline"
                           >
                             {a.label}
                           </Link>
@@ -1780,7 +1821,7 @@ export default async function AppHomePage({
                       )}
                     </span>
                   ) : null}
-                  <span className="shrink-0 text-[11px] text-text-faint">
+                  <span className="shrink-0 text-xs text-text-faint">
                     {timeFmt.format(new Date(item.time))}
                   </span>
                 </div>

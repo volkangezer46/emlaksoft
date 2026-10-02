@@ -58,9 +58,9 @@ edilir; yarım iş push edilmez.
       göre sıralıyor (`listMigrations()`), uygulanan sürümleri kendi oluşturduğu
       `public.schema_migrations` tablosunda izliyor, düzenlenmiş dosyalarda
       checksum uyuşmazlığını yakalıyor, `--dry-run`/`--baseline`/`--only`
-      destekliyor. **Yine de:** proje politikası gereği migration'lar tek tek
-      `apply-one.ts` ile uygulanır (bkz. CLAUDE.md) — bu script yalnız
-      toplu/senkronizasyon amaçlı, birincil yol değil.
+      destekliyor. Birincil yol: veritabanı dahil migration doğrulaması, read-only
+      dry-run, restore edilebilir backup/PITR kontrolü ve ardından kontrollü
+      `npm run db:migrate`. Ledger drift varsa uygulama yapılmaz.
 - [~] **F3** Güvenlik açıkları — **BÜYÜK ÖLÇÜDE KAPANDI.** `package.json`'da
       `overrides: { sharp: "^0.35.3", postcss: "^8.5.23" }` eklendi, `npm audit
       --audit-level=high --omit=dev` → **0**. Kalan tek açık (`brace-expansion`
@@ -79,7 +79,10 @@ edilir; yarım iş push edilmez.
 - [x] **F4** `.env.example` zaten güncel — cron route'larının kullandığı tüm
       değişkenler (`CRON_SECRET`, `NODE_ENV`, `NEXT_PUBLIC_APP_URL`) belgeli.
       (Not: dosya adı `.env.local.example` değil `.env.example`.)
-- [ ] **F5** Sır rotasyonu notu: `service_role` + DB şifresi sohbette paylaşıldı
+- [ ] **F5 — YAYIN BLOKERİ:** Public Git geçmişindeki aktif legacy `service_role` için yeni
+      `SUPABASE_SECRET_KEY` üret; yerel/Vercel ortamlarını değiştir, legacy anahtarı ve DB
+      parolasını döndür, eski anahtarın reddedildiğini doğrula; ardından koordineli Git geçmişi
+      temizliği ve taze clone zorunluluğu uygula.
 
 ## 2. Tema ve görsel kalite (T)
 

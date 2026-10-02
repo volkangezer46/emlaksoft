@@ -4,18 +4,11 @@ import { Activity, ArrowLeft, ArrowUpRight, Building2, CalendarClock, Download, 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { stopImpersonation } from "@/app/actions/platform";
-import { PLANS } from "@/lib/billing/plans";
+import { planLabel, PLANS } from "@/lib/billing/plans";
 import { auditActionLabel, relativeTimeTR } from "@/lib/admin-format";
 import { DAY_MS, daysAgoIso, now } from "@/lib/clock";
 import { SubscriptionPanel } from "./subscription-panel";
 import { CORE_MODULES, moduleForAction } from "./module-map";
-
-const planLabel: Record<string, string> = {
-  advisor: "Danışman",
-  office: "Ofis",
-  professional: "Profesyonel",
-  enterprise: "Kurumsal",
-};
 
 const tenantStatusLabel: Record<string, string> = {
   trial: "Deneme",
@@ -184,14 +177,14 @@ export default async function AdminTenantDetailPage({ params }: { params: Promis
         <ArrowLeft className="h-4 w-4" /> Ofis listesi
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-amber-300">Ofis kimliğiyle önizleme</p>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-amber-300">Ofis kimliğiyle önizleme</p>
             <h1 className="mt-2 font-display text-3xl font-extrabold">{tenant.name}</h1>
             <p className="mt-1 text-sm text-white/60">
-              {planLabel[tenant.plan] ?? tenant.plan} · {tenantStatusLabel[tenant.status] ?? tenant.status} · yönetici
+              {planLabel(tenant.plan)} · {tenantStatusLabel[tenant.status] ?? tenant.status} · yönetici
               erişimiyle güvenli okuma
             </p>
           </div>
@@ -203,7 +196,7 @@ export default async function AdminTenantDetailPage({ params }: { params: Promis
               plans={PLANS.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry }))}
             />
             <form action={stopImpersonation}>
-              <button type="submit" className="rounded-[10px] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950">
+              <button type="submit" className="rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950">
                 Önizlemeyi bitir
               </button>
             </form>
@@ -215,18 +208,18 @@ export default async function AdminTenantDetailPage({ params }: { params: Promis
               <Link
                 key={k.label}
                 href={k.href}
-                className="focus-ring press group relative block rounded-[14px] border border-white/10 bg-white/5 p-4 transition hover:border-white/25 hover:bg-white/8"
+                className="focus-ring press group relative block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-4 transition hover:border-white/25 hover:bg-white/8"
               >
                 <ArrowUpRight className="hover-action absolute right-3 top-3 h-4 w-4 text-white/40 opacity-0 transition group-hover:text-amber-300 group-hover:opacity-100" />
                 <k.icon className="h-4 w-4 text-mint-400" />
                 <p className="mt-2 font-display text-xl font-extrabold">{k.value}</p>
-                <p className="text-[11px] text-white/45">{k.label}</p>
+                <p className="text-xs text-white/45">{k.label}</p>
               </Link>
             ) : (
-              <div key={k.label} className="rounded-[14px] border border-white/10 bg-white/5 p-4">
+              <div key={k.label} className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-4">
                 <k.icon className="h-4 w-4 text-mint-400" />
                 <p className="mt-2 font-display text-xl font-extrabold">{k.value}</p>
-                <p className="text-[11px] text-white/45">{k.label}</p>
+                <p className="text-xs text-white/45">{k.label}</p>
               </div>
             ),
           )}
@@ -235,19 +228,19 @@ export default async function AdminTenantDetailPage({ params }: { params: Promis
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         {/* ---- Kullanım analitiği: modül × hafta ısı ızgarası ---- */}
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3.5">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <Activity className="h-4 w-4 text-brand-600" /> Kullanım analitiği · son 30 gün
             </h2>
-            <div className="flex items-center gap-2 text-[11px] font-semibold text-text-muted">
+            <div className="flex items-center gap-2 text-xs font-semibold text-text-muted">
               <span className="rounded-full bg-brand-600/8 px-2.5 py-1 text-brand-600">{totalOps} işlem</span>
               <span className="rounded-full bg-mint-500/10 px-2.5 py-1 text-mint-700">{activeActors} aktif kullanıcı</span>
             </div>
           </div>
           <div className="p-5">
             {usageTruncated ? (
-              <p className="mb-3 rounded-[10px] border border-amber-400/40 bg-amber-400/8 px-3 py-2 text-[11px] font-semibold text-amber-700">
+              <p className="mb-3 rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/8 px-3 py-2 text-xs font-semibold text-amber-700">
                 Son 30 günde {USAGE_LIMIT}+ kayıt var; analiz ilk {USAGE_LIMIT} kayıtla sınırlı — yoğunluklar alt sınırdır.
               </p>
             ) : null}
@@ -256,7 +249,7 @@ export default async function AdminTenantDetailPage({ params }: { params: Promis
             ) : (
               <div className="overflow-x-auto">
                 <div className="min-w-[440px]">
-                  <div className="grid grid-cols-[minmax(96px,1.2fr)_repeat(4,minmax(56px,1fr))_52px] items-center gap-1.5 pb-1.5 text-[10px] font-bold uppercase tracking-wide text-text-faint">
+                  <div className="grid grid-cols-[minmax(96px,1.2fr)_repeat(4,minmax(56px,1fr))_52px] items-center gap-1.5 pb-1.5 text-xs font-bold uppercase tracking-wide text-text-faint">
                     <span>Modül</span>
                     {weekLabels.map((w) => (
                       <span key={w} className="text-center">{w}</span>
@@ -289,10 +282,10 @@ export default async function AdminTenantDetailPage({ params }: { params: Promis
             )}
             {unusedModules.length > 0 ? (
               <div className="mt-4 border-t border-line pt-3">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-text-faint">Hiç kullanılmayan modüller</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-text-faint">Hiç kullanılmayan modüller</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {unusedModules.map((m) => (
-                    <span key={m} className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2.5 py-1 text-[11px] font-bold text-amber-700">
+                    <span key={m} className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2.5 py-1 text-xs font-bold text-amber-700">
                       {m}
                     </span>
                   ))}
@@ -303,7 +296,7 @@ export default async function AdminTenantDetailPage({ params }: { params: Promis
         </section>
 
         {/* ---- Hesap zaman çizelgesi ---- */}
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface">
           <div className="border-b border-line px-5 py-3.5">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <CalendarClock className="h-4 w-4 text-brand-600" /> Hesap geçmişi
@@ -314,16 +307,16 @@ export default async function AdminTenantDetailPage({ params }: { params: Promis
               {timeline.map((t) => (
                 <li key={t.label} className="relative">
                   <span className="absolute -left-[21.5px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-brand-600" />
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-text-faint">{t.label}</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-text-faint">{t.label}</p>
                   <p className="text-sm font-semibold text-ink-950">
                     {t.value}
-                    {t.hint ? <span className="ml-1.5 text-[11px] font-normal text-text-muted">· {t.hint}</span> : null}
+                    {t.hint ? <span className="ml-1.5 text-xs font-normal text-text-muted">· {t.hint}</span> : null}
                   </p>
                 </li>
               ))}
             </ol>
             <div className="mt-5 border-t border-line pt-3">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-text-faint">Son kritik olaylar</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-text-faint">Son kritik olaylar</p>
               {criticalRows.length === 0 ? (
                 <p className="mt-2 text-xs text-text-muted">Bu ofis için platform tarafında kritik olay kaydı yok.</p>
               ) : (
@@ -331,7 +324,7 @@ export default async function AdminTenantDetailPage({ params }: { params: Promis
                   {criticalRows.map((e) => (
                     <li key={e.id} className="flex items-center justify-between gap-2 text-xs">
                       <span className="min-w-0 truncate font-semibold text-ink-950">{auditActionLabel(e.action)}</span>
-                      <span className="shrink-0 text-[11px] text-text-faint">{relativeTimeTR(e.created_at)}</span>
+                      <span className="shrink-0 text-xs text-text-faint">{relativeTimeTR(e.created_at)}</span>
                     </li>
                   ))}
                 </ul>
@@ -347,10 +340,10 @@ export default async function AdminTenantDetailPage({ params }: { params: Promis
         </section>
       </div>
 
-      <section className="rounded-[20px] border border-warn-500/30 bg-warn-500/5 p-5">
+      <section className="rounded-[var(--radius-panel)] border border-warn-500/30 bg-warn-500/5 p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-start gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-warn-500/15 text-warn-600">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] bg-warn-500/15 text-warn-600">
               <ShieldAlert className="h-5 w-5" />
             </span>
             <div>
@@ -363,14 +356,14 @@ export default async function AdminTenantDetailPage({ params }: { params: Promis
           </div>
           <a
             href={`/api/admin/tenants/${tenant.id}/export`}
-            className="inline-flex shrink-0 items-center gap-2 rounded-[10px] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-ink-800"
+            className="inline-flex shrink-0 items-center gap-2 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-ink-800"
           >
             <Download className="h-4 w-4" /> Veri paketini indir
           </a>
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <LifeBuoy className="h-4 w-4 text-brand-600" /> Son açık destek talepleri
@@ -391,7 +384,7 @@ export default async function AdminTenantDetailPage({ params }: { params: Promis
                 <Link href={`/admin/tickets/${t.id}`} className="absolute inset-0" aria-label={`${t.subject} talebini aç`} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-ink-950 transition group-hover:text-brand-600">{t.subject}</p>
-                  <p className="mt-0.5 text-[11px] text-text-faint">
+                  <p className="mt-0.5 text-xs text-text-faint">
                     {ticketStatusLabel[t.status] ?? t.status} ·{" "}
                     <span className={`font-semibold ${priorityCls[t.priority] ?? ""}`}>{priorityLabel[t.priority] ?? t.priority}</span> ·{" "}
                     {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(t.created_at))}

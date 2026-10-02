@@ -239,7 +239,7 @@ export default async function MatchingPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-cyan-400/20 blur-[90px]" />
         <div className="relative grid gap-6 lg:grid-cols-[1.2fr_1fr] lg:items-center">
@@ -263,19 +263,19 @@ export default async function MatchingPage({
                 <Link
                   key={item.label}
                   href={item.href}
-                  className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 transition hover:border-brand-300"
+                  className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 transition hover:border-brand-300"
                 >
                   <p className={`flex items-start justify-between font-display text-xl font-extrabold ${item.cls}`}>
                     {item.value}
                     <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                   </p>
-                  <p className="text-[11px] text-white/45">{item.label}</p>
+                  <p className="text-xs text-white/45">{item.label}</p>
                 </Link>
               ))}
             </div>
           </div>
 
-          <div className="flex items-center gap-5 rounded-[16px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
+          <div className="flex items-center gap-5 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="relative grid h-28 w-28 place-items-center">
               <div
                 className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-25 blur-md"
@@ -297,11 +297,11 @@ export default async function MatchingPage({
               </svg>
               <div className="absolute text-center">
                 <p className="font-display text-xl font-extrabold">{avg || 0}</p>
-                <p className="text-[10px] text-white/45">ort. skor</p>
+                <p className="text-xs text-white/45">ort. skor</p>
               </div>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/45">Skor dağılımı</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-white/45">Skor dağılımı</p>
               <div className="mt-3 flex h-20 items-end gap-2">
                 {/* Her çubuk ?minSkor= filtresine iner; aktif çubuk tekrar tıklanınca temizler. */}
                 {[
@@ -318,12 +318,12 @@ export default async function MatchingPage({
                       title={`Skor ≥ ${b.min} önerilerini listele`}
                       className={`focus-ring group flex flex-1 flex-col items-center gap-1 rounded-[6px] transition ${active ? "bg-white/10" : "hover:bg-white/5"}`}
                     >
-                      <span className="text-[10px] font-bold text-white/80">{scoreBuckets[i]}</span>
+                      <span className="text-xs font-bold text-white/80">{scoreBuckets[i]}</span>
                       <div
                         className="bar-live w-full max-w-[28px] rounded-t-[4px] bg-gradient-to-t from-cyan-500 to-mint-400 transition group-hover:from-cyan-400 group-hover:to-mint-300"
                         style={{ height: `${Math.max((scoreBuckets[i] / maxBucket) * 100, 8)}%`, animationDelay: `${i * 0.08}s` }}
                       />
-                      <span className="text-[8px] text-white/35">{b.label}</span>
+                      <span className="text-xs text-white/35">{b.label}</span>
                     </Link>
                   );
                 })}
@@ -334,12 +334,12 @@ export default async function MatchingPage({
       </section>
 
       {/* Aktif ağırlık seti — şeffaflık satırı + Ayarlar bağlantısı */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[12px] border border-line bg-surface px-4 py-2.5 text-xs text-text-muted">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2.5 text-xs text-text-muted">
         <span className="font-bold text-ink-950">Ağırlıklar:</span>
         <span>
           {MATCHING_WEIGHT_KEYS.map((k) => `${MATCHING_WEIGHT_LABELS[k]} %${weightPercents[k]}`).join(" · ")}
         </span>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tenantWeights ? "bg-cyan-400/12 text-cyan-600" : "bg-ink-950/8 text-text-muted"}`}>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${tenantWeights ? "bg-cyan-400/12 text-cyan-600" : "bg-ink-950/8 text-text-muted"}`}>
           {tenantWeights ? "ofise özel" : "varsayılan"}
         </span>
         <Link
@@ -351,19 +351,19 @@ export default async function MatchingPage({
       </div>
 
       {(sp.customer || sp.demand || sp.property || kademeF || minSkorF != null) ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-cyan-400/30 bg-cyan-400/8 px-4 py-3 text-sm text-ink-950">
+        <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-cyan-400/30 bg-cyan-400/8 px-4 py-3 text-sm text-ink-950">
           <Sparkles className="h-4 w-4 text-cyan-600" />
           Filtre aktif
-          {sp.customer ? <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold">müşteri</span> : null}
-          {sp.demand ? <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold">talep</span> : null}
-          {sp.property ? <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold">portföy</span> : null}
+          {sp.customer ? <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold">müşteri</span> : null}
+          {sp.demand ? <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold">talep</span> : null}
+          {sp.property ? <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold">portföy</span> : null}
           {kademeF ? (
-            <Link href={matchHref({ kademe: null })} className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold hover:text-brand-600" title="Kademe filtresini kaldır">
+            <Link href={matchHref({ kademe: null })} className="rounded-full bg-white px-2 py-0.5 text-xs font-bold hover:text-brand-600" title="Kademe filtresini kaldır">
               {kademeF === "strong" ? "güçlü eşleşme" : "iyi eşleşme"} ✕
             </Link>
           ) : null}
           {minSkorF != null ? (
-            <Link href={matchHref({ minSkor: null })} className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold hover:text-brand-600" title="Skor filtresini kaldır">
+            <Link href={matchHref({ minSkor: null })} className="rounded-full bg-white px-2 py-0.5 text-xs font-bold hover:text-brand-600" title="Skor filtresini kaldır">
               skor ≥ {minSkorF} ✕
             </Link>
           ) : null}
@@ -371,7 +371,7 @@ export default async function MatchingPage({
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -401,7 +401,7 @@ export default async function MatchingPage({
               </p>
               <Link
                 href={matchHref({ kademe: null, minSkor: null })}
-                className="mt-4 rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white"
+                className="mt-4 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white"
               >
                 Skor filtresini temizle
               </Link>
@@ -414,8 +414,8 @@ export default async function MatchingPage({
               Açık talep ve yayında portföy ekleyin. Bütçe / il / oda örtüşünce burada skorlanır.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
-              <Link href="/app/musteriler" className="rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white">Müşteriler</Link>
-              <Link href="/app/portfoyler" className="rounded-[10px] border border-line px-4 py-2 text-sm font-semibold text-ink-950">Portföyler</Link>
+              <Link href="/app/musteriler" className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white">Müşteriler</Link>
+              <Link href="/app/portfoyler" className="rounded-[var(--radius-control)] border border-line px-4 py-2 text-sm font-semibold text-ink-950">Portföyler</Link>
             </div>
           </div>
           )
@@ -429,7 +429,7 @@ export default async function MatchingPage({
                   className="grid gap-4 px-5 py-4 transition hover:bg-brand-600/[0.02] lg:grid-cols-[1.1fr_1.1fr_auto] lg:items-center"
                 >
                   <div className="min-w-0">
-                    <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">
+                    <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-brand-600">
                       <Users className="h-3 w-3" /> Talep
                     </p>
                     <Link
@@ -452,7 +452,7 @@ export default async function MatchingPage({
                   </div>
 
                   <div className="min-w-0">
-                    <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-mint-600">
+                    <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-mint-600">
                       <Building2 className="h-3 w-3" /> Portföy
                     </p>
                     <Link
@@ -472,12 +472,12 @@ export default async function MatchingPage({
                   <div className="flex flex-col items-start gap-2 lg:items-end">
                     <div className="flex items-center gap-2">
                       <span className="font-display text-2xl font-extrabold text-ink-950">{pair.score}</span>
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${tierCls(pair.tier)}`}>
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${tierCls(pair.tier)}`}>
                         {tierLabel(pair.tier)}
                       </span>
                       {pair.likedByCustomer ? (
                         <span
-                          className="rounded-full bg-mint-500/12 px-2.5 py-1 text-[11px] font-bold text-mint-600"
+                          className="rounded-full bg-mint-500/12 px-2.5 py-1 text-xs font-bold text-mint-600"
                           title="Müşteri portalında bu portföyü beğendi — skora +10 eklendi"
                         >
                           💚 Müşteri beğendi
@@ -486,7 +486,7 @@ export default async function MatchingPage({
                     </div>
                     <div className="flex flex-wrap gap-1 lg:justify-end">
                       {pair.reasons.filter((r) => r.ok).slice(0, 4).map((r) => (
-                        <span key={r.label} className="rounded-full bg-mint-500/10 px-2 py-0.5 text-[10px] font-semibold text-mint-600">
+                        <span key={r.label} className="rounded-full bg-mint-500/10 px-2 py-0.5 text-xs font-semibold text-mint-600">
                           {r.label}
                         </span>
                       ))}
@@ -500,21 +500,21 @@ export default async function MatchingPage({
                     <div className="flex flex-wrap items-center gap-1.5 lg:justify-end">
                       <Link
                         href={`/app/portfoyler/sunumlar?portfoy=${pair.property.id}${customer ? `&musteri=${customer.id}` : ""}`}
-                        className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
+                        className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
                         title="Bu portföyle müşteriye özel sunum linki hazırla"
                       >
                         <Presentation className="h-3 w-3" /> Sunum hazırla
                       </Link>
                       <Link
                         href={`/app/randevular?property=${pair.property.id}${customer ? `&customer=${customer.id}` : ""}`}
-                        className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
+                        className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
                         title="Bu portföy için yer gösterme randevusu planla"
                       >
                         <CalendarPlus className="h-3 w-3" /> Randevu ver
                       </Link>
                       <Link
                         href={`/app/teklifler?portfoy=${pair.property.id}${customer ? `&musteri=${customer.id}` : ""}`}
-                        className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
+                        className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
                         title="Müşterinin teklifini ön dolgulu kaydet"
                       >
                         <Tag className="h-3 w-3" /> Teklif al
@@ -541,12 +541,12 @@ export default async function MatchingPage({
             {page > 1 ? (
               <Link
                 href={matchHref({ sayfa: page - 1 })}
-                className="focus-ring press rounded-[10px] border border-line bg-canvas px-3.5 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-300"
+                className="focus-ring press rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-300"
               >
                 ← Önceki
               </Link>
             ) : (
-              <span className="rounded-[10px] border border-line px-3.5 py-2 text-xs font-semibold text-text-faint">← Önceki</span>
+              <span className="rounded-[var(--radius-control)] border border-line px-3.5 py-2 text-xs font-semibold text-text-faint">← Önceki</span>
             )}
             <span className="text-xs font-semibold text-text-muted">
               Sayfa {page} / {totalPages}
@@ -554,12 +554,12 @@ export default async function MatchingPage({
             {page < totalPages ? (
               <Link
                 href={matchHref({ sayfa: page + 1 })}
-                className="focus-ring press rounded-[10px] border border-line bg-canvas px-3.5 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-300"
+                className="focus-ring press rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-300"
               >
                 Sonraki →
               </Link>
             ) : (
-              <span className="rounded-[10px] border border-line px-3.5 py-2 text-xs font-semibold text-text-faint">Sonraki →</span>
+              <span className="rounded-[var(--radius-control)] border border-line px-3.5 py-2 text-xs font-semibold text-text-faint">Sonraki →</span>
             )}
           </div>
         ) : null}

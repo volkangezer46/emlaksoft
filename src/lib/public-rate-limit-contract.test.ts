@@ -20,6 +20,7 @@ const FAIL_CLOSED_RATE_LIMIT_FILES = [
   "src/app/actions/vitrin.ts",
   "src/app/api/ai/admin-chat/route.ts",
   "src/app/api/takvim/[token]/route.ts",
+  "src/app/api/vitrin-favoriler/route.ts",
   "src/app/danisman/[slug]/vcard/route.ts",
   "src/app/giris/dogrulama/actions.ts",
 ] as const;

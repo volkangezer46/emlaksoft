@@ -18,6 +18,7 @@ import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/tab
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportReferralsCsv } from "@/app/actions/export";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
+import { getBaseUrl } from "@/lib/base-url";
 import {
   ConvertReferralButton,
   CopyReferralLinkButton,
@@ -34,9 +35,9 @@ import {
 const PAGE_SIZE = 50;
 
 const PAGER_BTN =
-  "focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+  "focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
 const PAGER_BTN_DISABLED =
-  "inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
+  "inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
 const STATUS_LABELS: Record<string, string> = {
   yeni: "Yeni",
@@ -62,7 +63,7 @@ function rel<T>(value: T | T[] | null): T | null {
 }
 
 function appBase() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return getBaseUrl();
 }
 
 type ReferralRow = {
@@ -236,7 +237,7 @@ export default async function ReferralsPage({
         </div>
         <Link
           href="/app/raporlar/memnuniyet"
-          className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border border-hairline-strong bg-surface px-3 py-2 text-xs font-semibold text-ink-950 transition hover:bg-canvas"
+          className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-3 py-2 text-xs font-semibold text-ink-950 transition hover:bg-canvas"
         >
           <Sparkles className="h-3.5 w-3.5 text-brand-600" />
           Memnuniyet raporu
@@ -273,7 +274,7 @@ export default async function ReferralsPage({
 
       {/* ---------------- Gelen tavsiyeler ---------------- */}
       <section id="gelenler" className="space-y-3">
-        <form className="rounded-[16px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] space-y-3" action="/app/tavsiyeler">
+        <form className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] space-y-3" action="/app/tavsiyeler">
           <div className="flex flex-wrap gap-3">
             <div className="relative min-w-[200px] flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
@@ -282,14 +283,14 @@ export default async function ReferralsPage({
                 defaultValue={q}
                 aria-label="Tavsiye ara"
                 placeholder="Ad veya telefon ara…"
-                className="w-full rounded-[11px] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+                className="w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
               />
             </div>
             <select
               name="durum"
               defaultValue={durumF}
               aria-label="Durum filtresi"
-              className="rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+              className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
             >
               <option value="">Tüm durumlar</option>
               {STATUS_KEYS.map((s) => (
@@ -300,7 +301,7 @@ export default async function ReferralsPage({
             </select>
             <button
               type="submit"
-              className="rounded-[10px] bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700"
+              className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700"
             >
               Filtrele
             </button>
@@ -316,7 +317,7 @@ export default async function ReferralsPage({
         </form>
 
         {(totalReferrals ?? 0) === 0 ? (
-          <div className="grid place-items-center rounded-[16px] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
+          <div className="grid place-items-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
             <div className="grid h-14 w-14 place-items-center rounded-full bg-brand-600/10">
               <HeartHandshake className="h-7 w-7 text-brand-600" />
             </div>
@@ -327,7 +328,7 @@ export default async function ReferralsPage({
             </p>
           </div>
         ) : rows.length === 0 ? (
-          <div className="grid place-items-center rounded-[18px] border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
+          <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
             <Search className="h-8 w-8 text-text-faint" />
             <h2 className="mt-3 font-display text-lg font-bold text-ink-950">Eşleşen tavsiye bulunamadı</h2>
             <p className="mt-1 text-sm text-text-muted">Filtreyi değiştirip tekrar deneyin.</p>
@@ -376,7 +377,7 @@ export default async function ReferralsPage({
                           </span>
                         ) : null}
                         {r.staff_note ? (
-                          <span className="mt-1 block max-w-[280px] whitespace-pre-line text-[11px] leading-relaxed text-text-faint">
+                          <span className="mt-1 block max-w-[280px] whitespace-pre-line text-xs leading-relaxed text-text-faint">
                             {r.staff_note}
                           </span>
                         ) : null}
@@ -395,7 +396,7 @@ export default async function ReferralsPage({
                         {r.created_customer_id ? (
                           <Link
                             href={`/app/musteriler/${r.created_customer_id}`}
-                            className="mt-1 block text-[11px] font-semibold text-mint-600 underline-offset-2 hover:underline"
+                            className="mt-1 block text-xs font-semibold text-mint-600 underline-offset-2 hover:underline"
                           >
                             Oluşan müşteri kaydı →
                           </Link>
@@ -471,7 +472,7 @@ export default async function ReferralsPage({
           <ReferralLinkCreator customers={customers} staff={staff} />
 
           {promoters.length > 0 ? (
-            <div className="rounded-[16px] border border-mint-500/30 bg-mint-500/5 p-4">
+            <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/5 p-4">
               <h2 className="flex items-center gap-2 font-display text-sm font-bold text-ink-950">
                 <Sparkles className="h-4 w-4 text-mint-600" />
                 Bunlar sizi tavsiye etmeye hazır
@@ -484,7 +485,7 @@ export default async function ReferralsPage({
                 {promoters.map((p) => (
                   <li
                     key={p.id}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-[11px] border border-line bg-surface px-3 py-2"
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2"
                   >
                     <Link
                       href={`/app/musteriler/${p.id}`}
@@ -499,7 +500,7 @@ export default async function ReferralsPage({
             </div>
           ) : null}
 
-          <div className="rounded-[16px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+          <div className="rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-xs)]">
             <div className="border-b border-line px-4 py-3">
               <h2 className="flex items-center gap-2 font-display text-sm font-bold text-ink-950">
                 <Link2 className="h-4 w-4 text-brand-600" />
@@ -543,7 +544,7 @@ export default async function ReferralsPage({
                               {c?.full_name ?? "Müşteri"}
                             </Link>
                             {l.reward_note ? (
-                              <span className="mt-0.5 block max-w-[260px] text-[11px] text-text-muted">
+                              <span className="mt-0.5 block max-w-[260px] text-xs text-text-muted">
                                 🎁 {l.reward_note}
                               </span>
                             ) : null}

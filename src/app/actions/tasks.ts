@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { notifyTenant } from "@/lib/notify";
+import { validateTenantReferences } from "@/lib/tenant-references";
 
 export type TaskResult = { error?: string; ok?: boolean; id?: string };
 
@@ -116,6 +117,13 @@ export async function createTask(_prev: TaskResult, formData: FormData): Promise
   // Tekrar yalnız terminli görevde anlamlı — termin yoksa sessizce yok say.
   const recurrence = dueRaw && recurrenceRaw ? recurrenceRaw : null;
 
+  const references = await validateTenantReferences(gate.tenantId, {
+    customerId: customerId || null,
+    propertyId: propertyId || null,
+    profileId: assignedTo || null,
+  });
+  if (!references.ok) return { error: references.error };
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tasks")
@@ -186,6 +194,11 @@ export async function updateTask(_prev: TaskResult, formData: FormData): Promise
   if (!KINDS.includes(kind)) return { error: "Geçersiz görev türü." };
   if (!PRIORITIES.includes(priority)) return { error: "Geçersiz öncelik." };
   if (recurrenceRaw && !RECURRENCES.includes(recurrenceRaw)) return { error: "Geçersiz tekrar periyodu." };
+
+  const references = await validateTenantReferences(gate.tenantId, {
+    profileId: assignedTo || null,
+  });
+  if (!references.ok) return { error: references.error };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -326,13 +339,34 @@ export async function reopenTask(formData: FormData): Promise<void> {
   revalidatePath("/app/gorevler");
 }
 
-export async function deleteTask(formData: FormData): Promise<void> {
+export async function deleteTask(formData: FormData): Promise<TaskResult> {
   const gate = await requirePermission("tasks", "delete");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
   const id = String(formData.get("id") ?? "").trim();
-  if (!id) return;
+  if (!id) return { error: "Görev bulunamadı." };
 
   const supabase = await createClient();
-  await supabase.from("tasks").delete().eq("id", id).eq("tenant_id", gate.tenantId);
+  const { data, error } = await supabase
+    .from("tasks")
+    .delete()
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("deleteTask", error);
+    return { error: "Görev silinemedi. Lütfen tekrar deneyin." };
+  }
+  if (!data) return { error: "Görev bulunamadı veya silme yetkiniz yok." };
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "task.delete",
+    entityType: "task",
+    entityId: id,
+  });
   revalidatePath("/app/gorevler");
+  return { ok: true, id };
 }

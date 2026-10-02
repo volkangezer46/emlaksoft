@@ -13,11 +13,12 @@ import {
   DialogHeader,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useQueryDialog } from "@/components/app/use-query-dialog";
 
 type Option = { id: string; full_name: string };
 
 const fieldClass =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
 const kindOptions = [
   { value: "followup", label: "Takip" },
@@ -35,8 +36,8 @@ const recurrenceOptions = [
   { value: "monthly", label: "Her ay" },
 ];
 
-export function NewTaskDialog({ members, customers }: { members: Option[]; customers: Option[] }) {
-  const [open, setOpen] = useState(false);
+export function NewTaskDialog({ members, customers, defaultOpen = false }: { members: Option[]; customers: Option[]; defaultOpen?: boolean }) {
+  const [open, setOpen] = useQueryDialog(defaultOpen);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Tekrar yalnız terminli görevde seçilebilir — termin alanını izle.
@@ -66,7 +67,7 @@ export function NewTaskDialog({ members, customers }: { members: Option[]; custo
       <DialogTrigger asChild>
         <button
           type="button"
-          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[11px] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 shadow-[var(--elev-2)]"
+          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 shadow-[var(--elev-2)]"
         >
           <Plus className="h-4 w-4" /> Yeni görev
         </button>
@@ -121,7 +122,7 @@ export function NewTaskDialog({ members, customers }: { members: Option[]; custo
                   </select>
                   <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
                 </div>
-                {!due ? <p className="mt-1 text-[11px] text-text-faint">Tekrar için önce son tarih seçin.</p> : null}
+                {!due ? <p className="mt-1 text-xs text-text-faint">Tekrar için önce son tarih seçin.</p> : null}
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="task-assignee">Atanan</label>
@@ -157,11 +158,11 @@ export function NewTaskDialog({ members, customers }: { members: Option[]; custo
 
               <div className="hairline-t sm:col-span-2 flex items-center justify-end gap-2 pt-4">
                 <DialogClose asChild>
-                  <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
+                  <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
                     Vazgeç
                   </button>
                 </DialogClose>
-                <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+                <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
                   <Check className="h-4 w-4" /> {pending ? "Ekleniyor…" : "Görevi ekle"}
                 </button>
               </div>

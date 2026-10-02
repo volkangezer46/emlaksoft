@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+import { isPublicTenantActive } from "@/lib/public-tenant";
+import { getBaseUrl } from "@/lib/base-url";
 
 export type OwnerPortalResult = { ok?: boolean; error?: string; token?: string; url?: string };
 
@@ -27,6 +29,7 @@ export async function createOwnerPortalToken(
     .select("id, property_code")
     .eq("id", propertyId)
     .eq("tenant_id", gate.tenantId)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (!property) return { error: "Portföy bulunamadı." };
@@ -69,8 +72,7 @@ export async function createOwnerPortalToken(
 }
 
 function buildOwnerPortalUrl(token: string): string {
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  return `${base}/malik-portali/${token}`;
+  return `${getBaseUrl()}/malik-portali/${token}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -120,7 +122,7 @@ export type OwnerPortalData = {
     district:    string | null;
     description: string | null;
   };
-  tenant: { name: string };
+  tenant: { id: string; name: string };
   ownerName: string;
   portalListings: {
     id:           string;
@@ -174,13 +176,16 @@ export async function getOwnerPortalData(token: string): Promise<OwnerPortalData
   ] = await Promise.all([
     admin.from("owner_portal_tokens")
       .update({ last_seen_at: new Date().toISOString() })
-      .eq("token", token),
+      .eq("token", token)
+      .eq("tenant_id", tenantId),
     admin.from("properties")
       .select("id, property_code, title, list_price, status, address_line, province:geo_provinces(name), district:geo_districts(name)")
       .eq("id", propertyId)
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
       .single(),
     admin.from("tenants")
-      .select("name")
+      .select("name, status")
       .eq("id", tenantId)
       .single(),
     admin.from("portal_listings")
@@ -203,7 +208,7 @@ export async function getOwnerPortalData(token: string): Promise<OwnerPortalData
       .limit(10),
   ]);
 
-  if (!property || !tenant) return null;
+  if (!property || !tenant || !isPublicTenantActive(tenant.status)) return null;
 
   const provinceName = Array.isArray(property.province)
     ? property.province[0]?.name ?? null
@@ -223,7 +228,7 @@ export async function getOwnerPortalData(token: string): Promise<OwnerPortalData
       district:    districtName,
       description: property.address_line ?? null,
     },
-    tenant: { name: tenant.name },
+    tenant: { id: tenantId, name: tenant.name },
     ownerName,
     portalListings: (listings ?? []).map((l) => ({
       id:          l.id,

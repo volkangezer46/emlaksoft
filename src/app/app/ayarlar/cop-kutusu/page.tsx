@@ -73,9 +73,9 @@ export default async function TrashPage() {
       </div>
 
       {/* Müşteriler */}
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-4 md:p-6">
+      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center gap-3 border-b border-line pb-4">
-          <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-cyan-400/12 text-cyan-500">
+          <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-cyan-400/12 text-cyan-500">
             <Users2 className="h-5 w-5" />
           </span>
           <div>
@@ -111,9 +111,9 @@ export default async function TrashPage() {
       </section>
 
       {/* Portföyler */}
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-4 md:p-6">
+      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center gap-3 border-b border-line pb-4">
-          <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-amber-400/15 text-amber-500">
+          <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-amber-400/15 text-amber-500">
             <Building2 className="h-5 w-5" />
           </span>
           <div>
@@ -151,7 +151,7 @@ export default async function TrashPage() {
       </section>
 
       {!canRestoreCustomers && !canRestoreProperties ? (
-        <p className="rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3.5 py-2.5 text-xs font-medium text-amber-700">
+        <p className="rounded-[var(--radius-control)] border border-amber-400/30 bg-amber-400/10 px-3.5 py-2.5 text-xs font-medium text-amber-700">
           Kayıtları geri almak için silme yetkisi gerekir. Yetki için ofis yöneticinize başvurun.
         </p>
       ) : null}

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/lib/notify-batch";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { getBaseUrl } from "@/lib/base-url";
 
-const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+const APP_URL = getBaseUrl();
 
 function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET?.trim();

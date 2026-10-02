@@ -66,7 +66,7 @@ export function SignPanel({
 
   if (state.ok) {
     return (
-      <div className="print-avoid-break rounded-[14px] border border-mint-500/30 bg-mint-500/10 px-5 py-6 text-center">
+      <div className="print-avoid-break rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/10 px-5 py-6 text-center">
         <CheckCircle2 className="mx-auto h-10 w-10 text-mint-600" />
         <p className="mt-3 font-display text-lg font-bold text-ink-950">İmzanız alındı</p>
         <p className="mt-1 text-sm text-text-muted">
@@ -86,7 +86,7 @@ export function SignPanel({
             </span>
           </p>
         ) : null}
-        <p className="mt-2 text-[11px] text-text-faint">
+        <p className="mt-2 text-xs text-text-faint">
           Bu işlem tarih-saat bilgisiyle birlikte elektronik kanıt olarak saklanır.
         </p>
       </div>
@@ -97,7 +97,7 @@ export function SignPanel({
     <div className="space-y-4">
       {/* SMS OTP adımı — telefon kayıtlı ve SMS gönderilebilir durumdaysa zorunlu */}
       {smsRequired && !verified ? (
-        <div className="rounded-[14px] border-2 border-brand-600/35 bg-brand-600/[0.05] px-4 py-4">
+        <div className="rounded-[var(--radius-card)] border-2 border-brand-600/35 bg-brand-600/[0.05] px-4 py-4">
           <p className="flex items-center gap-2 text-sm font-bold text-ink-950">
             <Smartphone className="h-4 w-4 text-brand-600" /> SMS doğrulaması gerekli
           </p>
@@ -112,7 +112,7 @@ export function SignPanel({
               <button
                 type="submit"
                 disabled={sendPending}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-[11px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
               >
                 <Smartphone className="h-4 w-4" />
                 {sendPending ? "Gönderiliyor…" : "Doğrulama kodu gönder"}
@@ -134,12 +134,12 @@ export function SignPanel({
                   maxLength={6}
                   required
                   placeholder="6 haneli kod"
-                  className="w-full rounded-[10px] border border-line bg-surface px-3 py-2.5 text-sm tracking-[0.3em] outline-none focus:border-brand-400"
+                  className="w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2.5 text-sm tracking-[0.3em] outline-none focus:border-brand-400"
                 />
                 <button
                   type="submit"
                   disabled={verifyPending}
-                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
                 >
                   {verifyPending ? "Doğrulanıyor…" : "Doğrula"}
                 </button>
@@ -158,12 +158,12 @@ export function SignPanel({
           )}
 
           {sendState.error ? (
-            <p className="mt-3 rounded-[10px] border border-danger-500/30 bg-danger-500/10 px-3 py-2 text-xs text-danger-600" role="alert">
+            <p className="mt-3 rounded-[var(--radius-control)] border border-danger-500/30 bg-danger-500/10 px-3 py-2 text-xs text-danger-600" role="alert">
               {sendState.error}
             </p>
           ) : null}
           {verifyState.error ? (
-            <p className="mt-3 rounded-[10px] border border-danger-500/30 bg-danger-500/10 px-3 py-2 text-xs text-danger-600" role="alert">
+            <p className="mt-3 rounded-[var(--radius-control)] border border-danger-500/30 bg-danger-500/10 px-3 py-2 text-xs text-danger-600" role="alert">
               {verifyState.error}
             </p>
           ) : null}
@@ -171,7 +171,7 @@ export function SignPanel({
       ) : null}
 
       {smsRequired && verified ? (
-        <p className="flex items-center gap-1.5 rounded-[12px] border border-mint-500/30 bg-mint-500/10 px-4 py-2.5 text-xs font-semibold text-mint-600">
+        <p className="flex items-center gap-1.5 rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/10 px-4 py-2.5 text-xs font-semibold text-mint-600">
           <ShieldCheck className="h-4 w-4" /> Telefonunuz SMS ile doğrulandı ✓ — şimdi imzalayabilirsiniz.
         </p>
       ) : null}
@@ -181,7 +181,7 @@ export function SignPanel({
         <form action={action}>
           <input type="hidden" name="token" value={token} />
           {/* Onay metni bilinçli olarak belirgin — imzanın hukuki karşılığı burada */}
-          <label className="flex cursor-pointer items-start gap-3 rounded-[12px] border-2 border-brand-600/35 bg-brand-600/[0.05] px-4 py-3.5 text-sm font-medium text-ink-950 transition hover:border-brand-600/55">
+          <label className="flex cursor-pointer items-start gap-3 rounded-[var(--radius-card)] border-2 border-brand-600/35 bg-brand-600/[0.05] px-4 py-3.5 text-sm font-medium text-ink-950 transition hover:border-brand-600/55">
             <input type="checkbox" name="consent" required className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600" />
             <span>
               Sözleşme metnini okudum, anladım ve içeriğini kabul ederek elektronik ortamda
@@ -190,7 +190,7 @@ export function SignPanel({
           </label>
 
           {state.error ? (
-            <p className="mt-3 rounded-[10px] border border-danger-500/30 bg-danger-500/10 px-3 py-2 text-xs text-danger-600" role="alert">
+            <p className="mt-3 rounded-[var(--radius-control)] border border-danger-500/30 bg-danger-500/10 px-3 py-2 text-xs text-danger-600" role="alert">
               {state.error}
             </p>
           ) : null}
@@ -198,7 +198,7 @@ export function SignPanel({
           <button
             type="submit"
             disabled={pending}
-            className="btn-shine no-print mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+            className="btn-shine no-print mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
           >
             <PenLine className="h-4 w-4" />
             {pending ? "İmzalanıyor…" : "Sözleşmeyi imzala"}

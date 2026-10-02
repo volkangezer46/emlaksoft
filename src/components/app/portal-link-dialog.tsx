@@ -61,15 +61,15 @@ function ResultPanel({
   };
 
   return (
-    <div className="rounded-[16px] border border-mint-500/30 bg-mint-500/5 p-5 text-center">
-      <span className="mx-auto grid h-11 w-11 place-items-center rounded-[13px] bg-mint-500/15 text-mint-600">
+    <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/5 p-5 text-center">
+      <span className="mx-auto grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-mint-500/15 text-mint-600">
         <Check className="h-5 w-5" />
       </span>
       <p className="mt-3 font-display text-base font-bold text-ink-950">Portal linki hazır</p>
       <p className="mt-1 text-xs text-text-muted">
         Link 90-180 gün geçerlidir. İstediğiniz an &quot;Paylaşılan portallar&quot; listesinden iptal edebilirsiniz.
       </p>
-      <p className="numeric mt-3 select-all break-all rounded-[10px] border border-line bg-canvas px-3 py-2 text-xs text-ink-950">
+      <p className="numeric mt-3 select-all break-all rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs text-ink-950">
         {url}
       </p>
       <div className="mt-3 flex flex-wrap justify-center gap-2">
@@ -82,7 +82,7 @@ function ResultPanel({
             href={waHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-mint-500/40 bg-mint-500/10 px-3 text-xs font-semibold text-mint-700 hover:bg-mint-500/20"
+            className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-mint-500/40 bg-mint-500/10 px-3 text-xs font-semibold text-mint-700 hover:bg-mint-500/20"
           >
             <MessageCircle className="h-3.5 w-3.5" /> WhatsApp&apos;ta gönder
           </a>
@@ -91,7 +91,7 @@ function ResultPanel({
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-hairline-strong bg-surface px-3 text-xs font-semibold text-ink-950 hover:bg-canvas"
+          className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-3 text-xs font-semibold text-ink-950 hover:bg-canvas"
         >
           <ExternalLink className="h-3.5 w-3.5" /> Önizle
         </a>
@@ -146,7 +146,7 @@ export function CustomerPortalLinkButton({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="grid h-8 w-8 place-items-center rounded-[9px] text-text-faint transition hover:bg-brand-600/10 hover:text-brand-600"
+          className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-brand-600/10 hover:text-brand-600"
           aria-label={`${customerName} için müşteri portalı linki üret`}
           title="Müşteri portalı linki"
         >
@@ -237,7 +237,7 @@ export function OwnerPortalLinkButton({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line bg-surface/90 text-text-muted shadow-[var(--shadow-xs)] backdrop-blur transition hover:border-brand-300 hover:text-brand-600"
+          className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface/90 text-text-muted shadow-[var(--shadow-xs)] backdrop-blur transition hover:border-brand-300 hover:text-brand-600"
           aria-label={`${propertyLabel} için malik portalı linki üret`}
           title="Malik portalı linki"
         >
@@ -268,7 +268,7 @@ export function OwnerPortalLinkButton({
                   onChange={(e) => setOwnerName(e.target.value)}
                   maxLength={120}
                   placeholder="Örn. Ahmet Yılmaz"
-                  className="mt-1 w-full rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+                  className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
                 />
               </label>
               <label className="block">
@@ -281,7 +281,7 @@ export function OwnerPortalLinkButton({
                   inputMode="tel"
                   maxLength={20}
                   placeholder="05XX XXX XX XX"
-                  className="mt-1 w-full rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+                  className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
                 />
               </label>
               <p className="text-xs text-text-faint">

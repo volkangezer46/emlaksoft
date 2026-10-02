@@ -1,18 +1,14 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { computeOfficeScore, loadOfficeScoreInputs } from "@/lib/office-score";
-import { twoFactorSatisfied } from "@/lib/tenant-guard";
+import { requireActiveTenant } from "@/lib/tenant-guard";
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  // Middleware yalnız sayfaları korur — 2FA açık hesap kodu geçmeden veri okuyamaz
-  if (!(await twoFactorSatisfied(user.id))) {
-    return NextResponse.json({ error: "two_factor_required" }, { status: 401 });
+  const gate = await requireActiveTenant();
+  if (!gate.ok) {
+    return NextResponse.json({ error: "forbidden", detail: gate.error }, { status: 403 });
   }
+  const supabase = await createClient();
 
   const [{ count: customers }, { count: properties }, { count: demands }, scoreInputs, { count: unread }] =
     await Promise.all([
@@ -27,13 +23,12 @@ export async function GET() {
         .from("notifications")
         .select("id", { count: "exact", head: true })
         .is("read_at", null)
-        .or(`user_id.eq.${user.id},user_id.is.null`),
+        .or(`user_id.eq.${gate.userId},user_id.is.null`),
     ]);
 
   const officeScore = computeOfficeScore(scoreInputs);
-
   return NextResponse.json({
-    tenantId: user.app_metadata?.tenant_id ?? null,
+    tenantId: gate.tenantId,
     counts: {
       customers: customers ?? 0,
       properties: properties ?? 0,

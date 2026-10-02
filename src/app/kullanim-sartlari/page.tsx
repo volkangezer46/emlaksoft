@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "Kullanım Şartları | EmlakSoft",
+  title: "Kullanım Şartları",
   description: "EmlakSoft üyelik ve kullanım şartları.",
   alternates: { canonical: "/kullanim-sartlari" },
 };

@@ -10,7 +10,7 @@ import {
 
 export function DashboardMock() {
   return (
-    <div className="overflow-hidden rounded-[18px] border border-line bg-surface premium-shadow">
+    <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface premium-shadow">
       {/* browser chrome */}
       <div className="window-chrome flex items-center gap-3 px-4 py-3">
         <div className="flex gap-1.5">
@@ -18,7 +18,7 @@ export function DashboardMock() {
           <span className="h-3 w-3 rounded-full bg-[#febc2e]" />
           <span className="h-3 w-3 rounded-full bg-[#28c840]" />
         </div>
-        <div className="mx-auto flex items-center gap-2 rounded-full bg-white/10 px-4 py-1 text-[11px] text-white/70">
+        <div className="mx-auto flex items-center gap-2 rounded-full bg-white/10 px-4 py-1 text-xs text-white/70">
           <span className="h-2 w-2 rounded-full bg-mint-400" />
           app.emlaksoft.com.tr/panel
         </div>
@@ -27,13 +27,13 @@ export function DashboardMock() {
       <div className="grid grid-cols-[56px_1fr] bg-canvas">
         {/* mini sidebar */}
         <div className="flex flex-col items-center gap-1 border-r border-line bg-surface py-4">
-          <span className="mb-3 grid h-8 w-8 place-items-center rounded-[9px] bg-[image:var(--grad-brand)] text-xs font-bold text-white">
+          <span className="mb-3 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] text-xs font-bold text-white">
             E
           </span>
           {[LayoutDashboard, Users, Building2, Phone, Wallet].map((Icon, i) => (
             <span
               key={i}
-              className={`grid h-9 w-9 place-items-center rounded-[10px] ${
+              className={`grid h-9 w-9 place-items-center rounded-[var(--radius-control)] ${
                 i === 0 ? "bg-brand-600/10 text-brand-600" : "text-text-faint"
               }`}
             >
@@ -47,13 +47,13 @@ export function DashboardMock() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-display text-sm font-bold text-ink-950">Günaydın, Volkan</p>
-              <p className="text-[11px] text-text-muted">Bugünün operasyon özeti</p>
+              <p className="text-xs text-text-muted">Bugünün operasyon özeti</p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-mint-500/12 px-2 py-1 text-[11px] font-semibold text-mint-600">
+              <span className="rounded-full bg-mint-500/12 px-2 py-1 text-xs font-semibold text-mint-600">
                 Ofis skoru 78
               </span>
-              <span className="grid h-7 w-7 place-items-center rounded-full bg-ink-800 text-[10px] font-bold text-white">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-ink-800 text-xs font-bold text-white">
                 VG
               </span>
             </div>
@@ -67,8 +67,8 @@ export function DashboardMock() {
               { l: "Teyitsiz", v: "23", c: "text-warn-500" },
               { l: "Kayıp/ay", v: "420B", c: "text-danger-500" },
             ].map((k) => (
-              <div key={k.l} className="rounded-[10px] border border-line bg-surface p-2.5">
-                <p className="text-[10px] text-text-muted">{k.l}</p>
+              <div key={k.l} className="rounded-[var(--radius-control)] border border-line bg-surface p-2.5">
+                <p className="text-xs text-text-muted">{k.l}</p>
                 <p className={`font-display text-lg font-extrabold ${k.c}`}>{k.v}</p>
               </div>
             ))}
@@ -76,10 +76,10 @@ export function DashboardMock() {
 
           <div className="mt-3 grid grid-cols-[1.5fr_1fr] gap-3">
             {/* chart */}
-            <div className="rounded-[12px] border border-line bg-surface p-3">
+            <div className="rounded-[var(--radius-card)] border border-line bg-surface p-3">
               <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold text-ink-950">Aylık hakediş</p>
-                <span className="flex items-center gap-1 rounded-full bg-mint-500/12 px-1.5 py-0.5 text-[10px] font-semibold text-mint-600">
+                <p className="text-xs font-semibold text-ink-950">Aylık hakediş</p>
+                <span className="flex items-center gap-1 rounded-full bg-mint-500/12 px-1.5 py-0.5 text-xs font-semibold text-mint-600">
                   +18%
                 </span>
               </div>
@@ -106,29 +106,29 @@ export function DashboardMock() {
               </svg>
               <div className="grid grid-cols-3 gap-1 text-center">
                 {["Oca", "Şub", "Mar"].map((m) => (
-                  <span key={m} className="text-[10px] text-text-faint">{m}</span>
+                  <span key={m} className="text-xs text-text-faint">{m}</span>
                 ))}
               </div>
             </div>
 
             {/* alerts */}
-            <div className="rounded-[12px] border border-line bg-surface p-3">
+            <div className="rounded-[var(--radius-card)] border border-line bg-surface p-3">
               <div className="flex items-center gap-1.5">
                 <Radar className="h-3.5 w-3.5 text-danger-500" />
-                <p className="text-[11px] font-semibold text-ink-950">Kayıp-kaçak</p>
+                <p className="text-xs font-semibold text-ink-950">Kayıp-kaçak</p>
               </div>
               <div className="mt-2 space-y-1.5">
-                <div className="rounded-[8px] bg-danger-500/8 px-2 py-1.5">
-                  <p className="text-[10px] font-semibold text-ink-950">#99211 düştü</p>
-                  <p className="text-[10px] text-text-muted">Sebep yok</p>
+                <div className="rounded-[var(--radius-control)] bg-danger-500/8 px-2 py-1.5">
+                  <p className="text-xs font-semibold text-ink-950">#99211 düştü</p>
+                  <p className="text-xs text-text-muted">Sebep yok</p>
                 </div>
-                <div className="rounded-[8px] bg-warn-500/10 px-2 py-1.5">
-                  <p className="text-[10px] font-semibold text-ink-950">7 gün teyitsiz</p>
-                  <p className="text-[10px] text-text-muted">12 ilan</p>
+                <div className="rounded-[var(--radius-control)] bg-warn-500/10 px-2 py-1.5">
+                  <p className="text-xs font-semibold text-ink-950">7 gün teyitsiz</p>
+                  <p className="text-xs text-text-muted">12 ilan</p>
                 </div>
-                <div className="flex items-center gap-1.5 rounded-[8px] bg-mint-500/10 px-2 py-1.5">
+                <div className="flex items-center gap-1.5 rounded-[var(--radius-control)] bg-mint-500/10 px-2 py-1.5">
                   <Bell className="h-3 w-3 text-mint-600" />
-                  <p className="text-[10px] font-semibold text-mint-600">2 hatırlatma</p>
+                  <p className="text-xs font-semibold text-mint-600">2 hatırlatma</p>
                 </div>
               </div>
             </div>

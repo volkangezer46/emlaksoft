@@ -128,7 +128,7 @@ export default async function RolePermissionsPage({
         </Link>
       </div>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/35 blur-[80px]" />
         <div className="relative">
@@ -147,7 +147,7 @@ export default async function RolePermissionsPage({
       <div className="flex gap-2">
         <Link
           href="/app/ayarlar/roller"
-          className={`rounded-[10px] px-3.5 py-2 text-xs font-semibold transition ${
+          className={`rounded-[var(--radius-control)] px-3.5 py-2 text-xs font-semibold transition ${
             activeTab === "roller"
               ? "bg-ink-950 text-white"
               : "border border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
@@ -157,7 +157,7 @@ export default async function RolePermissionsPage({
         </Link>
         <Link
           href="/app/ayarlar/roller?tab=istisnalar"
-          className={`rounded-[10px] px-3.5 py-2 text-xs font-semibold transition ${
+          className={`rounded-[var(--radius-control)] px-3.5 py-2 text-xs font-semibold transition ${
             activeTab === "istisnalar"
               ? "bg-ink-950 text-white"
               : "border border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
@@ -185,7 +185,7 @@ export default async function RolePermissionsPage({
               <Link
                 key={r.value}
                 href={`/app/ayarlar/roller?role=${r.value}`}
-                className={`shrink-0 rounded-[10px] px-3.5 py-2 text-xs font-semibold transition ${
+                className={`shrink-0 rounded-[var(--radius-control)] px-3.5 py-2 text-xs font-semibold transition ${
                   selectedRole === r.value
                     ? "bg-ink-950 text-white"
                     : "border border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
@@ -197,8 +197,8 @@ export default async function RolePermissionsPage({
           </div>
 
           {isOwnerRole ? (
-            <section className="rounded-[20px] border border-dashed border-line-strong bg-surface p-4 md:p-6 text-center">
-              <span className="mx-auto grid h-12 w-12 place-items-center rounded-[14px] bg-brand-600/10 text-brand-600">
+            <section className="rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface p-4 md:p-6 text-center">
+              <span className="mx-auto grid h-12 w-12 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
                 <ShieldCheck className="h-6 w-6" />
               </span>
               <h2 className="mt-4 font-display text-lg font-bold text-ink-950">Ofis sahibi her zaman tam yetkilidir</h2>

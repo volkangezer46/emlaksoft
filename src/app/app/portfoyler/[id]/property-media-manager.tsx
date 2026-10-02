@@ -9,14 +9,23 @@ import {
   applyDocFieldsToProperty,
   bulkDeletePropertyMedia,
   deletePropertyMedia,
+  finalizePropertyMediaUpload,
   ocrPropertyMediaDocument,
+  preparePropertyMediaUpload,
   reorderPropertyMedia,
   setCoverPropertyMedia,
-  uploadPropertyMedia,
   type MediaResult,
   type PropertyDocFields,
 } from "@/app/actions/property-media";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { uploadToDirectFileTarget } from "@/lib/direct-file-upload-client";
 import { DEFAULT_WATERMARK, type WatermarkSettings } from "@/lib/watermark";
 import { applyWatermarkToFile, loadWatermarkLogo } from "@/lib/watermark-canvas";
 
@@ -178,16 +187,30 @@ export function PropertyMediaManager({
         stamped = res.applied;
         patchQueue(item.key, { status: "uploading" });
       }
-      const fd = new FormData();
-      fd.set("property_id", propertyId);
-      fd.set("file", file);
-      fd.set("has_watermark", stamped ? "1" : "0");
-      const r = await uploadPropertyMedia(fd);
-      if (r.error) {
-        patchQueue(item.key, { status: "error", error: r.error });
-      } else {
-        patchQueue(item.key, { status: "done" });
+      const prepared = await preparePropertyMediaUpload({
+        propertyId,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        hasWatermark: stamped,
+      });
+      if (!prepared.ok) {
+        patchQueue(item.key, { status: "error", error: prepared.error });
+        return;
       }
+
+      const uploaded = await uploadToDirectFileTarget(prepared.upload, file);
+      if (!uploaded.ok) {
+        patchQueue(item.key, { status: "error", error: uploaded.error });
+        return;
+      }
+
+      const finalized = await finalizePropertyMediaUpload(propertyId, prepared.upload.sessionId);
+      if (!finalized.ok) {
+        patchQueue(item.key, { status: "error", error: finalized.error });
+        return;
+      }
+      patchQueue(item.key, { status: "done" });
     } catch {
       patchQueue(item.key, { status: "error", error: "Yükleme başarısız — bağlantıyı kontrol edin." });
     }
@@ -231,6 +254,7 @@ export function PropertyMediaManager({
   const [ocrBusyId, setOcrBusyId] = useState<string | null>(null);
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [ocrValues, setOcrValues] = useState<Record<string, string>>({});
+  const ocrReturnFocusRef = useRef<HTMLElement | null>(null);
   const [ocrGuven, setOcrGuven] = useState<string | null>(null);
   const [ocrNote, setOcrNote] = useState<string | null>(null);
   const [applyMsg, setApplyMsg] = useState<string | null>(null);
@@ -241,6 +265,7 @@ export function PropertyMediaManager({
 
   function runOcr(mediaId: string) {
     setOcrBusyId(mediaId);
+    ocrReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setOcrOpen(true);
     setOcrError(null);
     setOcrValues({});
@@ -416,7 +441,7 @@ export function PropertyMediaManager({
   );
 
   return (
-    <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+    <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
         <div>
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -426,7 +451,7 @@ export function PropertyMediaManager({
             {images.length} fotoğraf · {links.length} video/tur — paylaşım sayfasında gösterilir
             {canEdit ? (
               <span
-                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ${
                   watermark.enabled ? "bg-mint-500/15 text-mint-700" : "bg-ink-950/6 text-text-muted"
                 }`}
                 title={
@@ -464,7 +489,7 @@ export function PropertyMediaManager({
               type="button"
               onClick={() => cameraRef.current?.click()}
               disabled={uploading}
-              className="hidden items-center gap-1.5 rounded-[10px] bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60 [@media(hover:none)]:inline-flex"
+              className="hidden items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60 [@media(hover:none)]:inline-flex"
             >
               <Camera className="h-4 w-4" /> Kamera ile çek
             </button>
@@ -472,7 +497,7 @@ export function PropertyMediaManager({
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              className="btn-shine inline-flex items-center gap-1.5 rounded-[10px] bg-ink-950 px-3.5 py-2 text-sm font-semibold text-white hover:bg-ink-800 disabled:opacity-60"
+              className="btn-shine inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-sm font-semibold text-white hover:bg-ink-800 disabled:opacity-60"
             >
               {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
               Fotoğraf yükle
@@ -487,7 +512,7 @@ export function PropertyMediaManager({
             {queue.map((q) => (
               <div
                 key={q.key}
-                className="flex items-center gap-2 rounded-[10px] border border-line bg-canvas px-3 py-2 text-xs"
+                className="flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs"
               >
                 <span className="grid h-5 w-5 shrink-0 place-items-center">
                   {q.status === "uploading" || q.status === "stamping" ? (
@@ -517,7 +542,7 @@ export function PropertyMediaManager({
                     type="button"
                     onClick={() => retryItem(q.key)}
                     disabled={uploading}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-[8px] border border-line px-2 py-1 font-semibold text-ink-950 hover:bg-surface disabled:opacity-60"
+                    className="inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-control)] border border-line px-2 py-1 font-semibold text-ink-950 hover:bg-surface disabled:opacity-60"
                   >
                     <RefreshCw className="h-3 w-3" /> Yeniden dene
                   </button>
@@ -530,7 +555,7 @@ export function PropertyMediaManager({
                   <button
                     type="button"
                     onClick={() => cameraRef.current?.click()}
-                    className="hidden items-center gap-1.5 rounded-[10px] bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-700 [@media(hover:none)]:inline-flex"
+                    className="hidden items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-700 [@media(hover:none)]:inline-flex"
                   >
                     <Camera className="h-4 w-4" /> Bir daha çek
                   </button>
@@ -538,7 +563,7 @@ export function PropertyMediaManager({
                 <button
                   type="button"
                   onClick={() => setQueue([])}
-                  className="rounded-[10px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted hover:text-ink-950"
+                  className="rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted hover:text-ink-950"
                 >
                   Listeyi temizle
                 </button>
@@ -554,7 +579,7 @@ export function PropertyMediaManager({
         ) : null}
 
         {images.length > 0 && canEdit ? (
-          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-[12px] border border-line bg-canvas px-3 py-2">
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2">
             <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-ink-950">
               <input
                 type="checkbox"
@@ -572,7 +597,7 @@ export function PropertyMediaManager({
               <button
                 type="button"
                 onClick={() => makeCover(selected[0])}
-                className="inline-flex items-center gap-1.5 rounded-[9px] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 hover:border-brand-300"
+                className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 hover:border-brand-300"
               >
                 <Star className="h-3.5 w-3.5 text-amber-500" /> Kapak yap
               </button>
@@ -582,7 +607,7 @@ export function PropertyMediaManager({
                 trigger={
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1.5 rounded-[9px] border border-danger-500/30 bg-danger-500/10 px-3 py-1.5 text-xs font-semibold text-danger-500 hover:bg-danger-500/15"
+                    className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-danger-500/30 bg-danger-500/10 px-3 py-1.5 text-xs font-semibold text-danger-500 hover:bg-danger-500/15"
                   >
                     <Trash2 className="h-3.5 w-3.5" /> Seçilenleri sil ({selected.length})
                   </button>
@@ -628,7 +653,7 @@ export function PropertyMediaManager({
                   commitOrder();
                 }}
                 onDragEnd={commitOrder}
-                className={`group relative aspect-[4/3] overflow-hidden rounded-[14px] border bg-canvas transition ${
+                className={`group relative aspect-[4/3] overflow-hidden rounded-[var(--radius-card)] border bg-canvas transition ${
                   dragId === m.id
                     ? "border-brand-300 opacity-40"
                     : selectedSet.has(m.id)
@@ -637,7 +662,7 @@ export function PropertyMediaManager({
                 } ${canEdit ? "cursor-grab active:cursor-grabbing" : ""}`}
               >
                 <Image
-                  src={`/api/property-media/${m.id}`}
+                  src={`/api/property-media/${m.id}/download`}
                   alt="Portföy görseli"
                   fill
                   sizes="(max-width: 640px) 50vw, 25vw"
@@ -647,7 +672,7 @@ export function PropertyMediaManager({
                 />
                 {canEdit ? (
                   <>
-                    <label className="absolute left-2 top-2 z-10 grid h-7 w-7 cursor-pointer place-items-center rounded-[8px] bg-ink-950/55 backdrop-blur-sm">
+                    <label className="absolute left-2 top-2 z-10 grid h-7 w-7 cursor-pointer place-items-center rounded-[var(--radius-control)] bg-ink-950/55 backdrop-blur-sm">
                       <input
                         type="checkbox"
                         checked={selectedSet.has(m.id)}
@@ -656,25 +681,25 @@ export function PropertyMediaManager({
                         className="h-4 w-4 accent-[var(--brand-600)]"
                       />
                     </label>
-                    <span className="hover-action absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-[8px] bg-ink-950/55 text-white opacity-0 backdrop-blur-sm transition group-hover:opacity-100">
+                    <span className="hover-action absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-[var(--radius-control)] bg-ink-950/55 text-white opacity-0 backdrop-blur-sm transition group-hover:opacity-100">
                       <GripVertical className="h-3.5 w-3.5" />
                     </span>
                   </>
                 ) : null}
                 {/* Sıra numarası — sürükleyerek değiştirilen düzen görünür olsun */}
-                <span className="absolute bottom-2 left-2 z-10 rounded-full bg-ink-950/60 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur-sm">
+                <span className="absolute bottom-2 left-2 z-10 rounded-full bg-ink-950/60 px-2 py-0.5 text-xs font-bold text-white backdrop-blur-sm">
                   {i + 1}
                 </span>
                 <div className="absolute left-1/2 top-2 z-10 flex -translate-x-1/2 flex-wrap justify-center gap-1">
                   {m.is_cover ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-ink-950/80 px-2 py-0.5 text-[11px] font-bold text-white">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-ink-950/80 px-2 py-0.5 text-xs font-bold text-white">
                       <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> Kapak
                     </span>
                   ) : null}
                   {canEdit && !m.has_watermark ? (
                     <span
                       title="Bu görsel filigransız yüklendi. Ayar değişse bile eski görseller yeniden damgalanmaz — yeniden yükleyerek damgalayabilirsiniz."
-                      className="inline-flex items-center gap-1 rounded-full bg-amber-400/85 px-2 py-0.5 text-[11px] font-bold text-ink-950"
+                      className="inline-flex items-center gap-1 rounded-full bg-amber-400/85 px-2 py-0.5 text-xs font-bold text-ink-950"
                     >
                       <Droplets className="h-3 w-3" /> Filigran yok
                     </span>
@@ -687,7 +712,7 @@ export function PropertyMediaManager({
                       title="AI ile oku (tapu/yetki belgesi)"
                       disabled={ocrPending}
                       onClick={() => runOcr(m.id)}
-                      className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] bg-white/90 text-brand-600 hover:bg-white disabled:opacity-60"
+                      className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-brand-600 hover:bg-white disabled:opacity-60"
                     >
                       {ocrBusyId === m.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ScanText className="h-3.5 w-3.5" />}
                     </button>
@@ -696,7 +721,7 @@ export function PropertyMediaManager({
                         type="button"
                         title="Kapak yap"
                         onClick={() => makeCover(m.id)}
-                        className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] bg-white/90 text-ink-950 hover:bg-white"
+                        className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-ink-950 hover:bg-white"
                       >
                         <Star className="h-3.5 w-3.5" />
                       </button>
@@ -706,7 +731,7 @@ export function PropertyMediaManager({
                         <button
                           type="button"
                           title="Sil"
-                          className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] bg-danger-500 text-white hover:bg-danger-600"
+                          className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-danger-500 text-white hover:bg-danger-600"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -725,7 +750,7 @@ export function PropertyMediaManager({
         ) : null}
 
         {canEdit && images.length > 0 && unstamped > 0 && watermark.enabled ? (
-          <p className="mt-2 text-[11px] text-text-faint">
+          <p className="mt-2 text-xs text-text-faint">
             {unstamped} görsel filigransız. Filigran yükleme anında basıldığı için eski görseller
             geriye dönük damgalanmaz — istersen o fotoğrafları silip yeniden yükleyebilirsin.
           </p>
@@ -734,8 +759,8 @@ export function PropertyMediaManager({
         {links.length > 0 ? (
           <div className="mt-4 space-y-2">
             {links.map((m) => (
-              <div key={m.id} className="flex items-center gap-2 rounded-[12px] border border-line bg-canvas px-3 py-2.5">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-brand-600/10 text-brand-600">
+              <div key={m.id} className="flex items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
                   {m.kind === "tour" ? <View className="h-4 w-4" /> : <Film className="h-4 w-4" />}
                 </span>
                 <a
@@ -755,7 +780,7 @@ export function PropertyMediaManager({
                       fd.set("property_id", propertyId);
                       startTransition(() => deletePropertyMedia(fd));
                     }}
-                    className="grid h-7 w-7 min-h-9 min-w-9 shrink-0 place-items-center rounded-[8px] border border-line text-danger-500 hover:border-danger-500/40"
+                    className="grid h-7 w-7 min-h-9 min-w-9 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line text-danger-500 hover:border-danger-500/40"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -770,14 +795,14 @@ export function PropertyMediaManager({
             <input type="hidden" name="property_id" value={propertyId} />
             <label className="text-xs font-medium text-text-muted">
               Tür
-              <select name="kind" defaultValue="video" className="mt-1.5 block rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm font-semibold outline-none focus:border-brand-400">
+              <select name="kind" defaultValue="video" className="mt-1.5 block rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm font-semibold outline-none focus:border-brand-400">
                 <option value="video">Video</option>
                 <option value="tour">360° Sanal tur</option>
               </select>
             </label>
             <label className="min-w-[220px] flex-1 text-xs font-medium text-text-muted">
               Bağlantı (YouTube, Matterport, Kuula vb.)
-              <div className="mt-1.5 flex items-center gap-1.5 rounded-[10px] border border-line bg-canvas px-3">
+              <div className="mt-1.5 flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3">
                 <Link2 className="h-4 w-4 text-text-faint" />
                 <input
                   name="external_url"
@@ -789,7 +814,7 @@ export function PropertyMediaManager({
             <button
               type="submit"
               disabled={urlPending}
-              className="rounded-[10px] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-800 disabled:opacity-60"
+              className="rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-800 disabled:opacity-60"
             >
               {urlPending ? "Ekleniyor…" : "Bağlantı ekle"}
             </button>
@@ -799,32 +824,36 @@ export function PropertyMediaManager({
       </div>
 
       {/* C8: Belge OCR sonuç dialogu */}
-      {ocrOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/40 p-4 backdrop-blur-sm sm:items-center"
-          onClick={() => setOcrOpen(false)}
+      <Dialog open={ocrOpen} onOpenChange={setOcrOpen}>
+        <DialogContent
+          size="lg"
+          overlayClassName="bg-ink-950/40 backdrop-blur-sm"
+          className="max-w-xl rounded-[var(--radius-panel)] border-line p-5 shadow-none"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            const target = ocrReturnFocusRef.current;
+            ocrReturnFocusRef.current = null;
+            target?.focus();
+          }}
         >
-          <div
-            className="w-full max-w-xl rounded-[20px] border border-line bg-surface p-5"
-            onClick={(e) => e.stopPropagation()}
-          >
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <h3 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                <DialogTitle className="flex items-center gap-2 font-display font-bold text-ink-950">
                   <Sparkles className="h-4 w-4 text-brand-600" /> Belgeden okunan bilgiler
-                </h3>
-                <p className="mt-0.5 text-xs text-text-muted">
+                </DialogTitle>
+                <DialogDescription className="mt-0.5 text-xs text-text-muted">
                   AI çıktısıdır, hata içerebilir — uygulamadan önce kontrol edip düzeltin. Bulunamayan alanlar boş bırakılır.
-                </p>
+                </DialogDescription>
               </div>
-              <button
-                type="button"
-                aria-label="Kapat"
-                onClick={() => setOcrOpen(false)}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] border border-line text-text-muted hover:text-ink-950"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <DialogClose asChild>
+                <button
+                  type="button"
+                  aria-label="Kapat"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted hover:text-ink-950"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </DialogClose>
             </div>
 
             {ocrPending ? (
@@ -852,13 +881,13 @@ export function PropertyMediaManager({
                         value={ocrValues[f.key] ?? ""}
                         onChange={(e) => setOcrValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
                         placeholder="—"
-                        className="mt-1.5 block w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm font-semibold text-ink-950 outline-none focus:border-brand-400"
+                        className="mt-1.5 block w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm font-semibold text-ink-950 outline-none focus:border-brand-400"
                       />
                     </label>
                   ))}
                 </div>
 
-                <p className="mt-3 text-[11px] text-text-faint">
+                <p className="mt-3 text-xs text-text-faint">
                   Ada, parsel ve yüzölçümü portföy alanlarına yazılır; diğer tapu bilgileri iç notlara
                   &quot;Tapu bilgileri (AI)&quot; bloğu olarak eklenir.
                 </p>
@@ -870,7 +899,7 @@ export function PropertyMediaManager({
                   <button
                     type="button"
                     onClick={copyOcr}
-                    className="inline-flex items-center gap-1.5 rounded-[10px] border border-line px-3.5 py-2 text-sm font-semibold text-ink-950 hover:bg-canvas"
+                    className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3.5 py-2 text-sm font-semibold text-ink-950 hover:bg-canvas"
                   >
                     {copied ? <Check className="h-4 w-4 text-mint-600" /> : <Copy className="h-4 w-4" />}
                     {copied ? "Kopyalandı" : "Kopyala"}
@@ -880,7 +909,7 @@ export function PropertyMediaManager({
                       type="button"
                       onClick={applyOcr}
                       disabled={applyPending}
-                      className="btn-shine inline-flex items-center gap-1.5 rounded-[10px] bg-ink-950 px-3.5 py-2 text-sm font-semibold text-white hover:bg-ink-800 disabled:opacity-60"
+                      className="btn-shine inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-sm font-semibold text-white hover:bg-ink-800 disabled:opacity-60"
                     >
                       {applyPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                       Portföye uygula
@@ -889,9 +918,8 @@ export function PropertyMediaManager({
                 </div>
               </>
             )}
-          </div>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

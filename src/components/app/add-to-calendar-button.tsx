@@ -39,7 +39,7 @@ export function AddToCalendarButton({ event }: { event: CalendarEvent }) {
       <button
         type="button"
         onClick={() => setOpen((s) => !s)}
-        className="inline-flex items-center gap-1.5 rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+        className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
         aria-expanded={open}
         aria-haspopup="true"
       >
@@ -49,7 +49,7 @@ export function AddToCalendarButton({ event }: { event: CalendarEvent }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-1 w-52 overflow-hidden rounded-[12px] border border-line bg-surface shadow-[var(--shadow-lg)]">
+        <div className="absolute right-0 top-full z-20 mt-1 w-52 overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-lg)]">
           {/* Google Calendar */}
           <a
             href={googleCalendarAddUrl(event)}
@@ -91,7 +91,7 @@ export function AddToCalendarButton({ event }: { event: CalendarEvent }) {
           >
             <Download className="h-4 w-4 shrink-0 text-text-muted" />
             ICS dosyası indir
-            <span className="ml-auto text-[11px] text-text-faint">Apple, diğer</span>
+            <span className="ml-auto text-xs text-text-faint">Apple, diğer</span>
           </button>
         </div>
       )}

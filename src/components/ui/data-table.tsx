@@ -255,12 +255,12 @@ export function DataTable({
               }}
               placeholder={searchPlaceholder}
               aria-label={searchPlaceholder}
-              className="focus-ring surface-sunken w-full max-w-xs rounded-[10px] border border-hairline px-3 py-2 text-sm outline-none transition focus:bg-surface"
+              className="focus-ring surface-sunken w-full max-w-xs rounded-[var(--radius-control)] border border-hairline px-3 py-2 text-sm outline-none transition focus:bg-surface"
             />
           ) : null}
           {toolbar}
           <span
-            className="numeric ml-auto text-[11px] font-medium tracking-wide text-text-faint"
+            className="numeric ml-auto text-xs font-medium tracking-wide text-text-faint"
             aria-live="polite"
           >
             {sorted.length} kayıt
@@ -369,7 +369,7 @@ export function DataTable({
                                   href={target}
                                   // relative + z-10: satırı kaplayan görünmez
                                   // bağlantının üstünde kalsın, tıklama buraya gelsin
-                                  className="focus-ring press relative z-10 inline-flex items-center gap-1.5 rounded-[8px] border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-[var(--elev-1)] transition hover:bg-brand-600/5"
+                                  className="focus-ring press relative z-10 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-[var(--elev-1)] transition hover:bg-brand-600/5"
                                 >
                                   {col.linkLabel ?? "Aç"}
                                 </Link>
@@ -379,7 +379,7 @@ export function DataTable({
                             <>
                               {formatCell(value, col.format)}
                               {col.subtitleKey && row[col.subtitleKey] ? (
-                                <span className="mt-0.5 block text-[11px] font-normal text-text-faint">
+                                <span className="mt-0.5 block text-xs font-normal text-text-faint">
                                   {String(row[col.subtitleKey])}
                                 </span>
                               ) : null}
@@ -437,7 +437,7 @@ export function DataTable({
               type="button"
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={safePage === 0}
-              className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas disabled:pointer-events-none disabled:opacity-40"
+              className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas disabled:pointer-events-none disabled:opacity-40"
             >
               <ChevronLeft className="h-4 w-4" /> Önceki
             </button>
@@ -448,7 +448,7 @@ export function DataTable({
               type="button"
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={safePage >= totalPages - 1}
-              className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas disabled:pointer-events-none disabled:opacity-40"
+              className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas disabled:pointer-events-none disabled:opacity-40"
             >
               Sonraki <ChevronRight className="h-4 w-4" />
             </button>

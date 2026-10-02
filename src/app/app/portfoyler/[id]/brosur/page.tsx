@@ -5,6 +5,7 @@ import { ArrowLeft, Building2, Flame, Layers, Phone, QrCode, Ruler, BedDouble, C
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { moneyTry } from "@/lib/leak-shield";
+import { getBaseUrl } from "@/lib/base-url";
 import { PrintButton } from "./print-button";
 
 type Rel = { name?: string } | { name?: string }[] | null;
@@ -119,7 +120,7 @@ export default async function PropertyBrochurePage({
     return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), 500))}…`;
   })();
 
-  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const baseUrl = getBaseUrl();
   const vitrinUrl = tenant?.slug ? `${baseUrl}/vitrin/${tenant.slug}/${property.id}` : null;
   // Harici QR servisi (goqr.me) — vitrin-qr.tsx deseni; yalnız public ilan URL'i iletilir.
   const qrSrc = vitrinUrl
@@ -145,15 +146,15 @@ export default async function PropertyBrochurePage({
           <div className="flex min-w-0 items-center gap-3">
             {tenant?.logo_url ? (
               // eslint-disable-next-line @next/next/no-img-element -- Storage public URL; next/image remote domain konfigürasyonu gerektirir
-              <img src={tenant.logo_url} alt={`${officeName} logosu`} className="h-9 w-9 shrink-0 rounded-[8px] bg-white object-contain p-0.5" />
+              <img src={tenant.logo_url} alt={`${officeName} logosu`} className="h-9 w-9 shrink-0 rounded-[var(--radius-control)] bg-white object-contain p-0.5" />
             ) : (
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[8px] bg-white/10 font-display text-sm font-extrabold">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-white/10 font-display text-sm font-extrabold">
                 {officeName[0]}
               </span>
             )}
             <div className="min-w-0">
               <p className="truncate font-display text-base font-extrabold leading-tight">{officeName}</p>
-              {tenant?.phone ? <p className="text-[11px] text-white/60">{tenant.phone}</p> : null}
+              {tenant?.phone ? <p className="text-xs text-white/60">{tenant.phone}</p> : null}
             </div>
           </div>
           <span className="shrink-0 rounded-full bg-white/10 px-3 py-1 text-xs font-bold tracking-wide">
@@ -165,11 +166,12 @@ export default async function PropertyBrochurePage({
         <div className="print-avoid-break relative aspect-[16/9] w-full overflow-hidden bg-ink-950/5">
           {cover ? (
             <Image
-              src={`/api/property-media/${cover.id}`}
+              src={`/api/property-media/${cover.id}/download`}
               alt={property.title || property.property_code || "Portföy"}
               fill
               priority
               sizes="768px"
+              unoptimized
               className="object-cover"
             />
           ) : (
@@ -180,7 +182,7 @@ export default async function PropertyBrochurePage({
               </div>
             </div>
           )}
-          <span className="absolute left-4 top-4 rounded-full bg-ink-950/80 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-white">
+          <span className="absolute left-4 top-4 rounded-full bg-ink-950/80 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-white">
             {property.transaction_type}
           </span>
         </div>
@@ -203,9 +205,9 @@ export default async function PropertyBrochurePage({
           {specs.length > 0 ? (
             <div className="print-avoid-break mt-5 grid grid-cols-2 gap-2 sm:grid-cols-5">
               {specs.map((s) => (
-                <div key={s.label} className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5 text-center">
+                <div key={s.label} className="rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5 text-center">
                   <s.icon className="mx-auto h-4 w-4 text-brand-600" />
-                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-text-faint">{s.label}</p>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-text-faint">{s.label}</p>
                   <p className="text-sm font-bold text-ink-950">{s.value}</p>
                 </div>
               ))}
@@ -215,7 +217,7 @@ export default async function PropertyBrochurePage({
           {/* Açıklama — ilk ~600 karakter */}
           {shortDescription ? (
             <div className="mt-5">
-              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">İlan açıklaması</p>
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-faint">İlan açıklaması</p>
               <p className="mt-1.5 text-sm leading-relaxed text-text-muted">{shortDescription}</p>
             </div>
           ) : null}
@@ -246,23 +248,23 @@ export default async function PropertyBrochurePage({
             {qrSrc ? (
               <div className="shrink-0 text-center">
                 {/* eslint-disable-next-line @next/next/no-img-element -- harici QR servisi (goqr.me); next/image remote domain konfigürasyonu gerektirir */}
-                <img src={qrSrc} alt="İlanın vitrin sayfası için QR kodu" width={88} height={88} className="h-[88px] w-[88px] rounded-[8px] border border-line bg-white p-1" />
-                <p className="mt-1 flex items-center justify-center gap-1 text-[10px] font-semibold text-text-faint">
+                <img src={qrSrc} alt="İlanın vitrin sayfası için QR kodu" width={88} height={88} className="h-[88px] w-[88px] rounded-[var(--radius-control)] border border-line bg-white p-1" />
+                <p className="mt-1 flex items-center justify-center gap-1 text-xs font-semibold text-text-faint">
                   <QrCode className="h-3 w-3" /> İlanı telefonda aç
                 </p>
               </div>
             ) : (
-              <div className="shrink-0 rounded-[12px] border border-dashed border-line-strong px-4 py-3 text-center">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-text-faint">Portföy kodu</p>
+              <div className="shrink-0 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-3 text-center">
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-text-faint">Portföy kodu</p>
                 <p className="font-display text-lg font-extrabold text-ink-950">{property.property_code}</p>
               </div>
             )}
           </div>
-          <p className="mt-3 text-center text-[10px] text-text-faint">EmlakSoft ile hazırlandı</p>
+          <p className="mt-3 text-center text-xs text-text-faint">EmlakSoft ile hazırlandı</p>
         </footer>
       </article>
 
-      <p className="no-print text-center text-[11px] text-text-faint">
+      <p className="no-print text-center text-xs text-text-faint">
         Çıktı tek A4 sayfaya sığacak şekilde tasarlandı — tarayıcının yazdırma penceresinden &quot;PDF olarak kaydet&quot; seçebilirsiniz.
         {!tenant?.slug ? " Vitrin adresi (slug) tanımlanırsa QR kodu otomatik eklenir." : ""}
       </p>

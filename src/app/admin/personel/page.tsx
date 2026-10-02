@@ -54,7 +54,7 @@ const roleCls: Record<PlatformRole, string> = {
 };
 
 const field =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400";
 
 // ---------------------------------------------------------------------------
 // Add staff dialog
@@ -87,7 +87,7 @@ function AddStaffDialog({ onDone }: { onDone: () => void }) {
       <DialogTrigger asChild>
         <button
           type="button"
-          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[11px] bg-amber-400 px-4 py-2.5 text-sm font-bold text-ink-950"
+          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-amber-400 px-4 py-2.5 text-sm font-bold text-ink-950"
         >
           <Plus className="h-4 w-4" /> Personel ekle
         </button>
@@ -125,21 +125,21 @@ function AddStaffDialog({ onDone }: { onDone: () => void }) {
               </div>
 
               {error ? (
-                <p className="rounded-[10px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">{error}</p>
+                <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">{error}</p>
               ) : null}
               {success ? (
-                <p className="rounded-[10px] bg-mint-500/10 px-3 py-2 text-sm font-semibold text-mint-700" role="status">
+                <p className="rounded-[var(--radius-control)] bg-mint-500/10 px-3 py-2 text-sm font-semibold text-mint-700" role="status">
                   Personel eklendi ✓
                 </p>
               ) : null}
 
               <div className="hairline-t flex justify-end gap-2 pt-4">
                 <DialogClose asChild>
-                  <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:bg-canvas">
+                  <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:bg-canvas">
                     İptal
                   </button>
                 </DialogClose>
-                <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-ink-950 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+                <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
                   {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
                   {pending ? "Ekleniyor…" : "Ekle"}
                 </button>
@@ -210,7 +210,7 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => void }) 
             onChange={changeRole}
             disabled={pending || !member.is_active}
             aria-label={`${member.full_name} rolü`}
-            className={`focus-ring appearance-none rounded-[9px] border border-hairline bg-canvas py-1.5 pl-2.5 pr-8 text-xs font-semibold outline-none disabled:opacity-50 ${roleCls[member.role]}`}
+            className={`focus-ring appearance-none rounded-[var(--radius-control)] border border-hairline bg-canvas py-1.5 pl-2.5 pr-8 text-xs font-semibold outline-none disabled:opacity-50 ${roleCls[member.role]}`}
           >
             {(Object.entries(PLATFORM_ROLE_LABELS) as [PlatformRole, string][]).map(([v, l]) => (
               <option key={v} value={v}>{l}</option>
@@ -234,7 +234,7 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => void }) 
               <button
                 type="button"
                 disabled={pending}
-                className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-danger-500/30 bg-surface px-2.5 py-1.5 text-xs font-semibold text-danger-600 shadow-[var(--elev-1)] transition hover:bg-danger-500/8 disabled:opacity-50"
+                className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-danger-500/30 bg-surface px-2.5 py-1.5 text-xs font-semibold text-danger-600 shadow-[var(--elev-1)] transition hover:bg-danger-500/8 disabled:opacity-50"
               >
                 <UserMinus className="h-3 w-3" /> Pasif yap
               </button>
@@ -249,7 +249,7 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => void }) 
             type="button"
             onClick={reactivate}
             disabled={pending}
-            className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-mint-500/30 bg-surface px-2.5 py-1.5 text-xs font-semibold text-mint-700 shadow-[var(--elev-1)] transition hover:bg-mint-500/8 disabled:opacity-50"
+            className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-mint-500/30 bg-surface px-2.5 py-1.5 text-xs font-semibold text-mint-700 shadow-[var(--elev-1)] transition hover:bg-mint-500/8 disabled:opacity-50"
           >
             {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <><UserPlus className="h-3 w-3" /> Aktif yap</>}
           </button>
@@ -290,9 +290,9 @@ function StaffSkeleton() {
     <div className="animate-pulse space-y-2 px-5 py-4" aria-hidden>
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="flex items-center gap-3">
-          <div className="h-9 flex-1 rounded-[10px] bg-ink-950/8" />
-          <div className="h-9 w-28 rounded-[10px] bg-ink-950/8" />
-          <div className="h-9 w-20 rounded-[10px] bg-ink-950/8" />
+          <div className="h-9 flex-1 rounded-[var(--radius-control)] bg-ink-950/8" />
+          <div className="h-9 w-28 rounded-[var(--radius-control)] bg-ink-950/8" />
+          <div className="h-9 w-20 rounded-[var(--radius-control)] bg-ink-950/8" />
         </div>
       ))}
     </div>
@@ -359,13 +359,13 @@ export default function PersonelPage() {
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-amber-400/20 blur-[90px]" />
         <div className="relative">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="min-w-0">
-              <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-amber-300">
+              <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-amber-300">
                 <ShieldCheck className="h-3.5 w-3.5" /> Platform personeli
               </p>
               <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">Personel yönetimi</h1>
@@ -387,7 +387,7 @@ export default function PersonelPage() {
                   onClick={() => setRoleFilter(isActive ? "all" : r.role)}
                   aria-pressed={isActive}
                   title={isActive ? "Rol filtresini kaldır" : `Yalnızca ${r.label} rolünü göster`}
-                  className={`focus-ring press group relative block rounded-[14px] border p-3.5 text-left transition ${
+                  className={`focus-ring press group relative block rounded-[var(--radius-card)] border p-3.5 text-left transition ${
                     isActive
                       ? "border-amber-300/50 bg-white/15"
                       : "border-white/12 bg-white/8 backdrop-blur hover:border-white/25 hover:bg-white/12"
@@ -397,7 +397,7 @@ export default function PersonelPage() {
                   <p className="numeric mt-2 font-display text-xl font-extrabold tabular-nums text-white">
                     {loading ? "—" : r.count}
                   </p>
-                  <p className="text-[11px] text-white/70">{r.label}</p>
+                  <p className="text-xs text-white/70">{r.label}</p>
                 </button>
               );
             })}
@@ -406,7 +406,7 @@ export default function PersonelPage() {
       </section>
 
       {/* Arama + filtre çubuğu */}
-      <div className="flex flex-wrap items-center gap-3 rounded-[16px] border border-line bg-surface p-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3">
         <div className="relative w-full max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-faint" />
           <input
@@ -415,29 +415,29 @@ export default function PersonelPage() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Ad soyad veya e-posta ara…"
             aria-label="Personel ara"
-            className="focus-ring w-full rounded-[10px] border border-line bg-canvas px-8 py-2 text-sm outline-none transition focus:border-brand-400"
+            className="focus-ring w-full rounded-[var(--radius-control)] border border-line bg-canvas px-8 py-2 text-sm outline-none transition focus:border-brand-400"
           />
         </div>
         {searching ? (
           <button
             type="button"
             onClick={() => { setQuery(""); setRoleFilter("all"); }}
-            className="focus-ring press inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
+            className="focus-ring press inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
           >
             Filtreleri temizle
           </button>
         ) : null}
-        <p className="ml-auto text-[11px] text-text-faint">
+        <p className="ml-auto text-xs text-text-faint">
           {loading ? "Kadro yükleniyor…" : `${totalActive} aktif personel · ${staff.length} kayıt`}
         </p>
       </div>
 
       {/* Aktif personel */}
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex items-center gap-2 border-b border-line px-5 py-3.5">
           <ShieldCheck className="h-4 w-4 text-amber-600" />
           <h2 className="font-display font-bold text-ink-950">Aktif personel</h2>
-          <span className="ml-auto rounded-full bg-brand-600/10 px-2.5 py-0.5 text-[11px] font-bold text-brand-600">{active.length}</span>
+          <span className="ml-auto rounded-full bg-brand-600/10 px-2.5 py-0.5 text-xs font-bold text-brand-600">{active.length}</span>
         </div>
         {loading ? (
           <StaffSkeleton />
@@ -459,11 +459,11 @@ export default function PersonelPage() {
 
       {/* Pasif personel */}
       {passive.length > 0 ? (
-        <section className="overflow-hidden rounded-[20px] border border-line bg-surface opacity-70">
+        <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface opacity-70">
           <div className="flex items-center gap-2 border-b border-line px-5 py-3.5">
             <UserMinus className="h-4 w-4 text-text-faint" />
             <h2 className="font-display font-bold text-ink-950">Pasif personel</h2>
-            <span className="ml-auto rounded-full bg-canvas px-2.5 py-0.5 text-[11px] font-bold text-text-faint">{passive.length}</span>
+            <span className="ml-auto rounded-full bg-canvas px-2.5 py-0.5 text-xs font-bold text-text-faint">{passive.length}</span>
           </div>
           <StaffTable rows={passive} onDone={load} />
         </section>

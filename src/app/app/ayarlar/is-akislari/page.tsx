@@ -122,7 +122,7 @@ export default async function IsAkislariPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/35 blur-[80px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -139,18 +139,18 @@ export default async function IsAkislariPage() {
             </p>
           </div>
           <div className="flex gap-3">
-            <div className="rounded-[14px] border border-white/12 bg-white/[0.05] px-5 py-3 text-center">
+            <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-5 py-3 text-center">
               <p className="font-display text-xl font-extrabold text-mint-300">{activeCount}</p>
-              <p className="text-[11px] text-white/55">aktif akış</p>
+              <p className="text-xs text-white/55">aktif akış</p>
             </div>
             <Link
               href="/app/gorevler"
-              className="focus-ring press flex items-center gap-2.5 rounded-[14px] border border-white/12 bg-white/[0.05] px-5 py-3 transition hover:border-white/30"
+              className="focus-ring press flex items-center gap-2.5 rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-5 py-3 transition hover:border-white/30"
             >
               <ListChecks className="h-5 w-5 text-brand-300" />
               <div className="text-left">
                 <p className="font-display text-xl font-extrabold text-white">{totalSteps}</p>
-                <p className="text-[11px] text-white/55">tanımlı adım</p>
+                <p className="text-xs text-white/55">tanımlı adım</p>
               </div>
             </Link>
           </div>

@@ -2,19 +2,26 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
 import { checkAuthorityShield } from "@/lib/authority-shield";
 import { notifyTenant } from "@/lib/notify";
-import { buildSplits, calculateCommission } from "@/lib/commission";
-import { wonDealPropertyStatus } from "@/lib/deal-outcome";
+import { validateTenantReferences } from "@/lib/tenant-references";
+import { parseMoneyInput } from "@/lib/money-input";
+import {
+  DEAL_STAGES as WORKFLOW_DEAL_STAGES,
+  isDealStage,
+  isDealTransitionAllowed,
+  type DealStage,
+} from "@/lib/workflow-state";
 
 export type DealResult = { error?: string; ok?: boolean; dealId?: string };
 
-export const DEAL_STAGES = ["new", "qualified", "negotiation", "won", "lost"] as const;
-export type DealStage = (typeof DEAL_STAGES)[number];
+export const DEAL_STAGES = WORKFLOW_DEAL_STAGES;
+export type { DealStage };
 
 export async function createPipelineDeal(formData: FormData): Promise<DealResult> {
   const gate = await requirePermission("commissions", "create");
@@ -24,9 +31,14 @@ export async function createPipelineDeal(formData: FormData): Promise<DealResult
   const customerId = String(formData.get("customer_id") ?? "").trim() || null;
   const dealType = String(formData.get("deal_type") ?? "sale").trim() === "rent" ? "rent" : "sale";
   const stageRaw = String(formData.get("stage") ?? "new").trim();
-  const stage = (DEAL_STAGES as readonly string[]).includes(stageRaw) ? stageRaw : "new";
-  const amountRaw = String(formData.get("deal_value") ?? "").replace(/[^\d.,]/g, "");
-  const dealValue = amountRaw ? Number(amountRaw.replace(/\./g, "").replace(",", ".")) : null;
+  const creatableStages = new Set<DealStage>(["new", "qualified", "negotiation"]);
+  const stage = (DEAL_STAGES as readonly string[]).includes(stageRaw)
+    ? stageRaw as DealStage
+    : "new";
+  if (!creatableStages.has(stage)) return { error: "Yeni anlaşma kapanmış aşamada oluşturulamaz." };
+  const amountResult = parseMoneyInput(formData.get("deal_value"), { max: 100_000_000_000 });
+  if (!amountResult.ok) return { error: "Geçerli bir anlaşma tutarı girin." };
+  const dealValue = amountResult.value;
   const hasAuthority = String(formData.get("has_authority") ?? "") === "1";
 
   // Pipeline girişinde yetki; erken aşamada uyarı zorunlu değil — müzakere/won için şart
@@ -34,6 +46,15 @@ export async function createPipelineDeal(formData: FormData): Promise<DealResult
     const shield = checkAuthorityShield({ hasWrittenAuthority: hasAuthority });
     if (!shield.ok) return { error: shield.warning ?? "Yetki belgesi gerekli." };
   }
+  if (stage === "negotiation" && (!propertyId || !customerId)) {
+    return { error: "Müzakere aşaması için portföy ve müşteri zorunludur." };
+  }
+
+  const references = await validateTenantReferences(gate.tenantId, {
+    propertyId,
+    customerId,
+  });
+  if (!references.ok) return { error: references.error };
 
   const supabase = await createClient();
   const { data: deal, error } = await supabase
@@ -44,7 +65,7 @@ export async function createPipelineDeal(formData: FormData): Promise<DealResult
       customer_id: customerId,
       deal_type: dealType,
       stage,
-      deal_value: dealValue && Number.isFinite(dealValue) ? dealValue : null,
+      deal_value: dealValue,
       probability: stage === "won" ? 100 : stage === "negotiation" ? 60 : stage === "qualified" ? 40 : 20,
       assigned_to: gate.userId,
     })
@@ -82,142 +103,106 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
   }
   const stage = stageRaw as DealStage;
   const lossReason = String(formData.get("loss_reason") ?? "").trim() || null;
+  if (stage === "lost" && !lossReason) return { error: "Kayıp nedeni zorunludur." };
 
-  const supabase = await createClient();
-  const { data: existing } = await supabase
+  const admin = createAdminClient();
+  const { data: existing, error: loadError } = await admin
     .from("deals")
     .select("id, stage, property_id, customer_id, deal_type, deal_value")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
 
+  if (loadError) return { error: "Anlaşma durumu okunamadı." };
   if (!existing) return { error: "Anlaşma bulunamadı." };
-
-  // C.6 — "Won"dan geri alma (yanlış kazanıldı işareti). Otomatik üretilen
-  // komisyon henüz tahsil edilmişse aşama düşürülemez (hayalet/çelişik kayıt
-  // olmasın); tahsil edilmemişse aşağıda temizlenir.
-  const leavingWon = existing.stage === "won" && stage !== "won";
-  let autoCommissionId: string | null = null;
-  if (leavingWon) {
-    const { data: comm } = await supabase
-      .from("commissions")
-      .select("id, status")
-      .eq("deal_id", id)
-      .eq("tenant_id", gate.tenantId)
-      .maybeSingle();
-    if (comm) {
-      if (comm.status === "paid" || comm.status === "collected") {
-        return {
-          error:
-            "Bu anlaşmanın komisyonu tahsil edilmiş. Aşamayı düşürmeden önce Komisyon ekranından tahsilatı geri alın.",
-        };
-      }
-      autoCommissionId = comm.id; // 'calculated' → geri almada silinir
+  if (!isDealStage(existing.stage) || !isDealTransitionAllowed(existing.stage, stage)) {
+    return { error: "Bu aşama geçişi desteklenmiyor." };
+  }
+  if (stage === "won" && existing.stage !== "won") {
+    if (existing.deal_type === "rent") {
+      return { error: "Kiralama kapanışı; kira sözleşmesi, komisyon ve portföy birlikte kaydedilsin diye Kiralama ekranından tamamlanmalıdır." };
     }
+    const createGate = await requirePermission("commissions", "create");
+    if (!createGate.ok) return { error: createGate.error };
+  }
+  if (existing.stage === "won" && stage !== "won") {
+    const deleteGate = await requirePermission("commissions", "delete");
+    if (!deleteGate.ok) return { error: deleteGate.error };
   }
 
-  const { error } = await supabase
-    .from("deals")
-    .update({
-      stage,
-      loss_reason: stage === "lost" ? lossReason : null,
-      probability: stage === "won" ? 100 : stage === "lost" ? 0 : stage === "negotiation" ? 60 : stage === "qualified" ? 40 : 20,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id);
-
-  if (error) return { error: "Aşama güncellenemedi." };
-
-  await logActivity({
-    tenantId: gate.tenantId,
-    actorId: gate.userId,
-    action: "deal.stage",
-    entityType: "deal",
-    entityId: id,
-    oldValue: { stage: existing.stage },
-    newValue: { stage, loss_reason: lossReason },
+  const { data: transitionData, error } = await admin.rpc("transition_deal_stage_atomic", {
+    p_tenant_id: gate.tenantId,
+    p_actor_id: gate.userId,
+    p_deal_id: id,
+    p_stage: stage,
+    p_loss_reason: lossReason,
+    p_expected_stage: existing.stage,
   });
-
-  // C.6 — "Won"dan çıkış temizliği: tahsil edilmemiş otomatik komisyonu sil ve
-  // bu anlaşmanın win'iyle 'sold'/'rented' olmuş portföyü (başka kazanılmış
-  // anlaşması yoksa) 'active'e geri döndür.
-  if (leavingWon) {
-    if (autoCommissionId) {
-      await supabase.from("commissions").delete().eq("id", autoCommissionId).eq("tenant_id", gate.tenantId);
-    }
-    if (existing.property_id) {
-      const { data: otherWon } = await supabase
-        .from("deals")
-        .select("id")
-        .eq("tenant_id", gate.tenantId)
-        .eq("property_id", existing.property_id)
-        .eq("stage", "won")
-        .neq("id", id)
-        .limit(1)
-        .maybeSingle();
-      if (!otherWon) {
-        const { data: p } = await supabase
-          .from("properties")
-          .select("status")
-          .eq("id", existing.property_id)
-          .eq("tenant_id", gate.tenantId)
-          .maybeSingle();
-        if (p && (p.status === "sold" || p.status === "rented")) {
-          await supabase
-            .from("properties")
-            .update({ status: "active", updated_at: new Date().toISOString() })
-            .eq("id", existing.property_id)
-            .eq("tenant_id", gate.tenantId);
-        }
-      }
-    }
-    revalidatePath("/app/komisyon");
-    revalidatePath("/app/portfoyler");
+  if (error) {
+    console.error("updateDealStage atomic", { code: error.code });
+    return { error: "Aşama, komisyon ve portföy durumu birlikte güncellenemedi." };
   }
+  const transition = transitionData && typeof transitionData === "object" && !Array.isArray(transitionData)
+    ? transitionData as Record<string, unknown>
+    : null;
+  const outcome = typeof transition?.outcome === "string" ? transition.outcome : "invalid_result";
+  if (outcome === "commission_settled") {
+    return { error: "Komisyon tahsil edilmiş. Önce Komisyon ekranından tahsilatı geri alın." };
+  }
+  if (outcome === "payment_in_progress") {
+    return { error: "Bağlı ödeme bağlantısı varken anlaşma geri açılamaz; önce finans ekibiyle bağlantıyı kapatın." };
+  }
+  if (outcome === "rental_lifecycle_required") {
+    return { error: "Kiralama kaydına bağlı anlaşma buradan geri açılamaz; Kiralama ekranındaki yaşam döngüsünü kullanın." };
+  }
+  if (outcome === "conflict") return { error: "Anlaşma aşaması başka bir işlemde değişti. Sayfayı yenileyin." };
+  if (outcome === "property_required") return { error: "Kazanmak için anlaşmaya portföy bağlayın." };
+  if (outcome === "customer_required") return { error: "Kazanmak için anlaşmaya müşteri bağlayın." };
+  if (outcome === "deal_value_required") return { error: "Kazanmak için geçerli anlaşma tutarı girin." };
+  if (outcome === "commission_rate_required") return { error: "Kapanıştan önce portföyde 0'dan büyük geçerli bir komisyon oranı tanımlayın." };
+  if (outcome === "property_already_closed") return { error: "Bu portföy için kazanılmış başka bir anlaşma var." };
+  if (outcome === "property_unavailable") return { error: "Portföyün mevcut durumu bu kapanış türüyle uyuşmuyor." };
+  if (outcome === "property_active_rental") return { error: "Bu portföy için zaten aktif bir kiralama kaydı var." };
+  if (outcome === "invalid_transition") return { error: "Bu aşama geçişi desteklenmiyor." };
+  if (outcome !== "applied" && outcome !== "replay") return { error: "Aşama güncellenemedi." };
+
+  const previousStage = typeof transition?.previous_stage === "string"
+    ? transition.previous_stage
+    : existing.stage;
+  const propertyId = typeof transition?.property_id === "string" ? transition.property_id : existing.property_id;
+  const customerId = typeof transition?.customer_id === "string" ? transition.customer_id : existing.customer_id;
+  const dealType = typeof transition?.deal_type === "string" ? transition.deal_type : existing.deal_type;
+  const dealValue = typeof transition?.deal_value === "number" ? transition.deal_value : existing.deal_value;
 
   // Otomasyon tetikle — hata ana işlemi asla bozmasın
-  if (stage === "lost" && existing.stage !== "lost") {
+  if (outcome === "applied" && stage === "lost" && previousStage !== "lost") {
     try {
       await dispatchAutomationEvent(gate.tenantId, "deal_lost", {
         entityType: "deal",
         entityId: id,
         dealId: id,
-        customerId: existing.customer_id,
-        propertyId: existing.property_id,
+        customerId,
+        propertyId,
         assignedTo: gate.userId,
-        fields: { loss_reason: lossReason, deal_type: existing.deal_type, deal_value: existing.deal_value },
+        fields: { loss_reason: lossReason, deal_type: dealType, deal_value: dealValue },
       });
     } catch (e) {
       console.error("automation deal_lost", e);
     }
   }
 
-  // Won’a geçişte komisyon yoksa üret (pipeline içi — yetki property workflow’da zorunlu)
-  if (stage === "won" && existing.property_id && existing.stage !== "won") {
-    const { data: existingComm } = await supabase
-      .from("commissions")
-      .select("id")
-      .eq("deal_id", id)
-      .maybeSingle();
-
-    if (!existingComm) {
-      await ensureCommissionForDeal(
-        gate.tenantId,
-        gate.userId,
-        id,
-        existing.property_id,
-        existing.deal_value,
-        existing.deal_type,
-      );
+  if (outcome === "applied" && stage === "won" && previousStage !== "won") {
+    try {
+      await notifyTenant({
+        tenantId: gate.tenantId,
+        title: "Anlaşma kazanıldı",
+        body: "Pipeline’da won · komisyon kontrol edin",
+        href: "/app/komisyon",
+        kind: "success",
+      });
+    } catch (notificationError) {
+      console.error("updateDealStage notification", notificationError);
     }
-
-    await notifyTenant({
-      tenantId: gate.tenantId,
-      title: "Anlaşma kazanıldı",
-      body: "Pipeline’da won · komisyon kontrol edin",
-      href: "/app/komisyon",
-      kind: "success",
-    });
 
     // Otomasyon tetikle — hata ana işlemi asla bozmasın
     try {
@@ -225,10 +210,10 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
         entityType: "deal",
         entityId: id,
         dealId: id,
-        customerId: existing.customer_id,
-        propertyId: existing.property_id,
+        customerId,
+        propertyId,
         assignedTo: gate.userId,
-        fields: { deal_type: existing.deal_type, deal_value: existing.deal_value },
+        fields: { deal_type: dealType, deal_value: dealValue },
       });
     } catch (e) {
       console.error("automation deal_won", e);
@@ -244,15 +229,17 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
         id,
         ownerId: gate.userId,
         dealId: id,
-        customerId: existing.customer_id,
-        propertyId: existing.property_id,
-        fields: { deal_type: existing.deal_type },
+        customerId,
+        propertyId,
+        fields: { deal_type: dealType },
       },
     });
   }
 
   revalidatePath("/app/anlasmalar");
   revalidatePath("/app/komisyon");
+  revalidatePath("/app/portfoyler");
+  if (propertyId) revalidatePath(`/app/portfoyler/${propertyId}`);
   revalidatePath("/app");
   return { ok: true, dealId: id };
 }
@@ -264,30 +251,57 @@ export async function updateDeal(formData: FormData): Promise<DealResult> {
   const id = String(formData.get("deal_id") ?? "").trim();
   if (!id) return { error: "Anlaşma bulunamadı." };
 
-  const amountRaw = String(formData.get("deal_value") ?? "").replace(/[^\d.,]/g, "");
-  const dealValue = amountRaw ? Number(amountRaw.replace(/\./g, "").replace(",", ".")) : null;
+  const amountRaw = String(formData.get("deal_value") ?? "").trim();
+  const amountResult = parseMoneyInput(amountRaw, { max: 100_000_000_000 });
+  if (!amountResult.ok) return { error: "Geçerli bir anlaşma tutarı girin." };
   const probRaw = String(formData.get("probability") ?? "").trim();
-  const probability = probRaw ? Math.max(0, Math.min(100, Number(probRaw))) : null;
+  const probability = probRaw ? Number(probRaw) : null;
+  if (probRaw && (!Number.isFinite(probability) || probability == null || probability < 0 || probability > 100)) {
+    return { error: "Olasılık 0-100 arasında olmalı." };
+  }
   const assignedTo = String(formData.get("assigned_to") ?? "").trim();
   const dealType = String(formData.get("deal_type") ?? "").trim();
 
+  const references = await validateTenantReferences(gate.tenantId, {
+    profileId: assignedTo || null,
+  });
+  if (!references.ok) return { error: references.error };
+
+  const supabase = await createClient();
+  const { data: current, error: currentError } = await supabase
+    .from("deals")
+    .select("id, stage, deal_value, deal_type")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (currentError || !current) return { error: "Anlaşma bulunamadı." };
+  if (current.stage === "won" && (
+    (amountResult.value != null && Number(current.deal_value) !== amountResult.value)
+    || ((dealType === "sale" || dealType === "rent") && dealType !== current.deal_type)
+  )) {
+    return { error: "Kazanılmış anlaşmanın tutarı/türü değiştirilemez; önce kazanmayı geri alın." };
+  }
+
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (amountRaw) patch.deal_value = dealValue && Number.isFinite(dealValue) ? dealValue : null;
-  if (probRaw && probability != null && Number.isFinite(probability)) patch.probability = probability;
+  if (amountResult.value != null) patch.deal_value = amountResult.value;
+  if (probRaw && probability != null) patch.probability = probability;
   if (assignedTo) patch.assigned_to = assignedTo;
   if (dealType === "sale" || dealType === "rent") patch.deal_type = dealType;
 
-  const supabase = await createClient();
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("deals")
     .update(patch)
     .eq("id", id)
-    .eq("tenant_id", gate.tenantId);
+    .eq("tenant_id", gate.tenantId)
+    .eq("stage", current.stage)
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     console.error("updateDeal", error);
     return { error: "Anlaşma güncellenemedi." };
   }
+  if (!updated) return { error: "Anlaşma aşaması başka bir işlemde değişti. Sayfayı yenileyin." };
 
   await logActivity({
     tenantId: gate.tenantId,
@@ -345,14 +359,15 @@ export async function addDealCost(_prev: DealResult, fd: FormData): Promise<Deal
   const dealId = String(fd.get("deal_id") ?? "").trim();
   const kindRaw = String(fd.get("kind") ?? "").trim();
   const label = String(fd.get("label") ?? "").trim() || null;
-  const amount = parseFloat(String(fd.get("amount") ?? "0"));
+  const amountResult = parseMoneyInput(fd.get("amount"), { max: 100_000_000_000 });
   const notes = String(fd.get("notes") ?? "").trim() || null;
 
   if (!dealId) return { error: "Anlaşma bulunamadı." };
   if (!(DEAL_COST_KINDS as readonly string[]).includes(kindRaw)) {
     return { error: "Geçerli bir kalem türü seçin." };
   }
-  if (isNaN(amount) || amount <= 0) return { error: "Geçerli bir tutar girin." };
+  if (!amountResult.ok || amountResult.value == null) return { error: "Geçerli bir tutar girin." };
+  const amount = amountResult.value;
   const kind = kindRaw as DealCostKind;
 
   const supabase = await createClient();
@@ -550,81 +565,4 @@ export async function deleteDealNote(fd: FormData): Promise<void> {
 
   if (dealId) revalidatePath(`/app/anlasmalar/${dealId}`);
   revalidatePath("/app/anlasmalar");
-}
-
-async function ensureCommissionForDeal(
-  tenantId: string,
-  userId: string,
-  dealId: string,
-  propertyId: string,
-  dealValue: number | null,
-  dealType: string | null,
-) {
-  const supabase = await createClient();
-  const { data: property } = await supabase
-    .from("properties")
-    .select("list_price, commission_rate, property_code")
-    .eq("id", propertyId)
-    .maybeSingle();
-  if (!property) return;
-
-  const value = dealValue != null && Number.isFinite(Number(dealValue)) ? Number(dealValue) : Number(property.list_price) || 0;
-  // KDV orani ve paylasim burada SABIT yazilmisti (0.2 ve 50/50); ayni sabitler
-  // workflow.ts'te de vardi. Tek kaynaga tasindi (lib/commission.ts).
-  //
-  // KİRA KOMİSYONU — BİLİNÇLİ OLARAK DEĞİŞTİRİLMEDİ (denetim notu):
-  // Türkiye pratiğinde kirada komisyon genelde "1 aylık kira + KDV"dir; burada
-  // ise satışla aynı `deal_value × commission_rate` formülü çalışıyor. Formülü
-  // "1 aylık kira"ya çevirmek ancak `deal_value`nin AYLIK kira olduğu kesinse
-  // doğru olur. Kodda ve formda böyle bir ayrım YOK: alan tek ve etiketi
-  // "Anlaşma değeri (₺)" / "Tutar (₺)" (placeholder "örn. 4.500.000"), portföy
-  // boş bırakılınca `properties.list_price`a düşülüyor ve `list_price` kiralık
-  // portföyde aylık kira, satılıkta toplam bedel anlamına geliyor. Yani girdi
-  // anlamı belirsiz. Belirsiz varsayımla para hesabını değiştirmek yanlış
-  // fatura üretir; mevcut davranış korundu. Doğru çözüm ayrı bir ölçü birimi
-  // alanı (aylık/toplam) eklemek — ürün kararı gerektirir.
-  const calc = calculateCommission({
-    amount: value,
-    rate: Number(property.commission_rate) || undefined,
-  });
-  const splits = buildSplits(calc.net);
-
-  // upsert + ignoreDuplicates: eşzamanlı "kazanıldı" geçişinde (çift-tık/retry)
-  // ikinci çağrı uq_commissions_deal_id kısıtına takılıp SESSİZCE atlanır —
-  // deal başına tek komisyon garanti (ciro/hakediş iki katına çıkmaz). Hata
-  // artık yutulmuyor, loglanıyor.
-  const { error: commErr } = await supabase.from("commissions").upsert(
-    {
-      tenant_id: tenantId,
-      deal_id: dealId,
-      gross_amount: calc.net,
-      vat_amount: calc.vat,
-      status: "calculated",
-      splits,
-    },
-    { onConflict: "deal_id", ignoreDuplicates: true },
-  );
-  if (commErr) console.error("ensureCommissionForDeal komisyon upsert", commErr);
-
-  // Kira anlaşmasında portföy SATILDI olamaz — 'rented' (Kiralandı) yazılır.
-  const nextStatus = wonDealPropertyStatus(dealType);
-  await supabase
-    .from("properties")
-    .update({ status: nextStatus, updated_at: new Date().toISOString() })
-    .eq("id", propertyId);
-
-  await logActivity({
-    tenantId,
-    actorId: userId,
-    action: "commission.from_pipeline",
-    entityType: "deal",
-    entityId: dealId,
-    newValue: {
-      gross: calc.net,
-      vat: calc.vat,
-      property_code: property.property_code,
-      deal_type: dealType,
-      property_status: nextStatus,
-    },
-  });
 }

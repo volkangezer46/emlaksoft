@@ -9,8 +9,6 @@ const STATUS_OPTIONS = [
   { value: "draft",     label: "Taslak" },
   { value: "reserved",  label: "Rezerve" },
   { value: "passive",   label: "Pasif" },
-  { value: "sold",      label: "Satıldı" },
-  { value: "rented",    label: "Kiralandı" },
   { value: "withdrawn", label: "Vazgeçildi" },
   { value: "archived",  label: "Arşiv" },
 ];
@@ -67,7 +65,7 @@ export function PropertyBulkActions({
     <div className="space-y-3">
       {/* Toplu aksiyon araç çubuğu — seçim varken göster */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 rounded-[14px] border border-brand-300/40 bg-brand-600/[0.04] px-4 py-2.5">
+        <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-brand-300/40 bg-brand-600/[0.04] px-4 py-2.5">
           <span className="text-sm font-semibold text-brand-700">
             {selectedIds.size} portföy seçildi
           </span>
@@ -76,14 +74,14 @@ export function PropertyBulkActions({
               type="button"
               onClick={() => setDropdownOpen((s) => !s)}
               disabled={pending}
-              className="inline-flex items-center gap-1.5 rounded-[9px] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
             >
               {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
               Durum değiştir
               <ChevronDown className="h-3.5 w-3.5" />
             </button>
             {dropdownOpen && (
-              <div className="absolute left-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-[12px] border border-line bg-surface shadow-[var(--shadow-lg)]">
+              <div className="absolute left-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-lg)]">
                 {STATUS_OPTIONS.map((s) => (
                   <button
                     key={s.value}
@@ -110,18 +108,18 @@ export function PropertyBulkActions({
 
       {/* Sonuç mesajı */}
       {result?.ok && (
-        <div className="rounded-[10px] bg-mint-500/10 px-4 py-2 text-sm font-semibold text-mint-700">
+        <div className="rounded-[var(--radius-control)] bg-mint-500/10 px-4 py-2 text-sm font-semibold text-mint-700">
           ✓ {result.updatedCount} portföy güncellendi.
         </div>
       )}
       {result?.error && (
-        <div className="rounded-[10px] bg-red-50 px-4 py-2 text-sm text-red-600">
+        <div className="rounded-[var(--radius-control)] bg-red-50 px-4 py-2 text-sm text-red-600">
           {result.error}
         </div>
       )}
 
       {/* Tablo başlığı — tümünü seç */}
-      <div className="overflow-hidden rounded-[20px] border border-line bg-surface">
+      <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex items-center gap-3 border-b border-line px-4 py-3">
           <button
             type="button"
@@ -167,7 +165,7 @@ export function PropertyBulkActions({
                   </span>
                   <span className="ml-2 text-xs text-text-faint">{p.property_code}</span>
                 </span>
-                <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">
+                <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
                   {p.status}
                 </span>
               </label>

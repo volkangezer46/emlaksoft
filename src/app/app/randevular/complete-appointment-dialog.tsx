@@ -68,7 +68,7 @@ export function CompleteAppointmentDialog({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-brand-600 transition hover:border-brand-300"
+          className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
         >
           <CheckCircle2 className="h-3 w-3" /> Tamamlandı
         </button>
@@ -92,7 +92,7 @@ export function CompleteAppointmentDialog({
                     type="button"
                     aria-pressed={active}
                     onClick={() => setOutcome(active ? "" : key)}
-                    className={`focus-ring press flex flex-col items-center gap-1 rounded-[12px] border px-3 py-3 text-xs font-semibold transition ${
+                    className={`focus-ring press flex flex-col items-center gap-1 rounded-[var(--radius-card)] border px-3 py-3 text-xs font-semibold transition ${
                       active
                         ? "border-brand-400/60 bg-brand-600/8 text-brand-700"
                         : "border-line bg-canvas text-text-muted hover:border-brand-300 hover:text-ink-950"
@@ -104,7 +104,7 @@ export function CompleteAppointmentDialog({
                 );
               })}
             </div>
-            <p className="mt-1.5 text-[11px] text-text-faint">
+            <p className="mt-1.5 text-xs text-text-faint">
               Seçmeden de tamamlayabilirsiniz. Bu değerlendirme danışman notudur; müşteri portalındaki
               eşleştirme beğenisinden bağımsızdır.
             </p>
@@ -117,7 +117,7 @@ export function CompleteAppointmentDialog({
               rows={3}
               maxLength={500}
               placeholder="Örn. Müşteri konumu beğendi, fiyatta indirim bekliyor."
-              className="mt-1 w-full resize-none rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+              className="mt-1 w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
             />
           </label>
           {error ? <p className="text-sm font-semibold text-danger-500">{error}</p> : null}

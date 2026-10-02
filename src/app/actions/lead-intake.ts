@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "crypto";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 
@@ -35,8 +36,17 @@ export async function regenerateLeadToken(): Promise<void> {
   const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return;
 
-  const supabase = await createClient();
-  await supabase.from("tenants").update({ lead_capture_token: genToken() }).eq("id", gate.tenantId);
+  const admin = createAdminClient();
+  const { error } = await admin.rpc("rotate_lead_capture_token", {
+    p_tenant_id: gate.tenantId,
+    p_actor_id: gate.userId,
+    p_new_token: genToken(),
+    p_reason: "rotated",
+  });
+  if (error) {
+    console.error("regenerateLeadToken", { code: error.code });
+    throw new Error("Lead bağlantı anahtarı yenilenemedi.");
+  }
 
   await logActivity({
     tenantId: gate.tenantId,

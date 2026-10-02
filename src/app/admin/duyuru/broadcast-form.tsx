@@ -4,6 +4,7 @@ import { useTransition, useState, useRef } from "react";
 import { CheckCircle2, ChevronDown, Loader2, Send, Users } from "lucide-react";
 import { sendBroadcast, searchTenantsBroadcast, type BroadcastTarget } from "@/app/actions/platform-notifications";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { KIND_OPTIONS } from "./broadcast-options";
 
 const TARGET_OPTIONS: { value: BroadcastTarget; label: string; hint: string }[] = [
   { value: "all", label: "Tüm ofisler", hint: "İptal edilmemiş her ofise gönderir" },
@@ -12,16 +13,8 @@ const TARGET_OPTIONS: { value: BroadcastTarget; label: string; hint: string }[] 
   { value: "specific", label: "Belirli ofis", hint: "Ada göre arayıp tekil hedef seçin" },
 ];
 
-export const KIND_OPTIONS = [
-  { value: "info", label: "Bilgi", cls: "bg-brand-600/15 text-brand-600" },
-  { value: "success", label: "Başarılı", cls: "bg-mint-500/15 text-mint-600" },
-  { value: "warning", label: "Uyarı", cls: "bg-amber-400/15 text-amber-600" },
-  { value: "danger", label: "Kritik", cls: "bg-danger-500/15 text-danger-500" },
-  { value: "system", label: "Sistem", cls: "bg-cyan-400/15 text-cyan-600" },
-];
-
 const field =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400";
 
 export type AudienceCounts = { all: number; active: number; trial: number };
 
@@ -58,7 +51,7 @@ export function BroadcastForm({
     target === "all" ? audienceCounts.all : target === "active" ? audienceCounts.active : target === "trial" ? audienceCounts.trial : null;
 
   return (
-    <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-6">
+    <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-6">
       <div className="flex items-center gap-2 border-b border-line pb-4">
         <Send className="h-4 w-4 text-brand-600" />
         <h2 className="font-display font-bold text-ink-950">Duyuru oluştur</h2>
@@ -158,7 +151,7 @@ export function BroadcastForm({
           </div>
           {/* Gönderim ÖNCESİ kaç ofise ulaşacağı — sayı sunucudan geldi */}
           {audienceCount !== null ? (
-            <p className="mt-2 flex items-center gap-1.5 rounded-[10px] bg-brand-600/[0.06] px-3 py-2 text-xs font-semibold text-brand-700">
+            <p className="mt-2 flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600/[0.06] px-3 py-2 text-xs font-semibold text-brand-700">
               <Users className="h-3.5 w-3.5" />
               {selectedTarget?.label}: {audienceCount} ofis
             </p>
@@ -187,12 +180,12 @@ export function BroadcastForm({
 
         {/* Hata / sonuç */}
         {result?.error ? (
-          <p className="rounded-[10px] bg-danger-500/8 px-3 py-2 text-sm text-danger-500" role="alert">
+          <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm text-danger-500" role="alert">
             {result.error}
           </p>
         ) : null}
         {result?.ok ? (
-          <p className="flex items-center gap-2 rounded-[10px] bg-mint-500/10 px-3 py-2 text-sm font-semibold text-mint-600" role="status">
+          <p className="flex items-center gap-2 rounded-[var(--radius-control)] bg-mint-500/10 px-3 py-2 text-sm font-semibold text-mint-600" role="status">
             <CheckCircle2 className="h-4 w-4" /> {result.sent} ofise duyuru iletildi.
           </p>
         ) : null}
@@ -200,7 +193,7 @@ export function BroadcastForm({
         <button
           type="submit"
           disabled={pending}
-          className="btn-shine mt-1 inline-flex items-center gap-2 rounded-[11px] bg-ink-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
+          className="btn-shine mt-1 inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-ink-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           {pending ? "Gönderiliyor…" : "Duyuruyu gönder"}

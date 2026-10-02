@@ -40,7 +40,7 @@ export function LoginForm({ next, demoEnabled }: { next: string; demoEnabled: bo
                 required
                 autoComplete="email"
                 autoFocus
-                className="w-full rounded-[12px] border border-line bg-surface py-3 pl-10 pr-3.5 text-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10"
+                className="w-full rounded-[var(--radius-card)] border border-line bg-surface py-3 pl-10 pr-3.5 text-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10"
                 placeholder="ornek@ofis.com"
               />
             </div>
@@ -63,13 +63,13 @@ export function LoginForm({ next, demoEnabled }: { next: string; demoEnabled: bo
                 type={showPassword ? "text" : "password"}
                 required
                 autoComplete="current-password"
-                className="w-full rounded-[12px] border border-line bg-surface py-3 pl-10 pr-11 text-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10"
+                className="w-full rounded-[var(--radius-card)] border border-line bg-surface py-3 pl-10 pr-11 text-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10"
                 placeholder="••••••••"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-[8px] text-text-faint transition hover:bg-canvas hover:text-ink-800"
+                className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-800"
                 aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -78,7 +78,7 @@ export function LoginForm({ next, demoEnabled }: { next: string; demoEnabled: bo
           </div>
 
           {state.error ? (
-            <p className="rounded-[10px] border border-danger-500/25 bg-danger-500/8 px-3.5 py-2.5 text-sm font-medium text-danger-600" role="alert">
+            <p className="rounded-[var(--radius-control)] border border-danger-500/25 bg-danger-500/8 px-3.5 py-2.5 text-sm font-medium text-danger-600" role="alert">
               {state.error}
             </p>
           ) : null}
@@ -86,7 +86,7 @@ export function LoginForm({ next, demoEnabled }: { next: string; demoEnabled: bo
           <button
             type="submit"
             disabled={pending}
-            className="btn-shine group flex w-full items-center justify-center gap-2 rounded-[12px] bg-[image:var(--grad-brand)] px-4 py-3 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:brightness-[1.06] disabled:opacity-60"
+            className="btn-shine group flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-brand)] px-4 py-3 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:brightness-[1.06] disabled:opacity-60"
           >
             {pending ? (
               <>
@@ -99,7 +99,7 @@ export function LoginForm({ next, demoEnabled }: { next: string; demoEnabled: bo
             )}
           </button>
 
-          <p className="flex items-center justify-center gap-1.5 text-[11px] text-text-faint">
+          <p className="flex items-center justify-center gap-1.5 text-xs text-text-faint">
             <ShieldCheck className="h-3.5 w-3.5 text-mint-600" /> 256-bit TLS ile şifreli bağlantı
           </p>
         </form>

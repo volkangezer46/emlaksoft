@@ -48,9 +48,9 @@ function RevenueTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-[11px] border border-hairline bg-surface/95 px-3 py-2 shadow-[var(--inner-top),var(--elev-4)] backdrop-blur-sm">
+    <div className="rounded-[var(--radius-control)] border border-hairline bg-surface/95 px-3 py-2 shadow-[var(--inner-top),var(--elev-4)] backdrop-blur-sm">
       {label != null ? (
-        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-text-faint">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-faint">
           {label}
         </p>
       ) : null}
@@ -64,7 +64,7 @@ function RevenueTooltip({
           {tryFormatter.format(Number(payload[0]?.value ?? 0))}
         </span>
       </p>
-      <p className="mt-1 text-[11px] text-text-faint">Danışman detayı için tıklayın</p>
+      <p className="mt-1 text-xs text-text-faint">Danışman detayı için tıklayın</p>
     </div>
   );
 }

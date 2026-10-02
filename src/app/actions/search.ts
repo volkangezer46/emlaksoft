@@ -4,6 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { orIlike, safeLike } from "@/lib/pgrst";
 import { requireActiveTenant } from "@/lib/tenant-guard";
 import { formatTurkishPhone } from "@/lib/phone";
+import { getEffectivePermissions } from "@/lib/permissions-effective";
+import {
+  canSearchKind,
+  hasOfficeWideDataScope,
+  type SearchableKind,
+} from "@/lib/permission-data-scope";
 
 export type SearchHit = {
   id: string;
@@ -53,6 +59,9 @@ export async function searchWorkspace(query: string, limit: number = 20): Promis
   if (q.length < 2) return [];
 
   const supabase = await createClient();
+  const permissions = await getEffectivePermissions(gate.tenantId, gate.role, gate.userId);
+  const canSearch = (kind: SearchableKind) => canSearchKind(permissions, kind);
+  const officeWide = hasOfficeWideDataScope(gate.role);
   // Temizleme artik ortak yardimcida: onceden `%` ve `_` birakiliyordu,
   // yani kullanici `%` yazip tum kayitlari cekebiliyordu.
   const like = safeLike(q);
@@ -62,6 +71,70 @@ export async function searchWorkspace(query: string, limit: number = 20): Promis
   const factor = Math.max(1, Math.ceil(cap / 20));
   const per = (n: number) => n * factor;
 
+  let customerQuery = supabase
+    .from("customers")
+    .select("id, full_name, phone")
+    .eq("tenant_id", gate.tenantId)
+    .is("deleted_at", null)
+    .or(orIlike(["full_name", "phone", "email"], q))
+    .limit(per(8));
+  let propertyQuery = supabase
+    .from("properties")
+    .select("id, property_code, title, parcel_block, parcel_lot")
+    .eq("tenant_id", gate.tenantId)
+    .is("deleted_at", null)
+    .or(orIlike(["property_code", "title", "parcel_block", "parcel_lot"], q))
+    .limit(per(8));
+  let demandQuery = supabase
+    .from("customer_demands")
+    .select(
+      "id, transaction_type, property_type, rooms, customer:customers!inner(full_name, assigned_to)",
+    )
+    .eq("tenant_id", gate.tenantId)
+    .or(orIlike(["transaction_type", "property_type", "rooms"], q))
+    .limit(per(6));
+  let ticketQuery = supabase
+    .from("support_tickets")
+    .select("id, subject")
+    .eq("tenant_id", gate.tenantId)
+    .ilike("subject", like)
+    .limit(per(4));
+  let dealsByCustomerQuery = supabase
+    .from("deals")
+    .select(
+      "id, stage, deal_type, deal_value, customer:customers!inner(full_name), property:properties(title, property_code)",
+    )
+    .eq("tenant_id", gate.tenantId)
+    .ilike("customer.full_name", like)
+    .limit(per(4));
+  let dealsByPropertyQuery = supabase
+    .from("deals")
+    .select(
+      "id, stage, deal_type, deal_value, customer:customers(full_name), property:properties!inner(title, property_code)",
+    )
+    .eq("tenant_id", gate.tenantId)
+    .or(orIlike(["title", "property_code"], q), { referencedTable: "property" })
+    .limit(per(4));
+  let taskQuery = supabase
+    .from("tasks")
+    .select("id, title, kind, status, due_at")
+    .eq("tenant_id", gate.tenantId)
+    .or(orIlike(["title", "notes"], q))
+    .limit(per(6));
+
+  // Tenant RLS is not a substitute for the product's row scope. Roles without
+  // office-wide access may only discover records assigned to/created by them.
+  if (!officeWide) {
+    customerQuery = customerQuery.eq("assigned_to", gate.userId);
+    propertyQuery = propertyQuery.eq("assigned_to", gate.userId);
+    demandQuery = demandQuery.eq("customer.assigned_to", gate.userId);
+    ticketQuery = ticketQuery.eq("created_by", gate.userId);
+    dealsByCustomerQuery = dealsByCustomerQuery.eq("assigned_to", gate.userId);
+    dealsByPropertyQuery = dealsByPropertyQuery.eq("assigned_to", gate.userId);
+    taskQuery = taskQuery.eq("assigned_to", gate.userId);
+  }
+
+  const empty = Promise.resolve({ data: [], error: null });
   const [
     { data: customers },
     { data: properties },
@@ -71,52 +144,16 @@ export async function searchWorkspace(query: string, limit: number = 20): Promis
     { data: dealsByProperty },
     { data: tasks },
   ] = await Promise.all([
-    supabase
-      .from("customers")
-      .select("id, full_name, phone")
-      .is("deleted_at", null)
-      .or(orIlike(["full_name", "phone", "email"], q))
-      .limit(per(8)),
-    supabase
-      .from("properties")
-      .select("id, property_code, title, parcel_block, parcel_lot")
-      .or(orIlike(["property_code", "title", "parcel_block", "parcel_lot"], q))
-      .limit(per(8)),
-    supabase
-      .from("customer_demands")
-      .select("id, transaction_type, property_type, rooms, customer:customers(full_name)")
-      .or(orIlike(["transaction_type", "property_type", "rooms"], q))
-      .limit(per(6)),
-    supabase
-      .from("support_tickets")
-      .select("id, subject")
-      .ilike("subject", like)
-      .limit(per(4)),
+    canSearch("customer") ? customerQuery : empty,
+    canSearch("property") ? propertyQuery : empty,
+    canSearch("demand") ? demandQuery : empty,
+    canSearch("ticket") ? ticketQuery : empty,
     // Anlaşmanın kendine ait serbest metni yok; müşteri adı ve portföy
     // başlığı/kodu üzerinden iki ayrı !inner sorgu — PostgREST tek `or`
     // içinde iki farklı gömülü tabloyu tarayamıyor.
-    supabase
-      .from("deals")
-      .select(
-        "id, stage, deal_type, deal_value, customer:customers!inner(full_name), property:properties(title, property_code)",
-      )
-      .eq("tenant_id", gate.tenantId)
-      .ilike("customer.full_name", like)
-      .limit(per(4)),
-    supabase
-      .from("deals")
-      .select(
-        "id, stage, deal_type, deal_value, customer:customers(full_name), property:properties!inner(title, property_code)",
-      )
-      .eq("tenant_id", gate.tenantId)
-      .or(orIlike(["title", "property_code"], q), { referencedTable: "property" })
-      .limit(per(4)),
-    supabase
-      .from("tasks")
-      .select("id, title, kind, status, due_at")
-      .eq("tenant_id", gate.tenantId)
-      .or(orIlike(["title", "notes"], q))
-      .limit(per(6)),
+    canSearch("deal") ? dealsByCustomerQuery : empty,
+    canSearch("deal") ? dealsByPropertyQuery : empty,
+    canSearch("task") ? taskQuery : empty,
   ]);
 
   for (const c of customers ?? []) {

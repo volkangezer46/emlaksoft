@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { createPortal } from "react-dom";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -18,6 +17,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Dialog,
+  DialogDescription,
+  DialogFullscreenContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/components/app/toast-provider";
 import { bulkDeleteDocuments, deleteDocument } from "@/app/actions/documents";
 import {
@@ -131,7 +136,7 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
   return (
     <div className="space-y-3">
       {/* --- Toplu işlem çubuğu --- */}
-      <div className="flex flex-wrap items-center gap-3 rounded-[14px] border border-line bg-surface px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2.5">
         <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-text-muted">
           <input
             type="checkbox"
@@ -184,7 +189,7 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
       </div>
 
       {/* --- Liste --- */}
-      <ul className="divide-y divide-line overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+      <ul className="divide-y divide-line overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         {rows.map((row) => {
           const Icon = KIND_ICON[row.kind];
           const isSelected = selected.has(row.key);
@@ -204,25 +209,25 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
                   aria-label={`${row.name} seç`}
                   className="h-4 w-4 rounded border-line accent-[var(--brand-600)]"
                 />
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-canvas text-text-muted">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-canvas text-text-muted">
                   <Icon className="h-5 w-5" />
                 </span>
               </div>
 
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${SOURCE_CHIP[row.source]}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${SOURCE_CHIP[row.source]}`}>
                     {SOURCE_LABEL[row.source]}
                   </span>
-                  <span className="rounded-full bg-canvas px-2 py-0.5 text-[10px] font-semibold text-text-muted">
+                  <span className="rounded-full bg-canvas px-2 py-0.5 text-xs font-semibold text-text-muted">
                     {CATEGORY_LABEL[row.category]}
                   </span>
-                  <span className="text-[10px] font-medium text-text-faint">{KIND_LABEL[row.kind]}</span>
+                  <span className="text-xs font-medium text-text-faint">{KIND_LABEL[row.kind]}</span>
                 </div>
                 <p className="mt-1 truncate text-sm font-semibold text-ink-950" title={row.name}>
                   {row.name}
                 </p>
-                <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-text-muted">
+                <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-text-muted">
                   {row.relatedHref && row.relatedLabel ? (
                     <Link href={row.relatedHref} className="font-semibold text-brand-600 hover:underline">
                       {row.relatedLabel}
@@ -252,7 +257,7 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
                     onClick={() => setLightboxKey(row.key)}
                     aria-label={`${row.name} önizle`}
                     title="Önizle"
-                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[8px] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
                   >
                     <Eye className="h-4 w-4" />
                   </button>
@@ -263,7 +268,7 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
                     rel="noopener noreferrer"
                     aria-label={`${row.name} yeni sekmede aç`}
                     title={row.source === "sozlesme" ? "Sözleşmeyi aç" : "Yeni sekmede aç"}
-                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[8px] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
                   >
                     {row.source === "sozlesme" || row.source === "evrak" ? (
                       <Link2 className="h-4 w-4" />
@@ -279,7 +284,7 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
                     download={row.name}
                     aria-label={`${row.name} indir`}
                     title="İndir"
-                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[8px] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
                   >
                     <Download className="h-4 w-4" />
                   </a>
@@ -292,7 +297,7 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
                         type="button"
                         aria-label={`${row.name} ${row.source === "sozlesme" ? "iptal et" : "kaldır"}`}
                         title={row.source === "sozlesme" ? "Sözleşmeyi iptal et" : "Kaldır"}
-                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[8px] border border-line text-text-muted transition hover:border-danger-500/50 hover:text-danger-500"
+                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/50 hover:text-danger-500"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -323,11 +328,11 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
 }
 
 /**
- * Görsel önizleme — paketsiz, portal ile body'ye basılır.
+ * Görsel önizleme — ortak Radix tam ekran primitive'i ile body portalına basılır.
  * `GalleryLightbox` yeniden kullanılamadı: o bileşen kaynağı sabit olarak
  * `/api/property-media/[id]` kuruyor; belge merkezinde görseller iki farklı
- * yetkili uçtan gelir. Klavye/odak davranışı (Esc, ok tuşları, scroll kilidi)
- * aynı desende.
+ * yetkili uçtan gelir. Esc, focus trap, scroll kilidi ve focus dönüşünü ortak
+ * dialog sağlar; görseller arası ok tuşu davranışı burada kalır.
  */
 function Lightbox({
   images,
@@ -340,39 +345,32 @@ function Lightbox({
   onIndex: (i: number) => void;
   onClose: () => void;
 }) {
-  const dialogRef = useRef<HTMLDivElement>(null);
   const count = images.length;
   const prev = useCallback(() => onIndex((index - 1 + count) % count), [index, count, onIndex]);
   const next = useCallback(() => onIndex((index + 1) % count), [index, count, onIndex]);
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowLeft") prev();
-      else if (e.key === "ArrowRight") next();
-    }
-    window.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialogRef.current?.focus();
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [prev, next, onClose]);
-
   const current = images[index];
 
-  return createPortal(
-    <div
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
-      aria-label={`${current.name} önizleme`}
-      tabIndex={-1}
-      onClick={onClose}
-      className="fixed inset-0 z-[100] flex flex-col bg-ink-950/95 outline-none backdrop-blur-sm"
-    >
+  return (
+    <Dialog open onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogFullscreenContent
+        overlayClassName="bg-ink-950/95 backdrop-blur-sm"
+        className="flex flex-col bg-ink-950/95"
+        onClick={onClose}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowLeft") {
+            event.preventDefault();
+            prev();
+          } else if (event.key === "ArrowRight") {
+            event.preventDefault();
+            next();
+          }
+        }}
+      >
+      <DialogTitle className="sr-only">{current.name} önizleme</DialogTitle>
+      <DialogDescription className="sr-only">
+        {count} görsellik belge önizlemesi. Önceki ve sonraki görsele ok tuşlarıyla geçebilirsiniz.
+      </DialogDescription>
       <div className="flex items-center justify-between gap-3 px-4 py-3 text-white" onClick={(e) => e.stopPropagation()}>
         <span className="min-w-0 truncate text-sm font-semibold text-white/85">
           {current.name}
@@ -433,7 +431,7 @@ function Lightbox({
           </>
         ) : null}
       </div>
-    </div>,
-    document.body,
+      </DialogFullscreenContent>
+    </Dialog>
   );
 }

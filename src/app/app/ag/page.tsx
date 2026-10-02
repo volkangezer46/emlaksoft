@@ -99,7 +99,7 @@ function listingAge(sharedAt: string) {
 
 function ContactCard({ contact }: { contact: NetworkContact }) {
   return (
-    <div className="mt-2 rounded-[12px] border border-mint-500/30 bg-mint-500/6 p-3">
+    <div className="mt-2 rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/6 p-3">
       <p className="flex items-center gap-1.5 text-xs font-semibold text-mint-600">
         <ShieldCheck className="h-3.5 w-3.5" /> İletişim açıldı — {contact.officeName}
       </p>
@@ -209,7 +209,7 @@ export default async function AgPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-500/25 blur-[70px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -240,10 +240,10 @@ export default async function AgPage({
               <a
                 key={k.label}
                 href={k.href}
-                className="focus-ring press lift block min-w-[92px] rounded-[14px] border border-white/12 bg-white/8 p-3 text-center transition hover:border-white/30"
+                className="focus-ring press lift block min-w-[92px] rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 text-center transition hover:border-white/30"
               >
                 <p className="numeric font-display text-2xl font-extrabold text-white">{k.value}</p>
-                <p className="text-[11px] text-white/70">{k.label}</p>
+                <p className="text-xs text-white/70">{k.label}</p>
               </a>
             ))}
           </div>
@@ -251,8 +251,8 @@ export default async function AgPage({
       </section>
 
       {/* Güven metni — ağın veri sözleşmesi */}
-      <div className="flex items-start gap-3 rounded-[16px] border border-brand-600/20 bg-brand-600/6 p-4">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-brand-600/10 text-brand-600">
+      <div className="flex items-start gap-3 rounded-[var(--radius-card)] border border-brand-600/20 bg-brand-600/6 p-4">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
           <ShieldCheck className="h-5 w-5" />
         </span>
         <div className="text-sm">
@@ -300,14 +300,14 @@ export default async function AgPage({
               <a
                 key={s.label}
                 href="#havuz"
-                className="focus-ring press lift group flex items-center gap-3 rounded-[16px] border border-line bg-surface p-4 hover:border-brand-300"
+                className="focus-ring press lift group flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-300"
               >
-                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[11px] ${s.tint}`}>
+                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-control)] ${s.tint}`}>
                   <s.icon className="h-5 w-5" />
                 </span>
                 <span className="min-w-0">
                   <span className="numeric block truncate font-display text-lg font-extrabold text-ink-950">{s.value}</span>
-                  <span className="block text-[11px] text-text-muted">{s.label}</span>
+                  <span className="block text-xs text-text-muted">{s.label}</span>
                 </span>
               </a>
             ))}
@@ -331,7 +331,7 @@ export default async function AgPage({
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {pool.map((item) => (
-              <div key={item.listingId} className="flex flex-col rounded-[20px] border border-line bg-surface p-5">
+              <div key={item.listingId} className="flex flex-col rounded-[var(--radius-panel)] border border-line bg-surface p-5">
                 <div className="flex items-start justify-between gap-2">
                   <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted">
                     <Building2 className="h-3.5 w-3.5" />
@@ -342,7 +342,7 @@ export default async function AgPage({
                 </div>
 
                 {/* Güven göstergesi — ofisin tamamlanmış işlem sayısı */}
-                <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-amber-600">
+                <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-600">
                   <Trophy className="h-3 w-3" /> {item.wonDeals} tamamlanmış işlem
                 </p>
 
@@ -364,7 +364,7 @@ export default async function AgPage({
                 </div>
 
                 {item.note ? (
-                  <p className="mt-2 rounded-[10px] bg-canvas p-2 text-xs text-text-muted">{item.note}</p>
+                  <p className="mt-2 rounded-[var(--radius-control)] bg-canvas p-2 text-xs text-text-muted">{item.note}</p>
                 ) : null}
 
                 <div className="mt-3 flex items-end justify-between gap-2">
@@ -372,11 +372,11 @@ export default async function AgPage({
                     <p className="font-display text-lg font-extrabold text-ink-950">
                       {item.price != null ? formatTry(item.price) : "Fiyat sorunuz"}
                     </p>
-                    <p className="text-[11px] font-semibold text-mint-600">
+                    <p className="text-xs font-semibold text-mint-600">
                       %{item.commissionSharePct} komisyon paylaşımı
                     </p>
                   </div>
-                  <p className="text-[11px] text-text-faint">{listingAge(item.sharedAt)}</p>
+                  <p className="text-xs text-text-faint">{listingAge(item.sharedAt)}</p>
                 </div>
 
                 <div className="mt-3 border-t border-line pt-3">
@@ -417,7 +417,7 @@ export default async function AgPage({
         ) : (
           <div className="space-y-4">
             {myListings.map((listing) => (
-              <div key={listing.id} className="rounded-[20px] border border-line bg-surface p-5">
+              <div key={listing.id} className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
@@ -442,7 +442,7 @@ export default async function AgPage({
                       <Inbox className="h-3.5 w-3.5" /> Gelen talepler ({listing.incoming.length})
                     </p>
                     {listing.incoming.map((req) => (
-                      <div key={req.id} className="rounded-[14px] bg-canvas p-3">
+                      <div key={req.id} className="rounded-[var(--radius-card)] bg-canvas p-3">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
@@ -488,7 +488,7 @@ export default async function AgPage({
         ) : (
           <div className="space-y-3">
             {myRequests.map((req) => (
-              <div key={req.id} className="rounded-[20px] border border-line bg-surface p-5">
+              <div key={req.id} className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -540,14 +540,14 @@ export default async function AgPage({
               <a
                 key={s.label}
                 href="#talep-havuzu"
-                className="focus-ring press lift flex items-center gap-3 rounded-[16px] border border-line bg-surface p-4 hover:border-brand-300"
+                className="focus-ring press lift flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-300"
               >
-                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[11px] ${s.tint}`}>
+                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-control)] ${s.tint}`}>
                   <s.icon className="h-5 w-5" />
                 </span>
                 <span className="min-w-0">
                   <span className="numeric block truncate font-display text-lg font-extrabold text-ink-950">{s.value}</span>
-                  <span className="block text-[11px] text-text-muted">{s.label}</span>
+                  <span className="block text-xs text-text-muted">{s.label}</span>
                 </span>
               </a>
             ))}
@@ -579,7 +579,7 @@ export default async function AgPage({
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {demandPool.map((item) => (
-              <div key={item.networkDemandId} className="flex flex-col rounded-[20px] border border-line bg-surface p-5">
+              <div key={item.networkDemandId} className="flex flex-col rounded-[var(--radius-panel)] border border-line bg-surface p-5">
                 <div className="flex items-start justify-between gap-2">
                   <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted">
                     <Building2 className="h-3.5 w-3.5" />
@@ -596,7 +596,7 @@ export default async function AgPage({
                 </p>
 
                 {item.note ? (
-                  <p className="mt-2 rounded-[10px] bg-canvas p-2 text-xs text-text-muted">{item.note}</p>
+                  <p className="mt-2 rounded-[var(--radius-control)] bg-canvas p-2 text-xs text-text-muted">{item.note}</p>
                 ) : null}
 
                 <div className="mt-3 flex items-end justify-between gap-2">
@@ -604,11 +604,11 @@ export default async function AgPage({
                     <p className="font-display text-lg font-extrabold text-ink-950">
                       {formatBudgetRange(item.budgetMin, item.budgetMax)}
                     </p>
-                    <p className="text-[11px] font-semibold text-mint-600">
+                    <p className="text-xs font-semibold text-mint-600">
                       %{item.commissionSharePct} komisyon paylaşımı
                     </p>
                   </div>
-                  <p className="text-[11px] text-text-faint">{listingAge(item.sharedAt)}</p>
+                  <p className="text-xs text-text-faint">{listingAge(item.sharedAt)}</p>
                 </div>
 
                 <div className="mt-3 border-t border-line pt-3">
@@ -650,7 +650,7 @@ export default async function AgPage({
         ) : (
           <div className="space-y-4">
             {myDemands.map((nd) => (
-              <div key={nd.id} className="rounded-[20px] border border-line bg-surface p-5">
+              <div key={nd.id} className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
@@ -682,7 +682,7 @@ export default async function AgPage({
                       <Inbox className="h-3.5 w-3.5" /> Gelen portföy önerileri ({nd.incoming.length})
                     </p>
                     {nd.incoming.map((resp) => (
-                      <div key={resp.id} className="rounded-[14px] bg-canvas p-3">
+                      <div key={resp.id} className="rounded-[var(--radius-card)] bg-canvas p-3">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
@@ -731,7 +731,7 @@ export default async function AgPage({
         ) : (
           <div className="space-y-3">
             {myDemandResponses.map((resp) => (
-              <div key={resp.id} className="rounded-[20px] border border-line bg-surface p-5">
+              <div key={resp.id} className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">

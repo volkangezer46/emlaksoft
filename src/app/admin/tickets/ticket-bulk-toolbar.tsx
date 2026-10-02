@@ -90,15 +90,15 @@ export function TicketBulkToolbar({
     >
       <form
         onSubmit={submit}
-        className="mx-auto flex max-w-[1120px] flex-col gap-3 rounded-[16px] border border-white/12 bg-ink-950/95 p-3 text-white shadow-[var(--elev-4)] backdrop-blur-xl lg:flex-row lg:items-center"
+        className="mx-auto flex max-w-[1120px] flex-col gap-3 rounded-[var(--radius-card)] border border-white/12 bg-ink-950/95 p-3 text-white shadow-[var(--elev-4)] backdrop-blur-xl lg:flex-row lg:items-center"
       >
         <div className="flex items-center gap-3 lg:mr-2">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-amber-400 text-ink-950">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-amber-400 text-ink-950">
             <Layers3 className="h-4 w-4" aria-hidden />
           </span>
           <div className="min-w-0">
             <p className="numeric text-sm font-extrabold">{selectedIds.length} talep seçildi</p>
-            <p className="text-[10px] text-white/55">En fazla 50 kayıt birlikte güncellenebilir.</p>
+            <p className="text-xs text-white/55">En fazla 50 kayıt birlikte güncellenebilir.</p>
           </div>
         </div>
 
@@ -109,7 +109,7 @@ export function TicketBulkToolbar({
             value={field}
             onChange={(event) => changeField(event.target.value as BulkField)}
             disabled={pending}
-            className="focus-ring h-10 rounded-[10px] border border-white/12 bg-white/[0.08] px-3 text-xs font-semibold text-white outline-none"
+            className="focus-ring h-10 rounded-[var(--radius-control)] border border-white/12 bg-white/[0.08] px-3 text-xs font-semibold text-white outline-none"
           >
             <option className="text-ink-950" value="status">Durumu değiştir</option>
             <option className="text-ink-950" value="priority">Önceliği değiştir</option>
@@ -123,7 +123,7 @@ export function TicketBulkToolbar({
             value={effectiveValue}
             onChange={(event) => setValue(event.target.value)}
             disabled={pending}
-            className="focus-ring h-10 rounded-[10px] border border-white/12 bg-white/[0.08] px-3 text-xs font-semibold text-white outline-none"
+            className="focus-ring h-10 rounded-[var(--radius-control)] border border-white/12 bg-white/[0.08] px-3 text-xs font-semibold text-white outline-none"
           >
             {field === "status"
               ? statusTargets.map((status) => (
@@ -160,14 +160,14 @@ export function TicketBulkToolbar({
             onClick={onClear}
             disabled={pending}
             aria-label="Seçimi temizle"
-            className="focus-ring grid h-10 w-10 shrink-0 place-items-center rounded-[10px] border border-white/12 text-white/65 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+            className="focus-ring grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-control)] border border-white/12 text-white/65 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
           >
             <X className="h-4 w-4" aria-hidden />
           </button>
         </div>
 
         {error ? (
-          <p role="alert" className="rounded-[9px] bg-danger-500/15 px-3 py-2 text-xs font-semibold text-danger-200 lg:absolute lg:bottom-full lg:right-0 lg:mb-2">
+          <p role="alert" className="rounded-[var(--radius-control)] bg-danger-500/15 px-3 py-2 text-xs font-semibold text-danger-200 lg:absolute lg:bottom-full lg:right-0 lg:mb-2">
             {error}
           </p>
         ) : null}

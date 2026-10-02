@@ -30,7 +30,7 @@ export function CopyConfirmLink({ token }: { token: string }) {
       type="button"
       onClick={copy}
       title="Teyit linkini kopyala"
-      className="relative z-10 inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+      className="relative z-10 inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
     >
       {copied ? <Check className="h-3 w-3 text-mint-600" /> : <Link2 className="h-3 w-3" />} Teyit linki
     </button>

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">EmlakSoft</title>
+  <desc id="desc">Koyu lacivert zemin üzerinde altın kalkan ve E harfi</desc>
+  <defs>
+    <linearGradient id="bg" x1="48" y1="24" x2="464" y2="488" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B2347"/>
+      <stop offset="1" stop-color="#041127"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="132" y1="92" x2="386" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFD873"/>
+      <stop offset="0.48" stop-color="#F7B93F"/>
+      <stop offset="1" stop-color="#D48A0B"/>
+    </linearGradient>
+    <filter id="glow" x="70" y="44" width="372" height="420" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="248" r="174" fill="#1463FF" fill-opacity=".08"/>
+  <path d="M256 75 392 125v108c0 91-54 166-136 207-82-41-136-116-136-207V125L256 75Z" fill="#F7B93F" fill-opacity=".18" filter="url(#glow)"/>
+  <path d="M256 83 382 130v101c0 84-49 153-126 193-77-40-126-109-126-193V130L256 83Z" fill="none" stroke="url(#gold)" stroke-width="22" stroke-linejoin="round"/>
+  <path d="M205 164h116v30h-80v47h70v29h-70v55h83v30H205V164Z" fill="url(#gold)"/>
+  <path d="M256 101 364 141" stroke="#FFF3C4" stroke-width="5" stroke-linecap="round" opacity=".5"/>
+</svg>

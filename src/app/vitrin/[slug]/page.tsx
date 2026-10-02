@@ -11,6 +11,7 @@ import { FavNavBadge } from "./fav-nav-badge";
 import { CompareBar } from "@/components/public/compare-select";
 import { DAY_MS, msSince, now } from "@/lib/clock";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 /** Son 7 günde yayına giren ilan "Yeni" rozeti alır (published_at gerçek yayın damgası). */
 function isNewListing(publishedAt: string | null): boolean {
@@ -18,7 +19,7 @@ function isNewListing(publishedAt: string | null): boolean {
 }
 
 // ISR: vitrin herkese acik — CDN onbellekli, 2 dk tazelenir (jet hiz)
-export const revalidate = 120;
+export const revalidate = 60;
 
 function money(n: number | null, tx?: string | null) {
   if (n == null) return "Fiyat için sorun";
@@ -58,10 +59,10 @@ export async function generateMetadata({
   const admin = createAdminClient();
   const { data: tenant } = await admin
     .from("tenants")
-    .select("id, name")
+    .select("id, name, status")
     .eq("slug", slug)
     .maybeSingle();
-  if (!tenant) return { title: "Vitrin bulunamadı" };
+  if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "Vitrin bulunamadı" };
 
   const { count } = await admin
     .from("properties")
@@ -104,13 +105,13 @@ export default async function VitrinPage({
   const [{ data: tenant }, { data: provinces }] = await Promise.all([
     admin
       .from("tenants")
-      .select("id, name, brand_color, lead_capture_token, lead_capture_enabled")
+      .select("id, name, status, brand_color, lead_capture_token, lead_capture_enabled")
       .eq("slug", slug)
       .maybeSingle(),
     admin.from("geo_provinces").select("id, name").eq("is_active", true).order("name"),
   ]);
 
-  if (!tenant) notFound();
+  if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
 
   const q = (sp.q ?? "").trim();
   const min = parseMoneyParam(sp.min);
@@ -208,7 +209,7 @@ export default async function VitrinPage({
   }
 
   const fieldCls =
-    "w-full rounded-[12px] border border-white/15 bg-white/[0.06] px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition focus:border-mint-400/50 focus:bg-white/[0.09]";
+    "w-full rounded-[var(--radius-card)] border border-white/15 bg-white/[0.06] px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition focus:border-mint-400/50 focus:bg-white/[0.09]";
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -219,17 +220,17 @@ export default async function VitrinPage({
         <div className="relative mx-auto max-w-6xl px-4 py-12 sm:py-16">
           <Link
             href={`/vitrin/${slug}`}
-            className="focus-ring flex w-fit items-center gap-3 rounded-[14px] transition hover:opacity-90"
+            className="focus-ring flex w-fit items-center gap-3 rounded-[var(--radius-card)] transition hover:opacity-90"
           >
             <span
-              className="grid h-11 w-11 place-items-center rounded-[13px] text-base font-extrabold text-white"
+              className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] text-base font-extrabold text-white"
               style={{ background: tenant.brand_color || "var(--grad-brand)" }}
             >
               {tenant.name ? tenant.name[0] : "E"}
             </span>
             <span>
               <span className="block font-display text-lg font-extrabold">{tenant.name}</span>
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-mint-400">
+              <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-mint-400">
                 Portföy vitrini
               </span>
             </span>
@@ -290,7 +291,7 @@ export default async function VitrinPage({
             </select>
             <button
               type="submit"
-              className="inline-flex items-center justify-center gap-1.5 rounded-[12px] bg-white px-4 py-2.5 text-xs font-bold text-ink-950 transition hover:bg-white/90"
+              className="inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-card)] bg-white px-4 py-2.5 text-xs font-bold text-ink-950 transition hover:bg-white/90"
             >
               <Search className="h-3.5 w-3.5" /> Filtrele
             </button>
@@ -307,9 +308,9 @@ export default async function VitrinPage({
       </header>
 
       {/* Grid */}
-      <main className="mx-auto max-w-6xl px-4 py-10">
+      <main id="main-content" className="mx-auto max-w-6xl px-4 py-10">
         {properties.length === 0 ? (
-          <div className="rounded-[20px] border border-dashed border-line bg-surface px-5 py-20 text-center">
+          <div className="rounded-[var(--radius-panel)] border border-dashed border-line bg-surface px-5 py-20 text-center">
             <Building2 className="mx-auto h-8 w-8 text-text-faint" />
             <p className="mt-3 text-sm font-semibold text-ink-950">
               {hasFilter ? "Filtrelere uygun ilan bulunamadı" : "Şu anda yayında ilan yok"}
@@ -357,7 +358,7 @@ export default async function VitrinPage({
                 >
                 <Link
                   href={`/vitrin/${slug}/${p.id}`}
-                  className="lift group overflow-hidden rounded-[18px] border border-line bg-surface transition hover:border-brand-300"
+                  className="lift group overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface transition hover:border-brand-300"
                 >
                   <div className="relative aspect-[4/3] overflow-hidden bg-ink-950/5">
                     {coverId ? (
@@ -366,6 +367,7 @@ export default async function VitrinPage({
                         alt={p.title || "Portföy"}
                         fill
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        unoptimized
                         className="object-cover transition group-hover:scale-105"
                       />
                     ) : (
@@ -373,14 +375,14 @@ export default async function VitrinPage({
                         <Building2 className="h-10 w-10" />
                       </div>
                     )}
-                    <span className="absolute left-3 top-3 rounded-full bg-ink-950/80 px-2.5 py-1 text-[11px] font-bold uppercase text-white">
+                    <span className="absolute left-3 top-3 rounded-full bg-ink-950/80 px-2.5 py-1 text-xs font-bold uppercase text-white">
                       {p.transaction_type}
                     </span>
                     {/* Sağ üst köşe favori kalbinin (VitrinCardShell) alanı —
                         "Yeni" rozeti işlem türü pilinin altına alınır ki kalp
                         rozetin üstüne binmesin. */}
                     {isNewListing(p.published_at) ? (
-                      <span className="absolute left-3 top-12 rounded-full bg-mint-500 px-2.5 py-1 text-[11px] font-bold uppercase text-white shadow-[var(--shadow-xs)]">
+                      <span className="absolute left-3 top-12 rounded-full bg-mint-500 px-2.5 py-1 text-xs font-bold uppercase text-white shadow-[var(--shadow-xs)]">
                         Yeni
                       </span>
                     ) : null}
@@ -400,7 +402,7 @@ export default async function VitrinPage({
                     {/* Döviz karşılığı — kur yoksa hiç gösterilmez */}
                     {(() => {
                       const line = fxApproxLine(p.list_price != null ? Number(p.list_price) : null, fxRates);
-                      return line ? <p className="mt-0.5 text-[11px] text-text-faint" title={fxTitle}>{line}</p> : null;
+                      return line ? <p className="mt-0.5 text-xs text-text-faint" title={fxTitle}>{line}</p> : null;
                     })()}
                   </div>
                 </Link>
@@ -418,10 +420,10 @@ export default async function VitrinPage({
         <section className="mt-10">
           <Link
             href={`/vitrin/${slug}/degerleme`}
-            className="lift group flex flex-wrap items-center justify-between gap-4 rounded-[20px] border border-line bg-surface px-5 py-5 transition hover:border-brand-300 sm:px-6"
+            className="lift group flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-panel)] border border-line bg-surface px-5 py-5 transition hover:border-brand-300 sm:px-6"
           >
             <span className="flex items-center gap-4">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px] bg-brand-600/10 text-brand-600">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
                 <Calculator className="h-5 w-5" />
               </span>
               <span>
@@ -441,7 +443,7 @@ export default async function VitrinPage({
         <SavedSearchBox slug={slug} provinces={provinces ?? []} roomOptions={roomOptions} />
 
         {/* Lead form */}
-        <section className="mt-12 overflow-hidden rounded-[24px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+        <section className="mt-12 overflow-hidden rounded-[var(--radius-hero)] border border-line bg-surface shadow-[var(--shadow-xs)]">
           <div className="grid gap-0 lg:grid-cols-[1fr_1.1fr]">
             <div className="theme-dark relative overflow-hidden bg-[image:var(--grad-ink)] p-8 text-white">
               <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
@@ -455,7 +457,7 @@ export default async function VitrinPage({
               {tenant.lead_capture_enabled !== false && tenant.lead_capture_token ? (
                 <LeadForm token={tenant.lead_capture_token} provinces={provinces ?? []} vitrinSlug={slug} />
               ) : (
-                <p className="rounded-[12px] border border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-white/60">
+                <p className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-white/60">
                   Talep formu şu anda kapalı.
                 </p>
               )}
@@ -464,7 +466,7 @@ export default async function VitrinPage({
         </section>
       </main>
 
-      <footer className="border-t border-line py-6 text-center text-[11px] text-text-faint">
+      <footer className="border-t border-line py-6 text-center text-xs text-text-faint">
         <Link href="/" className="font-semibold underline-offset-2 transition hover:text-brand-600 hover:underline">
           Powered by EmlakSoft
         </Link>{" "}

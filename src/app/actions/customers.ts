@@ -10,6 +10,7 @@ import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
 import { isValidOptionalTurkishMobile, normalizeTurkishPhone, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
 import { daysFromNowIso } from "@/lib/clock";
+import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 
 export type CustomerResult = { error?: string; ok?: boolean; id?: string };
 
@@ -75,7 +76,7 @@ export async function createCustomer(
 
   if (error) {
     console.error("createCustomer", error);
-    return { error: "Müşteri eklenemedi. Lütfen tekrar deneyin." };
+    return { error: planLimitErrorMessage(error) ?? "Müşteri eklenemedi. Lütfen tekrar deneyin." };
   }
 
   await logActivity({

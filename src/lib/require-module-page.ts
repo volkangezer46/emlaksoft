@@ -3,7 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaff } from "@/lib/platform";
 import { type AppModule, DEFAULT_MATRIX } from "@/lib/permissions";
-import { effectiveCanAccessModule, getEffectivePermissions, type EffectivePermissions } from "@/lib/permissions-effective";
+import {
+  effectiveCanAccessModule,
+  getEffectivePermissions,
+  immutableReadonlyPermissions,
+  type EffectivePermissions,
+} from "@/lib/permissions-effective";
 
 /**
  * Sayfa seviyesi yetki — sidebar URL bypass’ını keser.
@@ -27,10 +32,15 @@ export async function requireModulePage(mod: AppModule) {
     .select("role, tenant_id")
     .eq("id", user.id)
     .maybeSingle();
-  const role = profile?.role ?? "advisor";
-  const tenantId = profile?.tenant_id ?? (user.app_metadata?.tenant_id as string | undefined) ?? null;
+  const role = impersonating ? "readonly" : (profile?.role ?? "advisor");
+  const claimedTenantId = typeof user.app_metadata?.tenant_id === "string"
+    ? user.app_metadata.tenant_id.trim() || null
+    : null;
+  const tenantId = impersonating ? claimedTenantId : (profile?.tenant_id ?? claimedTenantId);
 
-  const perms = await getEffectivePermissions(tenantId, role, user.id);
+  const perms = impersonating
+    ? immutableReadonlyPermissions()
+    : await getEffectivePermissions(tenantId, role, user.id);
   if (!effectiveCanAccessModule(perms, mod)) {
     redirect("/app?yetki=yok");
   }

@@ -2,16 +2,17 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
+import { escapeCsvCell } from "@/lib/csv";
+import { planLabel } from "@/lib/billing/plans";
 
 export type ExportResult = { error?: string; csv?: string; filename?: string };
 
-const planLabel: Record<string, string> = { advisor: "Danışman", office: "Ofis", professional: "Profesyonel", enterprise: "Kurumsal" };
 const statusLabel: Record<string, string> = { trial: "Deneme", active: "Aktif", past_due: "Gecikmiş", suspended: "Askıda", cancelled: "İptal" };
 
 function toCsv(rows: Record<string, unknown>[]) {
   if (rows.length === 0) return "";
   const keys = Object.keys(rows[0]!);
-  const esc = (v: unknown) => `"${(v == null ? "" : String(v)).replace(/"/g, '""')}"`;
+  const esc = escapeCsvCell;
   // BOM + başlık satırı → Excel Türkçe uyumu
   return "\uFEFF" + [keys.join(","), ...rows.map((r) => keys.map((k) => esc(r[k])).join(","))].join("\n");
 }
@@ -29,7 +30,7 @@ export async function exportTenantsCsv(): Promise<ExportResult> {
   if (error) return { error: "Dışa aktarma başarısız." };
   const rows = (data ?? []).map((t) => ({
     ofis: t.name,
-    paket: planLabel[t.plan] ?? t.plan,
+    paket: planLabel(t.plan),
     durum: statusLabel[t.status] ?? t.status,
     kayit_tarihi: t.created_at,
     deneme_bitis: t.trial_ends_at ?? "",
@@ -51,7 +52,7 @@ export async function exportSubscriptionsCsv(): Promise<ExportResult> {
     const name = Array.isArray(t) ? t[0]?.name : t?.name;
     return {
       ofis: name ?? "",
-      paket: planLabel[s.plan] ?? s.plan,
+      paket: planLabel(s.plan),
       durum: s.status,
       tutar_try: s.amount_try,
       donem: s.billing_cycle ?? "",
@@ -188,7 +189,7 @@ export async function exportPlatformReportCsv(): Promise<ExportResult> {
     const s = subByTenant.get(t.id);
     return {
       ofis: t.name,
-      paket: planLabel[t.plan] ?? t.plan,
+      paket: planLabel(t.plan),
       ofis_durumu: statusLabel[t.status] ?? t.status,
       abonelik_durumu: s ? (subStatusLabel[s.status] ?? s.status) : "Abonelik yok",
       aylik_tutar_try: s?.amount_try ?? 0,

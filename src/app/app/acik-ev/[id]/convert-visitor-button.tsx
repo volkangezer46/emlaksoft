@@ -39,7 +39,7 @@ export function ConvertVisitorButton({
       type="button"
       onClick={onConvert}
       disabled={pending}
-      className="focus-ring press inline-flex items-center gap-1 rounded-[8px] border border-line bg-canvas px-2 py-1 text-[11px] font-semibold text-brand-600 transition hover:border-brand-300 disabled:opacity-60"
+      className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2 py-1 text-xs font-semibold text-brand-600 transition hover:border-brand-300 disabled:opacity-60"
     >
       {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserPlus className="h-3 w-3" />}
       Müşteri olarak kaydet

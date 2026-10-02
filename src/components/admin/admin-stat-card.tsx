@@ -58,7 +58,7 @@ export function AdminStatCard({
     : "border-line bg-surface hover:border-brand-300";
 
   const cls = [
-    "group relative block rounded-[14px] border p-3.5 transition",
+    "group relative block rounded-[var(--radius-card)] border p-3.5 transition",
     shell,
     href ? "focus-ring press lift" : "",
   ].join(" ");
@@ -82,11 +82,11 @@ export function AdminStatCard({
       ) : (
         <p className={`mt-2 font-display text-xl font-extrabold ${dark ? "text-white" : "text-ink-950"}`}>{value}</p>
       )}
-      <p className={`text-[11px] ${dark ? "text-white/70" : "text-text-muted"}`}>{label}</p>
+      <p className={`text-xs ${dark ? "text-white/70" : "text-text-muted"}`}>{label}</p>
       {empty ? (
-        <p className={`mt-1 text-[11px] font-medium ${dark ? "text-white/40" : "text-text-faint"}`}>{emptyHint}</p>
+        <p className={`mt-1 text-xs font-medium ${dark ? "text-white/40" : "text-text-faint"}`}>{emptyHint}</p>
       ) : hint ? (
-        <p className={`mt-1 text-[11px] font-medium ${dark ? "text-white/45" : "text-text-faint"}`}>{hint}</p>
+        <p className={`mt-1 text-xs font-medium ${dark ? "text-white/45" : "text-text-faint"}`}>{hint}</p>
       ) : null}
       {children}
     </>

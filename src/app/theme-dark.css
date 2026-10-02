@@ -1,0 +1,131 @@
+/* ============================================================================
+   EmlakSoft — Koyu tema (yalnız /app ve /admin)
+   ----------------------------------------------------------------------------
+   Etkinleştirme: <html data-theme="dark">. Public vitrin/portallar bilerek açık
+   kalır (marka ve beyaz etiket kontrolü orada). Attribute'u ThemeController
+   yönetir; ilk boyamada yanıp sönmeyi kök layout'taki satır içi script önler.
+
+   Strateji: bileşenler zaten semantik token (--surface, --text, --line, --accent)
+   kullanıyor; bu dosya yalnız token değerlerini çevirir. Token'a bağlı olmayan
+   birkaç ham sınıf (bg-white, text-ink-950, pastel -50 zeminler) en alttaki
+   küçük override listesiyle kapatılır. `.theme-dark` (her zaman koyu hero
+   bölümleri) etkilenmez: override'lar `:not(.theme-dark *)` ile dışarıda tutulur.
+   ========================================================================== */
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Yüzeyler */
+  --canvas: #0a1020;
+  --surface: #101a2e;
+  --surface-2: #0d1627;
+  --surface-raised: #15213a;
+  --surface-sunken: #080d19;
+  --surface-overlay: rgba(16, 26, 46, 0.86);
+  --surface-accent-soft: color-mix(in srgb, var(--accent) 14%, var(--surface));
+
+  /* Metin — --text-faint #7d8aa5, --surface üzerinde ≈5:1 */
+  --text: #e8edf7;
+  --text-muted: #a3afc6;
+  --text-faint: #7d8aa5;
+
+  /* Çizgiler */
+  --line: #1e2b45;
+  --line-strong: #2a3a5c;
+  --hairline: rgba(255, 255, 255, 0.08);
+  --hairline-strong: rgba(255, 255, 255, 0.14);
+
+  /* Ink: arka plan olarak kullanılan düğme/blok tonları biraz açılır ki koyu
+     zeminde seçilsin. Metin olarak kullanımı aşağıdaki sınıf override'ı yapar. */
+  --ink-950: #1c2f57;
+  --ink-900: #203664;
+  --ink-800: #27427a;
+  --ink-700: #31528f;
+
+  /* Marka: metin olarak okunur, beyaz yazılı düğmede yeterli kontrast */
+  --accent: var(--brand-500);
+  --accent-hover: var(--brand-400);
+  --brand-50: rgba(47, 120, 255, 0.14);
+  --brand-700: #7aa9ff;
+
+  /* Pastel zeminler ve onların koyu metin tonları */
+  --mint-50: rgba(16, 185, 163, 0.14);
+  --mint-600: var(--mint-400);
+  --mint-700: var(--mint-300);
+  --danger-50: rgba(229, 72, 77, 0.14);
+  --danger-100: rgba(229, 72, 77, 0.24);
+  --danger-600: #ef7f83;
+  --danger-700: var(--danger-300);
+  --amber-600: var(--amber-400);
+  --amber-700: var(--amber-300);
+  --warn-600: var(--warn-400);
+
+  --success-fg: var(--mint-400);
+  --success-bg: var(--mint-50);
+  --warning-fg: var(--warn-400);
+  --warning-bg: rgba(245, 165, 36, 0.14);
+  --danger-fg: var(--danger-400);
+  --danger-bg: var(--danger-50);
+
+  /* Durum tonları: zemin yüzeyle karışır, metin açık ton */
+  --success-soft: color-mix(in srgb, var(--mint-500) 16%, var(--surface));
+  --success-strong: var(--mint-300);
+  --warning-soft: color-mix(in srgb, var(--amber-400) 16%, var(--surface));
+  --warning-strong: var(--amber-300);
+  --danger-soft: color-mix(in srgb, var(--danger-500) 16%, var(--surface));
+  --danger-strong: var(--danger-300);
+  --info-soft: color-mix(in srgb, var(--brand-500) 16%, var(--surface));
+  --info-strong: var(--brand-300);
+  --neutral-soft: rgba(255, 255, 255, 0.06);
+  --neutral-strong: var(--text);
+
+  /* Koyu zeminde gölge görünmez; derinliği koyu ve geniş gölge + ince üst ışık verir */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 32px 80px -24px rgba(0, 0, 0, 0.65);
+  --shadow-modal: 0 28px 70px -18px rgba(0, 0, 0, 0.7);
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 6px -1px rgba(0, 0, 0, 0.3);
+  --elev-2: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 16px -4px rgba(0, 0, 0, 0.4);
+  --elev-3: 0 1px 3px rgba(0, 0, 0, 0.4), 0 12px 28px -8px rgba(0, 0, 0, 0.5);
+  --elev-4: 0 2px 4px rgba(0, 0, 0, 0.45), 0 24px 56px -16px rgba(0, 0, 0, 0.6);
+  --elev-5: 0 3px 6px rgba(0, 0, 0, 0.5), 0 40px 88px -24px rgba(0, 0, 0, 0.7);
+  --inner-top: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ---- Token'a bağlı olmayan ham sınıflar ------------------------------------ */
+
+html[data-theme="dark"] .bg-white:not(.theme-dark *) {
+  background-color: var(--surface);
+}
+html[data-theme="dark"] :is(.bg-white\/95, .bg-white\/90, .bg-white\/85, .bg-white\/80, .bg-white\/75, .bg-white\/70):not(.theme-dark *) {
+  background-color: color-mix(in srgb, var(--surface) 84%, transparent);
+}
+html[data-theme="dark"] :is(.text-ink-950, .text-ink-900, .text-ink-800):not(.theme-dark *) {
+  color: var(--text);
+}
+html[data-theme="dark"] .bg-amber-50:not(.theme-dark *) {
+  background-color: rgba(242, 184, 75, 0.12);
+}
+html[data-theme="dark"] :is(.bg-zinc-50, .bg-zinc-100):not(.theme-dark *) {
+  background-color: var(--surface-sunken);
+}
+html[data-theme="dark"] .skeleton {
+  background-color: rgba(255, 255, 255, 0.07);
+  background-image: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.08) 50%, transparent 100%);
+}
+html[data-theme="dark"] .glass-card {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+html[data-theme="dark"] input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"]),
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select {
+  color-scheme: dark;
+}
+html[data-theme="dark"] ::placeholder {
+  color: var(--text-faint);
+}
+html[data-theme="dark"] ::selection {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+}
