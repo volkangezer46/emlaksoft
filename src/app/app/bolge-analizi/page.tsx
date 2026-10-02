@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight, Building2, Info, LineChart, MapPinned, Minus, Sparkles, Trophy, TrendingDown, TrendingUp, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { PageHeader } from "@/components/ui/page-header";
 import { DataTable } from "@/components/ui/data-table";
 import { ChartFrame, BarCompare, AreaTrend } from "@/app/app/_ui/lazy-chart";
 import { compareTr } from "@/lib/tr-text";
@@ -261,49 +262,42 @@ export default async function RegionAnalysisPage({
 
   return (
     <div className="space-y-6">
-      <section className="no-print theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-12 -top-20 h-60 w-60 rounded-full bg-mint-500/25 blur-[80px]" />
-        <div className="relative">
-          <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-            <MapPinned className="h-3.5 w-3.5" /> Kendi verinizden piyasa görünümü
-          </span>
-          <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Bölge analizi</h1>
-          <p className="mt-1 max-w-2xl text-sm text-white/60">
-            İlçe bazında medyan m² fiyatı, listede kalma süresi ve kapanan işlem hacmi.
-          </p>
+      <PageHeader
+        className="no-print mb-0"
+        eyebrow="Kendi verinizden piyasa görünümü"
+        title="Bölge analizi"
+        description="İlçe bazında medyan m² fiyatı, listede kalma süresi ve kapanan işlem hacmi."
+      />
 
-          <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {[
-              { label: "İlçe", value: String(rows.length), icon: MapPinned, href: null },
-              { label: "Aktif portföy", value: String(totalActive), icon: Building2, href: "/app/portfoyler" },
-              { label: "Medyan m²", value: money(officeMedian), icon: TrendingUp, href: null },
-              { label: `Kapanan (${months} ay)`, value: `${totalClosed}`, icon: ArrowUpRight, href: "/app/anlasmalar" },
-            ].map((item) =>
-              item.href ? (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur hover:border-white/30"
-                >
-                  <span className="flex items-start justify-between">
-                    <item.icon className="h-4 w-4 text-mint-400" />
-                    <ArrowUpRight className="hover-action h-4 w-4 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
-                  </span>
-                  <p className="mt-2 font-display text-xl font-extrabold text-white">{item.value}</p>
-                  <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
-                </Link>
-              ) : (
-                <div key={item.label} className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur">
-                  <item.icon className="h-4 w-4 text-mint-400" />
-                  <p className="mt-2 font-display text-xl font-extrabold text-white">{item.value}</p>
-                  <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
-                </div>
-              ),
-            )}
-          </div>
-        </div>
-      </section>
+      <div className="no-print grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          { label: "İlçe", value: String(rows.length), icon: MapPinned, href: null },
+          { label: "Aktif portföy", value: String(totalActive), icon: Building2, href: "/app/portfoyler" },
+          { label: "Medyan m²", value: money(officeMedian), icon: TrendingUp, href: null },
+          { label: `Kapanan (${months} ay)`, value: `${totalClosed}`, icon: ArrowUpRight, href: "/app/anlasmalar" },
+        ].map((item) =>
+          item.href ? (
+            <Link
+              key={item.label}
+              href={item.href}
+              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)] hover:border-brand-300"
+            >
+              <span className="flex items-start justify-between">
+                <item.icon className="h-4 w-4 text-brand-600" />
+                <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+              </span>
+              <p className="mt-2 font-display text-xl font-extrabold text-text">{item.value}</p>
+              <p className="text-xs text-text-muted">{item.label}</p>
+            </Link>
+          ) : (
+            <div key={item.label} className="rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]">
+              <item.icon className="h-4 w-4 text-brand-600" />
+              <p className="mt-2 font-display text-xl font-extrabold text-text">{item.value}</p>
+              <p className="text-xs text-text-muted">{item.label}</p>
+            </div>
+          ),
+        )}
+      </div>
 
       {/* Filtreler <form> degil <Link>: iki dugme grubu da ayni "tx"/"months"
           parametrelerini tasiyor. Tek form icinde hem gizli input hem ayni adli

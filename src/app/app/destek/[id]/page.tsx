@@ -1,11 +1,10 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   Activity,
   ArrowLeft,
-  Building2,
   CheckCircle2,
-  Hash,
   History,
   LifeBuoy,
   MessageSquareText,
@@ -32,11 +31,11 @@ const statusLabel: Record<string, string> = {
   closed: "Kapalı",
 };
 const statusCls: Record<string, string> = {
-  open: "bg-brand-500/20 text-cyan-100",
-  in_progress: "bg-cyan-400/20 text-cyan-100",
-  waiting: "bg-amber-400/20 text-amber-100",
-  resolved: "bg-mint-500/20 text-emerald-100",
-  closed: "bg-white/10 text-white/65",
+  open: "bg-brand-600/10 text-brand-700",
+  in_progress: "bg-cyan-400/15 text-cyan-700",
+  waiting: "bg-amber-400/15 text-amber-700",
+  resolved: "bg-mint-500/15 text-mint-700",
+  closed: "bg-canvas text-text-muted",
 };
 const categoryLabel: Record<string, string> = {
   general: "Genel",
@@ -163,39 +162,32 @@ export default async function SupportTicketDetailPage({ params }: { params: Prom
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Destek taleplerine dön
       </Link>
 
-      <header className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white sm:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-cyan-400/15 blur-[75px]" />
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-white/50">
-              <span className="inline-flex items-center gap-1"><Hash className="h-3 w-3" />{ticket.ticket_no ?? ticket.id.slice(0, 8).toUpperCase()}</span>
-              <span aria-hidden>·</span>
-              <span className="inline-flex items-center gap-1"><Building2 className="h-3 w-3" />EmlakSoft Destek</span>
-            </div>
-            <h1 className="mt-2 max-w-3xl text-balance font-display text-2xl font-extrabold tracking-[-0.02em] text-white sm:text-3xl">{ticket.subject}</h1>
-            <p className="mt-2 text-xs text-white/45">Açılış {dt(ticket.created_at)} · Son hareket {dt(updatedAt)}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+      <PageHeader
+        className="mb-0"
+        eyebrow={`#${ticket.ticket_no ?? ticket.id.slice(0, 8).toUpperCase()} · EmlakSoft Destek`}
+        title={ticket.subject}
+        meta={
+          <>
             <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", statusCls[ticket.status] ?? statusCls.open)}>{statusLabel[ticket.status] ?? ticket.status}</span>
-            <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-bold text-white/70">{categoryLabel[ticket.category] ?? ticket.category}</span>
-            <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-200">{priorityLabel[ticket.priority] ?? ticket.priority}</span>
-          </div>
-        </div>
+            <span className="rounded-full bg-canvas px-2.5 py-1 text-xs font-bold text-text-muted">{categoryLabel[ticket.category] ?? ticket.category}</span>
+            <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-700">{priorityLabel[ticket.priority] ?? ticket.priority}</span>
+          </>
+        }
+        description={`Açılış ${dt(ticket.created_at)} · Son hareket ${dt(updatedAt)}`}
+      />
 
-        <div className="relative mt-5 grid overflow-hidden rounded-[var(--radius-card)] border border-white/10 bg-white/[0.055] sm:grid-cols-3">
-          {[
-            { icon: Timer, label: "İlk yanıt", value: relativeTime(ticket.first_response_due_at, firstResponseDone), detail: firstResponseDone ? dt(ticket.first_response_at) : dt(ticket.first_response_due_at) },
-            { icon: ShieldCheck, label: "Çözüm hedefi", value: relativeTime(ticket.resolution_due_at, terminal), detail: dt(ticket.resolution_due_at) },
-            { icon: MessageSquareText, label: "Konuşma", value: `${rows.length} mesaj`, detail: `${attachments.length} güvenli dosya` },
-          ].map((metric) => (
-            <div key={metric.label} className="flex items-center gap-3 border-white/10 p-3.5 sm:[&:not(:first-child)]:border-l">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-white/10 text-cyan-200"><metric.icon className="h-4 w-4" /></span>
-              <span className="min-w-0"><span className="block text-xs font-semibold uppercase tracking-[0.06em] text-white/40">{metric.label}</span><span className="block truncate text-sm font-bold text-white">{metric.value}</span><span className="block truncate text-xs text-white/40">{metric.detail}</span></span>
-            </div>
-          ))}
-        </div>
-      </header>
+      <div className="grid overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-xs)] sm:grid-cols-3">
+        {[
+          { icon: Timer, label: "İlk yanıt", value: relativeTime(ticket.first_response_due_at, firstResponseDone), detail: firstResponseDone ? dt(ticket.first_response_at) : dt(ticket.first_response_due_at) },
+          { icon: ShieldCheck, label: "Çözüm hedefi", value: relativeTime(ticket.resolution_due_at, terminal), detail: dt(ticket.resolution_due_at) },
+          { icon: MessageSquareText, label: "Konuşma", value: `${rows.length} mesaj`, detail: `${attachments.length} güvenli dosya` },
+        ].map((metric) => (
+          <div key={metric.label} className="flex items-center gap-3 border-line p-3.5 sm:[&:not(:first-child)]:border-l">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600"><metric.icon className="h-4 w-4" /></span>
+            <span className="min-w-0"><span className="block text-xs font-semibold uppercase tracking-wider text-text-muted">{metric.label}</span><span className="block truncate text-sm font-bold text-text">{metric.value}</span><span className="block truncate text-xs text-text-faint">{metric.detail}</span></span>
+          </div>
+        ))}
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
         <main className="min-w-0 space-y-4">

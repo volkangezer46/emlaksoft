@@ -1,6 +1,8 @@
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import Link from "next/link";
 import { daysAgoIso } from "@/lib/clock";
-import { ArrowLeft, Building2, RotateCcw, Trash2, Users2 } from "lucide-react";
+import { Building2, RotateCcw, Trash2, Users2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
@@ -56,21 +58,17 @@ export default async function TrashPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link
-          href="/app/ayarlar"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted transition hover:text-brand-600"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> Ayarlar
-        </Link>
-        <h1 className="mt-2 flex items-center gap-2 font-display text-2xl font-extrabold text-ink-950">
-          <Trash2 className="h-6 w-6 text-danger-500" /> Çöp kutusu
-        </h1>
-        <p className="mt-1 text-sm text-text-muted">
-          Son {RETENTION_DAYS} günde silinen müşteri ve portföyler. Geri alınan kayıtlar listelerine döner;
-          kalıcı silme yoktur.
-        </p>
-      </div>
+      <PageHeader
+        breadcrumbs={[{ label: "Ayarlar", href: "/app/ayarlar" }, { label: "Çöp kutusu" }]}
+        icon={
+          <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-danger-500/10 text-danger-600">
+            <Trash2 className="h-5 w-5" />
+          </span>
+        }
+        title="Çöp kutusu"
+        description={`Son ${RETENTION_DAYS} günde silinen müşteri ve portföyler. Geri alınan kayıtlar listelerine döner; kalıcı silme yoktur.`}
+        className="mb-0"
+      />
 
       {/* Müşteriler */}
       <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
@@ -85,7 +83,7 @@ export default async function TrashPage() {
         </div>
 
         {customers.length === 0 ? (
-          <p className="mt-5 text-sm text-text-muted">Son {RETENTION_DAYS} günde silinen müşteri yok.</p>
+          <EmptyStateV3 className="mt-4" variant="compact" icon={<Users2 />} title="Silinen müşteri yok" description={`Son ${RETENTION_DAYS} günde silinen müşteri bulunmuyor.`} action={<Link href="/app/musteriler" className="text-xs font-semibold text-brand-600 hover:underline">Müşterilere git</Link>} />
         ) : (
           <ul className="mt-4 divide-y divide-line/60">
             {customers.map((c) => (
@@ -123,7 +121,7 @@ export default async function TrashPage() {
         </div>
 
         {properties.length === 0 ? (
-          <p className="mt-5 text-sm text-text-muted">Son {RETENTION_DAYS} günde silinen portföy yok.</p>
+          <EmptyStateV3 className="mt-4" variant="compact" icon={<Trash2 />} title="Silinen portföy yok" description={`Son ${RETENTION_DAYS} günde silinen portföy bulunmuyor.`} action={<Link href="/app/portfoyler" className="text-xs font-semibold text-brand-600 hover:underline">Portföylere git</Link>} />
         ) : (
           <ul className="mt-4 divide-y divide-line/60">
             {properties.map((p) => (

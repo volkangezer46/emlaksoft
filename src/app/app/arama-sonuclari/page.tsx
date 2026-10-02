@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { searchWorkspace, type SearchHit } from "@/app/actions/search";
+import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/app/empty-state";
 
 /**
@@ -78,80 +79,76 @@ export default async function AramaSonuclariPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/30 blur-[80px]" />
-        <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-cyan-400/15 blur-[70px]" />
-        <div className="relative">
-          <span className="flex items-center gap-2 text-xs font-semibold text-brand-300">
-            <Search className="h-4 w-4" /> Global arama
-          </span>
-          <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Arama sonuçları</h1>
-          <p className="mt-1 text-sm text-white/75">
-            {q.length >= 2 ? (
-              <>
-                &quot;{q}&quot; için {hits.length} sonuç{tur ? ` · ${GROUPS.find((g) => g.kind === tur)?.title} filtresinde ${visibleCount}` : ""}{" "}
-                bulundu.
-              </>
-            ) : (
-              "Müşteri, portföy, talep, anlaşma, görev ve destek kayıtlarında arayın."
-            )}
-          </p>
+      <PageHeader
+        eyebrow="Global arama"
+        title="Arama sonuçları"
+        className="mb-0"
+        description={
+          q.length >= 2 ? (
+            <>
+              &quot;{q}&quot; için {hits.length} sonuç{tur ? ` · ${GROUPS.find((g) => g.kind === tur)?.title} filtresinde ${visibleCount}` : ""}{" "}
+              bulundu.
+            </>
+          ) : (
+            "Müşteri, portföy, talep, anlaşma, görev ve destek kayıtlarında arayın."
+          )
+        }
+      />
 
-          {/* GET formu — sorgu URL'e yazılır (?q=), sunucu tarafında aranır */}
-          <form action="/app/arama-sonuclari" className="relative mt-4 flex max-w-xl items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
-              <input
-                name="q"
-                type="search"
-                defaultValue={q}
-                placeholder="En az 2 karakter — ad, telefon, ilan no…"
-                aria-label="Arama sorgusu"
-                className="w-full rounded-[var(--radius-control)] border border-white/15 bg-white/8 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/40 outline-none backdrop-blur transition focus:border-white/40"
-              />
-            </div>
-            {/* Aktif tür filtresi formda korunur */}
-            {tur ? <input type="hidden" name="tur" value={tur} /> : null}
-            <button
-              type="submit"
-              className="focus-ring press min-h-[42px] rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+      <section>
+        {/* GET formu — sorgu URL'e yazılır (?q=), sunucu tarafında aranır */}
+        <form action="/app/arama-sonuclari" className="mt-0 flex max-w-xl items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+            <input
+              name="q"
+              type="search"
+              defaultValue={q}
+              placeholder="En az 2 karakter — ad, telefon, ilan no…"
+              aria-label="Arama sorgusu"
+              className="w-full rounded-[var(--radius-control)] border border-line bg-surface py-2.5 pl-10 pr-3 text-sm text-text placeholder:text-text-faint outline-none transition focus:border-brand-400"
+            />
+          </div>
+          {/* Aktif tür filtresi formda korunur */}
+          {tur ? <input type="hidden" name="tur" value={tur} /> : null}
+          <button
+            type="submit"
+            className="focus-ring press min-h-[42px] rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+          >
+            Ara
+          </button>
+        </form>
+
+        {/* Tür sayaçları — KPI + filtre bir arada; tıklanınca liste daralır */}
+        {hits.length > 0 ? (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Link
+              href={buildHref(q, null)}
+              aria-current={!tur ? "page" : undefined}
+              className={`focus-ring press rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                !tur ? "bg-brand-600 text-white" : "border border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
+              }`}
             >
-              Ara
-            </button>
-          </form>
-
-          {/* Tür sayaçları — KPI + filtre bir arada; tıklanınca liste daralır */}
-          {hits.length > 0 ? (
-            <div className="mt-5 flex flex-wrap items-center gap-2">
-              <Link
-                href={buildHref(q, null)}
-                aria-current={!tur ? "page" : undefined}
-                className={`focus-ring press rounded-full px-3 py-1.5 text-xs font-bold transition ${
-                  !tur ? "bg-white text-ink-950" : "border border-white/20 text-white/70 hover:border-white/40 hover:text-white"
-                }`}
-              >
-                Tümü · {hits.length}
-              </Link>
-              {nonEmpty.map((g) => {
-                const Icon = g.icon;
-                const active = tur === g.kind;
-                return (
-                  <Link
-                    key={g.kind}
-                    href={buildHref(q, active ? null : g.kind)}
-                    aria-current={active ? "page" : undefined}
-                    className={`focus-ring press inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition ${
-                      active ? "bg-white text-ink-950" : "border border-white/20 text-white/70 hover:border-white/40 hover:text-white"
-                    }`}
-                  >
-                    <Icon className="h-3.5 w-3.5" /> {g.title} · {g.items.length}
-                  </Link>
-                );
-              })}
-            </div>
-          ) : null}
-        </div>
+              Tümü · {hits.length}
+            </Link>
+            {nonEmpty.map((g) => {
+              const Icon = g.icon;
+              const active = tur === g.kind;
+              return (
+                <Link
+                  key={g.kind}
+                  href={buildHref(q, active ? null : g.kind)}
+                  aria-current={active ? "page" : undefined}
+                  className={`focus-ring press inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                    active ? "bg-brand-600 text-white" : "border border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" /> {g.title} · {g.items.length}
+                </Link>
+              );
+            })}
+          </div>
+        ) : null}
       </section>
 
       {/* İçgörü şeridi — sonuç dağılımı özeti */}

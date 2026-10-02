@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Building2, Gauge, Info, Scale, Share2, TrendingUp } from "lucide-react";
+import { Building2, Gauge, Info, Scale, Share2, TrendingUp } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import {
@@ -159,32 +160,32 @@ export default async function ValuationReportPage({
 
   return (
     <div className="space-y-6">
-      <div className="no-print flex flex-wrap items-center justify-between gap-3">
-        <Link
-          href="/app/degerleme"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600"
-        >
-          <ArrowLeft className="h-4 w-4" /> Değerleme merkezine dön
-        </Link>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Paylaşım durumu — shared_at cron/aksiyonla yazılır; müşteriye
-              gönderilip gönderilmediğini danışman burada görür. */}
-          {valuation.shared_at ? (
-            <span
-              title={`Paylaşıldı: ${tarih(valuation.shared_at)}`}
-              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-mint-500/30 bg-mint-500/10 px-3 py-2 text-xs font-bold text-mint-700"
-            >
-              <Share2 className="h-3.5 w-3.5" /> Paylaşıldı · {tarih(valuation.shared_at)}
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-text-muted">
-              <Share2 className="h-3.5 w-3.5" /> Henüz paylaşılmadı
-            </span>
-          )}
-          <ShareButton valuationId={valuation.id} title={valuation.title} />
-          <PrintButton />
-        </div>
-      </div>
+      <PageHeader
+        className="no-print mb-0"
+        breadcrumbs={[{ label: "Değerleme merkezi", href: "/app/degerleme" }, { label: "Değerleme raporu" }]}
+        title={valuation.title ?? "Başlıksız değerleme"}
+        description="Değerleme raporu — ekrandan inceleyin, müşteriyle paylaşın veya yazdırın."
+        actions={
+          <>
+            {/* Paylaşım durumu — shared_at cron/aksiyonla yazılır; müşteriye
+                gönderilip gönderilmediğini danışman burada görür. */}
+            {valuation.shared_at ? (
+              <span
+                title={`Paylaşıldı: ${tarih(valuation.shared_at)}`}
+                className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-mint-500/30 bg-mint-500/10 px-3 py-2 text-xs font-bold text-mint-700"
+              >
+                <Share2 className="h-3.5 w-3.5" /> Paylaşıldı · {tarih(valuation.shared_at)}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-text-muted">
+                <Share2 className="h-3.5 w-3.5" /> Henüz paylaşılmadı
+              </span>
+            )}
+            <ShareButton valuationId={valuation.id} title={valuation.title} />
+            <PrintButton />
+          </>
+        }
+      />
 
       <article className="print-sheet surface-card rounded-[var(--radius-panel)] p-6 sm:p-8">
         {/* Rapor başlığı — çıktıda ofis adı belgenin üst bandı oluyor. */}
@@ -193,9 +194,9 @@ export default async function ValuationReportPage({
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-600">
               {office?.name ?? "Emlak ofisi"}
             </p>
-            <h1 className="mt-1 font-display text-2xl font-extrabold tracking-[-0.02em] text-ink-950">
+            <h2 className="mt-1 font-display text-2xl font-extrabold tracking-[-0.02em] text-ink-950">
               Değerleme raporu
-            </h1>
+            </h2>
             <p className="mt-1 text-sm text-text-muted">{valuation.title ?? "Başlıksız değerleme"}</p>
           </div>
           <dl className="text-right text-xs text-text-muted">

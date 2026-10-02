@@ -18,10 +18,11 @@ export function PageHeader({
   breadcrumbs,
   actions,
   meta,
+  icon,
   className,
 }: {
   title: string;
-  description?: string;
+  description?: ReactNode;
   /** Başlığın üstünde küçük bağlam etiketi (ör. modül adı). */
   eyebrow?: string;
   breadcrumbs?: BreadcrumbItem[];
@@ -29,11 +30,15 @@ export function PageHeader({
   actions?: ReactNode;
   /** Başlığın yanında: rozet, sayaç vb. */
   meta?: ReactNode;
+  /** Başlığın solunda: ikon veya avatar. */
+  icon?: ReactNode;
   className?: string;
 }) {
   return (
     <header className={cn("mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between", className)}>
-      <div className="min-w-0">
+      <div className={cn("min-w-0", icon ? "flex items-start gap-3" : undefined)}>
+        {icon ? <div className="shrink-0">{icon}</div> : null}
+        <div className="min-w-0">
         {breadcrumbs && breadcrumbs.length > 0 ? <Breadcrumb items={breadcrumbs} className="mb-2" /> : null}
         {eyebrow ? (
           <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-accent">{eyebrow}</p>
@@ -42,7 +47,8 @@ export function PageHeader({
           <h1 className="font-display text-2xl font-bold tracking-tight text-text">{title}</h1>
           {meta}
         </div>
-        {description ? <p className="mt-1 max-w-2xl text-sm text-text-muted">{description}</p> : null}
+        {description ? <div className="mt-1 max-w-2xl text-sm text-text-muted">{description}</div> : null}
+        </div>
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
     </header>

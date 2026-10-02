@@ -14,12 +14,11 @@ import {
 import { signOut } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getPlatformStaff } from "@/lib/platform";
+import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
 import Link from "next/link";
-import type { CSSProperties } from "react";
 import { planLabel } from "@/lib/billing/plans";
 
-const RING_C = 2 * Math.PI * 42;
 
 const nf = new Intl.NumberFormat("tr-TR");
 
@@ -77,105 +76,80 @@ export default async function SuspendedPage() {
 
   return (
     <div className="space-y-6">
-      {/* Koyu hero — durum + kimlik */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-danger-500/25 blur-[80px]" />
-        <div className="pointer-events-none absolute -left-16 bottom-0 h-44 w-44 rounded-full bg-amber-400/15 blur-[80px]" />
-        <div className="relative grid gap-6 lg:grid-cols-[1.3fr_auto] lg:items-center">
-          <div>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-500/15 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-danger-500">
-              <Lock className="h-3 w-3" /> Erişim kilitli
-            </span>
-            <h1 className="mt-3 font-display text-2xl font-extrabold md:text-3xl">Hesap erişimi kısıtlandı</h1>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/65">
-              <span className="font-semibold text-white">{office?.name ?? "Ofisiniz"}</span> aboneliği şu an{" "}
-              <span className="font-semibold text-danger-500">{isCancelled ? "iptal" : "askıda"}</span>. Panel erişimi
-              geçici olarak kapalı; kayıtlar saklama politikası kapsamında korunur ve abonelik yenilendiğinde erişim yeniden değerlendirilir.
-            </p>
-
-            {/* Hesap kimlik şeridi */}
-            <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {[
-                { label: "Ofis", value: office?.name ?? "—" },
-                { label: "Durum", value: isCancelled ? "İptal" : "Askıda", danger: true },
-                { label: "Paket", value: office?.plan ? planLabel(office.plan) : "—" },
-              ].map((r) => (
-                <Link
-                  key={r.label}
-                  href="/app/abonelik"
-                  className="focus-ring press group relative rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3.5 py-2.5 transition hover:border-white/30"
-                >
-                  <ArrowUpRight className="hover-action absolute right-2 top-2 h-3 w-3 text-white/50 opacity-0 transition group-hover:opacity-100" />
-                  <p className="text-xs uppercase tracking-[0.08em] text-white/45">{r.label}</p>
-                  <p className={`truncate text-sm font-bold ${r.danger ? "text-danger-500" : "text-white"}`}>{r.value}</p>
-                </Link>
-              ))}
-            </div>
-
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              {!isCancelled ? (
-                <ButtonLink href="/app/abonelik">
-                  <CreditCard className="h-4 w-4" /> Ödemeyi tamamla
-                </ButtonLink>
-              ) : null}
-              <a
-                href="mailto:destek@emlaksoft.com.tr"
-                className={`inline-flex min-h-[42px] items-center gap-2 rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-semibold transition ${
-                  isCancelled
-                    ? "bg-brand-600 text-white hover:bg-brand-700"
-                    : "border border-white/20 text-white/80 hover:border-white/40 hover:text-white"
-                }`}
+      <PageHeader
+        className="mb-0"
+        icon={
+          <span className="grid h-12 w-12 place-items-center rounded-[var(--radius-card)] bg-danger-500/10 text-danger-600">
+            <ShieldAlert className="h-6 w-6" />
+          </span>
+        }
+        title="Hesap erişimi kısıtlandı"
+        meta={
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-danger-600">
+            <Lock className="h-3 w-3" /> Erişim kilitli
+          </span>
+        }
+        description={
+          <>
+            <span className="font-semibold text-text">{office?.name ?? "Ofisiniz"}</span> aboneliği şu an{" "}
+            <span className="font-semibold text-danger-600">{isCancelled ? "iptal" : "askıda"}</span>. Panel erişimi
+            geçici olarak kapalı; kayıtlar saklama politikası kapsamında korunur ve abonelik yenilendiğinde erişim yeniden değerlendirilir.
+          </>
+        }
+        actions={
+          <>
+            {!isCancelled ? (
+              <ButtonLink href="/app/abonelik">
+                <CreditCard className="h-4 w-4" /> Ödemeyi tamamla
+              </ButtonLink>
+            ) : null}
+            <a
+              href="mailto:destek@emlaksoft.com.tr"
+              className={`inline-flex min-h-[42px] items-center gap-2 rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-semibold transition ${
+                isCancelled
+                  ? "bg-brand-600 text-white hover:bg-brand-700"
+                  : "border border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
+              }`}
+            >
+              <Mail className="h-4 w-4" /> Destek yaz
+            </a>
+            {staff ? (
+              <Link
+                href="/admin"
+                className="inline-flex min-h-[42px] items-center rounded-[var(--radius-control)] border border-amber-400/40 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:border-amber-400/70"
               >
-                <Mail className="h-4 w-4" /> Destek yaz
-              </a>
-              {staff ? (
-                <Link
-                  href="/admin"
-                  className="inline-flex min-h-[42px] items-center rounded-[var(--radius-control)] border border-amber-400/40 px-4 py-2.5 text-sm font-semibold text-amber-300 transition hover:border-amber-400/70"
-                >
-                  Ops paneline git
-                </Link>
-              ) : null}
-              <form action={signOut}>
-                <button
-                  type="submit"
-                  className="min-h-[42px] rounded-[var(--radius-control)] border border-white/15 px-4 py-2.5 text-sm font-semibold text-white/60 transition hover:border-white/30 hover:text-white"
-                >
-                  Çıkış yap
-                </button>
-              </form>
-            </div>
-          </div>
+                Ops paneline git
+              </Link>
+            ) : null}
+            <form action={signOut}>
+              <button
+                type="submit"
+                className="min-h-[42px] rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:border-brand-300 hover:text-text"
+              >
+                Çıkış yap
+              </button>
+            </form>
+          </>
+        }
+      />
 
-          {/* Durum rozeti — animasyonlu halka */}
-          <div className="mx-auto grid h-32 w-32 place-items-center lg:h-36 lg:w-36">
-            <div className="relative grid h-full w-full place-items-center">
-              <div
-                className="conic-spin pointer-events-none absolute inset-0 rounded-full opacity-30 blur-md"
-                style={{ background: "conic-gradient(from 0deg, var(--danger-500), var(--amber-400), var(--danger-500))" }}
-              />
-              <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="6" />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="42"
-                  fill="none"
-                  stroke="var(--danger-500)"
-                  strokeWidth="6"
-                  strokeLinecap="round"
-                  className="ring-sweep"
-                  style={{ "--circ": RING_C, "--dash": RING_C * 0.35 } as CSSProperties}
-                />
-              </svg>
-              <span className="relative grid h-14 w-14 place-items-center rounded-[var(--radius-card)] bg-danger-500/15 text-danger-500">
-                <ShieldAlert className="h-7 w-7" />
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {[
+          { label: "Ofis", value: office?.name ?? "—" },
+          { label: "Durum", value: isCancelled ? "İptal" : "Askıda", danger: true },
+          { label: "Paket", value: office?.plan ? planLabel(office.plan) : "—" },
+        ].map((r) => (
+          <Link
+            key={r.label}
+            href="/app/abonelik"
+            className="focus-ring press group relative rounded-[var(--radius-card)] border border-line bg-surface px-3.5 py-2.5 shadow-[var(--shadow-xs)] transition hover:border-brand-300"
+          >
+            <ArrowUpRight className="hover-action absolute right-2 top-2 h-3 w-3 text-text-faint opacity-0 transition group-hover:opacity-100" />
+            <p className="text-xs uppercase tracking-wider text-text-muted">{r.label}</p>
+            <p className={`truncate text-sm font-bold ${r.danger ? "text-danger-600" : "text-text"}`}>{r.value}</p>
+          </Link>
+        ))}
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
         {/* Geri dönüş adımları */}

@@ -13,6 +13,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { isPast } from "@/lib/clock";
 import { getOpenHouse, listOpenHouseVisitors } from "@/app/actions/targets-openhouse-sources";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 import { getBaseUrl } from "@/lib/base-url";
@@ -102,17 +103,12 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
         <ArrowLeft className="h-4 w-4" /> Açık ev listesine dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/30 blur-[80px]" />
-        <div className="relative">
-          <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-            <DoorOpen className="h-3.5 w-3.5" /> Açık ev günü
-          </span>
-          <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">
-            {property?.title ?? property?.property_code ?? "Açık ev"}
-          </h1>
-          <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/60">
+      <PageHeader
+        eyebrow="Açık ev günü"
+        title={property?.title ?? property?.property_code ?? "Açık ev"}
+        className="mb-0"
+        description={
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span className="flex items-center gap-1.5">
               <CalendarDays className="h-3.5 w-3.5" />
               {date.toLocaleString("tr-TR", {
@@ -129,28 +125,28 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
                 <MapPin className="h-3.5 w-3.5" /> {event.location}
               </span>
             ) : null}
-          </p>
+          </span>
+        }
+      />
 
-          <div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {[
-              { label: "Ziyaretçi", value: String(gercekSayi), icon: Users },
-              { label: "Telefonu alınan", value: String(telefonlu), icon: Users },
-              { label: "Müşteriye dönüşen", value: String(musteriyeDonusen), icon: ArrowUpRight },
-              {
-                label: "Kapasite",
-                value: event.max_visitors ? `${gercekSayi} / ${event.max_visitors}` : "Sınırsız",
-                icon: DoorOpen,
-              },
-            ].map((k) => (
-              <div key={k.label} className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur">
-                <k.icon className="h-4 w-4 text-mint-400" />
-                <p className="numeric mt-2 font-display text-lg font-extrabold text-white">{k.value}</p>
-                <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
-              </div>
-            ))}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          { label: "Ziyaretçi", value: String(gercekSayi), icon: Users },
+          { label: "Telefonu alınan", value: String(telefonlu), icon: Users },
+          { label: "Müşteriye dönüşen", value: String(musteriyeDonusen), icon: ArrowUpRight },
+          {
+            label: "Kapasite",
+            value: event.max_visitors ? `${gercekSayi} / ${event.max_visitors}` : "Sınırsız",
+            icon: DoorOpen,
+          },
+        ].map((k) => (
+          <div key={k.label} className="rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]">
+            <k.icon className="h-4 w-4 text-brand-600" />
+            <p className="numeric mt-2 font-display text-lg font-extrabold text-text">{k.value}</p>
+            <p className="text-xs text-text-muted">{k.label}</p>
           </div>
-        </div>
-      </section>
+        ))}
+      </div>
 
       <div className="flex flex-wrap items-center gap-3">
         {canEdit ? (
