@@ -15,7 +15,6 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { daysAgoIso, msSince } from "@/lib/clock";
 import { ApplyTemplateButton, AutomationRowActions } from "./automation-actions";
-import { AutomationWizard } from "./automation-wizard";
 import { TRIGGER_LABELS, ACTION_LABELS } from "./labels";
 
 type AutomationRow = {
@@ -80,14 +79,12 @@ export default async function OtomasyonlarPage({
   const durum = params.durum ?? "";
   const supabase = await createClient();
 
-  const [{ data }, { data: staffData }, { data: logData }] = await Promise.all([
+  const [{ data }, { data: logData }] = await Promise.all([
     supabase
       .from("automations")
       .select("id, name, description, trigger_type, conditions, actions, status, run_count, last_run_at, updated_at")
       .order("updated_at", { ascending: false })
       .limit(50),
-    // Sihirbazdaki "Danışmana ata" aksiyonu için aktif ekip listesi
-    supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
     // Son 7 günün çalışma geçmişi — KPI + "Son çalışmalar" özeti
     supabase
       .from("automation_logs")
@@ -96,7 +93,6 @@ export default async function OtomasyonlarPage({
       .order("created_at", { ascending: false })
       .limit(200),
   ]);
-  const staff = (staffData ?? []) as { id: string; full_name: string }[];
 
   const rows = (data ?? []) as AutomationRow[];
   const active   = rows.filter((r) => r.status === "active").length;
@@ -125,17 +121,12 @@ export default async function OtomasyonlarPage({
             </p>
             {canEdit && (
               <div className="mt-3">
-                <AutomationWizard
-                  staff={staff}
-                  trigger={
-                    <button
-                      type="button"
-                      className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white"
-                    >
-                      <Plus className="h-4 w-4" /> Yeni otomasyon
-                    </button>
-                  }
-                />
+                <Link
+                  href="/app/otomasyonlar/yeni"
+                  className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  <Plus className="h-4 w-4" /> Yeni otomasyon
+                </Link>
               </div>
             )}
           </div>

@@ -1,9 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { ChevronDown, Pencil, Plus, Target } from "lucide-react";
+import { ChevronDown, Pencil } from "lucide-react";
 import {
-  createTarget,
   updateTarget,
   type TargetResult,
 } from "@/app/actions/targets-openhouse-sources";
@@ -43,65 +42,46 @@ const selectClass =
   "w-full appearance-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
 /**
- * Hedef oluşturma + düzenleme dialogu.
- * `target` verilirse düzenleme modunda açılır (kalem ikon tetikleyici),
- * verilmezse "Yeni hedef" tetikleyicisi render edilir.
+ * Hedef DÜZENLEME dialogu (kalem ikon tetikleyici, hızlı alan düzenleme).
+ * Yeni hedef ekleme sayfa içi panelde: bkz. target-create-panel.tsx.
  */
 export function TargetFormDialog({
   members,
   target,
-  triggerVariant = "solid",
 }: {
   members: Member[];
-  target?: TargetFormValues;
-  /** "hero": koyu hero üstündeki beyaz buton; "solid": açık zeminde primary buton. */
-  triggerVariant?: "hero" | "solid";
+  target: TargetFormValues;
 }) {
   const [open, setOpen] = useState(false);
   // Başarıda kapatma action akışında (bkz. task-edit-dialog): efekt gerektirmez.
   const [state, formAction, pending] = useActionState<TargetResult, FormData>(
     async (prev, fd) => {
-      const result = target ? await updateTarget(prev, fd) : await createTarget(prev, fd);
+      const result = await updateTarget(prev, fd);
       if (result.ok) setOpen(false);
       return result;
     },
     {},
   );
 
-  const defaultMonth = target
-    ? target.period_start.slice(0, 7)
-    : new Date().toISOString().slice(0, 7);
+  const defaultMonth = target.period_start.slice(0, 7);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {target ? (
-          <button
-            type="button"
-            aria-label="Hedefi düzenle"
-            // relative z-10: kartı kaplayan overlay linkin üstünde kalması için
-            className="focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
-        ) : triggerVariant === "hero" ? (
-          <button
-            type="button"
-            className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 shadow-[var(--elev-2)]"
-          >
-            <Plus className="h-4 w-4" /> Yeni hedef
-          </button>
-        ) : (
-          <Button>
-            <Plus className="h-4 w-4" /> Yeni hedef
-          </Button>
-        )}
+        <button
+          type="button"
+          aria-label="Hedefi düzenle"
+          // relative z-10: kartı kaplayan overlay linkin üstünde kalması için
+          className="focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
       </DialogTrigger>
 
       <DialogContent size="md">
         <DialogHeader
-          icon={target ? <Pencil /> : <Target />}
-          title={target ? "Hedefi düzenle" : "Yeni hedef"}
+          icon={<Pencil />}
+          title="Hedefi düzenle"
           description="Danışman veya ofis geneli için dönemsel anlaşma ve gelir hedefi."
         />
         <form action={formAction}>

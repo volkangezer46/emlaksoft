@@ -17,7 +17,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { getExpiringAuthorizations } from "@/app/actions/property-management";
 import { exportPortalListingsCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
-import { ClosePortalDialog, NewPortalDialog } from "./portal-dialogs";
+import { ClosePortalDialog, NewPortalPanel, NewPortalTrigger } from "./portal-dialogs";
 import { ConfirmListingButton } from "./confirm-listing-button";
 import { BulkConfirmForm } from "./bulk-confirm-form";
 import { EmptyState } from "@/components/app/empty-state";
@@ -213,7 +213,7 @@ export default async function PortalsPage({
               label="Dışa aktar"
               className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
             />
-            <NewPortalDialog properties={propertyOptions} />
+            <NewPortalTrigger disabled={propertyOptions.length === 0} />
           </div>
         </div>
         <div className="relative mt-6 grid grid-cols-3 gap-3">
@@ -237,6 +237,8 @@ export default async function PortalsPage({
           ))}
         </div>
       </section>
+
+      {propertyOptions.length > 0 ? <NewPortalPanel properties={propertyOptions} /> : null}
 
       {expiring.length > 0 ? (
         <section className="overflow-hidden rounded-[var(--radius-panel)] border border-amber-400/30 bg-amber-400/[0.06] shadow-[var(--shadow-xs)]">
@@ -356,7 +358,7 @@ export default async function PortalsPage({
           tone="brand"
           action={
             propertyOptions.length > 0
-              ? { label: "Yeni portal ilanı", node: <div className="[&>button]:bg-brand-600 [&>button]:text-white"><NewPortalDialog properties={propertyOptions} /></div> }
+              ? { label: "Yeni portal ilanı", node: <NewPortalTrigger variant="solid" /> }
               : undefined
           }
         />

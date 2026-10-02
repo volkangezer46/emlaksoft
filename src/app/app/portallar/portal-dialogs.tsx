@@ -22,14 +22,58 @@ import {
   DialogContent,
   DialogHeader,
 } from "@/components/ui/dialog";
+import { InlinePanel, InlinePanelTrigger } from "@/components/ui/inline-panel";
 
 type PropertyOption = { id: string; property_code: string; title: string | null };
 
 const inputClass =
   "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
-export function NewPortalDialog({ properties }: { properties: PropertyOption[] }) {
-  const [open, setOpen] = useState(false);
+export const NEW_PORTAL_PANEL_ID = "portal-ilani-ekle";
+
+/** "Portal ilanı ekle" düğmesi; sayfa içi paneli açar. Portföy yoksa pasiftir. */
+export function NewPortalTrigger({
+  disabled,
+  variant = "hero",
+}: {
+  disabled?: boolean;
+  variant?: "hero" | "solid";
+}) {
+  return (
+    <InlinePanelTrigger
+      panelId={NEW_PORTAL_PANEL_ID}
+      disabled={disabled}
+      className={
+        variant === "hero"
+          ? "btn-shine bg-white px-4 py-2.5 font-bold text-ink-950 hover:bg-white/90"
+          : undefined
+      }
+    >
+      <Plus className="h-4 w-4" /> {variant === "hero" ? "Portal ilanı ekle" : "Yeni portal ilanı"}
+    </InlinePanelTrigger>
+  );
+}
+
+export function NewPortalPanel({ properties }: { properties: PropertyOption[] }) {
+  return (
+    <InlinePanel
+      id={NEW_PORTAL_PANEL_ID}
+      title="Portal ilanı bağla"
+      description="Portföyü yayın ağına ekleyin."
+      icon={<RadioTower />}
+    >
+      {(close) => <NewPortalForm properties={properties} onDone={close} />}
+    </InlinePanel>
+  );
+}
+
+function NewPortalForm({
+  properties,
+  onDone,
+}: {
+  properties: PropertyOption[];
+  onDone: () => void;
+}) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -42,64 +86,64 @@ export function NewPortalDialog({ properties }: { properties: PropertyOption[] }
     setPending(false);
     if (result.ok) {
       formRef.current?.reset();
-      setOpen(false);
       router.refresh();
+      onDone();
     } else {
       setError(result.error ?? "Portal ilanı eklenemedi.");
     }
   }
 
   return (
-    <>
-      <button type="button" onClick={() => setOpen(true)} disabled={properties.length === 0} className="btn-shine inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 disabled:cursor-not-allowed disabled:opacity-50">
-        <Plus className="h-4 w-4" /> Portal ilanı ekle
-      </button>
-      <DialogShell open={open} onOpenChange={setOpen} title="Portal ilanı bağla" description="Portföyü yayın ağına ekleyin." icon={RadioTower}>
-          <form ref={formRef} action={submit} className="grid gap-4 p-4 md:p-6">
-            <div className="text-sm font-medium text-ink-950">
-              Portföy *
-              {/* Zorunlu alan: temizleme düğmesi kapalı (`required`),
-                  boş bırakılırsa gizli input `required` ile submit'i durdurur. */}
-              <Combobox
-                className="mt-1.5"
-                name="property_id"
-                required
-                aria-label="Portföy"
-                placeholder="Portföy seçin"
-                searchPlaceholder="Kod ya da başlık ara…"
-                emptyText="Eşleşen portföy yok"
-                onSearch={searchProperties}
-                options={properties.map((property) => ({
-                  value: property.id,
-                  label: property.title ?? "İsimsiz portföy",
-                  hint: property.property_code,
-                }))}
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="text-sm font-medium text-ink-950">
-                Portal *
-                <select name="portal_name" required defaultValue="Sahibinden" className={`${inputClass} mt-1.5`}>
-                  {["Sahibinden", "Hepsiemlak", "Emlakjet", "EmlakSoft vitrin", "Diğer"].map((portal) => <option key={portal}>{portal}</option>)}
-                </select>
-              </label>
-              <label className="text-sm font-medium text-ink-950">
-                İlan numarası
-                <input name="portal_listing_id" className={`${inputClass} mt-1.5`} placeholder="128874" />
-              </label>
-            </div>
-            <label className="text-sm font-medium text-ink-950">
-              İlan bağlantısı
-              <div className="relative mt-1.5">
-                <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-                <input name="portal_url" type="url" className={`${inputClass} pl-10`} placeholder="https://…" />
-              </div>
-            </label>
-            {error ? <p role="alert" className="text-sm text-danger-500">{error}</p> : null}
-            <DialogActions pending={pending} submitLabel="Yayın ağına ekle" />
-          </form>
-      </DialogShell>
-    </>
+    <form ref={formRef} action={submit} className="grid gap-4 p-4 md:p-6">
+      <div className="text-sm font-medium text-ink-950">
+        Portföy *
+        {/* Zorunlu alan: temizleme düğmesi kapalı (`required`),
+            boş bırakılırsa gizli input `required` ile submit'i durdurur. */}
+        <Combobox
+          className="mt-1.5"
+          name="property_id"
+          required
+          aria-label="Portföy"
+          placeholder="Portföy seçin"
+          searchPlaceholder="Kod ya da başlık ara…"
+          emptyText="Eşleşen portföy yok"
+          onSearch={searchProperties}
+          options={properties.map((property) => ({
+            value: property.id,
+            label: property.title ?? "İsimsiz portföy",
+            hint: property.property_code,
+          }))}
+        />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="text-sm font-medium text-ink-950">
+          Portal *
+          <select name="portal_name" required defaultValue="Sahibinden" className={`${inputClass} mt-1.5`}>
+            {["Sahibinden", "Hepsiemlak", "Emlakjet", "EmlakSoft vitrin", "Diğer"].map((portal) => <option key={portal}>{portal}</option>)}
+          </select>
+        </label>
+        <label className="text-sm font-medium text-ink-950">
+          İlan numarası
+          <input name="portal_listing_id" className={`${inputClass} mt-1.5`} placeholder="128874" />
+        </label>
+      </div>
+      <label className="text-sm font-medium text-ink-950">
+        İlan bağlantısı
+        <div className="relative mt-1.5">
+          <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+          <input name="portal_url" type="url" className={`${inputClass} pl-10`} placeholder="https://…" />
+        </div>
+      </label>
+      {error ? <p role="alert" className="text-sm text-danger-500">{error}</p> : null}
+      <div className="hairline-t flex justify-end gap-2 pt-4">
+        <button type="button" onClick={onDone} className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
+          Vazgeç
+        </button>
+        <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+          <Check className="h-4 w-4" /> {pending ? "Kaydediliyor…" : "Yayın ağına ekle"}
+        </button>
+      </div>
+    </form>
   );
 }
 
