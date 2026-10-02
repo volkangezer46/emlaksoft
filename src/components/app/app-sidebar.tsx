@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ChevronRight, Lock, Menu, Sparkles, X } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar `src/lib/icons.ts` sözlüğünden gelir.
@@ -29,7 +29,7 @@ export function AppSidebar({
   lockedHrefs?: string[];
 }) {
   const pathname = usePathname();
-  const router = useRouter();
+  // Prefetch: next/link varsayılanı (görünür alanda + hover) yeterli; elle router.prefetch yağmuru kaldırıldı.
   const [open, setOpen] = useState(false);
 
   // Menü 9 iş başlığına indirgendi (bkz. src/lib/nav-config.ts). Başlıkta izinli
@@ -45,8 +45,6 @@ export function AppSidebar({
         href={item.href}
         aria-current={active ? "page" : undefined}
         onClick={() => setOpen(false)}
-        onMouseEnter={() => router.prefetch(item.href)}
-        onFocus={() => router.prefetch(item.href)}
         className={`flex items-center gap-2.5 rounded-[var(--radius-control)] py-2 pl-3 pr-2 text-sm transition ${
           active ? "bg-white/10 font-semibold text-white" : "text-white/75 hover:bg-white/6 hover:text-white"
         }`}
@@ -69,8 +67,6 @@ export function AppSidebar({
           aria-current={active ? "true" : undefined}
           aria-expanded={active}
           onClick={() => setOpen(false)}
-          onMouseEnter={() => router.prefetch(section.href)}
-          onFocus={() => router.prefetch(section.href)}
           className={`group relative flex items-center gap-3 overflow-hidden rounded-[var(--radius-control)] px-3 py-2.5 text-sm transition ${
             active ? "bg-white/10 font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]" : "text-white/80 hover:bg-white/6 hover:text-white"
           }`}

@@ -2,9 +2,8 @@
 
 import { useEffect } from "react";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
-import { createClient } from "@/lib/supabase/client";
 import { emitNotificationInsert, type NotificationInsertRow } from "@/lib/realtime";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 
 /** App layout: kritik tablolarda değişiklik → soft refresh */
 export function RealtimeRefresh({ tenantId }: { tenantId: string | null }) {
@@ -21,16 +20,21 @@ export function RealtimeRefresh({ tenantId }: { tenantId: string | null }) {
   // fetch'e) düşer, hata yüzeye çıkmaz.
   useEffect(() => {
     if (!tenantId) return;
-    const supabase = createClient();
+    let supabase: SupabaseClient | null = null;
     let channel: RealtimeChannel | null = null;
     let cancelled = false;
 
     // Kullanıcıya özel bildirimleri (user_id dolu) başka kullanıcıya
     // sızdırmamak için önce oturumdaki user id okunur; abonelik sonra kurulur.
-    void supabase.auth.getSession().then(({ data }) => {
+    // supabase-js ilk yükleme paketine girmesin diye ayrı parçadan, gerektiğinde indirilir.
+    void import("@/lib/supabase/client").then(async ({ createClient }) => {
+      if (cancelled) return;
+      const client = createClient();
+      supabase = client;
+      const { data } = await client.auth.getSession();
       if (cancelled) return;
       const uid = data.session?.user?.id ?? null;
-      channel = supabase
+      channel = client
         .channel(`es-rt-notif:${tenantId}`)
         .on(
           "postgres_changes",
@@ -47,7 +51,7 @@ export function RealtimeRefresh({ tenantId }: { tenantId: string | null }) {
 
     return () => {
       cancelled = true;
-      if (channel) void supabase.removeChannel(channel);
+      if (supabase && channel) void supabase.removeChannel(channel);
     };
   }, [tenantId]);
 

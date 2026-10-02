@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * HGDekor tarzı: ilgili tabloda değişiklik olunca sayfayı yenile.
@@ -30,27 +30,36 @@ export function useRealtimeRefresh(opts: {
   useEffect(() => {
     if (!enabled || !tenantId) return;
     const tables = tablesKey.split("|").filter(Boolean);
-    const supabase = createClient();
     const channelName = `es-rt:${tenantId}:${tables.join(",")}`;
+    let cancelled = false;
+    let supabase: SupabaseClient | null = null;
+    let channel: RealtimeChannel | null = null;
 
     const bump = () => {
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => router.refresh(), debounceMs ?? 400);
     };
 
-    let channel = supabase.channel(channelName);
-    for (const table of tables) {
-      channel = channel.on(
-        "postgres_changes",
-        { event: "*", schema: "public", table, filter: `tenant_id=eq.${tenantId}` },
-        () => bump(),
-      );
-    }
-    channel.subscribe();
+    // supabase-js ilk boyamayı bloklamasın: istemci boşta/sonra ayrı parça olarak yüklenir.
+    void import("@/lib/supabase/client").then(({ createClient }) => {
+      if (cancelled) return;
+      supabase = createClient();
+      let ch = supabase.channel(channelName);
+      for (const table of tables) {
+        ch = ch.on(
+          "postgres_changes",
+          { event: "*", schema: "public", table, filter: `tenant_id=eq.${tenantId}` },
+          () => bump(),
+        );
+      }
+      ch.subscribe();
+      channel = ch;
+    });
 
     return () => {
+      cancelled = true;
       if (timer.current) clearTimeout(timer.current);
-      void supabase.removeChannel(channel);
+      if (supabase && channel) void supabase.removeChannel(channel);
     };
   }, [enabled, tenantId, tablesKey, debounceMs, router]);
 }

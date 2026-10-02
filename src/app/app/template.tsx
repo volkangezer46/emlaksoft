@@ -3,10 +3,10 @@
  *
  * 1) View Transitions destekleyen tarayıcı: React <ViewTransition> (Next 16.3+, yapılandırma gerekmez)
  *    navigasyonda tarayıcının native cross-fade'ini tetikler; süre/easing
- *    globals.css'te ::view-transition-*(root) ve .page-fade sınıfında (180ms).
+ *    globals.css'te ::view-transition-*(root) ve .page-fade sınıfında (150ms).
  *    Bu durumda .page-in keyframe'i @supports (view-transition-name: root) bloğunda
  *    .vt-page üzerinden kapatılır — çift animasyon olmaz.
- * 2) Desteklemeyen tarayıcı: eski davranış aynen — .page-in ile 0.3s yükselme + fade.
+ * 2) Desteklemeyen tarayıcı: eski davranış aynen — .page-in ile 0.15s yükselme + fade.
  *
  * Not: canary TİP augmentasyonu triple-slash ile yüklenir (runtime importu Turbopack'te
  * çözülemiyor); çalışma zamanında App Router'ın React sürümü ViewTransition'ı export ediyor.

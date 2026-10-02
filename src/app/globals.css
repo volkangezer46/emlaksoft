@@ -1056,10 +1056,10 @@ p {
 
 /* Panel sayfa geçişi — her navigasyonda zarif giriş (template.tsx ile) */
 @keyframes page-in {
-  from { opacity: 0; transform: translateY(7px); }
+  from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: none; }
 }
-.page-in { animation: page-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.page-in { animation: page-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) both; }
 @media (prefers-reduced-motion: reduce) {
   .page-in { animation: none; }
 }
@@ -1271,17 +1271,17 @@ p {
    ============================================================ */
 
 /* ---- 1) VIEW TRANSITIONS (experimental.viewTransition + app/template.tsx) ----
-   Root snapshot'ın varsayılan cross-fade'ini 180ms'e çeker; panel içeriği
-   (React <ViewTransition default="page-fade">) aynı süreyle uyumlu. */
+   Root snapshot'ın varsayılan cross-fade'ini 180ms'e çeker (150ms); panel içeriği
+   (React <ViewTransition default="page-fade">) aynı süreyle uyumlu (≤150ms: gezinme hızlı hissedilsin). */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 180ms;
+  animation-duration: 150ms;
   animation-timing-function: ease;
 }
 ::view-transition-group(.page-fade),
 ::view-transition-old(.page-fade),
 ::view-transition-new(.page-fade) {
-  animation-duration: 180ms;
+  animation-duration: 150ms;
   animation-timing-function: ease;
 }
 
