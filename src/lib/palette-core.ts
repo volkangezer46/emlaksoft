@@ -19,8 +19,8 @@ export function matchesQuery(label: string, q: string): boolean {
 }
 
 const APP_ACTIONS: (PaletteEntry & { module: AppModule })[] = [
-  { label: "Yeni müşteri", href: "/app/musteriler?yeni=1", icon: UserPlus, module: "customers" },
-  { label: "Yeni portföy", href: "/app/portfoyler?yeni=1", icon: Building2, module: "properties" },
+  { label: "Yeni müşteri", href: "/app/musteriler/yeni", icon: UserPlus, module: "customers" },
+  { label: "Yeni portföy", href: "/app/portfoyler/yeni", icon: Building2, module: "properties" },
   { label: "Yeni randevu", href: "/app/randevular/yeni", icon: CalendarDays, module: "appointments" },
   { label: "Yeni görev", href: "/app/gorevler/yeni", icon: ListChecks, module: "tasks" },
 ];

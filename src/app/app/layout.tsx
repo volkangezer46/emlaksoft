@@ -221,12 +221,12 @@ export default async function AppLayout({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-52">
                   {canCreateCustomer ? <DropdownMenuItem asChild>
-                    <Link href="/app/musteriler?yeni=1">
+                    <Link href="/app/musteriler/yeni">
                       <UserPlus /> Yeni müşteri
                     </Link>
                   </DropdownMenuItem> : null}
                   {canCreateProperty ? <DropdownMenuItem asChild>
-                    <Link href="/app/portfoyler?yeni=1">
+                    <Link href="/app/portfoyler/yeni">
                       <Building2 /> Yeni portföy
                     </Link>
                   </DropdownMenuItem> : null}
