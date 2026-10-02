@@ -1,10 +1,6 @@
 import "server-only";
-import {
-  discardExternalResponse,
-  externalErrorMetadata,
-  fetchExternal,
-  readExternalJson,
-} from "@/lib/external-fetch";
+import { externalErrorMetadata } from "@/lib/external-fetch";
+import { getOpenAiChatModel, openAiChat, type OpenAiAudit } from "@/lib/ai/openai-client";
 
 const OPENAI_TIMEOUT_MS = 45_000;
 const OPENAI_MAX_RESPONSE_BYTES = 512 * 1024;
@@ -154,10 +150,14 @@ const PROMPTS: Record<ContentKind, string> = {
   email: "Bu portföyü tanıtan resmi ama sıcak bir Türkçe e-posta metni yaz (konu satırı dahil).",
 };
 
-async function openAiContent(kind: ContentKind, input: PropertyContentInput): Promise<string | null> {
+async function openAiContent(
+  kind: ContentKind,
+  input: PropertyContentInput,
+  audit?: OpenAiAudit,
+): Promise<string | null> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
-  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const model = getOpenAiChatModel();
 
   const facts = JSON.stringify(
     {
@@ -179,10 +179,13 @@ async function openAiContent(kind: ContentKind, input: PropertyContentInput): Pr
   );
 
   try {
-    const res = await fetchExternal("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
+    const { content } = await openAiChat({
+      apiKey: key,
+      purpose: "property_content",
+      audit,
+      timeoutMs: OPENAI_TIMEOUT_MS,
+      maxResponseBytes: OPENAI_MAX_RESPONSE_BYTES,
+      body: {
         model,
         temperature: 0.7,
         messages: [
@@ -191,19 +194,13 @@ async function openAiContent(kind: ContentKind, input: PropertyContentInput): Pr
             content:
               "Sen bir Türk emlak pazarlama uzmanısın. Yalnızca verilen gerçeklere dayan, uydurma bilgi ekleme. Türkçe yaz.",
           },
-          { role: "user", content: `${PROMPTS[kind]}\n\nPortföy bilgileri (JSON): ${facts}` },
+          { role: "user", content: `${PROMPTS[kind]}
+
+Portföy bilgileri (JSON): ${facts}` },
         ],
-      }),
-    }, { timeoutMs: OPENAI_TIMEOUT_MS });
-    if (!res.ok) {
-      await discardExternalResponse(res);
-      return null;
-    }
-    const json = await readExternalJson<{ choices?: { message?: { content?: string } }[] }>(
-      res,
-      OPENAI_MAX_RESPONSE_BYTES,
-    );
-    return json.choices?.[0]?.message?.content?.trim() || null;
+      },
+    });
+    return content?.trim() || null;
   } catch (e) {
     console.error("openAiContent", externalErrorMetadata(e));
     return null;
@@ -213,8 +210,9 @@ async function openAiContent(kind: ContentKind, input: PropertyContentInput): Pr
 export async function generateContent(
   kind: ContentKind,
   input: PropertyContentInput,
+  audit?: OpenAiAudit,
 ): Promise<{ text: string; source: "ai" | "template" }> {
-  const ai = await openAiContent(kind, input);
+  const ai = await openAiContent(kind, input, audit);
   if (ai) return { text: ai, source: "ai" };
   return { text: templateContent(kind, input), source: "template" };
 }

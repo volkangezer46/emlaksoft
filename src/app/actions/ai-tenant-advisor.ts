@@ -5,12 +5,8 @@ import { requirePermission } from "@/lib/require-permission";
 import { getOpenAiKey } from "@/lib/ai-advisor";
 import { computeLeadScore } from "@/lib/lead-score";
 import { checkRateLimit } from "@/lib/rate-limit";
-import {
-  externalErrorMetadata,
-  fetchExternal,
-  readExternalJson,
-  requireExternalSuccess,
-} from "@/lib/external-fetch";
+import { externalErrorMetadata } from "@/lib/external-fetch";
+import { getOpenAiChatModel, openAiChat } from "@/lib/ai/openai-client";
 import { createTask } from "@/app/actions/tasks";
 
 // ---------------------------------------------------------------------------
@@ -38,7 +34,7 @@ export type AdvisorAction =
 
 const MAX_MESSAGES = 12;
 const MAX_LEN = 2000;
-const OPENAI_MODEL = "gpt-4o-mini";
+const OPENAI_MODEL = getOpenAiChatModel();
 const OPENAI_TIMEOUT_MS = 45_000;
 const OPENAI_MAX_RESPONSE_BYTES = 1024 * 1024;
 
@@ -271,34 +267,30 @@ async function callOpenAI(
   apiKey: string,
   messages: TenantAdvisorMessage[],
   context: TenantAdvisorContext,
+  audit: { tenantId: string; actorId: string },
 ): Promise<string> {
-  const res = await fetchExternal("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
+  const { content } = await openAiChat({
+    apiKey,
+    purpose: "tenant_advisor",
+    audit,
+    timeoutMs: OPENAI_TIMEOUT_MS,
+    maxResponseBytes: OPENAI_MAX_RESPONSE_BYTES,
+    body: {
       model: OPENAI_MODEL,
       temperature: 0.4,
       max_tokens: 700,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        { role: "system", content: `OFİSİN GÜNCEL VERİLERİ:\n${contextToText(context)}` },
+        { role: "system", content: `OFİSİN GÜNCEL VERİLERİ:
+${contextToText(context)}` },
         ...messages.map((m) => ({ role: m.role, content: m.content })),
       ],
-    }),
-  }, { timeoutMs: OPENAI_TIMEOUT_MS });
-
-  await requireExternalSuccess(res);
-  const json = await readExternalJson<{ choices?: { message?: { content?: unknown } }[] }>(
-    res,
-    OPENAI_MAX_RESPONSE_BYTES,
-  );
-  const content = json?.choices?.[0]?.message?.content;
+    },
+  });
   if (!content) throw new Error("OpenAI boş yanıt döndü.");
-  return String(content).trim();
+  return content.trim();
 }
+
 
 // ---------------------------------------------------------------------------
 // Kural tabanlı yedek yanıtlar — anahtar yoksa / hata olursa
@@ -503,7 +495,7 @@ export async function askTenantAdvisor(
   let result: TenantAdvisorResult;
   if (apiKey) {
     try {
-      result = { reply: await callOpenAI(apiKey, clean, context), usedAI: true };
+      result = { reply: await callOpenAI(apiKey, clean, context, { tenantId: gate.tenantId, actorId: gate.userId }), usedAI: true };
     } catch (e) {
       console.error("askTenantAdvisor:openai", externalErrorMetadata(e));
       result = { reply: fallbackTenantAdvisor(clean, context), usedAI: false };

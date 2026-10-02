@@ -1,10 +1,6 @@
 import "server-only";
-import {
-  discardExternalResponse,
-  externalErrorMetadata,
-  fetchExternal,
-  readExternalJson,
-} from "@/lib/external-fetch";
+import { externalErrorMetadata } from "@/lib/external-fetch";
+import { getOpenAiVisionModel, openAiChat, type OpenAiAudit } from "@/lib/ai/openai-client";
 
 const OPENAI_VISION_TIMEOUT_MS = 90_000;
 const OPENAI_MAX_RESPONSE_BYTES = 1024 * 1024;
@@ -122,7 +118,7 @@ export async function extractPropertyDocFields(input: {
   imageUrl?: string;
   imageBase64?: string;
   mimeType?: string | null;
-}): Promise<DocOcrResult> {
+}, audit?: OpenAiAudit): Promise<DocOcrResult> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return { ok: false, error: "AI anahtarı tanımlı değil" };
 
@@ -132,13 +128,18 @@ export async function extractPropertyDocFields(input: {
   if (!url) return { ok: false, error: "Okunacak görsel bulunamadı." };
 
   // Vision gerektirir — content.ts ile aynı varsayılan (gpt-4o-mini vision destekler).
-  const model = process.env.OPENAI_VISION_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const model = getOpenAiVisionModel();
 
   try {
-    const res = await fetchExternal("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
+    // NOT: görsel baytları metin maskelemesinin dışındadır (openai-client `image_url`
+    // alt ağacına dokunmaz); yalnız istem metni maskelenir. Bkz. docs/rapor notu.
+    const { content } = await openAiChat({
+      apiKey: key,
+      purpose: "document_ocr",
+      audit,
+      timeoutMs: OPENAI_VISION_TIMEOUT_MS,
+      maxResponseBytes: OPENAI_MAX_RESPONSE_BYTES,
+      body: {
         model,
         temperature: 0,
         response_format: { type: "json_object" },
@@ -152,18 +153,9 @@ export async function extractPropertyDocFields(input: {
             ],
           },
         ],
-      }),
-    }, { timeoutMs: OPENAI_VISION_TIMEOUT_MS });
-    if (!res.ok) {
-      await discardExternalResponse(res);
-      console.error("extractPropertyDocFields http", { status: res.status });
-      return { ok: false, error: "AI servisine ulaşılamadı. Lütfen tekrar deneyin." };
-    }
-    const json = await readExternalJson<{ choices?: { message?: { content?: string } }[] }>(
-      res,
-      OPENAI_MAX_RESPONSE_BYTES,
-    );
-    const raw = json.choices?.[0]?.message?.content?.trim() || "";
+      },
+    });
+    const raw = content?.trim() || "";
     // JSON modu dışına düşen modeller için kod bloğu temizliği
     const cleaned = raw.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
     const parsed = JSON.parse(cleaned) as Record<string, unknown>;

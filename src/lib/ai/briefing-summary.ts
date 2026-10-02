@@ -1,14 +1,9 @@
 import "server-only";
 import { getOpenAiKey } from "@/lib/ai-advisor";
 import type { BriefingItem } from "@/lib/briefing";
-import {
-  discardExternalResponse,
-  externalErrorMetadata,
-  fetchExternal,
-  readExternalJson,
-} from "@/lib/external-fetch";
+import { externalErrorMetadata } from "@/lib/external-fetch";
+import { getOpenAiChatModel, openAiChat, type OpenAiAudit } from "@/lib/ai/openai-client";
 
-const OPENAI_MODEL = "gpt-4o-mini";
 const OPENAI_TIMEOUT_MS = 30_000;
 const OPENAI_MAX_RESPONSE_BYTES = 256 * 1024;
 
@@ -23,21 +18,24 @@ const OPENAI_MAX_RESPONSE_BYTES = 256 * 1024;
  * Sayfayı yavaşlatmamak için bu fonksiyon Suspense'li ayrı bir server
  * component içinden çağrılır (bkz. `src/app/app/page.tsx`).
  */
-export async function generateBriefingSummary(items: BriefingItem[]): Promise<string | null> {
+export async function generateBriefingSummary(
+  items: BriefingItem[],
+  audit?: OpenAiAudit,
+): Promise<string | null> {
   if (items.length === 0) return null;
 
   const apiKey = await getOpenAiKey();
   if (!apiKey) return null;
 
   try {
-    const res = await fetchExternal("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
+    const { content } = await openAiChat({
+      apiKey,
+      purpose: "briefing_summary",
+      audit,
+      timeoutMs: OPENAI_TIMEOUT_MS,
+      maxResponseBytes: OPENAI_MAX_RESPONSE_BYTES,
+      body: {
+        model: getOpenAiChatModel(),
         temperature: 0.5,
         max_tokens: 90,
         messages: [
@@ -54,17 +52,9 @@ export async function generateBriefingSummary(items: BriefingItem[]): Promise<st
             content: `Bugünün brifing maddeleri:\n${items.map((i) => `- ${i.text}`).join("\n")}`,
           },
         ],
-      }),
-    }, { timeoutMs: OPENAI_TIMEOUT_MS });
-    if (!res.ok) {
-      await discardExternalResponse(res);
-      return null;
-    }
-    const json = await readExternalJson<{ choices?: { message?: { content?: string } }[] }>(
-      res,
-      OPENAI_MAX_RESPONSE_BYTES,
-    );
-    const text = json.choices?.[0]?.message?.content?.trim();
+      },
+    });
+    const text = content?.trim();
     return text || null;
   } catch (e) {
     console.error("generateBriefingSummary", externalErrorMetadata(e));

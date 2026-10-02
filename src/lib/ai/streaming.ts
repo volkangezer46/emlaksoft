@@ -3,9 +3,8 @@ import {
   discardExternalResponse,
   externalErrorMetadata,
   ExternalResponseTooLargeError,
-  fetchExternal,
-  requireExternalSuccess,
 } from "@/lib/external-fetch";
+import { openAiChatRequest, type OpenAiAudit } from "@/lib/ai/openai-client";
 
 // ---------------------------------------------------------------------------
 // AI sohbet akışı (streaming) yardımcıları — /api/ai/tenant-chat ve
@@ -141,21 +140,33 @@ type ToolCallDelta = {
  * `{type:"tool_calls"}` olayı hâlinde (fragmanları birleştirip) üretir.
  * Sağlayıcı hata gövdesini açığa çıkarmayan güvenli bir hata fırlatır.
  */
+export type OpenAiStreamContext = {
+  /** Denetim izi için tenant/kullanıcı; yoksa kayıt yazılmaz. */
+  audit?: OpenAiAudit | null;
+  /** Denetim izi etiketi (kişisel veri içermez). */
+  purpose?: string;
+  /** Bilinen ad-soyadlar — verilirse ayrıca maskelenir (varsayılan kapalı). */
+  names?: string[];
+};
+
 export async function* streamOpenAIChatEvents(
   apiKey: string,
   payload: OpenAiStreamPayload,
   signal?: AbortSignal,
+  ctx: OpenAiStreamContext = {},
 ): AsyncGenerator<OpenAiStreamEvent> {
-  const res = await fetchExternal("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({ ...payload, stream: true }),
-  }, { timeoutMs: OPENAI_STREAM_TIMEOUT_MS, signal });
-
-  await requireExternalSuccess(res);
+  // Maskeleme + bayt/zaman sınırı + tekrar deneme tek istemcide (openai-client).
+  const { response: res, redactor } = await openAiChatRequest({
+    apiKey,
+    purpose: ctx.purpose ?? "chat_stream",
+    body: { ...payload, stream: true },
+    timeoutMs: OPENAI_STREAM_TIMEOUT_MS,
+    maxResponseBytes: OPENAI_STREAM_MAX_RESPONSE_BYTES,
+    signal,
+    audit: ctx.audit,
+    names: ctx.names,
+  });
+  const restorer = redactor.createStreamRestorer();
   if (!res.body) {
     throw new Error("OpenAI stream response was empty.");
   }
@@ -203,7 +214,8 @@ export async function* streamOpenAIChatEvents(
           };
           const delta = json.choices?.[0]?.delta;
           if (typeof delta?.content === "string" && delta.content) {
-            yield { type: "delta", text: delta.content };
+            const text = restorer.push(delta.content);
+            if (text) yield { type: "delta", text };
           }
           for (const tc of delta?.tool_calls ?? []) {
             const idx = tc.index ?? 0;
@@ -222,12 +234,19 @@ export async function* streamOpenAIChatEvents(
     reader.releaseLock();
   }
 
+  const tail = restorer.flush();
+  if (tail) yield { type: "delta", text: tail };
+
   if (pendingCalls.size > 0) {
     const calls: OpenAiToolCall[] = [...pendingCalls.entries()]
       .sort(([a], [b]) => a - b)
       .map(([, c]) => c)
       .filter((c) => c.id && c.name)
-      .map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: c.args } }));
+      .map((c) => ({
+        id: c.id,
+        type: "function",
+        function: { name: c.name, arguments: redactor.restoreText(c.args) },
+      }));
     if (calls.length > 0) yield { type: "tool_calls", calls };
   }
 }
@@ -240,8 +259,9 @@ export async function* streamOpenAIChat(
   apiKey: string,
   payload: OpenAiStreamPayload,
   signal?: AbortSignal,
+  ctx?: OpenAiStreamContext,
 ): AsyncGenerator<string> {
-  for await (const evt of streamOpenAIChatEvents(apiKey, payload, signal)) {
+  for await (const evt of streamOpenAIChatEvents(apiKey, payload, signal, ctx)) {
     if (evt.type === "delta") yield evt.text;
   }
 }

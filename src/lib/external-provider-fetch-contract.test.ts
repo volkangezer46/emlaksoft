@@ -3,13 +3,7 @@ import { join, relative, resolve, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const protectedProviderFiles = [
-  "src/app/actions/ai-tenant-advisor.ts",
-  "src/lib/ai-advisor.ts",
-  "src/lib/ai/briefing-summary.ts",
-  "src/lib/ai/call-summary.ts",
-  "src/lib/ai/content.ts",
-  "src/lib/ai/document-ocr.ts",
-  "src/lib/ai/streaming.ts",
+  "src/lib/ai/openai-client.ts",
   "src/lib/calendar/index.ts",
   "src/lib/tcmb.ts",
   "src/lib/billing/iyzico.ts",
