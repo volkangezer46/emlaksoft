@@ -251,6 +251,21 @@ export default async function PropertiesPage({
           .limit(MAP_LIMIT)
       : Promise.resolve({ data: null, count: null });
 
+  // Liste promise'i bir kez başlatılır; kapak sorgusu liste biter bitmez DİĞER sorgularla
+  // paralel koşar (eskiden tüm Promise.all'dan sonra seri çalışıyordu).
+  const listP = Promise.resolve(listQuery);
+  const coversP = listP.then(async (res) => {
+    const ids = ((res.data ?? []) as unknown as PropertyRow[]).map((p) => p.id);
+    if (ids.length === 0) return [] as { id: string; property_id: string }[];
+    const { data: covers } = await supabase
+      .from("property_media")
+      .select("id, property_id")
+      .in("property_id", ids)
+      .eq("kind", "image")
+      .eq("is_cover", true);
+    return (covers ?? []) as { id: string; property_id: string }[];
+  });
+
   const [
     { data },
     { data: mapData, count: mapLocatedTotal },
@@ -264,8 +279,9 @@ export default async function PropertiesPage({
     { count: redCount },
     { data: valueRows },
     savedViews,
+    coverRows,
   ] = await Promise.all([
-    listQuery,
+    listP,
     mapQuery,
     // Filtrelenmiş gerçek toplam — hem sayfalama ("X-Y / Toplam Z") hem de
     // harita görünümünde konumsuz portföy sayısı için tek doğruluk kaynağı.
@@ -284,6 +300,7 @@ export default async function PropertiesPage({
     // Toplam portföy değeri — hafif tek kolon; sayfa dilimi değil (makul üst sınırla).
     supabase.from("properties").select("list_price").is("deleted_at", null).limit(VALUE_SUM_LIMIT),
     savedViewsPromise,
+    coversP,
   ]);
 
   const rows = (data ?? []) as unknown as PropertyRow[];
@@ -304,16 +321,8 @@ export default async function PropertiesPage({
   // Kapak görselleri — tek ek sorgu; property_id -> media id eşlemesi.
   // Görsel tenant/yetki kontrollü download ucu üzerinden servis edilir.
   const coverByProperty = new Map<string, string>();
-  if (rows.length > 0) {
-    const { data: covers } = await supabase
-      .from("property_media")
-      .select("id, property_id")
-      .in("property_id", rows.map((p) => p.id))
-      .eq("kind", "image")
-      .eq("is_cover", true);
-    for (const cover of (covers ?? []) as { id: string; property_id: string }[]) {
-      if (!coverByProperty.has(cover.property_id)) coverByProperty.set(cover.property_id, cover.id);
-    }
+  for (const cover of coverRows) {
+    if (!coverByProperty.has(cover.property_id)) coverByProperty.set(cover.property_id, cover.id);
   }
 
 

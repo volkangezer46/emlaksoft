@@ -34,7 +34,9 @@ export default async function DealsPage({ searchParams }: { searchParams?: Promi
   const canEdit = (perms.commissions ?? []).includes("edit");
   const supabase = await createClient();
 
-  const [{ data: dealsRaw, count: dealTotal }, { data: members }] = await Promise.all([
+  // Anlaşma listesi bir kez başlatılır; İYS + evrak sorguları liste biter bitmez DİĞER
+  // sorgularla paralel koşar (eskiden hepsinden sonra seri ikinci tur çalışıyordu).
+  const dealsP = Promise.resolve(
     supabase
       .from("deals")
       // Pipeline 200 anlaşmayla sınırlı; gerçek toplam olmadan kullanıcı
@@ -49,34 +51,42 @@ export default async function DealsPage({ searchParams }: { searchParams?: Promi
       )
       .order("updated_at", { ascending: false })
       .limit(200),
+  );
+  const relatedP = dealsP.then(async (res) => {
+    const rows = res.data ?? [];
+    const customerIds = [
+      ...new Set(rows.map((d) => d.customer_id).filter((v): v is string => Boolean(v))),
+    ];
+    const ids = rows.map((d) => d.id);
+    return Promise.all([
+      customerIds.length
+        ? supabase
+            .from("iys_consents")
+            .select("customer_id, status")
+            .eq("channel", "sms")
+            .in("customer_id", customerIds)
+        : Promise.resolve({ data: [] as { customer_id: string; status: string }[] }),
+      ids.length
+        ? supabase
+            .from("deal_checklist_items")
+            .select("deal_id, is_required, is_done")
+            .in("deal_id", ids)
+            .eq("is_required", true)
+        : Promise.resolve({ data: [] as { deal_id: string; is_required: boolean; is_done: boolean }[] }),
+    ]);
+  });
+
+  const [
+    { data: dealsRaw, count: dealTotal },
+    { data: members },
+    [{ data: smsConsents }, { data: checklistRows }],
+  ] = await Promise.all([
+    dealsP,
+
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
+    relatedP,
   ]);
 
-  // Kazanma sihirbazının tebrik SMS'i için İYS onayları (bkz. gelen-kutusu deseni)
-  const dealCustomerIds = [
-    ...new Set((dealsRaw ?? []).map((d) => d.customer_id).filter((v): v is string => Boolean(v))),
-  ];
-
-  // Evrak durumu rozeti: tüm kartlar için TEK toplu sorgu (N+1 yok) —
-  // deal_id in-list, zorunlu maddeler client'ta gruplanır (200 kart × ~9 madde).
-  const dealIds = (dealsRaw ?? []).map((d) => d.id);
-  // İki sorgu birbirinden bağımsız (ikisi de deal listesine bağlı) → paralel.
-  const [{ data: smsConsents }, { data: checklistRows }] = await Promise.all([
-    dealCustomerIds.length
-      ? supabase
-          .from("iys_consents")
-          .select("customer_id, status")
-          .eq("channel", "sms")
-          .in("customer_id", dealCustomerIds)
-      : Promise.resolve({ data: [] as { customer_id: string; status: string }[] }),
-    dealIds.length
-      ? supabase
-          .from("deal_checklist_items")
-          .select("deal_id, is_required, is_done")
-          .in("deal_id", dealIds)
-          .eq("is_required", true)
-      : Promise.resolve({ data: [] as { deal_id: string; is_required: boolean; is_done: boolean }[] }),
-  ]);
   const smsGranted = new Set(
     (smsConsents ?? []).filter((c) => c.status === "granted").map((c) => c.customer_id),
   );

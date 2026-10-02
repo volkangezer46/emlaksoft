@@ -125,11 +125,13 @@ export default async function InboxPage({
   const { userId } = await requireModulePage("calls");
   const supabase = await createClient();
   // WhatsApp şablon değişkenleri — {ofis} ve {danisman} satır menüsüne prop'lanır
-  const [{ data: waTenant }, { data: waAdvisor }] = await Promise.all([
+  // Bağımsız sorgular hemen başlar; aşağıdaki ana Promise.all ile aynı turda beklenir
+  // (eskiden WA → kayıtlı görünüm → ana sorgular 3 seri tur sürüyordu).
+  const waPromise = Promise.all([
     supabase.from("tenants").select("name, phone").limit(1).maybeSingle(),
     supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
   ]);
-  const savedViews = await listSavedViews("/app/gelen-kutusu");
+  const savedViewsPromise = listSavedViews("/app/gelen-kutusu");
   const sp = await searchParams;
 
   const q = sp.q ?? "";
@@ -196,6 +198,8 @@ export default async function InboxPage({
     { count: commUnmatched },
     { count: callUnmatched },
     { count: missedWeek },
+    [{ data: waTenant }, { data: waAdvisor }],
+    savedViews,
   ] = await Promise.all([
     commQuery,
     includeCalls
@@ -208,6 +212,8 @@ export default async function InboxPage({
     supabase.from("communications").select("id", { count: "exact", head: true }).is("customer_id", null),
     supabase.from("calls").select("id", { count: "exact", head: true }).is("customer_id", null),
     supabase.from("calls").select("id", { count: "exact", head: true }).eq("direction", "missed").gte("started_at", weekAgoIso),
+    waPromise,
+    savedViewsPromise,
   ]);
 
   // ---- Birleştirme ---------------------------------------------------------
