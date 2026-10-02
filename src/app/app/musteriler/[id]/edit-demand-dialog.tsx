@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { GeoSelect } from "@/components/app/geo-select";
 import { updateDemand, type DemandResult } from "@/app/actions/demands";
+import { defaultDefinitionValues } from "@/lib/definition-defaults";
 
 type Province = { id: string; name: string };
 
@@ -79,7 +80,7 @@ export function EditDemandDialog({
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted">Tür</label>
                 <select name="property_type" defaultValue={demand.property_type ?? "Daire"} className={fieldClass}>
-                  {["Daire", "Villa", "Arsa", "İşyeri", "Müstakil ev", "Bina"].map((t) => <option key={t}>{t}</option>)}
+                  {defaultDefinitionValues("property_type").map((t) => <option key={t}>{t}</option>)}
                 </select>
               </div>
               <div>

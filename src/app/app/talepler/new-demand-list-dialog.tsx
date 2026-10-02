@@ -12,6 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { GeoSelect } from "@/components/app/geo-select";
+import { defaultDefinitionValues } from "@/lib/definition-defaults";
 
 type Province = { id: string; name: string };
 type CustomerOption = { id: string; full_name: string };
@@ -82,7 +83,7 @@ export function NewDemandListDialog({
           <div>
             <label className="mb-1.5 block text-sm text-text-muted" htmlFor="demand-type">Portföy türü</label>
             <select id="demand-type" name="property_type" defaultValue="Daire" className={fieldClass}>
-              {["Daire", "Villa", "Arsa", "İşyeri", "Müstakil ev", "Bina"].map((t) => (
+              {defaultDefinitionValues("property_type").map((t) => (
                 <option key={t}>{t}</option>
               ))}
             </select>

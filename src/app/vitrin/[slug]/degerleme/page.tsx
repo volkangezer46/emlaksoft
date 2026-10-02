@@ -5,12 +5,13 @@ import { ArrowLeft, Calculator, Clock3, ShieldCheck, Sparkles } from "lucide-rea
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ValuationFunnel } from "@/components/public/valuation-funnel";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { defaultDefinitionValues } from "@/lib/definition-defaults";
 
 // ISR: vitrin gibi herkese açık — CDN önbellekli, 2 dk tazelenir.
 // SEO mıknatısı: bilerek indexlenebilir (noindex YOK).
 export const revalidate = 60;
 
-const FALLBACK_PROPERTY_TYPES = ["Daire", "Villa", "Müstakil ev", "İşyeri", "Arsa"];
+const FALLBACK_PROPERTY_TYPES = defaultDefinitionValues("property_type");
 
 export async function generateMetadata({
   params,

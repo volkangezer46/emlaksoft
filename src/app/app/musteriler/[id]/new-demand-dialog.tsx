@@ -12,6 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { GeoSelect } from "@/components/app/geo-select";
+import { defaultDefinitionValues, DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
 
 type Province = { id: string; name: string };
 
@@ -20,14 +21,9 @@ const initial: DemandResult = {};
 const fieldClass =
   "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
-const DEFAULT_TRANSACTION_TYPES = ["Satılık", "Kiralık"];
-const DEFAULT_PROPERTY_TYPES = ["Daire", "Villa", "Arsa", "İşyeri", "Müstakil ev", "Bina"];
-const DEFAULT_URGENCY_OPTIONS: { value: string; label: string }[] = [
-  { value: "low", label: "Düşük" },
-  { value: "normal", label: "Normal" },
-  { value: "high", label: "Yüksek" },
-  { value: "urgent", label: "Acil" },
-];
+const DEFAULT_TRANSACTION_TYPES = defaultDefinitionValues("transaction_type");
+const DEFAULT_PROPERTY_TYPES = defaultDefinitionValues("property_type");
+const DEFAULT_URGENCY_OPTIONS: { value: string; label: string }[] = [...DEFAULT_DEFINITIONS.demand_urgency];
 
 export function NewDemandDialog({
   customerId,

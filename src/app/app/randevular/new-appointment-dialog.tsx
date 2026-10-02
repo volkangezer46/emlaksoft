@@ -22,18 +22,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useQueryDialog } from "@/components/app/use-query-dialog";
+import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
 
 type Option = { id: string; label: string };
 
 const fieldClass =
   "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
-const DEFAULT_TYPE_OPTIONS = [
-  { value: "showing", label: "Yer gösterme" },
-  { value: "office", label: "Ofis görüşmesi" },
-  { value: "valuation", label: "Değerleme" },
-  { value: "contract", label: "Sözleşme" },
-];
+const DEFAULT_TYPE_OPTIONS = [...DEFAULT_DEFINITIONS.appointment_type];
 
 export function NewAppointmentDialog({
   customers,

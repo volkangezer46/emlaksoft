@@ -2,10 +2,11 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Globe, Loader2, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Globe, Loader2, Lock, Pencil, Plus, ShieldCheck, Trash2, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/app/toast-provider";
-import { addDefinition, toggleDefinition, deleteDefinition, renameDefinition, type DefinitionResult } from "@/app/actions/definitions";
+import { addDefinition, toggleDefinition, deleteDefinition, renameDefinition, moveDefinition, setDefinitionColor, type DefinitionResult } from "@/app/actions/definitions";
+import { isSystemDefinitionValue } from "@/lib/definition-defaults";
 
 export type DefRow = {
   id: string;
@@ -120,6 +121,39 @@ function CategoryPanel({ category, tenantId }: { category: Category; tenantId: s
       setBusy(null);
     }
   }
+  function onMove(id: string, direction: "up" | "down") {
+    setBusy(id);
+    setRowError(null);
+    startTransition(async () => {
+      try {
+        const res = await moveDefinition(id, direction);
+        if (res.error) setRowError(res.error);
+        else router.refresh();
+      } catch {
+        setRowError("Sıralama güncellenemedi. Lütfen tekrar deneyin.");
+      } finally {
+        setBusy(null);
+      }
+    });
+  }
+  function onColor(id: string, color: string | null) {
+    setBusy(id);
+    setRowError(null);
+    startTransition(async () => {
+      try {
+        const res = await setDefinitionColor(id, color);
+        if (res.error) setRowError(res.error);
+        else {
+          push(color ? "Renk güncellendi" : "Renk kaldırıldı", "ok");
+          router.refresh();
+        }
+      } catch {
+        setRowError("Renk güncellenemedi. Lütfen tekrar deneyin.");
+      } finally {
+        setBusy(null);
+      }
+    });
+  }
   function startEdit(d: DefRow) {
     setEditingId(d.id);
     setEditLabel(d.label);
@@ -163,6 +197,9 @@ function CategoryPanel({ category, tenantId }: { category: Category; tenantId: s
           category.items.map((d) => {
             const isGlobal = d.tenant_id == null;
             const isOwn = d.tenant_id === tenantId;
+            const isSystem = isSystemDefinitionValue(d.category, d.value);
+            const ownItems = category.items.filter((x) => x.tenant_id === tenantId);
+            const ownIndex = ownItems.findIndex((x) => x.id === d.id);
             return (
               <div key={d.id} className={`flex items-center gap-3 rounded-[var(--radius-card)] border border-line px-4 py-2.5 ${!d.is_active ? "opacity-55" : ""}`}>
                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-control)] bg-canvas text-text-faint" title={isGlobal ? "Sistem varsayılanı" : "Ofise özel"}>
@@ -190,7 +227,11 @@ function CategoryPanel({ category, tenantId }: { category: Category; tenantId: s
                   </div>
                 ) : (
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-ink-950">{d.label}</p>
+                    <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-ink-950">
+                      {d.color ? <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: d.color }} /> : null}
+                      <span className="truncate">{d.label}</span>
+                      {isSystem ? <span title="Sistem anahtarı: silinemez ve gizlenemez" className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-text-faint"><ShieldCheck className="h-3 w-3" /> kilitli</span> : null}
+                    </p>
                     {d.value !== d.label ? <p className="truncate text-xs text-text-faint">değer: {d.value}</p> : null}
                   </div>
                 )}
@@ -198,6 +239,25 @@ function CategoryPanel({ category, tenantId }: { category: Category; tenantId: s
                   <span className="rounded-full bg-canvas px-2 py-0.5 text-xs font-semibold text-text-muted">Sistem</span>
                 ) : isOwn ? (
                   <div className="flex items-center gap-1.5">
+                    <button type="button" onClick={() => onMove(d.id, "up")} disabled={busy === d.id || ownIndex <= 0} aria-label="Yukarı taşı" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-brand-600 disabled:opacity-30">
+                      <ArrowUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button type="button" onClick={() => onMove(d.id, "down")} disabled={busy === d.id || ownIndex < 0 || ownIndex >= ownItems.length - 1} aria-label="Aşağı taşı" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-brand-600 disabled:opacity-30">
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    </button>
+                    <input
+                      type="color"
+                      aria-label={`${d.label} rengi`}
+                      defaultValue={d.color ?? "#6366f1"}
+                      disabled={busy === d.id}
+                      onBlur={(e) => { if (e.target.value.toLowerCase() !== (d.color ?? "").toLowerCase()) onColor(d.id, e.target.value); }}
+                      className="h-7 w-7 min-h-9 min-w-9 shrink-0 cursor-pointer rounded-[var(--radius-control)] border border-line bg-canvas p-1 disabled:opacity-50"
+                    />
+                    {d.color ? (
+                      <button type="button" onClick={() => onColor(d.id, null)} disabled={busy === d.id} aria-label="Rengi kaldır" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950 disabled:opacity-50">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    ) : null}
                     {editingId !== d.id ? (
                       <button type="button" onClick={() => startEdit(d)} disabled={busy === d.id} aria-label="Yeniden adlandır" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-brand-600 disabled:opacity-50">
                         <Pencil className="h-3.5 w-3.5" />
@@ -206,14 +266,15 @@ function CategoryPanel({ category, tenantId }: { category: Category; tenantId: s
                     <button
                       type="button"
                       onClick={() => onToggle(d.id, !d.is_active)}
-                      disabled={busy === d.id}
+                      disabled={busy === d.id || (isSystem && d.is_active)}
+                      title={isSystem && d.is_active ? "Sistem anahtarı gizlenemez" : undefined}
                       className={`rounded-[var(--radius-control)] border px-2.5 py-1 text-xs font-semibold transition disabled:opacity-50 ${d.is_active ? "border-line text-text-muted hover:border-amber-400 hover:text-amber-600" : "border-mint-500/30 text-mint-600"}`}
                     >
                       {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : d.is_active ? "Gizle" : "Göster"}
                     </button>
-                    <ConfirmDialog
+                    {isSystem ? null : <ConfirmDialog
                       title="Tanımı sil"
-                      description={`"${d.label}" seçeneği kalıcı olarak silinecek. Bu tanımı kullanan kayıtlar etkilenmez ama seçenek listelerden kalkar.`}
+                      description={`"${d.label}" seçeneği kalıcı olarak silinecek. Kayıtlarda kullanılan bir değer silinemez; bu durumda "Gizle" seçeneğini kullanın.`}
                       confirmLabel="Sil"
                       onConfirm={() => onDelete(d.id)}
                       trigger={
@@ -221,7 +282,7 @@ function CategoryPanel({ category, tenantId }: { category: Category; tenantId: s
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       }
-                    />
+                    />}
                   </div>
                 ) : null}
               </div>

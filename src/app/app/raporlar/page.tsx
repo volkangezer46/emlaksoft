@@ -12,6 +12,8 @@ import {
   Trophy,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getDefinitionsOrDefault, toLabelMap } from "@/lib/definitions";
+import { defaultLabelMap } from "@/lib/definition-defaults";
 import { requireModulePage } from "@/lib/require-module-page";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { computeOfficeScore, type OfficeScoreInputs } from "@/lib/office-score";
@@ -169,15 +171,8 @@ export default async function ReportsPage() {
   const lossMax = Math.max(1, ...lossRows.map((r) => r.count));
 
   // Kaynak ROI — customers.source × kazanılan anlaşmalar (customer_id join)
-  const SOURCE_LABELS: Record<string, string> = {
-    referral: "Referans",
-    web:      "Web sitesi",
-    social:   "Sosyal medya",
-    walk_in:  "Elden geldi",
-    phone:    "Telefon",
-    portal:   "Portal",
-    other:    "Diğer",
-  };
+  // Etiketler: tek sabit kaynak (eski/yeni değerler) üstüne ofisin tanımları
+  const SOURCE_LABELS: Record<string, string> = { ...defaultLabelMap("customer_source"), ...toLabelMap(await getDefinitionsOrDefault("customer_source")) };
   const sourceLabel = (s: string) => SOURCE_LABELS[s] ?? s;
   const allRoiRows = aggregate.roi.map((row) => ({
     source: row.source,

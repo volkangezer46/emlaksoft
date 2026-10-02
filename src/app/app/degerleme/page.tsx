@@ -19,6 +19,7 @@ import { DAY_MS } from "@/lib/clock";
 import { ValuationForm } from "./valuation-form";
 import { DataPartnerStatus } from "@/components/app/data-partner-badges";
 import { EmptyState } from "@/components/app/empty-state";
+import { getDefinitionsOrDefault } from "@/lib/definitions";
 
 import { PageHeader } from "@/components/ui/page-header";
 type ValuationSource = { name: string; weight: number; value: number; note: string };
@@ -285,7 +286,7 @@ export default async function ValuationPage({
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
-        <ValuationForm properties={properties ?? []} provinces={provinces ?? []} defaultPropertyId={preselectedPropertyId} />
+        <ValuationForm properties={properties ?? []} provinces={provinces ?? []} defaultPropertyId={preselectedPropertyId} propertyTypes={(await getDefinitionsOrDefault("property_type")).map((d) => d.value)} />
         <section id="gecmis" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <Sparkles className="h-4 w-4 text-amber-500" /> Son değerlemeler

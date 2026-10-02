@@ -2,17 +2,9 @@ import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
+import { DEFAULT_DEFINITIONS, type DefinitionCategory } from "@/lib/definition-defaults";
 
-export type DefinitionCategory =
-  | "customer_type"
-  | "customer_source"
-  | "property_type"
-  | "transaction_type"
-  | "contract_type"
-  | "expense_category"
-  | "appointment_type"
-  | "demand_urgency"
-  | "ticket_category";
+export type { DefinitionCategory };
 
 export type DefinitionItem = { value: string; label: string; color: string | null };
 
@@ -93,4 +85,19 @@ export const getDefinitions = cache(async (category: DefinitionCategory): Promis
 /** Etiket eşleme haritası (value → label) — rozet/gösterim için pratik. */
 export function toLabelMap(items: DefinitionItem[]): Record<string, string> {
   return Object.fromEntries(items.map((i) => [i.value, i.label]));
+}
+
+/**
+ * getDefinitions + seed fallback: tablo boş/erişilemezse `definition-defaults.ts`
+ * varsayılanları döner (tek sabit kaynak). Dropdown'lar bunu kullanmalı.
+ */
+export async function getDefinitionsOrDefault(category: DefinitionCategory): Promise<DefinitionItem[]> {
+  let items: DefinitionItem[] = [];
+  try {
+    items = await getDefinitions(category);
+  } catch {
+    items = [];
+  }
+  if (items.length > 0) return items;
+  return DEFAULT_DEFINITIONS[category].map((d) => ({ value: d.value, label: d.label, color: null }));
 }
