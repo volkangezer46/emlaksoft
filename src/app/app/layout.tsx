@@ -241,7 +241,7 @@ export default async function AppLayout({
               </DropdownMenu> : null}
               <Link
                 href="/app/raporlar"
-                title="Rapor merkezini aç"
+                title="Kural tabanlı ofis skoru (yapay zekâ değil): açık talepler, canlı portal ilanları, son 7 günün randevu ve aramaları ile son 30 günün kapanışları puan ekler; gecikmiş portal teyitleri puan düşürür. Başlangıç 42. Rapor merkezini açmak için tıklayın."
                 className="focus-ring hidden items-center gap-2 rounded-full border border-mint-500/20 bg-mint-500/10 px-3 py-1.5 text-xs font-semibold text-mint-600 transition hover:border-mint-500/45 hover:bg-mint-500/15 lg:flex"
               >
                 <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-500" />

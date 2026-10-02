@@ -276,7 +276,7 @@ export default async function KiralamaPage({
         <StatCard label="Aktif kira" value={activeCount} icon={KeyRound} href="/app/kiralama" />
         <StatCard label="Bu ay tahsilat" value={money(paidSum)} icon={Wallet} tone="success" href="/app/kiralama?durum=paid" />
         <StatCard label="Bu ay bekleyen" value={money(pendingSum)} icon={Hourglass} tone="warning" href="/app/kiralama?durum=pending" />
-        <StatCard label="Geciken tahakkuk" value={overdueCount} icon={AlertTriangle} tone="danger" href="/app/kiralama?durum=overdue" />
+        <StatCard label="Geciken tahakkuk (ay)" value={overdueCount} icon={AlertTriangle} tone="danger" href="/app/kiralama?durum=overdue" />
         <StatCard label="Açık arıza" value={openMaint} icon={Wrench} tone={openMaint > 0 ? "warning" : "neutral"} href="/app/kiralama?ariza=acik" />
       </div>
 
