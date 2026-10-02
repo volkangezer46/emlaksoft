@@ -7,6 +7,7 @@ import {
   Clock,
   FileSignature,
   FileText,
+  History,
   ShieldAlert,
   User,
   XCircle,
@@ -22,6 +23,7 @@ import { FillFieldsDialog } from "./fill-fields-dialog";
 import { VersionHistory } from "./version-history";
 import { riskSummary, scanContract } from "@/lib/contract-risk";
 import { now } from "@/lib/clock";
+import { ContactActions, DetailTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 
 const TYPE_LABELS: Record<string, string> = {
   satis:        "Satış",
@@ -51,10 +53,20 @@ function entityName(v: { full_name?: string; title?: string; property_code?: str
   return item?.full_name ?? item?.title ?? item?.property_code ?? null;
 }
 
-export default async function ContractDetailPage({ params }: { params: Promise<{ id: string }> }) {
+const CONTRACT_TAB_IDS = ["icerik", "imza", "surum"] as const;
+
+export default async function ContractDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { perms } = await requireModulePage("contracts", "/app/sozlesmeler");
   const canEdit = perms.contracts?.includes("edit") ?? false;
   const { id } = await params;
+  // Seçili sekme sunucuda çözülür; sürüm geçmişi yalnız o sekmede sorgulanır
+  const tab = resolveTab(await searchParams, CONTRACT_TAB_IDS, "icerik", { ozet: "icerik", imzalayanlar: "imza" });
   const supabase = await createClient();
 
   const { data } = await supabase
@@ -82,7 +94,7 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
   if (signerError) throw new Error("Sözleşme imzalayanları okunamadı.");
 
   // Sürüm geçmişi — içerik düzenlendikçe önceki haller burada listelenir
-  const versions = await listContractVersions(id);
+  const versions = tab === "surum" ? await listContractVersions(id) : [];
 
   const contract = data;
   const statusInfo = STATUS_STYLES[contract.status] ?? STATUS_STYLES.draft;
@@ -118,6 +130,37 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
       propertyRel?.commission_rate != null ? Number(propertyRel.commission_rate) : null,
   });
   const ozet = riskSummary(riskler);
+  const signedCount = signers.filter((s) => s.status === "signed").length;
+  const pendingCount = signers.filter((s) => s.status === "pending").length;
+
+  /** Sağ sütun — tek "sonraki en iyi eylem". */
+  const sekmeHref = (t: string) => `/app/sozlesmeler/${id}?sekme=${t}`;
+  const nba: { title: string; reason: string; href: string | null; label: string } =
+    contract.status === "signed"
+      ? {
+          title: "Sözleşme imzalandı",
+          reason: customerRel?.id ? "Müşteri kaydına dönüp süreci takip edin." : "İmza tamamlandı; ek işlem gerekmiyor.",
+          href: customerRel?.id ? `/app/musteriler/${customerRel.id}` : null,
+          label: "Müşteriye git",
+        }
+      : contract.status === "cancelled" || contract.status === "rejected"
+        ? {
+            title: contract.status === "rejected" ? "Sözleşme reddedildi" : "Sözleşme iptal edildi",
+            reason: "Gerekirse yeni bir sözleşme oluşturun.",
+            href: "/app/sozlesmeler",
+            label: "Sözleşmeler",
+          }
+        : ozet.error > 0
+          ? { title: `${ozet.error} hatayı giderin`, reason: "Sözleşme kontrolünde hata var; imzaya göndermeden önce düzeltin.", href: sekmeHref("icerik"), label: "Kontrole git" }
+          : contract.status === "draft"
+            ? { title: signers.length === 0 ? "İmzaya gönderin" : "Taslağı imzaya gönderin", reason: "İçerik hazırsa imzalayanları ekleyip gönderin.", href: sekmeHref("imza"), label: "İmza paneli" }
+            : { title: `${pendingCount} imza bekleniyor`, reason: "İmza linkini elle iletmek için imza sekmesini kullanın.", href: sekmeHref("imza"), label: "İmzalayanlar" };
+
+  const tabDefs: DetailTabDef[] = [
+    { id: "icerik", label: "İçerik & kontrol", icon: FileText, count: riskler.length },
+    { id: "imza", label: "İmzalayanlar", icon: FileSignature, count: signers.length },
+    { id: "surum", label: "Sürüm geçmişi", icon: History },
+  ];
 
   return (
     <div className="space-y-6">
@@ -190,215 +233,255 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-        {/* Sözleşme içeriği */}
-        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-6 shadow-[var(--shadow-xs)]">
-          {/* Risk taramasi — icerigin USTUNDE: kullanici metni okumadan
-              once neyin eksik oldugunu gormeli. */}
-          {riskler.length > 0 ? (
-            <section className="mb-4 rounded-[var(--radius-card)] border border-line bg-canvas p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="flex items-center gap-2 font-display text-sm font-bold text-ink-950">
-                  <ShieldAlert className="h-4 w-4 text-amber-500" /> Sözleşme kontrolü
-                </h2>
-                <div className="flex flex-wrap gap-1.5">
-                  {ozet.error > 0 ? (
-                    <span className="rounded-full bg-danger-500/10 px-2.5 py-0.5 text-xs font-bold text-danger-600">
-                      {ozet.error} hata
-                    </span>
-                  ) : null}
-                  {ozet.warning > 0 ? (
-                    <span className="rounded-full bg-amber-400/15 px-2.5 py-0.5 text-xs font-bold text-amber-600">
-                      {ozet.warning} uyarı
-                    </span>
-                  ) : null}
-                  {ozet.info > 0 ? (
-                    <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-xs font-bold text-brand-600">
-                      {ozet.info} bilgi
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-              <ul className="mt-3 space-y-2">
-                {riskler.map((r) => (
-                  <li
-                    key={r.code}
-                    className={`rounded-[var(--radius-card)] border px-3.5 py-2.5 ${
-                      r.level === "error"
-                        ? "border-danger-500/30 bg-danger-500/[0.05]"
-                        : r.level === "warning"
-                          ? "border-amber-400/35 bg-amber-400/[0.06]"
-                          : "border-line bg-surface"
-                    }`}
-                  >
-                    <p
-                      className={`text-sm font-semibold ${
-                        r.level === "error"
-                          ? "text-danger-600"
-                          : r.level === "warning"
-                            ? "text-amber-600"
-                            : "text-ink-950"
-                      }`}
-                    >
-                      {r.title}
-                    </p>
-                    <p className="mt-0.5 text-xs leading-relaxed text-text-muted">{r.detail}</p>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-3 text-xs leading-relaxed text-text-faint">
-                Bu tarama <strong>mekanik</strong>tir: bir maddenin varlığını arar, içeriğinin doğru ya
-                da yeterli olduğunu söyleyemez. <strong>Hukuki görüş yerine geçmez.</strong>
-              </p>
-            </section>
-          ) : (
-            <p className="mb-4 flex items-center gap-2 rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/[0.06] px-4 py-2.5 text-sm text-mint-600">
-              <ShieldAlert className="h-4 w-4" /> Mekanik kontrollerde bulgu yok.
-            </p>
-          )}
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0 space-y-4">
+          <DetailTabs basePath={`/app/sozlesmeler/${id}`} tabs={tabDefs} active={tab} label="Sözleşme sekmeleri" />
 
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-              <FileText className="h-4 w-4 text-brand-600" /> İçerik
-            </h2>
-            {canEdit && (
-              <div className="flex flex-wrap items-center gap-2">
-                {contract.status === "draft" && (
-                  <>
-                    {/* Değişken doldurma sihirbazı — ___ / {{...}} kalıplarını
-                        müşteri+portföy verisinden önerilerle doldurur. key:
-                        içerik değişince alan listesi ve öneriler tazelensin. */}
-                    <FillFieldsDialog
-                      key={contract.updated_at ?? contract.body.length}
-                      contractId={id}
-                      body={contract.body ?? ""}
-                      suggestions={{
-                        customerName:    customerRel?.full_name ?? null,
-                        customerPhone:   customerRel?.phone ?? null,
-                        customerEmail:   customerRel?.email ?? null,
-                        propertyLabel:   propertyRel
-                          ? (propertyRel.title ?? propertyRel.property_code ?? null)
-                          : null,
-                        propertyAddress: propertyRel?.address_line ?? null,
-                        priceText:       propertyRel?.list_price != null
-                          ? `${new Intl.NumberFormat("tr-TR").format(Number(propertyRel.list_price))} TL`
-                          : null,
-                        todayText: new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date(now())),
-                      }}
-                    />
-                    <Link
-                      href={`/app/sozlesmeler/${id}/duzenle`}
-                      className="rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-600/5"
-                    >
-                      Düzenle
-                    </Link>
-                  </>
-                )}
-                {/* İptal: imzalanmamış/iptal edilmemiş sözleşmeler geri çekilebilir. */}
-                {["draft", "sent"].includes(contract.status) && (
-                  <CancelContractButton id={id} />
-                )}
-              </div>
-            )}
-          </div>
-          <div className="mt-4 max-h-[60vh] overflow-y-auto">
-            {contract.body ? (
-              <div className="prose prose-sm max-w-none whitespace-pre-wrap rounded-[var(--radius-card)] border border-line bg-canvas/60 p-4 text-sm leading-relaxed text-ink-950">
-                {contract.body}
-              </div>
-            ) : (
-              <p className="rounded-[var(--radius-card)] border border-dashed border-line-strong p-6 text-center text-sm text-text-muted">
-                İçerik girilmemiş.
-              </p>
-            )}
-          </div>
-        </section>
-
-        {/* İmzalayanlar + gönderme paneli */}
-        <div className="space-y-4">
-          {/* İmzalayan listesi */}
-          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-              <FileSignature className="h-4 w-4 text-mint-600" /> İmzalayanlar
-              <span className="ml-auto text-xs font-normal text-text-faint">{signers.length} kişi</span>
-            </h2>
-
-            {signers.length === 0 ? (
-              <p className="mt-3 text-sm text-text-muted">
-                Henüz imzalayan eklenmedi.
-                {contract.status === "draft" && " Aşağıdan imzaya gönderin."}
-              </p>
-            ) : (
-              <div className="mt-3 space-y-2">
-                {signers.map((s) => (
-                  <div key={s.id} className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-2.5">
-                    <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold text-white ${
-                      s.status === "signed" ? "bg-mint-500" : s.status === "rejected" ? "bg-danger-500" : "bg-zinc-400"
-                    }`}>
-                      {(s.full_name as string).slice(0, 1).toUpperCase()}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-ink-950">{s.full_name as string}</p>
-                      <p className="text-xs text-text-faint">
-                        {s.email as string | null ?? s.phone as string | null ?? "—"}
-                      </p>
-                      {/* İmza denetim izi: imzalayan IP + zaman — e-imzanın hukuki
-                          kanıtı. Yazılıyordu ama gösterilmiyordu. */}
-                      {s.status === "signed" && (s.ip_address || s.signed_at) ? (
-                        <p className="mt-0.5 text-xs tabular-nums text-text-faint">
-                          {s.ip_address ? `IP ${String(s.ip_address)}` : ""}
-                          {s.ip_address && s.signed_at ? " · " : ""}
-                          {s.signed_at ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(new Date(s.signed_at as string)) : ""}
+          {tab === "icerik" ? (
+            <div className="space-y-4">
+                  <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-6 shadow-[var(--shadow-xs)]">
+                    {/* Risk taramasi — icerigin USTUNDE: kullanici metni okumadan
+                        once neyin eksik oldugunu gormeli. */}
+                    {riskler.length > 0 ? (
+                      <section className="mb-4 rounded-[var(--radius-card)] border border-line bg-canvas p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h2 className="flex items-center gap-2 font-display text-sm font-bold text-ink-950">
+                            <ShieldAlert className="h-4 w-4 text-amber-500" /> Sözleşme kontrolü
+                          </h2>
+                          <div className="flex flex-wrap gap-1.5">
+                            {ozet.error > 0 ? (
+                              <span className="rounded-full bg-danger-500/10 px-2.5 py-0.5 text-xs font-bold text-danger-600">
+                                {ozet.error} hata
+                              </span>
+                            ) : null}
+                            {ozet.warning > 0 ? (
+                              <span className="rounded-full bg-amber-400/15 px-2.5 py-0.5 text-xs font-bold text-amber-600">
+                                {ozet.warning} uyarı
+                              </span>
+                            ) : null}
+                            {ozet.info > 0 ? (
+                              <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-xs font-bold text-brand-600">
+                                {ozet.info} bilgi
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                        <ul className="mt-3 space-y-2">
+                          {riskler.map((r) => (
+                            <li
+                              key={r.code}
+                              className={`rounded-[var(--radius-card)] border px-3.5 py-2.5 ${
+                                r.level === "error"
+                                  ? "border-danger-500/30 bg-danger-500/[0.05]"
+                                  : r.level === "warning"
+                                    ? "border-amber-400/35 bg-amber-400/[0.06]"
+                                    : "border-line bg-surface"
+                              }`}
+                            >
+                              <p
+                                className={`text-sm font-semibold ${
+                                  r.level === "error"
+                                    ? "text-danger-600"
+                                    : r.level === "warning"
+                                      ? "text-amber-600"
+                                      : "text-ink-950"
+                                }`}
+                              >
+                                {r.title}
+                              </p>
+                              <p className="mt-0.5 text-xs leading-relaxed text-text-muted">{r.detail}</p>
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="mt-3 text-xs leading-relaxed text-text-faint">
+                          Bu tarama <strong>mekanik</strong>tir: bir maddenin varlığını arar, içeriğinin doğru ya
+                          da yeterli olduğunu söyleyemez. <strong>Hukuki görüş yerine geçmez.</strong>
                         </p>
-                      ) : null}
+                      </section>
+                    ) : (
+                      <p className="mb-4 flex items-center gap-2 rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/[0.06] px-4 py-2.5 text-sm text-mint-600">
+                        <ShieldAlert className="h-4 w-4" /> Mekanik kontrollerde bulgu yok.
+                      </p>
+                    )}
+
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                        <FileText className="h-4 w-4 text-brand-600" /> İçerik
+                      </h2>
+                      {canEdit && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {contract.status === "draft" && (
+                            <>
+                              {/* Değişken doldurma sihirbazı — ___ / {{...}} kalıplarını
+                                  müşteri+portföy verisinden önerilerle doldurur. key:
+                                  içerik değişince alan listesi ve öneriler tazelensin. */}
+                              <FillFieldsDialog
+                                key={contract.updated_at ?? contract.body.length}
+                                contractId={id}
+                                body={contract.body ?? ""}
+                                suggestions={{
+                                  customerName:    customerRel?.full_name ?? null,
+                                  customerPhone:   customerRel?.phone ?? null,
+                                  customerEmail:   customerRel?.email ?? null,
+                                  propertyLabel:   propertyRel
+                                    ? (propertyRel.title ?? propertyRel.property_code ?? null)
+                                    : null,
+                                  propertyAddress: propertyRel?.address_line ?? null,
+                                  priceText:       propertyRel?.list_price != null
+                                    ? `${new Intl.NumberFormat("tr-TR").format(Number(propertyRel.list_price))} TL`
+                                    : null,
+                                  todayText: new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date(now())),
+                                }}
+                              />
+                              <Link
+                                href={`/app/sozlesmeler/${id}/duzenle`}
+                                className="rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-600/5"
+                              >
+                                Düzenle
+                              </Link>
+                            </>
+                          )}
+                          {/* İptal: imzalanmamış/iptal edilmemiş sözleşmeler geri çekilebilir. */}
+                          {["draft", "sent"].includes(contract.status) && (
+                            <CancelContractButton id={id} />
+                          )}
+                        </div>
+                      )}
                     </div>
-                    {/* SMS ulaşmadıysa imza linki elle iletilebilsin — token
-                        gönderimde DB tarafında üretiliyor, /imza/{token} */}
-                    {canEdit && s.status === "pending" && "token" in s && s.token
-                      ? <CopySignLink token={String(s.token)} />
-                      : null}
-                    {/* SMS OTP ile telefonunu doğrulayan imzalayan rozeti */}
-                    {s.verified_at ? (
-                      <span className="whitespace-nowrap rounded-full bg-mint-500/12 px-2 py-0.5 text-xs font-bold text-mint-600" title="Telefon SMS koduyla doğrulandı">
-                        SMS ile doğrulandı ✓
-                      </span>
-                    ) : null}
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                      s.status === "signed" ? "bg-mint-500/12 text-mint-600" :
-                      s.status === "rejected" ? "bg-danger-500/12 text-danger-500" :
-                      "bg-zinc-100 text-text-muted"
-                    }`}>
-                      {s.status === "signed" ? "İmzaladı" : s.status === "rejected" ? "Reddetti" : "Bekliyor"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* Gönderme paneli — sadece taslak + yetki varsa */}
-          {canEdit && (
-            <ContractSignPanel contractId={id} status={contract.status} />
-          )}
-
-          {/* Sürüm geçmişi — içerik düzenlendikçe önceki haller (geri dönülebilir) */}
-          <VersionHistory
-            contractId={id}
-            versions={versions}
-            canRestore={canEdit && contract.status === "draft"}
-          />
-
-          {/* İmzalanma tarihi */}
-          {contract.signed_at && (
-            <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/8 px-4 py-3 text-sm">
-              <p className="flex items-center gap-2 font-semibold text-mint-700">
-                <CheckCircle2 className="h-4 w-4" /> İmzalandı
-              </p>
-              <p className="mt-1 text-xs text-mint-700/70">{relDate(contract.signed_at)}</p>
+                    <div className="mt-4 max-h-[60vh] overflow-y-auto">
+                      {contract.body ? (
+                        <div className="prose prose-sm max-w-none whitespace-pre-wrap rounded-[var(--radius-card)] border border-line bg-canvas/60 p-4 text-sm leading-relaxed text-ink-950">
+                          {contract.body}
+                        </div>
+                      ) : (
+                        <p className="rounded-[var(--radius-card)] border border-dashed border-line-strong p-6 text-center text-sm text-text-muted">
+                          İçerik girilmemiş.
+                        </p>
+                      )}
+                    </div>
+                  </section>
             </div>
-          )}
+          ) : null}
+
+          {tab === "imza" ? (
+            <div className="space-y-4">
+                    {/* İmzalayan listesi */}
+                    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+                      <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                        <FileSignature className="h-4 w-4 text-mint-600" /> İmzalayanlar
+                        <span className="ml-auto text-xs font-normal text-text-faint">{signers.length} kişi</span>
+                      </h2>
+
+                      {signers.length === 0 ? (
+                        <p className="mt-3 text-sm text-text-muted">
+                          Henüz imzalayan eklenmedi.
+                          {contract.status === "draft" && " Aşağıdan imzaya gönderin."}
+                        </p>
+                      ) : (
+                        <div className="mt-3 space-y-2">
+                          {signers.map((s) => (
+                            <div key={s.id} className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-2.5">
+                              <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold text-white ${
+                                s.status === "signed" ? "bg-mint-500" : s.status === "rejected" ? "bg-danger-500" : "bg-zinc-400"
+                              }`}>
+                                {(s.full_name as string).slice(0, 1).toUpperCase()}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold text-ink-950">{s.full_name as string}</p>
+                                <p className="text-xs text-text-faint">
+                                  {s.email as string | null ?? s.phone as string | null ?? "—"}
+                                </p>
+                                {/* İmza denetim izi: imzalayan IP + zaman — e-imzanın hukuki
+                                    kanıtı. Yazılıyordu ama gösterilmiyordu. */}
+                                {s.status === "signed" && (s.ip_address || s.signed_at) ? (
+                                  <p className="mt-0.5 text-xs tabular-nums text-text-faint">
+                                    {s.ip_address ? `IP ${String(s.ip_address)}` : ""}
+                                    {s.ip_address && s.signed_at ? " · " : ""}
+                                    {s.signed_at ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(new Date(s.signed_at as string)) : ""}
+                                  </p>
+                                ) : null}
+                              </div>
+                              {/* SMS ulaşmadıysa imza linki elle iletilebilsin — token
+                                  gönderimde DB tarafında üretiliyor, /imza/{token} */}
+                              {canEdit && s.status === "pending" && "token" in s && s.token
+                                ? <CopySignLink token={String(s.token)} />
+                                : null}
+                              {/* SMS OTP ile telefonunu doğrulayan imzalayan rozeti */}
+                              {s.verified_at ? (
+                                <span className="whitespace-nowrap rounded-full bg-mint-500/12 px-2 py-0.5 text-xs font-bold text-mint-600" title="Telefon SMS koduyla doğrulandı">
+                                  SMS ile doğrulandı ✓
+                                </span>
+                              ) : null}
+                              <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                                s.status === "signed" ? "bg-mint-500/12 text-mint-600" :
+                                s.status === "rejected" ? "bg-danger-500/12 text-danger-500" :
+                                "bg-zinc-100 text-text-muted"
+                              }`}>
+                                {s.status === "signed" ? "İmzaladı" : s.status === "rejected" ? "Reddetti" : "Bekliyor"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+
+                    {/* Gönderme paneli — sadece taslak + yetki varsa */}
+                    {canEdit && (
+                      <ContractSignPanel contractId={id} status={contract.status} />
+                    )}
+
+                    {/* İmzalanma tarihi */}
+                    {contract.signed_at && (
+                      <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/8 px-4 py-3 text-sm">
+                        <p className="flex items-center gap-2 font-semibold text-mint-700">
+                          <CheckCircle2 className="h-4 w-4" /> İmzalandı
+                        </p>
+                        <p className="mt-1 text-xs text-mint-700/70">{relDate(contract.signed_at)}</p>
+                      </div>
+                    )}
+            </div>
+          ) : null}
+
+          {tab === "surum" ? (
+            <div className="space-y-4">
+                    {/* Sürüm geçmişi — içerik düzenlendikçe önceki haller (geri dönülebilir) */}
+                    <VersionHistory
+                      contractId={id}
+                      versions={versions}
+                      canRestore={canEdit && contract.status === "draft"}
+                    />
+            </div>
+          ) : null}
         </div>
+
+        {/* Sağ sütun — her sekmede görünür */}
+        <aside aria-label="Özet ve sonraki eylem" className="space-y-4 lg:sticky lg:top-4">
+          <NextActionCard title={nba.title} reason={nba.reason} href={nba.href} label={nba.label} />
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+            <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-muted">
+              {customerName ?? "Müşteri bağlı değil"}
+            </p>
+            <div className="mt-3">
+              <ContactActions
+                phone={customerRel?.phone}
+                name={customerRel?.full_name}
+                appointmentHref={customerRel?.id ? `/app/randevular?customer=${customerRel.id}${propertyRel?.id ? `&property=${propertyRel.id}` : ""}` : null}
+              />
+            </div>
+            <dl className="mt-4 space-y-1.5 border-t border-line pt-3 text-sm">
+              <div className="flex justify-between gap-3">
+                <dt className="text-text-muted">İmza</dt>
+                <dd className="font-semibold text-ink-950">{signedCount}/{signers.length}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-text-muted">Kontrol bulgusu</dt>
+                <dd className="font-semibold text-ink-950">{riskler.length}</dd>
+              </div>
+            </dl>
+          </section>
+        </aside>
       </div>
+
     </div>
   );
 }

@@ -7,7 +7,10 @@ import {
   Banknote,
   Building2,
   CalendarClock,
+  FileText,
   Gauge,
+  LayoutDashboard,
+  StickyNote,
   HeartHandshake,
   ListChecks,
   MessageSquareQuote,
@@ -19,6 +22,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now } from "@/lib/clock";
 import { Badge } from "@/components/ui/badge";
+import { ContactActions, DetailTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { computeDealScore, scoreGap } from "@/lib/deal-score";
 import { getBaseUrl } from "@/lib/base-url";
@@ -78,9 +82,19 @@ function rel<T>(value: T | T[] | null | undefined): T | null {
  * eşleştiriliyor. Bu bir yaklaşım, kesin bağ değil; sayfada da öyle
  * etiketleniyor ("aynı portföy + müşteri").
  */
-export default async function DealDetailPage({ params }: { params: Promise<{ id: string }> }) {
+const DEAL_TAB_IDS = ["ozet", "finans", "belgeler", "gorevler", "notlar"] as const;
+
+export default async function DealDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { perms, userId } = await requireModulePage("commissions");
   const { id } = await params;
+  // Seçili sekme sunucuda çözülür; yalnız aktif sekmenin bölümleri çizilir
+  const tab = resolveTab(await searchParams, DEAL_TAB_IDS, "ozet", { gorev: "gorevler" });
   const supabase = await createClient();
 
   const { data: deal } = await supabase
@@ -162,7 +176,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
           .order("created_at", { ascending: false })
           .limit(10)
       : Promise.resolve({ data: null }),
-    capraz
+    capraz && tab === "belgeler"
       ? supabase
           .from("contracts")
           .select("id, title, contract_type, status, signed_at, created_at")
@@ -274,6 +288,32 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   );
   const sapma = scoreGap(olasilik, skor.score);
 
+  /** Sağ sütun — tek "sonraki en iyi eylem": kurallar öncelik sırasıyla. */
+  const nba: { title: string; reason: string; href: string | null; label: string } = kayip
+    ? {
+        title: "Kayıp nedenini değerlendirin",
+        reason: deal.loss_reason ? "Kayıp nedeni kayıtlı; benzer müşteriler için eşleştirmeyi gözden geçirin." : "Kayıp nedeni girilmemiş; notlara ekleyin.",
+        href: `/app/anlasmalar/${deal.id}?sekme=notlar`,
+        label: "Notlara git",
+      }
+    : kazanildi && canSeeCommission && komisyonlar.length === 0
+      ? { title: "Komisyon kaydı açın", reason: "Anlaşma kazanıldı ama komisyon kaydı yok.", href: "/app/komisyon", label: "Komisyon merkezi" }
+      : kazanildi
+        ? { title: "Evrak dosyasını tamamlayın", reason: "Kapanış evrakları ve masraflar eksiksiz olmalı.", href: `/app/anlasmalar/${deal.id}?sekme=belgeler`, label: "Evraklara git" }
+        : acikGorev > 0
+          ? { title: `${acikGorev} açık görevi tamamlayın`, reason: "Bu anlaşmaya bağlı bekleyen görev var.", href: `/app/anlasmalar/${deal.id}?sekme=gorevler`, label: "Görevlere git" }
+          : (offers ?? []).length === 0 && capraz
+            ? { title: "Teklif oluşturun", reason: "Bu portföy + müşteri için teklif kaydı yok.", href: "/app/teklifler", label: "Teklifler" }
+            : { title: "Müşteriyle iletişimde kalın", reason: `Sistem tahmini %${skor.score} — ${skor.label}`, href: customer ? `/app/musteriler/${customer.id}?sekme=iletisim` : null, label: "İletişim kaydı" };
+
+  const tabDefs: DetailTabDef[] = [
+    { id: "ozet", label: "Özet", icon: LayoutDashboard },
+    { id: "finans", label: "Finans", icon: Banknote, count: canSeeCommission ? komisyonlar.length : null },
+    { id: "belgeler", label: "Belgeler & teklifler", icon: FileText },
+    { id: "gorevler", label: "Görevler", icon: ListChecks, count: (tasks ?? []).length },
+    { id: "notlar", label: "Notlar", icon: StickyNote },
+  ];
+
   return (
     <div className="space-y-6">
       <Link
@@ -318,7 +358,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 href: undefined,
               },
               { label: "Komisyon (brüt)", value: canSeeCommission ? money(brutToplam) : "—", icon: Tag, href: undefined },
-              { label: "Açık görev", value: String(acikGorev), icon: ListChecks, href: "#gorevler" },
+              { label: "Açık görev", value: String(acikGorev), icon: ListChecks, href: `/app/anlasmalar/${deal.id}?sekme=gorevler` },
             ].map((k) =>
               k.href ? (
                 <Link
@@ -352,413 +392,462 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         </p>
       ) : null}
 
-      {!kazanildi && !kayip ? (
-        <section className="surface-card rounded-[var(--radius-panel)] p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-                <Gauge className="h-4 w-4 text-brand-600" /> Kapanma tahmini
-              </h2>
-              <p className="mt-0.5 text-xs text-text-faint">
-                Kural tabanlı puanlama — istatistiksel model değil. Her faktör aşağıda gerekçesiyle.
-              </p>
-            </div>
-            <div className="text-right">
-              <p
-                className={`numeric font-display text-3xl font-extrabold ${
-                  skor.tier === "high"
-                    ? "text-mint-600"
-                    : skor.tier === "medium"
-                      ? "text-amber-600"
-                      : "text-danger-600"
-                }`}
-              >
-                %{skor.score}
-              </p>
-              <p className="text-xs text-text-muted">sistem tahmini</p>
-            </div>
-          </div>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0 space-y-4">
+          <DetailTabs basePath={`/app/anlasmalar/${deal.id}`} tabs={tabDefs} active={tab} label="Anlaşma sekmeleri" />
 
-          {/* Faktor dokumu: kullanici katilmadiginda NEDENINI gorebilmeli. */}
-          <ul className="mt-4 grid gap-1.5 sm:grid-cols-2">
-            {skor.factors.map((f) => (
-              <li
-                key={f.label}
-                className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm"
-              >
-                <span className="text-text-muted">{f.label}</span>
-                <span
-                  className={`numeric font-bold ${f.points < 0 ? "text-danger-600" : "text-ink-950"}`}
-                >
-                  {f.points > 0 ? "+" : ""}
-                  {f.points}
-                </span>
-              </li>
-            ))}
-          </ul>
+          {tab === "ozet" ? (
+            <div className="space-y-4">
+                {!kazanildi && !kayip ? (
+                  <section className="surface-card rounded-[var(--radius-panel)] p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                          <Gauge className="h-4 w-4 text-brand-600" /> Kapanma tahmini
+                        </h2>
+                        <p className="mt-0.5 text-xs text-text-faint">
+                          Kural tabanlı puanlama — istatistiksel model değil. Her faktör aşağıda gerekçesiyle.
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p
+                          className={`numeric font-display text-3xl font-extrabold ${
+                            skor.tier === "high"
+                              ? "text-mint-600"
+                              : skor.tier === "medium"
+                                ? "text-amber-600"
+                                : "text-danger-600"
+                          }`}
+                        >
+                          %{skor.score}
+                        </p>
+                        <p className="text-xs text-text-muted">sistem tahmini</p>
+                      </div>
+                    </div>
 
-          {/* Sapma uyarisi: 20 puan altindaki fark gurultu sayiliyor. */}
-          {sapma != null ? (
-            <p
-              className="mt-3 rounded-[var(--radius-card)] border border-amber-400/35 bg-amber-400/[0.07] px-4 py-2.5 text-xs leading-relaxed text-ink-950"
-              role="status"
-            >
-              Kayıtlı olasılık <strong className="numeric">%{Math.round(olasilik ?? 0)}</strong>, sistem
-              tahmini <strong className="numeric">%{skor.score}</strong> —{" "}
-              <strong className="numeric">{Math.abs(sapma)} puan</strong>{" "}
-              {sapma > 0 ? "daha iyimser" : "daha karamsar"}. Yukarıdaki faktörlere bakın.
-            </p>
-          ) : null}
-        </section>
-      ) : null}
+                    {/* Faktor dokumu: kullanici katilmadiginda NEDENINI gorebilmeli. */}
+                    <ul className="mt-4 grid gap-1.5 sm:grid-cols-2">
+                      {skor.factors.map((f) => (
+                        <li
+                          key={f.label}
+                          className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm"
+                        >
+                          <span className="text-text-muted">{f.label}</span>
+                          <span
+                            className={`numeric font-bold ${f.points < 0 ? "text-danger-600" : "text-ink-950"}`}
+                          >
+                            {f.points > 0 ? "+" : ""}
+                            {f.points}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
 
-      {/*
-        Memnuniyet anketi — yalnız kazanılan anlaşmada. Anket kapanışın son
-        halkasıydı ama yalnız rapor sayfasından üretilebiliyordu; danışman
-        anlaşmayı kapattığı yerde tek tıkla üretebilsin.
-      */}
-      {kazanildi ? (
-        <section className="surface-card rounded-[var(--radius-panel)] p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-                <HeartHandshake className="h-4 w-4 text-mint-600" /> Memnuniyet anketi
-              </h2>
-              <p className="mt-0.5 text-xs text-text-faint">
-                Tek soruluk 0-10 anketi. SMS gönderilmez — linki müşteriye siz iletirsiniz.
-              </p>
-            </div>
-            {surveyRow && surveyUrl ? (
-              <div className="flex flex-wrap items-center gap-2">
-                {surveyAnswered && surveyTone ? (
-                  <>
-                    <span className="numeric font-display text-2xl font-extrabold text-ink-950">
-                      {surveyRow.score}
-                    </span>
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${surveyTone.cls}`}
-                    >
-                      {surveyTone.label}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-xs font-bold text-brand-600">
-                      Yanıt bekliyor
-                    </span>
-                    <CopySurveyLinkButton url={surveyUrl} />
-                  </>
-                )}
-              </div>
-            ) : !deal.customer_id ? (
-              <p className="text-xs font-semibold text-text-muted">
-                Anlaşmaya müşteri bağlı değil — anket gönderilecek kişi belirsiz.
-              </p>
-            ) : canCreateSurvey ? (
-              <CreateSurveyButton dealId={deal.id} />
-            ) : (
-              <p className="text-xs font-semibold text-text-muted">
-                Anket üretmek için rapor yetkisi gerekiyor.
-              </p>
-            )}
-          </div>
-          {surveyRow?.comment ? (
-            <p className="mt-3 flex items-start gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5 text-sm italic leading-relaxed text-text-muted">
-              <MessageSquareQuote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-text-faint" />
-              {surveyRow.comment}
-            </p>
-          ) : null}
-        </section>
-      ) : null}
+                    {/* Sapma uyarisi: 20 puan altindaki fark gurultu sayiliyor. */}
+                    {sapma != null ? (
+                      <p
+                        className="mt-3 rounded-[var(--radius-card)] border border-amber-400/35 bg-amber-400/[0.07] px-4 py-2.5 text-xs leading-relaxed text-ink-950"
+                        role="status"
+                      >
+                        Kayıtlı olasılık <strong className="numeric">%{Math.round(olasilik ?? 0)}</strong>, sistem
+                        tahmini <strong className="numeric">%{skor.score}</strong> —{" "}
+                        <strong className="numeric">{Math.abs(sapma)} puan</strong>{" "}
+                        {sapma > 0 ? "daha iyimser" : "daha karamsar"}. Yukarıdaki faktörlere bakın.
+                      </p>
+                    ) : null}
+                  </section>
+                ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Bağlı portföy — tıklanabilir */}
-        <section className="surface-card rounded-[var(--radius-panel)] p-5">
-          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-            <Building2 className="h-4 w-4 text-brand-600" /> Portföy
-          </h2>
-          {property ? (
-            <Link
-              href={`/app/portfoyler/${property.id}`}
-              className="lift-hover focus-ring group mt-3 block rounded-[var(--radius-card)] border border-line bg-canvas p-4 transition hover:border-brand-300"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">
-                    {property.property_code}
-                  </p>
-                  <p className="mt-0.5 truncate font-semibold text-ink-950">{property.title ?? "Başlıksız"}</p>
-                  <p className="mt-1 text-xs text-text-muted">
-                    {[property.transaction_type, property.property_type, province?.name, district?.name]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                  <p className="numeric mt-2 font-display text-lg font-extrabold text-ink-950">
-                    {money(property.list_price != null ? Number(property.list_price) : null)}
-                  </p>
-                </div>
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-surface text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
-                  <ArrowUpRight className="h-4 w-4" />
-                </span>
-              </div>
-            </Link>
-          ) : (
-            <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
-              Bu anlaşmaya portföy bağlanmamış.
-            </p>
-          )}
-        </section>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {/* Bağlı portföy — tıklanabilir */}
+                  <section className="surface-card rounded-[var(--radius-panel)] p-5">
+                    <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                      <Building2 className="h-4 w-4 text-brand-600" /> Portföy
+                    </h2>
+                    {property ? (
+                      <Link
+                        href={`/app/portfoyler/${property.id}`}
+                        className="lift-hover focus-ring group mt-3 block rounded-[var(--radius-card)] border border-line bg-canvas p-4 transition hover:border-brand-300"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">
+                              {property.property_code}
+                            </p>
+                            <p className="mt-0.5 truncate font-semibold text-ink-950">{property.title ?? "Başlıksız"}</p>
+                            <p className="mt-1 text-xs text-text-muted">
+                              {[property.transaction_type, property.property_type, province?.name, district?.name]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
+                            <p className="numeric mt-2 font-display text-lg font-extrabold text-ink-950">
+                              {money(property.list_price != null ? Number(property.list_price) : null)}
+                            </p>
+                          </div>
+                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-surface text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
+                            <ArrowUpRight className="h-4 w-4" />
+                          </span>
+                        </div>
+                      </Link>
+                    ) : (
+                      <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+                        Bu anlaşmaya portföy bağlanmamış.
+                      </p>
+                    )}
+                  </section>
 
-        {/* Bağlı müşteri — tıklanabilir */}
-        <section className="surface-card rounded-[var(--radius-panel)] p-5">
-          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-            <User className="h-4 w-4 text-brand-600" /> Müşteri
-          </h2>
-          {customer ? (
-            <Link
-              href={`/app/musteriler/${customer.id}`}
-              className="lift-hover focus-ring group mt-3 block rounded-[var(--radius-card)] border border-line bg-canvas p-4 transition hover:border-brand-300"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-ink-950">{customer.full_name}</p>
-                  <p className="numeric mt-1 text-xs text-text-muted">{customer.phone ?? "Telefon yok"}</p>
-                  <p className="mt-0.5 truncate text-xs text-text-muted">{customer.email ?? "E-posta yok"}</p>
-                </div>
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-surface text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
-                  <ArrowUpRight className="h-4 w-4" />
-                </span>
-              </div>
-            </Link>
-          ) : (
-            <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
-              Bu anlaşmaya müşteri bağlanmamış.
-            </p>
-          )}
-          <dl className="mt-3 space-y-1.5">
-            <div className="hairline-t flex justify-between gap-3 pt-2 text-sm">
-              <dt className="text-text-muted">Sorumlu danışman</dt>
-              <dd className="font-semibold text-ink-950">
-                {deal.assigned_to ? (
-                  <Link
-                    href={`/app/ekip/${deal.assigned_to}`}
-                    className="focus-ring rounded-[var(--radius-control)] text-brand-600 hover:underline"
-                  >
-                    {assignee?.full_name ?? "Danışman"}
-                  </Link>
-                ) : (
-                  "Atanmadı"
-                )}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-3 text-sm">
-              <dt className="text-text-muted">Son güncelleme</dt>
-              <dd className="font-semibold text-ink-950">{tarih(deal.updated_at)}</dd>
-            </div>
-          </dl>
-        </section>
-      </div>
-
-      {/* Komisyon — yetki gerektiriyor */}
-      {canSeeCommission ? (
-        <section className="surface-card rounded-[var(--radius-panel)] p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-              <Banknote className="h-4 w-4 text-brand-600" /> Komisyon
-            </h2>
-            <Link href="/app/komisyon" className="text-xs font-semibold text-brand-600 hover:underline">
-              Komisyon merkezine git →
-            </Link>
-          </div>
-          {komisyonlar.length === 0 ? (
-            <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
-              {kazanildi
-                ? "Anlaşma kazanıldı ama komisyon kaydı açılmamış."
-                : "Bu anlaşmaya bağlı komisyon kaydı yok."}
-            </p>
-          ) : (
-            <>
-              <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                {[
-                  ["Brüt", money(brutToplam)],
-                  ["KDV", money(kdvToplam)],
-                  ["Tahsil edilen", money(tahsilEdilen)],
-                ].map(([k, v]) => (
-                  <div key={k} className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
-                    <p className="text-xs text-text-faint">{k}</p>
-                    <p className="numeric text-sm font-bold text-ink-950">{v}</p>
-                  </div>
-                ))}
-              </div>
-              <TableFrame className="mt-3" minWidth={480}>
-                <Table>
-                  <THead>
-                    <TR>
-                      <TH>Tarih</TH>
-                      <TH align="right">Brüt</TH>
-                      <TH align="right">KDV</TH>
-                      <TH>Durum</TH>
-                    </TR>
-                  </THead>
-                  <TBody>
-                    {komisyonlar.map((c) => {
-                      const tahsil = c.status === "paid" || c.status === "collected";
-                      return (
-                        <TR key={c.id} interactive>
-                          <TD>
-                            {/* Satır → komisyon defteri, kaydın durumuna uyan filtreyle */}
+                  {/* Bağlı müşteri — tıklanabilir */}
+                  <section className="surface-card rounded-[var(--radius-panel)] p-5">
+                    <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                      <User className="h-4 w-4 text-brand-600" /> Müşteri
+                    </h2>
+                    {customer ? (
+                      <Link
+                        href={`/app/musteriler/${customer.id}`}
+                        className="lift-hover focus-ring group mt-3 block rounded-[var(--radius-card)] border border-line bg-canvas p-4 transition hover:border-brand-300"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-ink-950">{customer.full_name}</p>
+                            <p className="numeric mt-1 text-xs text-text-muted">{customer.phone ?? "Telefon yok"}</p>
+                            <p className="mt-0.5 truncate text-xs text-text-muted">{customer.email ?? "E-posta yok"}</p>
+                          </div>
+                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-surface text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
+                            <ArrowUpRight className="h-4 w-4" />
+                          </span>
+                        </div>
+                      </Link>
+                    ) : (
+                      <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+                        Bu anlaşmaya müşteri bağlanmamış.
+                      </p>
+                    )}
+                    <dl className="mt-3 space-y-1.5">
+                      <div className="hairline-t flex justify-between gap-3 pt-2 text-sm">
+                        <dt className="text-text-muted">Sorumlu danışman</dt>
+                        <dd className="font-semibold text-ink-950">
+                          {deal.assigned_to ? (
                             <Link
-                              href={`/app/komisyon?durum=${tahsil ? "tahsil" : "bekleyen"}`}
-                              className="absolute inset-0"
-                              aria-label="Komisyon defterinde aç"
-                            />
-                            {tarih(c.created_at)}
-                          </TD>
-                          <TD align="right">{money(Number(c.gross_amount))}</TD>
-                          <TD align="right">{money(Number(c.vat_amount))}</TD>
-                          <TD>
-                            <Badge variant={tahsil ? "success" : "warning"}>{c.status ?? "—"}</Badge>
-                          </TD>
-                        </TR>
-                      );
-                    })}
-                  </TBody>
-                </Table>
-              </TableFrame>
-            </>
-          )}
-        </section>
-      ) : null}
+                              href={`/app/ekip/${deal.assigned_to}`}
+                              className="focus-ring rounded-[var(--radius-control)] text-brand-600 hover:underline"
+                            >
+                              {assignee?.full_name ?? "Danışman"}
+                            </Link>
+                          ) : (
+                            "Atanmadı"
+                          )}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3 text-sm">
+                        <dt className="text-text-muted">Son güncelleme</dt>
+                        <dd className="font-semibold text-ink-950">{tarih(deal.updated_at)}</dd>
+                      </div>
+                    </dl>
+                  </section>
+                </div>
+            </div>
+          ) : null}
 
-      {/* Evrak dosyası — kapanış evrakları kontrol listesi (deal_checklist_items) */}
-      <Suspense fallback={<ChecklistSkeleton />}>
-        <ChecklistLoader
-          dealId={deal.id}
-          dealType={deal.deal_type}
-          canEdit={(perms.commissions ?? []).includes("edit")}
-        />
-      </Suspense>
+          {tab === "finans" ? (
+            <div className="space-y-4">
+                {/*
+                  Memnuniyet anketi — yalnız kazanılan anlaşmada. Anket kapanışın son
+                  halkasıydı ama yalnız rapor sayfasından üretilebiliyordu; danışman
+                  anlaşmayı kapattığı yerde tek tıkla üretebilsin.
+                */}
+                {kazanildi ? (
+                  <section className="surface-card rounded-[var(--radius-panel)] p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                          <HeartHandshake className="h-4 w-4 text-mint-600" /> Memnuniyet anketi
+                        </h2>
+                        <p className="mt-0.5 text-xs text-text-faint">
+                          Tek soruluk 0-10 anketi. SMS gönderilmez — linki müşteriye siz iletirsiniz.
+                        </p>
+                      </div>
+                      {surveyRow && surveyUrl ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {surveyAnswered && surveyTone ? (
+                            <>
+                              <span className="numeric font-display text-2xl font-extrabold text-ink-950">
+                                {surveyRow.score}
+                              </span>
+                              <span
+                                className={`rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${surveyTone.cls}`}
+                              >
+                                {surveyTone.label}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-xs font-bold text-brand-600">
+                                Yanıt bekliyor
+                              </span>
+                              <CopySurveyLinkButton url={surveyUrl} />
+                            </>
+                          )}
+                        </div>
+                      ) : !deal.customer_id ? (
+                        <p className="text-xs font-semibold text-text-muted">
+                          Anlaşmaya müşteri bağlı değil — anket gönderilecek kişi belirsiz.
+                        </p>
+                      ) : canCreateSurvey ? (
+                        <CreateSurveyButton dealId={deal.id} />
+                      ) : (
+                        <p className="text-xs font-semibold text-text-muted">
+                          Anket üretmek için rapor yetkisi gerekiyor.
+                        </p>
+                      )}
+                    </div>
+                    {surveyRow?.comment ? (
+                      <p className="mt-3 flex items-start gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5 text-sm italic leading-relaxed text-text-muted">
+                        <MessageSquareQuote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-text-faint" />
+                        {surveyRow.comment}
+                      </p>
+                    ) : null}
+                  </section>
+                ) : null}
 
-      {/* İşlem dosyası — kapora + kapanış masrafları (deal_costs ile GERÇEK bağ) */}
-      <Suspense fallback={<CostsSkeleton />}>
-        <CostsLoader dealId={deal.id} canEdit={(perms.commissions ?? []).includes("edit")} />
-      </Suspense>
+                {/* Komisyon — yetki gerektiriyor */}
+                {canSeeCommission ? (
+                  <section className="surface-card rounded-[var(--radius-panel)] p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                        <Banknote className="h-4 w-4 text-brand-600" /> Komisyon
+                      </h2>
+                      <Link href="/app/komisyon" className="text-xs font-semibold text-brand-600 hover:underline">
+                        Komisyon merkezine git →
+                      </Link>
+                    </div>
+                    {komisyonlar.length === 0 ? (
+                      <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+                        {kazanildi
+                          ? "Anlaşma kazanıldı ama komisyon kaydı açılmamış."
+                          : "Bu anlaşmaya bağlı komisyon kaydı yok."}
+                      </p>
+                    ) : (
+                      <>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                          {[
+                            ["Brüt", money(brutToplam)],
+                            ["KDV", money(kdvToplam)],
+                            ["Tahsil edilen", money(tahsilEdilen)],
+                          ].map(([k, v]) => (
+                            <div key={k} className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
+                              <p className="text-xs text-text-faint">{k}</p>
+                              <p className="numeric text-sm font-bold text-ink-950">{v}</p>
+                            </div>
+                          ))}
+                        </div>
+                        <TableFrame className="mt-3" minWidth={480}>
+                          <Table>
+                            <THead>
+                              <TR>
+                                <TH>Tarih</TH>
+                                <TH align="right">Brüt</TH>
+                                <TH align="right">KDV</TH>
+                                <TH>Durum</TH>
+                              </TR>
+                            </THead>
+                            <TBody>
+                              {komisyonlar.map((c) => {
+                                const tahsil = c.status === "paid" || c.status === "collected";
+                                return (
+                                  <TR key={c.id} interactive>
+                                    <TD>
+                                      {/* Satır → komisyon defteri, kaydın durumuna uyan filtreyle */}
+                                      <Link
+                                        href={`/app/komisyon?durum=${tahsil ? "tahsil" : "bekleyen"}`}
+                                        className="absolute inset-0"
+                                        aria-label="Komisyon defterinde aç"
+                                      />
+                                      {tarih(c.created_at)}
+                                    </TD>
+                                    <TD align="right">{money(Number(c.gross_amount))}</TD>
+                                    <TD align="right">{money(Number(c.vat_amount))}</TD>
+                                    <TD>
+                                      <Badge variant={tahsil ? "success" : "warning"}>{c.status ?? "—"}</Badge>
+                                    </TD>
+                                  </TR>
+                                );
+                              })}
+                            </TBody>
+                          </Table>
+                        </TableFrame>
+                      </>
+                    )}
+                  </section>
+                ) : null}
 
-      {/* Notlar — ekip içi yorum akışı + sistem izleri (deal_notes ile GERÇEK bağ) */}
-      <Suspense fallback={<NotesSkeleton />}>
-        <NotesLoader
-          dealId={deal.id}
-          canEdit={(perms.commissions ?? []).includes("edit")}
-          currentUserId={userId}
-        />
-      </Suspense>
+                {/* İşlem dosyası — kapora + kapanış masrafları (deal_costs ile GERÇEK bağ) */}
+                <Suspense fallback={<CostsSkeleton />}>
+                  <CostsLoader dealId={deal.id} canEdit={(perms.commissions ?? []).includes("edit")} />
+                </Suspense>
+            </div>
+          ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Teklifler ve sözleşmeler: yaklaşık eşleşme, bu açıkça yazılıyor */}
-        <section className="surface-card rounded-[var(--radius-panel)] p-5">
-          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-            <Tag className="h-4 w-4 text-brand-600" /> Teklifler
-          </h2>
-          <p className="mt-1 text-xs text-text-faint">
-            Teklif kaydında anlaşma bağı yok; aynı portföy + müşteri ikilisine göre listeleniyor.
-          </p>
-          {(offers ?? []).length === 0 ? (
-            <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
-              Eşleşen teklif yok.
+          {tab === "belgeler" ? (
+            <div className="space-y-4">
+                {/* Evrak dosyası — kapanış evrakları kontrol listesi (deal_checklist_items) */}
+                <Suspense fallback={<ChecklistSkeleton />}>
+                  <ChecklistLoader
+                    dealId={deal.id}
+                    dealType={deal.deal_type}
+                    canEdit={(perms.commissions ?? []).includes("edit")}
+                  />
+                </Suspense>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {/* Teklifler ve sözleşmeler: yaklaşık eşleşme, bu açıkça yazılıyor */}
+                  <section className="surface-card rounded-[var(--radius-panel)] p-5">
+                    <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                      <Tag className="h-4 w-4 text-brand-600" /> Teklifler
+                    </h2>
+                    <p className="mt-1 text-xs text-text-faint">
+                      Teklif kaydında anlaşma bağı yok; aynı portföy + müşteri ikilisine göre listeleniyor.
+                    </p>
+                    {(offers ?? []).length === 0 ? (
+                      <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
+                        Eşleşen teklif yok.
+                      </p>
+                    ) : (
+                      <ul className="mt-3 space-y-2">
+                        {(offers ?? []).map((o) => (
+                          <li key={o.id}>
+                            <Link
+                              href={`/app/teklifler/${o.id}`}
+                              className="focus-ring flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5 transition hover:border-brand-300"
+                            >
+                              <span className="numeric font-semibold text-ink-950">{money(Number(o.amount))}</span>
+                              <span className="flex items-center gap-2 text-xs text-text-muted">
+                                {o.status ?? "—"}
+                                <ArrowUpRight className="h-3.5 w-3.5" />
+                              </span>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+
+                  <section className="surface-card rounded-[var(--radius-panel)] p-5">
+                    <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                      <CalendarClock className="h-4 w-4 text-brand-600" /> Sözleşmeler
+                    </h2>
+                    <p className="mt-1 text-xs text-text-faint">
+                      Aynı portföy + müşteri ikilisine göre listeleniyor.
+                    </p>
+                    {(contracts ?? []).length === 0 ? (
+                      <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
+                        Eşleşen sözleşme yok.
+                      </p>
+                    ) : (
+                      <ul className="mt-3 space-y-2">
+                        {(contracts ?? []).map((c) => (
+                          <li key={c.id}>
+                            <Link
+                              href={`/app/sozlesmeler/${c.id}`}
+                              className="focus-ring flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5 transition hover:border-brand-300"
+                            >
+                              <span className="min-w-0 truncate font-semibold text-ink-950">{c.title ?? c.contract_type}</span>
+                              <span className="flex shrink-0 items-center gap-2 text-xs text-text-muted">
+                                {c.status ?? "—"}
+                                <ArrowUpRight className="h-3.5 w-3.5" />
+                              </span>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                </div>
+            </div>
+          ) : null}
+
+          {tab === "gorevler" ? (
+            <div className="space-y-4">
+                {/* Görevler — deal_id ile GERÇEK bağ */}
+                <section id="gorevler" className="surface-card scroll-mt-24 rounded-[var(--radius-panel)] p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                      <ListChecks className="h-4 w-4 text-brand-600" /> Bağlı görevler
+                    </h2>
+                    <Link href="/app/gorevler" className="text-xs font-semibold text-brand-600 hover:underline">
+                      Görev merkezine git →
+                    </Link>
+                  </div>
+                  {(tasks ?? []).length === 0 ? (
+                    <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+                      Bu anlaşmaya bağlı görev yok.
+                    </p>
+                  ) : (
+                    <ul className="mt-3 space-y-2">
+                      {(tasks ?? []).map((t) => {
+                        const bitti = t.status === "done" || t.status === "Tamamlandı";
+                        return (
+                          <li key={t.id}>
+                            <Link
+                              href={`/app/gorevler?filter=${bitti ? "done" : "open"}`}
+                              className="focus-ring flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5 transition hover:border-brand-300"
+                            >
+                              <span className={`font-medium ${bitti ? "text-text-faint line-through" : "text-ink-950"}`}>
+                                {t.title}
+                              </span>
+                              <span className="flex items-center gap-2 text-xs text-text-muted">
+                                {t.due_at ? tarih(t.due_at) : "Tarihsiz"}
+                                <Badge variant={bitti ? "success" : t.priority === "high" ? "danger" : "default"}>
+                                  {bitti ? "Tamam" : (t.status ?? "Açık")}
+                                </Badge>
+                                <ArrowUpRight className="h-3.5 w-3.5" />
+                              </span>
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </section>
+            </div>
+          ) : null}
+
+          {tab === "notlar" ? (
+            <div className="space-y-4">
+                {/* Notlar — ekip içi yorum akışı + sistem izleri (deal_notes ile GERÇEK bağ) */}
+                <Suspense fallback={<NotesSkeleton />}>
+                  <NotesLoader
+                    dealId={deal.id}
+                    canEdit={(perms.commissions ?? []).includes("edit")}
+                    currentUserId={userId}
+                  />
+                </Suspense>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Sağ sütun — her sekmede görünür */}
+        <aside aria-label="Özet ve sonraki eylem" className="space-y-4 lg:sticky lg:top-4">
+          <NextActionCard title={nba.title} reason={nba.reason} href={nba.href} label={nba.label} />
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+            <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-muted">
+              {customer ? customer.full_name : "Müşteri bağlı değil"}
             </p>
-          ) : (
-            <ul className="mt-3 space-y-2">
-              {(offers ?? []).map((o) => (
-                <li key={o.id}>
-                  <Link
-                    href={`/app/teklifler/${o.id}`}
-                    className="focus-ring flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5 transition hover:border-brand-300"
-                  >
-                    <span className="numeric font-semibold text-ink-950">{money(Number(o.amount))}</span>
-                    <span className="flex items-center gap-2 text-xs text-text-muted">
-                      {o.status ?? "—"}
-                      <ArrowUpRight className="h-3.5 w-3.5" />
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="surface-card rounded-[var(--radius-panel)] p-5">
-          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-            <CalendarClock className="h-4 w-4 text-brand-600" /> Sözleşmeler
-          </h2>
-          <p className="mt-1 text-xs text-text-faint">
-            Aynı portföy + müşteri ikilisine göre listeleniyor.
-          </p>
-          {(contracts ?? []).length === 0 ? (
-            <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
-              Eşleşen sözleşme yok.
-            </p>
-          ) : (
-            <ul className="mt-3 space-y-2">
-              {(contracts ?? []).map((c) => (
-                <li key={c.id}>
-                  <Link
-                    href={`/app/sozlesmeler/${c.id}`}
-                    className="focus-ring flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5 transition hover:border-brand-300"
-                  >
-                    <span className="min-w-0 truncate font-semibold text-ink-950">{c.title ?? c.contract_type}</span>
-                    <span className="flex shrink-0 items-center gap-2 text-xs text-text-muted">
-                      {c.status ?? "—"}
-                      <ArrowUpRight className="h-3.5 w-3.5" />
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+            <div className="mt-3">
+              <ContactActions
+                phone={customer?.phone}
+                name={customer?.full_name}
+                appointmentHref={
+                  customer
+                    ? `/app/randevular?customer=${customer.id}${deal.property_id ? `&property=${deal.property_id}` : ""}`
+                    : null
+                }
+                noteHref={`/app/anlasmalar/${deal.id}?sekme=notlar`}
+              />
+            </div>
+          </section>
+        </aside>
       </div>
 
-      {/* Görevler — deal_id ile GERÇEK bağ */}
-      <section id="gorevler" className="surface-card scroll-mt-24 rounded-[var(--radius-panel)] p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-            <ListChecks className="h-4 w-4 text-brand-600" /> Bağlı görevler
-          </h2>
-          <Link href="/app/gorevler" className="text-xs font-semibold text-brand-600 hover:underline">
-            Görev merkezine git →
-          </Link>
-        </div>
-        {(tasks ?? []).length === 0 ? (
-          <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
-            Bu anlaşmaya bağlı görev yok.
-          </p>
-        ) : (
-          <ul className="mt-3 space-y-2">
-            {(tasks ?? []).map((t) => {
-              const bitti = t.status === "done" || t.status === "Tamamlandı";
-              return (
-                <li key={t.id}>
-                  <Link
-                    href={`/app/gorevler?filter=${bitti ? "done" : "open"}`}
-                    className="focus-ring flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5 transition hover:border-brand-300"
-                  >
-                    <span className={`font-medium ${bitti ? "text-text-faint line-through" : "text-ink-950"}`}>
-                      {t.title}
-                    </span>
-                    <span className="flex items-center gap-2 text-xs text-text-muted">
-                      {t.due_at ? tarih(t.due_at) : "Tarihsiz"}
-                      <Badge variant={bitti ? "success" : t.priority === "high" ? "danger" : "default"}>
-                        {bitti ? "Tamam" : (t.status ?? "Açık")}
-                      </Badge>
-                      <ArrowUpRight className="h-3.5 w-3.5" />
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
     </div>
   );
 }

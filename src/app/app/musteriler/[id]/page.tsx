@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Mail,
   MapPin,
+  MessageSquare,
   PhoneCall,
   Sparkles,
   Target,
@@ -19,7 +20,8 @@ import { EditCustomerDialog } from "./edit-customer-dialog";
 import { CustomerTagChips } from "./customer-tag-chips";
 import { fetchTenantTags } from "../tenant-tags";
 import { DeleteCustomerButton } from "./delete-customer-button";
-import { Customer360Tabs } from "./customer-360-tabs";
+import { Customer360Tabs, CUSTOMER_TAB_IDS, CUSTOMER_TAB_ALIASES } from "./customer-360-tabs";
+import { resolveTab } from "@/components/app/detail-tabs";
 import { CustomerTasks, type CustomerTaskRow } from "./customer-tasks";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 import { WaTemplateMenu } from "@/components/app/wa-template-menu";
@@ -131,7 +133,13 @@ function shortDate(iso: string) {
   return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
 }
 
-export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CustomerDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { perms, userId } = await requireModulePage("customers");
   const canEdit = (perms.customers ?? []).includes("edit");
   const canDelete = (perms.customers ?? []).includes("delete");
@@ -140,7 +148,10 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const canTaskDelete = (perms.tasks ?? []).includes("delete");
   const canTaskView = (perms.tasks ?? []).includes("view");
   const { id } = await params;
+  // Seçili sekme sunucuda çözülür; yalnız o sekmenin verisi çekilir (eski ?tab= linkleri de çalışır)
+  const tab = resolveTab(await searchParams, CUSTOMER_TAB_IDS, "ozet", CUSTOMER_TAB_ALIASES);
   const supabase = await createClient();
+  const noRows = Promise.resolve({ data: null });
 
   // Tüm sorgular yalnızca `id`'ye bağlı — müşteri sorgusu da batch'e katıldı (notFound sonra)
   const [
@@ -153,6 +164,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     { data: dealsData },
     { data: consentsData },
     { data: filesData },
+    { count: auditCount },
+    { count: filesCount },
     { data: tasksData },
     { data: commsData },
     { data: offersData },
@@ -188,12 +201,14 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .order("scheduled_at", { ascending: false })
       .limit(50),
     supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
-    supabase
-      .from("audit_logs")
-      .select("id, action, created_at")
-      .eq("entity_id", id)
-      .order("created_at", { ascending: false })
-      .limit(40),
+    tab === "gecmis"
+      ? supabase
+          .from("audit_logs")
+          .select("id, action, created_at")
+          .eq("entity_id", id)
+          .order("created_at", { ascending: false })
+          .limit(40)
+      : noRows,
     supabase
       .from("deals")
       .select("id, stage, deal_type, deal_value, updated_at")
@@ -205,11 +220,16 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .select("id, channel, status, granted_at")
       .eq("customer_id", id)
       .order("created_at", { ascending: false }),
-    supabase
-      .from("customer_files")
-      .select("id, file_name, file_size, file_type, storage_path, label, created_at, uploader:profiles!customer_files_uploaded_by_fkey(full_name)")
-      .eq("customer_id", id)
-      .order("created_at", { ascending: false }),
+    tab === "dosyalar"
+      ? supabase
+          .from("customer_files")
+          .select("id, file_name, file_size, file_type, storage_path, label, created_at, uploader:profiles!customer_files_uploaded_by_fkey(full_name)")
+          .eq("customer_id", id)
+          .order("created_at", { ascending: false })
+      : noRows,
+    // Sekme sayaçları — yalnız sayı (head), satır çekilmez
+    supabase.from("audit_logs").select("id", { count: "exact", head: true }).eq("entity_id", id),
+    supabase.from("customer_files").select("id", { count: "exact", head: true }).eq("customer_id", id),
     supabase
       .from("tasks")
       .select("id, title, kind, priority, status, due_at, completed_at")
@@ -230,12 +250,14 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .eq("customer_id", id)
       .order("created_at", { ascending: false })
       .limit(50),
-    supabase
-      .from("contracts")
-      .select("id, title, contract_type, status, signed_at, created_at")
-      .eq("customer_id", id)
-      .order("created_at", { ascending: false })
-      .limit(50),
+    tab === "zaman"
+      ? supabase
+          .from("contracts")
+          .select("id, title, contract_type, status, signed_at, created_at")
+          .eq("customer_id", id)
+          .order("created_at", { ascending: false })
+          .limit(50)
+      : noRows,
     /*
      * "Sonraki en iyi aksiyon" kartı yalnız aday portföy SAYISINI kullanıyor
      * ("N aktif portföy taranabilir"). Eskiden bunun için 100 satır, `features`
@@ -411,7 +433,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   }[];
   const doneTasks = ((tasksData ?? []) as (CustomerTaskRow & { completed_at?: string | null })[])
     .filter((t) => t.status === "done" && (t.completed_at || t.due_at));
-  const timeline: TimelineItem[] = [
+  const timeline: TimelineItem[] = tab !== "zaman" ? [] : [
     ...calls.map((c): TimelineItem => ({
       key: `call-${c.id}`,
       kind: "call",
@@ -476,8 +498,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   // Çağrı ve randevu kayıtları aktivite akışında listelenir.
   const stats = [
     { label: "Talep", value: demands.length, icon: Target, tab: "talepler" },
-    { label: "Çağrı", value: calls.length, icon: PhoneCall, tab: "aktivite" },
-    { label: "Randevu", value: appts.length, icon: CalendarDays, tab: "aktivite" },
+    { label: "Çağrı", value: calls.length, icon: PhoneCall, tab: "ozet" },
+    { label: "Randevu", value: appts.length, icon: CalendarDays, tab: "ozet" },
   ];
 
   return (
@@ -596,6 +618,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                 <Link href={`/app/randevular?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <CalendarDays className="h-4 w-4" /> Randevu ver
                 </Link>
+                <Link href={`/app/musteriler/${customer.id}?sekme=iletisim`} scroll={false} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                  <MessageSquare className="h-4 w-4" /> Not ekle
+                </Link>
                 <Link href={`/app/eslestirme?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <Target className="h-4 w-4" /> Eşleştir
                 </Link>
@@ -649,7 +674,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               {stats.map((s) => (
                 <Link
                   key={s.label}
-                  href={`/app/musteriler/${customer.id}?tab=${s.tab}`}
+                  href={`/app/musteriler/${customer.id}?sekme=${s.tab}`}
                   scroll={false}
                   className="focus-ring press group flex items-center gap-2.5 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-2 backdrop-blur transition hover:border-brand-300 hover:bg-white/10"
                 >
@@ -663,89 +688,112 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           </div>
         </div>
 
-        {/* Sonraki en iyi aksiyon — tek öneri, tek buton; kural eşleşmezse kart yok */}
-        {nba ? (
-          <div className="relative mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-mint-400/25 bg-white/[0.06] px-4 py-3 backdrop-blur">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-mint-500/15 text-mint-400">
-                <Sparkles className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs font-bold uppercase tracking-[0.08em] text-mint-400">Sonraki en iyi aksiyon</p>
-                <p className="truncate text-sm font-semibold text-white">{nba.title}</p>
-                <p className="truncate text-xs text-white/50">{nba.reason}</p>
-              </div>
-            </div>
-            {nba.externalHref ? (
-              <a
-                href={nba.externalHref}
-                className="btn-shine inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
-              >
-                <PhoneCall className="h-4 w-4" /> {nba.action}
-              </a>
-            ) : nba.href ? (
-              <Link
-                href={nba.href}
-                className="btn-shine inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
-              >
-                {nba.action} <ArrowUpRight className="h-4 w-4" />
-              </Link>
-            ) : null}
-          </div>
-        ) : null}
       </section>
 
-      {sellerPrediction ? <SellerPotentialCard prediction={sellerPrediction} /> : null}
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0">
+          <Customer360Tabs
+            customerId={customer.id}
+            customerName={customer.full_name}
+            defaultProvinceId={customer.province_id}
+            provinces={provinces ?? []}
+            transactionTypes={transactionTypeOptions}
+            propertyTypes={propertyTypeOptions}
+            urgencyOptions={demandUrgencyOptions}
+            demands={demands}
+            activity={activity}
+            timeline={timeline}
+            tags={tags}
+            notes={customer.notes}
+            source={customer.source}
+            sourceDetail={customer.lead_source_detail}
+            createdAt={customer.created_at}
+            audit={audit}
+            deals={(dealsData ?? []).map((d) => ({
+              id: d.id,
+              stage: d.stage,
+              deal_type: d.deal_type,
+              deal_value: d.deal_value != null ? Number(d.deal_value) : null,
+              updated_at: d.updated_at,
+            }))}
+            consents={consentsData ?? []}
+            files={filesData ?? []}
+            communications={(commsData ?? []) as Parameters<typeof CommunicationTimeline>[0]["initialItems"]}
+            canCreateComm={(perms.customers ?? []).includes("create")}
+            active={tab}
+            showTasks={canTaskView}
+            counts={{
+              demands: demands.length,
+              comms: commsList.length,
+              tasks: (tasksData ?? []).filter((t) => t.status === "open").length,
+              deals: (dealsData ?? []).length,
+              files: filesCount ?? 0,
+              consents: (consentsData ?? []).length,
+              audit: auditCount ?? 0,
+            }}
+            ozetSlot={
+              <>
+                {/* Portföy önerileri — yalnız Özet açıkken sorgulanır */}
+                <Suspense fallback={<MatchedSkeleton />}>
+                  <MatchedSection demands={activeDemands} />
+                </Suspense>
+                {/* Memnuniyet & Paylaşımlar — anket ve sunum yoksa bileşen kendini gizler,
+                    bu yüzden Suspense fallback'i de yok (olmayan bölümün iskeleti çizilmez). */}
+                <Suspense fallback={null}>
+                  <SatisfactionSection customerId={customer.id} appUrl={publicBase} />
+                </Suspense>
+              </>
+            }
+            tasksSlot={
+              canTaskView ? (
+                <CustomerTasks
+                  customerId={customer.id}
+                  tasks={(tasksData ?? []) as CustomerTaskRow[]}
+                  canCreate={canTaskCreate}
+                  canEdit={canTaskEdit}
+                  canDelete={canTaskDelete}
+                />
+              ) : null
+            }
+          />
+        </div>
 
-      <Customer360Tabs
-        customerId={customer.id}
-        customerName={customer.full_name}
-        defaultProvinceId={customer.province_id}
-        provinces={provinces ?? []}
-        transactionTypes={transactionTypeOptions}
-        propertyTypes={propertyTypeOptions}
-        urgencyOptions={demandUrgencyOptions}
-        demands={demands}
-        activity={activity}
-        timeline={timeline}
-        tags={tags}
-        notes={customer.notes}
-        source={customer.source}
-        sourceDetail={customer.lead_source_detail}
-        createdAt={customer.created_at}
-        audit={audit}
-        deals={(dealsData ?? []).map((d) => ({
-          id: d.id,
-          stage: d.stage,
-          deal_type: d.deal_type,
-          deal_value: d.deal_value != null ? Number(d.deal_value) : null,
-          updated_at: d.updated_at,
-        }))}
-        consents={consentsData ?? []}
-        files={filesData ?? []}
-        communications={(commsData ?? []) as Parameters<typeof CommunicationTimeline>[0]["initialItems"]}
-        canCreateComm={(perms.customers ?? []).includes("create")}
-      />
-
-      {/* Memnuniyet & Paylaşımlar — anket ve sunum yoksa bileşen kendini gizler,
-          bu yüzden Suspense fallback'i de yok (olmayan bölümün iskeleti çizilmez). */}
-      <Suspense fallback={null}>
-        <SatisfactionSection customerId={customer.id} appUrl={publicBase} />
-      </Suspense>
-
-      {canTaskView ? (
-        <CustomerTasks
-          customerId={customer.id}
-          tasks={(tasksData ?? []) as CustomerTaskRow[]}
-          canCreate={canTaskCreate}
-          canEdit={canTaskEdit}
-          canDelete={canTaskDelete}
-        />
-      ) : null}
-
-      <Suspense fallback={<MatchedSkeleton />}>
-        <MatchedSection demands={activeDemands} />
-      </Suspense>
+        {/* Sağ sütun — her sekmede görünür: sonraki en iyi eylem + satıcı potansiyeli */}
+        <aside aria-label="Özet ve sonraki eylem" className="space-y-4 lg:sticky lg:top-4">
+          {nba ? (
+            <section className="rounded-[var(--radius-panel)] border border-mint-500/30 bg-surface p-4 shadow-[var(--shadow-xs)]">
+              <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-mint-600">
+                <Sparkles className="h-3.5 w-3.5" /> Sonraki en iyi eylem
+              </p>
+              <p className="mt-2 text-sm font-semibold text-ink-950">{nba.title}</p>
+              <p className="mt-1 text-xs text-text-muted">{nba.reason}</p>
+              {nba.externalHref ? (
+                <a
+                  href={nba.externalHref}
+                  className="btn-shine mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  <PhoneCall className="h-4 w-4" /> {nba.action}
+                </a>
+              ) : nba.href ? (
+                <Link
+                  href={nba.href}
+                  className="btn-shine mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  {nba.action} <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              ) : null}
+            </section>
+          ) : (
+            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-muted">Sonraki en iyi eylem</p>
+              <p className="mt-2 text-sm text-text-muted">
+                {customer.blacklist ? "Kara listedeki müşteri için eylem önerilmez." : "Şu an için önerilen bir eylem yok."}
+              </p>
+            </section>
+          )}
+          {sellerPrediction ? <SellerPotentialCard prediction={sellerPrediction} /> : null}
+        </aside>
+      </div>
     </div>
   );
 }

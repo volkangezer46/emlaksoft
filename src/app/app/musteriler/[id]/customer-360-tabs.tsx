@@ -1,15 +1,14 @@
-"use client";
-
-import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
-  Activity,
   ArrowUpRight,
   CalendarDays,
   FileText,
   Folder,
   Handshake,
   History,
+  LayoutDashboard,
+  ListChecks,
   MessageSquare,
   PhoneCall,
   Plus,
@@ -21,7 +20,8 @@ import {
 import { ButtonLink } from "@/components/ui/button";
 import { DemandStatusButtons } from "./demand-status-buttons";
 import { EditDemandDialog } from "./edit-demand-dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DetailTabs, type DetailTabDef } from "@/components/app/detail-tabs";
+import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import { CustomerFilesTab } from "./customer-files-tab";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
 import { CustomerTimelineTab, type TimelineItem } from "./customer-timeline-tab";
@@ -75,18 +75,28 @@ function dateTime(iso: string) {
   return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
 }
 
-const tabs = [
-  // "Zaman tüneli" ilk sırada; varsayılan seçili sekme yine "talepler" (aşağıdaki fallback)
-  { id: "zaman",    label: "Zaman tüneli", icon: History },
-  { id: "talepler",  label: "Talepler",   icon: Target },
-  { id: "anlasmalar", label: "Anlaşmalar", icon: Handshake },
-  { id: "iletisim", label: "İletişim",   icon: MessageSquare },
-  { id: "dosyalar", label: "Dosyalar",   icon: Folder },
-  { id: "izinler",  label: "İYS",        icon: ShieldCheck },
-  { id: "aktivite", label: "Aktivite",   icon: Activity },
-  { id: "notlar",   label: "Notlar",     icon: Sparkles },
-  { id: "gecmis",   label: "Geçmiş",     icon: FileText },
+/**
+ * Sekme kimlikleri (URL: ?sekme=). Eski `?tab=` linkleri de çalışır:
+ * "aktivite" → özet (aktivite akışı artık Özet'te).
+ */
+export const CUSTOMER_TAB_IDS = [
+  "ozet",
+  "talepler",
+  "zaman",
+  "iletisim",
+  "gorevler",
+  "anlasmalar",
+  "dosyalar",
+  "izinler",
+  "notlar",
+  "gecmis",
 ] as const;
+export const CUSTOMER_TAB_ALIASES: Record<string, string> = { aktivite: "ozet" };
+
+/** Aktif olmayan sekmenin içeriği (ve onun async bölümleri) hiç çizilmez. */
+function Pane({ id, active, children }: { id: string; active: string; children: ReactNode }) {
+  return active === id ? <div className="space-y-4">{children}</div> : null;
+}
 
 type DealRow = {
   id: string;
@@ -127,8 +137,6 @@ type FileRow = {
   uploader: { full_name?: string } | { full_name?: string }[] | null;
 };
 
-type TabId = (typeof tabs)[number]["id"];
-
 export function Customer360Tabs({
   customerId,
   provinces,
@@ -146,6 +154,11 @@ export function Customer360Tabs({
   files = [],
   communications = [],
   canCreateComm = false,
+  active,
+  counts,
+  showTasks = true,
+  ozetSlot,
+  tasksSlot,
 }: {
   customerId: string;
   customerName: string;
@@ -168,22 +181,14 @@ export function Customer360Tabs({
   files?: FileRow[];
   communications?: CommRow[];
   canCreateComm?: boolean;
+  /** Seçili sekme (sunucuda çözülür); yalnız bu sekmenin içeriği çizilir. */
+  active: string;
+  counts: { demands: number; comms: number; tasks: number | null; deals: number; files: number; consents: number; audit: number };
+  showTasks?: boolean;
+  /** Özet sekmesinin akan bölümleri (portföy önerileri + memnuniyet) — yalnız aktifken çizilir. */
+  ozetSlot?: ReactNode;
+  tasksSlot?: ReactNode;
 }) {
-  /*
-   * Sekme durumu URL'den (?tab=) okunur: hero istatistik kutuları ve dış
-   * sayfalar (örn. /app/talepler kartı) belirli bir sekmeye link verebilsin.
-   * Sekme değişiminde replaceState kullanılır — Next router'a entegre olduğu
-   * için useSearchParams güncellenir ama sunucuya yeniden istek gitmez.
-   */
-  const searchParams = useSearchParams();
-  const spTab = searchParams.get("tab");
-  const tab: TabId = tabs.some((t) => t.id === spTab) ? (spTab as TabId) : "talepler";
-  function setTab(next: TabId) {
-    const url = new URL(window.location.href);
-    url.searchParams.set("tab", next);
-    window.history.replaceState(null, "", url);
-  }
-
   const stageLabel: Record<string, string> = {
     new: "Yeni",
     qualified: "Nitelikli",
@@ -198,53 +203,28 @@ export function Customer360Tabs({
     call: "Arama",
   };
 
+  const tabDefs: DetailTabDef[] = [
+    { id: "ozet", label: "Özet", icon: LayoutDashboard, count: activity.length },
+    { id: "talepler", label: "Talepler", icon: Target, count: counts.demands },
+    { id: "zaman", label: "Zaman tüneli", icon: History },
+    { id: "iletisim", label: "İletişim", icon: MessageSquare, count: counts.comms },
+    { id: "gorevler", label: "Görevler", icon: ListChecks, count: counts.tasks, hidden: !showTasks },
+    { id: "anlasmalar", label: "Anlaşmalar", icon: Handshake, count: counts.deals },
+    { id: "dosyalar", label: "Dosyalar", icon: Folder, count: counts.files },
+    { id: "izinler", label: "İYS", icon: ShieldCheck, count: counts.consents },
+    { id: "notlar", label: "Notlar", icon: Sparkles },
+    { id: "gecmis", label: "Geçmiş", icon: FileText, count: counts.audit },
+  ];
+
   return (
-    <Tabs
-      value={tab}
-      onValueChange={(v) => setTab(v as TabId)}
-      className="space-y-4"
-    >
-      {/*
-        Elle yazilmis butonlardan Radix Tabs'e gecildi. Onceki halde EKSIK OLANLAR:
-          - role="tablist" / role="tab" / role="tabpanel" ve aria-selected
-          - ok tuslariyla sekmeler arasi gezinme (WAI-ARIA sekme deseninin
-            temel gereksinimi; Tab tusu sekme cubugundan CIKAR, icerige gecer)
-          - aria-controls / aria-labelledby baglantisi
-        Gorunum korundu: hap seklindeki sekmeler, sayaclar ve ikonlar ayni.
-      */}
-      <TabsList className="flex-wrap border-0 bg-transparent p-0">
-        {tabs.map((t) => {
-          const count =
-            t.id === "zaman"      ? timeline.length
-            : t.id === "talepler"   ? demands.length
-            : t.id === "anlasmalar" ? deals.length
-            : t.id === "iletisim" ? communications.length
-            : t.id === "dosyalar" ? (files ?? []).length
-            : t.id === "izinler"  ? consents.length
-            : t.id === "aktivite" ? activity.length
-            : t.id === "gecmis"   ? audit.length
-            : null;
-          return (
-            <TabsTrigger
-              key={t.id}
-              value={t.id}
-              className="group focus-ring rounded-full border border-line bg-surface px-3.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-400 data-[state=active]:border-brand-600 data-[state=active]:bg-brand-600 data-[state=active]:text-white data-[state=active]:shadow-none [&_svg]:h-3.5 [&_svg]:w-3.5"
-            >
-              <t.icon />
-              {t.label}
-              {count != null ? (
-                <span className="text-text-faint transition-colors group-data-[state=active]:text-white/70">{count}</span>
-              ) : null}
-            </TabsTrigger>
-          );
-        })}
-      </TabsList>
+    <div className="space-y-4">
+      <DetailTabs basePath={`/app/musteriler/${customerId}`} tabs={tabDefs} active={active} label="Müşteri sekmeleri" />
 
-      <TabsContent value="zaman">
+      <Pane id="zaman" active={active}>
         <CustomerTimelineTab items={timeline} />
-      </TabsContent>
+      </Pane>
 
-      <TabsContent value="talepler">
+      <Pane id="talepler" active={active}>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -253,9 +233,7 @@ export function Customer360Tabs({
             <ButtonLink href={`/app/musteriler/${customerId}/talep/yeni`} size="sm" icon={Plus}>Talep ekle</ButtonLink>
           </div>
           {demands.length === 0 ? (
-            <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
-              Bu müşteri için henüz talep tanımlanmadı.
-            </p>
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteri için henüz talep tanımlanmadı." />
           ) : (
             <div className="mt-4 space-y-3">
               {demands.map((d) => (
@@ -286,9 +264,9 @@ export function Customer360Tabs({
             </div>
           )}
         </section>
-      </TabsContent>
+      </Pane>
 
-      <TabsContent value="anlasmalar">
+      <Pane id="anlasmalar" active={active}>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -299,9 +277,7 @@ export function Customer360Tabs({
             </Link>
           </div>
           {deals.length === 0 ? (
-            <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
-              Bu müşteriye bağlı anlaşma yok.
-            </p>
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı anlaşma yok." />
           ) : (
             <div className="mt-4 space-y-2">
               {deals.map((d) => (
@@ -327,19 +303,19 @@ export function Customer360Tabs({
             </div>
           )}
         </section>
-      </TabsContent>
+      </Pane>
 
-      <TabsContent value="iletisim">
+      <Pane id="iletisim" active={active}>
         <CommunicationTimeline
           customerId={customerId}
           initialItems={communications}
           canCreate={canCreateComm}
         />
-      </TabsContent>
+      </Pane>
 
-      <TabsContent value="dosyalar"><CustomerFilesTab customerId={customerId} files={files ?? []} /></TabsContent>
+      <Pane id="dosyalar" active={active}><CustomerFilesTab customerId={customerId} files={files ?? []} /></Pane>
 
-      <TabsContent value="izinler">
+      <Pane id="izinler" active={active}>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -350,9 +326,7 @@ export function Customer360Tabs({
             </Link>
           </div>
           {consents.length === 0 ? (
-            <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
-              Kayıtlı ticari ileti izni yok.
-            </p>
+            <EmptyStateV3 variant="compact" className="mt-4" title="Kayıtlı ticari ileti izni yok." />
           ) : (
             <div className="mt-4 space-y-2">
               {consents.map((c) => (
@@ -377,17 +351,15 @@ export function Customer360Tabs({
             </div>
           )}
         </section>
-      </TabsContent>
+      </Pane>
 
-      <TabsContent value="aktivite">
+      <Pane id="ozet" active={active}>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <PhoneCall className="h-4 w-4 text-mint-600" /> Aktivite akışı
           </h2>
           {activity.length === 0 ? (
-            <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
-              Henüz çağrı veya randevu kaydı yok.
-            </p>
+            <EmptyStateV3 variant="compact" className="mt-4" title="Henüz çağrı veya randevu kaydı yok." />
           ) : (
             <div className="mt-4 space-y-3">
               {activity.map((a) => (
@@ -405,9 +377,12 @@ export function Customer360Tabs({
             </div>
           )}
         </section>
-      </TabsContent>
+      {ozetSlot}
+      </Pane>
 
-      <TabsContent value="notlar">
+      <Pane id="gorevler" active={active}>{tasksSlot}</Pane>
+
+      <Pane id="notlar" active={active}>
         <div className="space-y-4">
           {tags.length > 0 ? (
             <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
@@ -440,17 +415,15 @@ export function Customer360Tabs({
             </div>
           </section>
         </div>
-      </TabsContent>
+      </Pane>
 
-      <TabsContent value="gecmis">
+      <Pane id="gecmis" active={active}>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <FileText className="h-4 w-4 text-brand-600" /> İşlem geçmişi
           </h2>
           {audit.length === 0 ? (
-            <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
-              Henüz denetim kaydı yok. Yeni düzenlemeler burada görünecek.
-            </p>
+            <EmptyStateV3 variant="compact" className="mt-4" title="Henüz denetim kaydı yok. Yeni düzenlemeler burada görünecek." />
           ) : (
             <div className="mt-4 space-y-2">
               {audit.map((a) => (
@@ -462,7 +435,7 @@ export function Customer360Tabs({
             </div>
           )}
         </section>
-      </TabsContent>
-    </Tabs>
+      </Pane>
+    </div>
   );
 }
