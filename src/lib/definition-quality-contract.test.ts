@@ -15,7 +15,7 @@ describe("definition management quality contract", () => {
   });
 
   it("checks every update and delete actually affected an office-owned row", () => {
-    expect(action.match(/\.select\("id"\)\s*\.maybeSingle\(\)/g)).toHaveLength(3);
+    expect(action.match(/\.select\("id"\)\s*\.maybeSingle\(\)/g)).toHaveLength(4); // toggle, rename, color, delete
     expect(action).toContain("Tanım bulunamadı veya sistem tanımı değiştirilemez.");
     expect(action).toContain("Tanım bulunamadı veya sistem tanımı silinemez.");
   });

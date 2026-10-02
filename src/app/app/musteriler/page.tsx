@@ -34,7 +34,7 @@ import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { NewCustomerDialog } from "./new-customer-dialog";
-import { getDefinitions } from "@/lib/definitions";
+import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { CustomerRowDelete } from "./customer-row-delete";
 import { CustomerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import {
@@ -92,20 +92,6 @@ type OccasionRow = {
   anniversary_date: string | null;
   anniversary_note: string | null;
 };
-
-const SOURCE_LABELS: Record<string, string> = {
-  referral:    "Referans",
-  web:         "Web sitesi",
-  social:      "Sosyal medya",
-  walk_in:     "Elden geldi",
-  phone:       "Telefon",
-  portal:      "Portal",
-  other:       "Diğer",
-};
-
-const CUSTOMER_TYPES = [
-  "Alıcı", "Satıcı", "Kiracı", "Mülk sahibi", "Yatırımcı",
-];
 
 /** Sayfa başına kayıt — gerçek sayfalama, 500'lük dilim yerine. */
 const PAGE_SIZE = 50;
@@ -372,15 +358,15 @@ export default async function CustomersPage({
       .limit(2000),
     // Etiket filtresi + toplu etiketleme önerileri — tenant'taki distinct etiketler
     fetchTenantTags(supabase),
-    getDefinitions("customer_type"),
-    getDefinitions("customer_source"),
+    getDefinitionsOrDefault("customer_type"),
+    getDefinitionsOrDefault("customer_source"),
     savedViewsPromise,
   ]);
 
-  // DB-driven tanımlar (boşsa sabit yedeğe düş)
-  const customerTypes = typeDefs.length > 0 ? typeDefs : CUSTOMER_TYPES.map((t) => ({ value: t, label: t, color: null }));
+  // DB-driven tanımlar (boşsa definition-defaults.ts yedeği getDefinitionsOrDefault içinde)
+  const customerTypes = typeDefs;
   const customerTypeValues = customerTypes.map((t) => t.value);
-  const sourceEntries = sourceDefs.length > 0 ? sourceDefs.map((s) => [s.value, s.label] as const) : Object.entries(SOURCE_LABELS);
+  const sourceEntries = sourceDefs.map((s) => [s.value, s.label] as const);
 
   // ---- Sıcaklık skorlama (tek toplu RPC — N+1 yok) ------------------------
   const poolRows = (heatPool ?? []) as unknown as HeatPoolRow[];

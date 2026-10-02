@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+import { getDefinitionsOrDefault } from "@/lib/definitions";
+import { isDefinitionCategory, isSystemDefinitionValue } from "@/lib/definition-defaults";
+import { addDefinition, deleteDefinition, renameDefinition } from "@/app/actions/definitions";
 
 const MANUAL_STATUSES = [
   "draft", "pending_docs", "pending_auth", "photo_needed", "ready", "active",
@@ -125,7 +128,22 @@ export async function getExpiringAuthorizations(daysAhead = 15) {
 // P1-6: Lookup değerleri
 // ---------------------------------------------------------------------------
 
+/**
+ * ADAPTÖR: `definitions` tablosuyla çakışan kategoriler (property_type,
+ * transaction_type, ...) artık tek kaynaktan (definitions) okunur/yazılır.
+ * Yalnız definitions'ta karşılığı olmayan kategoriler (heating_type vb.)
+ * `lookup_values` tablosunda kalır. Çıktı şeması eski lookup şemasıyla aynıdır.
+ */
 export async function getLookupValues(category: string) {
+  if (isDefinitionCategory(category)) {
+    const defs = await getDefinitionsOrDefault(category);
+    return defs.map((d, i) => ({
+      value: d.value,
+      label: d.label,
+      sort_order: i + 1,
+      is_system: isSystemDefinitionValue(category, d.value),
+    }));
+  }
   const supabase = await createClient();
   const { data } = await supabase
     .from("lookup_values")
@@ -137,6 +155,18 @@ export async function getLookupValues(category: string) {
   return data ?? [];
 }
 
+async function findOwnDefinitionId(tenantId: string, category: string, value: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("definitions")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("category", category)
+    .eq("value", value)
+    .maybeSingle();
+  return (data?.id as string | undefined) ?? null;
+}
+
 export async function upsertLookupValue(
   category: string,
   value: string,
@@ -145,6 +175,20 @@ export async function upsertLookupValue(
 ): Promise<PropertyActionResult> {
   const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return { error: gate.error };
+
+  if (isDefinitionCategory(category)) {
+    const existing = await findOwnDefinitionId(gate.tenantId, category, value);
+    if (existing) {
+      const res = await renameDefinition(existing, label);
+      return res.error ? { error: res.error } : { ok: true };
+    }
+    const fd = new FormData();
+    fd.set("category", category);
+    fd.set("value", value);
+    fd.set("label", label);
+    const res = await addDefinition({}, fd);
+    return res.error ? { error: res.error } : { ok: true };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -172,6 +216,13 @@ export async function deleteLookupValue(
 ): Promise<PropertyActionResult> {
   const gate = await requirePermission("settings", "delete");
   if (!gate.ok) return { error: gate.error };
+
+  if (isDefinitionCategory(category)) {
+    const existing = await findOwnDefinitionId(gate.tenantId, category, value);
+    if (!existing) return { error: "Değer bulunamadı veya sistem değeri silinemez." };
+    const res = await deleteDefinition(existing);
+    return res.error ? { error: res.error } : { ok: true };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase

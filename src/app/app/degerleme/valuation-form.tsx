@@ -7,20 +7,23 @@ import { useToast } from "@/components/app/toast-provider";
 import { GeoSelect } from "@/components/app/geo-select";
 import { Combobox } from "@/components/ui/combobox";
 import { searchProperties } from "@/app/actions/lookup";
+import { defaultDefinitionValues } from "@/lib/definition-defaults";
 
 type Prop = { id: string; property_code: string; title: string | null; list_price: number | null };
 type Province = { id: string; name: string };
 
-const PROPERTY_TYPES = ["Daire", "Villa", "Arsa", "İşyeri", "Müstakil ev", "Bina"];
+const DEFAULT_PROPERTY_TYPES = defaultDefinitionValues("property_type");
 
 export function ValuationForm({
   properties,
   provinces,
   defaultPropertyId,
+  propertyTypes = DEFAULT_PROPERTY_TYPES,
 }: {
   properties: Prop[];
   provinces: Province[];
   defaultPropertyId?: string;
+  propertyTypes?: string[];
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -89,7 +92,7 @@ export function ValuationForm({
             <label htmlFor="valuation-property-type" className="mb-1.5 block text-sm text-text-muted">Portföy türü</label>
             <select id="valuation-property-type" name="property_type" defaultValue="" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm">
               <option value="">Fark etmez</option>
-              {PROPERTY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              {propertyTypes.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           <div>

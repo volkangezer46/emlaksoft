@@ -6,8 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { exportExpensesCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { listExpenses } from "@/app/actions/expenses";
-import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
-import { getDefinitions } from "@/lib/definitions";
+import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { requireReportingData } from "@/lib/reporting/result";
 import { EmptyState } from "@/components/app/empty-state";
 import { ChartFrame } from "@/app/app/_ui/lazy-chart";
@@ -76,7 +75,7 @@ export default async function GiderlerPage({
     // liste görünümü için 200 kayıt tavanı yeterli, ama toplam/tutar asla bu
     // tavana bağlı olmamalı (bkz. tenant_expense_aggregates).
     listExpenses(undefined, { from: fromF ?? undefined, to: toF ?? undefined }),
-    getDefinitions("expense_category"),
+    getDefinitionsOrDefault("expense_category"),
     supabase.rpc("tenant_expense_aggregates", { p_from: fromF, p_to: toF, p_as_of: now.toISOString() }),
   ]);
   const aggregate = requireReportingData("tenant-expense-aggregates", aggregateResult) as unknown as {
@@ -89,8 +88,8 @@ export default async function GiderlerPage({
   const canEdit = perms.expenses?.includes("edit") ?? false;
   const canDelete = perms.expenses?.includes("delete") ?? false;
 
-  // DB-driven gider kategorileri (boşsa sabit yedeğe düş)
-  const categories = catDefs.length > 0 ? catDefs.map((c) => ({ value: c.value, label: c.label })) : EXPENSE_CATEGORIES;
+  // DB-driven gider kategorileri (boşsa definition-defaults.ts yedeği)
+  const categories = catDefs.map((c) => ({ value: c.value, label: c.label }));
   const catLabel = (v: string) => categories.find((c) => c.value === v)?.label ?? v;
 
   // ?kategori= sunucu filtresi — yalnızca tanımlı kategori değerleri kabul edilir

@@ -2,22 +2,10 @@ import Link from "next/link";
 import { ArrowLeft, ListTree } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
+import { DEFINITION_CATEGORIES } from "@/lib/definition-defaults";
 import { DefinitionsManager, type DefRow } from "./definitions-manager";
 
 export const metadata = { title: "Tanımlar" };
-
-const CATEGORY_LABELS: Record<string, string> = {
-  customer_type: "Müşteri tipi",
-  customer_source: "Müşteri kaynağı",
-  property_type: "Portföy tipi",
-  transaction_type: "İşlem tipi",
-  contract_type: "Sözleşme tipi",
-  expense_category: "Gider kategorisi",
-  appointment_type: "Randevu tipi",
-  demand_urgency: "Talep aciliyeti",
-  ticket_category: "Destek kategorisi",
-};
-const ORDER = ["customer_type", "customer_source", "property_type", "transaction_type", "contract_type", "expense_category", "appointment_type", "demand_urgency", "ticket_category"];
 
 export default async function DefinitionsPage() {
   const { tenantId } = await requireModulePage("settings");
@@ -39,10 +27,10 @@ export default async function DefinitionsPage() {
     byCat.get(r.category)!.push(r);
   }
 
-  const categories = ORDER.filter((c) => byCat.has(c) || true).map((c) => ({
-    key: c,
-    label: CATEGORY_LABELS[c] ?? c,
-    items: byCat.get(c) ?? [],
+  const categories = DEFINITION_CATEGORIES.map((c) => ({
+    key: c.key,
+    label: c.label,
+    items: byCat.get(c.key) ?? [],
   }));
 
   return (

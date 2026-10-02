@@ -15,6 +15,7 @@ import { useToast } from "@/components/app/toast-provider";
 import { LatLngPicker } from "@/components/app/lat-lng-picker";
 import { GeoSelect } from "@/components/app/geo-select";
 import { HEATING_OPTIONS, FACADE_OPTIONS } from "@/app/app/portfoyler/new-property-dialog";
+import { defaultDefinitionValues, LEGACY_TRANSACTION_TYPE_VALUES } from "@/lib/definition-defaults";
 
 type Province = { id: string; name: string };
 
@@ -52,8 +53,8 @@ type Props = {
 const field =
   "mt-1.5 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400";
 
-const DEFAULT_TRANSACTION_TYPES = ["Satılık", "Kiralık", "sale", "rent"];
-const DEFAULT_PROPERTY_TYPES = ["Daire", "Villa", "Arsa", "İşyeri", "Diğer"];
+const DEFAULT_TRANSACTION_TYPES = [...defaultDefinitionValues("transaction_type"), ...LEGACY_TRANSACTION_TYPE_VALUES];
+const DEFAULT_PROPERTY_TYPES = defaultDefinitionValues("property_type");
 
 export function EditPropertyDialog({
   property,

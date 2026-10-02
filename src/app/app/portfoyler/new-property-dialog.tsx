@@ -20,6 +20,7 @@ import {
 import { LatLngPicker } from "@/components/app/lat-lng-picker";
 import { GeoSelect } from "@/components/app/geo-select";
 import { useQueryDialog } from "@/components/app/use-query-dialog";
+import { defaultDefinitionValues } from "@/lib/definition-defaults";
 
 type Province = { id: string; name: string };
 type Branch = { id: string; name: string };
@@ -27,8 +28,8 @@ type Branch = { id: string; name: string };
 const fieldClass =
   "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
-const DEFAULT_PROPERTY_TYPES = ["Daire", "Villa", "Arsa", "İşyeri", "Müstakil ev", "Bina"];
-const DEFAULT_TRANSACTION_TYPES = ["Satılık", "Kiralık"];
+const DEFAULT_PROPERTY_TYPES = defaultDefinitionValues("property_type");
+const DEFAULT_TRANSACTION_TYPES = defaultDefinitionValues("transaction_type");
 
 /** Isınma türleri — sabit liste (portallerde filtrelenen standart değerler). */
 export const HEATING_OPTIONS = [

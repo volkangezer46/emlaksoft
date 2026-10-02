@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { CalendarClock, TriangleAlert } from "lucide-react";
 import { updateAppointment } from "@/app/actions/appointments";
+import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
 import {
   Dialog,
   DialogClose,
@@ -21,12 +22,7 @@ type Appointment = {
   notes: string | null;
 };
 
-const DEFAULT_TYPES: TypeOption[] = [
-  { value: "showing", label: "Yer gösterme" },
-  { value: "office", label: "Ofis görüşmesi" },
-  { value: "valuation", label: "Değerleme" },
-  { value: "contract", label: "Sözleşme" },
-];
+const DEFAULT_TYPES: TypeOption[] = [...DEFAULT_DEFINITIONS.appointment_type];
 
 // UTC ISO → yerel tarih & saat parçaları (kaymayı önlemek için yerel bileşenler)
 function localParts(iso: string) {
