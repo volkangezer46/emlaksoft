@@ -6,10 +6,10 @@
 > bölümündeki dosyalara bakılır.
 
 > [!IMPORTANT]
-> 13 Ağustos 2026 uçtan uca denetimin güncel ve bağlayıcı kaydı
-> `docs/AUDIT_2026-08-13.md` dosyasındadır. Public Git geçmişindeki aktif
-> secret olayı ve canlı DB migration drift'i çözülmeden commit, push, migration veya deploy
-> yapılmamalıdır.
+> Güncel durum: `docs/DURUM.md` · tek yol haritası: `docs/ROADMAP.md` · deploy: `docs/DEPLOY.md`.
+> 13 Ağustos 2026 denetim kaydı `docs/AUDIT_2026-08-13.md` (tarihsel). Secret döndürme ve yedek
+> doğrulaması hâlâ açık maddelerdir (sahip sorumluluğu, bkz. ROADMAP P0); migration ve deploy
+> yalnız `docs/DEPLOY.md` sırasıyla yapılır.
 
 ## Proje nedir
 
@@ -25,8 +25,7 @@ sitesi) ve token'lı public portallar (malik/müşteri/imza/ödeme).
 
 ## Şu anki durum (bu dosyayı güncel tutmak için tarih: kontrol et)
 
-Projenin önceki sürümü canlıda ve proje aktif geliştirme altında; 13 Ağustos denetim/yayın
-adayı henüz canlıya alınmadı. Genellikle **birden fazla oturum/araç aynı
+Uygulama canlıda ve aktif geliştirme altında (bugünün sayıları: `docs/DURUM.md`). Genellikle **birden fazla oturum/araç aynı
 anda** bu depoda çalışıyor olabilir (ör. bir tarafta güvenlik sertleştirme migration'ları
 yazılırken diğer tarafta UI işi yapılabilir) — çalışmaya başlamadan önce `git status` ve
 `git log --oneline -20` ile gerçek durumu doğrula, bu dosyadaki özete körü körüne güvenme.
@@ -59,13 +58,13 @@ butonları; ortak parola kullanılmaz, kimlik bilgisi sunucu sırrından türeti
 |---|---|
 | AI çalışma kuralları (breaking changes uyarısı, dokümantasyon okuma zorunluluğu) | `AGENTS.md` |
 | Mimari/harita, komutlar, yetki modeli, modül ekleme kuralları | `CLAUDE.md`, `ARCHITECTURE.md` |
-| Yol haritası / faz durumu | `ROADMAP.md` → `docs/MASTER_PLAN.md`, `docs/ROADMAP_V2.md` |
+| Yol haritası (tek kaynak) / bugünün durumu | `docs/ROADMAP.md`, `docs/DURUM.md` |
 | Açık iş listesi / özellik envanteri | `TASKS.md` → `docs/OZELLIK_MASTER_LISTESI.md` |
 | Değişiklik geçmişi | `CHANGELOG.md` |
-| Deploy rehberi | `DEPLOY_CHECKLIST.md`, `docs/DEPLOY_CHECKLIST.md` |
+| Deploy rehberi | `docs/DEPLOY.md` |
 | Güncel uçtan uca denetim/yayın kararı | `docs/AUDIT_2026-08-13.md` |
-| Önceki release-hardening devir kaydı | `docs/DEVIR_2026-08-10_RELEASE_HARDENING.md` |
-| Geçmiş oturumların tarihsel devir notları | `docs/DEVIR_NOTU.md`, `DEVIR_TESLIM.md` |
+| Önceki release-hardening devir kaydı (arşiv) | `docs/arsiv/DEVIR_2026-08-10_RELEASE_HARDENING.md` |
+| Geçmiş oturumların tarihsel devir notları (arşiv) | `docs/arsiv/DEVIR_NOTU.md`, `docs/arsiv/DEVIR_TESLIM.md` |
 | Güvenlik açığı bildirimi | `SECURITY.md` |
 
 ## Önemli davranış kuralları (özet — tam liste `CLAUDE.md`'de)

@@ -1,8 +1,8 @@
 # TASKS.md — EmlakSoft
 
 > Görev takibi bu depoda üç seviyede yapılır: (1) uzun-vadeli/kapsamlı envanter
-> `docs/OZELLIK_MASTER_LISTESI.md`'de, (2) faz/dalga durumu `docs/MASTER_PLAN.md` +
-> `ROADMAP.md`'de, (3) bu dosya — **kısa vadeli, tarihli anlık görüntü** (snapshot).
+> `docs/OZELLIK_MASTER_LISTESI.md`'de, (2) faz/dalga durumu `docs/ROADMAP.md` (tek yol haritası) +
+> `docs/DURUM.md`'de, (3) bu dosya — **kısa vadeli, tarihli anlık görüntü** (snapshot).
 > Yeni bir oturum açan AI, işe başlamadan önce `git log --oneline -20` ve
 > `git status --short` ile gerçek durumu doğrulamalı; bu dosya bir başlangıç noktasıdır,
 > tek doğruluk kaynağı değildir.
@@ -73,7 +73,7 @@ dalgası) sonrası tespit edilen punch-list, "hepsini sırayla yap" talimatıyla
   (`src/app/api/webhooks/meta/route.ts` içinde `STUB:` işaretli).
 
 Tam liste ve öncelik sıralaması için ilgili oturumun sohbet kaydına veya
-`docs/DEVIR_NOTU.md`'ye bakılabilir.
+`docs/arsiv/DEVIR_NOTU.md`'ye bakılabilir.
 
 ## Uzun vadeli envanter
 
