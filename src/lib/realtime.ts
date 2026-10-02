@@ -13,7 +13,6 @@
  *   açılmaz ve zil bileşeni tenant/user bilgisi taşımak zorunda kalmaz.
  */
 
-import { createClient } from "@/lib/supabase/client";
 import type { RealtimePostgresInsertPayload } from "@supabase/supabase-js";
 
 export function subscribeToInserts<T extends Record<string, unknown>>(opts: {
@@ -24,22 +23,33 @@ export function subscribeToInserts<T extends Record<string, unknown>>(opts: {
   filter?: string;
   onInsert: (row: T) => void;
 }): () => void {
-  const supabase = createClient();
-  const channel = supabase
-    .channel(opts.channel)
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: opts.table,
-        ...(opts.filter ? { filter: opts.filter } : {}),
-      },
-      (payload: RealtimePostgresInsertPayload<T>) => opts.onInsert(payload.new),
-    )
-    .subscribe();
+  // supabase-js (~100 KB) yalnızca abonelik gerçekten kurulurken indirilir; bu
+  // modülü import eden zil gibi bileşenler paketi şişirmez.
+  let cancelled = false;
+  let cleanup: (() => void) | null = null;
+  void import("@/lib/supabase/client").then(({ createClient }) => {
+    if (cancelled) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel(opts.channel)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: opts.table,
+          ...(opts.filter ? { filter: opts.filter } : {}),
+        },
+        (payload: RealtimePostgresInsertPayload<T>) => opts.onInsert(payload.new),
+      )
+      .subscribe();
+    cleanup = () => {
+      void supabase.removeChannel(channel);
+    };
+  });
   return () => {
-    void supabase.removeChannel(channel);
+    cancelled = true;
+    cleanup?.();
   };
 }
 
