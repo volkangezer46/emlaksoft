@@ -7,6 +7,7 @@ import { DashboardWidgetProvider } from "./dashboard-widgets";
 import { buildHomeBounds, type HomeCtx } from "./_home/data";
 import { BlokIskelet, PanelIskelet } from "./_home/ortak";
 import { SayfaBasligi, TvUst, OrnekVeri, YetkiUyari } from "./_home/ust-bolum";
+import { BosOfisKapisi, KurulumSeridi } from "./_home/baslayalim";
 import { DuyuruSatiri } from "./_home/duyuru-satiri";
 import { BugunOzet } from "./_home/bugun-ozet";
 import { Gorevler } from "./_home/gorevler";
@@ -80,6 +81,14 @@ export default async function AppHomePage({
           </Suspense>
         )}
 
+        {/* Kurulum tamamlanana kadar ilerleme şeridi (TV modunda yok) */}
+        <Suspense fallback={null}>
+          <KurulumSeridi ctx={ctx} />
+        </Suspense>
+
+        {/* Müşteri + portföy yokken tüm dolu bloklar yerine tek "Başlayalım" kartı */}
+        <Suspense fallback={<PanelIskelet rows={2} />}>
+          <BosOfisKapisi ctx={ctx}>
         {/* Ürün turu hedefi: bugünün işleri */}
         <div data-tour="brifing">
           <Suspense fallback={<PanelIskelet rows={2} />}>
@@ -156,6 +165,8 @@ export default async function AppHomePage({
             <SonMusteriler />
           </Suspense>
         )}
+          </BosOfisKapisi>
+        </Suspense>
       </div>
     </DashboardWidgetProvider>
   );

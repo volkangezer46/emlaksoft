@@ -1,4 +1,5 @@
 import { ArrowRight, Check, Lock } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
@@ -32,6 +33,10 @@ export default async function UpgradePage({
         description={gate?.pitch ?? "Daha fazla özellik için paketinizi yükseltebilirsiniz."}
         breadcrumbs={[{ label: "Ana ekran", href: "/app" }, { label: "Paket" }]}
       />
+
+      <Alert tone="info" title="Deneme boyunca tüm paketlerin özellikleri açık" className="mb-4">
+        Ücretsiz deneme süresince hiçbir sayfa paket nedeniyle kilitlenmez. Bu sayfaya yalnız deneme dışı hesaplarda yönlendirilirsiniz.
+      </Alert>
 
       <Card>
         <CardHeader>

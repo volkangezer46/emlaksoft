@@ -21,7 +21,7 @@ export default async function OnboardingPage() {
   }
 
   const supabase = await createClient();
-  const [tenantRes, customersRes, propertiesRes, membersRes, integrationsRes, sampleCustomersRes] = await Promise.all([
+  const [tenantRes, customersRes, propertiesRes, membersRes, integrationsRes, sampleCustomersRes, wonDealsRes] = await Promise.all([
     supabase.from("tenants").select("phone, city, license_no, sample_seeded_at").eq("id", tenantId).maybeSingle(),
     supabase.from("customers").select("id", { count: "exact", head: true }).eq("is_sample", false),
     supabase.from("properties").select("id", { count: "exact", head: true }).eq("is_sample", false),
@@ -32,6 +32,7 @@ export default async function OnboardingPage() {
       .eq("is_active", true)
       .in("provider", ["netgsm", "whatsapp"]),
     supabase.from("customers").select("id", { count: "exact", head: true }).eq("is_sample", true),
+    supabase.from("deals").select("id", { count: "exact", head: true }).eq("stage", "won").eq("is_sample", false),
   ]);
 
   const tenant = tenantRes.data as {
@@ -51,6 +52,7 @@ export default async function OnboardingPage() {
     },
     customers,
     properties,
+    wonDeals: wonDealsRes.count ?? 0,
     members: membersRes.count ?? 0,
     activeIntegrations: integrationsRes.count ?? 0,
   });
@@ -63,7 +65,7 @@ export default async function OnboardingPage() {
       <PageHeader
         eyebrow="Başlangıç"
         title="Ofis kurulumu"
-        description="Beş kısa adımda ofisinizi çalışır hale getirin. Dilediğiniz adımı sonraya bırakabilirsiniz."
+        description="Altı kısa adımda ofisinizi çalışır hale getirin. Dilediğiniz adımı sonraya bırakabilirsiniz."
         breadcrumbs={[{ label: "Ana ekran", href: "/app" }, { label: "Kurulum" }]}
       />
       <SetupWizard

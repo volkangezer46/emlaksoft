@@ -16,13 +16,13 @@ export function HizliAksiyonlar() {
       <section className="surface-card h-full rounded-[var(--radius-panel)] p-5">
         <h2 className="font-display font-bold text-ink-950">Hızlı aksiyonlar</h2>
         <div className="mt-4 grid grid-cols-2 gap-2">
-          <Link href="/app/musteriler" className={quickTile}>
+          <Link href="/app/musteriler/yeni" className={quickTile}>
             <div className="grid h-10 w-10 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600 transition group-hover:bg-brand-600 group-hover:text-white">
               <ICONS.musteri className="h-5 w-5" />
             </div>
             <span className="text-xs font-semibold text-ink-950">Müşteri</span>
           </Link>
-          <Link href="/app/portfoyler" className={quickTile}>
+          <Link href="/app/portfoyler/yeni" className={quickTile}>
             <div className="grid h-10 w-10 place-items-center rounded-[var(--radius-control)] bg-mint-500/10 text-mint-600 transition group-hover:bg-mint-500 group-hover:text-white">
               <ICONS.portfoy className="h-5 w-5" />
             </div>

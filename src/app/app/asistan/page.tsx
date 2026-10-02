@@ -161,7 +161,7 @@ export default async function AsistanPage({
   return (
     <div className="space-y-5">
       {/* Hero — komuta merkezi başlığı + 8 canlı KPI */}
-      <PageHeader title="AI Asistan — Komuta Merkezi" eyebrow="EmlakSoft · Yapay zeka" description="Ofisinizin canlı verilerine bağlı akıllı asistan. Kimi arayacağınızı, performansınızı ve fiyatı riskli portföylerinizi sorun; somut, tıklanabilir öneriler alın." />
+      <PageHeader title="AI Asistan — Komuta Merkezi" eyebrow="EmlakSoft · Yapay zeka" description="Ofisinizin canlı verilerine bağlı akıllı asistan. Kimi arayacağınızı, performansınızı ve fiyatı riskli portföylerinizi sorun; somut, tıklanabilir öneriler alın. Telefon, TC kimlik no, e-posta, IBAN ve kart numarası yapay zeka sağlayıcısına (OpenAI) gönderilmeden önce metinlerde otomatik maskelenir; ad-soyad ve serbest metindeki diğer bilgiler maskelenmeyebilir, görseller (ör. tapu OCR) maskelenmez." />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-14 h-52 w-52 rounded-full bg-brand-500/25 blur-[90px]" />

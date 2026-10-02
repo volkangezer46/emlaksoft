@@ -10,13 +10,15 @@ export type OnboardingCounts = {
   customers: number;
   /** Örnek olmayan portföy sayısı. */
   properties: number;
+  /** Kazanılmış (stage = won) anlaşma sayısı; komisyon yalnız bundan doğar. */
+  wonDeals: number;
   /** Ofisteki toplam kullanıcı (profil) sayısı. */
   members: number;
   /** Aktif mesajlaşma entegrasyonu (netgsm/whatsapp) sayısı. */
   activeIntegrations: number;
 };
 
-export type OnboardingStepId = "profile" | "customer" | "property" | "team" | "channel";
+export type OnboardingStepId = "profile" | "customer" | "property" | "deal" | "team" | "channel";
 
 export type OnboardingStep = {
   id: OnboardingStepId;
@@ -71,6 +73,15 @@ export function buildOnboarding(
       href: "/app/portfoyler",
       cta: "Portföy ekle",
       done: counts.properties > 0,
+    },
+    {
+      id: "deal",
+      title: "İlk anlaşmanı kapat, komisyonun otomatik oluşsun",
+      description:
+        "Komisyon elle girilmez; anlaşmayı kazanıldı olarak kapattığınızda otomatik oluşur ve her kayıt bir anlaşmaya bağlı kalır.",
+      href: "/app/anlasmalar/yeni",
+      cta: "Anlaşma ekle",
+      done: counts.wonDeals > 0,
     },
     {
       id: "team",
