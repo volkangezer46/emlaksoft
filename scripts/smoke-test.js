@@ -26,8 +26,8 @@ async function smokeTest() {
   };
 
   const SUPABASE_URL = getEnv('NEXT_PUBLIC_SUPABASE_URL');
-  const ANON_KEY = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY');
-  const SERVICE_KEY = getEnv('SUPABASE_SERVICE_ROLE_KEY');
+  const ANON_KEY = getEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY') || getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  const SERVICE_KEY = getEnv('SUPABASE_SECRET_KEY') || getEnv('SUPABASE_SERVICE_ROLE_KEY');
 
   if (!SUPABASE_URL || !ANON_KEY || !SERVICE_KEY) {
     console.error('❌ Supabase ENV eksik');
@@ -122,7 +122,8 @@ async function smokeTest() {
 
   if (failed > 0) {
     console.log('\n⚠️  Bazı testler başarısız. Migration uygulandı mı?');
-    console.log('   → supabase/apply_premium_plus.sql çalıştır');
+    console.log('   → npm run db:migrate -- --dry-run');
+    console.log('   → Ledger ayrışması varsa MIGRATION_GUIDE.md prosedürünü izleyin');
     process.exit(1);
   }
 

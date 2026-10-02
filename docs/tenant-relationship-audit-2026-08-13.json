@@ -1,0 +1,212 @@
+{
+  "audit_date": "2026-08-13",
+  "database": {
+    "server_version": "17.6",
+    "inspection_mode": "read_only_transaction",
+    "writes_performed": false
+  },
+  "scope": {
+    "tenant_owned_single_column_foreign_keys_reviewed": 150,
+    "already_composite_tenant_bound": 52,
+    "already_trigger_guarded": 1,
+    "structural_gaps_found": 97,
+    "live_cross_tenant_mismatches": 0,
+    "gaps_remediated_in_source": 83,
+    "deferred_for_domain_review": 14
+  },
+  "findings_by_severity_and_delete_action": {
+    "critical_high_remediated": {
+      "CASCADE": [
+        "customer_demands_customer_tenant_fkey",
+        "portal_listings_property_tenant_fkey",
+        "listing_closures_listing_tenant_fkey",
+        "commissions_deal_tenant_fkey",
+        "iys_consents_customer_tenant_fkey",
+        "communications_customer_tenant_fkey",
+        "targets_profile_tenant_fkey",
+        "automation_logs_automation_tenant_fkey",
+        "property_price_history_property_tenant_fkey",
+        "property_status_history_property_tenant_fkey",
+        "offer_rounds_offer_tenant_fkey",
+        "deal_costs_deal_tenant_fkey",
+        "deal_notes_deal_tenant_fkey",
+        "deal_checklist_items_deal_tenant_fkey",
+        "rentals_property_tenant_fkey",
+        "rentals_renter_tenant_fkey",
+        "rent_charges_rental_tenant_fkey",
+        "maintenance_requests_rental_tenant_fkey",
+        "project_units_project_tenant_fkey",
+        "unit_payments_unit_tenant_fkey",
+        "property_keys_property_tenant_fkey",
+        "property_key_events_key_tenant_fkey",
+        "agent_badges_staff_tenant_fkey",
+        "agent_score_snapshots_staff_tenant_fkey",
+        "approval_comments_request_tenant_fkey",
+        "listing_views_property_tenant_fkey",
+        "lost_sale_dismissals_customer_tenant_fkey",
+        "playbook_steps_playbook_tenant_fkey",
+        "playbook_runs_playbook_tenant_fkey",
+        "saved_views_user_tenant_fkey",
+        "staff_leaves_staff_tenant_fkey",
+        "tenant_advisor_sessions_user_tenant_fkey",
+        "vitrin_price_alerts_property_tenant_fkey"
+      ],
+      "SET_NULL": [
+        "offers_deal_tenant_fkey",
+        "tasks_deal_tenant_fkey",
+        "campaigns_creator_tenant_fkey",
+        "expenses_creator_tenant_fkey",
+        "expenses_property_tenant_fkey",
+        "communications_property_tenant_fkey",
+        "communications_creator_tenant_fkey",
+        "automations_creator_tenant_fkey",
+        "property_dues_property_tenant_fkey",
+        "property_dues_creator_tenant_fkey",
+        "property_price_history_changer_tenant_fkey",
+        "property_status_history_changer_tenant_fkey",
+        "offer_rounds_creator_tenant_fkey",
+        "deal_costs_creator_tenant_fkey",
+        "deal_notes_author_tenant_fkey",
+        "deal_checklist_items_completer_tenant_fkey",
+        "presentations_customer_tenant_fkey",
+        "tasks_recurrence_parent_tenant_fkey",
+        "rentals_creator_tenant_fkey",
+        "maintenance_requests_creator_tenant_fkey",
+        "projects_creator_tenant_fkey",
+        "project_units_customer_tenant_fkey",
+        "unit_payments_creator_tenant_fkey",
+        "property_keys_holder_tenant_fkey",
+        "property_keys_creator_tenant_fkey",
+        "property_key_events_staff_tenant_fkey",
+        "approval_requests_requester_tenant_fkey",
+        "approval_requests_decider_tenant_fkey",
+        "approval_comments_author_tenant_fkey",
+        "announcements_creator_tenant_fkey",
+        "contract_templates_creator_tenant_fkey",
+        "message_templates_creator_tenant_fkey",
+        "playbooks_creator_tenant_fkey",
+        "playbook_steps_assignee_tenant_fkey",
+        "staff_leaves_creator_tenant_fkey"
+      ],
+      "NO_ACTION": [
+        "customers_assignee_tenant_fkey",
+        "customers_creator_tenant_fkey",
+        "properties_assignee_tenant_fkey",
+        "properties_source_agent_tenant_fkey",
+        "properties_creator_tenant_fkey",
+        "portal_listings_publisher_tenant_fkey",
+        "listing_closures_creator_tenant_fkey",
+        "deals_property_tenant_fkey",
+        "deals_customer_tenant_fkey",
+        "deals_assignee_tenant_fkey",
+        "calls_customer_tenant_fkey",
+        "calls_handler_tenant_fkey",
+        "presentations_creator_tenant_fkey",
+        "lost_sale_dismissals_creator_tenant_fkey",
+        "tenant_role_permissions_updater_tenant_fkey"
+      ]
+    },
+    "medium_deferred": {
+      "CASCADE": [
+        {
+          "child": "network_demands.demand_id",
+          "parent": "customer_demands.id",
+          "reason": "network_domain_semantics_review",
+          "live_mismatches": 0
+        },
+        {
+          "child": "network_listings.property_id",
+          "parent": "properties.id",
+          "reason": "network_domain_semantics_review",
+          "live_mismatches": 0
+        },
+        {
+          "child": "support_ticket_attachment_uploads.ticket_id",
+          "parent": "support_tickets.id",
+          "reason": "platform_support_workflow_review",
+          "live_mismatches": 0
+        },
+        {
+          "child": "support_ticket_attachments.ticket_id",
+          "parent": "support_tickets.id",
+          "reason": "platform_support_workflow_review",
+          "live_mismatches": 0
+        },
+        {
+          "child": "support_ticket_csat.submitted_by",
+          "parent": "profiles.id",
+          "reason": "platform_support_workflow_review",
+          "live_mismatches": 0
+        },
+        {
+          "child": "support_ticket_csat.ticket_id",
+          "parent": "support_tickets.id",
+          "reason": "platform_support_workflow_review",
+          "live_mismatches": 0
+        },
+        {
+          "child": "support_ticket_events.ticket_id",
+          "parent": "support_tickets.id",
+          "reason": "platform_support_workflow_review",
+          "live_mismatches": 0
+        }
+      ],
+      "SET_NULL": [
+        {
+          "child": "billing_fulfillment_events.invoice_id",
+          "parent": "invoices.id",
+          "reason": "billing_reconciliation_semantics_review",
+          "live_mismatches": 0
+        },
+        {
+          "child": "billing_fulfillment_events.payment_link_id",
+          "parent": "payment_links.id",
+          "reason": "billing_reconciliation_semantics_review",
+          "live_mismatches": 0
+        },
+        {
+          "child": "invoices.subscription_id",
+          "parent": "subscriptions.id",
+          "reason": "billing_reconciliation_semantics_review",
+          "live_mismatches": 0
+        },
+        {
+          "child": "network_demands.created_by",
+          "parent": "profiles.id",
+          "reason": "network_domain_semantics_review",
+          "live_mismatches": 0
+        },
+        {
+          "child": "network_listings.created_by",
+          "parent": "profiles.id",
+          "reason": "network_domain_semantics_review",
+          "live_mismatches": 0
+        },
+        {
+          "child": "public_lead_consent_events.customer_id",
+          "parent": "customers.id",
+          "reason": "service_role_audit_retention_review",
+          "live_mismatches": 0
+        },
+        {
+          "child": "support_tickets.created_by",
+          "parent": "profiles.id",
+          "reason": "platform_support_workflow_review",
+          "live_mismatches": 0
+        }
+      ]
+    }
+  },
+  "trigger_guarded_non_gap": {
+    "child": "share_links.created_by",
+    "parent": "profiles.id",
+    "delete_action": "NO ACTION",
+    "guard": "public.enforce_share_link_tenant_parent()",
+    "live_mismatches": 0
+  },
+  "source_changes": {
+    "focused_core_migration": "supabase/migrations/20260809000010_core_tenant_relationship_boundaries.sql",
+    "broad_user_writable_migration": "supabase/migrations/20260809000020_crm_tenant_relationship_boundaries.sql",
+    "contract_test": "src/lib/crm-tenant-relationship-boundary-contract.test.ts"
+  }
+}

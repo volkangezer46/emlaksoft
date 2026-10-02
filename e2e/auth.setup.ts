@@ -5,14 +5,19 @@ import { test as setup, expect } from "@playwright/test";
  * yazar; chromium projesi bu dosyayı storageState olarak kullanır.
  *
  * Test kullanıcısı `npx tsx scripts/e2e-user.ts` ile hazırlanır (idempotent).
- * Kimlik bilgileri env ile override edilebilir; varsayılanlar script'teki
- * sabitlerle aynıdır (test hesabı).
+ * Kimlik bilgileri yalnız ortam değişkenlerinden gelir; repoda paylaşılan bir
+ * varsayılan parola yoktur.
  */
 const authFile = "e2e/.auth/user.json";
-const EMAIL = process.env.E2E_USER_EMAIL ?? "e2e-test@emlaksoft.local";
-const PASSWORD = process.env.E2E_USER_PASSWORD ?? "E2e!Emlak-2026-Test";
+const EMAIL = process.env.E2E_USER_EMAIL?.trim() ?? "";
+const PASSWORD = process.env.E2E_USER_PASSWORD ?? "";
 
 setup("authenticate", async ({ page }) => {
+  if (process.env.E2E_MUTATION_ALLOWED !== "true" || !EMAIL || PASSWORD.length < 16) {
+    throw new Error(
+      "Authenticated E2E requires E2E_MUTATION_ALLOWED=true plus explicit E2E_USER_EMAIL/E2E_USER_PASSWORD (min 16 chars).",
+    );
+  }
   await page.goto("/giris");
   await page.locator("#email").fill(EMAIL);
   await page.locator("#password").fill(PASSWORD);

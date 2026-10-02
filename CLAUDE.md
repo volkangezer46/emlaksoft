@@ -4,7 +4,8 @@
 
 Türk emlak ofisleri için multi-tenant SaaS (Next.js 16 App Router + Supabase + Vercel).
 Müşteri/talep/portföy/randevu/anlaşma/komisyon omurgası + kayıp-kaçak kalkanı, değerleme
-(emsal motoru), otomasyonlar, 22 cron (bkz. `vercel.json`), AI asistan, vitrin ve token'lı public portallar.
+(emsal motoru), otomasyonlar, sözleşmeyle doğrulanan cron envanteri (bkz. `vercel.json`), AI asistan,
+vitrin ve token'lı public portallar.
 Tamamı Türkçe; deploy bilinçli olarak en sona bırakıldı (`docs/DEPLOY_CHECKLIST.md`).
 
 ## Komutlar
@@ -15,18 +16,21 @@ npm run build          # prod build (deploy öncesi yeşil olmalı)
 npm run type-check     # tsc --noEmit
 npm run lint           # eslint
 npm run test           # vitest (birim)
-npm run test:e2e       # playwright (public smoke)
+npm run test:e2e:public # playwright (salt-okunur public smoke)
 npm run db:rls-audit   # RLS denetimi
-npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql  # migration TEK TEK, sırayla
+npm run check:migrations -- --database # salt-okunur ledger/checksum kontrolü
+npm run db:migrate -- --dry-run         # salt-okunur migration önizleme
 ```
 
-Migration için `apply-migrations.ts` KULLANMA (sabit/eksik liste) — her zaman `apply-one.ts`.
-Migration POLİTİKASI: yeni migration dosyası yazan, onu `apply-one.ts` ile HEMEN dev DB'ye
-uygular (kullanıcı kararı: "full otomatik"). Enum ADD VALUE + kullanımı aynı dosyada olamaz
-(ayrı dosya, örn. 087/087b deseni).
+Migration POLİTİKASI: uygulanmış dosyalar forward-only ve değiştirilemezdir. Yeni dosya
+önce statik + DB ledger/checksum denetiminden ve gerçekten salt-okunur dry-run'dan geçer.
+Canlı uygulama yalnız restore edilebilir backup/PITR doğrulandıktan sonra kontrollü
+`npm run db:migrate` ile yapılır; ledger drift varsa yazma yapılmaz. Enum ADD VALUE +
+kullanımı aynı dosyada olamaz (ayrı dosya, örn. 087/087b deseni).
 Demo veri: `npm run seed:demo` (demo-ofis tenant'ını tüm modüllerde doldurur, idempotent);
 hızlı demo girişleri `src/lib/demo-personas.ts` + `ENABLE_DEMO_LOGIN=1` (yalnız dev).
-E2E kullanıcısı: `npx tsx scripts/e2e-user.ts` (e2e-test tenant'ı, owner).
+Oturumlu E2E yalnız izole test DB'de, açık `E2E_MUTATION_ALLOWED=true` ve benzersiz
+`E2E_USER_EMAIL`/`E2E_USER_PASSWORD` ile çalıştırılır.
 
 ## Mimari kilit noktaları
 

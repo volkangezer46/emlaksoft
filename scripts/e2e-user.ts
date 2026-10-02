@@ -1,37 +1,46 @@
 /**
  * E2E test kullanıcısı hazırlayıcı (idempotent).
  *
- * - auth.users içinde e2e-test@emlaksoft.local yoksa oluşturur, varsa şifreyi
- *   bilinen sabite resetler (test hesabı — sabit şifre bilinçli).
+ * - auth.users içinde açıkça verilen test e-postasını oluşturur veya günceller.
+ * - Parola yalnız ortam değişkeninden gelir; repoda sabit test parolası yoktur.
  * - `e2e-test` slug'lı özel bir tenant'a owner profili bağlar (upsert).
  * - `two_factor_sms=false` garanti eder (2FA login akışını tetiklemesin).
  * - Sonunda anon key ile gerçek bir signInWithPassword yapıp doğrular.
  *
  * Kullanım: npx tsx scripts/e2e-user.ts
- * Gereken env (.env.local): NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
- * NEXT_PUBLIC_SUPABASE_ANON_KEY
+ * Gereken env (.env.local): NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY,
+ * NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
  */
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 
 dotenv.config({ path: ".env.local" });
 
-export const E2E_EMAIL = "e2e-test@emlaksoft.local";
-export const E2E_PASSWORD = "E2e!Emlak-2026-Test";
+if (process.env.E2E_MUTATION_ALLOWED !== "true") {
+  throw new Error("E2E kullanıcı hazırlığı için E2E_MUTATION_ALLOWED=true zorunludur.");
+}
+
+const E2E_EMAIL = process.env.E2E_USER_EMAIL?.trim() ?? "";
+const E2E_PASSWORD = process.env.E2E_USER_PASSWORD ?? "";
+if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(E2E_EMAIL)) {
+  throw new Error("Geçerli E2E_USER_EMAIL zorunludur.");
+}
+if (E2E_PASSWORD.length < 16) {
+  throw new Error("E2E_USER_PASSWORD en az 16 karakter olmalıdır.");
+}
 const TENANT_SLUG = "e2e-test";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const service = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 if (!url || !service || !anonKey) {
-  console.error("Eksik env: NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / NEXT_PUBLIC_SUPABASE_ANON_KEY (.env.local)");
+  console.error("Eksik env: NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SECRET_KEY / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (.env.local)");
   process.exit(1);
 }
 
 // --- Kazara prod'a çalıştırma freni ---------------------------------------
 // Hedef DB host'u ve tenant slug'ı her koşulda yazdırılır. Host local değilse
-// (hosted Supabase = potansiyel prod) SEED_CONFIRM=1 olmadan script ÇIKAR:
-// bilinen sabit şifreli test kullanıcısı prod'a sessizce yazılmasın.
+// (hosted Supabase = potansiyel prod) SEED_CONFIRM=1 olmadan script ÇIKAR.
 const dbHost = new URL(url).hostname;
 const isLocalDb = ["localhost", "127.0.0.1", "0.0.0.0", "kong"].includes(dbHost);
 console.log(`Hedef DB: ${dbHost} · hedef tenant: ${TENANT_SLUG}`);

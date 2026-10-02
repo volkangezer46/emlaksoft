@@ -76,7 +76,7 @@
 3. `DEPLOY_CHECKLIST.md` - Production deploy checklist
 4. `docs/SPRINT_PREMIUM_PLUS.md` - Sprint özeti
 5. `vercel.json` - Cron jobs konfigürasyonu
-6. `supabase/apply_premium_plus.sql` - Birleşik migration
+6. `supabase/apply_premium_plus.sql` - Arşivlenmiş, fail-closed eski bundle (çalıştırılmaz)
 
 ### Güncellenen
 - `docs/PREMIUM_PLUS.md` - Kalan özellikler güncel
@@ -88,7 +88,8 @@
 ## 🚀 Deploy Hazırlığı
 
 ### Supabase
-- [ ] `apply_premium_plus.sql` çalıştır
+- [ ] `npm run db:migrate -- --dry-run` ile checksum/ledger önizlemesi al
+- [ ] Ayrışma varsa `MIGRATION_GUIDE.md` ile yalnız kanıtlanan satırları uzlaştır
 - [ ] Storage bucket `customer-files` oluştur
 - [ ] Storage policy ekle
 

@@ -2,9 +2,10 @@
   "name": "emlaksoft",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@11.6.2",
   "engines": {
     "node": ">=22.0.0",
-    "npm": ">=11.18.0"
+    "npm": ">=11.6.2"
   },
   "scripts": {
     "dev": "next dev",
@@ -25,6 +26,10 @@
     "db:rls-audit": "tsx scripts/rls-audit.ts",
     "audit:actions": "tsx scripts/action-gate-audit.ts",
     "check:links": "tsx scripts/check-link-contracts.ts",
+    "check:migrations": "tsx scripts/validate-migrations.ts",
+    "check:workflow-data": "tsx scripts/check-core-workflow-data.ts",
+    "check:cron": "tsx scripts/check-cron-contracts.ts",
+    "test:e2e:public": "playwright test --project=public",
     "audit:deps": "tsx scripts/audit-gate.ts"
   },
   "dependencies": {
@@ -67,8 +72,13 @@
   "overrides": {
     "sharp": "^0.35.3",
     "postcss": "^8.5.23",
+    "nanoid": "^3.3.17",
+    "minimatch@3.1.5": {
+      "brace-expansion": "^1.1.18"
+    },
     "minimatch@>=10": {
-      "brace-expansion": "^5.0.8"
-    }
+      "brace-expansion": "^5.0.9"
+    },
+    "js-yaml": "^4.3.1"
   }
 }

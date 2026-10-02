@@ -10,9 +10,17 @@ async function main() {
     try { await c.connect(); client = c; break; } catch { try { await c.end(); } catch {} }
   }
   if (!client) throw new Error("no db");
-  const q = process.argv[2] ?? `select tablename, indexname, indexdef from pg_indexes where schemaname='public' order by tablename, indexname`;
-  const r = await client.query(q);
-  console.log(JSON.stringify(r.rows, null, 1));
-  await client.end();
+  try {
+    // Diagnostic helper only. Never accept operator-supplied SQL and make the
+    // server enforce read-only mode even if this file changes accidentally.
+    await client.query("begin read only");
+    const result = await client.query(
+      "select tablename, indexname, indexdef from pg_indexes where schemaname = 'public' order by tablename, indexname",
+    );
+    console.log(JSON.stringify(result.rows, null, 1));
+    await client.query("rollback");
+  } finally {
+    await client.end();
+  }
 }
 main().catch((e) => { console.error(e); process.exit(1); });

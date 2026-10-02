@@ -5,6 +5,12 @@
 > ne" sorusunu birkaç dakikada cevaplar. Daha derin bilgi için altındaki "Daha fazlası"
 > bölümündeki dosyalara bakılır.
 
+> [!IMPORTANT]
+> 13 Ağustos 2026 uçtan uca denetimin güncel ve bağlayıcı kaydı
+> `docs/AUDIT_2026-08-13.md` dosyasındadır. Public Git geçmişindeki aktif
+> secret olayı ve canlı DB migration drift'i çözülmeden commit, push, migration veya deploy
+> yapılmamalıdır.
+
 ## Proje nedir
 
 **EmlakSoft** — Türk emlak ofisleri için çok-kiracılı (multi-tenant) SaaS.
@@ -19,15 +25,17 @@ sitesi) ve token'lı public portallar (malik/müşteri/imza/ödeme).
 
 ## Şu anki durum (bu dosyayı güncel tutmak için tarih: kontrol et)
 
-Proje canlıda ve aktif geliştirme altında. Genellikle **birden fazla oturum/araç aynı
+Projenin önceki sürümü canlıda ve proje aktif geliştirme altında; 13 Ağustos denetim/yayın
+adayı henüz canlıya alınmadı. Genellikle **birden fazla oturum/araç aynı
 anda** bu depoda çalışıyor olabilir (ör. bir tarafta güvenlik sertleştirme migration'ları
 yazılırken diğer tarafta UI işi yapılabilir) — çalışmaya başlamadan önce `git status` ve
 `git log --oneline -20` ile gerçek durumu doğrula, bu dosyadaki özete körü körüne güvenme.
 
 Kaba ölçek: 100+ rota, çok sayıda cron (`vercel.json`), yüzlerce birim/contract testi
 (`npm run test`), Playwright E2E (`npm run test:e2e`). Migration'lar `supabase/migrations/`
-altında sıralı; her biri yazılır yazılmaz `scripts/apply-one.ts` ile dev DB'ye uygulanır
-(bkz. `AGENTS.md`/`CLAUDE.md` — `apply-migrations.ts` KULLANILMAZ).
+altında sıralı ve forward-only'dir. Önce checksum/ledger denetimi ile dry-run yapılır;
+restore edilebilir backup/PITR doğrulandıktan sonra kontrollü biçimde `npm run db:migrate`
+çalıştırılır. Ledger drift varsa veritabanına yazılmaz.
 
 ## Hızlı komutlar
 
@@ -37,12 +45,13 @@ npm run build           # prod build (deploy öncesi yeşil olmalı)
 npm run type-check      # tsc --noEmit
 npm run lint            # eslint . --max-warnings=0
 npm run test            # vitest (birim + contract testleri)
-npm run test:e2e        # playwright (public smoke)
-npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql   # migration uygula (TEK TEK)
+npm run test:e2e:public # playwright (salt-okunur public smoke)
+npm run check:migrations -- --database # canlı ledger salt-okunur kontrol
+npm run db:migrate -- --dry-run         # kalıcı yazmaz; kısa süreli advisory lock alır
 ```
 
-Demo giriş (yalnız dev, `ENABLE_DEMO_LOGIN=1`): `/giris` sayfasındaki hızlı-giriş
-butonları; şifre `Demo1234!`.
+Demo giriş (yalnız dev, `ENABLE_DEMO_LOGIN=true`): `/giris` sayfasındaki hızlı-giriş
+butonları; ortak parola kullanılmaz, kimlik bilgisi sunucu sırrından türetilir.
 
 ## Daha fazlası (derinlemesine bilgi için)
 
@@ -54,12 +63,15 @@ butonları; şifre `Demo1234!`.
 | Açık iş listesi / özellik envanteri | `TASKS.md` → `docs/OZELLIK_MASTER_LISTESI.md` |
 | Değişiklik geçmişi | `CHANGELOG.md` |
 | Deploy rehberi | `DEPLOY_CHECKLIST.md`, `docs/DEPLOY_CHECKLIST.md` |
-| Geçmiş oturumların ayrıntılı devir notları | `docs/DEVIR_NOTU.md`, `DEVIR_TESLIM.md` |
+| Güncel uçtan uca denetim/yayın kararı | `docs/AUDIT_2026-08-13.md` |
+| Önceki release-hardening devir kaydı | `docs/DEVIR_2026-08-10_RELEASE_HARDENING.md` |
+| Geçmiş oturumların tarihsel devir notları | `docs/DEVIR_NOTU.md`, `DEVIR_TESLIM.md` |
 | Güvenlik açığı bildirimi | `SECURITY.md` |
 
 ## Önemli davranış kuralları (özet — tam liste `CLAUDE.md`'de)
 
-- Migration yazan onu hemen `apply-one.ts` ile uygular.
+- Uygulanmış migration dosyası değiştirilmez. Yeni migration önce doğrulanır ve dry-run'dan
+  geçirilir; canlı uygulama yalnız backup/PITR ve ledger bütünlüğü doğrulandıktan sonra yapılır.
 - Yeni modül eklerken 4 kayıt yeri var (permissions.ts + NAV_MODULES + sidebar + roller
   ekranı) — biri atlanırsa modül görünmez ya da kapısız kalır.
 - Bileşende `Date.now()`/`new Date()` doğrudan çağrılmaz — `src/lib/clock.ts`.

@@ -5,76 +5,166 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: "Deployed URL for read-only operational smoke"
+        required: false
+        type: string
+      expected_release_sha:
+        description: "Expected deployed Git SHA (defaults to the workflow commit)"
+        required: false
+        type: string
+      run_authorized_crons:
+        description: "Execute every production cron (mutating; deliberate post-deploy only)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
 
 jobs:
   secret-scan:
-    name: Sır tarama (gitleaks)
+    name: Full-history secret scan
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Gitleaks must see every reachable commit, not only the checked-out
+          # tree or GitHub's default shallow clone.
+          fetch-depth: 0
 
-      - name: gitleaks kur
+      - name: Install gitleaks
         run: |
-          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz \
-            | tar -xz -C /tmp gitleaks
-          sudo mv /tmp/gitleaks /usr/local/bin/gitleaks
+          curl --fail --silent --show-error --location \
+            --output /tmp/gitleaks.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          printf '%s  %s\n' \
+            '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb' \
+            '/tmp/gitleaks.tar.gz' > /tmp/gitleaks.sha256
+          sha256sum --check /tmp/gitleaks.sha256
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
 
-      - name: Sırları tara (çalışma ağacı)
-        # --no-git: git geçmişini değil, checkout edilen dosya ağacını tarar.
-        # .env.local artık repo'da olmadığından temiz geçer; ileride bir API
-        # anahtarı/secret koda sızarsa CI kırılır. --redact: değerleri gizler.
-        run: gitleaks detect --no-git --redact --verbose --exit-code 1
+      - name: Scan complete Git history
+        run: /tmp/gitleaks git --redact --verbose --exit-code 1 .
 
-  type-check:
-    name: Type check & build
+  quality:
+    name: Contracts, tests, E2E and build
     runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: placeholder-publishable-key
+      SUPABASE_SECRET_KEY: placeholder-secret-key
+      OTP_HMAC_SECRET: ci-only-independent-otp-pepper-with-at-least-32-bytes
+      TWO_FACTOR_COOKIE_SECRET: ci-only-independent-2fa-cookie-secret-at-least-32-characters
+      PROPERTY_MEDIA_SIGNING_SECRET: ci-only-property-media-secret-at-least-32-characters
+      NEXT_PUBLIC_APP_URL: https://placeholder.emlaksoft.com.tr
+      HEALTHCHECK_SECRET: ci-only-healthcheck-secret-with-at-least-32-characters
+      RELEASE_MIGRATION: 20990101000000_ci_release_contract.sql
+      RELEASE_MIGRATION_CHECKSUM: 0123456789abcdef
+      ENABLE_DEMO_LOGIN: "false"
+      ALLOW_PAYMENT_LINK_DEMO: "false"
+      ALLOW_BILLING_DEMO: "false"
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          # Sürüm .nvmrc'den okunur — tek doğruluk kaynağı. Burada sabit bir
-          # numara yazmak CI ile yerel geliştirmenin ayrışmasına yol açıyordu.
           node-version-file: .nvmrc
           cache: npm
 
+      - name: Pin npm
+        run: |
+          npm install --global npm@11.6.2
+          test "$(npm --version)" = "11.6.2"
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Static release contracts
+        run: |
+          npm run check:links
+          npm run check:migrations
+          npm run check:cron
+          npm run audit:actions
 
       - name: Type check
         run: npm run type-check
 
       - name: Lint
-        # --max-warnings=0: uyari birikmesini engeller. Bilincli istisnalar
-        # kod icinde gerekceli eslint-disable ile isaretli.
         run: npx eslint . --max-warnings=0
 
-      - name: Testler
+      - name: Unit and contract tests
         run: npm test
 
-      - name: Server Action yetki kapısı denetimi
-        # DB'ye gitmez, statik tarama — CI'da güvenle koşar.
-        # Yeni bir action eklenip yetki kapısı unutulursa burada kırılır.
-        run: npm run audit:actions
-
-      - name: Bağımlılık açığı kapısı
-        # ARTIK BLOKLUYOR. `continue-on-error` kaldırıldı.
-        #
-        # Düz `npm audit --audit-level=high` CI'ı KALICI KIRMIZI yapardı ve
-        # kırmızı bir CI hiçbir şey söylemez — herkes görmezden gelir. Sebep:
-        #   npm audit            -> 12 high
-        #   npm audit --omit=dev ->  3 high
-        # 9'u dev-only (eslint zinciri), 3'ü Next'in KENDI ic bagimliliklarinda
-        # (postcss, sharp) ve npm'in onerdigi "fix" Next 16 -> 9.3.3 dusurmek.
-        #
-        # Kapı bu 3'ü GEREKÇESİYLE bekletiyor, geri kalan her yeni high/critical
-        # açıkta CI'ı kırıyor. İstisna listesi scripts/audit-gate.ts içinde.
+      - name: Production dependency gate
         run: npm run audit:deps
 
-      - name: Build
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Non-mutating public E2E
+        run: npm run test:e2e:public
+
+      - name: Production build
         run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
-          SUPABASE_SERVICE_ROLE_KEY: placeholder-service-key
-          NEXT_PUBLIC_APP_URL: https://placeholder.emlaksoft.com.tr
+
+  operational-smoke:
+    name: Read-only deployed environment gates
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.app_url != '' }}
+    needs: [secret-scan, quality]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    env:
+      APP_URL: ${{ inputs.app_url }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      DATABASE_POOLER_URL: ${{ secrets.DATABASE_POOLER_URL }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      HEALTHCHECK_SECRET: ${{ secrets.HEALTHCHECK_SECRET }}
+      EXPECTED_RELEASE_SHA: ${{ inputs.expected_release_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Pin npm
+        run: npm install --global npm@11.6.2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Health readiness probe
+        run: >-
+          node -e "if (!process.env.HEALTHCHECK_SECRET) throw new Error('HEALTHCHECK_SECRET missing');
+          fetch(new URL('/api/health', process.env.APP_URL), {redirect:'manual',headers:{authorization:'Bearer '+process.env.HEALTHCHECK_SECRET}})
+          .then(async r => { const b = await r.json(); const m=b.checks?.migrations; const expected=(process.env.EXPECTED_RELEASE_SHA||'').slice(0,12);
+          if (!r.ok || b.status !== 'ready' || m?.status !== 'ready' || m?.ready !== true || !m.expected || !m.applied ||
+          m.expected.version !== m.applied.version || m.expected.checksum !== m.applied.checksum || b.release?.ready !== true ||
+          (expected && b.release?.sha !== expected)) throw new Error('health/release contract failed: HTTP '+r.status+' / '+b.status); })"
+
+      - name: Cron authorization guards (non-mutating)
+        run: npm run cron:smoke -- --auth-only
+
+      - name: Public E2E against deployment (non-mutating)
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e:public
+
+      - name: Migration ledger and checksum gate (read-only)
+        if: ${{ env.DATABASE_POOLER_URL != '' || env.DATABASE_URL != '' }}
+        run: npm run check:migrations -- --database
+
+      - name: RLS isolation audit (transaction is always rolled back)
+        if: ${{ env.DATABASE_POOLER_URL != '' || env.DATABASE_URL != '' }}
+        run: npm run db:rls-audit
+
+      - name: Execute all production crons (mutating opt-in)
+        if: ${{ inputs.run_authorized_crons }}
+        run: npm run cron:smoke

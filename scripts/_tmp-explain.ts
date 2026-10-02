@@ -15,11 +15,16 @@ const QS = [
 ];
 (async () => {
   await c.connect();
-  await c.query("set enable_seqscan=off");
-  for (const q of QS) {
-    const r = await c.query("explain (costs off) " + q);
-    console.log("--- " + q.slice(0, 70));
-    console.log(r.rows.map((x: Record<string, string>) => x["QUERY PLAN"]).join("\n"));
+  try {
+    await c.query("begin read only");
+    await c.query("set local enable_seqscan=off");
+    for (const q of QS) {
+      const r = await c.query("explain (costs off) " + q);
+      console.log("--- " + q.slice(0, 70));
+      console.log(r.rows.map((x: Record<string, string>) => x["QUERY PLAN"]).join("\n"));
+    }
+    await c.query("rollback");
+  } finally {
+    await c.end();
   }
-  await c.end();
 })();

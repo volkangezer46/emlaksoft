@@ -1,104 +1,95 @@
-# Premium Plus Migrations - Uygulama Talimatı
+# Migration Guide
 
-## Supabase Dashboard Üzerinden Uygulama
+EmlakSoft migration'ları `supabase/migrations/` altında forward-only SQL
+dosyalarıdır. Uygulanan dosyanın adı ve ilk 16 karakter SHA-256 checksum'ı
+`public.schema_migrations` ledger'ında tutulur.
 
-1. **Supabase Dashboard'a giriş yapın**
-   - https://supabase.com/dashboard
-   - Projenizi seçin
+## Yeni migration
 
-2. **SQL Editor'ı açın**
-   - Sol menüden "SQL Editor" seçin
-
-3. **Migration dosyasını çalıştırın**
-   - `supabase/apply_premium_plus.sql` dosyasının içeriğini kopyalayın
-   - SQL Editor'a yapıştırın
-   - "Run" butonuna tıklayın
-
-4. **Storage Bucket oluşturun**
-   - Sol menüden "Storage" seçin
-   - "Create bucket" tıklayın
-   - Bucket name: `customer-files`
-   - Public: **OFF** (private)
-   - "Create bucket" tıklayın
-
-5. **Storage RLS Policy ekleyin**
-   - `customer-files` bucket'ına tıklayın
-   - "Policies" tab'ına geçin
-   - "New Policy" → "For full customization"
-   - Policy name: `Authenticated tenant access`
-   - Aşağıdaki SQL'i yapıştırın:
-
-```sql
-create policy "Authenticated tenant access"
-on storage.objects for all
-using (
-  bucket_id = 'customer-files'
-  and (storage.foldername(name))[1] = (auth.jwt()->>'tenant_id')::text
-);
-```
-
-6. **Doğrulama**
-   - SQL Editor'dan kontrol:
-```sql
-select column_name, data_type 
-from information_schema.columns 
-where table_name = 'profiles' and column_name = 'notification_prefs';
-
-select table_name 
-from information_schema.tables 
-where table_name = 'customer_files';
-```
-
-## Alternatif: Local Supabase CLI
-
-Eğer Supabase CLI kuruluysa:
+1. UTC tarih + altı haneli artan sıra ile küçük harfli bir dosya ekleyin:
+   `YYYYMMDDNNNNNN_aciklama.sql`.
+2. Yeni değişikliği idempotent ve mümkünse geriye uyumlu tasarlayın.
+3. Eski migration'ı değiştirmeyin; düzeltme için yeni dosya ekleyin.
+4. Statik kapıları çalıştırın:
 
 ```bash
-# CLI kur (eğer yoksa)
-npm install -g supabase
-
-# Local Supabase başlat
-supabase start
-
-# Migrations uygula
-supabase db push
+npm run check:migrations
+npm test
+npm run type-check
 ```
 
-## Notlar
+Validator geçersiz adları, yeni 14 haneli sıra çakışmalarını, aynı SQL içeriğini
+ve boş dosyaları reddeder. Repoda önceden var olan üç sıra çakışması, deployed
+ledger kayıtlarını yeniden adlandırmamak için exact legacy allowlist ile
+dondurulmuştur; bu liste yeni dosya kabul etmez.
 
-- `apply_premium_plus.sql` içindeki tüm migration'lar `if not exists` kullanır
-- Birden fazla kez çalıştırılması güvenlidir
-- Hata alırsanız output'u kontrol edin
-- Storage policy manuel eklenmeli (Dashboard üzerinden)
+## Uygulama
 
----
+`.env.local` içinde `DATABASE_POOLER_URL` veya `DATABASE_URL` tanımlayın:
 
-**Migrations Listesi:**
-- ✅ `000009` - Bildirim tercihleri (`profiles.notification_prefs`)
-- ✅ `000010` - Müşteri dosya deposu (`customer_files` table)
-- ✅ `000011` - Permission contract tests
-- ✅ `000012` - Leak SLA tracking
-- ✅ `000013` - PWA push subscriptions
-- ✅ `000014` - `permission_defaults` + `tenant_role_permissions` (DB-tabanlı yetkilendirme şeması + MATRIX seed)
-- ✅ `000015` - Telefon verisi normalizasyonu + `05XXXXXXXXX` CHECK kısıtı (profiles/customers/calls)
-- ✅ `000016` - `has_effective_permission()` SQL fonksiyonu + commissions/payment_links role-aware RLS + profiles rol değişim guard'ı
-- ✅ `000017` - Geo tam kapsama şeması (`source_id`, `postal_code`, `population`, `pg_trgm` arama indeksleri, geo tabloları için `service_role` yazma yetkisi)
-- ✅ `000018` - `geo_province_stats` / `geo_district_stats` view'ları (admin ekranlarında hızlı kapsama sayımı)
-- ✅ `000019` - Leak-SLA düzeltmesi: `sla_warning_sent_at` + `leak_severity` kolonları `listing_closures`'a eklendi (000012 yanlışlıkla var olmayan `portal_closures`'ı hedeflemişti) + SLA indeksi
-- ✅ `000020` - Inbound lead yakalama: `tenants.lead_capture_token` + `lead_capture_enabled`, `customers.lead_channel` + `auto_assigned` (public form/webhook + round-robin atama)
-- ✅ `000021` - Portföy medya galerisi: `property_media` tablosu (foto/video/360 tur) + `property-media` storage bucket (private)
-- ✅ `000022` - Görev / takip otomasyonu: `tasks` tablosu + `permission_defaults` `tasks` modülü seed'i
-- ✅ `000023` - EmlakSoft satış CRM'i: `demo_requests` tablosu (landing/demo formu lead havuzu, platform-level, RLS `is_platform_staff()`)
-- ✅ `000024` - Platform bildirim merkezi: `platform_notifications` tablosu (staff'a fan-out; demo/ticket/uyarı, her personel kendi okundu durumu, RLS `staff_id = auth.uid()`)
-- ✅ `000025` - Platform ayarları: `platform_settings` anahtar-değer tablosu (OpenAI API anahtarı vb.; okuma service_role, yazma yalnızca super_admin)
+```bash
+npm run db:migrate -- --dry-run
+npm run db:migrate
+npm run check:migrations -- --database
+```
 
-> **Storage:** `000021` `property-media` bucket'ını SQL ile private olarak oluşturur. Ek storage RLS policy'si gerekmez —
-> yükleme/silme sunucu tarafında `service_role` (admin client) ile, görsel sunumu `/api/property-media/[id]` route'u ile yapılır.
+Runner advisory lock alır, her dosyayı ayrı transaction içinde uygular ve
+checksum kaydını aynı transaction'da yazar. Hata halinde migration rollback
+olur. Uygulanmış dosyanın checksum'ı değiştiyse runner hiçbir yeni migration'a
+geçmeden durur.
 
-> `apply_premium_plus.sql` bu migration'ları içermiyor (dosya `000012`'de donmuş) — production DB'de `000014`-`000022`
-> `scripts/apply-one.ts` ile doğrudan Postgres bağlantısı (`DATABASE_POOLER_URL`) üzerinden uygulandı. Yeni bir ortam
-> kurarken aynı yolu izleyin: `npx tsx scripts/apply-one.ts supabase/migrations/<dosya>.sql` sırayla `000014`-`000022`'a kadar `000014`'ten
-> başlayarak, veya SQL Editor'a dosyaları elle yapıştırın.
->
-> Coğrafya verisi (81 il / 973 ilçe / ~31.900 mahalle) `npm run geo:sync` ile TurkiyeAPI'den senkronize edildi ve
-> production DB'ye zaten yazıldı. `/admin/geo` üzerinden düzenlenebilir/eklenebilir/pasifleştirilebilir.
+Tek bir dosya yalnız kontrollü onarım için seçilebilir:
+
+```bash
+npm run db:migrate -- --only YYYYMMDDHHMMSS_aciklama.sql
+```
+
+## Seçici ledger uzlaştırması
+
+Toplu `--baseline` güvenlik nedeniyle kapalıdır. Bir şema objesinin bulunması,
+aynı migration'daki backfill, grant, constraint ve politika adımlarının tamamının
+uygulandığını tek başına kanıtlamaz. Runner bu nedenle yalnız built-in salt-okunur
+kanıt sorgusu başarılı olan tek bir migration satırını, açık operatör onayıyla
+uzlaştırır. Yeni DB kurulumunda baseline kullanılmaz.
+
+Her doğrulanmış satır için ayrı ayrı:
+
+1. Restore edilebilir backup/PITR noktası alın.
+2. Migration SQL'inin tamamını canlı şema, grant/RLS ve gerekli veri invariantlarıyla
+   karşılaştırın.
+3. Salt-okunur önizlemeyi çalıştırın:
+
+```bash
+npm run db:migrate -- --baseline --only YYYYMMDDHHMMSS_aciklama.sql --confirm-schema-present --dry-run
+```
+
+4. Yalnız aynı exact dosya için, onaylı bakım penceresinde ledger satırını yazın:
+
+```bash
+npm run db:migrate -- --baseline --only YYYYMMDDHHMMSS_aciklama.sql --confirm-schema-present
+```
+
+5. Her satırdan sonra `npm run check:migrations -- --database` çalıştırın.
+
+`--only`, başka bir migration'daki ledger/şema ayrışmasını atlatamaz. Normal migrate
+ve kontrollü `--only` onarımları, uzlaştırılması gereken herhangi bir eski satır
+varken fail-closed durur. Baseline eksik şemayı düzeltmez; yalnız bağımsız olarak
+kanıtlanmış mevcut durumu ledger'a kaydeder.
+
+## Release readiness
+
+Final migration'dan sonra:
+
+```bash
+npm run check:migrations -- --release
+```
+
+Çıktıdaki `RELEASE_MIGRATION` ve `RELEASE_MIGRATION_CHECKSUM` değerlerini deploy
+ortamına girin. `/api/health`, expected ledger satırı yoksa veya checksum farklı
+ise production readiness için 503 döndürür.
+
+## Geri dönüş
+
+Uygulanmış migration dosyası değiştirilmez ve otomatik down migration yoktur.
+Önce uygulama deploy'u geri alınır; şema sorunu yeni forward-fix migration ile
+onarılır. Veri restore'u gerekiyorsa `docs/runbooks/RESTORE.md` izlenir.

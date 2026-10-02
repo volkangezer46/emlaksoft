@@ -1,5 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const remoteBaseUrl = process.env.APP_URL?.trim().replace(/\/$/, "") || null;
+const authenticatedE2EEnabled = process.env.E2E_MUTATION_ALLOWED === "true";
+
 /**
  * EmlakSoft E2E test configuration.
  *
@@ -19,7 +22,7 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 15_000 },
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: remoteBaseUrl ?? "http://localhost:3000",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
@@ -27,7 +30,7 @@ export default defineConfig({
     // 1) Bir kez login olup oturumu diske yazar (bkz. e2e/auth.setup.ts).
     {
       name: "setup",
-      testMatch: /auth\.setup\.ts/,
+      testMatch: authenticatedE2EEnabled ? /auth\.setup\.ts/ : /$^/,
       use: { ...devices["Desktop Chrome"] },
     },
     // 2) Public smoke — auth GEREKTIRMEZ, storageState kullanmaz.
@@ -39,15 +42,18 @@ export default defineConfig({
     // 3) Oturumlu akışlar — setup'ın yazdığı storageState ile çalışır.
     {
       name: "chromium",
+      testMatch: authenticatedE2EEnabled ? /.*\.spec\.ts/ : /$^/,
       testIgnore: /public-smoke\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/user.json" },
       dependencies: ["setup"],
     },
   ],
-  webServer: {
-    command: "npm run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: true,
-    timeout: 180_000,
-  },
+  webServer: remoteBaseUrl
+    ? undefined
+    : {
+        command: "npm run dev",
+        url: "http://localhost:3000",
+        reuseExistingServer: true,
+        timeout: 180_000,
+      },
 });
