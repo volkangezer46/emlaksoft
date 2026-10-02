@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {
   ArrowDownLeft,
-  ArrowUpRight,
   CalendarClock,
   ChevronLeft,
   ChevronRight,
@@ -27,6 +26,9 @@ import { SavedViews } from "@/components/app/saved-views";
 import { SmsDialog } from "./sms-dialog";
 import { WaTemplateMenu } from "@/components/app/wa-template-menu";
 import { RowQuickActions } from "./row-actions";
+import { PageHeader } from "@/components/ui/page-header";
+import { ButtonLink } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 /**
  * Gelen Kutusu — birleşik iletişim akışı (v1: salt görünüm + navigasyon).
@@ -307,43 +309,35 @@ export default async function InboxPage({
 
   return (
     <div className="space-y-6">
-      {/* Hero + KPI */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/35 blur-[70px]" />
-        <div className="relative flex flex-wrap items-start justify-between gap-5">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-              <span className="status-pulse h-2 w-2 rounded-full bg-mint-400" /> İletişim akışı canlı
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Gelen Kutusu</h1>
-            <p className="mt-1 text-sm text-white/60">
-              SMS, WhatsApp, e-posta, çağrı ve notlar — tüm iletişim tek kronolojik akışta.
-            </p>
-          </div>
-        </div>
-        <div className="relative mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[
-            { label: "Bugün gelen", value: kpiToday, icon: ArrowDownLeft, href: `/app/gelen-kutusu?yon=gelen&from=${todayParam}` },
-            { label: "Bu hafta", value: kpiWeek, icon: CalendarClock, href: `/app/gelen-kutusu?from=${weekParam}` },
-            { label: "Cevapsız (7g)", value: kpiMissed, icon: PhoneMissed, href: `/app/gelen-kutusu?yon=cevapsiz&from=${weekParam}` },
-            { label: "Eşleşmemiş", value: kpiUnmatched, icon: UserX, href: "/app/gelen-kutusu?durum=eslesmemis" },
-          ].map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
-            >
-              <div className="flex items-start justify-between">
-                <item.icon className="h-4 w-4 text-mint-400" />
-                <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-              </div>
-              <p className="mt-2 font-display text-xl font-extrabold text-white">{item.value.toLocaleString("tr-TR")}</p>
-              <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
+      <PageHeader
+        title="Gelen Kutusu"
+        description="SMS, WhatsApp, e-posta, çağrı ve notlar — tüm iletişim tek kronolojik akışta."
+        actions={
+          <ButtonLink href="/app/musteriler" variant="primary" icon={Users}>
+            Müşterilere git
+          </ButtonLink>
+        }
+      />
+
+      {/* Kompakt, tıklanabilir özet — sıfır değerler sönük */}
+      <Card className="flex flex-wrap items-center gap-x-2 gap-y-1 p-2">
+        {[
+          { label: "Bugün gelen", value: kpiToday, icon: ArrowDownLeft, href: `/app/gelen-kutusu?yon=gelen&from=${todayParam}` },
+          { label: "Bu hafta", value: kpiWeek, icon: CalendarClock, href: `/app/gelen-kutusu?from=${weekParam}` },
+          { label: "Cevapsız (7g)", value: kpiMissed, icon: PhoneMissed, href: `/app/gelen-kutusu?yon=cevapsiz&from=${weekParam}` },
+          { label: "Eşleşmemiş", value: kpiUnmatched, icon: UserX, href: "/app/gelen-kutusu?durum=eslesmemis" },
+        ].map((item) => (
+          <Link
+            key={item.label}
+            href={item.href}
+            className={`focus-ring press flex items-center gap-2.5 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-canvas ${item.value === 0 ? "opacity-55" : ""}`}
+          >
+            <item.icon className="h-4 w-4 text-brand-600" />
+            <span className="font-display text-lg font-bold leading-none text-text">{item.value.toLocaleString("tr-TR")}</span>
+            <span className="text-xs text-text-muted">{item.label}</span>
+          </Link>
+        ))}
+      </Card>
 
       {/* Filtreler — GET formu (sayfa 1'e döner) + kanal çipleri link olarak */}
       <div className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] space-y-3">
