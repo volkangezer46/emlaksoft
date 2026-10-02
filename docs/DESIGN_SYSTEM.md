@@ -51,3 +51,24 @@ Sekme linkleri mevcut parametreleri korur ve `page`'i sıfırlar. Panel alanlar�
 - `href`siz KPI, sahte skor, sessiz boş durum.
 - Dokunma hedefi 32px altı, odak halkasız (`focus-ring`) etkileşimli öğe.
 - Dark modu bozan sabit `bg-white` / `text-black`.
+
+## DataTable (premium liste tablosu)
+
+`ui/data-table.tsx` — Server Component'ten çağrılır; kolonlar bildirimseldir (`format`), render fonksiyonu yoktur.
+Aşağıdaki özelliklerin HEPSİ opt-in; hiçbiri verilmezse davranış eskisiyle birebir aynıdır. Saf mantık `ui/data-table-logic.ts` (testli).
+
+| Prop | Etki |
+|---|---|
+| `densityToggle` + `defaultDensity` | Rahat 44 / Normal 40 / Sıkı 32px anahtarı (`aria-pressed`). Sıkı'da alt satır gizlenir. |
+| `storageKey` | Yoğunluk ve gizli sütunlar `localStorage`'da kalır (`<key>:density`, `<key>:columns`; try/catch, hydration güvenli). Tabloya özgü benzersiz ad ver. |
+| `columnMenu` | "Sütunlar" menüsü; ilk sütun ve `pinned` sütunlar gizlenemez. |
+| `stickyHeader` | `true` → kap 70vh, başlık yapışır; string ile özel `max-height`. |
+| `selectable` + `bulkActions` | Onay kutusu sütunu (sayfa için tümünü seç, ara durum) + alt yapışık "N kayıt seçili" çubuğu. `bulkActions` bir ELEMENT'tir; içindeki client bileşen `useDataTableSelection()` ile `selectedIds`/`clear` alır. Yalnız `id` alanı olan satırlar seçilir. |
+| `keyboardNav` | Satır `tabIndex` ile roving odak: ↑/↓, `j`/`k`, Home/End, PageUp/Down gezinir; Enter satır linkini açar; Space seçer (`selectable` ise); Esc seçimi temizler. Odak halkası `outline` ile. |
+| `revealRowActions` | `rowActions` yalnız hover / satır odağı / dokunmatikte görünür (Attio tarzı). |
+| `mobileCards` | ≤640px'de tablo yerine kart listesi. `column.priority`: `primary` (kart başlığı, varsayılan ilk sütun), `secondary` (etiketli satır, varsayılan), `hidden`. |
+| `loading` / `loadingRows` | Gövde yerine iskelet satırlar (`aria-busy`). |
+| `empty` | `{ title, description, icon, action }` — EmptyStateV3 (`bare`) ile gösterilir; arama boşluğunda "Aramayı temizle" eylemi otomatik. |
+| `caption` | Ekran okuyucu için tablo adı. |
+
+Kural: yeni tablo sayfasında `keyboardNav`, `densityToggle` + `storageKey` ve çok sütunlu ise `columnMenu`/`mobileCards` açılması önerilir.

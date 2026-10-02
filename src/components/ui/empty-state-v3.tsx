@@ -14,6 +14,7 @@ export function EmptyStateV3({
   icon,
   action,
   variant = "full",
+  bare = false,
   className,
 }: {
   title: string;
@@ -21,6 +22,8 @@ export function EmptyStateV3({
   icon?: ReactNode;
   action?: ReactNode;
   variant?: "inline" | "compact" | "full";
+  /** `full` varyantta kesikli çerçeve/zemin olmadan (tablo/kart içine gömülü). */
+  bare?: boolean;
   className?: string;
 }) {
   if (variant === "inline") {
@@ -46,7 +49,7 @@ export function EmptyStateV3({
       className={cn(
         "flex flex-col items-center text-center",
         full
-          ? "gap-3 rounded-[var(--radius-card)] border border-dashed border-line bg-surface px-6 py-12"
+          ? cn("gap-3 px-6 py-12", !bare && "rounded-[var(--radius-card)] border border-dashed border-line bg-surface")
           : "gap-1.5 px-4 py-6",
         className,
       )}
