@@ -1,166 +1,58 @@
 import Link from "next/link";
-import { ShieldAlert } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { Calculator, LineChart } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
-import {
-  DEFAULT_DOWN_PAYMENT_PCT,
-  DEFAULT_LOAN_MONTHS,
-  DEFAULT_MONTHLY_RATE_PCT,
-  DEFAULT_RATES,
-  MAX_LOAN_MONTHS,
-  MIN_LOAN_MONTHS,
-  type DeedFeeShare,
-} from "@/lib/purchase-costs";
-import { PurchaseCalculator, type CalculatorProperty } from "./calculator";
+import { cn } from "@/lib/utils";
+import { CalculatorView, type CalculatorSearchParams } from "./calculator-view";
+import { InvestmentView, type InvestmentSearchParams } from "../yatirim/investment-view";
 
-import { PageHeader } from "@/components/ui/page-header";
-export const metadata = { title: "Alım maliyeti hesaplayıcı" };
+export const metadata = { title: "Hesaplayıcılar" };
 
-/** features.sqm — string ("120" / "120,5") ya da number gelebilir. */
-function sqmOf(features: unknown): number | null {
-  const raw = (features as { sqm?: number | string | null } | null)?.sqm;
-  const n = typeof raw === "string" ? Number(raw.replace(",", ".")) : Number(raw);
-  return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
-}
-
-/** URL paramı → sayı. Geçersizse `fallback`. */
-function num(raw: string | undefined, fallback: number): number {
-  if (raw == null || raw === "") return fallback;
-  const n = Number(String(raw).replace(",", "."));
-  return Number.isFinite(n) && n >= 0 ? n : fallback;
-}
+const TABS = [
+  { id: "maliyet", label: "Alım maliyeti & kredi", href: "/app/hesaplayici", icon: Calculator },
+  { id: "yatirim", label: "Yatırım getirisi", href: "/app/hesaplayici?sekme=yatirim", icon: LineChart },
+] as const;
 
 /**
- * Alım maliyeti & kredi hesaplayıcısı.
+ * Hesaplayıcılar: alım maliyeti & kredi + yatırım getirisi tek sayfada, iki sekme.
+ * `?sekme=yatirim` yatırım analizini açar; diğer değerler ("kredi", "maliyet", boş)
+ * alım maliyeti sekmesine gider (eski `?sekme=kredi` bağlantıları çalışır).
+ * Eski /app/yatirim yolu parametreleri koruyarak buraya yönlendirir.
  *
- * MODÜL KAPISI: `valuation` — projede değerleme/analiz ekranlarının anahtarı
- * budur (bkz. /app/degerleme). Yeni modül anahtarı AÇILMADI; hesaplayıcı
- * değerleme ailesinin bir parçası olarak aynı kapıdan geçer.
- *
- * SEARCHPARAMS: Sayfa tamamen link'lenebilir — "Müşteriye gönder" düğmesi
- * hesap parametrelerini URL'e yazar, link açıldığında aynı sonuç görünür.
- * Bu yüzden tüm parametreler burada okunup istemciye ilk değer olarak geçer.
+ * MODÜL KAPISI: iki sekme de `valuation` — tek kapı.
  */
-export default async function CalculatorPage({
+export default async function CalculatorsPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    portfoy?: string;
-    fiyat?: string;
-    pesinat?: string;
-    vade?: string;
-    faiz?: string;
-    komisyon?: string;
-    harc?: string;
-    m2?: string;
-    sekme?: string;
-  }>;
+  searchParams: Promise<CalculatorSearchParams & InvestmentSearchParams>;
 }) {
   await requireModulePage("valuation");
   const sp = await searchParams;
-  const supabase = await createClient();
-
-  // Portföy listesi: fiyatı girilmiş satılık portföyler (hesap satış bedeli
-  // üzerinden kurulduğu için fiyatsız kayıt seçici de anlamsız).
-  const { data: propertyRows } = await supabase
-    .from("properties")
-    .select("id, property_code, title, list_price, transaction_type, features")
-    .is("deleted_at", null)
-    .gt("list_price", 0)
-    .order("created_at", { ascending: false })
-    .limit(150);
-
-  const properties: CalculatorProperty[] = (propertyRows ?? []).map((p) => ({
-    id: p.id,
-    label: p.title || p.property_code,
-    code: p.property_code,
-    price: p.list_price != null ? Number(p.list_price) : null,
-    sqm: sqmOf(p.features),
-    transactionType: p.transaction_type ?? null,
-  }));
-
-  // `?portfoy=` listede yoksa (150 kayıt sınırının dışında) tek tek çekilir —
-  // portföy detayından gelen link her zaman çalışsın.
-  let selected = properties.find((p) => p.id === sp.portfoy) ?? null;
-  if (sp.portfoy && !selected) {
-    const { data: one } = await supabase
-      .from("properties")
-      .select("id, property_code, title, list_price, transaction_type, features")
-      .eq("id", sp.portfoy)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (one) {
-      selected = {
-        id: one.id,
-        label: one.title || one.property_code,
-        code: one.property_code,
-        price: one.list_price != null ? Number(one.list_price) : null,
-        sqm: sqmOf(one.features),
-        transactionType: one.transaction_type ?? null,
-      };
-      properties.unshift(selected);
-    }
-  }
-
-  // Öncelik: URL'deki açık değer > seçili portföyün değeri > varsayılan.
-  const price = num(sp.fiyat, selected?.price ?? 0);
-  const sqm = num(sp.m2, selected?.sqm ?? 0);
-  const downPayment =
-    sp.pesinat != null && sp.pesinat !== ""
-      ? num(sp.pesinat, 0)
-      : price > 0
-        ? Math.round((price * DEFAULT_DOWN_PAYMENT_PCT) / 100)
-        : 0;
-  const months = Math.min(
-    MAX_LOAN_MONTHS,
-    Math.max(MIN_LOAN_MONTHS, Math.round(num(sp.vade, DEFAULT_LOAN_MONTHS))),
-  );
-  const deedFeeShare: DeedFeeShare = sp.harc === "buyer" ? "buyer" : "half";
+  const active = sp.sekme === "yatirim" ? "yatirim" : "maliyet";
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Alım maliyeti & kredi hesaplayıcı" eyebrow={"Müşteri sorusu: \"cebimden ne çıkar?\""} description="Tapu harcı, döner sermaye, komisyon, sigorta ve kredi masraflarını kalem kalem çıkarır; peşinat + masraf toplamını ve aylık taksidi tek ekranda gösterir. Sonucu tek tıkla müşteriye link olarak gönderin." />
-<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative"><p className="mt-4 inline-flex items-start gap-2 rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/70">
-            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
-            Oranlar mevzuata göre sabitlenmiştir ({DEFAULT_RATES.deedFeeTotalPct}% tapu harcı, %
-            {DEFAULT_RATES.loanAllocationFeePct} kredi tahsis tavanı). Mevzuat değişirse tek dosyadan güncellenir —
-            çıktı her hâlükârda <strong className="text-white">yaklaşıktır</strong>.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2 text-xs">
-            <Link
-              href="/app/degerleme"
-              className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3 py-2 font-semibold text-white/80 transition hover:border-white/35"
-            >
-              Değerleme motoru →
-            </Link>
-            <Link
-              href="/app/yatirim"
-              className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3 py-2 font-semibold text-white/80 transition hover:border-white/35"
-            >
-              Yatırım analizi →
-            </Link>
-            <Link
-              href="/app/portfoyler"
-              className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3 py-2 font-semibold text-white/80 transition hover:border-white/35"
-            >
-              Portföyler →
-            </Link>
-          </div></div></section>
-
-      <PurchaseCalculator
-        properties={properties}
-        initial={{
-          propertyId: selected?.id ?? "",
-          price,
-          downPayment,
-          months,
-          monthlyRatePct: num(sp.faiz, DEFAULT_MONTHLY_RATE_PCT),
-          commissionPct: num(sp.komisyon, DEFAULT_RATES.commissionPct),
-          deedFeeShare,
-          sqm,
-          tab: sp.sekme === "kredi" ? "kredi" : "maliyet",
-        }}
-      />
+      <nav aria-label="Hesaplayıcı sekmeleri" className="no-print -mx-1 overflow-x-auto px-1">
+        <ul className="inline-flex min-w-max items-center gap-1 rounded-[var(--radius-card)] border border-line bg-canvas p-1">
+          {TABS.map((tab) => (
+            <li key={tab.id}>
+              <Link
+                href={tab.href}
+                aria-current={tab.id === active ? "page" : undefined}
+                className={cn(
+                  "focus-ring inline-flex items-center gap-2 rounded-[var(--radius-control)] px-3.5 py-1.5 text-sm font-semibold transition",
+                  tab.id === active
+                    ? "bg-surface text-ink-950 shadow-[var(--shadow-xs)]"
+                    : "text-text-muted hover:text-ink-950",
+                )}
+              >
+                <tab.icon className="h-3.5 w-3.5" aria-hidden />
+                {tab.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      {active === "yatirim" ? <InvestmentView sp={sp} /> : <CalculatorView sp={sp} />}
     </div>
   );
 }

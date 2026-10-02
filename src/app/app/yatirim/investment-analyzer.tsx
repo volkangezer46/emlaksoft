@@ -338,11 +338,11 @@ export function InvestmentAnalyzer({
 
   function selectProperty(id: string) {
     if (!id) return;
-    router.push(`/app/yatirim?portfoy=${id}`);
+    router.push(`/app/hesaplayici?sekme=yatirim&portfoy=${id}`);
   }
 
   async function copyShareLink() {
-    const url = `${window.location.origin}/app/yatirim?${shareParams.toString()}`;
+    const url = `${window.location.origin}/app/hesaplayici?sekme=yatirim&${shareParams.toString()}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
