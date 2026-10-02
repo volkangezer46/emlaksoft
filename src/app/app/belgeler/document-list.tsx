@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { createPortal } from "react-dom";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -18,6 +17,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Dialog,
+  DialogDescription,
+  DialogFullscreenContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/components/app/toast-provider";
 import { bulkDeleteDocuments, deleteDocument } from "@/app/actions/documents";
 import {
@@ -323,11 +328,11 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
 }
 
 /**
- * Görsel önizleme — paketsiz, portal ile body'ye basılır.
+ * Görsel önizleme — ortak Radix tam ekran primitive'i ile body portalına basılır.
  * `GalleryLightbox` yeniden kullanılamadı: o bileşen kaynağı sabit olarak
  * `/api/property-media/[id]` kuruyor; belge merkezinde görseller iki farklı
- * yetkili uçtan gelir. Klavye/odak davranışı (Esc, ok tuşları, scroll kilidi)
- * aynı desende.
+ * yetkili uçtan gelir. Esc, focus trap, scroll kilidi ve focus dönüşünü ortak
+ * dialog sağlar; görseller arası ok tuşu davranışı burada kalır.
  */
 function Lightbox({
   images,
@@ -340,39 +345,32 @@ function Lightbox({
   onIndex: (i: number) => void;
   onClose: () => void;
 }) {
-  const dialogRef = useRef<HTMLDivElement>(null);
   const count = images.length;
   const prev = useCallback(() => onIndex((index - 1 + count) % count), [index, count, onIndex]);
   const next = useCallback(() => onIndex((index + 1) % count), [index, count, onIndex]);
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowLeft") prev();
-      else if (e.key === "ArrowRight") next();
-    }
-    window.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialogRef.current?.focus();
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [prev, next, onClose]);
-
   const current = images[index];
 
-  return createPortal(
-    <div
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
-      aria-label={`${current.name} önizleme`}
-      tabIndex={-1}
-      onClick={onClose}
-      className="fixed inset-0 z-[100] flex flex-col bg-ink-950/95 outline-none backdrop-blur-sm"
-    >
+  return (
+    <Dialog open onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogFullscreenContent
+        overlayClassName="bg-ink-950/95 backdrop-blur-sm"
+        className="flex flex-col bg-ink-950/95"
+        onClick={onClose}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowLeft") {
+            event.preventDefault();
+            prev();
+          } else if (event.key === "ArrowRight") {
+            event.preventDefault();
+            next();
+          }
+        }}
+      >
+      <DialogTitle className="sr-only">{current.name} önizleme</DialogTitle>
+      <DialogDescription className="sr-only">
+        {count} görsellik belge önizlemesi. Önceki ve sonraki görsele ok tuşlarıyla geçebilirsiniz.
+      </DialogDescription>
       <div className="flex items-center justify-between gap-3 px-4 py-3 text-white" onClick={(e) => e.stopPropagation()}>
         <span className="min-w-0 truncate text-sm font-semibold text-white/85">
           {current.name}
@@ -433,7 +431,7 @@ function Lightbox({
           </>
         ) : null}
       </div>
-    </div>,
-    document.body,
+      </DialogFullscreenContent>
+    </Dialog>
   );
 }

@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { notifyTenant } from "@/lib/notify";
 import { isValidTurkishMobile, normalizeTurkishPhone, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 export type PublicReferralResult = {
   ok?: boolean;
@@ -42,18 +43,39 @@ export async function submitReferralByToken(fd: FormData): Promise<PublicReferra
 
   // Token tahmini / spam koruması — IP başına dakikada 8 tavsiye denemesi.
   const ip = await clientIp();
-  const { allowed } = await checkRateLimit(`tavsiye:${ip}`, { limit: 8, windowSec: 60 });
+  const { allowed } = await checkRateLimit(`tavsiye:${ip}`, {
+    limit: 8,
+    windowSec: 60,
+    failurePolicy: "deny",
+  });
   if (!allowed) return { error: "Çok fazla istek. Lütfen biraz sonra tekrar deneyin." };
 
   const admin = createAdminClient();
   const { data: link } = await admin
     .from("referral_links")
-    .select("id, tenant_id, customer_id, staff_id, created_by, is_active, customer:customers(full_name)")
+    .select("id, tenant_id, customer_id, staff_id, created_by, is_active")
     .eq("public_token", token)
     .maybeSingle();
 
   if (!link) return { error: "Bağlantı geçersiz veya kaldırılmış." };
+  const { data: tenant } = await admin
+    .from("tenants")
+    .select("status")
+    .eq("id", link.tenant_id)
+    .maybeSingle();
+  if (!tenant || !isPublicTenantActive(tenant.status)) {
+    return { error: "Bağlantı geçersiz veya kaldırılmış." };
+  }
   if (link.is_active === false) return { error: "Bu tavsiye bağlantısı kapatılmış." };
+
+  const { data: referrer } = await admin
+    .from("customers")
+    .select("full_name")
+    .eq("id", link.customer_id)
+    .eq("tenant_id", link.tenant_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!referrer) return { error: "Bağlantı geçersiz veya kaldırılmış." };
 
   const phone = normalizeTurkishPhone(phoneRaw);
 
@@ -62,6 +84,7 @@ export async function submitReferralByToken(fd: FormData): Promise<PublicReferra
   const { data: existing } = await admin
     .from("referrals")
     .select("id")
+    .eq("tenant_id", link.tenant_id)
     .eq("link_id", link.id)
     .eq("referred_phone", phone)
     .limit(1)
@@ -87,12 +110,20 @@ export async function submitReferralByToken(fd: FormData): Promise<PublicReferra
 
   // Danışmana bildirim — hata teşekkür ekranını düşürmesin.
   try {
-    const rel = link.customer as { full_name?: string } | { full_name?: string }[] | null;
-    const referrerName = (Array.isArray(rel) ? rel[0]?.full_name : rel?.full_name) ?? "Bir müşteriniz";
-    const target = (link.staff_id as string | null) ?? (link.created_by as string | null) ?? null;
+    const referrerName = referrer.full_name ?? "Bir müşteriniz";
+    const targetId = (link.staff_id as string | null) ?? (link.created_by as string | null) ?? null;
+    const { data: target } = targetId
+      ? await admin
+          .from("profiles")
+          .select("id")
+          .eq("id", targetId)
+          .eq("tenant_id", link.tenant_id)
+          .eq("is_active", true)
+          .maybeSingle()
+      : { data: null };
     await notifyTenant({
       tenantId: String(link.tenant_id),
-      userId: target,
+      userId: target?.id ?? null,
       title: `🤝 Yeni tavsiye: ${name} — ${referrerName} yönlendirdi`,
       body: note ? note.slice(0, 160) : "Tavsiye edilen kişiyi bugün arayın; sıcak temas hızlı kapanır.",
       href: "/app/tavsiyeler?durum=yeni",

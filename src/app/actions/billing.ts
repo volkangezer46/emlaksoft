@@ -1,12 +1,26 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { PLANS, planAmountTry, type BillingCycle, type PlanId } from "@/lib/billing/plans";
-import { initializeCheckoutForm, isIyzicoConfigured } from "@/lib/billing/iyzico";
-import { createCheckoutInvoice, fulfillSuccessfulPayment } from "@/lib/billing/fulfillment";
-import { toE164TurkishPhone } from "@/lib/phone";
+import {
+  IYZICO_CURRENCY,
+  initializeCheckoutForm,
+  isIyzicoConfigured,
+} from "@/lib/billing/iyzico";
+import {
+  assertBillingPlanPreflight,
+  createCheckoutInvoice,
+  fulfillSuccessfulPayment,
+  invoiceAmountsTry,
+  markCheckoutInvoiceFailed,
+  markCheckoutInvoiceInitialized,
+} from "@/lib/billing/fulfillment";
+import { clientIp } from "@/lib/rate-limit";
+import { validateCheckoutBuyer, type ValidatedCheckoutBuyer } from "@/lib/billing/buyer";
+import { getBaseUrl } from "@/lib/base-url";
 
 export type CheckoutResult = {
   error?: string;
@@ -17,14 +31,7 @@ export type CheckoutResult = {
 const PLAN_IDS = new Set(PLANS.map((p) => p.id));
 
 function appUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
-}
-
-function splitName(full: string) {
-  const parts = full.trim().split(/\s+/);
-  const name = parts[0] || "Ofis";
-  const surname = parts.slice(1).join(" ") || "Yönetici";
-  return { name, surname };
+  return getBaseUrl();
 }
 
 export async function startPlanCheckout(formData: FormData): Promise<CheckoutResult> {
@@ -43,41 +50,87 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
   if (!user) return { error: "Oturum bulunamadı." };
 
   const [{ data: tenant }, { data: profile }, { data: sub }] = await Promise.all([
-    supabase.from("tenants").select("id, name, plan, tax_number").eq("id", gate.tenantId).maybeSingle(),
+    supabase
+      .from("tenants")
+      .select("id, name, plan, tax_number, phone, address_line, city")
+      .eq("id", gate.tenantId)
+      .maybeSingle(),
     supabase.from("profiles").select("full_name, phone").eq("id", user.id).maybeSingle(),
     supabase.from("subscriptions").select("id").eq("tenant_id", gate.tenantId).maybeSingle(),
   ]);
 
   if (!tenant) return { error: "Ofis bulunamadı." };
 
+  try {
+    await assertBillingPlanPreflight(gate.tenantId, plan);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Paket kapasitesi doğrulanamadı." };
+  }
+
   const amountTry = planAmountTry(plan, cycle);
-  const conversationId = `es-${gate.tenantId.slice(0, 8)}-${Date.now()}`;
+  const invoiceAmounts = invoiceAmountsTry(amountTry);
+  const conversationId = `es-${gate.tenantId.slice(0, 8)}-${randomBytes(12).toString("hex")}`;
+  const configured = isIyzicoConfigured();
+  const demoAllowed = process.env.NODE_ENV !== "production" || process.env.ALLOW_BILLING_DEMO === "true";
+  let checkoutBuyer: ValidatedCheckoutBuyer | null = null;
 
-  await createCheckoutInvoice({
-    tenantId: gate.tenantId,
-    subscriptionId: sub?.id ?? null,
-    plan,
-    cycle,
-    conversationId,
-    amountTry,
-  });
+  if (!configured && !demoAllowed) {
+    return { error: "Ödeme altyapısı yapılandırılmamış. Lütfen yönetici ile iletişime geçin." };
+  }
 
-  // Sandbox anahtarı yoksa: demo ödeme akışı — YALNIZCA geliştirmede/açıkça izin verildiğinde.
-  // Production'da iyzico yoksa demo tahsilatla ücretsiz abonelik verilmesi engellenir.
-  if (!isIyzicoConfigured()) {
-    const demoAllowed = process.env.NODE_ENV !== "production" || process.env.ALLOW_BILLING_DEMO === "true";
-    if (!demoAllowed) {
-      return { error: "Ödeme altyapısı yapılandırılmamış. Lütfen yönetici ile iletişime geçin." };
+  if (configured) {
+    try {
+      checkoutBuyer = validateCheckoutBuyer({
+        id: user.id,
+        fullName: profile?.full_name,
+        email: user.email,
+        phone: profile?.phone || tenant.phone,
+        identityNumber: tenant.tax_number,
+        address: tenant.address_line,
+        city: tenant.city,
+        ip: await clientIp(),
+      });
+    } catch (error) {
+      return {
+        error: error instanceof Error
+          ? `${error.message} Ofis ve fatura bilgilerini Ayarlar bölümünden tamamlayın.`
+          : "Ödeme sahibi bilgileri doğrulanamadı.",
+      };
     }
-    await fulfillSuccessfulPayment({
+  }
+
+  let invoiceId: string;
+  try {
+    invoiceId = await createCheckoutInvoice({
       tenantId: gate.tenantId,
+      subscriptionId: sub?.id ?? null,
       plan,
       cycle,
       conversationId,
-      paymentId: `demo-${conversationId}`,
       amountTry,
-      source: "demo",
     });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Fatura taslağı oluşturulamadı." };
+  }
+
+  // Sandbox anahtarı yoksa: demo ödeme akışı — YALNIZCA geliştirmede/açıkça izin verildiğinde.
+  // Production'da iyzico yoksa demo tahsilatla ücretsiz abonelik verilmesi engellenir.
+  if (!configured) {
+    try {
+      await fulfillSuccessfulPayment({
+        tenantId: gate.tenantId,
+        plan,
+        cycle,
+        conversationId,
+        paymentId: `demo-${conversationId}`,
+        expectedAmountTry: invoiceAmounts.totalTry,
+        expectedCurrency: IYZICO_CURRENCY,
+        source: "demo",
+      });
+    } catch (error) {
+      await markCheckoutInvoiceFailed({ invoiceId, tenantId: gate.tenantId });
+      return { error: error instanceof Error ? error.message : "Demo tahsilat tamamlanamadı." };
+    }
     revalidatePath("/app/abonelik");
     revalidatePath("/app/ayarlar");
     revalidatePath("/admin/billing");
@@ -87,44 +140,27 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
     };
   }
 
-  const fullName = profile?.full_name || tenant.name || "Ofis Yöneticisi";
-  const { name, surname } = splitName(fullName);
-  const gsmNumber = toE164TurkishPhone(profile?.phone) || "+905555555555";
-  const email = user.email || "billing@emlaksoft.test";
-
   try {
     const init = await initializeCheckoutForm({
       conversationId,
-      price: amountTry,
-      paidPrice: amountTry,
+      price: invoiceAmounts.totalTry,
+      paidPrice: invoiceAmounts.totalTry,
       basketId: conversationId,
       callbackUrl: `${appUrl()}/api/iyzico/callback`,
-      buyer: {
-        id: user.id.slice(0, 32),
-        name,
-        surname,
-        email,
-        gsmNumber,
-        identityNumber: "11111111111",
-        registrationAddress: tenant.name || "Türkiye",
-        city: "Istanbul",
-        country: "Turkey",
-      },
-      billingAddress: {
-        contactName: fullName,
-        city: "Istanbul",
-        country: "Turkey",
-        address: tenant.name || "Türkiye",
-      },
+      buyer: checkoutBuyer!.buyer,
+      billingAddress: checkoutBuyer!.billingAddress,
       basketItemName: `EmlakSoft ${plan} (${cycle === "yearly" ? "yıllık" : "aylık"})`,
     });
 
     if (init.status !== "success" || !init.paymentPageUrl) {
+      await markCheckoutInvoiceFailed({ invoiceId, tenantId: gate.tenantId });
       return { error: init.errorMessage || "Ödeme oturumu açılamadı." };
     }
 
+    await markCheckoutInvoiceInitialized({ invoiceId, tenantId: gate.tenantId });
     return { checkoutUrl: init.paymentPageUrl };
   } catch (e) {
+    await markCheckoutInvoiceFailed({ invoiceId, tenantId: gate.tenantId });
     console.error("startPlanCheckout", e);
     return { error: e instanceof Error ? e.message : "iyzico bağlantı hatası." };
   }

@@ -37,6 +37,7 @@ export type NotifPrefKey =
   | "priceDrop"
   | "savedSearch"
   | "share"
+  | "support"
   | "dunning"
   | "rentOverdue"
   | "network";
@@ -59,17 +60,26 @@ export async function notifyTenant(input: {
 }) {
   const admin = createAdminClient();
 
-  if (input.prefKey && input.userId) {
-    const { data: profile } = await admin
+  if (input.userId) {
+    const { data: profile, error: profileError } = await admin
       .from("profiles")
       .select("notification_prefs")
       .eq("id", input.userId)
+      .eq("tenant_id", input.tenantId)
+      .eq("is_active", true)
       .maybeSingle();
+    if (profileError) throw new Error("Bildirim hedefi doğrulanamadı.");
+    if (!profile) throw new Error("Bildirim hedefi bu ofiste aktif değil.");
     const prefs = profile?.notification_prefs as Record<string, unknown> | null | undefined;
-    if (prefs && typeof prefs === "object" && prefs[input.prefKey] === false) return;
+    if (
+      input.prefKey
+      && prefs
+      && typeof prefs === "object"
+      && prefs[input.prefKey] === false
+    ) return;
   }
 
-  await admin.from("notifications").insert({
+  const { error: notificationError } = await admin.from("notifications").insert({
     tenant_id: input.tenantId,
     user_id: input.userId ?? null,
     title: input.title,
@@ -77,6 +87,7 @@ export async function notifyTenant(input: {
     href: input.href ?? null,
     kind: input.kind ?? "info",
   });
+  if (notificationError) throw new Error("Bildirim kalıcılaştırılamadı.");
 
   if (input.userId) {
     // Best-effort: VAPID yoksa sessizce atlar, bildirim satırı zaten yazıldı.

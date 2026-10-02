@@ -5,143 +5,199 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { requirePlatformStaff, requirePlatformModule } from "@/lib/platform";
-import { IMPERSONATE_COOKIE } from "@/lib/impersonation";
+import {
+  getPlatformStaffIdentity,
+  requirePlatformModule,
+} from "@/lib/platform";
+import {
+  IMPERSONATE_COOKIE,
+  impersonationCookieOptions,
+  restoreImpersonationMetadata,
+} from "@/lib/impersonation";
 import { logActivity } from "@/lib/activity";
-import { getPlan, type PlanId } from "@/lib/billing/plans";
+import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 
 export type PlatformResult = { error?: string; ok?: boolean; redirectTo?: string };
 
 const PLANS = ["advisor", "office", "professional", "enterprise"] as const;
 const STATUSES = ["trial", "active", "past_due", "suspended", "cancelled"] as const;
+const IMPERSONATION_ROLES: ReadonlySet<string> = new Set(["super_admin", "ops", "support"]);
 
 export async function updateTenantPlanStatus(formData: FormData): Promise<PlatformResult> {
-  await requirePlatformStaff();
+  const staff = await requirePlatformModule("billing");
 
   const id = String(formData.get("id") ?? "").trim();
   const plan = String(formData.get("plan") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
-
   if (!id) return { error: "Tenant bulunamadı." };
   if (plan && !(PLANS as readonly string[]).includes(plan)) return { error: "Geçersiz paket." };
   if (status && !(STATUSES as readonly string[]).includes(status)) return { error: "Geçersiz durum." };
-
-  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (plan) patch.plan = plan;
-  if (status) patch.status = status;
+  if (!plan && !status) return { ok: true };
 
   const admin = createAdminClient();
-  const { error } = await admin.from("tenants").update(patch).eq("id", id);
+  const { data, error } = await admin.rpc("update_tenant_plan_subscription", {
+    p_tenant_id: id,
+    p_actor_id: staff.id,
+    p_plan: plan || null,
+    p_status: status || null,
+  });
   if (error) {
     console.error("updateTenantPlanStatus", error);
-    return { error: "Tenant güncellenemedi." };
+    return {
+      error:
+        planLimitErrorMessage(error) ??
+        (error.code === "PGRST202"
+          ? "Abonelik güncelleme servisi henüz hazır değil. Veritabanı migration'ını uygulayın."
+          : "Tenant ve abonelik güncellenemedi."),
+    };
   }
-
-  const subPatch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (plan) {
-    subPatch.plan = plan;
-    subPatch.amount_try = getPlan(plan as PlanId).monthlyTry;
-  }
-  if (status) {
-    subPatch.status =
-      status === "trial"
-        ? "trialing"
-        : status === "active"
-          ? "active"
-          : status === "past_due"
-            ? "past_due"
-            : status === "cancelled"
-              ? "cancelled"
-              : "paused";
-  }
-  const { error: subError } = await admin.from("subscriptions").update(subPatch).eq("tenant_id", id);
-  if (subError) console.error("updateTenantPlanStatus subscription", subError);
 
   revalidatePath("/admin");
   revalidatePath("/admin/tenants");
   revalidatePath("/admin/billing");
+  revalidatePath("/vitrin/[slug]", "page");
+  revalidatePath("/vitrin/[slug]/[id]", "page");
+  revalidatePath("/vitrin/[slug]/degerleme", "page");
+  revalidatePath("/vitrin/[slug]/favoriler", "page");
+  revalidatePath("/danisman/[slug]", "page");
+  revalidatePath("/sitemap.xml");
+  const tenantSlug = data && typeof data === "object" && !Array.isArray(data)
+    ? (data as Record<string, unknown>).tenantSlug
+    : null;
+  if (typeof tenantSlug === "string" && tenantSlug) {
+    revalidatePath(`/vitrin/${tenantSlug}`);
+  }
   return { ok: true };
 }
 
-export async function setTenantPlanStatus(formData: FormData): Promise<void> {
-  await updateTenantPlanStatus(formData);
-}
-
-/**
- * Gerçek impersonation: JWT app_metadata.tenant_id + profiles.tenant_id geçici değişir.
- * Rol readonly — yanlışlıkla yıkıcı yazmayı azaltır. Cookie banner için.
- */
 export async function startImpersonation(formData: FormData): Promise<void> {
-  // Impersonation tenant yönetimi yetkisi gerektirir (destek/muhasebe rolü giremez)
   const staff = await requirePlatformModule("tenants");
+  if (!IMPERSONATION_ROLES.has(staff.role)) return;
   const tenantId = String(formData.get("tenant_id") ?? "").trim();
   if (!tenantId) return;
 
   const admin = createAdminClient();
-  const { data: tenant } = await admin.from("tenants").select("id, name").eq("id", tenantId).maybeSingle();
-  if (!tenant) return;
+  const { data: tenant } = await admin
+    .from("tenants")
+    .select("id, name, status")
+    .eq("id", tenantId)
+    .maybeSingle();
+  if (!tenant || tenant.status === "suspended" || tenant.status === "cancelled") return;
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user || user.id !== staff.id) return;
 
   const meta = (user.app_metadata ?? {}) as Record<string, unknown>;
-  const homeTenant =
-    (meta.home_tenant_id as string | undefined) ??
-    (meta.tenant_id as string | undefined) ??
-    null;
-  const homeRole = (meta.home_role as string | undefined) ?? (meta.role as string | undefined) ?? "owner";
+  if (meta.impersonating === true) return;
 
-  const { data: profile } = await admin.from("profiles").select("tenant_id, role").eq("id", staff.id).maybeSingle();
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+  const sessionId = claimsData?.claims?.session_id;
+  if (claimsError || typeof sessionId !== "string" || !sessionId) return;
 
-  await admin.auth.admin.updateUserById(staff.id, {
-    app_metadata: {
-      ...meta,
-      tenant_id: tenantId,
-      role: "readonly",
-      impersonating: true,
-      home_tenant_id: homeTenant ?? profile?.tenant_id ?? null,
-      home_role: homeRole ?? profile?.role ?? "owner",
-    },
-  });
-
-  if (profile) {
-    await admin
-      .from("profiles")
-      .update({
-        tenant_id: tenantId,
-        role: "readonly",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", staff.id);
+  const claimExpiry = Number(claimsData.claims.exp);
+  const nowIso = new Date().toISOString();
+  const { error: staleCleanupError } = await admin
+    .from("platform_impersonation_sessions")
+    .delete()
+    .eq("staff_id", staff.id)
+    .lt("expires_at", nowIso);
+  if (staleCleanupError) {
+    console.error("start impersonation stale snapshot cleanup", staleCleanupError);
+    return;
+  }
+  const expiresAt = new Date(
+    Math.min(
+      Date.now() + 4 * 60 * 60_000,
+      Number.isFinite(claimExpiry) ? claimExpiry * 1000 : Number.MAX_SAFE_INTEGER,
+    ),
+  ).toISOString();
+  const { error: snapshotError } = await admin
+    .from("platform_impersonation_sessions")
+    .insert({
+      staff_id: staff.id,
+      auth_session_id: sessionId,
+      target_tenant_id: tenantId,
+      original_app_metadata: meta,
+      expires_at: expiresAt,
+    });
+  if (snapshotError) {
+    console.error("start impersonation snapshot", snapshotError);
+    return;
   }
 
-  const jar = await cookies();
-  jar.set(IMPERSONATE_COOKIE, tenantId, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 4,
+  const impersonationMeta: Record<string, unknown> = {
+    ...meta,
+    tenant_id: tenantId,
+    role: "readonly",
+    impersonating: true,
+    home_tenant_id: meta.tenant_id ?? null,
+    home_role: meta.role ?? null,
+    impersonation_session_id: sessionId,
+  };
+  const { error: claimError } = await admin.auth.admin.updateUserById(staff.id, {
+    app_metadata: impersonationMeta,
   });
-  jar.set("es_impersonate_name", tenant.name, {
-    httpOnly: false,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 4,
-  });
+  if (claimError) {
+    await admin.from("platform_impersonation_sessions").delete().eq("staff_id", staff.id);
+    console.error("start impersonation claims", claimError);
+    return;
+  }
 
-  await logActivity({
+  const { error: refreshError } = await supabase.auth.refreshSession();
+  if (refreshError) {
+    const { error: compensationError } = await admin.auth.admin.updateUserById(staff.id, {
+      app_metadata: restoreImpersonationMetadata(impersonationMeta, meta),
+    });
+    if (!compensationError) {
+      await admin.from("platform_impersonation_sessions").delete().eq("staff_id", staff.id);
+    }
+    console.error("start impersonation refresh", { refreshError, compensationError });
+    return;
+  }
+
+  const auditResult = await logActivity({
     tenantId,
     actorId: staff.id,
     action: "ops.impersonate.start",
     entityType: "tenant",
     entityId: tenantId,
-    newValue: { tenant: tenant.name },
+    newValue: { tenant: tenant.name, auth_session_id: sessionId },
   });
+  if (!auditResult.ok) {
+    const { error: restoreError } = await admin.auth.admin.updateUserById(staff.id, {
+      app_metadata: restoreImpersonationMetadata(impersonationMeta, meta),
+    });
+    if (!restoreError) {
+      const [{ error: rollbackRefreshError }, { error: snapshotDeleteError }] = await Promise.all([
+        supabase.auth.refreshSession(),
+        admin
+          .from("platform_impersonation_sessions")
+          .delete()
+          .eq("staff_id", staff.id)
+          .eq("auth_session_id", sessionId),
+      ]);
+      if (rollbackRefreshError) await supabase.auth.signOut();
+      console.error("start impersonation audit compensation", {
+        audit: auditResult.error,
+        rollbackRefreshError,
+        snapshotDeleteError,
+      });
+    } else {
+      // Keep the session snapshot so the fail-safe stop flow remains possible.
+      console.error("start impersonation audit compensation", {
+        audit: auditResult.error,
+        restoreError,
+      });
+    }
+    return;
+  }
 
-  await supabase.auth.refreshSession();
+  const jar = await cookies();
+  jar.set(IMPERSONATE_COOKIE, tenantId, impersonationCookieOptions(true));
+  jar.set("es_impersonate_name", tenant.name, impersonationCookieOptions(false));
 
   revalidatePath("/app");
   revalidatePath("/admin/tenants");
@@ -149,55 +205,107 @@ export async function startImpersonation(formData: FormData): Promise<void> {
 }
 
 export async function stopImpersonation(): Promise<void> {
-  const staff = await requirePlatformStaff();
+  const staff = await getPlatformStaffIdentity();
+  if (!staff) redirect("/giris");
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user || user.id !== staff.id) return;
+
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+  const sessionId = claimsData?.claims?.session_id;
+  if (claimsError || typeof sessionId !== "string" || !sessionId) return;
 
   const jar = await cookies();
-  const tenantId = jar.get(IMPERSONATE_COOKIE)?.value;
-  jar.delete(IMPERSONATE_COOKIE);
-  jar.delete("es_impersonate_name");
-
   const admin = createAdminClient();
-  const meta = (user?.app_metadata ?? {}) as Record<string, unknown>;
-  const homeTenant = (meta.home_tenant_id as string | undefined) ?? null;
-  const homeRole = (meta.home_role as string | undefined) ?? "owner";
-
-  if (user && homeTenant) {
-    await admin.auth.admin.updateUserById(staff.id, {
-      app_metadata: {
-        ...meta,
-        tenant_id: homeTenant,
-        role: homeRole,
-        impersonating: false,
-        home_tenant_id: homeTenant,
-        home_role: homeRole,
-      },
-    });
-    await admin
-      .from("profiles")
-      .update({
-        tenant_id: homeTenant,
-        role: homeRole,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", staff.id);
-    await supabase.auth.refreshSession();
+  const meta = (user.app_metadata ?? {}) as Record<string, unknown>;
+  const { data: snapshot, error: snapshotError } = await admin
+    .from("platform_impersonation_sessions")
+    .select("auth_session_id, target_tenant_id, original_app_metadata")
+    .eq("staff_id", staff.id)
+    .maybeSingle();
+  if (snapshotError) {
+    console.error("stop impersonation snapshot", snapshotError);
+    return;
   }
 
+  let tenantId: string | null = null;
+  let original: Record<string, unknown>;
+
+  if (snapshot) {
+    if (snapshot.auth_session_id !== sessionId) {
+      console.error("stop impersonation session mismatch", { staffId: staff.id });
+      return;
+    }
+    tenantId = snapshot.target_tenant_id;
+    original = snapshot.original_app_metadata && typeof snapshot.original_app_metadata === "object"
+      ? snapshot.original_app_metadata as Record<string, unknown>
+      : {};
+  } else if (meta.impersonating === true) {
+    // Rolling-deploy compatibility for sessions started before snapshot table.
+    tenantId = typeof meta.tenant_id === "string" ? meta.tenant_id : null;
+    if (!tenantId) {
+      console.error("stop impersonation legacy target missing", { staffId: staff.id });
+      return;
+    }
+    original = { ...meta };
+    original.tenant_id = meta.home_tenant_id ?? null;
+    original.role = meta.home_role ?? null;
+    delete original.home_tenant_id;
+    delete original.home_role;
+    delete original.impersonation_session_id;
+    original.impersonating = false;
+  } else {
+    jar.delete(IMPERSONATE_COOKIE);
+    jar.delete("es_impersonate_name");
+    redirect("/admin/tenants");
+  }
+
+  const restored = restoreImpersonationMetadata(meta, original);
+  const { error: restoreClaimError } = await admin.auth.admin.updateUserById(staff.id, {
+    app_metadata: restored,
+  });
+  if (restoreClaimError) {
+    console.error("stop impersonation claims", restoreClaimError);
+    return;
+  }
+
+  const { error: refreshError } = await supabase.auth.refreshSession();
+  if (refreshError) {
+    // Snapshot/cookies intentionally stay in place so stop is retryable.
+    console.error("stop impersonation refresh", refreshError);
+    return;
+  }
+
+  let auditFailed = false;
   if (tenantId) {
-    await logActivity({
+    const auditResult = await logActivity({
       tenantId,
       actorId: staff.id,
       action: "ops.impersonate.stop",
       entityType: "tenant",
       entityId: tenantId,
     });
+    auditFailed = !auditResult.ok;
   }
+
+  if (snapshot) {
+    const { error: deleteError } = await admin
+      .from("platform_impersonation_sessions")
+      .delete()
+      .eq("staff_id", staff.id)
+      .eq("auth_session_id", sessionId);
+    if (deleteError) {
+      console.error("stop impersonation snapshot cleanup", deleteError);
+      return;
+    }
+  }
+
+  jar.delete(IMPERSONATE_COOKIE);
+  jar.delete("es_impersonate_name");
 
   revalidatePath("/app");
   revalidatePath("/admin/tenants");
-  redirect("/admin/tenants");
+  redirect(auditFailed ? "/admin/tenants?audit=failed" : "/admin/tenants");
 }

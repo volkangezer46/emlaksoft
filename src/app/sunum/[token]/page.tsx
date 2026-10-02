@@ -20,6 +20,8 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { PrintButton } from "./print-button";
+import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 // Sunum linkleri kişiye özeldir → arama motorlarına kapalı (degerleme-raporu deseni).
 export const metadata: Metadata = {
@@ -84,7 +86,7 @@ export default async function PublicPresentationPage({
   const propertyIds = (pres.property_ids ?? []) as string[];
 
   const [{ data: tenant }, { data: advisor }, { data: propertyData }] = await Promise.all([
-    admin.from("tenants").select("name, phone, logo_url, brand_color").eq("id", pres.tenant_id).maybeSingle(),
+    admin.from("tenants").select("name, status, phone, logo_url, brand_color").eq("id", pres.tenant_id).maybeSingle(),
     pres.created_by
       ? admin.from("profiles").select("full_name, phone").eq("id", pres.created_by).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -99,6 +101,7 @@ export default async function PublicPresentationPage({
           .is("deleted_at", null)
       : Promise.resolve({ data: [] }),
   ]);
+  if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
 
   // Sunum sonrası taslağa çekilen/silinen portföyler linke sızmasın
   // (public medya API'siyle aynı çizgi); seçim sırası korunur.
@@ -114,10 +117,10 @@ export default async function PublicPresentationPage({
     .eq("kind", "image")
     .order("is_cover", { ascending: false })
     .order("sort_order", { ascending: true });
-  const mediaByProperty = new Map<string, string[]>();
+  const mediaByProperty = new Map<string, { id: string; src: string }[]>();
   for (const m of mediaRows ?? []) {
     const list = mediaByProperty.get(m.property_id) ?? [];
-    list.push(m.id);
+    list.push({ id: m.id, src: createShortLivedPropertyMediaUrl(m.id, "presentation") });
     mediaByProperty.set(m.property_id, list);
   }
 
@@ -240,7 +243,7 @@ export default async function PublicPresentationPage({
         {properties.map((property, index) => {
           const feat = (property.features ?? {}) as Feat;
           const images = mediaByProperty.get(property.id as string) ?? [];
-          const coverId = images[0] ?? null;
+          const cover = images[0] ?? null;
           const gallery = images.slice(1, 7);
           const loc = [relName(property.district as Rel), relName(property.province as Rel)]
             .filter(Boolean)
@@ -264,9 +267,9 @@ export default async function PublicPresentationPage({
             >
               {/* Kapak fotoğrafı */}
               <div className="relative aspect-[16/9] w-full overflow-hidden bg-[image:var(--grad-brand-soft)]">
-                {coverId ? (
+                {cover ? (
                   <Image
-                    src={`/api/property-media/${coverId}`}
+                    src={cover.src}
                     alt={(property.title as string | null) ?? (property.property_code as string)}
                     fill
                     sizes="(max-width: 768px) 100vw, 768px"
@@ -330,10 +333,10 @@ export default async function PublicPresentationPage({
 
                 {gallery.length > 0 ? (
                   <div className="print-avoid-break mt-5 grid grid-cols-3 gap-2">
-                    {gallery.map((mid) => (
-                      <div key={mid} className="relative aspect-[4/3] overflow-hidden rounded-[10px] border border-line bg-canvas">
+                    {gallery.map((media) => (
+                      <div key={media.id} className="relative aspect-[4/3] overflow-hidden rounded-[10px] border border-line bg-canvas">
                         <Image
-                          src={`/api/property-media/${mid}`}
+                          src={media.src}
                           alt="Portföy fotoğrafı"
                           fill
                           sizes="(max-width: 768px) 33vw, 240px"

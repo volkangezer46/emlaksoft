@@ -1,6 +1,7 @@
 import { MapPin, Search } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
+import { GeoSyncAutoRefresh } from "./geo-sync-auto-refresh";
 import { ProvinceRow, type ProvinceRowData } from "./province-row";
 
 export default async function AdminGeoPage({
@@ -19,12 +20,21 @@ export default async function AdminGeoPage({
     .order("plate_code", { ascending: true });
   if (query) provinceQuery = provinceQuery.ilike("name", `%${query}%`);
 
-  const [{ data: provinces }, { data: stats }] = await Promise.all([
+  const [{ data: provinces }, { data: stats }, syncResult] = await Promise.all([
     provinceQuery,
     admin.from("geo_province_stats").select("province_id, district_count, neighborhood_count"),
+    admin.from("geo_province_sync_status").select("*"),
   ]);
 
   const statMap = new Map((stats ?? []).map((s) => [s.province_id, s]));
+  const syncMap = new Map(
+    ((syncResult.data ?? []) as Array<Record<string, unknown>>)
+      .filter((row) => typeof row.province_id === "string")
+      .map((row) => [row.province_id as string, row]),
+  );
+  const hasActiveSync = [...syncMap.values()].some((row) => (
+    row.status === "queued" || row.status === "running" || row.status === "retry"
+  ));
   const totalDistricts = (stats ?? []).reduce((sum, s) => sum + (s.district_count ?? 0), 0);
   const totalNeighborhoods = (stats ?? []).reduce((sum, s) => sum + (s.neighborhood_count ?? 0), 0);
 
@@ -38,10 +48,13 @@ export default async function AdminGeoPage({
     population: p.population,
     districtCount: statMap.get(p.id)?.district_count ?? 0,
     neighborhoodCount: statMap.get(p.id)?.neighborhood_count ?? 0,
+    sync: syncMap.get(p.id) ?? null,
+    syncAvailable: !syncResult.error,
   }));
 
   return (
     <div className="space-y-6">
+      <GeoSyncAutoRefresh active={hasActiveSync} />
       <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -51,7 +64,7 @@ export default async function AdminGeoPage({
             </p>
             <h1 className="mt-2 font-display text-3xl font-extrabold">İl · ilçe · mahalle</h1>
             <p className="mt-2 max-w-xl text-sm text-white/60">
-              TurkiyeAPI kaynaklı tam kapsama — admin panelden düzenlenebilir, eklenebilir, pasifleştirilebilir.
+              TurkiyeAPI kaynağıyla il bazlı doğrulama ve eksik tamamlama. Seçilen il öne alınır; diğer il taramaları bekler.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -83,8 +96,13 @@ export default async function AdminGeoPage({
               className="w-full rounded-[10px] border border-line bg-canvas px-8 py-2 text-sm outline-none focus:border-brand-400"
             />
           </form>
-          <p className="text-xs text-text-muted">İl adı ilçe listesini açar; düzenlemek için satırdaki kalem simgesini kullanın.</p>
+          <p className="text-xs text-text-muted">Kaynakta bulunmayan mevcut kayıtlar silinmez; pasif kayıtlar otomatik açılmaz.</p>
         </div>
+        {syncResult.error ? (
+          <div className="border-b border-amber-300/40 bg-amber-500/[0.06] px-5 py-3 text-xs font-medium text-amber-800">
+            İl bazlı tarama altyapısı bu ortamda henüz etkin değil. Mevcut coğrafya kayıtları görüntülenmeye devam eder.
+          </div>
+        ) : null}
         <div>
           {rows.map((p) => (
             <ProvinceRow key={p.id} province={p} />

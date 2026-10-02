@@ -1,10 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { SearchX, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table, TableEmptyRow, TableFrame, TBody, TD, TFoot, TH, THead, TR } from "@/components/ui/table";
 import { ExpenseEditDialog, type Expense } from "./expense-edit-dialog";
+import { deleteExpense } from "@/app/actions/expenses";
+import { useToast } from "@/components/app/toast-provider";
 
 /**
  * Gider listesi — satıra tıklayınca düzenleme diyaloğu açılır.
@@ -41,14 +44,14 @@ export function ExpensesTable({
   categories,
   canEdit,
   canDelete,
-  deleteAction,
 }: {
   expenses: Expense[];
   categories: readonly Category[];
   canEdit: boolean;
   canDelete: boolean;
-  deleteAction: (fd: FormData) => Promise<void>;
 }) {
+  const router = useRouter();
+  const { push } = useToast();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<Expense | null>(null);
 
@@ -151,8 +154,15 @@ export function ExpensesTable({
                           title="Gideri sil"
                           description={`"${e.title}" kaydı kalıcı olarak silinecek. Bu işlem geri alınamaz.`}
                           confirmLabel="Sil"
-                          formAction={deleteAction}
-                          hiddenFields={{ id: e.id }}
+                          onConfirm={async () => {
+                            const result = await deleteExpense(e.id);
+                            if (result.error) {
+                              push(result.error, "err");
+                              return;
+                            }
+                            push("Gider silindi", "ok");
+                            router.refresh();
+                          }}
                           trigger={
                             <button
                               type="button"

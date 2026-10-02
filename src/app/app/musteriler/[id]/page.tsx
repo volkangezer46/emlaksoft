@@ -30,6 +30,7 @@ import type { TimelineItem } from "./customer-timeline-tab";
 import { COMM_CHANNELS } from "@/lib/comm-types";
 import { computeNextBestAction } from "./next-best-action";
 import { isPast, msSince, DAY_MS } from "@/lib/clock";
+import { getBaseUrl } from "@/lib/base-url";
 import { scoreSellerLikelihood, isOwnerCustomer, hasListingIntent } from "@/lib/seller-prediction";
 import { SellerPotentialCard } from "@/components/app/seller-potential-card";
 // Ortak tekil SMS dialogu — tek kopya gelen-kutusu'nda yaşar (Yanıtla da onu kullanır)
@@ -278,7 +279,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const audit = (auditData ?? []) as { id: string; action: string; created_at: string }[];
 
   // Memnuniyet & Paylaşımlar — public link tabanı sunum/anket sayfalarıyla aynı
-  const publicBase = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const publicBase = getBaseUrl();
 
   // Portföy öneri widget'ı için
   const activeDemands = demands

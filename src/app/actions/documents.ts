@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { isDocSource, SOURCE_GATE } from "@/lib/documents";
+import { isSafeTenantObjectPath } from "@/lib/file-validation";
+import { cancelContract } from "@/app/actions/contracts";
 
 /**
  * Belge Merkezi (/app/belgeler) yazma işlemleri.
@@ -34,9 +35,9 @@ export type DocumentResult = { ok?: boolean; error?: string; deleted?: number };
  * Kaynağa göre doğru tabloya giden silme.
  *
  * Kaynak başına davranış (bilinçli olarak farklı):
- *  - musteri  → satır + storage nesnesi silinir (dosyanın kendisi bizde).
- *  - portfoy  → satır + storage nesnesi silinir (harici URL'li video/turda
- *               storage_path null olur, yalnız satır gider).
+ *  - musteri  → satır atomik silinir, storage nesnesi durable outbox'a alınır.
+ *  - portfoy  → satır atomik silinir, storage nesnesi durable outbox'a alınır
+ *               (harici URL'li video/turda storage_path null, yalnız satır gider).
  *  - evrak    → yalnız `file_url` temizlenir; kontrol listesi MADDESİ kalır.
  *               Madde silinseydi "eksik evrak" uyarısı da kaybolurdu; belge
  *               merkezinden dosyayı kaldırmak, evrağı gereksiz kılmaz.
@@ -64,9 +65,12 @@ export async function deleteDocument(kaynak: string, id: string): Promise<Docume
     if (!file) return { error: "Dosya bulunamadı." };
 
     if (file.storage_path) {
-      const admin = createAdminClient();
-      await admin.storage.from("customer-files").remove([file.storage_path]);
+      if (!isSafeTenantObjectPath(file.storage_path, gate.tenantId, file.customer_id)) {
+        console.error("deleteDocument unsafe customer storage path", { id: cleanId });
+        return { error: "Dosya yolu güvenlik doğrulamasından geçemedi." };
+      }
     }
+    // The table trigger queues storage removal in the same DB transaction.
     const { error } = await supabase
       .from("customer_files")
       .delete()
@@ -100,9 +104,12 @@ export async function deleteDocument(kaynak: string, id: string): Promise<Docume
     if (!media) return { error: "Medya bulunamadı." };
 
     if (media.storage_path) {
-      const admin = createAdminClient();
-      await admin.storage.from("property-media").remove([media.storage_path]);
+      if (!isSafeTenantObjectPath(media.storage_path, gate.tenantId, media.property_id)) {
+        console.error("deleteDocument unsafe property storage path", { id: cleanId });
+        return { error: "Medya yolu güvenlik doğrulamasından geçemedi." };
+      }
     }
+    // The table trigger queues storage removal in the same DB transaction.
     const { error } = await supabase
       .from("property_media")
       .delete()
@@ -172,25 +179,8 @@ export async function deleteDocument(kaynak: string, id: string): Promise<Docume
   }
   if (contract.status === "cancelled") return { error: "Sözleşme zaten iptal edilmiş." };
 
-  const { error } = await supabase
-    .from("contracts")
-    .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
-    .eq("id", cleanId)
-    .eq("tenant_id", gate.tenantId);
-  if (error) {
-    console.error("deleteDocument contracts", error);
-    return { error: "Sözleşme iptal edilemedi." };
-  }
-
-  await logActivity({
-    tenantId: gate.tenantId,
-    actorId: gate.userId,
-    action: "contract.cancel",
-    entityType: "contract",
-    entityId: contract.id,
-    oldValue: { title: contract.title, status: contract.status },
-    newValue: { status: "cancelled", kaynak: "belge_merkezi" },
-  });
+  const cancellation = await cancelContract(cleanId);
+  if (!cancellation.ok) return { error: cancellation.error ?? "Sözleşme iptal edilemedi." };
   revalidatePath("/app/belgeler");
   revalidatePath("/app/sozlesmeler");
   return { ok: true, deleted: 1 };

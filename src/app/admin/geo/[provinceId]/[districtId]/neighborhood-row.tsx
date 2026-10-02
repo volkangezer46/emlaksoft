@@ -45,12 +45,14 @@ export function NeighborhoodRow({ neighborhood }: { neighborhood: NeighborhoodRo
         <input type="hidden" name="province_id" value={neighborhood.province_id} />
         <input
           name="name"
+          aria-label="Mahalle adı"
           defaultValue={neighborhood.name}
           required
           className="rounded-[9px] border border-line bg-surface px-2.5 py-1.5 text-sm font-semibold outline-none focus:border-brand-400"
         />
         <input
           name="postal_code"
+          aria-label={`${neighborhood.name} posta kodu`}
           defaultValue={neighborhood.postal_code ?? ""}
           placeholder="Posta kodu"
           className="w-24 rounded-[9px] border border-line bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
@@ -61,13 +63,13 @@ export function NeighborhoodRow({ neighborhood }: { neighborhood: NeighborhoodRo
         </label>
         <div className="flex items-center gap-2">
           <button type="submit" disabled={pending} className="rounded-[8px] bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-ink-800 disabled:opacity-60">
-            {pending ? "..." : "Kaydet"}
+            {pending ? "Kaydediliyor…" : "Kaydet"}
           </button>
-          <button type="button" onClick={() => setEditing(false)} className="grid h-7 w-7 place-items-center rounded-[8px] text-text-muted hover:bg-canvas">
+          <button type="button" aria-label={`${neighborhood.name} düzenlemesini iptal et`} onClick={() => setEditing(false)} className="focus-ring grid h-7 w-7 min-h-8 min-w-8 place-items-center rounded-[8px] text-text-muted hover:bg-canvas">
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
-        {state.error ? <p className="text-xs text-danger-500 sm:col-span-4">{state.error}</p> : null}
+        {state.error ? <p role="alert" className="text-xs text-danger-500 sm:col-span-4">{state.error}</p> : null}
       </form>
     );
   }
@@ -83,7 +85,7 @@ export function NeighborhoodRow({ neighborhood }: { neighborhood: NeighborhoodRo
         </p>
       </div>
       <div className="flex items-center gap-1">
-        <button onClick={() => setEditing(true)} className="grid h-7 w-7 place-items-center rounded-[8px] text-text-muted hover:bg-canvas">
+        <button type="button" aria-label={`${neighborhood.name} mahallesini düzenle`} onClick={() => setEditing(true)} className="focus-ring grid h-7 w-7 min-h-8 min-w-8 place-items-center rounded-[8px] text-text-muted hover:bg-canvas">
           <Pencil className="h-3.5 w-3.5" />
         </button>
         {confirmingDelete ? (
@@ -99,12 +101,12 @@ export function NeighborhoodRow({ neighborhood }: { neighborhood: NeighborhoodRo
             </button>
           </form>
         ) : (
-          <button onClick={() => setConfirmingDelete(true)} className="grid h-7 w-7 place-items-center rounded-[8px] text-text-muted hover:bg-danger-500/10 hover:text-danger-500">
+          <button type="button" aria-label={`${neighborhood.name} mahallesini sil`} onClick={() => setConfirmingDelete(true)} className="focus-ring grid h-7 w-7 min-h-8 min-w-8 place-items-center rounded-[8px] text-text-muted hover:bg-danger-500/10 hover:text-danger-500">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
-      {delState.error ? <p className="w-full text-xs text-danger-500">{delState.error}</p> : null}
+      {delState.error ? <p role="alert" className="w-full text-xs text-danger-500">{delState.error}</p> : null}
     </div>
   );
 }

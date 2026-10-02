@@ -68,7 +68,7 @@ function downloadBlob(content: string, filename: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
-export function ImportWizard() {
+export function ImportWizard({ canImportProperties }: { canImportProperties: boolean }) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [target, setTarget] = useState<ImportTarget>("customers");
   const [fileName, setFileName] = useState("");
@@ -223,26 +223,41 @@ export function ImportWizard() {
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {TARGETS.map((t) => {
                 const active = target === t.key;
+                const allowed = t.key !== "properties" || canImportProperties;
                 return (
                   <button
                     key={t.key}
                     type="button"
-                    onClick={() => setTarget(t.key)}
+                    disabled={!allowed}
+                    aria-describedby={!allowed ? "property-import-permission-note" : undefined}
+                    onClick={() => {
+                      if (allowed) setTarget(t.key);
+                    }}
                     className={`focus-ring press flex items-start gap-3 rounded-[16px] border p-4 text-left transition ${
                       active ? "border-brand-400 bg-brand-600/[0.06]" : "border-line bg-canvas hover:border-brand-300"
-                    }`}
+                    } disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:border-line`}
                   >
                     <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[12px] ${active ? "bg-brand-600 text-white" : "bg-brand-600/10 text-brand-600"}`}>
                       <t.icon className="h-5 w-5" />
                     </span>
                     <span>
                       <span className="block text-sm font-bold text-ink-950">{t.label}</span>
-                      <span className="mt-0.5 block text-xs text-text-muted">{t.desc}</span>
+                      <span className="mt-0.5 block text-xs text-text-muted">
+                        {allowed ? t.desc : "Portföy ekleme yetkisi gerekir."}
+                      </span>
                     </span>
                   </button>
                 );
               })}
             </div>
+            {!canImportProperties ? (
+              <p
+                id="property-import-permission-note"
+                className="mt-2 rounded-[12px] border border-amber-400/30 bg-amber-400/5 px-3 py-2.5 text-xs text-amber-700"
+              >
+                Müşteri aktarımına devam edebilirsiniz. Portföy aktarımı için portföy oluşturma yetkisi gerekir.
+              </p>
+            ) : null}
           </div>
 
           <div>

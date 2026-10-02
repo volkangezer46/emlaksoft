@@ -2,7 +2,8 @@ import Link from "next/link";
 import { Bell, History, Megaphone } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
-import { BroadcastForm, KIND_OPTIONS } from "./broadcast-form";
+import { BroadcastForm } from "./broadcast-form";
+import { KIND_OPTIONS } from "./broadcast-options";
 
 const audienceLabel: Record<string, string> = {
   all: "Tüm ofisler",

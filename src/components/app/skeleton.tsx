@@ -38,7 +38,8 @@ export function SkeletonRow() {
 
 export function SkeletonDashboard() {
   return (
-    <div className="space-y-6">
+    <div role="status" aria-busy="true" aria-live="polite" className="space-y-6">
+      <span className="sr-only">Kontrol paneli yükleniyor</span>
       <Skeleton className="h-40 rounded-[20px]" />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
@@ -65,7 +66,8 @@ export function SkeletonDashboard() {
 
 export function SkeletonList({ rows = 6 }: { rows?: number }) {
   return (
-    <div className="space-y-6">
+    <div role="status" aria-busy="true" aria-live="polite" className="space-y-6">
+      <span className="sr-only">Liste yükleniyor</span>
       <Skeleton className="h-32 rounded-[22px]" />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (

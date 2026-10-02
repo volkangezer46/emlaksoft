@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyTenant } from "@/lib/notify";
-import { sendSms, sendWhatsApp } from "@/lib/messaging/netgsm";
+import { prepareTenantSmsSender } from "@/lib/messaging/tenant-providers";
 
 /**
  * Otomasyon motoru — `automations` tablosundaki kuralları fiilen ÇALIŞTIRAN katman.
@@ -70,7 +70,7 @@ export type AutomationEventPayload = {
   dealId?: string | null;
   /** Görev/bildirim atanacak kullanıcı (danışman) */
   assignedTo?: string | null;
-  /** SMS/WhatsApp hedefi; yoksa customerId üzerinden bakılır */
+  /** Legacy hint only; marketing delivery always uses the tenant-owned customer row. */
   phone?: string | null;
   /** Koşul (conditions) değerlendirmesinde kullanılan ham alanlar */
   fields?: Record<string, unknown>;
@@ -163,21 +163,49 @@ function hrefForEntity(payload: AutomationEventPayload): string {
   }
 }
 
-/** SMS/WhatsApp hedef telefonu: payload'da yoksa müşteri kaydından okur. */
-async function resolvePhone(
+type MarketingRecipientResolution =
+  | { ok: true; phone: string }
+  | { ok: false; reason: string };
+
+/**
+ * Binds the outbound address and current local IYS projection to the same
+ * tenant-owned active customer. Caller-supplied phone hints are never trusted.
+ */
+async function resolveConsentedMarketingPhone(
   admin: SupabaseClient,
   tenantId: string,
   payload: AutomationEventPayload,
-): Promise<string | null> {
-  if (payload.phone) return payload.phone;
-  if (!payload.customerId) return null;
-  const { data } = await admin
+  channel: "sms" | "whatsapp",
+): Promise<MarketingRecipientResolution> {
+  if (!payload.customerId) return { ok: false, reason: "no_customer_consent_context" };
+
+  const { data: customer, error: customerError } = await admin
     .from("customers")
     .select("phone")
     .eq("id", payload.customerId)
     .eq("tenant_id", tenantId)
+    .is("deleted_at", null)
+    .eq("blacklist", false)
     .maybeSingle();
-  return (data?.phone as string | null) ?? null;
+  const phone = typeof customer?.phone === "string" ? customer.phone.trim() : "";
+  if (customerError || !phone) return { ok: false, reason: "customer_or_phone_unavailable" };
+
+  const { data: consent, error: consentError } = await admin
+    .from("iys_consents")
+    .select("status, revoked_at")
+    .eq("tenant_id", tenantId)
+    .eq("customer_id", payload.customerId)
+    .eq("channel", channel)
+    .maybeSingle();
+  if (
+    consentError ||
+    consent?.status !== "granted" ||
+    consent.revoked_at !== null
+  ) {
+    return { ok: false, reason: "iys_consent_not_granted" };
+  }
+
+  return { ok: true, phone };
 }
 
 // ---------------------------------------------------------------------------
@@ -264,22 +292,28 @@ async function executeAction(
       }
 
       case "send_sms": {
-        const phone = await resolvePhone(admin, automation.tenant_id, payload);
-        if (!phone) return { type, result: "skip", detail: "no_phone" };
+        // Resolve tenant-owned credentials before consent, then keep the
+        // send-time IYS lookup as the final database operation before network I/O.
+        const sender = await prepareTenantSmsSender(automation.tenant_id);
+        const recipient = await resolveConsentedMarketingPhone(
+          admin,
+          automation.tenant_id,
+          payload,
+          "sms",
+        );
+        if (!recipient.ok) return { type, result: "skip", detail: recipient.reason };
         const text = renderTemplate(String(cfg.template ?? cfg.message ?? automation.name), payload);
-        const res = await sendSms(phone, text);
+        const res = await sender(recipient.phone, text);
         // Kredi/yapılandırma yoksa sessizce atla — otomasyonu hataya düşürme
         if (!res.ok) return { type, result: "skip", detail: res.error };
         return { type, result: "ok" };
       }
 
       case "send_whatsapp": {
-        const phone = await resolvePhone(admin, automation.tenant_id, payload);
-        if (!phone) return { type, result: "skip", detail: "no_phone" };
-        const text = renderTemplate(String(cfg.template ?? cfg.message ?? automation.name), payload);
-        const res = await sendWhatsApp(phone, text);
-        if (!res.ok) return { type, result: "skip", detail: res.error };
-        return { type, result: "ok" };
+        // Existing automation rows contain free text, not an approved Meta
+        // template name/language contract. Business-initiated free text is
+        // never sent or downgraded to the global platform account.
+        return { type, result: "skip", detail: "whatsapp_template_contract_required" };
       }
 
       case "assign_to_staff": {
@@ -370,17 +404,10 @@ async function executeAction(
         }
 
         if (payload.entityType === "deal" || payload.dealId) {
-          if (!["new", "qualified", "negotiation", "won", "lost"].includes(target)) {
-            return { type, result: "skip", detail: "invalid_deal_stage" };
-          }
-          const dealId = payload.dealId ?? payload.entityId;
-          const { error } = await admin
-            .from("deals")
-            .update({ stage: target, updated_at: new Date().toISOString() })
-            .eq("id", dealId)
-            .eq("tenant_id", automation.tenant_id);
-          if (error) return { type, result: "error", detail: error.message };
-          return { type, result: "ok", detail: `deal→${target}` };
+          // Won/lost transitions create or roll back financial and property
+          // ledgers. Automations must never make those human/legal decisions,
+          // and terminal events must not immediately reopen themselves.
+          return { type, result: "skip", detail: "deal_stage_requires_human" };
         }
 
         return { type, result: "skip", detail: "unsupported_entity" };

@@ -5,6 +5,7 @@ import { ArrowLeft, Building2, Flame, Layers, Phone, QrCode, Ruler, BedDouble, C
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { moneyTry } from "@/lib/leak-shield";
+import { getBaseUrl } from "@/lib/base-url";
 import { PrintButton } from "./print-button";
 
 type Rel = { name?: string } | { name?: string }[] | null;
@@ -119,7 +120,7 @@ export default async function PropertyBrochurePage({
     return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), 500))}…`;
   })();
 
-  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const baseUrl = getBaseUrl();
   const vitrinUrl = tenant?.slug ? `${baseUrl}/vitrin/${tenant.slug}/${property.id}` : null;
   // Harici QR servisi (goqr.me) — vitrin-qr.tsx deseni; yalnız public ilan URL'i iletilir.
   const qrSrc = vitrinUrl
@@ -165,11 +166,12 @@ export default async function PropertyBrochurePage({
         <div className="print-avoid-break relative aspect-[16/9] w-full overflow-hidden bg-ink-950/5">
           {cover ? (
             <Image
-              src={`/api/property-media/${cover.id}`}
+              src={`/api/property-media/${cover.id}/download`}
               alt={property.title || property.property_code || "Portföy"}
               fill
               priority
               sizes="768px"
+              unoptimized
               className="object-cover"
             />
           ) : (

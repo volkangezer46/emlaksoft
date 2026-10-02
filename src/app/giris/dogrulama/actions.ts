@@ -9,11 +9,13 @@ import {
   generateLoginCode,
   LOGIN_CODE_MAX_ATTEMPTS,
   LOGIN_CODE_TTL_MS,
-  sha256Hex,
   TWO_FACTOR_COOKIE,
+  TWO_FACTOR_COOKIE_TTL_SECONDS,
+  twoFactorBindingFromClaims,
   twoFactorCookieOptions,
   twoFactorCookieValue,
 } from "@/lib/two-factor";
+import { hashOtpForStorage, verifyOtpHash } from "@/lib/otp-hmac";
 import { sendSignerSms } from "@/app/imza/_lib/sms";
 import { sendSms } from "@/lib/messaging/netgsm";
 import { logLoginEvent } from "../_lib/login-events";
@@ -45,17 +47,41 @@ export async function verifyLoginCode(
   const userAgent = (await headers()).get("user-agent");
   const tenantId = (user.app_metadata?.tenant_id as string | undefined) ?? null;
 
-  const { allowed } = await checkRateLimit(`2fa-verify:${user.id}`, { limit: 15, windowSec: 60 });
+  const { allowed } = await checkRateLimit(`2fa-verify:${user.id}`, {
+    limit: 15,
+    windowSec: 60,
+    failurePolicy: "deny",
+  });
   if (!allowed) return { error: "Çok fazla deneme. Lütfen biraz sonra tekrar deneyin." };
 
   const admin = createAdminClient();
-  const { data: challenge } = await admin
-    .from("login_challenges")
-    .select("id, code_hash, expires_at, attempts")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const [{ data: challenge }, { data: profile, error: profileError }] = await Promise.all([
+    admin
+      .from("login_challenges")
+      .select("id, code_hash, expires_at, attempts")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    admin
+      .from("profiles")
+      .select("tenant_id, role, is_active, two_factor_sms, two_factor_version, phone")
+      .eq("id", user.id)
+      .maybeSingle(),
+  ]);
+
+  if (
+    profileError ||
+    !profile?.is_active ||
+    !profile.two_factor_sms ||
+    !profile.phone ||
+    profile.tenant_id !== tenantId ||
+    profile.role !== user.app_metadata?.role
+  ) {
+    await supabase.auth.signOut();
+    (await cookies()).delete(TWO_FACTOR_COOKIE);
+    return { error: "Hesap veya iki adımlı doğrulama ayarı geçersiz." };
+  }
 
   if (!challenge) return { error: "Bekleyen doğrulama kodu yok. Yeni kod isteyin." };
   if (new Date(challenge.expires_at).getTime() < Date.now()) {
@@ -63,6 +89,16 @@ export async function verifyLoginCode(
   }
   if (challenge.attempts >= LOGIN_CODE_MAX_ATTEMPTS) {
     return { error: "Çok fazla hatalı deneme. Lütfen yeni kod isteyin." };
+  }
+
+  let codeMatches: boolean;
+  try {
+    codeMatches = verifyOtpHash(code, challenge.code_hash, "login", user.id);
+  } catch (hashError) {
+    console.error("verifyLoginCode OTP configuration", {
+      error: hashError instanceof Error ? hashError.name : "unknown",
+    });
+    return { error: "Doğrulama güvenli şekilde tamamlanamadı. Lütfen yöneticinize başvurun." };
   }
 
   // Deneme hakkı HASH kontrolünden ÖNCE atomik tüketilir (optimistic lock):
@@ -78,7 +114,7 @@ export async function verifyLoginCode(
     return { error: "Eşzamanlı deneme algılandı. Lütfen tekrar deneyin." };
   }
 
-  if ((await sha256Hex(code)) !== challenge.code_hash) {
+  if (!codeMatches) {
     await logLoginEvent({ userId: user.id, tenantId, ip, userAgent, result: "2fa_failed" });
     const remaining = LOGIN_CODE_MAX_ATTEMPTS - challenge.attempts - 1;
     return {
@@ -90,8 +126,56 @@ export async function verifyLoginCode(
   }
 
   // Doğru kod: challenge temizlenir, çerez set edilir, giriş tamamlanır
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+  const binding = claimsError
+    ? null
+    : twoFactorBindingFromClaims(
+        user.id,
+        profile.two_factor_version,
+        claimsData?.claims,
+      );
+  if (!binding) return { error: "Oturum doğrulanamadı. Lütfen yeniden giriş yapın." };
+
+  let cookieValue: string;
+  try {
+    cookieValue = await twoFactorCookieValue(binding);
+  } catch (cookieError) {
+    console.error("verifyLoginCode cookie", cookieError);
+    return { error: "İki adımlı doğrulama güvenli şekilde tamamlanamadı." };
+  }
+
+  // PostgREST/RLS cannot inspect the HTTP-only cookie. Persist the same
+  // session/version-bound proof through the service role so database access
+  // also requires this exact Supabase session to have completed SMS 2FA.
+  const verifiedAtMs = Date.now();
+  const sessionExpiresAtMs = binding.sessionExpiresAt
+    ? binding.sessionExpiresAt * 1000
+    : verifiedAtMs + TWO_FACTOR_COOKIE_TTL_SECONDS * 1000;
+  const expiresAtMs = Math.min(
+    verifiedAtMs + TWO_FACTOR_COOKIE_TTL_SECONDS * 1000,
+    sessionExpiresAtMs,
+  );
+  if (expiresAtMs <= verifiedAtMs) {
+    return { error: "Oturumun süresi doldu. Lütfen yeniden giriş yapın." };
+  }
+
+  const { error: proofError } = await admin.from("two_factor_verified_sessions").upsert(
+    {
+      session_id: binding.sessionId,
+      user_id: user.id,
+      profile_version: binding.profileVersion,
+      verified_at: new Date(verifiedAtMs).toISOString(),
+      expires_at: new Date(expiresAtMs).toISOString(),
+    },
+    { onConflict: "session_id" },
+  );
+  if (proofError) {
+    console.error("verifyLoginCode session proof", proofError);
+    return { error: "İki adımlı doğrulama güvenli şekilde tamamlanamadı." };
+  }
+
   await admin.from("login_challenges").delete().eq("user_id", user.id);
-  (await cookies()).set(TWO_FACTOR_COOKIE, await twoFactorCookieValue(user.id), twoFactorCookieOptions());
+  (await cookies()).set(TWO_FACTOR_COOKIE, cookieValue, twoFactorCookieOptions());
   await logLoginEvent({ userId: user.id, tenantId, ip, userAgent, result: "success" });
 
   redirect(next);
@@ -108,24 +192,43 @@ export async function resendLoginCode(
   } = await supabase.auth.getUser();
   if (!user) redirect("/giris");
 
-  const { allowed } = await checkRateLimit(`2fa-send:${user.id}`, { limit: 5, windowSec: 300 });
+  const { allowed } = await checkRateLimit(`2fa-send:${user.id}`, {
+    limit: 5,
+    windowSec: 300,
+    failurePolicy: "deny",
+  });
   if (!allowed) return { error: "Çok sık kod istendi. Lütfen birkaç dakika sonra tekrar deneyin." };
 
   const admin = createAdminClient();
   const { data: profile } = await admin
     .from("profiles")
-    .select("two_factor_sms, phone, tenant_id")
+    .select("two_factor_sms, phone, tenant_id, role, is_active")
     .eq("id", user.id)
     .maybeSingle();
-  if (!profile?.two_factor_sms || !profile.phone) {
+  if (
+    !profile?.is_active ||
+    !profile.two_factor_sms ||
+    !profile.phone ||
+    profile.tenant_id !== user.app_metadata?.tenant_id ||
+    profile.role !== user.app_metadata?.role
+  ) {
     return { error: "Bu hesap için SMS doğrulaması gerekli değil." };
   }
 
   const code = generateLoginCode();
   await admin.from("login_challenges").delete().eq("user_id", user.id);
+  let codeHash: string;
+  try {
+    codeHash = hashOtpForStorage(code, "login", user.id);
+  } catch (hashError) {
+    console.error("resendLoginCode OTP configuration", {
+      error: hashError instanceof Error ? hashError.name : "unknown",
+    });
+    return { error: "Kod güvenli şekilde oluşturulamadı. Lütfen yöneticinize başvurun." };
+  }
   const { error: chError } = await admin.from("login_challenges").insert({
     user_id: user.id,
-    code_hash: await sha256Hex(code),
+    code_hash: codeHash,
     expires_at: new Date(Date.now() + LOGIN_CODE_TTL_MS).toISOString(),
   });
   if (chError) {
@@ -154,6 +257,20 @@ export async function resendLoginCode(
 /** Doğrulamadan vazgeç — oturumu kapatır ve giriş sayfasına döner. */
 export async function cancelLoginVerification(): Promise<void> {
   const supabase = await createClient();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const sessionId = claimsData?.claims?.session_id;
+  const userId = claimsData?.claims?.sub;
+  if (typeof sessionId === "string" && sessionId && typeof userId === "string" && userId) {
+    try {
+      await createAdminClient()
+        .from("two_factor_verified_sessions")
+        .delete()
+        .eq("session_id", sessionId)
+        .eq("user_id", userId);
+    } catch (proofError) {
+      console.error("cancelLoginVerification clear session proof", proofError);
+    }
+  }
   await supabase.auth.signOut();
   (await cookies()).delete(TWO_FACTOR_COOKIE);
   redirect("/giris");

@@ -371,7 +371,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
                     >
                       {coverId ? (
                         <Image
-                          src={`/api/property-media/${coverId}`}
+                          src={`/api/property-media/${coverId}/download`}
                           alt={m.property.title ?? m.property.property_code}
                           fill
                           sizes="80px"

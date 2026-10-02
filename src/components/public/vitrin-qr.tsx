@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Download, Loader2, Printer, QrCode } from "lucide-react";
+import { fetchTrustedQrPng } from "@/lib/client-download";
 
 /**
  * Vitrin QR kodu bölümü (/app/ayarlar/lead).
@@ -37,9 +38,7 @@ export function VitrinQr({
     setDownloading(true);
     try {
       // goqr.me CORS'a açık — blob indirip yerel dosya olarak kaydettir.
-      const res = await fetch(qrPrintSrc);
-      if (!res.ok) throw new Error(String(res.status));
-      const blob = await res.blob();
+      const blob = await fetchTrustedQrPng(qrPrintSrc);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

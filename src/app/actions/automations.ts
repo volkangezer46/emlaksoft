@@ -35,11 +35,11 @@ const TEMPLATES: Record<string, {
     actions: [{ type: "create_task", config: { title: "Yeni müşteri ilk arama", due_minutes: 5 } }],
   },
   deal_won: {
-    name: "Satış sonrası teşekkür WhatsApp'ı",
-    description: "Satış kapandığında müşteriye otomatik teşekkür mesajı gönderir.",
+    name: "Satış sonrası teşekkür takibi",
+    description: "Satış kapandığında müşteriye onaylı kanaldan dönüş yapılması için görev açar.",
     trigger_type: "deal_won",
     trigger_config: {},
-    actions: [{ type: "send_whatsapp", config: { template: "Sayın {{name}}, satın alımınız için teşekkür ederiz!" } }],
+    actions: [{ type: "create_task", config: { title: "Müşteriye satış sonrası teşekkür mesajı gönder", priority: "normal" } }],
   },
   property_matched: {
     name: "Eşleşen portföyü müşteriye gönder",
@@ -171,7 +171,6 @@ const ACTION_TYPES = [
 
 const CONDITION_OPS = ["eq", "neq", "gt", "gte", "lt", "lte", "contains"] as const;
 const DEMAND_STATUSES = ["new", "active", "matched", "closed"] as const;
-const DEAL_STAGES = ["new", "qualified", "negotiation", "won", "lost"] as const;
 
 /** Zaman tabanlı tetikleyicilerin trigger_config gün anahtarı. */
 const TRIGGER_DAY_KEYS: Record<string, string> = {
@@ -184,8 +183,6 @@ const TRIGGER_DAY_KEYS: Record<string, string> = {
 const STATUS_ENTITY_BY_TRIGGER: Record<string, "demand" | "deal"> = {
   new_demand: "demand",
   demand_stale: "demand",
-  deal_won: "deal",
-  deal_lost: "deal",
 };
 
 type ParsedWizard = {
@@ -270,6 +267,11 @@ async function parseWizardForm(
     if (!(ACTION_TYPES as readonly string[]).includes(type)) {
       return { error: "Geçersiz aksiyon türü." };
     }
+    if (type === "send_whatsapp") {
+      return {
+        error: "WhatsApp otomasyonu, onaylı Meta şablon adı ve dil sözleşmesi eklenene kadar kullanılamaz.",
+      };
+    }
     const src = (a.config ?? {}) as Record<string, unknown>;
     const config: Record<string, unknown> = {};
 
@@ -326,10 +328,9 @@ async function parseWizardForm(
         const entity = STATUS_ENTITY_BY_TRIGGER[triggerType];
         if (!entity) return { error: "Bu tetikleyicide durum değiştirilemez." };
         const target = String(src.target_status ?? "");
-        const valid = entity === "demand"
-          ? (DEMAND_STATUSES as readonly string[])
-          : (DEAL_STAGES as readonly string[]);
-        if (!valid.includes(target)) return { error: "Geçersiz hedef durum." };
+        if (entity !== "demand" || !(DEMAND_STATUSES as readonly string[]).includes(target)) {
+          return { error: "Geçersiz hedef durum." };
+        }
         config.target_status = target;
         break;
       }

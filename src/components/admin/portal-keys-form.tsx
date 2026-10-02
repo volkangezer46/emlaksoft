@@ -85,7 +85,8 @@ function PortalKeyCard({
             name="base_url"
             type="url"
             autoComplete="off"
-            placeholder="API base URL (opsiyonel)"
+            placeholder="Sözleşmedeki API base URL (zorunlu)"
+            required
             className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm text-ink-950 outline-none focus:border-brand-300"
           />
           {result?.error && (
@@ -128,22 +129,26 @@ export function PortalApiKeysSection({
   sahibindenConfigured,
   hepsiemlakConfigured,
   zingatConfigured,
+  emlakjetConfigured,
   maskedSahibinden,
   maskedHepsiemlak,
   maskedZingat,
+  maskedEmlakjet,
 }: {
   canEdit: boolean;
   sahibindenConfigured: boolean;
   hepsiemlakConfigured: boolean;
   zingatConfigured: boolean;
+  emlakjetConfigured: boolean;
   maskedSahibinden: string | null;
   maskedHepsiemlak: string | null;
   maskedZingat: string | null;
+  maskedEmlakjet: string | null;
 }) {
   return (
     <div>
       <p className="mb-3 flex items-center gap-2 text-xs font-semibold text-text-muted">
-        <RadioTower className="h-3.5 w-3.5" /> Portal API entegrasyonları (ilan otomatik gönderim)
+        <RadioTower className="h-3.5 w-3.5" /> Yetkili portal API bağlantıları (kurumsal sözleşme + doğrulanmış base URL gerekir)
       </p>
       <div className="grid gap-4 lg:grid-cols-3">
         <PortalKeyCard
@@ -165,6 +170,13 @@ export function PortalApiKeysSection({
           label="Zingat"
           configured={zingatConfigured}
           maskedKey={maskedZingat}
+          canEdit={canEdit}
+        />
+        <PortalKeyCard
+          portal="emlakjet"
+          label="Emlakjet"
+          configured={emlakjetConfigured}
+          maskedKey={maskedEmlakjet}
           canEdit={canEdit}
         />
       </div>

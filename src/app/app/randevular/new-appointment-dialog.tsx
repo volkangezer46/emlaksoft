@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useQueryDialog } from "@/components/app/use-query-dialog";
 
 type Option = { id: string; label: string };
 
@@ -40,6 +41,7 @@ export function NewAppointmentDialog({
   typeOptions = DEFAULT_TYPE_OPTIONS,
   defaultCustomerId,
   defaultPropertyId,
+  defaultOpen = false,
 }: {
   customers: Option[];
   properties: Option[];
@@ -48,8 +50,9 @@ export function NewAppointmentDialog({
   defaultCustomerId?: string;
   /** ?property= ile gelindiğinde (eşleştirme → "Randevu ver") ön seçim. */
   defaultPropertyId?: string;
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useQueryDialog(defaultOpen);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Sunucu çakışma bulduğunda uyarı metni gelir; kayıt YAPILMAMIŞTIR.

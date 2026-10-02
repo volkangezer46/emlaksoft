@@ -15,6 +15,7 @@ import { getOpenHouse, listOpenHouseVisitors } from "@/app/actions/targets-openh
 import { Badge } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
+import { getBaseUrl } from "@/lib/base-url";
 import { VisitorForm } from "./visitor-form";
 import { RegistrationQrCard } from "./registration-qr-card";
 import { StatusSelect } from "./status-select";
@@ -76,7 +77,7 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
   const gecmis = isPast(event.scheduled_at);
 
   // Self check-in public linki — kapıya asılan QR bu sayfayı açar.
-  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const baseUrl = getBaseUrl();
   const checkinUrl = event.public_token ? `${baseUrl}/acik-ev-kayit/${event.public_token}` : null;
 
   // `visitor_count` sayacı RPC ile artıyor; gerçek satır sayısıyla ayrışabilir

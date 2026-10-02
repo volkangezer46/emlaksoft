@@ -28,7 +28,11 @@ export async function askAdvisor(
 
   // Hız sınırı — 'use server' export'u route'u atlayıp doğrudan çağrılabilir;
   // sınırsız OpenAI çağrısını engelle (tenant asistanıyla aynı politika).
-  const { allowed } = await checkRateLimit(`ai-chat:${staff.id}`, { limit: 10, windowSec: 60 });
+  const { allowed } = await checkRateLimit(`ai-chat:${staff.id}`, {
+    limit: 10,
+    windowSec: 60,
+    failurePolicy: "deny",
+  });
   if (!allowed) {
     return {
       reply: "Çok hızlı gidiyorsunuz — lütfen bir dakika sonra tekrar deneyin.",

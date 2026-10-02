@@ -7,26 +7,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { getPlatformSetting } from "@/lib/platform-settings";
 import { relativeTimeTR } from "@/lib/admin-format";
-import { DAY_MS, msSince } from "@/lib/clock";
+import { msSince } from "@/lib/clock";
+import { CRON_JOBS } from "@/lib/cron-jobs";
 import { OpenAiKeyForm } from "@/components/admin/openai-key-form";
 import { EndeksaKeyForm, TapusorKeyForm } from "@/components/admin/integration-keys-form";
 import { PortalApiKeysSection } from "@/components/admin/portal-keys-form";
+import { getPortalConfig } from "@/lib/integrations/portals";
 
 const TOTAL_PROVINCES = 81;
-
-/** Beklenen cron uçları — route klasör adlarıyla birebir. Kalp atışı hiç
- *  düşmemiş olsa bile listede görünsünler ("Kayıt yok"). */
-const CRON_JOBS: { job: string; label: string }[] = [
-  { job: "abonelik-kontrol", label: "Abonelik kontrolü" },
-  { job: "dogum-gunu", label: "Doğum günü / yıldönümü" },
-  { job: "gorev-hatirlat", label: "Görev hatırlatma" },
-  { job: "gunluk-ozet", label: "Günlük ofis özeti" },
-  { job: "leak-sla", label: "Kayıp-kaçak SLA" },
-  { job: "otomasyon", label: "Otomasyon motoru" },
-  { job: "portal-teyit", label: "Portal teyit takibi" },
-  { job: "randevu-hatirlat", label: "Randevu hatırlatma" },
-  { job: "tcmb-kur", label: "TCMB kur çekimi" },
-];
 
 type Heartbeat = { job: string; last_run_at: string; last_status: string; last_detail: string | null };
 
@@ -57,7 +45,7 @@ export default async function AdminSystemPage() {
   const [
     dbKey,
     dbEndeksaId, dbEndeksaSecret, dbTapusorKey,
-    dbSahibindenKey, dbHepsiemlakKey, dbZingatKey,
+    sahibindenConfig, hepsiemlakConfig, zingatConfig, emlakjetConfig,
     { count: provinces }, { count: districts }, { count: neighborhoods },
     { data: heartbeatRows },
     schemaRows,
@@ -67,9 +55,10 @@ export default async function AdminSystemPage() {
     getPlatformSetting("endeksa_client_id"),
     getPlatformSetting("endeksa_client_secret"),
     getPlatformSetting("tapusor_api_key"),
-    getPlatformSetting("sahibinden_api_key"),
-    getPlatformSetting("hepsiemlak_api_key"),
-    getPlatformSetting("zingat_api_key"),
+    getPortalConfig("sahibinden"),
+    getPortalConfig("hepsiemlak"),
+    getPortalConfig("zingat"),
+    getPortalConfig("emlakjet"),
     admin.from("geo_provinces").select("id", { count: "exact", head: true }),
     admin.from("geo_districts").select("id", { count: "exact", head: true }),
     admin.from("geo_neighborhoods").select("id", { count: "exact", head: true }),
@@ -82,9 +71,9 @@ export default async function AdminSystemPage() {
   for (const h of (heartbeatRows ?? []) as Heartbeat[]) heartbeats.set(h.job, h);
 
   // Cron sağlığı özeti — hero kartlarında gösterilir
-  const cronHealthy = CRON_JOBS.filter(({ job }) => {
+  const cronHealthy = CRON_JOBS.filter(({ job, staleAfterMinutes }) => {
     const hb = heartbeats.get(job);
-    return hb && hb.last_status !== "error" && msSince(hb.last_run_at) <= DAY_MS;
+    return hb && hb.last_status !== "error" && msSince(hb.last_run_at) <= staleAfterMinutes * 60_000;
   }).length;
   const schemaMissing = schemaRows.filter((r) => !r.ok);
 
@@ -103,13 +92,15 @@ export default async function AdminSystemPage() {
   const tapusorConfigured = Boolean(tapusorApiKey);
 
   // Portal API anahtarları
-  const sahibindenKey  = dbSahibindenKey?.trim()  || process.env.SAHIBINDEN_API_KEY?.trim()  || null;
-  const hepsiemlakKey  = dbHepsiemlakKey?.trim()  || process.env.HEPSIEMLAK_API_KEY?.trim()  || null;
-  const zingatKey      = dbZingatKey?.trim()      || process.env.ZINGAT_API_KEY?.trim()      || null;
+  const sahibindenKey  = sahibindenConfig?.apiKey ?? null;
+  const hepsiemlakKey  = hepsiemlakConfig?.apiKey ?? null;
+  const zingatKey      = zingatConfig?.apiKey ?? null;
+  const emlakjetKey    = emlakjetConfig?.apiKey ?? null;
 
   const maskedSahibinden  = sahibindenKey  ? mask(sahibindenKey)  : null;
   const maskedHepsiemlak  = hepsiemlakKey  ? mask(hepsiemlakKey)  : null;
   const maskedZingat      = zingatKey      ? mask(zingatKey)      : null;
+  const maskedEmlakjet    = emlakjetKey    ? mask(emlakjetKey)    : null;
 
   // Endeksa/Tapusor masked değerler (güvenli gösterim)
   const maskedEndeksaId = endeksaClientId ? mask(endeksaClientId, 4, 3) : null;
@@ -136,7 +127,7 @@ export default async function AdminSystemPage() {
             value={`${cronHealthy}/${CRON_JOBS.length}`}
             icon={HeartPulse}
             accent={cronHealthy === CRON_JOBS.length ? "text-mint-400" : "text-amber-300"}
-            hint="son 24 saatte hatasız çalıştı"
+            hint="iş zamanlamasına göre sağlıklı"
           />
           <AdminStatCard
             tone="dark"
@@ -189,13 +180,10 @@ export default async function AdminSystemPage() {
             </div>
           </div>
           <p className="mt-4 text-xs text-text-muted">
-            81 il, 973 ilçe ve 31.900+ mahalle TurkiyeAPI kaynağından senkronize edildi. Yeniden senkron için:
+            Her il, coğrafya yönetiminden tek tıkla ayrı taranır. Seçilen il öne alınır; diğer il taramaları bekletilir ve eksikler atomik olarak tamamlanır.
           </p>
-          <code className="mt-2 block rounded-[10px] bg-ink-950 px-3 py-2 text-[11px] text-mint-300">
-            npm run geo:sync
-          </code>
           <p className="mt-2 text-[11px] text-text-faint">
-            Kaynak: TurkiyeAPI v2 statik veri seti — çeyreklik yeniden senkron önerilir (<code>scripts/geo-sync.ts</code>).
+            Kaynak: TurkiyeAPI v2. Kaynakta bulunmayan yerel kayıtlar silinmez ve pasif kayıtlar otomatik yeniden açılmaz.
           </p>
           <Link
             href="/admin/geo"
@@ -226,16 +214,16 @@ export default async function AdminSystemPage() {
         </section>
 
         {/* Cron sağlığı: her job son çalışmasında cron_heartbeats'e tek satır
-            düşer. 24 saatten eski (veya hiç düşmemiş) kayıt "gecikmiş" sayılır. */}
+            düşer. Gecikme eşiği işin gerçek Vercel zamanlamasına göre değişir. */}
         <section className="rounded-[20px] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
             <HeartPulse className="h-4 w-4" /> Cron sağlığı
           </p>
           <h2 className="mt-1 font-display font-bold text-ink-950">Zamanlanmış görevler</h2>
           <div className="mt-4 space-y-2">
-            {CRON_JOBS.map(({ job, label }) => {
+            {CRON_JOBS.map(({ job, label, cadenceLabel, staleAfterMinutes }) => {
               const hb = heartbeats.get(job);
-              const stale = !hb || msSince(hb.last_run_at) > DAY_MS;
+              const stale = !hb || msSince(hb.last_run_at) > staleAfterMinutes * 60_000;
               const failed = hb?.last_status === "error";
               return (
                 <div
@@ -245,7 +233,7 @@ export default async function AdminSystemPage() {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink-950">{label}</p>
                     <p className="truncate text-[11px] text-text-faint">
-                      <span className="numeric">{job}</span>
+                      <span className="numeric">{job}</span> · {cadenceLabel}
                       {hb ? ` · ${relativeTimeTR(hb.last_run_at)}` : " · hiç çalışmadı"}
                       {hb?.last_detail ? ` · ${hb.last_detail}` : ""}
                     </p>
@@ -268,8 +256,8 @@ export default async function AdminSystemPage() {
             })}
           </div>
           <p className="mt-3 text-[11px] text-text-faint">
-            Son çalışma 24 saatten eskiyse görev &quot;gecikmiş&quot; sayılır. Kalp atışı, cron
-            çalışmasının sonunda yazılır ve asıl işi asla bloklamaz.
+            Her görev kendi çalışma sıklığına göre değerlendirilir. Kalp atışı yazılamazsa
+            sunucu kaydı oluşur; zamanlanmış işin ana sonucu bloklanmaz.
           </p>
         </section>
 
@@ -332,9 +320,9 @@ export default async function AdminSystemPage() {
 
         {schemaMissing.length > 0 ? (
           <div className="border-b border-line bg-danger-500/[0.04] px-5 py-4">
-            <p className="text-sm font-semibold text-ink-950">Eksik migration&apos;ları sırayla uygulayın:</p>
+            <p className="text-sm font-semibold text-ink-950">Eksik migration&apos;lar için güvenli yayın sırası:</p>
             <code className="mt-2 block overflow-x-auto whitespace-pre rounded-[10px] bg-ink-950 px-3 py-2 text-[11px] leading-relaxed text-mint-300">
-              {schemaMissing.map((m) => `npx tsx scripts/apply-one.ts supabase/migrations/${m.migration}`).join("\n")}
+              {`npm run check:migrations -- --database\nnpm run db:migrate -- --dry-run\n# Backup/PITR doğrulandıktan sonra:\nnpm run db:migrate`}
             </code>
           </div>
         ) : null}
@@ -394,12 +382,14 @@ export default async function AdminSystemPage() {
       {/* Portal API anahtarları */}
       <PortalApiKeysSection
         canEdit={staff.role === "super_admin"}
-        sahibindenConfigured={Boolean(sahibindenKey)}
-        hepsiemlakConfigured={Boolean(hepsiemlakKey)}
-        zingatConfigured={Boolean(zingatKey)}
+        sahibindenConfigured={Boolean(sahibindenConfig)}
+        hepsiemlakConfigured={Boolean(hepsiemlakConfig)}
+        zingatConfigured={Boolean(zingatConfig)}
+        emlakjetConfigured={Boolean(emlakjetConfig)}
         maskedSahibinden={maskedSahibinden}
         maskedHepsiemlak={maskedHepsiemlak}
         maskedZingat={maskedZingat}
+        maskedEmlakjet={maskedEmlakjet}
       />
 
       {/* Bilinçli ertelenenler */}

@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 import { notifyTenant } from "@/lib/notify";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { isValidTurkishMobile, normalizeTurkishPhone, formatTurkishPhone } from "@/lib/phone";
@@ -56,12 +57,16 @@ export async function createVitrinSavedSearch(input: SavedSearchInput): Promise<
   }
 
   const ip = await clientIp();
-  const { allowed } = await checkRateLimit(`vitrin-saved-search:${ip}`, { limit: 5, windowSec: 3600 });
+  const { allowed } = await checkRateLimit(`vitrin-saved-search:${ip}`, {
+    limit: 5,
+    windowSec: 3600,
+    failurePolicy: "deny",
+  });
   if (!allowed) return { ok: false, error: "Çok fazla deneme yapıldı. Lütfen daha sonra tekrar deneyin." };
 
   const admin = createAdminClient();
-  const { data: tenant } = await admin.from("tenants").select("id, name").eq("slug", slug).maybeSingle();
-  if (!tenant) return { ok: false, error: "Ofis bulunamadı." };
+  const { data: tenant } = await admin.from("tenants").select("id, name, status").eq("slug", slug).maybeSingle();
+  if (!tenant || !isPublicTenantActive(tenant.status)) return { ok: false, error: "Ofis bulunamadı." };
 
   // il/ilçe tutarlılığı — ilçe seçildiyse seçilen ile ait olmalı
   const { data: province } = await admin
@@ -146,29 +151,51 @@ export async function likePublicShare(token: string): Promise<ShareLikeResult> {
   const { allowed } = await checkRateLimit(`share-like:${ip}:${cleanToken.slice(0, 24)}`, {
     limit: 2,
     windowSec: 86_400,
+    failurePolicy: "deny",
   });
   if (!allowed) return { ok: true }; // zaten iletildi — ziyaretçiye hata gösterme
 
   const admin = createAdminClient();
   const { data: share } = await admin
     .from("share_links")
-    .select("id, tenant_id, entity_type, entity_id, expires_at, created_by")
+    .select("id, tenant_id, entity_type, entity_id, expires_at, created_by, tenant:tenants(status)")
     .eq("token", cleanToken)
     .maybeSingle();
-  if (!share || share.entity_type !== "property" || isPast(share.expires_at)) {
+  const shareTenant = share && (Array.isArray(share.tenant) ? share.tenant[0] : share.tenant);
+  if (
+    !share ||
+    share.entity_type !== "property" ||
+    isPast(share.expires_at) ||
+    !shareTenant ||
+    !isPublicTenantActive(shareTenant.status)
+  ) {
     return { ok: false, error: "Geçersiz bağlantı." };
   }
 
-  const { data: property } = await admin
-    .from("properties")
-    .select("title, property_code")
-    .eq("id", share.entity_id)
-    .maybeSingle();
+  const [{ data: property }, { data: creator }] = await Promise.all([
+    admin
+      .from("properties")
+      .select("title, property_code")
+      .eq("id", share.entity_id)
+      .eq("tenant_id", share.tenant_id)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    share.created_by
+      ? admin
+          .from("profiles")
+          .select("id")
+          .eq("id", share.created_by)
+          .eq("tenant_id", share.tenant_id)
+          .eq("is_active", true)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  if (!property) return { ok: false, error: "Geçersiz bağlantı." };
   const label = property?.title || property?.property_code || "Portföy";
 
   await notifyTenant({
     tenantId: share.tenant_id,
-    userId: (share.created_by as string | null) ?? null,
+    userId: creator?.id ?? null,
     title: "Paylaşımınız beğenildi",
     body: `"${label}" paylaşım linkini açan ziyaretçi Beğendim'e tıkladı. İlgi sıcak — arama zamanı.`,
     href: `/app/portfoyler/${share.entity_id}`,

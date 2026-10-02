@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "Ön Bilgilendirme Formu | EmlakSoft",
+  title: "Ön Bilgilendirme Formu",
   description: "Mesafeli Sözleşmeler Yönetmeliği m.5 kapsamında ön bilgilendirme formu.",
   alternates: { canonical: "/on-bilgilendirme" },
 };

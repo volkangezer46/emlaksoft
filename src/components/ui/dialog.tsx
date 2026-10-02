@@ -25,6 +25,39 @@ import { cn } from "@/lib/utils";
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogClose = DialogPrimitive.Close;
+export const DialogTitle = DialogPrimitive.Title;
+export const DialogDescription = DialogPrimitive.Description;
+
+/** Mobil navigasyon için Radix erişilebilirlik davranışlarını koruyan sol çekmece. */
+export function DialogDrawerContent({
+  children,
+  className,
+  responsiveClassName = "md:hidden",
+  ...props
+}: ComponentProps<typeof DialogPrimitive.Content> & {
+  responsiveClassName?: string;
+}) {
+  return (
+    <DialogPrimitive.Portal>
+      <DialogPrimitive.Overlay
+        className={cn(
+          "dialog-overlay fixed inset-0 z-50 bg-ink-950/60 backdrop-blur-sm",
+          responsiveClassName,
+        )}
+      />
+      <DialogPrimitive.Content
+        {...props}
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 w-[min(88vw,300px)] overflow-hidden shadow-[var(--shadow-lg)] outline-none",
+          responsiveClassName,
+          className,
+        )}
+      >
+        {children}
+      </DialogPrimitive.Content>
+    </DialogPrimitive.Portal>
+  );
+}
 
 const sizeClass = {
   sm: "max-w-md",
@@ -36,14 +69,21 @@ const sizeClass = {
 export function DialogContent({
   children,
   className,
+  overlayClassName,
   size = "lg",
   ...props
 }: ComponentProps<typeof DialogPrimitive.Content> & {
   size?: keyof typeof sizeClass;
+  overlayClassName?: string;
 }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="dialog-overlay fixed inset-0 z-50 overflow-y-auto bg-ink-950/55 p-4 backdrop-blur-md">
+      <DialogPrimitive.Overlay
+        className={cn(
+          "dialog-overlay fixed inset-0 z-50 overflow-y-auto bg-ink-950/55 p-4 backdrop-blur-md",
+          overlayClassName,
+        )}
+      >
         <div className="flex min-h-full items-start justify-center sm:items-center">
           <DialogPrimitive.Content
             {...props}
@@ -59,6 +99,44 @@ export function DialogContent({
           </DialogPrimitive.Content>
         </div>
       </DialogPrimitive.Overlay>
+    </DialogPrimitive.Portal>
+  );
+}
+
+/**
+ * Fotoğraf galerisi, belge önizleme ve karşılaştırma gibi gerçekten tam
+ * ekran yüzeyler için Radix davranışlarını koruyan içerik kabuğu.
+ *
+ * Tam ekran görünümü elle kurulmuş `role="dialog"` katmanlarıyla çözmek;
+ * focus trap, arka planı inert yapma ve odağı tetikleyiciye döndürme gibi
+ * kritik davranışları her tüketicide yeniden yazmaya zorluyordu. Bu primitive
+ * aynı görsel serbestliği Radix'in modal sözleşmesiyle sunar.
+ */
+export function DialogFullscreenContent({
+  children,
+  className,
+  overlayClassName,
+  ...props
+}: ComponentProps<typeof DialogPrimitive.Content> & {
+  overlayClassName?: string;
+}) {
+  return (
+    <DialogPrimitive.Portal>
+      <DialogPrimitive.Overlay
+        className={cn(
+          "dialog-overlay fixed inset-0 z-[100] bg-ink-950/60 backdrop-blur-sm",
+          overlayClassName,
+        )}
+      />
+      <DialogPrimitive.Content
+        {...props}
+        className={cn(
+          "fixed inset-0 z-[101] overflow-hidden outline-none",
+          className,
+        )}
+      >
+        {children}
+      </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
   );
 }

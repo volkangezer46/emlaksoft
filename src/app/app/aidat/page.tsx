@@ -106,15 +106,21 @@ export default async function AidatPage({
   // ---- KPI toplamları: DB'de TAM SUM (aidat_kpi RPC) — önceki 2000-satır havuz
   //      yaklaşıktı ve büyük ofiste eksik sayardı. Geciken ŞERİDİ için ayrı odaklı
   //      sorgu (en yakın vadeli ilk 20 geciken); tüm havuzu çekmeye gerek yok.
-  const overdueStripQuery = supabase
+  let overdueStripQuery = supabase
     .from("property_dues")
     .select("id, title, amount, period, due_date, status, property:properties(id, property_code, title)")
     .neq("status", "paid")
     .lte("due_date", todayStr)
     .order("due_date", { ascending: true })
     .limit(20);
+  if (tenantId) overdueStripQuery = overdueStripQuery.eq("tenant_id", tenantId);
 
-  const [{ data: listData, count: listCount }, kpiRes, { data: overdueStripData }, { data: propData }] = await Promise.all([
+  const [
+    { data: listData, count: listCount, error: listError },
+    kpiRes,
+    { data: overdueStripData, error: overdueStripError },
+    { data: propData, error: propertiesError },
+  ] = await Promise.all([
     listQuery,
     supabase.rpc("aidat_kpi"),
     overdueStripQuery,
@@ -125,6 +131,14 @@ export default async function AidatPage({
       .order("created_at", { ascending: false })
       .limit(300),
   ]);
+
+  const readFailures = [listError, kpiRes.error, overdueStripError, propertiesError].filter(Boolean);
+  if (readFailures.length > 0) {
+    console.error("aidat page data load failed", {
+      codes: readFailures.map((error) => error?.code || "unknown"),
+    });
+    throw new Error("Aidat verileri güvenli şekilde yüklenemedi.");
+  }
 
   const filteredDues = (listData ?? []) as unknown as DueLite[];
   const properties = (propData ?? []).map((p) => ({ id: p.id as string, property_code: p.property_code as string, title: p.title as string | null }));

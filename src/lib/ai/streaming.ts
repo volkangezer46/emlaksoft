@@ -1,4 +1,11 @@
 import "server-only";
+import {
+  discardExternalResponse,
+  externalErrorMetadata,
+  ExternalResponseTooLargeError,
+  fetchExternal,
+  requireExternalSuccess,
+} from "@/lib/external-fetch";
 
 // ---------------------------------------------------------------------------
 // AI sohbet akışı (streaming) yardımcıları — /api/ai/tenant-chat ve
@@ -13,6 +20,8 @@ import "server-only";
 // ---------------------------------------------------------------------------
 
 const encoder = new TextEncoder();
+const OPENAI_STREAM_TIMEOUT_MS = 90_000;
+const OPENAI_STREAM_MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 
 /** SSE yanıt başlıkları (proxy tamponlamasını da kapatır). */
 export const SSE_HEADERS: HeadersInit = {
@@ -55,7 +64,7 @@ export function sseResponse(run: (send: SseSend) => Promise<void>): Response {
 
       void run(send)
         .catch((e) => {
-          console.error("sseResponse:run", e);
+          console.error("sseResponse:run", externalErrorMetadata(e));
           send({ error: "Yanıt üretilirken bir hata oluştu. Lütfen tekrar deneyin." });
         })
         .finally(() => {
@@ -130,31 +139,40 @@ type ToolCallDelta = {
  * OpenAI chat/completions'ı `stream: true` ile çağırır; içerik parçalarını
  * `{type:"delta"}` olarak, araç çağrılarını ise akış bitince tek bir
  * `{type:"tool_calls"}` olayı hâlinde (fragmanları birleştirip) üretir.
- * Hata biçimi mevcut `callOpenAI` ile aynıdır: `OpenAI <status>: ...` fırlatır.
+ * Sağlayıcı hata gövdesini açığa çıkarmayan güvenli bir hata fırlatır.
  */
 export async function* streamOpenAIChatEvents(
   apiKey: string,
   payload: OpenAiStreamPayload,
   signal?: AbortSignal,
 ): AsyncGenerator<OpenAiStreamEvent> {
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  const res = await fetchExternal("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({ ...payload, stream: true }),
-    signal,
-  });
+  }, { timeoutMs: OPENAI_STREAM_TIMEOUT_MS, signal });
 
-  if (!res.ok || !res.body) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`OpenAI ${res.status}: ${errText.slice(0, 200)}`);
+  await requireExternalSuccess(res);
+  if (!res.body) {
+    throw new Error("OpenAI stream response was empty.");
+  }
+  const declaredLength = res.headers.get("content-length");
+  if (
+    declaredLength &&
+    /^\d+$/.test(declaredLength) &&
+    Number(declaredLength) > OPENAI_STREAM_MAX_RESPONSE_BYTES
+  ) {
+    await discardExternalResponse(res);
+    throw new ExternalResponseTooLargeError();
   }
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let bytesRead = 0;
   // index → birleştirilmekte olan araç çağrısı
   const pendingCalls = new Map<number, { id: string; name: string; args: string }>();
 
@@ -162,6 +180,11 @@ export async function* streamOpenAIChatEvents(
     outer: for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
+      bytesRead += value.byteLength;
+      if (bytesRead > OPENAI_STREAM_MAX_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new ExternalResponseTooLargeError();
+      }
       buffer += decoder.decode(value, { stream: true });
 
       // Her SSE `data:` satırı kendi başına tam bir JSON'dur; son (muhtemelen

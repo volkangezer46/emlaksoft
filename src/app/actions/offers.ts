@@ -2,9 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
-import { logActivity } from "@/lib/activity";
+import { validateTenantReferences } from "@/lib/tenant-references";
+import { parseMoneyInput } from "@/lib/money-input";
+import { isIsoDate } from "@/lib/workflow-state";
 
 export type OfferResult = { ok?: boolean; error?: string; id?: string };
 
@@ -12,57 +15,57 @@ export async function createOffer(
   _prev: OfferResult,
   fd: FormData,
 ): Promise<OfferResult> {
-  const gate = await requirePermission("commissions", "create");
+  const gate = await requirePermission("offers", "create");
   if (!gate.ok) return { error: gate.error };
 
   const propertyId = String(fd.get("property_id") ?? "").trim();
   const customerId = String(fd.get("customer_id") ?? "").trim() || null;
-  const amount     = parseFloat(String(fd.get("amount") ?? "0"));
+  const amountResult = parseMoneyInput(fd.get("amount"), { max: 100_000_000_000 });
   const validUntil = String(fd.get("valid_until") ?? "").trim() || null;
   const notes      = String(fd.get("notes") ?? "").trim() || null;
 
   if (!propertyId) return { error: "Portföy seçimi zorunludur." };
-  if (isNaN(amount) || amount <= 0) return { error: "Geçerli bir teklif tutarı girin." };
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("offers")
-    .insert({
-      tenant_id:   gate.tenantId,
-      property_id: propertyId,
-      customer_id: customerId,
-      created_by:  gate.userId,
-      amount,
-      valid_until: validUntil,
-      notes,
-      status:      "submitted",
-      submitted_at: new Date().toISOString(),
-    })
-    .select("id")
-    .single();
-
-  if (error || !data) return { error: "Teklif kaydedilemedi." };
-
-  // İlk teklif = 1. pazarlık turu (alıcı) — hata ana işlemi asla bozmasın
-  try {
-    await supabase.from("offer_rounds").insert({
-      tenant_id:  gate.tenantId,
-      offer_id:   data.id,
-      round_no:   1,
-      side:       "buyer",
-      amount,
-      note:       notes,
-      created_by: gate.userId,
-    });
-  } catch (e) {
-    console.error("offer_rounds initial round", e);
+  if (!amountResult.ok || amountResult.value == null) return { error: "Geçerli bir teklif tutarı girin." };
+  if (validUntil && !isIsoDate(validUntil)) return { error: "Geçerli bir teklif son tarihi girin." };
+  if (validUntil && validUntil < new Date().toISOString().slice(0, 10)) {
+    return { error: "Teklif son tarihi geçmişte olamaz." };
   }
+  if (notes && notes.length > 5000) return { error: "Teklif notu en fazla 5000 karakter olabilir." };
+  const amount = amountResult.value;
+
+  const references = await validateTenantReferences(gate.tenantId, {
+    propertyId,
+    customerId,
+  });
+  if (!references.ok) return { error: references.error };
+
+  const admin = createAdminClient();
+  const { data: transitionData, error } = await admin.rpc("create_offer_atomic", {
+    p_tenant_id: gate.tenantId,
+    p_actor_id: gate.userId,
+    p_property_id: propertyId,
+    p_customer_id: customerId,
+    p_amount: amount,
+    p_valid_until: validUntil,
+    p_notes: notes,
+  });
+  if (error) {
+    console.error("createOffer atomic", { code: error.code });
+    return { error: "Teklif ve pazarlık kaydı oluşturulamadı." };
+  }
+  const transition = transitionData && typeof transitionData === "object" && !Array.isArray(transitionData)
+    ? transitionData as Record<string, unknown>
+    : null;
+  if (transition?.outcome !== "created" || typeof transition.offer_id !== "string") {
+    return { error: "Teklif kaydedilemedi." };
+  }
+  const offerId = transition.offer_id;
 
   // Otomasyon tetikle — hata ana işlemi asla bozmasın
   try {
     await dispatchAutomationEvent(gate.tenantId, "offer_received", {
       entityType: "offer",
-      entityId: data.id,
+      entityId: offerId,
       propertyId,
       customerId,
       assignedTo: gate.userId,
@@ -74,7 +77,7 @@ export async function createOffer(
 
   revalidatePath("/app/teklifler");
   revalidatePath(`/app/portfoyler/${propertyId}`);
-  return { ok: true, id: data.id };
+  return { ok: true, id: offerId };
 }
 
 export async function updateOfferStatus(
@@ -82,56 +85,39 @@ export async function updateOfferStatus(
   status: "accepted" | "rejected" | "countered" | "withdrawn",
   counterAmount?: number,
 ): Promise<OfferResult> {
-  const gate = await requirePermission("commissions", "edit");
+  const gate = await requirePermission("offers", "edit");
   if (!gate.ok) return { error: gate.error };
-
-  const supabase = await createClient();
-  await supabase
-    .from("offers")
-    .update({
-      status,
-      counter_amount: counterAmount ?? null,
-      responded_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", offerId)
-    .eq("tenant_id", gate.tenantId);
-
-  // GERİYE UYUMLU: karşı teklif counter_amount'ı güncellemeye devam eder,
-  // ek olarak satıcı turu olarak pazarlık geçmişine de düşer.
-  if (status === "countered" && counterAmount && counterAmount > 0) {
-    try {
-      const nextNo = await nextRoundNo(supabase, offerId);
-      await supabase.from("offer_rounds").insert({
-        tenant_id:  gate.tenantId,
-        offer_id:   offerId,
-        round_no:   nextNo,
-        side:       "seller",
-        amount:     counterAmount,
-        created_by: gate.userId,
-      });
-    } catch (e) {
-      console.error("offer_rounds counter round", e);
-    }
+  const counterResult = status === "countered"
+    ? parseMoneyInput(counterAmount, { max: 100_000_000_000 })
+    : { ok: true as const, value: null };
+  if (!counterResult.ok || (status === "countered" && counterResult.value == null)) {
+    return { error: "Karşı teklif için geçerli bir tutar girin." };
   }
+
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("transition_offer_atomic", {
+    p_tenant_id: gate.tenantId,
+    p_actor_id: gate.userId,
+    p_offer_id: offerId,
+    p_status: status,
+    p_counter_amount: status === "countered" ? counterResult.value : null,
+  });
+  if (error) {
+    console.error("updateOfferStatus atomic", { code: error.code });
+    return { error: "Teklif durumu güncellenemedi." };
+  }
+  const result = data && typeof data === "object" && !Array.isArray(data)
+    ? data as Record<string, unknown>
+    : null;
+  const outcome = typeof result?.outcome === "string" ? result.outcome : "invalid_result";
+  if (outcome === "not_found") return { error: "Teklif bulunamadı." };
+  if (outcome === "invalid_transition") return { error: "Kapanmış bir teklif yeniden açılamaz." };
+  if (outcome === "expired") return { error: "Süresi dolmuş teklif kabul edilemez veya karşılanamaz." };
+  if (outcome !== "applied" && outcome !== "replay") return { error: "Teklif durumu güncellenemedi." };
 
   revalidatePath("/app/teklifler");
   revalidatePath(`/app/teklifler/${offerId}`);
   return { ok: true };
-}
-
-/** Bir sonraki tur numarası = son tur + 1 (tur yoksa 1). */
-async function nextRoundNo(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  offerId: string,
-): Promise<number> {
-  const { data } = await supabase
-    .from("offer_rounds")
-    .select("round_no")
-    .eq("offer_id", offerId)
-    .order("round_no", { ascending: false })
-    .limit(1);
-  return ((data?.[0]?.round_no as number | undefined) ?? 0) + 1;
 }
 
 /** Pazarlık turu ekler — kapanmış (accepted/rejected/withdrawn) teklife tur eklenemez. */
@@ -139,43 +125,39 @@ export async function addOfferRound(
   _prev: OfferResult,
   fd: FormData,
 ): Promise<OfferResult> {
-  const gate = await requirePermission("commissions", "edit");
+  const gate = await requirePermission("offers", "edit");
   if (!gate.ok) return { error: gate.error };
 
   const offerId = String(fd.get("offer_id") ?? "").trim();
   const side    = String(fd.get("side") ?? "").trim();
-  const amount  = parseFloat(String(fd.get("amount") ?? "0"));
+  const amountResult = parseMoneyInput(fd.get("amount"), { max: 100_000_000_000 });
   const note    = String(fd.get("note") ?? "").trim() || null;
 
   if (!offerId) return { error: "Teklif bulunamadı." };
   if (side !== "buyer" && side !== "seller") return { error: "Geçerli bir taraf seçin." };
-  if (isNaN(amount) || amount <= 0) return { error: "Geçerli bir tutar girin." };
+  if (!amountResult.ok || amountResult.value == null) return { error: "Geçerli bir tutar girin." };
+  if (note && note.length > 2000) return { error: "Tur notu en fazla 2000 karakter olabilir." };
 
-  const supabase = await createClient();
-  const { data: offer } = await supabase
-    .from("offers")
-    .select("id, status")
-    .eq("id", offerId)
-    .eq("tenant_id", gate.tenantId)
-    .maybeSingle();
-
-  if (!offer) return { error: "Teklif bulunamadı." };
-  if (["accepted", "rejected", "withdrawn"].includes(offer.status)) {
-    return { error: "Kapanmış teklife tur eklenemez." };
-  }
-
-  const nextNo = await nextRoundNo(supabase, offerId);
-  const { error } = await supabase.from("offer_rounds").insert({
-    tenant_id:  gate.tenantId,
-    offer_id:   offerId,
-    round_no:   nextNo,
-    side,
-    amount,
-    note,
-    created_by: gate.userId,
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("add_offer_round_atomic", {
+    p_tenant_id: gate.tenantId,
+    p_actor_id: gate.userId,
+    p_offer_id: offerId,
+    p_side: side,
+    p_amount: amountResult.value,
+    p_note: note,
   });
-
-  if (error) return { error: "Tur kaydedilemedi." };
+  if (error) {
+    console.error("addOfferRound atomic", { code: error.code });
+    return { error: "Tur kaydedilemedi." };
+  }
+  const result = data && typeof data === "object" && !Array.isArray(data)
+    ? data as Record<string, unknown>
+    : null;
+  if (result?.outcome === "not_found") return { error: "Teklif bulunamadı." };
+  if (result?.outcome === "invalid_state") return { error: "Kapanmış teklife tur eklenemez." };
+  if (result?.outcome === "expired") return { error: "Süresi dolmuş teklife yeni pazarlık turu eklenemez." };
+  if (result?.outcome !== "created") return { error: "Tur kaydedilemedi." };
 
   revalidatePath(`/app/teklifler/${offerId}`);
   return { ok: true, id: offerId };
@@ -192,7 +174,7 @@ export type OfferRound = {
 
 /** Teklifin pazarlık turlarını kronolojik sırayla getirir. */
 export async function listOfferRounds(offerId: string): Promise<OfferRound[]> {
-  const gate = await requirePermission("commissions", "view");
+  const gate = await requirePermission("offers", "view");
   if (!gate.ok) return [];
 
   const supabase = await createClient();
@@ -211,26 +193,41 @@ export async function updateOffer(
   _prev: OfferResult,
   fd: FormData,
 ): Promise<OfferResult> {
-  const gate = await requirePermission("commissions", "edit");
+  const gate = await requirePermission("offers", "edit");
   if (!gate.ok) return { error: gate.error };
 
   const id = String(fd.get("id") ?? "").trim();
   if (!id) return { error: "Teklif bulunamadı." };
 
-  const amount     = parseFloat(String(fd.get("amount") ?? "0"));
+  const amountResult = parseMoneyInput(fd.get("amount"), { max: 100_000_000_000 });
   const validUntil = String(fd.get("valid_until") ?? "").trim() || null;
   const notes      = String(fd.get("notes") ?? "").trim() || null;
 
-  if (isNaN(amount) || amount <= 0) return { error: "Geçerli bir teklif tutarı girin." };
+  if (!amountResult.ok || amountResult.value == null) return { error: "Geçerli bir teklif tutarı girin." };
+  if (validUntil && !isIsoDate(validUntil)) return { error: "Geçerli bir teklif son tarihi girin." };
+  if (validUntil && validUntil < new Date().toISOString().slice(0, 10)) {
+    return { error: "Teklif son tarihi geçmişte olamaz." };
+  }
+  if (notes && notes.length > 5000) return { error: "Teklif notu en fazla 5000 karakter olabilir." };
 
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("offers")
-    .update({ amount, valid_until: validUntil, notes, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("tenant_id", gate.tenantId);
-
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("update_offer_terms_atomic", {
+    p_tenant_id: gate.tenantId,
+    p_actor_id: gate.userId,
+    p_offer_id: id,
+    p_expected_amount: amountResult.value,
+    p_valid_until: validUntil,
+    p_notes: notes,
+  });
   if (error) return { error: "Teklif güncellenemedi." };
+  const outcome = String((data as { outcome?: string } | null)?.outcome ?? "");
+  if (outcome === "not_found") return { error: "Teklif bulunamadı." };
+  if (outcome === "amount_immutable") {
+    return { error: "Gönderilmiş teklifin tutarı değiştirilemez; yeni bir pazarlık turu ekleyin." };
+  }
+  if (outcome === "expired") return { error: "Teklif son tarihi geçmişte olamaz." };
+  if (outcome === "invalid_state") return { error: "Kapanmış teklifin koşulları değiştirilemez." };
+  if (outcome !== "applied" && outcome !== "replay") return { error: "Teklif güncellenemedi." };
 
   revalidatePath("/app/teklifler");
   revalidatePath(`/app/teklifler/${id}`);
@@ -239,7 +236,7 @@ export async function updateOffer(
 
 /** Tek teklifi ilişkili portföy + müşteri ID'leriyle getirir (detay sayfası için). */
 export async function getOffer(id: string) {
-  const gate = await requirePermission("commissions", "view");
+  const gate = await requirePermission("offers", "view");
   if (!gate.ok) return null;
 
   const supabase = await createClient();
@@ -279,143 +276,41 @@ export type ConvertOfferResult = {
  * uygulanmadıysa bağ kurulamaz ama anlaşma yine oluşur/bulunur.
  */
 export async function convertOfferToDeal(offerId: string): Promise<ConvertOfferResult> {
+  const offerGate = await requirePermission("offers", "edit");
+  if (!offerGate.ok) return { error: offerGate.error };
   const gate = await requirePermission("commissions", "create");
   if (!gate.ok) return { error: gate.error };
 
-  const supabase = await createClient();
-  const { data: offer } = await supabase
-    .from("offers")
-    .select("id, amount, status, property_id, customer_id")
-    .eq("id", offerId)
-    .eq("tenant_id", gate.tenantId)
-    .maybeSingle();
-
-  if (!offer) return { error: "Teklif bulunamadı." };
-  if (offer.status !== "accepted") {
-    return { error: "Yalnızca kabul edilmiş teklif anlaşmaya dönüştürülebilir." };
-  }
-
-  // 1) Kesin bağ zaten var mı? (deal_id kolonu yoksa sorgu hata döner → yok say)
-  const { data: linkRow } = await supabase
-    .from("offers")
-    .select("deal_id")
-    .eq("id", offerId)
-    .eq("tenant_id", gate.tenantId)
-    .maybeSingle();
-  const alreadyLinked = (linkRow as { deal_id?: string | null } | null)?.deal_id ?? null;
-  if (alreadyLinked) return { ok: true, dealId: alreadyLinked, linked: true };
-
-  // 2) Aynı müşteri + portföy için açık anlaşma
-  if (offer.property_id && offer.customer_id) {
-    const { data: openDeals } = await supabase
-      .from("deals")
-      .select("id, stage")
-      .eq("tenant_id", gate.tenantId)
-      .eq("property_id", offer.property_id)
-      .eq("customer_id", offer.customer_id)
-      .not("stage", "in", "(won,lost)")
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    const openDeal = openDeals?.[0];
-    if (openDeal) {
-      await linkOfferToDeal(supabase, gate.tenantId, offerId, openDeal.id);
-      revalidatePath(`/app/teklifler/${offerId}`);
-      revalidatePath(`/app/anlasmalar/${openDeal.id}`);
-      return { ok: true, dealId: openDeal.id, linked: true };
-    }
-  }
-
-  // 3) Yeni anlaşma — negotiation aşamasında, teklif tutarıyla
-  let dealType: "sale" | "rent" = "sale";
-  if (offer.property_id) {
-    const { data: property } = await supabase
-      .from("properties")
-      .select("transaction_type")
-      .eq("id", offer.property_id)
-      .maybeSingle();
-    const tt = String(property?.transaction_type ?? "").toLowerCase();
-    if (tt.includes("kira") || tt.includes("rent")) dealType = "rent";
-  }
-
-  const dealValue = Number(offer.amount) || null;
-  const { data: deal, error } = await supabase
-    .from("deals")
-    .insert({
-      tenant_id: gate.tenantId,
-      property_id: offer.property_id,
-      customer_id: offer.customer_id,
-      deal_type: dealType,
-      stage: "negotiation",
-      deal_value: dealValue,
-      probability: 60,
-      assigned_to: gate.userId,
-    })
-    .select("id")
-    .single();
-
-  if (error || !deal) {
-    console.error("convertOfferToDeal", error);
-    return { error: "Anlaşma oluşturulamadı." };
-  }
-
-  await linkOfferToDeal(supabase, gate.tenantId, offerId, deal.id);
-
-  // Kaynak izi: audit log'un yanında kullanıcı görünür bir sistem notu —
-  // anlaşma detayındaki not akışına düşer (deal_notes, migration 000094).
-  // Hata ana akışı asla bozmasın (tablo yoksa da dönüşüm tamamlanır).
-  try {
-    const tutar = dealValue != null
-      ? new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(dealValue)
-      : "—";
-    const tarih = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date());
-    const { error: noteError } = await supabase.from("deal_notes").insert({
-      tenant_id: gate.tenantId,
-      deal_id: deal.id,
-      author_id: gate.userId,
-      body: `Tekliften dönüştürüldü: ₺${tutar} — ${tarih}`,
-    });
-    if (noteError) console.error("convertOfferToDeal note", noteError);
-  } catch (e) {
-    console.error("convertOfferToDeal note", e);
-  }
-
-  // Kaynak izi: bu anlaşma teklif kabulünden doğdu
-  await logActivity({
-    tenantId: gate.tenantId,
-    actorId: gate.userId,
-    action: "deal.from_offer",
-    entityType: "deal",
-    entityId: deal.id,
-    newValue: { offer_id: offerId, amount: dealValue, stage: "negotiation" },
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("convert_offer_to_deal_atomic", {
+    p_tenant_id: gate.tenantId,
+    p_actor_id: gate.userId,
+    p_offer_id: offerId,
   });
+  if (error) {
+    console.error("convertOfferToDeal atomic", { code: error.code });
+    return { error: "Teklif anlaşmaya dönüştürülemedi; hiçbir kısmi kayıt oluşturulmadı." };
+  }
+  const result = data && typeof data === "object" && !Array.isArray(data)
+    ? data as Record<string, unknown>
+    : null;
+  const outcome = typeof result?.outcome === "string" ? result.outcome : "invalid_result";
+  if (outcome === "not_found") return { error: "Teklif bulunamadı." };
+  if (outcome === "invalid_state") return { error: "Yalnızca kabul edilmiş teklif anlaşmaya dönüştürülebilir." };
+  if ((outcome !== "applied" && outcome !== "replay") || typeof result?.deal_id !== "string") {
+    return { error: "Teklif anlaşmaya dönüştürülemedi." };
+  }
+  const dealId = result.deal_id;
+  const linked = outcome === "replay" || result.linked === true;
 
   revalidatePath(`/app/teklifler/${offerId}`);
   revalidatePath("/app/anlasmalar");
-  return { ok: true, dealId: deal.id, linked: false };
-}
-
-/** offers.deal_id bağını kurar — kolon yoksa/hata olursa ana akışı bozmaz. */
-async function linkOfferToDeal(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  tenantId: string,
-  offerId: string,
-  dealId: string,
-) {
-  try {
-    const { error } = await supabase
-      .from("offers")
-      .update({ deal_id: dealId, updated_at: new Date().toISOString() })
-      .eq("id", offerId)
-      .eq("tenant_id", tenantId);
-    if (error) console.error("linkOfferToDeal", error);
-  } catch (e) {
-    console.error("linkOfferToDeal", e);
-  }
+  revalidatePath(`/app/anlasmalar/${dealId}`);
+  return { ok: true, dealId, linked };
 }
 
 export async function listOffers(propertyId?: string) {
-  const gate = await requirePermission("commissions", "view");
+  const gate = await requirePermission("offers", "view");
   if (!gate.ok) return [];
 
   const supabase = await createClient();

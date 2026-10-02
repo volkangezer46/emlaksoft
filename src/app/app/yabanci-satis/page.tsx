@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/app/empty-state";
 import { fetchLatestRates, formatFx, fxAgeLabel, fxApproxLine } from "@/lib/fx";
@@ -47,7 +48,9 @@ type ForeignCustomer = {
 };
 
 export default async function ForeignSalePage() {
-  await requireModulePage("properties");
+  const { perms } = await requireModulePage("properties");
+  const canApplyChecklist = effectiveHasPermission(perms, "commissions", "edit");
+  const canMarkForeign = effectiveHasPermission(perms, "customers", "edit");
   const supabase = await createClient();
   const nowMs = now();
   const yearStart = `${new Date(nowMs).getUTCFullYear()}-01-01`;
@@ -290,7 +293,11 @@ export default async function ForeignSalePage() {
         </div>
         <div className="border-t border-line bg-canvas/50 px-5 py-4">
           <p className="mb-2 text-xs font-semibold text-text-muted">Bu listeyi bir anlaşmaya uygula</p>
-          <ApplyChecklistForm deals={openDeals} itemCount={FOREIGN_SALE_CHECKLIST.length} />
+          <ApplyChecklistForm
+            deals={openDeals}
+            itemCount={FOREIGN_SALE_CHECKLIST.length}
+            canEdit={canApplyChecklist}
+          />
         </div>
       </section>
 
@@ -347,7 +354,7 @@ export default async function ForeignSalePage() {
 
         <div className="border-t border-line bg-canvas/50 px-5 py-4">
           <p className="mb-2 text-xs font-semibold text-text-muted">Müşteriyi yabancı olarak işaretle</p>
-          <MarkForeignForm customers={markableCustomers} />
+          <MarkForeignForm customers={markableCustomers} canEdit={canMarkForeign} />
         </div>
       </section>
     </div>

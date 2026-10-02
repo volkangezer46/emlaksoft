@@ -5,13 +5,14 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { notifyTenant } from "@/lib/notify";
+import { getBaseUrl } from "@/lib/base-url";
 
 export type SurveyResult = { error?: string; ok?: boolean; id?: string; url?: string };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function appUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return getBaseUrl();
 }
 
 /**
@@ -37,7 +38,7 @@ export async function createSurveyForDeal(formData: FormData): Promise<SurveyRes
   const supabase = await createClient();
   const { data: deal } = await supabase
     .from("deals")
-    .select("id, stage, customer_id, assigned_to, customer:customers(full_name)")
+    .select("id, stage, customer_id, assigned_to")
     .eq("id", dealId)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
@@ -46,13 +47,34 @@ export async function createSurveyForDeal(formData: FormData): Promise<SurveyRes
   if (deal.stage !== "won") return { error: "Anket yalnızca kazanılan anlaşmalar için oluşturulabilir." };
   if (!deal.customer_id) return { error: "Anlaşmaya bağlı müşteri yok — anket gönderilecek kişi belirsiz." };
 
+  const [{ data: customer }, { data: agent }] = await Promise.all([
+    supabase
+      .from("customers")
+      .select("id, full_name")
+      .eq("id", deal.customer_id)
+      .eq("tenant_id", gate.tenantId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    deal.assigned_to
+      ? supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", deal.assigned_to)
+          .eq("tenant_id", gate.tenantId)
+          .eq("is_active", true)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  if (!customer) return { error: "Anlaşmanın müşterisi bulunamadı veya bu ofise ait değil." };
+  if (deal.assigned_to && !agent) return { error: "Anlaşmanın danışmanı bu ofise ait değil." };
+
   const { data, error } = await supabase
     .from("surveys")
     .insert({
       tenant_id: gate.tenantId,
       deal_id: deal.id,
-      customer_id: deal.customer_id,
-      agent_id: (deal.assigned_to as string | null) ?? null,
+      customer_id: customer.id,
+      agent_id: agent?.id ?? null,
     })
     .select("id, public_token")
     .single();
@@ -76,9 +98,8 @@ export async function createSurveyForDeal(formData: FormData): Promise<SurveyRes
   });
 
   // Müşterinin danışmanına haber ver — linki müşteriye o iletecek.
-  const rel = deal.customer as { full_name?: string } | { full_name?: string }[] | null;
-  const customerName = (Array.isArray(rel) ? rel[0]?.full_name : rel?.full_name) ?? "müşteri";
-  const agentId = (deal.assigned_to as string | null) ?? null;
+  const customerName = customer.full_name ?? "müşteri";
+  const agentId = agent?.id ?? null;
   if (agentId) {
     try {
       await notifyTenant({

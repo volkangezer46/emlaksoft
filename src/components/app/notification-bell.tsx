@@ -10,6 +10,7 @@ import {
   CheckCheck,
   CheckCircle2,
   Info,
+  Loader2,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -21,6 +22,7 @@ import {
 } from "@/app/actions/notifications";
 import { filterByNotifPrefs, readNotifPrefs, type NotifPrefs } from "@/components/app/notification-prefs";
 import { onNotificationInsert } from "@/lib/realtime";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const KIND_META: Record<string, { icon: LucideIcon; cls: string }> = {
   success: { icon: CheckCircle2, cls: "bg-mint-500/12 text-mint-600" },
@@ -70,6 +72,7 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
   const [prefs, setPrefs] = useState<NotifPrefs | null>(null);
   const [tab, setTab] = useState<"all" | "unread">("all");
   const [shake, setShake] = useState(false);
+  const [markingAll, setMarkingAll] = useState(false);
 
   // Canlı bildirim: RealtimeRefresh, notifications INSERT'lerini window event
   // olarak köprülüyor (tenant/user filtresi orada, RLS'li kanal — bkz.
@@ -97,16 +100,6 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
       setShake(true);
     });
   }, []);
-
-  // Elle kurulmuş popover: Escape ile kapanma (Radix'teki davranışın dengi).
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
 
   // Sunucudan yeni `initial` geldiğinde yerel listeyi tazele. Efekt yerine
   // React'in belgelediği "prop değişiminde render sırasında state ayarla"
@@ -149,9 +142,9 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
     startTransition(() => setItems(next));
   }
 
-  async function onOpen() {
-    setOpen((v) => !v);
-    if (!open) {
+  async function onOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+    if (nextOpen) {
       // Tercihler localStorage'dan okunuyor; efekt yerine burada — panel
       // açılmadan değerine ihtiyaç yok ve olay içinde okumak daha doğrudan.
       setPrefs(readNotifPrefs());
@@ -167,9 +160,15 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
   }
 
   async function onReadAll() {
-    await markAllNotificationsRead();
-    const now = new Date().toISOString();
-    setItems((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? now })));
+    if (markingAll) return;
+    setMarkingAll(true);
+    try {
+      await markAllNotificationsRead();
+      const now = new Date().toISOString();
+      setItems((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? now })));
+    } finally {
+      setMarkingAll(false);
+    }
   }
 
   function renderItem(n: NotificationRow) {
@@ -210,7 +209,7 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
   }
 
   return (
-    <div className="relative">
+    <Popover open={open} onOpenChange={(nextOpen) => void onOpenChange(nextOpen)}>
       {/* Yeni bildirimde zile tek seferlik küçük sallanma; hareket azaltma
           tercihinde kapalı. Global stile dokunmamak için bileşen içi <style>. */}
       <style>{`
@@ -226,24 +225,26 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
           .es-bell-shake { animation: none; }
         }
       `}</style>
-      <button
-        type="button"
-        onClick={onOpen}
-        className="relative grid h-10 w-10 place-items-center rounded-[11px] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
-        aria-label={`Bildirimler${unread > 0 ? ` (${unread} okunmamış)` : ""}`}
-      >
-        <Bell className={`h-4 w-4${shake ? " es-bell-shake" : ""}`} onAnimationEnd={() => setShake(false)} />
-        {unread > 0 ? (
-          <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full border-2 border-white bg-danger-500 px-1 text-[10px] font-bold leading-none text-white">
-            {unread > 9 ? "9+" : unread}
-          </span>
-        ) : null}
-      </button>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="focus-ring relative grid h-10 w-10 place-items-center rounded-[11px] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+          aria-label={`Bildirimler${unread > 0 ? ` (${unread} okunmamış)` : ""}`}
+        >
+          <Bell className={`h-4 w-4${shake ? " es-bell-shake" : ""}`} onAnimationEnd={() => setShake(false)} />
+          {unread > 0 ? (
+            <span aria-hidden="true" className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full border-2 border-white bg-danger-500 px-1 text-[10px] font-bold leading-none text-white">
+              {unread > 9 ? "9+" : unread}
+            </span>
+          ) : null}
+        </button>
+      </PopoverTrigger>
 
-      {open ? (
-        <>
-          <button type="button" aria-label="Kapat" className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-12 z-50 w-[min(380px,calc(100vw-1.5rem))] overflow-hidden rounded-[16px] border border-line bg-surface shadow-[var(--shadow-lg)]">
+      <PopoverContent
+        aria-label="Bildirimler"
+        className="w-[min(380px,calc(100vw-1.5rem))] p-0"
+        align="end"
+      >
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <div className="flex items-center gap-2">
                 <p className="font-display text-sm font-bold text-ink-950">Bildirimler</p>
@@ -252,14 +253,15 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
                 ) : null}
               </div>
               {unread > 0 ? (
-                <button type="button" onClick={onReadAll} className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:underline">
-                  <CheckCheck className="h-3.5 w-3.5" /> Tümünü oku
+                <button type="button" disabled={markingAll} onClick={onReadAll} className="focus-ring inline-flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:underline disabled:opacity-60">
+                  {markingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5" />}
+                  {markingAll ? "İşleniyor…" : "Tümünü oku"}
                 </button>
               ) : null}
             </div>
 
             {/* Sekmeler */}
-            <div className="flex gap-1 border-b border-line px-2 py-1.5">
+            <div role="tablist" aria-label="Bildirim görünümü" className="flex gap-1 border-b border-line px-2 py-1.5">
               {([
                 { key: "all", label: "Tümü" },
                 { key: "unread", label: `Okunmamış${unread > 0 ? ` (${unread})` : ""}` },
@@ -267,6 +269,10 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
                 <button
                   key={t.key}
                   type="button"
+                  role="tab"
+                  id={`notification-tab-${t.key}`}
+                  aria-selected={tab === t.key}
+                  aria-controls="notification-tabpanel"
                   onClick={() => setTab(t.key)}
                   className={`rounded-[9px] px-3 py-1.5 text-xs font-semibold transition ${tab === t.key ? "bg-brand-600/10 text-brand-600" : "text-text-muted hover:bg-canvas"}`}
                 >
@@ -275,7 +281,12 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
               ))}
             </div>
 
-            <div className="max-h-96 overflow-y-auto">
+            <div
+              id="notification-tabpanel"
+              role="tabpanel"
+              aria-labelledby={`notification-tab-${tab}`}
+              className="max-h-96 overflow-y-auto"
+            >
               {shown.length === 0 ? (
                 <div className="grid place-items-center px-4 py-12 text-center">
                   <span className="grid h-12 w-12 place-items-center rounded-[14px] bg-canvas text-text-faint">
@@ -304,9 +315,7 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
                 Tümünü gör
               </Link>
             </div>
-          </div>
-        </>
-      ) : null}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }

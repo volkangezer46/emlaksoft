@@ -9,15 +9,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import type { CSSProperties } from "react";
+import { isPlanId, planLabel, PLANS } from "@/lib/billing/plans";
 
 const RING_C = 2 * Math.PI * 42;
-
-const planLabel: Record<string, string> = {
-  advisor: "Danışman",
-  office: "Ofis",
-  professional: "Profesyonel",
-  enterprise: "Kurumsal",
-};
 
 const statusLabel: Record<string, string> = {
   trial: "Deneme",
@@ -56,13 +50,15 @@ function buildHref(p: { q?: string; durum?: string; plan?: string; sayfa?: numbe
 export default async function AdminTenantsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string; durum?: string; plan?: string; sayfa?: string }>;
+  searchParams?: Promise<{ q?: string; durum?: string; plan?: string; sayfa?: string; audit?: string }>;
 }) {
-  await requirePlatformModule("tenants");
+  const staff = await requirePlatformModule("tenants");
+  const canImpersonate = staff.role === "super_admin" || staff.role === "ops" || staff.role === "support";
   const sp = (await searchParams) ?? {};
   const query = (sp.q ?? "").trim();
   const durum = sp.durum && statusLabel[sp.durum] ? sp.durum : undefined;
-  const plan = sp.plan && planLabel[sp.plan] ? sp.plan : undefined;
+  const plan = sp.plan && isPlanId(sp.plan) ? sp.plan : undefined;
+  const auditFailed = sp.audit === "failed";
   const page = parsePage(sp.sayfa);
   const filtered = Boolean(query || durum || plan);
 
@@ -126,15 +122,29 @@ export default async function AdminTenantsPage({
   });
   const activeRate = stats.filter((t) => t.status === "active").length / total;
 
-  const planCounts = ["advisor", "office", "professional", "enterprise"].map((p) => ({
-    key: p,
-    label: planLabel[p],
-    count: stats.filter((t) => t.plan === p).length,
+  const planCounts = PLANS.map((catalogPlan) => ({
+    key: catalogPlan.id,
+    label: catalogPlan.name,
+    count: stats.filter((t) => t.plan === catalogPlan.id).length,
   }));
   const maxPlan = Math.max(1, ...planCounts.map((p) => p.count));
 
   return (
     <div className="space-y-6">
+      {auditFailed ? (
+        <div role="alert" className="flex items-start justify-between gap-4 rounded-[14px] border border-danger-500/25 bg-danger-500/8 px-4 py-3 text-sm text-danger-600">
+          <div className="flex items-start gap-2.5">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-bold">Destek oturumu kapatıldı ancak denetim kaydı doğrulanamadı.</p>
+              <p className="mt-0.5 text-xs text-danger-600/85">Güvenlik ekibi hata kayıtlarını kontrol etmelidir; yeni impersonation başlatmadan önce olay kaydını doğrulayın.</p>
+            </div>
+          </div>
+          <Link href="/admin/tenants" aria-label="Uyarıyı kapat" className="focus-ring grid h-7 w-7 shrink-0 place-items-center rounded-[8px] hover:bg-danger-500/10">
+            <X className="h-4 w-4" />
+          </Link>
+        </div>
+      ) : null}
       <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-amber-400/20 blur-[90px]" />
@@ -260,7 +270,7 @@ export default async function AdminTenantsPage({
               href={buildHref({ q: query, durum })}
               className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
             >
-              Paket: {planLabel[plan]} <X className="h-3 w-3" />
+              Paket: {planLabel(plan)} <X className="h-3 w-3" />
             </Link>
           ) : null}
           <p className="ml-auto flex items-center gap-2 text-xs text-text-muted">
@@ -309,7 +319,7 @@ export default async function AdminTenantsPage({
                   {statusLabel[t.status] ?? t.status}
                 </span>
                 <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">
-                  {planLabel[t.plan] ?? t.plan}
+                  {planLabel(t.plan)}
                 </span>
                 {(() => {
                   const h = healthOf(t.id);
@@ -330,15 +340,17 @@ export default async function AdminTenantsPage({
                   tenantName={t.name}
                   currentPlan={t.plan}
                   currentStatus={t.status}
-                  planOptions={Object.entries(planLabel)}
+                  planOptions={PLANS.map((catalogPlan) => [catalogPlan.id, catalogPlan.name] as [string, string])}
                   statusOptions={Object.entries(statusLabel)}
                 />
-                <form action={startImpersonation}>
-                  <input type="hidden" name="tenant_id" value={t.id} />
-                  <button type="submit" className="rounded-[9px] border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-xs font-bold text-amber-700 transition hover:bg-amber-400/20">
-                    Ofise gir
-                  </button>
-                </form>
+                {canImpersonate ? (
+                  <form action={startImpersonation}>
+                    <input type="hidden" name="tenant_id" value={t.id} />
+                    <button type="submit" className="rounded-[9px] border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-xs font-bold text-amber-700 transition hover:bg-amber-400/20">
+                      Ofise gir
+                    </button>
+                  </form>
+                ) : null}
               </div>
             </article>
           ))}

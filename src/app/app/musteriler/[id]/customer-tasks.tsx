@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Clock, ListChecks, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { completeTask, createTask, deleteTask, reopenTask } from "@/app/actions/tasks";
 
 export type CustomerTaskRow = {
@@ -65,6 +66,22 @@ export function CustomerTasks({
       await fn(fd);
       router.refresh();
     });
+  }
+
+  async function removeTask(id: string) {
+    setError(null);
+    const fd = new FormData();
+    fd.set("id", id);
+    try {
+      const result = await deleteTask(fd);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Görev silinemedi. Lütfen tekrar deneyin.");
+    }
   }
 
   return (
@@ -136,11 +153,17 @@ export function CustomerTasks({
                 )
               ) : null}
               {canDelete ? (
-                <Tip label="Sil">
-                  <button type="button" disabled={pending} onClick={() => act(deleteTask, t.id)} aria-label="Görevi sil" className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] border border-line text-danger-500 transition hover:border-danger-500/40">
+                <ConfirmDialog
+                  title="Görevi sil"
+                  description={`“${t.title}” kalıcı olarak silinecek. Bu işlem geri alınamaz.`}
+                  confirmLabel="Sil"
+                  onConfirm={() => removeTask(t.id)}
+                  trigger={
+                    <button type="button" disabled={pending} aria-label="Görevi sil" className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] border border-line text-danger-500 transition hover:border-danger-500/40">
                     <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </Tip>
+                    </button>
+                  }
+                />
               ) : null}
             </div>
           );

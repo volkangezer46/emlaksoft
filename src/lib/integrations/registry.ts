@@ -3,21 +3,29 @@
  *
  * NEDEN: EmlakSoft'un dış dünyaya açılan tüm bağlantı noktalarını (resmi kayıt,
  * iletişim, değerleme, medya-AI) tek listede toplar. Her kalem "bağlı" mı yoksa
- * "bağlantı bekliyor" mu — env/DB anahtarından GERÇEK durumu okunur; hiçbir şey
- * uydurulmaz. Anahtar girildiğinde ilgili adaptör (src/lib/integrations/*.ts)
- * canlıya geçer. Yeni entegrasyon = buraya bir kayıt + bir adaptör dosyası.
+ * "bağlantı bekliyor" mu — tenant binding/secret doğrulamasından GERÇEK durum
+ * okunur; hiçbir şey uydurulmaz. Adaptörün varlığı tek başına "hazır" sayılmaz.
+ * Yeni entegrasyon = buraya kayıt + adaptör + uçtan uca kabul sözleşmesi.
  */
 
-import { isEndeksaConfigured } from "./endeksa";
-import { isTapusorConfigured } from "./tapusor";
+import { isEndeksaConfiguredFull } from "./endeksa";
+import { isTapusorConfiguredFull } from "./tapusor";
+import { isIyzicoConfigured } from "@/lib/billing/iyzico";
+import { isPortalConfigured } from "@/lib/integrations/portals";
+import { getNetgsmConfig, getWhatsAppConfig } from "@/lib/messaging/netgsm";
+import {
+  isTenantSmsAvailable,
+  isTenantWhatsAppAvailable,
+} from "@/lib/messaging/tenant-providers";
 
 export type IntegrationCategory =
   | "resmi" // resmi kayıt / kamu
   | "iletisim" // müşteri iletişim kanalları
   | "degerleme" // değerleme & finans
-  | "medya"; // görsel / AI medya
+  | "medya" // görsel / AI medya
+  | "operasyon"; // ödeme, fatura ve ilan yayını
 
-export type IntegrationStatus = "connected" | "pending";
+export type IntegrationStatus = "configured" | "setup_required" | "planned";
 
 export type Integration = {
   key: string;
@@ -34,10 +42,30 @@ export type Integration = {
   turkish?: boolean;
 };
 
-const env = (k: string): boolean => Boolean(process.env[k]?.trim());
-
 /** Tüm entegrasyonları CANLI durumlarıyla döndürür (yalnız sunucuda çağır). */
-export function listIntegrations(): Integration[] {
+export async function listIntegrations(tenantId: string | null = null): Promise<Integration[]> {
+  const [
+    endeksaConfigured,
+    tapusorConfigured,
+    netgsmConfigured,
+    whatsappConfigured,
+    portalConfigured,
+  ] = await Promise.all([
+    isEndeksaConfiguredFull(),
+    isTapusorConfiguredFull(),
+    tenantId
+      ? isTenantSmsAvailable(tenantId)
+      : getNetgsmConfig().then(Boolean),
+    tenantId
+      ? isTenantWhatsAppAvailable(tenantId)
+      : getWhatsAppConfig().then(Boolean),
+    Promise.all([
+      isPortalConfigured("sahibinden"),
+      isPortalConfigured("hepsiemlak"),
+      isPortalConfigured("zingat"),
+      isPortalConfigured("emlakjet"),
+    ]).then((states) => states.some(Boolean)),
+  ]);
   return [
     {
       key: "takbis",
@@ -45,7 +73,7 @@ export function listIntegrations(): Integration[] {
       category: "resmi",
       description: "Ada/parsel ile malik, yüzölçüm ve mülkiyet geçmişini resmi tapu sisteminden çeker.",
       unlocks: "Portföy açarken malik bilgisini otomatik doldurma + malik doğrulama.",
-      status: env("TAKBIS_API_KEY") ? "connected" : "pending",
+      status: "planned",
       requires: "TAKBİS entegratör anlaşması + TAKBIS_API_KEY",
       turkish: true,
     },
@@ -53,20 +81,60 @@ export function listIntegrations(): Integration[] {
       key: "iys",
       name: "İYS (İleti Yönetim Sistemi)",
       category: "resmi",
-      description: "Ticari ileti izinlerini resmi entegratör API'sinden gerçek zamanlı doğrular.",
+      description: "Ticari ileti izinlerinin resmi entegratör API'siyle doğrulanması için planlanan bağlantı.",
       unlocks: "Toplu SMS/WhatsApp öncesi otomatik izin kontrolü — izinsiz gönderimi bloklar.",
-      status: env("IYS_API_KEY") || env("IYS_INTEGRATOR_TOKEN") ? "connected" : "pending",
+      status: "planned",
       requires: "İYS entegratör (Netgsm/İleti vb.) API anahtarı",
+      turkish: true,
+    },
+    {
+      key: "netgsm",
+      name: "Netgsm SMS",
+      category: "iletisim",
+      description: "Ofise ait izole kimlik bilgileriyle işlem ve kampanya SMS'leri gönderir; teslim sonuçları kayıt altına alınır.",
+      unlocks: "Randevu, imza, güvenlik ve izinli kampanya bildirimlerinde gerçek SMS gönderimi.",
+      status: netgsmConfigured ? "configured" : "setup_required",
+      requires: "Ayarlar'da Netgsm kullanıcı kodu, parola ve onaylı mesaj başlığı",
+      turkish: true,
+    },
+    {
+      key: "iyzico",
+      name: "iyzico Ödeme",
+      category: "operasyon",
+      description: "Abonelik ve güvenli ödeme bağlantılarında imzalı iyzico tahsilat akışını kullanır.",
+      unlocks: "Doğrulanmış callback/webhook mutabakatıyla otomatik ödeme ve fatura durum yönetimi.",
+      status: isIyzicoConfigured() ? "configured" : "setup_required",
+      requires: "IYZICO_API_KEY, IYZICO_SECRET_KEY ve doğru sandbox/canlı API kökü",
+      turkish: true,
+    },
+    {
+      key: "property_portals",
+      name: "Kurumsal İlan Portalları",
+      category: "operasyon",
+      description: "Sahibinden, Hepsiemlak, Zingat veya Emlakjet kurumsal API'sine ilan gönderir ve kaldırır.",
+      unlocks: "Portföy ekranından seçili portala yayın, güncelleme ve yayından kaldırma.",
+      status: portalConfigured ? "configured" : "setup_required",
+      requires: "En az bir portal için kurumsal sözleşme, API anahtarı ve sağlayıcının verdiği HTTPS API kökü",
+      turkish: true,
+    },
+    {
+      key: "efatura",
+      name: "E-Fatura / E-Arşiv",
+      category: "operasyon",
+      description: "Sağlayıcı adaptörleri mevcut; faturalama yaşam döngüsüne uçtan uca bağlama ve mali kabul süreci henüz tamamlanmadı.",
+      unlocks: "Tahsilat sonrası mevzuata uygun belgenin otomatik oluşturulması ve kalıcı sağlayıcı makbuzu.",
+      status: "planned",
+      requires: "Uyumlu sağlayıcı sözleşmesi + uçtan uca mali kabul ve iptal/iade senaryoları",
       turkish: true,
     },
     {
       key: "whatsapp",
       name: "WhatsApp Business API",
       category: "iletisim",
-      description: "İki yönlü WhatsApp: mesaj müşteri kartına düşer, onaylı şablonlar, ekip gelen kutusu.",
-      unlocks: "Canlı WhatsApp yazışması + kampanyaların gerçek gönderimi.",
-      status: env("WHATSAPP_PHONE_ID") && env("WHATSAPP_TOKEN") ? "connected" : "pending",
-      requires: "Meta WhatsApp Business hesabı + WHATSAPP_TOKEN, WHATSAPP_PHONE_ID",
+      description: "Meta kimliği doğrulanmış ofis hesabından onaylı şablonlarla WhatsApp gönderimi yapar.",
+      unlocks: "İzinli kampanya ve işlem bildirimlerinde tenant'a izole WhatsApp gönderimi.",
+      status: whatsappConfigured ? "configured" : "setup_required",
+      requires: "Meta Cloud API: doğrulanmış telefon kimliği, WABA kimliği, Graph sürümü ve erişim belirteci",
       turkish: true,
     },
     {
@@ -75,7 +143,7 @@ export function listIntegrations(): Integration[] {
       category: "iletisim",
       description: "Sosyal reklam formlarından gelen lead otomatik müşteri + talep olur.",
       unlocks: "Sosyal reklam lead'lerinin otomatik yakalanması + hız-lead tetiği.",
-      status: env("META_APP_SECRET") && env("META_PAGE_TOKEN") ? "connected" : "pending",
+      status: "planned",
       requires: "Meta uygulaması + sayfa erişim tokenı (META_PAGE_TOKEN)",
     },
     {
@@ -84,7 +152,7 @@ export function listIntegrations(): Integration[] {
       category: "degerleme",
       description: "Bölge endeksi ve emsal m² verisiyle değerleme motorunu besler.",
       unlocks: "Emsal motorunda gerçek piyasa verisiyle otomatik değerleme.",
-      status: isEndeksaConfigured() ? "connected" : "pending",
+      status: endeksaConfigured ? "configured" : "setup_required",
       requires: "Endeksa API (ENDEKSA_CLIENT_ID / SECRET) veya ayarlardan anahtar",
     },
     {
@@ -93,7 +161,7 @@ export function listIntegrations(): Integration[] {
       category: "degerleme",
       description: "Yapay zekâ destekli konut değerleme raporu (EDİ).",
       unlocks: "Değerlemede ikinci bağımsız AI görüşü.",
-      status: isTapusorConfigured() ? "connected" : "pending",
+      status: tapusorConfigured ? "configured" : "setup_required",
       requires: "Tapusor API anahtarı (TAPUSOR_API_KEY)",
     },
     {
@@ -102,7 +170,7 @@ export function listIntegrations(): Integration[] {
       category: "degerleme",
       description: "Canlı konut kredisi faiz akışı ile en uygun banka/taksit karşılaştırması.",
       unlocks: "Müşteri portalında canlı kredi karşılaştırma; danışman = finansman danışmanı.",
-      status: env("BANK_RATES_API_KEY") ? "connected" : "pending",
+      status: "planned",
       requires: "Kredi oran sağlayıcısı API anahtarı",
     },
     {
@@ -111,7 +179,7 @@ export function listIntegrations(): Integration[] {
       category: "medya",
       description: "Boş oda döşeme önizlemesi, otomatik ilan videosu ve akıllı kapak seçimi.",
       unlocks: "Fotoğrafları AI ile döşeme, story/video üretimi, kalite skoruyla kapak.",
-      status: env("AI_MEDIA_API_KEY") ? "connected" : "pending",
+      status: "planned",
       requires: "Görsel AI sağlayıcısı API anahtarı (ör. staging/generation servisi)",
     },
   ];

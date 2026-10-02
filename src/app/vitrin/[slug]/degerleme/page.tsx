@@ -4,10 +4,11 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Calculator, Clock3, ShieldCheck, Sparkles } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ValuationFunnel } from "@/components/public/valuation-funnel";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 // ISR: vitrin gibi herkese açık — CDN önbellekli, 2 dk tazelenir.
 // SEO mıknatısı: bilerek indexlenebilir (noindex YOK).
-export const revalidate = 120;
+export const revalidate = 60;
 
 const FALLBACK_PROPERTY_TYPES = ["Daire", "Villa", "Müstakil ev", "İşyeri", "Arsa"];
 
@@ -20,10 +21,10 @@ export async function generateMetadata({
   const admin = createAdminClient();
   const { data: tenant } = await admin
     .from("tenants")
-    .select("id, name")
+    .select("id, name, status")
     .eq("slug", slug)
     .maybeSingle();
-  if (!tenant) return { title: "Vitrin bulunamadı" };
+  if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "Vitrin bulunamadı" };
 
   const title = `${tenant.name} | Ücretsiz Değerleme`;
   const description = `Eviniz ne kadar eder? ${tenant.name} ile il, ilçe ve m² bilgisinden ücretsiz ön değerleme alın; net değerleme için danışman sizi arasın.`;
@@ -54,11 +55,11 @@ export default async function VitrinDegerlemePage({
 
   const { data: tenant } = await admin
     .from("tenants")
-    .select("id, name, brand_color, lead_capture_token, lead_capture_enabled")
+    .select("id, name, status, brand_color, lead_capture_token, lead_capture_enabled")
     .eq("slug", slug)
     .maybeSingle();
 
-  if (!tenant) notFound();
+  if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
 
   // provinces + mülk tipi tanımları tenant'tan bağımsız değil ama paralel çekilebilir.
   // Tanımlar: global (tenant_id null) + ofise özel; aynı value'da ofis kazanır
@@ -88,7 +89,7 @@ export default async function VitrinDegerlemePage({
 
   return (
     <div className="min-h-screen bg-canvas">
-      <div className="theme-dark relative overflow-hidden bg-[image:var(--grad-ink)] text-white">
+      <main id="main-content" className="theme-dark relative overflow-hidden bg-[image:var(--grad-ink)] text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-20 -top-24 h-80 w-80 rounded-full bg-brand-600/25 blur-[120px]" />
 
@@ -159,7 +160,7 @@ export default async function VitrinDegerlemePage({
             <ArrowLeft className="h-3.5 w-3.5" /> {tenant.name} vitrinine dön
           </Link>
         </div>
-      </div>
+      </main>
 
       <footer className="border-t border-line py-6 text-center text-[11px] text-text-faint">
         <Link href="/" className="font-semibold underline-offset-2 transition hover:text-brand-600 hover:underline">

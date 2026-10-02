@@ -20,6 +20,12 @@ import { signUp, type AuthResult } from "@/app/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { PasswordStrengthMeter } from "@/components/auth/password-strength";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { getPlan, type BillingCycle, type PlanId } from "@/lib/billing/plans";
+import {
+  defaultTeamSizeForPlan,
+  registrationPlanForTeamSize,
+  type RegistrationTeamSize,
+} from "@/lib/billing/registration-plan";
 
 const initial: AuthResult = {};
 
@@ -46,15 +52,26 @@ function errorStep(message: string): 1 | 2 | null {
   return null;
 }
 
-export function RegisterForm() {
+export function RegisterForm({
+  initialPlan = "office",
+  initialCycle = "monthly",
+}: {
+  initialPlan?: PlanId;
+  initialCycle?: BillingCycle;
+}) {
   const [state, action, pending] = useActionState(signUp, initial);
   const [step, setStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
   const [pw, setPw] = useState("");
+  const [teamSize, setTeamSize] = useState<RegistrationTeamSize>(
+    defaultTeamSizeForPlan(initialPlan),
+  );
   const step1Ref = useRef<HTMLDivElement>(null);
   const step2Ref = useRef<HTMLDivElement>(null);
 
   const errorTargetStep = state.error ? errorStep(state.error) : null;
+  const selectedPlanId = registrationPlanForTeamSize(initialPlan, teamSize);
+  const selectedPlan = getPlan(selectedPlanId);
 
   function validateStep(ref: React.RefObject<HTMLDivElement | null>) {
     const inputs = ref.current?.querySelectorAll<HTMLInputElement>("input");
@@ -77,11 +94,17 @@ export function RegisterForm() {
   return (
     <AuthShell
       panelTitle="Ofisinizi 2 dakikada dijitalleştirin"
-      panelDesc="14 gün ücretsiz, kredi kartsız ve taahhütsüz. Kurulum sihirbazı ofisinizi adım adım hazırlar; verileriniz Türkiye mevzuatına uygun şekilde korunur."
+      panelDesc="14 gün ücretsiz, kredi kartsız ve taahhütsüz. Kurulum sihirbazı ofisinizi adım adım hazırlar; verileriniz rol, yetki ve denetim kontrolleriyle korunur."
     >
       <div className="mt-8 lg:mt-0">
         <h1 className="font-display text-3xl font-extrabold text-ink-950">Ücretsiz başlayın</h1>
         <p className="mt-2 text-sm text-text-muted">3 kısa adımda çalışma alanınız hazır.</p>
+        <p
+          className="mt-3 inline-flex rounded-full bg-brand-600/10 px-3 py-1.5 text-xs font-semibold text-brand-700"
+          aria-live="polite"
+        >
+          {selectedPlan.name} · {initialCycle === "yearly" ? "Yıllık" : "Aylık"} plan seçimi
+        </p>
 
         {/* Adım göstergesi — tamamlanmış adımlar tıklanarak geri dönülebilir */}
         <ol className="mt-7 flex items-center gap-2" aria-label="Kayıt adımları">
@@ -122,6 +145,8 @@ export function RegisterForm() {
         </ol>
 
         <form action={action} className="mt-7">
+          <input type="hidden" name="plan" value={selectedPlanId} />
+          <input type="hidden" name="cycle" value={initialCycle} />
           {/* ADIM 1 — Hesap bilgileri */}
           <div ref={step1Ref} className={step === 1 ? "space-y-4" : "hidden"}>
             <div>
@@ -163,7 +188,14 @@ export function RegisterForm() {
               <div className="grid grid-cols-2 gap-2.5">
                 {TEAM_OPTIONS.map((o) => (
                   <label key={o.value} className="group cursor-pointer">
-                    <input type="radio" name="agents" value={o.value} defaultChecked={o.value === "2-10"} className="peer sr-only" />
+                    <input
+                      type="radio"
+                      name="agents"
+                      value={o.value}
+                      checked={teamSize === o.value}
+                      onChange={() => setTeamSize(o.value as RegistrationTeamSize)}
+                      className="peer sr-only"
+                    />
                     <span className="block rounded-[12px] border border-line bg-surface px-3.5 py-3 transition peer-checked:border-brand-600 peer-checked:bg-brand-600/[0.05] peer-checked:ring-2 peer-checked:ring-brand-600/25 hover:border-brand-300">
                       <span className="block text-sm font-bold text-ink-950">{o.title}</span>
                       <span className="block text-[11px] text-text-muted">{o.desc}</span>
@@ -214,7 +246,13 @@ export function RegisterForm() {
             </div>
 
             <label className="flex cursor-pointer items-start gap-2.5 rounded-[12px] border border-line bg-surface px-3.5 py-3 text-[12px] leading-relaxed text-text-muted transition hover:border-brand-300">
-              <input type="checkbox" required className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600" />
+              <input
+                type="checkbox"
+                name="legal_consent"
+                value="accepted"
+                required
+                className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
+              />
               <span>
                 <Link href="/kullanim-sartlari" target="_blank" className="font-semibold text-brand-600 hover:underline">Kullanım Şartları</Link>&apos;nı ve{" "}
                 <Link href="/kvkk-aydinlatma" target="_blank" className="font-semibold text-brand-600 hover:underline">KVKK Aydınlatma Metni</Link>&apos;ni okudum, kabul ediyorum.

@@ -1,11 +1,18 @@
 "use client";
 
-import { useMemo, useOptimistic, useState, useTransition } from "react";
+import { useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, FileCheck2, GripVertical, Loader2, MessageSquare, Pencil, Sparkles, X } from "lucide-react";
 import { updateDealStage, updateDeal, type DealStage } from "@/app/actions/deals";
 import { useToast } from "@/components/app/toast-provider";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { StatusTransitionBar, isAllowedTransition } from "./status-transition";
 import { WinCelebrationDialog } from "./win-celebration-dialog";
 
@@ -89,6 +96,9 @@ export function DealBoard({
   const [dragging, setDragging] = useState<{ id: string; stage: string } | null>(null);
   const [dragOverCol, setDragOverCol] = useState<DealStage | null>(null);
   const [droppedId, setDroppedId] = useState<string | null>(null);
+  const editReturnFocusRef = useRef<HTMLElement | null>(null);
+  const lossReturnFocusRef = useRef<HTMLElement | null>(null);
+  const winReturnFocusRef = useRef<HTMLElement | null>(null);
 
   // React 19 optimistic desen: kart tıklandığı anda hedef sütunda görünür,
   // server action arkada çalışır. Transition bitince taban `deals` prop'una
@@ -119,7 +129,10 @@ export function DealBoard({
     // Won'a ilk geçiş: kutlama sihirbazı server onayı beklenmeden açılır
     // (optimistic); FLOW gereği won'dan won'a geçiş zaten mümkün değil.
     const prior = optimisticDeals.find((x) => x.id === dealId);
-    if (stage === "won" && prior && prior.stage !== "won") setWonFor(prior);
+    if (stage === "won" && prior && prior.stage !== "won") {
+      winReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setWonFor(prior);
+    }
     // Yeni sütununa inen karta kısa vurgu (animate-rise + brand halka) — kozmetik
     setDroppedId(dealId);
     window.setTimeout(() => setDroppedId((v) => (v === dealId ? null : v)), 900);
@@ -206,6 +219,7 @@ export function DealBoard({
                 // Kayıp akışı korunur: neden onaylanmadan optimistic taşıma YOK;
                 // diyalog iptal edilirse kart yerinde kalır.
                 setLossReason("");
+                lossReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
                 setLossFor(deal);
                 return;
               }
@@ -236,6 +250,8 @@ export function DealBoard({
                   return (
                     <article
                       key={d.id}
+                      id={`deal-card-${d.id}`}
+                      tabIndex={-1}
                       draggable
                       onDragStart={(e) => {
                         e.dataTransfer.setData("text/plain", d.id);
@@ -246,7 +262,7 @@ export function DealBoard({
                         setDragging(null);
                         setDragOverCol(null);
                       }}
-                      className={`lift group relative cursor-grab rounded-[14px] border bg-surface p-3 shadow-[var(--shadow-xs)] transition active:cursor-grabbing ${
+                      className={`lift group relative cursor-grab rounded-[14px] border bg-surface p-3 shadow-[var(--shadow-xs)] transition focus:outline-none focus:ring-2 focus:ring-brand-400/40 active:cursor-grabbing ${
                         isDragging
                           ? "border-brand-300 opacity-40 [transform:rotate(1.5deg)_scale(0.98)]"
                           : justDropped
@@ -340,13 +356,19 @@ export function DealBoard({
                         <StatusTransitionBar
                           dealId={d.id}
                           stage={d.stage}
-                          onWonStart={() => setWonFor(d)}
+                          onWonStart={() => {
+                            winReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+                            setWonFor(d);
+                          }}
                           onWonError={() => setWonFor((v) => (v?.id === d.id ? null : v))}
                         />
                         {canEdit ? (
                           <button
                             type="button"
-                            onClick={() => setEditing(d)}
+                            onClick={(event) => {
+                              editReturnFocusRef.current = event.currentTarget;
+                              setEditing(d);
+                            }}
                             className="inline-flex items-center gap-1 rounded-[7px] border border-line px-2 py-1 text-[11px] font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
                           >
                             <Pencil className="h-3 w-3" /> Düzenle
@@ -394,7 +416,11 @@ export function DealBoard({
                           <button
                             type="button"
                             disabled={busy}
-                            onClick={() => { setLossReason(""); setLossFor(d); }}
+                            onClick={(event) => {
+                              setLossReason("");
+                              lossReturnFocusRef.current = event.currentTarget;
+                              setLossFor(d);
+                            }}
                             className="rounded-[7px] px-2 py-1 text-[11px] font-semibold text-danger-500 hover:bg-danger-500/10 disabled:opacity-50"
                           >
                             Kayıp
@@ -410,38 +436,51 @@ export function DealBoard({
         );
       })}
 
-      {editing ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/40 p-4 backdrop-blur-sm sm:items-center" onClick={() => setEditing(null)}>
-          <div className="w-full max-w-md rounded-[20px] border border-line bg-surface shadow-[var(--shadow-lg)]" onClick={(e) => e.stopPropagation()}>
+      <Dialog open={editing !== null} onOpenChange={(open) => { if (!open) setEditing(null); }}>
+        {editing ? (
+          <DialogContent
+            size="sm"
+            overlayClassName="bg-ink-950/40 backdrop-blur-sm"
+            className="rounded-[20px] border-line shadow-[var(--shadow-lg)]"
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              const target = editReturnFocusRef.current;
+              editReturnFocusRef.current = null;
+              if (target?.isConnected) target.focus();
+              else document.getElementById(`deal-card-${editing.id}`)?.focus();
+            }}
+          >
             <div className="flex items-center justify-between border-b border-line px-6 py-4">
-              <h2 className="font-display text-lg font-bold text-ink-950">Anlaşmayı düzenle</h2>
-              <button onClick={() => setEditing(null)} className="grid h-8 w-8 place-items-center rounded-[8px] text-text-muted hover:bg-canvas" aria-label="Kapat">
-                <X className="h-5 w-5" />
-              </button>
+              <DialogTitle className="font-display text-lg font-bold text-ink-950">Anlaşmayı düzenle</DialogTitle>
+              <DialogClose asChild>
+                <button type="button" className="grid h-8 w-8 place-items-center rounded-[8px] text-text-muted hover:bg-canvas" aria-label="Kapat">
+                  <X className="h-5 w-5" />
+                </button>
+              </DialogClose>
             </div>
             <form action={submitEdit} className="space-y-4 p-6">
               <input type="hidden" name="deal_id" value={editing.id} />
-              <p className="text-sm text-text-muted">{editing.property_title ?? editing.property_code ?? "Anlaşma"} · {editing.customer_name ?? "Müşteri atanmadı"}</p>
+              <DialogDescription className="text-sm text-text-muted">{editing.property_title ?? editing.property_code ?? "Anlaşma"} · {editing.customer_name ?? "Müşteri atanmadı"}</DialogDescription>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-text-muted">Anlaşma değeri (₺)</label>
-                <input name="deal_value" defaultValue={editing.deal_value ?? ""} inputMode="numeric" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" />
+                <label htmlFor={`deal-${editing.id}-value`} className="mb-1 block text-xs font-semibold text-text-muted">Anlaşma değeri (₺)</label>
+                <input id={`deal-${editing.id}-value`} name="deal_value" defaultValue={editing.deal_value ?? ""} inputMode="numeric" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-text-muted">Olasılık (%)</label>
-                  <input name="probability" type="number" min={0} max={100} defaultValue={editing.probability ?? ""} className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" />
+                  <label htmlFor={`deal-${editing.id}-probability`} className="mb-1 block text-xs font-semibold text-text-muted">Olasılık (%)</label>
+                  <input id={`deal-${editing.id}-probability`} name="probability" type="number" min={0} max={100} defaultValue={editing.probability ?? ""} className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-text-muted">Tür</label>
-                  <select name="deal_type" defaultValue={editing.deal_type} className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
+                  <label htmlFor={`deal-${editing.id}-type`} className="mb-1 block text-xs font-semibold text-text-muted">Tür</label>
+                  <select id={`deal-${editing.id}-type`} name="deal_type" defaultValue={editing.deal_type} className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
                     <option value="sale">Satış</option>
                     <option value="rent">Kiralama</option>
                   </select>
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-text-muted">Sorumlu danışman</label>
-                <select name="assigned_to" defaultValue={editing.assigned_to ?? ""} className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
+                <label htmlFor={`deal-${editing.id}-assignee`} className="mb-1 block text-xs font-semibold text-text-muted">Sorumlu danışman</label>
+                <select id={`deal-${editing.id}-assignee`} name="assigned_to" defaultValue={editing.assigned_to ?? ""} className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
                   <option value="">Değiştirme</option>
                   {members.map((m) => (
                     <option key={m.id} value={m.id}>{m.full_name}</option>
@@ -449,37 +488,64 @@ export function DealBoard({
                 </select>
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setEditing(null)} className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted hover:bg-canvas">Vazgeç</button>
+                <DialogClose asChild>
+                  <button type="button" className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted hover:bg-canvas">Vazgeç</button>
+                </DialogClose>
                 <button type="submit" disabled={pending} className="rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60">
                   {pending ? "Kaydediliyor…" : "Kaydet"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+          </DialogContent>
+        ) : null}
+      </Dialog>
+
+      {wonFor ? (
+        <WinCelebrationDialog
+          deal={wonFor}
+          returnFocus={() => {
+            const target = winReturnFocusRef.current;
+            winReturnFocusRef.current = null;
+            if (target?.isConnected) target.focus();
+            else document.getElementById(`deal-card-${wonFor.id}`)?.focus();
+          }}
+          onClose={() => setWonFor(null)}
+        />
       ) : null}
 
-      {wonFor ? <WinCelebrationDialog deal={wonFor} onClose={() => setWonFor(null)} /> : null}
-
-      {lossFor ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/40 p-4 backdrop-blur-sm sm:items-center" onClick={() => setLossFor(null)}>
-          <div className="w-full max-w-sm rounded-[20px] border border-line bg-surface shadow-[var(--shadow-lg)]" onClick={(e) => e.stopPropagation()}>
+      <Dialog open={lossFor !== null} onOpenChange={(open) => { if (!open) setLossFor(null); }}>
+        {lossFor ? (
+          <DialogContent
+            size="sm"
+            overlayClassName="bg-ink-950/40 backdrop-blur-sm"
+            className="max-w-sm rounded-[20px] border-line shadow-[var(--shadow-lg)]"
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              const target = lossReturnFocusRef.current;
+              lossReturnFocusRef.current = null;
+              if (target?.isConnected) target.focus();
+              else document.getElementById(`deal-card-${lossFor.id}`)?.focus();
+            }}
+          >
             <div className="flex items-center justify-between border-b border-line px-6 py-4">
-              <h2 className="font-display text-lg font-bold text-ink-950">Kayıp nedeni</h2>
-              <button onClick={() => setLossFor(null)} className="grid h-8 w-8 place-items-center rounded-[8px] text-text-muted hover:bg-canvas" aria-label="Kapat">
-                <X className="h-5 w-5" />
-              </button>
+              <DialogTitle className="font-display text-lg font-bold text-ink-950">Kayıp nedeni</DialogTitle>
+              <DialogClose asChild>
+                <button type="button" className="grid h-8 w-8 place-items-center rounded-[8px] text-text-muted hover:bg-canvas" aria-label="Kapat">
+                  <X className="h-5 w-5" />
+                </button>
+              </DialogClose>
             </div>
             <div className="space-y-4 p-6">
-              <p className="text-sm text-text-muted">{lossFor.property_title ?? lossFor.property_code ?? "Anlaşma"} neden kaybedildi?</p>
+              <DialogDescription className="text-sm text-text-muted">{lossFor.property_title ?? lossFor.property_code ?? "Anlaşma"} neden kaybedildi?</DialogDescription>
               <div className="flex flex-wrap gap-1.5">
                 {["Fiyat yüksek", "Rakip kapattı", "Müşteri vazgeçti", "İletişim koptu", "Finansman"].map((r) => (
-                  <button key={r} type="button" onClick={() => setLossReason(r)} className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${lossReason === r ? "bg-danger-500 text-white" : "border border-line text-text-muted hover:border-danger-500/40"}`}>
+                  <button key={r} type="button" aria-pressed={lossReason === r} onClick={() => setLossReason(r)} className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${lossReason === r ? "bg-danger-500 text-white" : "border border-line text-text-muted hover:border-danger-500/40"}`}>
                     {r}
                   </button>
                 ))}
               </div>
               <textarea
+                aria-label="Kayıp nedeni"
                 value={lossReason}
                 onChange={(e) => setLossReason(e.target.value)}
                 rows={2}
@@ -487,7 +553,9 @@ export function DealBoard({
                 className="w-full resize-none rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-danger-400"
               />
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setLossFor(null)} className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted hover:bg-canvas">Vazgeç</button>
+                <DialogClose asChild>
+                  <button type="button" className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted hover:bg-canvas">Vazgeç</button>
+                </DialogClose>
                 <button
                   type="button"
                   disabled={pending}
@@ -498,9 +566,9 @@ export function DealBoard({
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      ) : null}
+          </DialogContent>
+        ) : null}
+      </Dialog>
     </div>
   );
 }

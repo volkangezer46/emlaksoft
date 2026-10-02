@@ -13,14 +13,15 @@ type CampaignRow = {
 export function CampaignActions({
   campaign,
   canSend,
+  canDelete,
 }: {
   campaign: CampaignRow;
   canSend: boolean;
+  canDelete: boolean;
 }) {
-  const canSendNow =
-    canSend && (campaign.status === "draft" || campaign.status === "scheduled");
+  const canSendNow = canSend && campaign.status === "draft";
 
-  const canDelete = canSend && campaign.status !== "sending";
+  const canDeleteNow = canDelete && campaign.status !== "sending";
 
   return (
     <div className="flex items-center gap-1.5">
@@ -29,15 +30,15 @@ export function CampaignActions({
           trigger={
             <button
               type="button"
-              title="Gönder"
+              title="Gönderim kuyruğuna al"
               className="focus-ring press inline-flex items-center gap-1.5 rounded-[8px] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700"
             >
-              <Send className="h-3.5 w-3.5" /> Gönder
+              <Send className="h-3.5 w-3.5" /> Kuyruğa al
             </button>
           }
-          title={`"${campaign.title}" gönderilsin mi?`}
-          description="Mesajlar tüm alıcılara iletilir; bu işlem geri alınamaz."
-          confirmLabel="Gönder"
+          title={`"${campaign.title}" kuyruğa alınsın mı?`}
+          description="Teslimat arka planda küçük partilerle yürür. Her alıcının kayıtlı kanal izni, mesaj çıkmadan hemen önce yeniden kontrol edilir."
+          confirmLabel="Kuyruğa al"
           tone="default"
           onConfirm={async () => {
             await sendCampaign(campaign.id);
@@ -49,7 +50,7 @@ export function CampaignActions({
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Gönderiliyor
         </span>
       )}
-      {canDelete && (
+      {canDeleteNow && (
         <ConfirmDialog
           trigger={
             <button

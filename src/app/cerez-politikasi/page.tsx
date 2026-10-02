@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "Çerez Politikası | EmlakSoft",
+  title: "Çerez Politikası",
   description: "EmlakSoft'un kullandığı çerezler ve yönetim seçenekleri.",
   alternates: { canonical: "/cerez-politikasi" },
 };

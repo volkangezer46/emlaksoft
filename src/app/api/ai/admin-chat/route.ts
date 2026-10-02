@@ -13,6 +13,7 @@ import {
 import { sseResponse, streamOpenAIChat } from "@/lib/ai/streaming";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { externalErrorMetadata } from "@/lib/external-fetch";
 
 // ---------------------------------------------------------------------------
 // Platform (admin) yapay zeka iş danışmanı — akan (streaming) sohbet ucu.
@@ -105,7 +106,11 @@ export async function POST(req: Request) {
   }
 
   // Hız sınırı — personel başına dakikada 10 mesaj
-  const { allowed } = await checkRateLimit(`ai-chat:${staff.id}`, { limit: 10, windowSec: 60 });
+  const { allowed } = await checkRateLimit(`ai-chat:${staff.id}`, {
+    limit: 10,
+    windowSec: 60,
+    failurePolicy: "deny",
+  });
   if (!allowed) {
     return NextResponse.json(
       { error: "Çok fazla istek gönderildi. Lütfen bir dakika sonra tekrar deneyin." },
@@ -143,7 +148,7 @@ export async function POST(req: Request) {
       } catch (e) {
         // İstemci iptal ettiyse elde kalan kısmı kaydet; başka hata varsa yedeğe düş
         if ((e as Error)?.name !== "AbortError") {
-          console.error("admin-chat:openai", e);
+          console.error("admin-chat:openai", externalErrorMetadata(e));
         }
       }
     }

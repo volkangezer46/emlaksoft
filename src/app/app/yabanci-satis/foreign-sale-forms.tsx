@@ -31,11 +31,21 @@ function Feedback({ state, okText }: { state: ForeignSaleResult; okText: string 
 export function ApplyChecklistForm({
   deals,
   itemCount,
+  canEdit,
 }: {
   deals: { id: string; label: string }[];
   itemCount: number;
+  canEdit: boolean;
 }) {
   const [state, formAction, pending] = useActionState(applyForeignChecklist, EMPTY);
+
+  if (!canEdit) {
+    return (
+      <p className="rounded-[12px] border border-amber-400/30 bg-amber-400/5 px-4 py-3 text-xs text-amber-700">
+        Evrak listesini uygulamak için anlaşma düzenleme yetkisi gerekir. Listeyi incelemeye devam edebilirsiniz.
+      </p>
+    );
+  }
 
   if (deals.length === 0) {
     return (
@@ -79,8 +89,22 @@ export function ApplyChecklistForm({
  * "Yabancı olarak işaretle" — mevcut müşteriyi yabancı uyruklu yapar.
  * Uyruk ve pasaport opsiyoneldir; sonradan müşteri kartından tamamlanabilir.
  */
-export function MarkForeignForm({ customers }: { customers: { id: string; full_name: string }[] }) {
+export function MarkForeignForm({
+  customers,
+  canEdit,
+}: {
+  customers: { id: string; full_name: string }[];
+  canEdit: boolean;
+}) {
   const [state, formAction, pending] = useActionState(markCustomerForeign, EMPTY);
+
+  if (!canEdit) {
+    return (
+      <p className="rounded-[12px] border border-amber-400/30 bg-amber-400/5 px-4 py-3 text-xs text-amber-700">
+        Müşteri kaydını işaretlemek için müşteri düzenleme yetkisi gerekir.
+      </p>
+    );
+  }
 
   if (customers.length === 0) {
     return (

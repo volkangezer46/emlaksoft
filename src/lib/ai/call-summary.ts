@@ -1,7 +1,15 @@
 import "server-only";
 import { getOpenAiKey } from "@/lib/ai-advisor";
+import {
+  discardExternalResponse,
+  externalErrorMetadata,
+  fetchExternal,
+  readExternalJson,
+} from "@/lib/external-fetch";
 
 const OPENAI_MODEL = "gpt-4o-mini";
+const OPENAI_TIMEOUT_MS = 30_000;
+const OPENAI_MAX_RESPONSE_BYTES = 256 * 1024;
 
 export type CallSummaryInput = {
   notes: string;
@@ -45,7 +53,7 @@ export async function generateCallSummary(input: CallSummaryInput): Promise<Call
   ].join("\n");
 
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const res = await fetchExternal("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -71,9 +79,15 @@ export async function generateCallSummary(input: CallSummaryInput): Promise<Call
           },
         ],
       }),
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    }, { timeoutMs: OPENAI_TIMEOUT_MS });
+    if (!res.ok) {
+      await discardExternalResponse(res);
+      return null;
+    }
+    const json = await readExternalJson<{ choices?: { message?: { content?: string } }[] }>(
+      res,
+      OPENAI_MAX_RESPONSE_BYTES,
+    );
     const raw = json.choices?.[0]?.message?.content?.trim();
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { ozet?: string; sonraki_adim?: string };
@@ -82,7 +96,7 @@ export async function generateCallSummary(input: CallSummaryInput): Promise<Call
     if (!summary || !nextStep) return null;
     return { summary, nextStep };
   } catch (e) {
-    console.error("generateCallSummary", e);
+    console.error("generateCallSummary", externalErrorMetadata(e));
     return null;
   }
 }

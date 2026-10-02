@@ -7,12 +7,13 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { estimateMultiSourceValue } from "@/lib/valuation";
 import { comparablesSourceEntry, listComparableDetails } from "@/lib/comparables";
+import { getBaseUrl } from "@/lib/base-url";
 
 export type ValuationResult = { error?: string; ok?: boolean; id?: string };
 export type ValuationShareResult = { error?: string; ok?: boolean; url?: string };
 
 function appUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return getBaseUrl();
 }
 
 /**
@@ -23,7 +24,7 @@ function appUrl() {
  * public sayfa token'ı service role ile çözer (paylas/[token] deseni).
  */
 export async function generateValuationShareLink(id: string): Promise<ValuationShareResult> {
-  const gate = await requirePermission("valuation", "view");
+  const gate = await requirePermission("valuation", "edit");
   if (!gate.ok) return { error: gate.error };
   const valuationId = String(id ?? "").trim();
   if (!valuationId) return { error: "Değerleme zorunlu." };
@@ -132,32 +133,32 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
       )
       .eq("id", propertyId)
       .eq("tenant_id", gate.tenantId)
+      .is("deleted_at", null)
       .maybeSingle();
-    if (p) {
-      resolvedTitle = resolvedTitle || p.title || p.property_code;
-      price = price ?? (p.list_price != null ? Number(p.list_price) : null);
-      const feat = p.features as {
-        sqm?: number;
-        floor?: number;
-        building_age?: number;
-        heating?: string;
-        facade?: string;
-      } | null;
-      area = area ?? (feat?.sqm != null ? Number(feat.sqm) : null);
-      targetFloor = feat?.floor != null ? Number(feat.floor) : null;
-      targetBuildingAge = feat?.building_age != null ? Number(feat.building_age) : null;
-      targetHeating = feat?.heating ?? null;
-      targetFacade = feat?.facade ?? null;
-      adaVal = adaVal ?? p.parcel_block ?? null;
-      parselVal = parselVal ?? p.parcel_lot ?? null;
-      // Formda secim yoksa portfoyden devral (?? ile: bos string degil, null kontrolu).
-      districtId = districtId ?? p.district_id ?? null;
-      propertyType = propertyType ?? p.property_type ?? null;
-      transactionType = transactionType ?? p.transaction_type ?? null;
-      const provinceRel = p.province as { name?: string } | { name?: string }[] | null;
-      const pName = Array.isArray(provinceRel) ? provinceRel[0]?.name : provinceRel?.name;
-      provinceName = provinceName ?? pName ?? null;
-    }
+    if (!p) return { error: "Portföy bulunamadı veya bu ofise ait değil." };
+    resolvedTitle = resolvedTitle || p.title || p.property_code;
+    price = price ?? (p.list_price != null ? Number(p.list_price) : null);
+    const feat = p.features as {
+      sqm?: number;
+      floor?: number;
+      building_age?: number;
+      heating?: string;
+      facade?: string;
+    } | null;
+    area = area ?? (feat?.sqm != null ? Number(feat.sqm) : null);
+    targetFloor = feat?.floor != null ? Number(feat.floor) : null;
+    targetBuildingAge = feat?.building_age != null ? Number(feat.building_age) : null;
+    targetHeating = feat?.heating ?? null;
+    targetFacade = feat?.facade ?? null;
+    adaVal = adaVal ?? p.parcel_block ?? null;
+    parselVal = parselVal ?? p.parcel_lot ?? null;
+    // Formda secim yoksa portfoyden devral (?? ile: bos string degil, null kontrolu).
+    districtId = districtId ?? p.district_id ?? null;
+    propertyType = propertyType ?? p.property_type ?? null;
+    transactionType = transactionType ?? p.transaction_type ?? null;
+    const provinceRel = p.province as { name?: string } | { name?: string }[] | null;
+    const pName = Array.isArray(provinceRel) ? provinceRel[0]?.name : provinceRel?.name;
+    provinceName = provinceName ?? pName ?? null;
   }
 
   const est = await estimateMultiSourceValue({
@@ -180,6 +181,12 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
     targetHeating,
     targetFacade,
   });
+
+  if (est.mid == null) {
+    return {
+      error: "Değer üretmek için geçerli bir liste fiyatı veya emsal hesaplamasına uygun m² ve konum bilgisi girin.",
+    };
+  }
 
   // Emsal ANLIK GÖRÜNTÜSÜ: motorun kullandığı küme (aynı RPC zinciri) rapor
   // tablosu için kayda gömülür. Böylece rapor, aylar sonra açılsa bile

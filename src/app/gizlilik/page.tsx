@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "Gizlilik Politikası | EmlakSoft",
+  title: "Gizlilik Politikası",
   description: "EmlakSoft gizlilik politikası — verileriniz nasıl korunur.",
   alternates: { canonical: "/gizlilik" },
 };

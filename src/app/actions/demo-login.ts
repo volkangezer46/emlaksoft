@@ -2,15 +2,25 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { getDemoPersona, isDemoLoginEnabled, type DemoPersona } from "@/lib/demo-personas";
+import { createAdminClient, resolveSupabaseAdminKey } from "@/lib/supabase/admin";
+import { isDemoLoginEnabled, isPlatformDemoPersonaAllowed } from "@/lib/demo-environment";
+import { getDemoPersona, type DemoPersona } from "@/lib/demo-personas";
+import { planAmountTry } from "@/lib/billing/plans";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
+import { deriveDemoPassword } from "@/lib/demo-credentials";
 
-/** Tüm demo hesapların ortak parolası — yalnızca sunucuda. */
-const DEMO_PASSWORD = "Demo1234!";
 const DEMO_TENANT_SLUG = "demo-ofis";
 const DEMO_TENANT_NAME = "Demo Emlak Ofisi";
 
 export type DemoLoginResult = { error?: string };
+
+function passwordForDemoIdentity(email: string): string {
+  const secret =
+    process.env.DEMO_LOGIN_SECRET?.trim() ||
+    resolveSupabaseAdminKey() ||
+    "";
+  return deriveDemoPassword(secret, email);
+}
 
 function errMsg(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -43,6 +53,7 @@ async function ensureAuthUser(
   persona: DemoPersona,
   tenantId: string | null,
 ): Promise<string> {
+  const password = passwordForDemoIdentity(persona.email);
   const meta =
     persona.kind === "office" && tenantId
       ? { tenant_id: tenantId, role: persona.role }
@@ -50,7 +61,7 @@ async function ensureAuthUser(
 
   const { data, error } = await admin.auth.admin.createUser({
     email: persona.email,
-    password: DEMO_PASSWORD,
+    password,
     email_confirm: true,
     user_metadata: { full_name: persona.label },
     app_metadata: meta,
@@ -65,7 +76,7 @@ async function ensureAuthUser(
   if (!existingId) throw new Error("Demo kullanıcı bulundu ama kimlik alınamadı.");
 
   const { error: updErr } = await admin.auth.admin.updateUserById(existingId, {
-    password: DEMO_PASSWORD,
+    password,
     email_confirm: true,
     user_metadata: { full_name: persona.label },
     app_metadata: meta,
@@ -106,7 +117,7 @@ async function ensureDemoTenant(): Promise<string> {
     plan: "professional",
     status: "active",
     billing_cycle: "monthly",
-    amount_try: 5990,
+    amount_try: planAmountTry("professional", "monthly"),
     current_period_start: new Date().toISOString(),
   });
   // Abonelik opsiyonel — çakışırsa yoksay
@@ -117,7 +128,11 @@ async function ensureDemoTenant(): Promise<string> {
 
 /** Yalnızca tıklanan kişiliği hazırlar (hızlı ilk giriş). */
 async function ensurePersona(persona: DemoPersona): Promise<void> {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (persona.kind === "platform" && !isPlatformDemoPersonaAllowed()) {
+    throw new Error("Platform demo kişilikleri bu ortamda kesin olarak kapalı.");
+  }
+
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !resolveSupabaseAdminKey()) {
     throw new Error("Sunucu yapılandırması eksik (Supabase servis anahtarı).");
   }
 
@@ -160,13 +175,24 @@ export async function quickDemoLogin(personaId: string): Promise<DemoLoginResult
     return { error: "Hızlı test girişi bu ortamda kapalı." };
   }
 
+  const ip = await clientIp();
+  const rate = await checkRateLimit(`demo-login:${ip}`, {
+    limit: 60,
+    windowSec: 10 * 60,
+    failurePolicy: "deny",
+  });
+  if (!rate.allowed) {
+    return { error: "Çok fazla demo giriş denemesi yapıldı. Lütfen daha sonra tekrar deneyin." };
+  }
+
   const persona = getDemoPersona(personaId);
   if (!persona) return { error: "Geçersiz test kişiliği." };
 
-  // GELİŞTİRME AŞAMASI: platform (super_admin/ops...) demo kişilikleri, demo modu açıkken
-  // (ENABLE_DEMO_LOGIN) production dahil tek tıkla açılır — geliştirme sırasında hızlı erişim.
-  // ⚠️ CANLIYA / GERÇEK MÜŞTERİYE GEÇMEDEN ÖNCE: ENABLE_DEMO_LOGIN=false yap.
-  // Bu tek anahtar tüm demo girişini (ofis + platform) kapatır ve /admin'i herkese açık olmaktan çıkarır.
+  // Defense in depth: even if the general demo gate is changed later, a
+  // privileged platform identity can never be provisioned in production.
+  if (persona.kind === "platform" && !isPlatformDemoPersonaAllowed()) {
+    return { error: "Platform hızlı girişi bu ortamda kapalı." };
+  }
 
   try {
     await ensurePersona(persona);
@@ -178,7 +204,7 @@ export async function quickDemoLogin(personaId: string): Promise<DemoLoginResult
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({
     email: persona.email,
-    password: DEMO_PASSWORD,
+    password: passwordForDemoIdentity(persona.email),
   });
 
   if (error) {

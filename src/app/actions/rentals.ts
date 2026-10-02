@@ -2,10 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { computeLegalIncrease } from "@/lib/tufe";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
+import { parseMoneyInput } from "@/lib/money-input";
+import { isIsoDate } from "@/lib/workflow-state";
 
 /**
  * Mülk Yönetimi (kiralama) server action'ları.
@@ -26,89 +29,60 @@ const AY_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 export async function createRental(_prev: RentalResult, fd: FormData): Promise<RentalResult> {
   const gate = await requirePermission("rentals", "create");
   if (!gate.ok) return { error: gate.error };
+  const financialGate = await requirePermission("commissions", "create");
+  if (!financialGate.ok) return { error: financialGate.error };
 
   const propertyId  = String(fd.get("property_id") ?? "").trim();
   const renterId    = String(fd.get("renter_customer_id") ?? "").trim();
-  const monthlyRent = parseFloat(String(fd.get("monthly_rent") ?? "0"));
+  const monthlyRentResult = parseMoneyInput(fd.get("monthly_rent"), { max: 1_000_000_000 });
   const dueDay      = parseInt(String(fd.get("due_day") ?? "0"), 10);
   const startDate   = String(fd.get("start_date") ?? "").trim();
   const endDate     = String(fd.get("end_date") ?? "").trim() || null;
-  const depositRaw  = String(fd.get("deposit") ?? "").trim();
-  const deposit     = depositRaw ? parseFloat(depositRaw) : null;
+  const depositResult = parseMoneyInput(fd.get("deposit"), { allowZero: true, max: 1_000_000_000 });
   const notes       = String(fd.get("notes") ?? "").trim() || null;
 
   if (!propertyId) return { error: "Portföy seçin." };
   if (!renterId) return { error: "Kiracı (müşteri) seçin." };
-  if (isNaN(monthlyRent) || monthlyRent <= 0) return { error: "Geçerli bir aylık kira tutarı girin." };
+  if (!monthlyRentResult.ok || monthlyRentResult.value == null) return { error: "Geçerli bir aylık kira tutarı girin." };
   if (isNaN(dueDay) || dueDay < 1 || dueDay > 28) return { error: "Vade günü 1-28 arasında olmalı." };
-  if (!startDate) return { error: "Başlangıç tarihi zorunludur." };
+  if (!startDate || !isIsoDate(startDate)) return { error: "Geçerli bir başlangıç tarihi girin." };
+  if (endDate && !isIsoDate(endDate)) return { error: "Geçerli bir bitiş tarihi girin." };
   if (endDate && endDate <= startDate) return { error: "Bitiş tarihi başlangıçtan sonra olmalı." };
-  if (deposit != null && (isNaN(deposit) || deposit < 0)) return { error: "Geçerli bir depozito tutarı girin." };
+  if (!depositResult.ok) return { error: "Geçerli bir depozito tutarı girin." };
+  if (notes && notes.length > 5000) return { error: "Not en fazla 5000 karakter olabilir." };
+  const monthlyRent = monthlyRentResult.value;
+  const deposit = depositResult.value;
 
-  const supabase = await createClient();
-
-  // Tenant izolasyonu: FK tek başına başka ofisin portföy/müşteri id'sine
-  // referansı engellemez — ikisi de bu ofise ait olmalı.
-  const [{ data: prop }, { data: renter }] = await Promise.all([
-    supabase.from("properties").select("id, status").eq("id", propertyId).eq("tenant_id", gate.tenantId).maybeSingle(),
-    supabase.from("customers").select("id").eq("id", renterId).eq("tenant_id", gate.tenantId).maybeSingle(),
-  ]);
-  if (!prop) return { error: "Portföy bulunamadı." };
-  if (!renter) return { error: "Kiracı (müşteri) bulunamadı." };
-
-  const { data, error } = await supabase
-    .from("rentals")
-    .insert({
-      tenant_id: gate.tenantId,
-      created_by: gate.userId,
-      property_id: propertyId,
-      renter_customer_id: renterId,
-      monthly_rent: monthlyRent,
-      due_day: dueDay,
-      start_date: startDate,
-      end_date: endDate,
-      deposit,
-      notes,
-      status: "active",
-      // Kira bitince aynı duruma dönebilmek için mevcut durumu sakla (C.3)
-      prev_property_status: prop.status ?? null,
-    })
-    .select("id")
-    .single();
-
-  if (error || !data) {
-    console.error("createRental", error);
+  const admin = createAdminClient();
+  const { data: transitionData, error } = await admin.rpc("create_rental_atomic", {
+    p_tenant_id: gate.tenantId,
+    p_actor_id: gate.userId,
+    p_property_id: propertyId,
+    p_renter_id: renterId,
+    p_monthly_rent: monthlyRent,
+    p_due_day: dueDay,
+    p_start_date: startDate,
+    p_end_date: endDate,
+    p_deposit: deposit,
+    p_notes: notes,
+  });
+  if (error) {
+    console.error("createRental atomic", { code: error.code });
+    return { error: "Kira, portföy ve kiracı kaydı birlikte oluşturulamadı." };
+  }
+  const transition = transitionData && typeof transitionData === "object" && !Array.isArray(transitionData)
+    ? transitionData as Record<string, unknown>
+    : null;
+  if (transition?.outcome === "property_not_found") return { error: "Portföy bulunamadı." };
+  if (transition?.outcome === "renter_not_found") return { error: "Kiracı (müşteri) bulunamadı." };
+  if (transition?.outcome === "property_unavailable") return { error: "Portföy satılmış, kiralanmış veya aktif kiraya bağlı." };
+  if (transition?.outcome === "commission_rate_required") {
+    return { error: "Kiralama kapanışından önce portföyde 0'dan büyük, en çok iki ondalık haneli geçerli bir komisyon oranı tanımlayın." };
+  }
+  if (transition?.outcome !== "created" || typeof transition.rental_id !== "string") {
     return { error: "Kira kaydı oluşturulamadı." };
   }
-
-  // Portföyü "Kiralandı" durumuna al — kira başladı (C.3). Zaten satılık/kiralanmış
-  // değilse; 'sold' bir portföy yanlışlıkla kiralanmışsa dokunma (belirsiz).
-  if (prop.status !== "rented" && prop.status !== "sold") {
-    await supabase
-      .from("properties")
-      .update({ status: "rented", updated_at: new Date().toISOString() })
-      .eq("id", propertyId)
-      .eq("tenant_id", gate.tenantId);
-  }
-
-  // Kiracıyı tip etiketiyle işaretle — best effort: başarısızlığı kira
-  // kaydını düşürmez (etiket kozmetik, kayıt esas).
-  try {
-    const { data: cust } = await supabase
-      .from("customers")
-      .select("customer_types")
-      .eq("id", renterId)
-      .maybeSingle();
-    const types: string[] = Array.isArray(cust?.customer_types) ? cust!.customer_types : [];
-    if (!types.includes("Kiracı")) {
-      await supabase
-        .from("customers")
-        .update({ customer_types: [...types, "Kiracı"] })
-        .eq("id", renterId);
-    }
-  } catch (e) {
-    console.error("createRental kiracı etiketi", e);
-  }
+  const rentalId = transition.rental_id;
 
   // İş akışı (playbook) tetikle — sözleşme/depozito/anahtar teslim paketi
   await triggerPlaybooks({
@@ -117,7 +91,7 @@ export async function createRental(_prev: RentalResult, fd: FormData): Promise<R
     actorId: gate.userId,
     entity: {
       type: "contract",
-      id: data.id,
+      id: rentalId,
       ownerId: gate.userId,
       customerId: renterId,
       propertyId,
@@ -126,7 +100,8 @@ export async function createRental(_prev: RentalResult, fd: FormData): Promise<R
   });
 
   revalidatePath("/app/kiralama");
-  return { ok: true, id: data.id };
+  revalidatePath(`/app/portfoyler/${propertyId}`);
+  return { ok: true, id: rentalId };
 }
 
 /** Kirayı sonlandırır — end_date boşsa bugünle doldurulur (geçmiş kayıt korunur). */
@@ -134,47 +109,31 @@ export async function endRental(id: string): Promise<RentalResult> {
   const gate = await requirePermission("rentals", "edit");
   if (!gate.ok) return { error: gate.error };
 
-  const supabase = await createClient();
-  const { data: rental } = await supabase
-    .from("rentals")
-    .select("id, end_date, property_id, prev_property_status")
-    .eq("id", id)
-    .eq("tenant_id", gate.tenantId)
-    .maybeSingle();
-  if (!rental) return { error: "Kira kaydı bulunamadı." };
-
-  const { error } = await supabase
-    .from("rentals")
-    .update({ status: "ended", end_date: rental.end_date ?? new Date().toISOString().slice(0, 10) })
-    .eq("id", id)
-    .eq("tenant_id", gate.tenantId);
-  if (error) return { error: "Kira sonlandırılamadı." };
-
-  // Portföyü tekrar müsait duruma döndür (C.3): kira başlarken saklanan önceki
-  // durum, yoksa 'active' (Aktif). Yalnız hâlâ 'rented' ise dokun — arada satılmış
-  // veya elle değiştirilmişse geçersiz kılma.
-  if (rental.property_id) {
-    const { data: p } = await supabase
-      .from("properties")
-      .select("status")
-      .eq("id", rental.property_id)
-      .eq("tenant_id", gate.tenantId)
-      .maybeSingle();
-    if (p?.status === "rented") {
-      const restore = rental.prev_property_status && rental.prev_property_status !== "rented"
-        ? rental.prev_property_status
-        : "active";
-      await supabase
-        .from("properties")
-        .update({ status: restore, updated_at: new Date().toISOString() })
-        .eq("id", rental.property_id)
-        .eq("tenant_id", gate.tenantId);
-    }
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("end_rental_atomic", {
+    p_tenant_id: gate.tenantId,
+    p_actor_id: gate.userId,
+    p_rental_id: id,
+    p_end_date: new Date().toISOString().slice(0, 10),
+  });
+  if (error) {
+    console.error("endRental atomic", { code: error.code });
+    return { error: "Kira ve portföy durumu birlikte sonlandırılamadı." };
   }
+  const transition = data && typeof data === "object" && !Array.isArray(data)
+    ? data as Record<string, unknown>
+    : null;
+  const outcome = typeof transition?.outcome === "string" ? transition.outcome : "invalid_result";
+  if (outcome === "not_found") return { error: "Kira kaydı bulunamadı." };
+  if (outcome === "invalid_end_date") return { error: "Sonlandırma tarihi başlangıçtan önce olamaz." };
+  if (outcome !== "applied" && outcome !== "replay") return { error: "Kira sonlandırılamadı." };
 
   revalidatePath("/app/kiralama");
   revalidatePath(`/app/kiralama/${id}`);
   revalidatePath("/app/portfoyler");
+  if (typeof transition?.property_id === "string") {
+    revalidatePath(`/app/portfoyler/${transition.property_id}`);
+  }
   return { ok: true };
 }
 
@@ -185,18 +144,35 @@ export async function markDepositReturned(id: string, returned = true): Promise<
   if (!gate.ok) return { error: gate.error };
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: rental, error: loadError } = await supabase
+    .from("rentals")
+    .select("id, status, deposit, deposit_returned")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (loadError || !rental) return { error: "Kira kaydı bulunamadı." };
+  if (returned && rental.status !== "ended") return { error: "Depozito yalnız kira sonlandıktan sonra iade edilebilir." };
+  if (returned && Number(rental.deposit) <= 0) return { error: "Bu kira kaydında iade edilecek depozito yok." };
+  if (rental.deposit_returned === returned) return { ok: true };
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
     .from("rentals")
     .update({
       deposit_returned: returned,
       deposit_returned_at: returned ? new Date().toISOString() : null,
     })
     .eq("id", id)
-    .eq("tenant_id", gate.tenantId);
+    .eq("tenant_id", gate.tenantId)
+    .eq("status", rental.status)
+    .eq("deposit_returned", !returned)
+    .select("id")
+    .maybeSingle();
   if (error) {
     console.error("markDepositReturned", error);
     return { error: "Depozito durumu güncellenemedi." };
   }
+  if (!data) return { error: "Depozito durumu bu sırada değişti; sayfayı yenileyin." };
 
   revalidatePath("/app/kiralama");
   revalidatePath(`/app/kiralama/${id}`);
@@ -216,18 +192,28 @@ export async function createRentCharge(rentalId: string, month: string): Promise
   const supabase = await createClient();
   const { data: rental } = await supabase
     .from("rentals")
-    .select("id, monthly_rent")
+    .select("id, monthly_rent, status, start_date, end_date")
     .eq("id", rentalId)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
   if (!rental) return { error: "Kira kaydı bulunamadı." };
+  const period = `${month}-01`;
+  if (period < String(rental.start_date).slice(0, 7) + "-01") {
+    return { error: "Kira başlangıcından önce tahakkuk oluşturulamaz." };
+  }
+  if (rental.end_date && period > String(rental.end_date).slice(0, 7) + "-01") {
+    return { error: "Kira bitişinden sonraki dönem için tahakkuk oluşturulamaz." };
+  }
+  if (rental.status !== "active" && !rental.end_date) {
+    return { error: "Sonlanmış kira için yeni tahakkuk oluşturulamaz." };
+  }
 
   const { data, error } = await supabase
     .from("rent_charges")
     .insert({
       tenant_id: gate.tenantId,
       rental_id: rentalId,
-      period: `${month}-01`,
+      period,
       amount: rental.monthly_rent,
       status: "pending",
     })
@@ -251,12 +237,17 @@ export async function toggleChargePaid(id: string, rentalId: string, paid: boole
   if (!gate.ok) return { error: gate.error };
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("rent_charges")
     .update({ status: paid ? "paid" : "pending", paid_at: paid ? new Date().toISOString() : null })
     .eq("id", id)
-    .eq("tenant_id", gate.tenantId);
+    .eq("tenant_id", gate.tenantId)
+    .eq("rental_id", rentalId)
+    .neq("status", paid ? "paid" : "pending")
+    .select("id")
+    .maybeSingle();
   if (error) return { error: "Tahakkuk durumu güncellenemedi." };
+  if (!data) return { error: "Tahakkuk bulunamadı veya durum zaten güncel." };
 
   revalidatePath("/app/kiralama");
   revalidatePath(`/app/kiralama/${rentalId}`);
@@ -281,8 +272,10 @@ export async function applyRentIncrease(
   const gate = await requirePermission("rentals", "edit");
   if (!gate.ok) return { error: gate.error };
 
-  if (isNaN(newRent) || newRent <= 0) return { error: "Geçerli bir yeni kira tutarı girin." };
-  if (!TARIH_RE.test(effectiveDate)) return { error: "Geçerli bir uygulama tarihi seçin." };
+  const rentResult = parseMoneyInput(newRent, { max: 1_000_000_000 });
+  if (!rentResult.ok || rentResult.value == null) return { error: "Geçerli, en çok iki ondalık haneli bir yeni kira tutarı girin." };
+  const validatedNewRent = rentResult.value;
+  if (!TARIH_RE.test(effectiveDate) || !isIsoDate(effectiveDate)) return { error: "Geçerli bir uygulama tarihi seçin." };
 
   const supabase = await createClient();
   const { data: rental } = await supabase
@@ -295,7 +288,7 @@ export async function applyRentIncrease(
   if (rental.status !== "active") return { error: "Yalnızca aktif kira kayıtlarına artış uygulanabilir." };
 
   const currentRent = Number(rental.monthly_rent);
-  if (newRent <= currentRent) return { error: "Yeni kira mevcut kiradan yüksek olmalı." };
+  if (validatedNewRent <= currentRent) return { error: "Yeni kira mevcut kiradan yüksek olmalı." };
 
   // Yasal tavan (TBK m.344): uygulama ayının 12 aylık ort. TÜFE'si — sunucu tarafında da kesilir.
   // ANCAK yalnız RESMİ veri olan aylarda: resmi olmayan (ör. 2026) ayda oran
@@ -304,7 +297,7 @@ export async function applyRentIncrease(
   // KESİLMEZ — sorumluluk, resmi oranı bilen kullanıcıdadır; denetim kaydına da
   // uydurma "TÜFE %X" yazılmaz.
   const legal = computeLegalIncrease(currentRent, effectiveDate.slice(0, 7));
-  if (legal.official && newRent > legal.newRent) {
+  if (legal.official && validatedNewRent > legal.newRent) {
     return {
       error: `Yeni kira yasal tavanı aşıyor — TÜFE %${legal.appliedRate.toFixed(2)} ile en fazla ${new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(legal.newRent)} olabilir.`,
     };
@@ -314,18 +307,26 @@ export async function applyRentIncrease(
     new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
   const tarih = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(`${effectiveDate}T00:00:00`));
   const oranNotu = legal.official ? `TÜFE %${legal.appliedRate.toFixed(2)}` : "manuel oran (resmi TÜFE bekleniyor)";
-  const izSatiri = `Kira artışı: ${para(currentRent)} → ${para(newRent)}, ${oranNotu}, ${tarih}`;
+  const izSatiri = `Kira artışı: ${para(currentRent)} → ${para(validatedNewRent)}, ${oranNotu}, ${tarih}`;
   const notes = rental.notes ? `${rental.notes}\n${izSatiri}` : izSatiri;
 
-  const { error } = await supabase
+  const admin = createAdminClient();
+  const updateBase = admin
     .from("rentals")
-    .update({ monthly_rent: newRent, notes })
+    .update({ monthly_rent: validatedNewRent, notes })
     .eq("id", rentalId)
-    .eq("tenant_id", gate.tenantId);
+    .eq("tenant_id", gate.tenantId)
+    .eq("status", "active")
+    .eq("monthly_rent", rental.monthly_rent);
+  const updateQuery = rental.notes == null
+    ? updateBase.is("notes", null)
+    : updateBase.eq("notes", rental.notes);
+  const { data: updated, error } = await updateQuery.select("id").maybeSingle();
   if (error) {
     console.error("applyRentIncrease", error);
     return { error: "Kira artışı uygulanamadı." };
   }
+  if (!updated) return { error: "Kira kaydı bu sırada değişti; sayfayı yenileyip tekrar deneyin." };
 
   await logActivity({
     tenantId: gate.tenantId,
@@ -334,7 +335,7 @@ export async function applyRentIncrease(
     entityType: "rental",
     entityId: rentalId,
     oldValue: { monthly_rent: currentRent },
-    newValue: { monthly_rent: newRent, effective_date: effectiveDate, tufe_rate: legal.appliedRate },
+    newValue: { monthly_rent: validatedNewRent, effective_date: effectiveDate, tufe_rate: legal.appliedRate },
   });
 
   revalidatePath("/app/kiralama");

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, CalendarRange, Receipt, Plus, X } from "lucide-react";
+import { ArrowUpRight, CalendarRange, Receipt, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now as nowMs } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
@@ -14,22 +14,9 @@ import { ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { CategoryDonut } from "./category-donut-lazy";
 import { ExpensesTable } from "./expenses-table";
+import { ExpenseCreateForm } from "./expense-create-form";
 
 // Inline server action wrappers — void return için form action uyumlu
-async function handleCreate(fd: FormData): Promise<void> {
-  "use server";
-  const { createExpense } = await import("@/app/actions/expenses");
-  await createExpense({}, fd);
-}
-
-async function handleDelete(fd: FormData): Promise<void> {
-  "use server";
-  const id = String(fd.get("id") ?? "").trim();
-  if (!id) return;
-  const { deleteExpense: del } = await import("@/app/actions/expenses");
-  await del(id);
-}
-
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 }
@@ -356,23 +343,10 @@ export default async function GiderlerPage({
       {canCreate && (
         <section className="rounded-[20px] border border-line bg-surface p-5">
           <h2 className="mb-4 font-display font-bold text-ink-950">Yeni Gider Ekle</h2>
-          <form action={handleCreate} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <label htmlFor="expense-title" className="sr-only">Gider başlığı</label>
-            <input id="expense-title" name="title" required placeholder="Başlık" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
-            <label htmlFor="expense-amount" className="sr-only">Tutar (TRY)</label>
-            <input id="expense-amount" name="amount" type="number" min="0" step="0.01" required placeholder="Tutar (TRY)" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
-            <label htmlFor="expense-category" className="sr-only">Gider kategorisi</label>
-            <select id="expense-category" name="category" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300">
-              {categories.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-            <label htmlFor="expense-date" className="sr-only">Gider tarihi</label>
-            <input id="expense-date" name="expense_date" type="date" defaultValue={new Date(nowMs()).toISOString().slice(0, 10)} className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
-            <label htmlFor="expense-notes" className="sr-only">Not (opsiyonel)</label>
-            <input id="expense-notes" name="notes" placeholder="Not (opsiyonel)" className="sm:col-span-2 rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
-            <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 sm:col-span-2">
-              <Plus className="h-4 w-4" /> Kaydet
-            </button>
-          </form>
+          <ExpenseCreateForm
+            categories={categories}
+            defaultDate={new Date(nowMs()).toISOString().slice(0, 10)}
+          />
         </section>
       )}
 
@@ -424,7 +398,6 @@ export default async function GiderlerPage({
           categories={categories}
           canEdit={canEdit}
           canDelete={canDelete}
-          deleteAction={handleDelete}
         />
       )}
     </div>

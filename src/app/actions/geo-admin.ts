@@ -1,10 +1,19 @@
 "use server";
 
 import { revalidatePath, revalidateTag } from "next/cache";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { logPlatformActivity } from "@/lib/platform-activity";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requirePlatformStaff } from "@/lib/platform";
+import { requirePlatformModule } from "@/lib/platform";
 
 export type GeoActionResult = { error?: string; ok?: boolean };
+export type GeoSyncActionResult = GeoActionResult & {
+  jobId?: string;
+  status?: string;
+  message?: string;
+};
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function cleanName(raw: FormDataEntryValue | null): string {
   return String(raw ?? "").trim().replace(/\s+/g, " ");
@@ -20,7 +29,7 @@ function parseCoord(raw: FormDataEntryValue | null): number | null {
 // ========== İL ==========
 
 export async function updateProvince(formData: FormData): Promise<GeoActionResult> {
-  await requirePlatformStaff();
+  await requirePlatformModule("geo");
   const id = String(formData.get("id") ?? "").trim();
   const name = cleanName(formData.get("name"));
   const lat = parseCoord(formData.get("lat"));
@@ -42,13 +51,82 @@ export async function updateProvince(formData: FormData): Promise<GeoActionResul
   }
 
   revalidatePath("/admin/geo");
+  revalidateTag("geo", "max");
   return { ok: true };
+}
+
+/**
+ * Only enqueues work. The provider request and atomic database merge run in a
+ * leased cron worker, so closing the browser cannot leave a partial province.
+ */
+export async function enqueueProvinceGeoSync(formData: FormData): Promise<GeoSyncActionResult> {
+  const staff = await requirePlatformModule("geo");
+  const provinceId = String(formData.get("province_id") ?? "").trim();
+  if (!UUID_PATTERN.test(provinceId)) return { error: "Geçersiz il seçimi." };
+
+  const rateLimit = await checkRateLimit(`platform:geo-sync:${staff.id}`, {
+    limit: 12,
+    windowSec: 60,
+    failurePolicy: "deny",
+  });
+  if (!rateLimit.allowed) {
+    return { error: "Çok sık tarama isteği gönderildi. Lütfen kısa süre sonra tekrar deneyin." };
+  }
+
+  const admin = createAdminClient();
+  const { data: province, error: provinceError } = await admin
+    .from("geo_provinces")
+    .select("id, plate_code, name, is_active")
+    .eq("id", provinceId)
+    .maybeSingle();
+  if (provinceError || !province) return { error: "İl bulunamadı." };
+  if (!province.is_active) return { error: "Pasif bir il otomatik taranamaz." };
+
+  const { data, error } = await admin.rpc("enqueue_geo_province_sync", {
+    p_province_id: province.id,
+    p_requested_by: staff.id,
+    p_priority: province.plate_code === 46 ? 1_000 : 100,
+  });
+  if (error) {
+    console.error("enqueueProvinceGeoSync", { code: error.code || "unknown" });
+    return { error: "Tarama kuyruğa alınamadı. Lütfen sistem durumunu kontrol edip yeniden deneyin." };
+  }
+
+  const raw = Array.isArray(data) ? data[0] : data;
+  const result = raw && typeof raw === "object" ? raw as Record<string, unknown> : null;
+  const jobId = typeof result?.id === "string"
+    ? result.id
+    : typeof result?.job_id === "string"
+      ? result.job_id
+      : undefined;
+  const status = typeof result?.status === "string" ? result.status : "queued";
+  if (!jobId) return { error: "Tarama işi doğrulanamadı; işlem başlatılmadı." };
+
+  await logPlatformActivity({
+    actorId: staff.id,
+    action: "geo.province_sync.enqueue",
+    entityType: "geo_province",
+    entityId: province.id,
+    meta: {
+      jobId,
+      plateCode: province.plate_code,
+      previousGeoJobsPaused: true,
+    },
+  });
+  revalidatePath("/admin/geo");
+  revalidateTag("geo", "max");
+  return {
+    ok: true,
+    jobId,
+    status,
+    message: `${province.name} taraması kuyruğa alındı. Diğer il taramaları bekletiliyor.`,
+  };
 }
 
 // ========== İLÇE ==========
 
 export async function createDistrict(formData: FormData): Promise<GeoActionResult> {
-  await requirePlatformStaff();
+  await requirePlatformModule("geo");
   const provinceId = String(formData.get("province_id") ?? "").trim();
   const name = cleanName(formData.get("name"));
   const lat = parseCoord(formData.get("lat"));
@@ -76,7 +154,7 @@ export async function createDistrict(formData: FormData): Promise<GeoActionResul
 }
 
 export async function updateDistrict(formData: FormData): Promise<GeoActionResult> {
-  await requirePlatformStaff();
+  await requirePlatformModule("geo");
   const id = String(formData.get("id") ?? "").trim();
   const provinceId = String(formData.get("province_id") ?? "").trim();
   const name = cleanName(formData.get("name"));
@@ -104,7 +182,7 @@ export async function updateDistrict(formData: FormData): Promise<GeoActionResul
 }
 
 export async function deleteDistrict(formData: FormData): Promise<GeoActionResult> {
-  await requirePlatformStaff();
+  await requirePlatformModule("geo");
   const id = String(formData.get("id") ?? "").trim();
   const provinceId = String(formData.get("province_id") ?? "").trim();
   if (!id) return { error: "İlçe bulunamadı." };
@@ -133,7 +211,7 @@ export async function deleteDistrict(formData: FormData): Promise<GeoActionResul
 // ========== MAHALLE ==========
 
 export async function createNeighborhood(formData: FormData): Promise<GeoActionResult> {
-  await requirePlatformStaff();
+  await requirePlatformModule("geo");
   const districtId = String(formData.get("district_id") ?? "").trim();
   const provinceId = String(formData.get("province_id") ?? "").trim();
   const name = cleanName(formData.get("name"));
@@ -160,7 +238,7 @@ export async function createNeighborhood(formData: FormData): Promise<GeoActionR
 }
 
 export async function updateNeighborhood(formData: FormData): Promise<GeoActionResult> {
-  await requirePlatformStaff();
+  await requirePlatformModule("geo");
   const id = String(formData.get("id") ?? "").trim();
   const districtId = String(formData.get("district_id") ?? "").trim();
   const provinceId = String(formData.get("province_id") ?? "").trim();
@@ -188,7 +266,7 @@ export async function updateNeighborhood(formData: FormData): Promise<GeoActionR
 }
 
 export async function deleteNeighborhood(formData: FormData): Promise<GeoActionResult> {
-  await requirePlatformStaff();
+  await requirePlatformModule("geo");
   const id = String(formData.get("id") ?? "").trim();
   const districtId = String(formData.get("district_id") ?? "").trim();
   const provinceId = String(formData.get("province_id") ?? "").trim();

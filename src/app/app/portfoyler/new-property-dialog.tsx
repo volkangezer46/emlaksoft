@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { LatLngPicker } from "@/components/app/lat-lng-picker";
 import { GeoSelect } from "@/components/app/geo-select";
+import { useQueryDialog } from "@/components/app/use-query-dialog";
 
 type Province = { id: string; name: string };
 type Branch = { id: string; name: string };
@@ -48,13 +49,15 @@ export function NewPropertyDialog({
   branches = [],
   propertyTypes = DEFAULT_PROPERTY_TYPES,
   transactionTypes = DEFAULT_TRANSACTION_TYPES,
+  defaultOpen = false,
 }: {
   provinces: Province[];
   branches?: Branch[];
   propertyTypes?: string[];
   transactionTypes?: string[];
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useQueryDialog(defaultOpen);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -122,7 +125,7 @@ export function NewPropertyDialog({
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="commission-rate">Komisyon oranı (%)</label>
-                <input id="commission-rate" name="commission_rate" inputMode="decimal" className={fieldClass} placeholder="2" />
+                <input id="commission-rate" name="commission_rate" inputMode="decimal" required min="0.01" max="100" step="0.01" className={fieldClass} placeholder="3" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="rooms">Oda</label>

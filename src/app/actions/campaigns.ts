@@ -4,9 +4,39 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
-import { sendBulkSms, sendWhatsApp } from "@/lib/messaging/netgsm";
+import { checkRateLimit } from "@/lib/rate-limit";
+import {
+  listApprovedTenantWhatsAppTemplates,
+  type ApprovedWhatsAppTemplate,
+} from "@/lib/messaging/whatsapp-cloud";
 
 export type CampaignResult = { ok?: boolean; error?: string; id?: string };
+export type WhatsAppTemplateListResult =
+  | { ok: true; templates: ApprovedWhatsAppTemplate[] }
+  | { ok: false; error: string };
+
+const CAMPAIGN_FILTERS = new Set(["all", "type:alici", "type:satici", "type:kira"]);
+const WHATSAPP_TEMPLATE_NAME_RE = /^[a-z0-9_]{1,512}$/;
+const WHATSAPP_TEMPLATE_LANGUAGE_RE = /^[a-z]{2,3}(?:_[A-Z]{2})?$/;
+
+/** Returns only approved template name/language pairs; provider secrets stay server-side. */
+export async function listApprovedWhatsAppTemplates(): Promise<WhatsAppTemplateListResult> {
+  const gate = await requirePermission("campaigns", "create");
+  if (!gate.ok) return { ok: false, error: gate.error };
+
+  const rate = await checkRateLimit(
+    `whatsapp-template-list:${gate.tenantId}:${gate.userId}`,
+    { limit: 10, windowSec: 60, failurePolicy: "deny" },
+  );
+  if (!rate.allowed) {
+    return {
+      ok: false,
+      error: "Şablon listesi çok sık yenilendi; lütfen bir dakika sonra tekrar deneyin.",
+    };
+  }
+
+  return listApprovedTenantWhatsAppTemplates(gate.tenantId);
+}
 
 // ---------------------------------------------------------------------------
 // Kampanya oluştur
@@ -16,164 +46,101 @@ export async function createCampaign(
   _prev: CampaignResult,
   fd: FormData,
 ): Promise<CampaignResult> {
-  const gate = await requirePermission("customers", "create");
+  const gate = await requirePermission("campaigns", "create");
   if (!gate.ok) return { error: gate.error };
 
-  const title    = String(fd.get("title")   ?? "").trim();
-  const channel  = String(fd.get("channel") ?? "sms").trim() as "sms" | "whatsapp" | "email";
-  const message  = String(fd.get("message") ?? "").trim();
-  const filter   = String(fd.get("filter")  ?? "all").trim(); // all | type:alici | type:satici
+  const title = String(fd.get("title") ?? "").trim();
+  const channel = String(fd.get("channel") ?? "sms").trim();
+  const message = String(fd.get("message") ?? "").trim();
+  const filter = String(fd.get("filter") ?? "all").trim();
+  const whatsappTemplateName = String(fd.get("whatsappTemplateName") ?? "").trim();
+  const whatsappTemplateLanguage = String(fd.get("whatsappTemplateLanguage") ?? "").trim();
 
-  if (!title)   return { error: "Kampanya başlığı zorunludur." };
-  if (!message) return { error: "Mesaj metni zorunludur." };
+  if (!title) return { error: "Kampanya başlığı zorunludur." };
   if (message.length > 612) return { error: "Mesaj en fazla 612 karakter olabilir." };
-
-  const supabase = await createClient();
-  const admin    = createAdminClient();
-
-  // Alıcı listesini hesapla
-  let query = supabase
-    .from("customers")
-    .select("id, full_name, phone")
-    .eq("tenant_id", gate.tenantId)
-    .not("phone", "is", null)
-    .eq("blacklist", false);
-
-  if (filter.startsWith("type:")) {
-    query = query.contains("customer_types", [filter.slice(5)]);
+  if (channel === "email") {
+    return { error: "E-posta gönderim sağlayıcısı henüz yapılandırılmadı; bu kanal kullanılamaz." };
+  }
+  if (channel !== "sms" && channel !== "whatsapp") {
+    return { error: "Geçersiz kampanya kanalı." };
+  }
+  if (channel === "sms" && !message) return { error: "SMS mesaj metni zorunludur." };
+  if (
+    channel === "whatsapp" &&
+    (!WHATSAPP_TEMPLATE_NAME_RE.test(whatsappTemplateName) ||
+      !WHATSAPP_TEMPLATE_LANGUAGE_RE.test(whatsappTemplateLanguage))
+  ) {
+    return {
+      error: "WhatsApp kampanyası için Meta tarafından onaylanmış şablon adı ve geçerli dil kodu zorunludur.",
+    };
+  }
+  if (!CAMPAIGN_FILTERS.has(filter)) {
+    return { error: "Geçersiz hedef kitle filtresi." };
   }
 
-  const { data: customers, error: custErr } = await query;
-  if (custErr) return { error: "Müşteriler yüklenemedi." };
-  if (!customers?.length) return { error: "Seçilen filtreye uygun telefon numarası bulunamadı." };
+  const admin = createAdminClient();
+  const { data: createResult, error: createError } = await admin.rpc(
+    "create_campaign_with_recipients",
+    {
+      p_tenant_id: gate.tenantId,
+      p_created_by: gate.userId,
+      p_title: title,
+      p_channel: channel,
+      p_message: message,
+      p_filter: filter,
+      p_whatsapp_template_name: channel === "whatsapp" ? whatsappTemplateName : null,
+      p_whatsapp_template_language: channel === "whatsapp" ? whatsappTemplateLanguage : null,
+    },
+  );
+  if (createError) {
+    if (createError.message.includes("No eligible campaign recipients")) {
+      return { error: "Seçilen filtreye uygun telefon numarası bulunamadı." };
+    }
+    console.error("atomic campaign creation failed", { code: createError.code });
+    return { error: "Kampanya ve alıcı kuyruğu oluşturulamadı; hiçbir kayıt kaydedilmedi." };
+  }
 
-  // Kampanyayı oluştur
-  const { data: campaign, error: campErr } = await supabase
-    .from("campaigns")
-    .insert({
-      tenant_id:   gate.tenantId,
-      created_by:  gate.userId,
-      title,
-      channel,
-      message,
-      status:      "draft",
-      total_count: customers.length,
-    })
-    .select("id")
-    .single();
-
-  if (campErr || !campaign) return { error: "Kampanya oluşturulamadı." };
-
-  // Alıcıları ekle
-  const recipients = customers.map((c) => ({
-    campaign_id: campaign.id,
-    customer_id: c.id,
-    phone:       c.phone as string,
-    full_name:   c.full_name,
-    status:      "pending" as const,
-  }));
-
-  await admin.from("campaign_recipients").insert(recipients);
+  const created = createResult && typeof createResult === "object" && !Array.isArray(createResult)
+    ? createResult as Record<string, unknown>
+    : null;
+  const campaignId = typeof created?.id === "string" ? created.id : null;
+  if (!campaignId) return { error: "Kampanya oluşturma sonucu doğrulanamadı." };
 
   revalidatePath("/app/kampanyalar");
-  return { ok: true, id: campaign.id };
+  return { ok: true, id: campaignId };
 }
 
 // ---------------------------------------------------------------------------
-// Kampanya gönder (async — kuyruğu işler)
+// Kampanya gönder: yalnız kuyruğa alır; provider I/O cron worker'dadır.
 // ---------------------------------------------------------------------------
 
 export async function sendCampaign(campaignId: string): Promise<CampaignResult> {
-  const gate = await requirePermission("customers", "create");
+  const gate = await requirePermission("campaigns", "edit");
   if (!gate.ok) return { error: gate.error };
 
   const admin = createAdminClient();
-
-  // Kampanya bilgilerini al
-  const { data: campaign } = await admin
+  const { data: campaign, error: campaignError } = await admin
     .from("campaigns")
-    .select("id, channel, message, status, tenant_id")
+    .select("id, status, tenant_id")
     .eq("id", campaignId)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
 
-  if (!campaign) return { error: "Kampanya bulunamadı." };
-  if (campaign.status === "sending" || campaign.status === "done") {
-    return { error: "Kampanya zaten gönderildi veya gönderiliyor." };
+  if (campaignError || !campaign) return { error: "Kampanya bulunamadı." };
+  if (campaign.status !== "draft" && campaign.status !== "scheduled") {
+    return { error: "Kampanya mevcut durumunda gönderim kuyruğuna alınamaz." };
   }
 
-  // Durumu güncelle
-  await admin
-    .from("campaigns")
-    .update({ status: "sending" })
-    .eq("id", campaignId);
-
-  // Bekleyen alıcıları çek
-  const { data: pending } = await admin
-    .from("campaign_recipients")
-    .select("id, phone, full_name")
-    .eq("campaign_id", campaignId)
-    .eq("status", "pending");
-
-  if (!pending?.length) {
-    await admin.from("campaigns").update({ status: "done", sent_at: new Date().toISOString() }).eq("id", campaignId);
-    return { ok: true };
+  const { data: enqueueResult, error: enqueueError } = await admin.rpc(
+    "enqueue_campaign_delivery",
+    {
+      p_campaign_id: campaignId,
+      p_tenant_id: gate.tenantId,
+    },
+  );
+  if (enqueueError || !enqueueResult) {
+    return { error: "Kampanya gönderim kuyruğuna alınamadı." };
   }
-
-  let sentCount = 0;
-  let failCount = 0;
-
-  if (campaign.channel === "sms") {
-    // Toplu SMS
-    const result = await sendBulkSms(
-      pending.map((r) => ({ phone: r.phone, name: r.full_name ?? undefined })),
-      campaign.message,
-    );
-
-    if (result.ok) {
-      await admin.from("campaign_recipients")
-        .update({ status: "sent", sent_at: new Date().toISOString() })
-        .eq("campaign_id", campaignId)
-        .eq("status", "pending");
-      sentCount = pending.length;
-    } else {
-      await admin.from("campaign_recipients")
-        .update({ status: "failed", error_msg: result.error ?? "Gönderim hatası" })
-        .eq("campaign_id", campaignId)
-        .eq("status", "pending");
-      failCount = pending.length;
-    }
-  } else if (campaign.channel === "email") {
-    // E-posta kanalı — gönderim sağlayıcısı (SMTP/Resend) yapılandırıldığında aktifleşir
-    await admin.from("campaign_recipients")
-      .update({ status: "failed", error_msg: "E-posta sağlayıcısı yapılandırılmamış. Yönetici ayarlardan ekleyince aktifleşir." })
-      .eq("campaign_id", campaignId)
-      .eq("status", "pending");
-    failCount = pending.length;
-  } else {
-    // WhatsApp — tek tek gönder (rate limit nedeniyle)
-    for (const r of pending) {
-      const res = await sendWhatsApp(r.phone, campaign.message);
-      if (res.ok) {
-        await admin.from("campaign_recipients")
-          .update({ status: "sent", sent_at: new Date().toISOString() })
-          .eq("id", r.id);
-        sentCount++;
-      } else {
-        await admin.from("campaign_recipients")
-          .update({ status: "failed", error_msg: res.error ?? "Hata" })
-          .eq("id", r.id);
-        failCount++;
-      }
-    }
-  }
-
-  await admin.from("campaigns").update({
-    status:       failCount === pending.length ? "failed" : "done",
-    sent_at:      new Date().toISOString(),
-    sent_count:   sentCount,
-    failed_count: failCount,
-  }).eq("id", campaignId);
 
   revalidatePath("/app/kampanyalar");
   return { ok: true };
@@ -184,7 +151,7 @@ export async function sendCampaign(campaignId: string): Promise<CampaignResult> 
 // ---------------------------------------------------------------------------
 
 export async function listCampaigns() {
-  const gate = await requirePermission("customers", "view");
+  const gate = await requirePermission("campaigns", "view");
   if (!gate.ok) return [];
 
   const supabase = await createClient();
@@ -198,23 +165,14 @@ export async function listCampaigns() {
   return data ?? [];
 }
 
-/**
- * Tek kampanya + alici dokumu (detay sayfasi icin).
- *
- * NEDEN SONRADAN EKLENDI: `campaign_recipients` tablosu her alici icin durum
- * ve HATA MESAJI tutuyordu ama hicbir ekran bu satirlari okumuyordu. Liste
- * sayfasi yalnizca "12 hata" gibi bir sayi gosteriyordu; kullanici HANGI
- * numaraya ulasilamadigini ve NEDEN ulasilamadigini ogrenemiyordu. Basarisiz
- * gonderimi duzeltmenin yolu yoktu.
- */
 export async function getCampaign(id: string) {
-  const gate = await requirePermission("customers", "view");
+  const gate = await requirePermission("campaigns", "view");
   if (!gate.ok) return null;
 
   const supabase = await createClient();
   const { data } = await supabase
     .from("campaigns")
-    .select("id, title, channel, message, status, total_count, sent_count, failed_count, scheduled_at, sent_at, created_at")
+    .select("id, title, channel, message, whatsapp_template_name, whatsapp_template_language, status, total_count, sent_count, failed_count, scheduled_at, sent_at, created_at")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
@@ -223,13 +181,10 @@ export async function getCampaign(id: string) {
 }
 
 export async function listCampaignRecipients(campaignId: string) {
-  const gate = await requirePermission("customers", "view");
+  const gate = await requirePermission("campaigns", "view");
   if (!gate.ok) return [];
 
   const supabase = await createClient();
-  // Once basarisizlar: kullanicinin bu sayfaya gelme sebebi genellikle
-  // "neden ulasmadi" sorusu. `status` metinsel siralamada failed < pending <
-  // sent oldugu icin artan sirada basarisizlar zaten ust sirada.
   const { data } = await supabase
     .from("campaign_recipients")
     .select("id, customer_id, full_name, phone, status, error_msg, sent_at, created_at")
@@ -246,16 +201,17 @@ export async function listCampaignRecipients(campaignId: string) {
 // ---------------------------------------------------------------------------
 
 export async function deleteCampaign(id: string): Promise<CampaignResult> {
-  const gate = await requirePermission("customers", "delete");
+  const gate = await requirePermission("campaigns", "delete");
   if (!gate.ok) return { error: gate.error };
 
   const supabase = await createClient();
-  await supabase
+  const { error } = await supabase
     .from("campaigns")
     .delete()
     .eq("id", id)
     .eq("tenant_id", gate.tenantId);
 
+  if (error) return { error: "Kampanya silinemedi." };
   revalidatePath("/app/kampanyalar");
   return { ok: true };
 }

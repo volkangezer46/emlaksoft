@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { PLATFORM_ROLE_LABELS, type PlatformRole } from "@/lib/platform-access";
 import { logPlatformActivity } from "@/lib/platform-activity";
+import { getBaseUrl } from "@/lib/base-url";
 
 const VALID_ROLES: PlatformRole[] = ["super_admin", "ops", "support", "billing"];
 
@@ -82,7 +83,7 @@ export async function addPlatformStaff(fd: FormData): Promise<StaffActionResult>
   // Auth'da yok → davet e-postası gönder, ardından platform_staff'a taslak yaz
   const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
     data: { full_name: fullName },
-    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/admin`,
+    redirectTo: `${getBaseUrl()}/admin`,
   });
 
   if (invErr || !invited.user) {

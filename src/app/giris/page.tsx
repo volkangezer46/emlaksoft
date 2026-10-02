@@ -1,4 +1,4 @@
-import { isDemoLoginEnabled } from "@/lib/demo-personas";
+import { isDemoLoginEnabled } from "@/lib/demo-environment";
 
 export const metadata = {
   title: "Giriş Yap",

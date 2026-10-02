@@ -11,6 +11,7 @@ import {
 import { CopyLinkButton, DeletePresentationButton } from "./presentation-actions";
 import { SharedPortals, type SharedPortalRow } from "./shared-portals";
 import { now } from "@/lib/clock";
+import { getBaseUrl } from "@/lib/base-url";
 
 type PresentationRow = {
   id: string;
@@ -30,7 +31,7 @@ function tarih(iso: string | null) {
 }
 
 function appUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return getBaseUrl();
 }
 
 /**

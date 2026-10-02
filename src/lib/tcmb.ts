@@ -1,4 +1,10 @@
 import "server-only";
+import {
+  discardExternalResponse,
+  externalErrorMetadata,
+  fetchExternal,
+  readExternalText,
+} from "@/lib/external-fetch";
 
 /**
  * TCMB günlük döviz kuru — resmî açık veri.
@@ -28,6 +34,8 @@ export type TcmbRate = {
 };
 
 const BASE = "https://www.tcmb.gov.tr/kurlar";
+const TCMB_TIMEOUT_MS = 15_000;
+const TCMB_MAX_RESPONSE_BYTES = 512 * 1024;
 
 function two(n: number) {
   return String(n).padStart(2, "0");
@@ -82,25 +90,38 @@ export type TcmbFetchResult =
  * `no-publication` bir HATA DEĞİL: hafta sonu/tatilde TCMB yayın yapmaz.
  * Çağıran bunu sessizce geçmeli, alarm üretmemeli.
  */
-export async function fetchTcmbRate(date: Date): Promise<TcmbFetchResult> {
+export async function fetchTcmbRate(
+  date: Date,
+  signal?: AbortSignal,
+): Promise<TcmbFetchResult> {
   const url = tcmbUrlForDate(date);
 
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await fetchExternal(url, {
       // Arşiv verisi değişmez; ama cron zaten günde bir çalışıyor.
       cache: "no-store",
       headers: { accept: "application/xml,text/xml,*/*" },
-      signal: AbortSignal.timeout(15_000),
-    });
+    }, { timeoutMs: TCMB_TIMEOUT_MS, signal });
   } catch (err) {
-    return { ok: false, reason: "fetch-error", detail: String(err).slice(0, 200) };
+    return { ok: false, reason: "fetch-error", detail: externalErrorMetadata(err).kind };
   }
 
-  if (res.status === 404) return { ok: false, reason: "no-publication" };
-  if (!res.ok) return { ok: false, reason: "fetch-error", detail: `HTTP ${res.status}` };
+  if (res.status === 404) {
+    await discardExternalResponse(res);
+    return { ok: false, reason: "no-publication" };
+  }
+  if (!res.ok) {
+    await discardExternalResponse(res);
+    return { ok: false, reason: "fetch-error", detail: `HTTP ${res.status}` };
+  }
 
-  const xml = await res.text();
+  let xml: string;
+  try {
+    xml = await readExternalText(res, TCMB_MAX_RESPONSE_BYTES);
+  } catch (err) {
+    return { ok: false, reason: "fetch-error", detail: externalErrorMetadata(err).kind };
+  }
 
   // TCMB bazen 404 yerine HTML hata sayfası döndürüyor
   if (!xml.includes("<Currency")) return { ok: false, reason: "no-publication" };
@@ -125,11 +146,14 @@ export async function fetchTcmbRate(date: Date): Promise<TcmbFetchResult> {
 }
 
 /** Bugünden geriye doğru `days` günü tarar; ilk bulduğu yayını döndürür. */
-export async function fetchLatestTcmbRate(days = 7): Promise<TcmbFetchResult> {
+export async function fetchLatestTcmbRate(
+  days = 7,
+  signal?: AbortSignal,
+): Promise<TcmbFetchResult> {
   for (let i = 0; i < days; i += 1) {
     const d = new Date();
     d.setUTCDate(d.getUTCDate() - i);
-    const result = await fetchTcmbRate(d);
+    const result = await fetchTcmbRate(d, signal);
     if (result.ok) return result;
     if (result.reason === "fetch-error") return result; // ağ sorunu — geriye gitmenin anlamı yok
   }

@@ -2,9 +2,14 @@
 
 import { useState, useRef } from "react";
 import { Upload, Loader2, FileText, Image, Trash2, Download } from "lucide-react";
-import { uploadCustomerFile, deleteCustomerFile } from "@/app/actions/customer-files";
+import {
+  deleteCustomerFile,
+  finalizeCustomerFileUpload,
+  prepareCustomerFileUpload,
+} from "@/app/actions/customer-files";
 import { useToast } from "@/components/app/toast-provider";
 import { useRouter } from "next/navigation";
+import { uploadToDirectFileTarget } from "@/lib/direct-file-upload-client";
 
 type FileRow = {
   id: string;
@@ -42,19 +47,37 @@ export function CustomerFilesTab({ customerId, files }: { customerId: string; fi
     if (!file) return;
 
     setUploading(true);
-    const fd = new FormData();
-    fd.set("customer_id", customerId);
-    fd.set("file", file);
+    try {
+      const prepared = await prepareCustomerFileUpload({
+        customerId,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+      });
+      if (!prepared.ok) {
+        push(prepared.error, "err");
+        return;
+      }
 
-    const res = await uploadCustomerFile(fd);
-    setUploading(false);
+      const uploaded = await uploadToDirectFileTarget(prepared.upload, file);
+      if (!uploaded.ok) {
+        push(uploaded.error, "err");
+        return;
+      }
 
-    if (res.ok) {
+      const finalized = await finalizeCustomerFileUpload(customerId, prepared.upload.sessionId);
+      if (!finalized.ok) {
+        push(finalized.error, "err");
+        return;
+      }
+
       push("Dosya yüklendi", "ok");
       router.refresh();
       if (fileInputRef.current) fileInputRef.current.value = "";
-    } else {
-      push(res.error ?? "Yükleme başarısız", "err");
+    } catch {
+      push("Yükleme başarısız — bağlantıyı kontrol edin.", "err");
+    } finally {
+      setUploading(false);
     }
   }
 

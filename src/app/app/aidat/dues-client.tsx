@@ -72,37 +72,61 @@ export function DuesClient({
   async function bulkPaid() {
     if (selected.size === 0) return;
     setBusy("bulk");
-    const res = await markDuesPaidBulk(Array.from(selected));
-    setBusy(null);
-    if (res.error) push(res.error, "err");
-    else {
-      push(`${res.updated ?? 0} aidat ödendi olarak işaretlendi`, "ok");
-      setSelected(new Set());
-      router.refresh();
+    try {
+      const res = await markDuesPaidBulk(Array.from(selected));
+      if (res.error) push(res.error, "err");
+      else {
+        push(`${res.updated ?? 0} aidat ödendi olarak işaretlendi`, "ok");
+        setSelected(new Set());
+        router.refresh();
+      }
+    } catch {
+      push("Aidatlar güncellenemedi. Bağlantınızı kontrol edip tekrar deneyin.", "err");
+    } finally {
+      setBusy(null);
     }
   }
 
   useEffect(() => {
     if (state.ok) {
       formRef.current?.reset();
+      push("Aidat kaydı oluşturuldu", "ok");
       router.refresh();
     }
-  }, [state, router]);
+  }, [state, router, push]);
 
   function toggle(id: string, toPaid: boolean) {
     setBusy(id);
     startTransition(async () => {
-      await toggleDuePaid(id, toPaid);
-      setBusy(null);
-      router.refresh();
+      try {
+        const result = await toggleDuePaid(id, toPaid);
+        if (result.error) push(result.error, "err");
+        else {
+          push(toPaid ? "Aidat ödendi olarak işaretlendi" : "Aidat bekleyen duruma alındı", "ok");
+          router.refresh();
+        }
+      } catch {
+        push("Aidat durumu güncellenemedi. Lütfen tekrar deneyin.", "err");
+      } finally {
+        setBusy(null);
+      }
     });
   }
   // ConfirmDialog onConfirm'den çağrılır; onay penceresi kapanınca liste tazelenir
   async function remove(id: string) {
     setBusy(id);
-    await deleteDue(id);
-    setBusy(null);
-    router.refresh();
+    try {
+      const result = await deleteDue(id);
+      if (result.error) push(result.error, "err");
+      else {
+        push("Aidat kaydı silindi", "ok");
+        router.refresh();
+      }
+    } catch {
+      push("Aidat silinemedi. Lütfen tekrar deneyin.", "err");
+    } finally {
+      setBusy(null);
+    }
   }
 
   return (
@@ -110,9 +134,15 @@ export function DuesClient({
       {canCreate ? (
         <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950"><Plus className="h-4 w-4 text-brand-600" /> Yeni aidat kaydı</h2>
-          <form ref={formRef} action={action} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <input name="title" required placeholder="Başlık (ör. Nisan aidatı)" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400 sm:col-span-2 lg:col-span-1" />
-            <input name="amount" type="number" min="0" step="0.01" required placeholder="Tutar (₺)" className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400" />
+          <form ref={formRef} action={action} aria-busy={pending} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="block text-[11px] font-semibold text-text-muted">
+              Başlık
+              <input name="title" required maxLength={160} placeholder="Örn. Nisan aidatı" className="mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm font-normal text-ink-950 outline-none focus:border-brand-400" />
+            </label>
+            <label className="block text-[11px] font-semibold text-text-muted">
+              Tutar (₺)
+              <input name="amount" type="number" min="0.01" max="9999999999.99" step="0.01" required placeholder="1.250,00" className="mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm font-normal text-ink-950 outline-none focus:border-brand-400" />
+            </label>
             {/* Bu iki tarih alanının TEK etiketi `title` idi. Native `title`
                 ekran okuyucularda güvenilir okunmaz ve görsel olarak da hiçbir
                 şey göstermez: kullanıcı iki boş tarih kutusu görüyordu.
@@ -144,7 +174,7 @@ export function DuesClient({
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Ekle
             </button>
           </form>
-          {state.error ? <p className="mt-2 text-sm text-danger-500">{state.error}</p> : null}
+          {state.error ? <p role="alert" className="mt-2 text-sm text-danger-500">{state.error}</p> : null}
         </section>
       ) : null}
 

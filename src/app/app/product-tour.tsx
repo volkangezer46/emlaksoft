@@ -2,9 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, Sparkles, X } from "lucide-react";
+import {
+  Dialog,
+  DialogDescription,
+  DialogFullscreenContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 /**
- * İlk giriş ürün turu — kütüphanesiz spotlight.
+ * İlk giriş ürün turu — ölçümü yerel, modal davranışı ortak Radix altyapısında
+ * çalışan spotlight.
  *
  * NASIL: Hedef elementin getBoundingClientRect'i ölçülür; tam ekran overlay
  * içinde hedef boyutunda şeffaf bir "delik" div'i konumlanır ve devasa bir
@@ -154,44 +161,30 @@ export function ProductTour() {
     };
   }, [phase, index, activeSteps]);
 
-  // Klavye: Esc kapat, ok tuşları ileri/geri
-  useEffect(() => {
-    if (phase !== "run" && phase !== "final") return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        close();
-      } else if (phase === "run" && (e.key === "ArrowRight" || e.key === "Enter")) {
-        e.preventDefault();
-        next();
-      } else if (phase === "run" && e.key === "ArrowLeft") {
-        e.preventDefault();
-        prev();
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [phase, close, next, prev]);
-
   if (phase === "idle" || phase === "off") return null;
 
   // ---- Bitiş ekranı: delik yok, ortalanmış kart ----
   if (phase === "final") {
     return (
-      <div className="fixed inset-0 z-[95] grid place-items-center bg-[rgba(7,26,56,0.55)] p-4">
+      <Dialog open onOpenChange={(nextOpen) => !nextOpen && close()}>
+        <DialogFullscreenContent
+          overlayClassName="bg-[rgba(7,26,56,0.55)] backdrop-blur-none"
+          className="grid place-items-center bg-transparent p-4"
+        >
         <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Tur tamamlandı"
           className="popover-in w-full max-w-sm rounded-[18px] border border-line bg-surface p-5 shadow-[var(--elev-5)]"
         >
           <span className="grid h-10 w-10 place-items-center rounded-[12px] bg-brand-600/10 text-brand-600">
             <Sparkles className="h-5 w-5" />
           </span>
-          <h2 className="mt-3 font-display text-lg font-bold text-ink-950">Hazırsınız!</h2>
-          <p className="mt-1 text-sm text-text-muted">
-            Tur tamamlandı — panel artık canlı ofis verinizle çalışıyor.
-          </p>
+          <DialogTitle asChild>
+            <h2 className="mt-3 font-display text-lg font-bold text-ink-950">Hazırsınız!</h2>
+          </DialogTitle>
+          <DialogDescription asChild>
+            <p className="mt-1 text-sm text-text-muted">
+              Tur tamamlandı — panel artık canlı ofis verinizle çalışıyor.
+            </p>
+          </DialogDescription>
           <p className="mt-3 rounded-[10px] bg-canvas px-3 py-2 text-xs text-text-muted">
             İstediğinde{" "}
             <kbd className="rounded-[5px] border border-line bg-surface px-1.5 py-0.5 font-semibold text-ink-950">?</kbd>{" "}
@@ -207,7 +200,8 @@ export function ProductTour() {
             Panele başla
           </button>
         </div>
-      </div>
+        </DialogFullscreenContent>
+      </Dialog>
     );
   }
 
@@ -246,7 +240,20 @@ export function ProductTour() {
   cardTop = Math.max(16, cardTop);
 
   return (
-    <div className="fixed inset-0 z-[95]" aria-hidden={false}>
+    <Dialog open onOpenChange={(nextOpen) => !nextOpen && close()}>
+      <DialogFullscreenContent
+        overlayClassName="bg-transparent backdrop-blur-none"
+        className="overflow-visible bg-transparent"
+        onKeyDown={(event) => {
+          if (event.key === "ArrowRight") {
+            event.preventDefault();
+            next();
+          } else if (event.key === "ArrowLeft") {
+            event.preventDefault();
+            prev();
+          }
+        }}
+      >
       {/* Spotlight deliği — dev box-shadow geri kalanı karartır */}
       <div
         className="absolute rounded-[18px] transition-[top,left,width,height] duration-300 ease-out"
@@ -260,9 +267,6 @@ export function ProductTour() {
       />
       {/* Balon kart */}
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={step.title}
         className="popover-in absolute rounded-[16px] border border-line bg-surface p-4 shadow-[var(--elev-5)] transition-[top,left] duration-300 ease-out"
         style={{ top: cardTop, left: cardLeft, width: CARD_W, maxWidth: "calc(100vw - 32px)" }}
       >
@@ -279,8 +283,12 @@ export function ProductTour() {
             <X className="h-4 w-4" />
           </button>
         </div>
-        <h2 className="mt-2 font-display text-base font-bold text-ink-950">{step.title}</h2>
-        <p className="mt-1 text-sm leading-relaxed text-text-muted">{step.desc}</p>
+        <DialogTitle asChild>
+          <h2 className="mt-2 font-display text-base font-bold text-ink-950">{step.title}</h2>
+        </DialogTitle>
+        <DialogDescription asChild>
+          <p className="mt-1 text-sm leading-relaxed text-text-muted">{step.desc}</p>
+        </DialogDescription>
         <div className="mt-4 flex items-center justify-between gap-2">
           <button
             type="button"
@@ -308,6 +316,7 @@ export function ProductTour() {
           </div>
         </div>
       </div>
-    </div>
+      </DialogFullscreenContent>
+    </Dialog>
   );
 }

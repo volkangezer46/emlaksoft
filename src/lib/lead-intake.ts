@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isValidOptionalTurkishMobile, normalizeTurkishPhone } from "@/lib/phone";
 import { notifyTenant } from "@/lib/notify";
 import { buildLeadCommunication } from "@/lib/lead-message";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 export type LeadInput = {
   fullName: string;
@@ -20,6 +21,14 @@ export type LeadInput = {
   rooms?: string;
   /** Müşteri tipleri (definitions/customer_type). Verilmezse ['alici'] — geriye uyumlu. */
   customer_types?: string[];
+  consent?: {
+    requestId: string;
+    scope: "lead_intake" | "valuation_lead";
+    version: string;
+    acceptedAt: string;
+    ipHash?: string | null;
+    userAgentHash?: string | null;
+  };
 };
 
 export type LeadResult =
@@ -86,11 +95,13 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
 
   const { data: tenant } = await admin
     .from("tenants")
-    .select("id, name, lead_capture_enabled")
+    .select("id, name, status, lead_capture_enabled")
     .eq("lead_capture_token", token)
     .maybeSingle();
 
-  if (!tenant) return { ok: false, error: "Geçersiz bağlantı.", status: 404 };
+  if (!tenant || !isPublicTenantActive(tenant.status)) {
+    return { ok: false, error: "Geçersiz bağlantı.", status: 404 };
+  }
   if (tenant.lead_capture_enabled === false) {
     return { ok: false, error: "Bu form şu anda kapalı.", status: 403 };
   }
@@ -146,6 +157,29 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
       return { ok: false, error: "Kayıt oluşturulamadı.", status: 500 };
     }
     customerId = created.id as string;
+  }
+
+  // Public forms must persist server-verified consent evidence before the lead
+  // is treated as accepted. A retry is safe because request_id is unique.
+  if (input.consent) {
+    const { error: consentError } = await admin.from("public_lead_consent_events").insert({
+      request_id: input.consent.requestId,
+      tenant_id: tenantId,
+      customer_id: customerId,
+      consent_scope: input.consent.scope,
+      consent_version: input.consent.version,
+      source,
+      ip_hash: input.consent.ipHash ?? null,
+      user_agent_hash: input.consent.userAgentHash ?? null,
+      accepted_at: input.consent.acceptedAt,
+    });
+    if (consentError) {
+      if (consentError.code === "23505") {
+        return { ok: true, customerId, assignedTo, duplicate: true };
+      }
+      console.error("intakeLead consent evidence", { code: consentError.code });
+      return { ok: false, error: "Onay kaydı oluşturulamadı.", status: 500 };
+    }
   }
 
   /*

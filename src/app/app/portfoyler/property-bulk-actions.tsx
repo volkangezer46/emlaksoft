@@ -9,8 +9,6 @@ const STATUS_OPTIONS = [
   { value: "draft",     label: "Taslak" },
   { value: "reserved",  label: "Rezerve" },
   { value: "passive",   label: "Pasif" },
-  { value: "sold",      label: "Satıldı" },
-  { value: "rented",    label: "Kiralandı" },
   { value: "withdrawn", label: "Vazgeçildi" },
   { value: "archived",  label: "Arşiv" },
 ];

@@ -160,7 +160,7 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
       .select("id, message_id, uploaded_by, uploaded_by_kind, visibility, file_name, mime_type, file_size, scan_status, created_at")
       .eq("ticket_id", id)
       .is("deleted_at", null)
-      .eq("scan_status", "verified")
+      .eq("scan_status", "signature_verified")
       .order("created_at", { ascending: true }),
     admin
       .from("platform_staff")

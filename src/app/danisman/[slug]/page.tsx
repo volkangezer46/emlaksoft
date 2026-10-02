@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
+import { cache } from "react";
 import {
   ArrowRight,
   BedDouble,
@@ -22,6 +23,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { agentInitials, shortenCustomerName } from "@/lib/agent-profile";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { AgentShareCard } from "./agent-share-card";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 /**
  * Danışman dijital kartviziti — PUBLIC mini profil sitesi.
@@ -40,7 +42,7 @@ import { AgentShareCard } from "./agent-share-card";
  * (vitrin/anket deseni). Yayın kapalıysa veya slug yoksa → notFound().
  */
 
-export const revalidate = 300;
+export const revalidate = 60;
 
 const MAX_LISTINGS = 6;
 
@@ -73,7 +75,7 @@ type AgentRecord = {
 };
 
 /** Yayındaki danışmanı slug'dan çözer; kapalı/pasif profil null döner. */
-async function loadAgent(slug: string): Promise<AgentRecord | null> {
+const loadAgent = cache(async function loadAgent(slug: string): Promise<AgentRecord | null> {
   if (!SLUG_RE.test(slug)) return null;
   const admin = createAdminClient();
   const { data } = await admin
@@ -84,8 +86,14 @@ async function loadAgent(slug: string): Promise<AgentRecord | null> {
   // Pasifleştirilmiş üyenin kartviziti de kapanır — ofisten ayrılan kişi
   // "aktif danışman" gibi görünmesin.
   if (!data || data.is_public !== true || data.is_active !== true) return null;
+  const { data: tenant, error: tenantError } = await admin
+    .from("tenants")
+    .select("status")
+    .eq("id", data.tenant_id)
+    .maybeSingle();
+  if (tenantError || !tenant || !isPublicTenantActive(tenant.status)) return null;
   return data as AgentRecord;
-}
+});
 
 export async function generateMetadata({
   params,
@@ -139,6 +147,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
       admin
         .from("booking_settings")
         .select("public_token")
+        .eq("tenant_id", agent.tenant_id)
         .eq("staff_id", agent.id)
         .eq("is_active", true)
         .maybeSingle(),
@@ -156,7 +165,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
         .limit(MAX_LISTINGS),
       admin
         .from("surveys")
-        .select("score, comment, answered_at, customer:customers(full_name)")
+        .select("customer_id, score, comment, answered_at")
         .eq("tenant_id", agent.tenant_id)
         .eq("agent_id", agent.id)
         .eq("status", "answered")
@@ -197,22 +206,32 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
    * "destekleyen" (>=9) ve yorumu dolu olan son 3 kayıt çıkar. Müşteri adı
    * kısaltılır — public sayfada tam ad gösterilmez.
    */
-  type CustomerRel = { full_name?: string } | { full_name?: string }[] | null;
   const answered = (surveyRows ?? []) as {
+    customer_id: string;
     score: number | null;
     comment: string | null;
     answered_at: string | null;
-    customer: CustomerRel;
   }[];
-  const scores = answered.map((s) => Number(s.score)).filter((n) => Number.isFinite(n));
+  const surveyCustomerIds = [...new Set(answered.map((s) => s.customer_id).filter(Boolean))];
+  const { data: surveyCustomers } = surveyCustomerIds.length
+    ? await admin
+        .from("customers")
+        .select("id, full_name")
+        .eq("tenant_id", agent.tenant_id)
+        .is("deleted_at", null)
+        .in("id", surveyCustomerIds)
+    : { data: [] as { id: string; full_name: string | null }[] };
+  const surveyCustomerNames = new Map((surveyCustomers ?? []).map((c) => [c.id, c.full_name]));
+  const tenantBoundAnswers = answered.filter((s) => surveyCustomerNames.has(s.customer_id));
+  const scores = tenantBoundAnswers.map((s) => Number(s.score)).filter((n) => Number.isFinite(n));
   const avgScore = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
-  const testimonials = answered
+  const testimonials = tenantBoundAnswers
     .filter((s) => Number(s.score) >= 9 && String(s.comment ?? "").trim().length > 0)
     .slice(0, 3)
-    .map((s) => {
-      const c = Array.isArray(s.customer) ? s.customer[0] : s.customer;
-      return { comment: String(s.comment).trim(), who: shortenCustomerName(c?.full_name ?? null) };
-    });
+    .map((s) => ({
+      comment: String(s.comment).trim(),
+      who: shortenCustomerName(surveyCustomerNames.get(s.customer_id) ?? null),
+    }));
 
   const telHref = toTelHref(agent.phone);
   const waHref = toWhatsAppLink(agent.phone);
@@ -359,7 +378,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl space-y-10 px-4 py-10">
+      <main id="main-content" className="mx-auto max-w-5xl space-y-10 px-4 py-10">
         {/* -------------------------------------------------------- Memnuniyet */}
         {avgScore != null ? (
           <section className="rounded-[22px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] sm:p-6">
@@ -436,6 +455,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
                           alt={p.title || "Portföy"}
                           fill
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                          unoptimized
                           className="object-cover transition group-hover:scale-105"
                         />
                       ) : (

@@ -119,10 +119,3 @@ export const DEMO_PERSONAS: DemoPersona[] = [
 export function getDemoPersona(id: string): DemoPersona | undefined {
   return DEMO_PERSONAS.find((p) => p.id === id);
 }
-
-/** Geliştirme ortamında veya ENABLE_DEMO_LOGIN=true iken açık. */
-export function isDemoLoginEnabled(): boolean {
-  if (process.env.ENABLE_DEMO_LOGIN === "true") return true;
-  if (process.env.ENABLE_DEMO_LOGIN === "false") return false;
-  return process.env.NODE_ENV === "development";
-}

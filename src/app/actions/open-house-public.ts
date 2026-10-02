@@ -6,6 +6,7 @@ import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { isPast } from "@/lib/clock";
 import { notifyTenant } from "@/lib/notify";
 import { isValidTurkishMobile, normalizeTurkishPhone, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 export type PublicCheckinResult = {
   ok?: boolean;
@@ -40,23 +41,54 @@ export async function registerOpenHouseVisitorByToken(fd: FormData): Promise<Pub
   if (String(fd.get("website") ?? "").trim()) return { ok: true };
 
   if (!UUID_RE.test(token)) return { error: "Geçersiz bağlantı." };
-  if (!fullName) return { error: "Ad soyad zorunludur." };
+  if (!fullName || fullName.length > 160) return { error: "Geçerli bir ad soyad girin." };
   if (!isValidTurkishMobile(phoneRaw)) return { error: TR_MOBILE_ERROR_MESSAGE };
   if (!kvkk) return { error: "Devam etmek için KVKK onayı gereklidir." };
 
   // Token tahmini / spam koruması — IP başına dakikada 10 kayıt denemesi.
   const ip = await clientIp();
-  const { allowed } = await checkRateLimit(`acik-ev-kayit:${ip}`, { limit: 10, windowSec: 60 });
+  const { allowed } = await checkRateLimit(`acik-ev-kayit:${ip}`, {
+    limit: 10,
+    windowSec: 60,
+    failurePolicy: "deny",
+  });
   if (!allowed) return { error: "Çok fazla istek. Lütfen biraz sonra tekrar deneyin." };
 
   const admin = createAdminClient();
   const { data: event } = await admin
     .from("open_houses")
-    .select("id, tenant_id, created_by, scheduled_at, duration_min, status, property:properties(title, property_code)")
+    .select("id, tenant_id, property_id, created_by, scheduled_at, duration_min, status")
     .eq("public_token", token)
     .maybeSingle();
 
   if (!event) return { error: "Bağlantı geçersiz veya etkinlik bulunamadı." };
+  const [{ data: tenant }, { data: property }, { data: creator }] = await Promise.all([
+    admin.from("tenants").select("status").eq("id", event.tenant_id).maybeSingle(),
+    admin
+      .from("properties")
+      .select("title, property_code")
+      .eq("id", event.property_id)
+      .eq("tenant_id", event.tenant_id)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    event.created_by
+      ? admin
+          .from("profiles")
+          .select("id")
+          .eq("id", event.created_by)
+          .eq("tenant_id", event.tenant_id)
+          .eq("is_active", true)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  if (
+    !tenant ||
+    !isPublicTenantActive(tenant.status) ||
+    !property ||
+    (event.created_by && !creator)
+  ) {
+    return { error: "Bağlantı geçersiz veya etkinlik bulunamadı." };
+  }
   if (event.status === "cancelled") return { error: "Bu açık ev etkinliği iptal edilmiş." };
   if (event.status === "completed" || isPast(eventEndIso(event.scheduled_at, event.duration_min))) {
     return { error: "Bu açık ev etkinliği sona erdi." };
@@ -86,16 +118,12 @@ export async function registerOpenHouseVisitorByToken(fd: FormData): Promise<Pub
     return { error: "Kayıt oluşturulamadı. Lütfen tekrar deneyin." };
   }
 
-  await admin.rpc("increment_visitor_count", { open_house_id: event.id }).maybeSingle();
-
   // Danışmana (etkinliği oluşturana) bildirim — hata teşekkür ekranını düşürmesin.
-  const prop = event.property as { title?: string | null; property_code?: string | null } | { title?: string | null; property_code?: string | null }[] | null;
-  const propOne = Array.isArray(prop) ? prop[0] : prop;
-  const propLabel = propOne?.title ?? propOne?.property_code ?? "Açık ev";
+  const propLabel = property.title ?? property.property_code ?? "Açık ev";
   try {
     await notifyTenant({
       tenantId: String(event.tenant_id),
-      userId: (event.created_by as string | null) ?? null,
+      userId: creator?.id ?? null,
       title: `Açık ev kaydı: ${fullName}`,
       body: `${propLabel} etkinliğine QR ile yeni ziyaretçi kaydoldu.`,
       href: `/app/acik-ev/${event.id}`,

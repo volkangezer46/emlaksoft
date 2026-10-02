@@ -12,6 +12,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listContractVersions } from "@/app/actions/contracts";
 import { ContractSignPanel } from "./contract-sign-panel";
@@ -58,18 +59,34 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
 
   const { data } = await supabase
     .from("contracts")
-    .select("id, title, contract_type, body, status, signed_at, expires_at, created_at, updated_at, property:properties(id,property_code,title,commission_rate,address_line,list_price), customer:customers(id,full_name,phone,email), signers:contract_signers(id,full_name,email,phone,status,signed_at,token,verified_at,ip_address)")
+    .select("id, title, contract_type, body, status, signed_at, expires_at, created_at, updated_at, property:properties(id,property_code,title,commission_rate,address_line,list_price), customer:customers(id,full_name,phone,email)")
     .eq("id", id)
     .maybeSingle();
 
   if (!data) notFound();
+
+  // Sign links are bearer credentials. Only an editor receives them, after
+  // the page/module authorization above; ordinary contract viewers never get
+  // direct table access to signer tokens or OTP state.
+  const admin = createAdminClient();
+  const signerQuery = canEdit
+    ? admin
+        .from("contract_signers")
+        .select("id,full_name,email,phone,status,signed_at,token,verified_at,ip_address")
+    : admin
+        .from("contract_signers")
+        .select("id,full_name,email,phone,status,signed_at,verified_at,ip_address");
+  const { data: signerRows, error: signerError } = await signerQuery
+    .eq("contract_id", id)
+    .order("created_at", { ascending: true });
+  if (signerError) throw new Error("Sözleşme imzalayanları okunamadı.");
 
   // Sürüm geçmişi — içerik düzenlendikçe önceki haller burada listelenir
   const versions = await listContractVersions(id);
 
   const contract = data;
   const statusInfo = STATUS_STYLES[contract.status] ?? STATUS_STYLES.draft;
-  const signers = Array.isArray(contract.signers) ? contract.signers : [];
+  const signers = signerRows ?? [];
   const propertyName = entityName(contract.property as Parameters<typeof entityName>[0]);
   const customerName = entityName(contract.customer as Parameters<typeof entityName>[0]);
 
@@ -278,7 +295,7 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
                   </>
                 )}
                 {/* İptal: imzalanmamış/iptal edilmemiş sözleşmeler geri çekilebilir. */}
-                {["draft", "sent", "rejected"].includes(contract.status) && (
+                {["draft", "sent"].includes(contract.status) && (
                   <CancelContractButton id={id} />
                 )}
               </div>
@@ -337,7 +354,9 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
                     </div>
                     {/* SMS ulaşmadıysa imza linki elle iletilebilsin — token
                         gönderimde DB tarafında üretiliyor, /imza/{token} */}
-                    {s.status === "pending" && s.token ? <CopySignLink token={String(s.token)} /> : null}
+                    {canEdit && s.status === "pending" && "token" in s && s.token
+                      ? <CopySignLink token={String(s.token)} />
+                      : null}
                     {/* SMS OTP ile telefonunu doğrulayan imzalayan rozeti */}
                     {s.verified_at ? (
                       <span className="whitespace-nowrap rounded-full bg-mint-500/12 px-2 py-0.5 text-[11px] font-bold text-mint-600" title="Telefon SMS koduyla doğrulandı">

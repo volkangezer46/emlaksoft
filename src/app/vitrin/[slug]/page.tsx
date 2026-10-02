@@ -11,6 +11,7 @@ import { FavNavBadge } from "./fav-nav-badge";
 import { CompareBar } from "@/components/public/compare-select";
 import { DAY_MS, msSince, now } from "@/lib/clock";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 /** Son 7 günde yayına giren ilan "Yeni" rozeti alır (published_at gerçek yayın damgası). */
 function isNewListing(publishedAt: string | null): boolean {
@@ -18,7 +19,7 @@ function isNewListing(publishedAt: string | null): boolean {
 }
 
 // ISR: vitrin herkese acik — CDN onbellekli, 2 dk tazelenir (jet hiz)
-export const revalidate = 120;
+export const revalidate = 60;
 
 function money(n: number | null, tx?: string | null) {
   if (n == null) return "Fiyat için sorun";
@@ -58,10 +59,10 @@ export async function generateMetadata({
   const admin = createAdminClient();
   const { data: tenant } = await admin
     .from("tenants")
-    .select("id, name")
+    .select("id, name, status")
     .eq("slug", slug)
     .maybeSingle();
-  if (!tenant) return { title: "Vitrin bulunamadı" };
+  if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "Vitrin bulunamadı" };
 
   const { count } = await admin
     .from("properties")
@@ -104,13 +105,13 @@ export default async function VitrinPage({
   const [{ data: tenant }, { data: provinces }] = await Promise.all([
     admin
       .from("tenants")
-      .select("id, name, brand_color, lead_capture_token, lead_capture_enabled")
+      .select("id, name, status, brand_color, lead_capture_token, lead_capture_enabled")
       .eq("slug", slug)
       .maybeSingle(),
     admin.from("geo_provinces").select("id, name").eq("is_active", true).order("name"),
   ]);
 
-  if (!tenant) notFound();
+  if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
 
   const q = (sp.q ?? "").trim();
   const min = parseMoneyParam(sp.min);
@@ -307,7 +308,7 @@ export default async function VitrinPage({
       </header>
 
       {/* Grid */}
-      <main className="mx-auto max-w-6xl px-4 py-10">
+      <main id="main-content" className="mx-auto max-w-6xl px-4 py-10">
         {properties.length === 0 ? (
           <div className="rounded-[20px] border border-dashed border-line bg-surface px-5 py-20 text-center">
             <Building2 className="mx-auto h-8 w-8 text-text-faint" />
@@ -366,6 +367,7 @@ export default async function VitrinPage({
                         alt={p.title || "Portföy"}
                         fill
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        unoptimized
                         className="object-cover transition group-hover:scale-105"
                       />
                     ) : (

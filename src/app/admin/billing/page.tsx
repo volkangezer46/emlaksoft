@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, ArrowUpRight, CreditCard, FileText, TrendingUp, X } from "lucide-react";
+import { Activity, AlertTriangle, ArrowUpRight, CreditCard, FileText, RefreshCw, TrendingUp, X } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { orIlike } from "@/lib/pgrst";
@@ -8,16 +8,10 @@ import { ExportButton } from "@/components/admin/export-button";
 import { AdminEmpty, AdminFilterChip, AdminSearchForm } from "@/components/admin/admin-table";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { now as clockNow } from "@/lib/clock";
+import { planLabel } from "@/lib/billing/plans";
 import type { CSSProperties } from "react";
 
 const RING_C = 2 * Math.PI * 42;
-
-const planLabel: Record<string, string> = {
-  advisor: "Danışman",
-  office: "Ofis",
-  professional: "Profesyonel",
-  enterprise: "Kurumsal",
-};
 
 const subStatus: Record<string, string> = {
   trialing: "Deneme",
@@ -128,16 +122,29 @@ export default async function AdminBillingPage({
   if (matchedTenantIds) invQuery = invQuery.in("tenant_id", matchedTenantIds.length ? matchedTenantIds : [""]);
 
   // Halka, trend ve hero sayıları filtreden bağımsız — liste sorguları ayrı daralır
-  const [{ data: subs, count: subCount }, { data: statRows }, { data: invoices, count: invCount }] = await Promise.all([
+  const [
+    { data: subs, count: subCount },
+    { data: statRows },
+    { data: invoices, count: invCount },
+    { data: captureQueue, count: captureQueueCount, error: captureQueueError },
+  ] = await Promise.all([
     subsQuery,
     admin.from("subscriptions").select("status, amount_try, created_at").limit(1000),
     invQuery,
+    admin
+      .from("billing_payment_captures")
+      .select("id, tenant_id, payment_id, target_type, amount_try, status, reconciliation_attempt_count, last_error_code, captured_at", { count: "exact" })
+      .in("status", ["captured_pending", "retry_pending", "manual_review", "refund_required"])
+      .order("captured_at", { ascending: false })
+      .limit(20),
   ]);
 
   const listRows = subs ?? [];
   const listFiltered = Boolean(durum || dateFiltered || query);
   const subRows = statRows ?? [];
   const invRows = invoices ?? [];
+  const reconciliationRows = captureQueue ?? [];
+  const reconciliationCount = captureQueueCount ?? reconciliationRows.length;
   const mrr = subRows.filter((s) => s.status === "active").reduce((sum, s) => sum + Number(s.amount_try || 0), 0);
   const trialing = subRows.filter((s) => s.status === "trialing").length;
   const pastDue = subRows.filter((s) => s.status === "past_due").length;
@@ -281,6 +288,73 @@ export default async function AdminBillingPage({
         </div>
       </section>
 
+      <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
+          <div>
+            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+              <RefreshCw className="h-4 w-4 text-brand-600" /> Tahsilat mutabakat kuyruğu
+            </h2>
+            <p className="mt-0.5 text-xs text-text-faint">
+              Sağlayıcıda doğrulanıp yerel işleme alınmayı bekleyen son 20 kayıt. İade gerektirenler otomatik para hareketi başlatmaz.
+            </p>
+          </div>
+          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+            reconciliationCount > 0
+              ? "bg-danger-500/10 text-danger-600"
+              : "bg-mint-500/10 text-mint-700"
+          }`}>
+            {reconciliationCount > 0 ? `${reconciliationCount} işlem gerekiyor` : "Kuyruk temiz"}
+          </span>
+        </div>
+
+        {captureQueueError ? (
+          <div className="flex items-start gap-2 px-5 py-4 text-sm text-warn-600">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>Mutabakat kuyruğu okunamadı. Billing reconciliation migration ve servis erişimini doğrulayın.</p>
+          </div>
+        ) : reconciliationRows.length === 0 ? (
+          <div className="px-5 py-5 text-sm text-text-muted">Bekleyen, inceleme veya iade kuyruğunda tahsilat yok.</div>
+        ) : (
+          <div className="divide-y divide-line">
+            {reconciliationRows.map((capture) => {
+              const statusLabel: Record<string, string> = {
+                captured_pending: "İşleme alınacak",
+                retry_pending: "Yeniden denenecek",
+                manual_review: "Manuel inceleme",
+                refund_required: "İade gerekli",
+              };
+              const urgent = capture.status === "refund_required" || capture.status === "manual_review";
+              return (
+                <div key={capture.id} className="grid gap-2 px-5 py-3 text-xs sm:grid-cols-[1fr_.8fr_.7fr_.8fr] sm:items-center">
+                  <div>
+                    <Link
+                      href={`/admin/tenants/${capture.tenant_id}`}
+                      className="focus-ring font-semibold text-ink-950 hover:text-brand-600"
+                    >
+                      {capture.target_type === "subscription" ? "Abonelik" : "Ödeme linki"}
+                    </Link>
+                    <p className="font-mono text-[10px] text-text-faint">{String(capture.payment_id).slice(0, 18)}…</p>
+                  </div>
+                  <p className="font-semibold text-ink-950">{money(Number(capture.amount_try))}</p>
+                  <div>
+                    <span className={`inline-flex rounded-full px-2 py-0.5 font-bold ${
+                      urgent ? "bg-danger-500/10 text-danger-600" : "bg-warn-500/10 text-warn-600"
+                    }`}>
+                      {statusLabel[capture.status] ?? capture.status}
+                    </span>
+                    <p className="mt-1 text-[10px] text-text-faint">Mutabakat denemesi: {capture.reconciliation_attempt_count}</p>
+                  </div>
+                  <div className="sm:text-right">
+                    <p className="text-text-muted">{new Date(capture.captured_at).toLocaleString("tr-TR")}</p>
+                    {capture.last_error_code ? <p className="font-mono text-[10px] text-danger-600">{capture.last_error_code}</p> : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
       {/* Tarih aralığı — yalnızca abonelik ve fatura LİSTELERİNİ daraltır */}
       <form
         action="/admin/billing"
@@ -422,7 +496,7 @@ export default async function AdminBillingPage({
                   <Link href={`/admin/tenants/${tenantId}`} className="absolute inset-0" aria-label={`${nameOf(s.tenant as Rel)} kaydını aç`} />
                 ) : null}
                 <p className="text-sm font-semibold text-ink-950">{nameOf(s.tenant as Rel)}</p>
-                <p className="text-xs text-text-muted">{planLabel[s.plan] ?? s.plan} · {s.billing_cycle}</p>
+                <p className="text-xs text-text-muted">{planLabel(s.plan)} · {s.billing_cycle}</p>
                 <p className="text-xs font-semibold text-ink-950">{money(Number(s.amount_try))}</p>
                 <span className="w-fit rounded-full bg-amber-400/15 px-2.5 py-1 text-[11px] font-bold text-amber-600">
                   {subStatus[s.status] ?? s.status}
@@ -469,7 +543,7 @@ export default async function AdminBillingPage({
             description={
               listFiltered
                 ? "Seçili tarih aralığı veya ofis aramasında fatura bulunamadı."
-                : "iyzico bağlandığında faturalar otomatik oluşacak; şimdilik abonelik iskeleti üzerinden takip edebilirsiniz."
+                : "Henüz ödeme oturumu başlatılmadı. Fatura taslağı ödeme başlatıldığında oluşur; yalnız doğrulanmış tahsilattan sonra ödendi durumuna geçer."
             }
           />
         ) : (

@@ -26,6 +26,7 @@ import {
   type PlatformModule,
   type PlatformRole,
 } from "@/lib/platform-access";
+import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
 
 type Item = {
   href: string;
@@ -130,7 +131,7 @@ export function AdminSidebar({
         {sections.map((section) => (
           <div key={section.title ?? "root"}>
             {section.title ? (
-              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/45">{section.title}</p>
+              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/70">{section.title}</p>
             ) : null}
             <nav className="space-y-1">
               {section.items.map((item) => {
@@ -140,6 +141,7 @@ export function AdminSidebar({
                   <Link
                     key={item.href}
                     href={item.href}
+                    aria-current={active ? "page" : undefined}
                     prefetch
                     onClick={() => setOpen(false)}
                     onMouseEnter={() => router.prefetch(item.href)}
@@ -147,7 +149,7 @@ export function AdminSidebar({
                     className={`group relative flex items-center gap-3 overflow-hidden rounded-[12px] px-3 py-2.5 text-sm transition ${
                       active
                         ? "bg-white/12 font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
-                        : "text-white/75 hover:bg-white/8 hover:text-white"
+                        : "text-white/85 hover:bg-white/8 hover:text-white"
                     }`}
                   >
                     {active ? <span className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-amber-400" /> : null}
@@ -160,7 +162,7 @@ export function AdminSidebar({
                     </span>
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate">{item.label}</span>
-                      <span className={`text-[11px] font-normal ${active ? "text-white/55" : "text-white/40"}`}>
+                      <span className={`text-[11px] font-normal ${active ? "text-white/75" : "text-white/65"}`}>
                         {item.hint}
                       </span>
                     </span>
@@ -201,30 +203,29 @@ export function AdminSidebar({
   );
 
   return (
-    <>
+    <Dialog open={open} onOpenChange={setOpen}>
       {/* Mobil: hamburger (amber, admin teması) — masaüstünde gizli */}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Admin menüsünü aç"
-        className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-10 w-10 place-items-center rounded-[11px] bg-amber-400 text-ink-950 shadow-[0_0_24px_-6px_rgba(251,191,36,0.7)] md:hidden"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          aria-label="Admin menüsünü aç"
+          className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-10 w-10 place-items-center rounded-[11px] bg-amber-400 text-ink-950 shadow-[0_0_24px_-6px_rgba(251,191,36,0.7)] md:hidden"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      </DialogTrigger>
 
       {/* Masaüstü sabit sidebar */}
       <div className="hidden w-[264px] shrink-0 border-r border-white/6 md:block">{content}</div>
 
-      {/* Mobil çekmece */}
-      {open ? (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <button type="button" aria-label="Menüyü kapat" onClick={() => setOpen(false)} className="absolute inset-0 bg-ink-950/60 backdrop-blur-sm" />
-          <div className="relative h-full w-[280px] shadow-[var(--shadow-lg)]">
-            <button type="button" onClick={() => setOpen(false)} className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-[10px] bg-white/8 text-white/70" aria-label="Kapat"><X className="h-5 w-5" /></button>
-            {content}
-          </div>
-        </div>
-      ) : null}
+      {/* Mobil çekmece — focus trap, Escape, scroll lock ve focus restore Radix'ten gelir. */}
+      <DialogDrawerContent id="admin-mobile-navigation" aria-describedby={undefined}>
+        <DialogTitleHidden>Admin menüsü</DialogTitleHidden>
+        <DialogClose asChild>
+          <button type="button" className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-[10px] bg-white/8 text-white/80" aria-label="Kapat"><X className="h-5 w-5" /></button>
+        </DialogClose>
+        {content}
+      </DialogDrawerContent>
 
       {/* Mobil alt gezinme */}
       <nav
@@ -238,6 +239,7 @@ export function AdminSidebar({
               <Link
                 key={tab.href}
                 href={tab.href}
+                aria-current={active ? "page" : undefined}
                 onClick={() => setOpen(false)}
                 className={`flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold transition ${active ? "text-amber-300" : "text-white/55 hover:text-white"}`}
               >
@@ -248,16 +250,14 @@ export function AdminSidebar({
               </Link>
             );
           })}
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold text-white/55 transition hover:text-white"
-          >
-            <span className="grid h-7 w-11 place-items-center rounded-full"><Menu className="h-[18px] w-[18px]" /></span>
-            Menü
-          </button>
+          <DialogTrigger asChild>
+            <button type="button" className="flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold text-white/65 transition hover:text-white">
+              <span className="grid h-7 w-11 place-items-center rounded-full"><Menu className="h-[18px] w-[18px]" /></span>
+              Menü
+            </button>
+          </DialogTrigger>
         </div>
       </nav>
-    </>
+    </Dialog>
   );
 }

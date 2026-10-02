@@ -17,7 +17,7 @@ export function LegalPage({
   children: React.ReactNode;
 }) {
   return (
-    <main className="min-h-screen bg-canvas">
+    <main id="main-content" className="min-h-screen bg-canvas">
       {/* Kurumsal başlık bandı */}
       <section className="theme-dark relative overflow-hidden bg-[image:var(--grad-ink)] text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-25" />

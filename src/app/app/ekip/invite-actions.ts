@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+import { getBaseUrl } from "@/lib/base-url";
 
 /**
  * "Daveti yinele" — davet edilmiş ama hiç giriş yapmamış üyeye erişim bağlantısını
@@ -32,7 +33,7 @@ export async function resendInvite(formData: FormData): Promise<void> {
   const email = authUser?.user?.email;
   if (!email) return;
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const appUrl = getBaseUrl();
   try {
     const supabase = await createClient();
     const { error } = await supabase.auth.resetPasswordForEmail(email, {

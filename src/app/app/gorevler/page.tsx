@@ -51,7 +51,7 @@ function endOfToday() {
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ filter?: string; mine?: string; tur?: string; tekrar?: string; sayfa?: string }>;
+  searchParams?: Promise<{ filter?: string; mine?: string; tur?: string; tekrar?: string; sayfa?: string; yeni?: string }>;
 }) {
   const ctx = await requireModulePage("tasks");
   const canEdit = (ctx.perms.tasks ?? []).includes("edit");
@@ -239,7 +239,7 @@ export default async function TasksPage({
               Arama, ziyaret, evrak ve follow-up görevlerini planlayın; ekibe atayın, gecikmeleri anında görün.
             </p>
           </div>
-          {canCreate ? <NewTaskDialog members={members ?? []} customers={customers ?? []} /> : null}
+          {canCreate ? <NewTaskDialog key={params.yeni === "1" ? "new-task" : "task-dialog"} members={members ?? []} customers={customers ?? []} defaultOpen={params.yeni === "1"} /> : null}
         </div>
         <div className="stagger-grid relative mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {/* Sayaçlar mevcut ?filter= parametresiyle ilgili listeye iner. */}

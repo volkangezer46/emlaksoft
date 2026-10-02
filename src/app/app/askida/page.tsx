@@ -17,17 +17,11 @@ import { getPlatformStaff } from "@/lib/platform";
 import { ButtonLink } from "@/components/ui/button";
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { planLabel } from "@/lib/billing/plans";
 
 const RING_C = 2 * Math.PI * 42;
 
 const nf = new Intl.NumberFormat("tr-TR");
-
-const planLabel: Record<string, string> = {
-  advisor: "Danışman",
-  office: "Ofis",
-  professional: "Profesyonel",
-  enterprise: "Kurumsal",
-};
 
 /**
  * Askıya alınmış / iptal edilmiş abonelik ekranı. Panel kilitliyken kullanıcıya
@@ -73,12 +67,12 @@ export default async function SuspendedPage() {
     ? [
         { icon: Mail, title: "1 · Bize yazın", desc: "destek@emlaksoft.com.tr adresine ofis adınızla kısa bir e-posta gönderin." },
         { icon: FileCheck2, title: "2 · Paketi seçin", desc: "Ekibimiz size uygun paketi ve geçiş adımlarını aynı gün iletir." },
-        { icon: ShieldCheck, title: "3 · Kaldığınız yerden", desc: "Hesap açılır açılmaz tüm verileriniz olduğu gibi yerinde olur." },
+        { icon: ShieldCheck, title: "3 · Kaldığınız yerden", desc: "Saklama politikası içindeki mevcut kayıtlarınıza hesap yeniden açıldığında erişirsiniz." },
       ]
     : [
         { icon: CreditCard, title: "1 · Ödemeyi tamamlayın", desc: "Abonelik sayfasından bekleyen ödemeyi kartla güvenle tamamlayın." },
         { icon: CalendarClock, title: "2 · Dakikalar içinde", desc: "Ödeme onaylanınca erişim otomatik açılır — beklemeye gerek yok." },
-        { icon: ShieldCheck, title: "3 · Kaldığınız yerden", desc: "Müşteri, portföy ve anlaşmalarınız olduğu gibi sizi bekliyor." },
+        { icon: ShieldCheck, title: "3 · Kaldığınız yerden", desc: "Saklama politikası içindeki müşteri, portföy ve anlaşma kayıtlarınıza yeniden erişin." },
       ];
 
   return (
@@ -97,7 +91,7 @@ export default async function SuspendedPage() {
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/65">
               <span className="font-semibold text-white">{office?.name ?? "Ofisiniz"}</span> aboneliği şu an{" "}
               <span className="font-semibold text-danger-500">{isCancelled ? "iptal" : "askıda"}</span>. Panel erişimi
-              geçici olarak kapalı; verileriniz eksiksiz saklanıyor ve abonelik yenilendiğinde anında geri açılıyor.
+              geçici olarak kapalı; kayıtlar saklama politikası kapsamında korunur ve abonelik yenilendiğinde erişim yeniden değerlendirilir.
             </p>
 
             {/* Hesap kimlik şeridi */}
@@ -105,7 +99,7 @@ export default async function SuspendedPage() {
               {[
                 { label: "Ofis", value: office?.name ?? "—" },
                 { label: "Durum", value: isCancelled ? "İptal" : "Askıda", danger: true },
-                { label: "Paket", value: office?.plan ? planLabel[office.plan] ?? office.plan : "—" },
+                { label: "Paket", value: office?.plan ? planLabel(office.plan) : "—" },
               ].map((r) => (
                 <Link
                   key={r.label}

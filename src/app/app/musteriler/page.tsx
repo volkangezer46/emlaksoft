@@ -217,6 +217,7 @@ export default async function CustomersPage({
     sirala?: string;
     yon?: string;
     sayfa?: string;
+    yeni?: string;
   }>;
 }) {
   const { perms, tenantId } = await requireModulePage("customers");
@@ -568,7 +569,7 @@ export default async function CustomersPage({
             <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Müşteri merkezi</h1>
             <p className="mt-1 text-sm text-white/60">Talep, iletişim ve müşteri yolculuğu tek operasyon ekranında.</p>
           </div>
-          {canCreate ? <NewCustomerDialog provinces={provinceList} branches={branchList} types={customerTypeValues} /> : null}
+          {canCreate ? <NewCustomerDialog key={sp.yeni === "1" ? "new-customer" : "customer-dialog"} provinces={provinceList} branches={branchList} types={customerTypeValues} defaultOpen={sp.yeni === "1"} /> : null}
         </div>
         <div className="relative mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
           <div className="stagger-grid grid grid-cols-3 gap-3">

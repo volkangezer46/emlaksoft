@@ -28,46 +28,38 @@ import {
   moneyTRY,
   relativeTimeTR,
   todayTR,
-  weekBuckets,
 } from "@/lib/admin-format";
 import type { CSSProperties } from "react";
-import { msUntil } from "@/lib/clock";
+import { planLabel as catalogPlanLabel, PLANS } from "@/lib/billing/plans";
+import { exactMrr, type PlatformReportingAggregate } from "@/lib/reporting/platform";
+import { requireReportingData } from "@/lib/reporting/result";
 
 const RING_C = 2 * Math.PI * 42;
 
 /**
- * Kontrol paneli ağır okumaları (tenants≤2000, subs≤5000, ticket/audit/count) —
- * platform geneli, saniye-taze olması gerekmez. 60 sn `unstable_cache`: art arda
- * gezinmelerde bu 6 sorgu tekrar koşmaz, panel önbellekten anında gelir. Zaman
- * bağımlı hesaplar (msUntil, weekBuckets) sayfada per-request çalışmaya devam eder.
+ * Kontrol paneli KPI'ları tam kapsamlı SQL aggregate, yalnız son ofis/hareket
+ * listeleri sırasıyla 5/10 satırdır. 60 sn `unstable_cache`: art arda
+ * gezinmelerde bu sorgular tekrar koşmaz, panel önbellekten anında gelir. Zaman
+ * bağımlı "yakında bitiyor" ve haftalık seriler de RPC içinde tek snapshot'tan üretilir.
  */
 const getAdminDashboardData = unstable_cache(
   async () => {
     const admin = createAdminClient();
-    const [{ data: tenants }, { count: memberCount }, { data: tickets }, { data: subs }, { data: audit }, { count: newDemos }] =
-      await Promise.all([
-        admin.from("tenants").select("id, name, plan, status, created_at, trial_ends_at").order("created_at", { ascending: false }).limit(2000),
-        admin.from("profiles").select("id", { count: "exact", head: true }),
-        admin.from("support_tickets").select("id, status, priority, created_at").order("created_at", { ascending: false }).limit(80),
-        admin.from("subscriptions").select("status, amount_try, plan, created_at").limit(5000),
-        admin.from("audit_logs").select("action, entity_type, actor_id, tenant_id, created_at, tenant:tenants(name)").order("created_at", { ascending: false }).limit(10),
-        admin.from("demo_requests").select("id", { count: "exact", head: true }).eq("status", "new"),
-      ]);
+    const [aggregateResult, tenantsResult, auditResult] = await Promise.all([
+      admin.rpc("platform_reporting_aggregates", { p_from: null, p_to: null, p_as_of: new Date().toISOString() }),
+      admin.from("tenants").select("id, name, plan, status, created_at, trial_ends_at").order("created_at", { ascending: false }).limit(5),
+      admin.from("audit_logs").select("action, entity_type, actor_id, tenant_id, created_at, tenant:tenants(name)").order("created_at", { ascending: false }).limit(10),
+    ]);
     return {
-      tenants: tenants ?? [],
-      memberCount: memberCount ?? 0,
-      tickets: tickets ?? [],
-      subs: subs ?? [],
-      audit: audit ?? [],
-      newDemos: newDemos ?? 0,
+      aggregate: requireReportingData("platform-dashboard-aggregates", aggregateResult) as unknown as PlatformReportingAggregate,
+      tenants: requireReportingData("platform-recent-tenants", tenantsResult),
+      audit: requireReportingData("platform-recent-activity", auditResult),
     };
   },
   ["admin-dashboard-v1"],
   { revalidate: 60, tags: ["admin-dashboard"] },
 );
 
-const planPrice: Record<string, number> = { advisor: 990, office: 2490, professional: 5990, enterprise: 12900 };
-const planLabel: Record<string, string> = { advisor: "Danışman", office: "Ofis", professional: "Profesyonel", enterprise: "Kurumsal" };
 const statusLabel: Record<string, string> = { trial: "Deneme", active: "Aktif", past_due: "Gecikmiş", suspended: "Askıda", cancelled: "İptal" };
 
 export default async function AdminHomePage() {
@@ -77,38 +69,33 @@ export default async function AdminHomePage() {
   if (staff.role === "billing") return <BillingHome staffName={staff.full_name} />;
   if (staff.role === "support") return <SupportHome staffName={staff.full_name} />;
 
-  const { tenants, memberCount, tickets, subs, audit, newDemos } = await getAdminDashboardData();
+  const { tenants, aggregate, audit } = await getAdminDashboardData();
 
   const list = tenants;
-  const ticketRows = tickets;
-  const subRows = subs;
   const auditRows = audit;
+  const summary = aggregate.summary;
 
-  const active = list.filter((t) => t.status === "active").length;
-  const trial = list.filter((t) => t.status === "trial").length;
-  const risk = list.filter((t) => t.status === "suspended" || t.status === "past_due").length;
-  const openTickets = ticketRows.filter((t) => ["open", "in_progress", "waiting"].includes(t.status)).length;
-  const urgentTickets = ticketRows.filter((t) => t.priority === "urgent" && !["resolved", "closed"].includes(t.status)).length;
+  const active = Number(summary.active_count);
+  const trial = Number(summary.trial_count);
+  const risk = Number(summary.risk_count);
+  const openTickets = Number(summary.open_ticket_count);
+  const urgentTickets = Number(summary.urgent_ticket_count);
 
-  const mrr = subRows.filter((s) => s.status === "active").reduce((sum, s) => sum + Number(s.amount_try || 0), 0);
-  const displayMrr = mrr || list.filter((t) => t.status === "active").reduce((sum, t) => sum + (planPrice[t.plan] ?? 0), 0);
+  const displayMrr = exactMrr(aggregate.plan_stats);
   const arr = displayMrr * 12;
 
-  const healthRate = list.length ? active / list.length : 0;
-  const conversion = list.length ? Math.round((active / list.length) * 100) : 0;
+  const totalTenants = Number(summary.tenant_count);
+  const healthRate = totalTenants ? active / totalTenants : 0;
+  const conversion = totalTenants ? Math.round((active / totalTenants) * 100) : 0;
 
   // Trial'ı 7 gün içinde biten tenant'lar
-  const soon = list.filter((t) => {
-    if (t.status !== "trial" || !t.trial_ends_at) return false;
-    const diff = msUntil(t.trial_ends_at);
-    return diff > 0 && diff < 7 * 86_400_000;
-  }).length;
+  const soon = Number(summary.trials_ending_7d);
 
   // Sparkline serileri (8 hafta)
-  const tenantSeries = weekBuckets(list.map((t) => t.created_at));
-  const activeSeries = weekBuckets(subRows.filter((s) => s.status === "active").map((s) => s.created_at));
-  const trialSeries = weekBuckets(list.filter((t) => t.status === "trial").map((t) => t.created_at));
-  const ticketSeries = weekBuckets(ticketRows.map((t) => t.created_at));
+  const tenantSeries = aggregate.weekly.map((row) => Number(row.tenants));
+  const activeSeries = aggregate.weekly.map((row) => Number(row.active_subscriptions));
+  const trialSeries = aggregate.weekly.map((row) => Number(row.trials));
+  const ticketSeries = aggregate.weekly.map((row) => Number(row.tickets));
 
   // Büyüme grafiği (8 hafta, kümülatif his için tenant kovaları)
   const buckets = tenantSeries;
@@ -118,21 +105,21 @@ export default async function AdminHomePage() {
   const growthArea = `0,80 ${growthLine} 280,80`;
   const growthLast = growthPts[growthPts.length - 1]!;
 
-  const planCounts = ["advisor", "office", "professional", "enterprise"].map((p) => ({
-    key: p,
-    label: planLabel[p],
-    count: list.filter((t) => t.plan === p).length,
+  const planCounts = PLANS.map((plan) => ({
+    key: plan.id,
+    label: plan.name,
+    count: Number(aggregate.plan_stats.find((row) => row.plan === plan.id)?.tenant_count ?? 0),
   }));
   const maxPlan = Math.max(1, ...planCounts.map((p) => p.count));
 
   const kpis = [
-    { label: "Toplam ofis", href: "/admin/tenants", value: list.length, sub: `+${buckets[7]} bu hafta`, icon: Building2, tone: "text-amber-500", stroke: "var(--amber-400)", fill: "rgba(242,184,75,0.14)", series: tenantSeries },
+    { label: "Toplam ofis", href: "/admin/tenants", value: totalTenants, sub: `+${buckets[7]} bu hafta`, icon: Building2, tone: "text-amber-500", stroke: "var(--amber-400)", fill: "rgba(242,184,75,0.14)", series: tenantSeries },
     { label: "Aktif abone", href: "/admin/tenants?durum=active", value: active, sub: `%${conversion} dönüşüm`, icon: TrendingUp, tone: "text-mint-600", stroke: "var(--mint-500)", fill: "rgba(16,185,163,0.14)", series: activeSeries },
     { label: "Deneme", href: "/admin/tenants?durum=trial", value: trial, sub: soon > 0 ? `${soon} yakında bitiyor` : "aktif deneme", icon: Sparkles, tone: "text-cyan-500", stroke: "var(--cyan-400)", fill: "rgba(34,211,238,0.14)", series: trialSeries },
     { label: "Açık talep", href: "/admin/tickets?durum=open", value: openTickets, sub: urgentTickets > 0 ? `${urgentTickets} acil` : "kuyruk sakin", icon: LifeBuoy, tone: "text-danger-500", stroke: "var(--danger-500)", fill: "rgba(229,72,77,0.12)", series: ticketSeries },
   ];
 
-  const demoCount = newDemos ?? 0;
+  const demoCount = Number(summary.new_demo_count);
 
   const alerts = [
     demoCount > 0 ? { href: "/admin/satis", tone: "brand", icon: Handshake, text: `${demoCount} yeni demo talebi yanıt bekliyor — satış fırsatı.` } : null,
@@ -142,7 +129,7 @@ export default async function AdminHomePage() {
   ].filter(Boolean) as { href: string; tone: string; icon: typeof AlertTriangle; text: string }[];
 
   const funnel = [
-    { label: "Toplam kayıt", href: "/admin/tenants", value: list.length, tone: "bg-brand-500" },
+    { label: "Toplam kayıt", href: "/admin/tenants", value: totalTenants, tone: "bg-brand-500" },
     { label: "Deneme", href: "/admin/tenants?durum=trial", value: trial, tone: "bg-cyan-400" },
     { label: "Aktif abone", href: "/admin/tenants?durum=active", value: active, tone: "bg-mint-500" },
   ];
@@ -251,7 +238,7 @@ export default async function AdminHomePage() {
                   <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:opacity-100" />
                 </Link>
                 <Link href="/admin/members" className="focus-ring group relative block rounded-[12px] border border-white/12 bg-white/8 p-3 transition hover:border-white/25 hover:bg-white/12">
-                  <p className="font-display text-lg font-extrabold text-white">{memberCount ?? 0}</p>
+                  <p className="font-display text-lg font-extrabold text-white">{Number(summary.member_count)}</p>
                   <p className="text-[11px] text-white/70">Toplam kullanıcı</p>
                   <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:opacity-100" />
                 </Link>
@@ -383,7 +370,7 @@ export default async function AdminHomePage() {
               <Link key={t.id} href={`/admin/tenants/${t.id}`} className="focus-ring group flex items-center justify-between gap-2 rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5 transition hover:border-brand-300">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink-950 transition group-hover:text-brand-600">{t.name}</p>
-                  <p className="text-[11px] text-text-faint">{planLabel[t.plan] ?? t.plan} · {statusLabel[t.status] ?? t.status}</p>
+                  <p className="text-[11px] text-text-faint">{catalogPlanLabel(t.plan)} · {statusLabel[t.status] ?? t.status}</p>
                 </div>
                 <span className="flex shrink-0 items-center gap-1.5">
                   <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />

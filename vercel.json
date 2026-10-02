@@ -76,6 +76,38 @@
     {
       "path": "/api/cron/lig-snapshot",
       "schedule": "0 2 1 * *"
+    },
+    {
+      "path": "/api/cron/ticket-sla",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/ticket-attachment-cleanup",
+      "schedule": "15 */2 * * *"
+    },
+    {
+      "path": "/api/cron/operational-retention",
+      "schedule": "37 3 * * *"
+    },
+    {
+      "path": "/api/cron/campaign-delivery",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/billing-reconciliation",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/direct-file-upload-cleanup",
+      "schedule": "25,55 * * * *"
+    },
+    {
+      "path": "/api/cron/public-mutation-outbox",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/geo-province-sync",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

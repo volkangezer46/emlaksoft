@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPublicTenantActive } from "@/lib/public-tenant";
+import { checkRateLimit } from "@/lib/rate-limit";
+import {
+  clientIpFromHeaders,
+  readRequestBodyLimited,
+  requestBodyTooLarge,
+} from "@/lib/public-request-security";
 
 /**
  * Vitrin favorileri çözümleme ucu (public, oturumsuz).
@@ -12,9 +19,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
  */
 
 type Body = { slug?: unknown; ids?: unknown };
+type DatabaseOperation = "client_init" | "tenant_lookup" | "property_lookup" | "media_lookup";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_IDS = 60;
+export const VITRIN_FAVORITES_MAX_BYTES = 8 * 1024;
 
 type Rel = { name?: string } | { name?: string }[] | null;
 function relName(v: Rel) {
@@ -35,10 +44,40 @@ export type VitrinFavItem = {
   coverId: string | null;
 };
 
+function isBody(value: unknown): value is Body {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function databaseUnavailable(operation: DatabaseOperation, error?: unknown) {
+  const rawCode =
+    typeof error === "object" && error !== null && "code" in error
+      ? String(error.code)
+      : "unknown";
+  const code = /^[a-z0-9_]{1,32}$/i.test(rawCode) ? rawCode : "unknown";
+  // Never log provider messages, query values, tenant slugs, IPs or property IDs.
+  console.error("vitrin favorites database unavailable", { operation, code });
+  return NextResponse.json(
+    { error: "Hizmet geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin." },
+    { status: 503 },
+  );
+}
+
 export async function POST(req: NextRequest) {
+  if (requestBodyTooLarge(req.headers, VITRIN_FAVORITES_MAX_BYTES)) {
+    return NextResponse.json({ error: "İstek gövdesi çok büyük." }, { status: 413 });
+  }
+
   let body: Body;
   try {
-    body = (await req.json()) as Body;
+    const bytes = await readRequestBodyLimited(req, VITRIN_FAVORITES_MAX_BYTES);
+    if (bytes === null) {
+      return NextResponse.json({ error: "İstek gövdesi çok büyük." }, { status: 413 });
+    }
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    if (!isBody(parsed)) {
+      return NextResponse.json({ error: "Geçersiz istek." }, { status: 400 });
+    }
+    body = parsed;
   } catch {
     return NextResponse.json({ error: "Geçersiz istek." }, { status: 400 });
   }
@@ -53,55 +92,85 @@ export async function POST(req: NextRequest) {
   if (!slug || slug.length > 80) return NextResponse.json({ error: "Geçersiz istek." }, { status: 400 });
   if (ids.length === 0) return NextResponse.json({ items: [] });
 
-  const admin = createAdminClient();
-  const { data: tenant } = await admin.from("tenants").select("id").eq("slug", slug).maybeSingle();
-  if (!tenant) return NextResponse.json({ error: "Ofis bulunamadı." }, { status: 404 });
+  const ip = clientIpFromHeaders(req.headers);
+  const { allowed } = await checkRateLimit(`vitrin-favoriler:${ip}`, {
+    limit: 60,
+    windowSec: 60,
+    failurePolicy: "deny",
+  });
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Çok fazla istek. Lütfen kısa süre sonra tekrar deneyin." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
 
-  // Tenant doğrulaması sorguda: başka ofisin id'si istense bile satır dönmez.
-  const { data: props } = await admin
-    .from("properties")
-    .select(
-      "id, title, property_code, transaction_type, list_price, features, province:geo_provinces(name), district:geo_districts(name)",
-    )
-    .eq("tenant_id", tenant.id)
-    .eq("status", "live")
-    .is("deleted_at", null)
-    .in("id", ids);
-
-  const rows = props ?? [];
-  const coverMap = new Map<string, string>();
-  if (rows.length) {
-    const { data: media } = await admin
-      .from("property_media")
-      .select("id, property_id, is_cover, sort_order")
-      .eq("kind", "image")
-      .in("property_id", rows.map((p) => p.id))
-      .order("is_cover", { ascending: false })
-      .order("sort_order", { ascending: true });
-    for (const m of media ?? []) {
-      if (!coverMap.has(m.property_id)) coverMap.set(m.property_id, m.id);
+  let operation: DatabaseOperation = "client_init";
+  try {
+    const admin = createAdminClient();
+    operation = "tenant_lookup";
+    const { data: tenant, error: tenantError } = await admin
+      .from("tenants")
+      .select("id, status")
+      .eq("slug", slug)
+      .maybeSingle();
+    if (tenantError) return databaseUnavailable(operation, tenantError);
+    if (!tenant || !isPublicTenantActive(tenant.status)) {
+      return NextResponse.json({ error: "Ofis bulunamadı." }, { status: 404 });
     }
-  }
 
-  // İstenen sıra korunur (ziyaretçinin favori ekleme sırası)
-  const byId = new Map(rows.map((p) => [p.id, p]));
-  const items: VitrinFavItem[] = [];
-  for (const id of ids) {
-    const p = byId.get(id);
-    if (!p) continue;
-    const feat = (p.features ?? {}) as { rooms?: string; sqm?: number };
-    items.push({
-      id: p.id,
-      title: p.title || p.property_code,
-      transactionType: p.transaction_type,
-      price: p.list_price != null ? Number(p.list_price) : null,
-      rooms: feat.rooms ?? null,
-      sqm: feat.sqm ?? null,
-      district: relName(p.district as Rel),
-      province: relName(p.province as Rel),
-      coverId: coverMap.get(p.id) ?? null,
-    });
-  }
+    // Tenant doğrulaması sorguda: başka ofisin id'si istense bile satır dönmez.
+    operation = "property_lookup";
+    const { data: props, error: propertiesError } = await admin
+      .from("properties")
+      .select(
+        "id, title, property_code, transaction_type, list_price, features, province:geo_provinces(name), district:geo_districts(name)",
+      )
+      .eq("tenant_id", tenant.id)
+      .eq("status", "live")
+      .is("deleted_at", null)
+      .in("id", ids);
+    if (propertiesError) return databaseUnavailable(operation, propertiesError);
 
-  return NextResponse.json({ items });
+    const rows = props ?? [];
+    const coverMap = new Map<string, string>();
+    if (rows.length) {
+      operation = "media_lookup";
+      const { data: media, error: mediaError } = await admin
+        .from("property_media")
+        .select("id, property_id, is_cover, sort_order")
+        .eq("kind", "image")
+        .in("property_id", rows.map((p) => p.id))
+        .order("is_cover", { ascending: false })
+        .order("sort_order", { ascending: true });
+      if (mediaError) return databaseUnavailable(operation, mediaError);
+      for (const m of media ?? []) {
+        if (!coverMap.has(m.property_id)) coverMap.set(m.property_id, m.id);
+      }
+    }
+
+    // İstenen sıra korunur (ziyaretçinin favori ekleme sırası)
+    const byId = new Map(rows.map((p) => [p.id, p]));
+    const items: VitrinFavItem[] = [];
+    for (const id of ids) {
+      const p = byId.get(id);
+      if (!p) continue;
+      const feat = (p.features ?? {}) as { rooms?: string; sqm?: number };
+      items.push({
+        id: p.id,
+        title: p.title || p.property_code,
+        transactionType: p.transaction_type,
+        price: p.list_price != null ? Number(p.list_price) : null,
+        rooms: feat.rooms ?? null,
+        sqm: feat.sqm ?? null,
+        district: relName(p.district as Rel),
+        province: relName(p.province as Rel),
+        coverId: coverMap.get(p.id) ?? null,
+      });
+    }
+
+    return NextResponse.json({ items });
+  } catch {
+    return databaseUnavailable(operation);
+  }
 }

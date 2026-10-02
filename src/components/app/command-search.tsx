@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  useMemo,
   startTransition,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -31,6 +32,7 @@ import {
 import { searchWorkspace, type SearchHit } from "@/app/actions/search";
 import { evaluatePaletteInput } from "@/lib/palette-calc";
 import { useToast } from "@/components/app/toast-provider";
+import type { AppModule } from "@/lib/permissions";
 
 const kindMeta: Record<SearchHit["kind"], { label: string; icon: typeof Users; tone: string }> = {
   customer: { label: "Müşteri", icon: Users, tone: "text-brand-600 bg-brand-600/10" },
@@ -42,16 +44,25 @@ const kindMeta: Record<SearchHit["kind"], { label: string; icon: typeof Users; t
 };
 
 // Boş palet durumu: sayfa navigasyonu kısayolları (ok tuşları + Enter da çalışır).
-const QUICK_ACTIONS: { label: string; href: string; icon: typeof Users }[] = [
-  { label: "Müşteriler", href: "/app/musteriler", icon: Users },
-  { label: "Portföyler", href: "/app/portfoyler", icon: Building2 },
-  { label: "Anlaşmalar", href: "/app/anlasmalar", icon: Handshake },
-  { label: "Komisyon", href: "/app/komisyon", icon: Wallet },
-  { label: "Raporlar", href: "/app/raporlar", icon: BarChart3 },
-  { label: "Görevler", href: "/app/gorevler", icon: ListChecks },
-  { label: "Randevular", href: "/app/randevular", icon: CalendarDays },
-  { label: "Ayarlar", href: "/app/ayarlar", icon: Settings },
+const QUICK_ACTIONS: { label: string; href: string; icon: typeof Users; module: AppModule }[] = [
+  { label: "Müşteriler", href: "/app/musteriler", icon: Users, module: "customers" },
+  { label: "Portföyler", href: "/app/portfoyler", icon: Building2, module: "properties" },
+  { label: "Anlaşmalar", href: "/app/anlasmalar", icon: Handshake, module: "commissions" },
+  { label: "Komisyon", href: "/app/komisyon", icon: Wallet, module: "commissions" },
+  { label: "Raporlar", href: "/app/raporlar", icon: BarChart3, module: "reports" },
+  { label: "Görevler", href: "/app/gorevler", icon: ListChecks, module: "tasks" },
+  { label: "Randevular", href: "/app/randevular", icon: CalendarDays, module: "appointments" },
+  { label: "Ayarlar", href: "/app/ayarlar", icon: Settings, module: "settings" },
 ];
+
+const RECENT_KIND_MODULE: Record<SearchHit["kind"], AppModule> = {
+  customer: "customers",
+  property: "properties",
+  demand: "demands",
+  deal: "commissions",
+  task: "tasks",
+  ticket: "support",
+};
 
 /* ------------------------------------------------------------------
    Son kullanılanlar — localStorage destekli küçük dış store,
@@ -123,7 +134,7 @@ function recentIcon(item: RecentItem): typeof Users {
   return QUICK_ACTIONS.find((a) => a.href === item.href)?.icon ?? History;
 }
 
-export function CommandSearch() {
+export function CommandSearch({ accessibleModules }: { accessibleModules: AppModule[] }) {
   const router = useRouter();
   const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -133,10 +144,26 @@ export function CommandSearch() {
   const [pending, setPending] = useState(false);
   const [active, setActive] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchSequence = useRef(0);
   const recents = useSyncExternalStore(subscribeRecents, readRecents, () => NO_RECENTS);
+  const allowedModules = useMemo(() => new Set(accessibleModules), [accessibleModules]);
+  const quickActions = useMemo(
+    () => QUICK_ACTIONS.filter((action) => allowedModules.has(action.module)),
+    [allowedModules],
+  );
+  const visibleRecents = useMemo(
+    () =>
+      recents.filter((item) => {
+        if (item.kind !== "page") return allowedModules.has(RECENT_KIND_MODULE[item.kind]);
+        const action = QUICK_ACTIONS.find((candidate) => candidate.href === item.href);
+        return Boolean(action && allowedModules.has(action.module));
+      }),
+    [allowedModules, recents],
+  );
 
   const runSearch = useCallback((value: string) => {
     if (timer.current) clearTimeout(timer.current);
+    const requestId = ++searchSequence.current;
     // Matematiksel ifade sunucuya gitmez: hesap satırı gösterilir.
     if (value.trim().length < 2 || evaluatePaletteInput(value) !== null) {
       setHits([]);
@@ -146,13 +173,30 @@ export function CommandSearch() {
     }
     setPending(true);
     timer.current = setTimeout(async () => {
-      const result = await searchWorkspace(value);
-      startTransition(() => {
-        setHits(result);
-        setActive(0);
-        setPending(false);
-      });
+      try {
+        const result = await searchWorkspace(value);
+        if (requestId !== searchSequence.current) return;
+        startTransition(() => {
+          setHits(result);
+          setActive(0);
+          setPending(false);
+        });
+      } catch {
+        if (requestId !== searchSequence.current) return;
+        startTransition(() => {
+          setHits([]);
+          setActive(0);
+          setPending(false);
+        });
+      }
     }, 180);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      searchSequence.current += 1;
+      if (timer.current) clearTimeout(timer.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -179,7 +223,7 @@ export function CommandSearch() {
   // AI Asistan satırı — arama metni varken listenin en altında görünür;
   // seçilince yazılan metin /app/asistan sayfasına ?q ile taşınır (ilk mesaj olur).
   const trimmed = q.trim();
-  const askVisible = trimmed.length > 0;
+  const askVisible = trimmed.length > 0 && allowedModules.has("dashboard");
   const askHref = `/app/asistan?q=${encodeURIComponent(trimmed)}`;
 
   // "Tüm sonuçları gör" — sonuç listesi doluyken en altta, AI satırının üstünde;
@@ -188,7 +232,7 @@ export function CommandSearch() {
   const allHref = `/app/arama-sonuclari?q=${encodeURIComponent(trimmed)}`;
 
   // Gezinilebilir satır sırası: [hesap] → [son kullanılanlar → hızlı eylemler | sonuçlar] → [tüm sonuçlar] → [AI]
-  const baseCount = calcVisible ? 1 : showQuick ? recents.length + QUICK_ACTIONS.length : hits.length;
+  const baseCount = calcVisible ? 1 : showQuick ? visibleRecents.length + quickActions.length : hits.length;
   const allIndex = baseCount;
   const askIndex = baseCount + (allVisible ? 1 : 0);
   const maxIndex = baseCount + (allVisible ? 1 : 0) + (askVisible ? 1 : 0) - 1;
@@ -225,12 +269,12 @@ export function CommandSearch() {
       return;
     }
     if (!calcVisible && showQuick) {
-      if (i < recents.length && recents[i]) {
-        goRecent(recents[i]!);
+      if (i < visibleRecents.length && visibleRecents[i]) {
+        goRecent(visibleRecents[i]!);
         return;
       }
-      const qi = i - recents.length;
-      const action = QUICK_ACTIONS[qi];
+      const qi = i - visibleRecents.length;
+      const action = quickActions[qi];
       if (action) {
         goRecent({ label: action.label, href: action.href, kind: "page" });
         return;
@@ -250,6 +294,9 @@ export function CommandSearch() {
   // Tüm sonuçlar satırı — sonuç listesi doluyken AI satırının hemen üstünde.
   const allRow = allVisible ? (
     <button
+      id={`app-command-option-${allIndex}`}
+      role="option"
+      aria-selected={allIndex === active}
       type="button"
       onClick={() => goHref(allHref)}
       onMouseEnter={() => setActive(allIndex)}
@@ -272,6 +319,9 @@ export function CommandSearch() {
 
   const askRow = askVisible ? (
     <button
+      id={`app-command-option-${askIndex}`}
+      role="option"
+      aria-selected={askIndex === active}
       type="button"
       onClick={() => goHref(askHref)}
       onMouseEnter={() => setActive(askIndex)}
@@ -295,6 +345,9 @@ export function CommandSearch() {
   // Hesap sonucu satırı — Enter/tık panoya kopyalar.
   const calcRow = calc ? (
     <button
+      id="app-command-option-0"
+      role="option"
+      aria-selected={active === 0}
       type="button"
       onClick={copyCalc}
       onMouseEnter={() => setActive(0)}
@@ -331,7 +384,9 @@ export function CommandSearch() {
           queueMicrotask(() => inputRef.current?.focus());
         }}
         aria-expanded={open}
-        aria-haspopup="dialog"
+        aria-haspopup="listbox"
+        aria-controls="app-command-results"
+        aria-label="Müşteri, portföy, anlaşma, görev veya ilan ara"
         className="focus-ring relative flex w-full items-center rounded-[11px] border border-hairline bg-canvas py-2.5 pl-10 pr-4 text-left text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300 hover:bg-surface hover:shadow-[var(--elev-2)] sm:pr-20"
       >
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
@@ -350,18 +405,21 @@ export function CommandSearch() {
             className="fixed inset-0 z-40 cursor-default"
             onClick={() => setOpen(false)}
           />
-          <div
-            role="dialog"
-            aria-label="Hızlı arama"
-            className="popover-in absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-[16px] border border-hairline bg-surface shadow-[var(--inner-top),var(--elev-5)]"
-          >
+          <div className="popover-in absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-[16px] border border-hairline bg-surface shadow-[var(--inner-top),var(--elev-5)]">
             <div className="hairline-b flex items-center gap-2 px-4">
               <Search className="h-4 w-4 text-text-faint" />
               <input
                 ref={inputRef}
+                role="combobox"
+                aria-label="Panel genelinde ara"
+                aria-autocomplete="list"
+                aria-expanded={open}
+                aria-controls="app-command-results"
+                aria-activedescendant={maxIndex >= 0 ? `app-command-option-${active}` : undefined}
                 value={q}
                 onChange={(e) => {
                   setQ(e.target.value);
+                  setActive(0);
                   runSearch(e.target.value);
                 }}
                 onKeyDown={(e) => {
@@ -386,7 +444,7 @@ export function CommandSearch() {
               </button>
             </div>
 
-            <div className="max-h-[min(60vh,28rem)] overflow-y-auto p-2">
+            <div id="app-command-results" role="listbox" aria-label="Arama sonuçları" className="max-h-[min(60vh,28rem)] overflow-y-auto p-2">
               {calcVisible ? (
                 <div>
                   <p className="px-3 pb-1.5 pt-2 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">Hesap makinesi</p>
@@ -395,16 +453,19 @@ export function CommandSearch() {
                 </div>
               ) : showQuick ? (
                 <div>
-                  {recents.length > 0 ? (
+                  {visibleRecents.length > 0 ? (
                     <>
                       <p className="px-3 pb-1.5 pt-2 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">Son kullanılanlar</p>
                       <ul className="space-y-1">
-                        {recents.map((item, i) => {
+                        {visibleRecents.map((item, i) => {
                           const Icon = recentIcon(item);
                           const meta = item.kind !== "page" ? kindMeta[item.kind] : null;
                           return (
                             <li key={item.href}>
                               <button
+                                id={`app-command-option-${i}`}
+                                role="option"
+                                aria-selected={i === active}
                                 type="button"
                                 onClick={() => goRecent(item)}
                                 onMouseEnter={() => setActive(i)}
@@ -434,12 +495,15 @@ export function CommandSearch() {
                   ) : null}
                   <p className="px-3 pb-1.5 pt-2 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">Hızlı eylemler</p>
                   <ul className="space-y-1">
-                    {QUICK_ACTIONS.map((action, i) => {
+                    {quickActions.map((action, i) => {
                       const Icon = action.icon;
-                      const idx = recents.length + i;
+                      const idx = visibleRecents.length + i;
                       return (
                         <li key={action.href}>
                           <button
+                            id={`app-command-option-${idx}`}
+                            role="option"
+                            aria-selected={idx === active}
                             type="button"
                             onClick={() => goRecent({ label: action.label, href: action.href, kind: "page" })}
                             onMouseEnter={() => setActive(idx)}
@@ -478,6 +542,9 @@ export function CommandSearch() {
                     return (
                       <li key={`${hit.kind}-${hit.id}`}>
                         <button
+                          id={`app-command-option-${i}`}
+                          role="option"
+                          aria-selected={i === active}
                           type="button"
                           onClick={() => go(hit)}
                           onMouseEnter={() => setActive(i)}

@@ -73,34 +73,51 @@ export function ExpenseEditDialog({
 
       <DialogContent size="sm">
         <DialogHeader icon={<Pencil />} title="Gideri düzenle" />
-        <form action={action} className="grid gap-3 p-6">
+        <form action={action} aria-busy={pending} className="grid gap-3 p-6">
                 <input type="hidden" name="id" value={expense.id} />
+                <label htmlFor={`expense-title-${expense.id}`} className="text-xs font-semibold text-text-muted">
+                  Gider başlığı
+                </label>
                 <input
+                  id={`expense-title-${expense.id}`}
                   name="title"
                   required
+                  maxLength={160}
                   defaultValue={expense.title}
                   placeholder="Başlık"
                   className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                 />
                 <div className="grid grid-cols-2 gap-3">
-                  <input
-                    name="amount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                    defaultValue={expense.amount}
-                    placeholder="Tutar (TRY)"
-                    className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
-                  />
-                  <input
-                    name="expense_date"
-                    type="date"
-                    defaultValue={expense.expense_date?.slice(0, 10)}
-                    className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
-                  />
+                  <div>
+                    <label htmlFor={`expense-amount-${expense.id}`} className="mb-1.5 block text-xs font-semibold text-text-muted">Tutar (TRY)</label>
+                    <input
+                      id={`expense-amount-${expense.id}`}
+                      name="amount"
+                      type="number"
+                      min="0.01"
+                      max="9999999999.99"
+                      step="0.01"
+                      required
+                      defaultValue={expense.amount}
+                      className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor={`expense-date-${expense.id}`} className="mb-1.5 block text-xs font-semibold text-text-muted">Gider tarihi</label>
+                    <input
+                      id={`expense-date-${expense.id}`}
+                      name="expense_date"
+                      type="date"
+                      min="1900-01-01"
+                      max="2100-12-31"
+                      defaultValue={expense.expense_date?.slice(0, 10)}
+                      className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                    />
+                  </div>
                 </div>
+                <label htmlFor={`expense-category-${expense.id}`} className="text-xs font-semibold text-text-muted">Gider kategorisi</label>
                 <select
+                  id={`expense-category-${expense.id}`}
                   name="category"
                   defaultValue={expense.category}
                   className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
@@ -111,8 +128,11 @@ export function ExpenseEditDialog({
                     </option>
                   ))}
                 </select>
+                <label htmlFor={`expense-notes-${expense.id}`} className="text-xs font-semibold text-text-muted">Not (opsiyonel)</label>
                 <input
+                  id={`expense-notes-${expense.id}`}
                   name="notes"
+                  maxLength={2000}
                   defaultValue={expense.notes ?? ""}
                   placeholder="Not (opsiyonel)"
                   className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"

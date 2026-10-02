@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowUpRight, Building2, Check, Copy, MapPin, MessageCircle, Phone, Rocket, StickyNote, UserPlus } from "lucide-react";
-import { addDemoNote, assignDemo, convertDemoToTenant, setDemoStatus, type ConvertResult } from "@/app/actions/platform-sales";
+import { ArrowUpRight, Building2, Check, MailCheck, MailWarning, MapPin, MessageCircle, Phone, Rocket, Send, StickyNote, UserPlus } from "lucide-react";
+import { addDemoNote, assignDemo, convertDemoToTenant, resendConvertedOwnerAccessLink, setDemoStatus, type ConvertResult } from "@/app/actions/platform-sales";
 
 export type DemoRow = {
   id: string;
@@ -45,7 +45,7 @@ export function DemoCard({ row, staff }: { row: DemoRow; staff: { id: string; fu
   const [noteOpen, setNoteOpen] = useState(false);
   const [convertError, setConvertError] = useState<string | null>(null);
   const [creds, setCreds] = useState<ConvertResult | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [accessMessage, setAccessMessage] = useState<string | null>(null);
 
   const current = STATUS.find((s) => s.key === row.status) ?? STATUS[0]!;
   const waPhone = row.phone?.replace(/\D/g, "").replace(/^0/, "90");
@@ -86,16 +86,18 @@ export function DemoCard({ row, staff }: { row: DemoRow; staff: { id: string; fu
     });
   };
 
-  const copyCreds = async () => {
-    if (!creds) return;
-    const text = `EmlakSoft giriş bilgileri\nOfis: ${creds.tenantName}\nE-posta: ${creds.email}\nGeçici şifre: ${creds.tempPassword}\nGiriş: https://emlaksoft.com/giris`;
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* yoksay */
-    }
+  const resendAccessLink = () => {
+    setAccessMessage(null);
+    const fd = new FormData();
+    fd.set("id", row.id);
+    startTransition(async () => {
+      const result = await resendConvertedOwnerAccessLink(fd);
+      setAccessMessage(
+        result.ok
+          ? "Yeni güvenli erişim bağlantısı müşterinin e-postasına gönderildi."
+          : (result.error ?? "Erişim bağlantısı gönderilemedi."),
+      );
+    });
   };
 
   const submitNote = () => {
@@ -182,20 +184,25 @@ export function DemoCard({ row, staff }: { row: DemoRow; staff: { id: string; fu
       ) : null}
 
       {creds ? (
-        <div className="mt-2 rounded-[12px] border border-mint-500/40 bg-mint-500/8 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="flex items-center gap-1.5 text-xs font-bold text-mint-600">
-              <Rocket className="h-3.5 w-3.5" /> {creds.tenantName} oluşturuldu · 14 gün deneme
-            </p>
-            <button type="button" onClick={copyCreds} className="inline-flex items-center gap-1 rounded-[7px] border border-mint-500/40 bg-surface px-2 py-1 text-[11px] font-semibold text-mint-600 transition hover:bg-mint-500/10">
-              <Copy className="h-3 w-3" /> {copied ? "Kopyalandı" : "Kopyala"}
-            </button>
-          </div>
-          <div className="mt-2 space-y-1 font-mono text-[11px] text-ink-950">
-            <p><span className="text-text-faint">E-posta:</span> {creds.email}</p>
-            <p><span className="text-text-faint">Geçici şifre:</span> <span className="font-bold">{creds.tempPassword}</span></p>
-          </div>
-          <p className="mt-1.5 text-[11px] text-text-muted">Bu bilgileri müşteriyle paylaşın. Şifre yalnızca şimdi görünür.</p>
+        <div className={`mt-2 rounded-[12px] border p-3 ${creds.accessLinkSent ? "border-mint-500/40 bg-mint-500/8" : "border-amber-400/45 bg-amber-400/10"}`}>
+          <p className={`flex items-center gap-1.5 text-xs font-bold ${creds.accessLinkSent ? "text-mint-600" : "text-amber-700"}`}>
+            {creds.accessLinkSent ? <MailCheck className="h-3.5 w-3.5" /> : <MailWarning className="h-3.5 w-3.5" />}
+            {creds.tenantName} oluşturuldu · 14 gün deneme
+          </p>
+          <p className="mt-2 text-[11px] leading-relaxed text-ink-950">
+            {creds.accessLinkSent
+              ? `${creds.email} adresine tek kullanımlık şifre oluşturma bağlantısı gönderildi.`
+              : "Ofis oluşturuldu ancak erişim e-postası gönderilemedi. E-posta sağlayıcısını kontrol edip yeniden gönderin."}
+          </p>
+          <button
+            type="button"
+            onClick={resendAccessLink}
+            disabled={pending}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-[8px] border border-current/20 bg-surface px-2.5 py-1.5 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/5 disabled:opacity-50"
+          >
+            <Send className="h-3 w-3" /> Güvenli bağlantıyı yeniden gönder
+          </button>
+          {accessMessage ? <p role="status" className="mt-2 text-[11px] font-medium text-text-muted">{accessMessage}</p> : null}
         </div>
       ) : null}
 

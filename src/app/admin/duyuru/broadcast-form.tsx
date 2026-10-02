@@ -4,20 +4,13 @@ import { useTransition, useState, useRef } from "react";
 import { CheckCircle2, ChevronDown, Loader2, Send, Users } from "lucide-react";
 import { sendBroadcast, searchTenantsBroadcast, type BroadcastTarget } from "@/app/actions/platform-notifications";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { KIND_OPTIONS } from "./broadcast-options";
 
 const TARGET_OPTIONS: { value: BroadcastTarget; label: string; hint: string }[] = [
   { value: "all", label: "Tüm ofisler", hint: "İptal edilmemiş her ofise gönderir" },
   { value: "active", label: "Aktif ofisler", hint: "Yalnızca aktif aboneliği olanlar" },
   { value: "trial", label: "Deneme ofisleri", hint: "14 günlük deneme süreci" },
   { value: "specific", label: "Belirli ofis", hint: "Ada göre arayıp tekil hedef seçin" },
-];
-
-export const KIND_OPTIONS = [
-  { value: "info", label: "Bilgi", cls: "bg-brand-600/15 text-brand-600" },
-  { value: "success", label: "Başarılı", cls: "bg-mint-500/15 text-mint-600" },
-  { value: "warning", label: "Uyarı", cls: "bg-amber-400/15 text-amber-600" },
-  { value: "danger", label: "Kritik", cls: "bg-danger-500/15 text-danger-500" },
-  { value: "system", label: "Sistem", cls: "bg-cyan-400/15 text-cyan-600" },
 ];
 
 const field =

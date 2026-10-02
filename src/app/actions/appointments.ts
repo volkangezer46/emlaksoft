@@ -7,6 +7,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { isAppointmentOutcome } from "@/lib/appointment-outcome";
+import { validateTenantReferences } from "@/lib/tenant-references";
+import {
+  isAppointmentStatus,
+  isAppointmentTransitionAllowed,
+} from "@/lib/workflow-state";
 
 export type AppointmentResult = {
   error?: string;
@@ -20,7 +25,6 @@ export type AppointmentResult = {
 };
 
 const TYPES = ["showing", "office", "valuation", "contract"];
-const STATUSES = ["pending", "confirmed", "signature", "completed", "cancelled"];
 
 type ConflictRow = {
   scheduled_at: string;
@@ -103,6 +107,15 @@ export async function createAppointment(formData: FormData): Promise<Appointment
   }
 
   const durationMin = Number.isFinite(durationValue) && durationValue > 0 ? Math.round(durationValue) : null;
+  if (durationMin != null && (durationMin < 5 || durationMin > 1440)) {
+    return { error: "Randevu süresi 5-1440 dakika arasında olmalı." };
+  }
+
+  const references = await validateTenantReferences(gate.tenantId, {
+    customerId: customerId || null,
+    propertyId: propertyId || null,
+  });
+  if (!references.ok) return { error: references.error };
 
   /*
    * Çakışma freni: aynı danışmanın örtüşen randevusu varsa ilk gönderimde
@@ -195,7 +208,21 @@ export async function updateAppointmentStatus(formData: FormData): Promise<Appoi
 
   const id = String(formData.get("id") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
-  if (!id || !STATUSES.includes(status)) return { error: "Geçersiz durum." };
+  if (!id || !isAppointmentStatus(status)) return { error: "Geçersiz durum." };
+
+  const supabase = await createClient();
+  const { data: current, error: currentError } = await supabase
+    .from("appointments")
+    .select("id, status")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (currentError || !current || !isAppointmentStatus(current.status)) {
+    return { error: "Randevu bulunamadı." };
+  }
+  if (!isAppointmentTransitionAllowed(current.status, status)) {
+    return { error: "Bu randevu durum geçişi desteklenmiyor." };
+  }
 
   const patch: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
   if (status === "signature" || status === "completed") {
@@ -216,16 +243,19 @@ export async function updateAppointmentStatus(formData: FormData): Promise<Appoi
     patch.outcome_note = null;
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("appointments")
     .update(patch)
     .eq("id", id)
-    .eq("tenant_id", gate.tenantId);
+    .eq("tenant_id", gate.tenantId)
+    .eq("status", current.status)
+    .select("id")
+    .maybeSingle();
   if (error) {
     console.error("updateAppointmentStatus", error);
     return { error: "Durum güncellenemedi." };
   }
+  if (!updated) return { error: "Randevu bu sırada değişti; sayfayı yenileyin." };
 
   revalidatePath("/app/randevular");
   return { ok: true };
@@ -259,6 +289,10 @@ export async function updateAppointment(formData: FormData): Promise<Appointment
   if (Number.isNaN(scheduledAt.getTime())) {
     return { error: "Geçerli bir tarih/saat girin." };
   }
+  const durationMin = Number.isFinite(durationValue) && durationValue > 0 ? Math.round(durationValue) : null;
+  if (durationMin != null && (durationMin < 5 || durationMin > 1440)) {
+    return { error: "Randevu süresi 5-1440 dakika arasında olmalı." };
+  }
 
   const supabase = await createClient();
 
@@ -279,7 +313,7 @@ export async function updateAppointment(formData: FormData): Promise<Appointment
         tenantId: gate.tenantId,
         advisorId,
         scheduledAt,
-        durationMin: Number.isFinite(durationValue) && durationValue > 0 ? Math.round(durationValue) : null,
+        durationMin,
         excludeId: id,
       });
       if (warning) return { conflictWarning: warning };
@@ -291,7 +325,7 @@ export async function updateAppointment(formData: FormData): Promise<Appointment
     .update({
       appointment_type: appointmentType,
       scheduled_at: scheduledAt.toISOString(),
-      duration_min: Number.isFinite(durationValue) && durationValue > 0 ? Math.round(durationValue) : null,
+      duration_min: durationMin,
       location: location || null,
       notes: notes || null,
       updated_at: new Date().toISOString(),

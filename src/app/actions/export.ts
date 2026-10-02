@@ -3,6 +3,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
+import { escapeCsvCell } from "@/lib/csv";
+import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
 
 export type ExportResult = { error?: string; csv?: string; filename?: string };
 
@@ -16,9 +18,9 @@ function toCsv(rows: Record<string, unknown>[]) {
     // verisi export'a girdiğinden, tehlikeli önekli hücrenin başına ' eklenir.
     // Saf sayılar (negatif tutar dâhil) bozulmasın diye +/- yalnız sayı-olmayan
     // değerlerde korunur.
-    const dangerous = /^[=@\t\r]/.test(s) || (/^[+-]/.test(s) && !/^[+-]?[\d.,\s]+$/.test(s));
+    const dangerous = /^[\t\r\n]/.test(s) || /^\s*[=@]/.test(s) || (/^\s*[+-]/.test(s) && !/^\s*[+-]?[\d.,\s]+$/.test(s));
     if (dangerous) s = `'${s}`;
-    return `"${s.replace(/"/g, '""')}"`;
+    return escapeCsvCell(s);
   };
   return [keys.join(","), ...rows.map((r) => keys.map((k) => esc(r[k])).join(","))].join("\n");
 }
@@ -33,12 +35,15 @@ export async function exportCustomersCsv(): Promise<ExportResult> {
   const gate = await requirePermission("customers", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let q = supabase
     .from("customers")
     .select("full_name, phone, email, customer_types, tags, source, created_at")
+    .eq("tenant_id", gate.tenantId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(2000);
+  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("assigned_to", gate.userId);
+  const { data, error } = await q;
   if (error) {
     console.error("exportCustomersCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
@@ -59,11 +64,15 @@ export async function exportCommissionsCsv(): Promise<ExportResult> {
   const gate = await requirePermission("commissions", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let q = supabase
     .from("commissions")
-    .select("gross_amount, vat_amount, status, created_at")
+    .select("gross_amount, vat_amount, status, created_at, deal:deals!inner(tenant_id, assigned_to)")
+    .eq("tenant_id", gate.tenantId)
+    .eq("deal.tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
     .limit(2000);
+  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("deal.assigned_to", gate.userId);
+  const { data, error } = await q;
   if (error) {
     console.error("exportCommissionsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
@@ -81,11 +90,14 @@ export async function exportAuditCsv(): Promise<ExportResult> {
   const gate = await requirePermission("settings", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let q = supabase
     .from("audit_logs")
     .select("action, entity_type, entity_id, actor_id, old_value, new_value, created_at")
+    .eq("tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
     .limit(2000);
+  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("actor_id", gate.userId);
+  const { data, error } = await q;
   if (error) {
     console.error("exportAuditCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
@@ -94,7 +106,11 @@ export async function exportAuditCsv(): Promise<ExportResult> {
   const actorIds = [...new Set((data ?? []).map((r) => r.actor_id).filter(Boolean))] as string[];
   const names = new Map<string, string>();
   if (actorIds.length) {
-    const { data: profiles } = await supabase.from("profiles").select("id, full_name").in("id", actorIds);
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .eq("tenant_id", gate.tenantId)
+      .in("id", actorIds);
     for (const p of profiles ?? []) names.set(p.id, p.full_name);
   }
 
@@ -114,14 +130,17 @@ export async function exportPropertiesCsv(): Promise<ExportResult> {
   const gate = await requirePermission("properties", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let q = supabase
     .from("properties")
     .select(
       "property_code, title, transaction_type, property_type, status, list_price, assigned_to, created_at, province:geo_provinces(name), district:geo_districts(name)",
     )
+    .eq("tenant_id", gate.tenantId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(2000);
+  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("assigned_to", gate.userId);
+  const { data, error } = await q;
   if (error) {
     console.error("exportPropertiesCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
@@ -130,7 +149,11 @@ export async function exportPropertiesCsv(): Promise<ExportResult> {
   const advisorIds = [...new Set((data ?? []).map((p) => p.assigned_to).filter(Boolean))] as string[];
   const names = new Map<string, string>();
   if (advisorIds.length) {
-    const { data: profiles } = await supabase.from("profiles").select("id, full_name").in("id", advisorIds);
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .eq("tenant_id", gate.tenantId)
+      .in("id", advisorIds);
     for (const p of profiles ?? []) names.set(p.id, p.full_name);
   }
 
@@ -153,12 +176,14 @@ export async function exportExpensesCsv(): Promise<ExportResult> {
   const gate = await requirePermission("expenses", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let q = supabase
     .from("expenses")
     .select("title, amount, category, expense_date, notes, created_at")
     .eq("tenant_id", gate.tenantId)
     .order("expense_date", { ascending: false })
     .limit(2000);
+  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("created_by", gate.userId);
+  const { data, error } = await q;
   if (error) {
     console.error("exportExpensesCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
@@ -178,13 +203,18 @@ export async function exportOffersCsv(): Promise<ExportResult> {
   const gate = await requirePermission("offers", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let q = supabase
     .from("offers")
     .select(
-      "amount, counter_amount, status, created_at, property:properties(property_code, title), customer:customers(full_name)",
+      "amount, counter_amount, status, created_at, property:properties(property_code, title, tenant_id), customer:customers(full_name, tenant_id)",
     )
+    .eq("tenant_id", gate.tenantId)
+    .eq("property.tenant_id", gate.tenantId)
+    .eq("customer.tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
     .limit(2000);
+  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("created_by", gate.userId);
+  const { data, error } = await q;
   if (error) {
     console.error("exportOffersCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
@@ -209,11 +239,17 @@ export async function exportPortalListingsCsv(): Promise<ExportResult> {
   const gate = await requirePermission("portals", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let q = supabase
     .from("portal_listings")
-    .select("portal_name, portal_listing_id, status, last_confirmed_at, property:properties(property_code)")
+    .select(
+      "portal_name, portal_listing_id, status, last_confirmed_at, property:properties!inner(property_code, tenant_id, assigned_to)",
+    )
+    .eq("tenant_id", gate.tenantId)
+    .eq("property.tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
     .limit(2000);
+  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("property.assigned_to", gate.userId);
+  const { data, error } = await q;
   if (error) {
     console.error("exportPortalListingsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
@@ -265,8 +301,11 @@ export async function exportDemandsCsv(filters: DemandExportFilters = {}): Promi
   let q = supabase
     .from("customer_demands")
     .select(
-      "transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, customer:customers(full_name), province:geo_provinces(name)",
-    );
+      "transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, customer:customers!inner(full_name, tenant_id, assigned_to), province:geo_provinces(name)",
+    )
+    .eq("tenant_id", gate.tenantId)
+    .eq("customer.tenant_id", gate.tenantId);
+  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("customer.assigned_to", gate.userId);
   if (filters.status && filters.status !== "all") q = q.eq("status", filters.status);
   else if (!filters.status) q = q.in("status", ["new", "active", "matched"]);
   if (aciliyet.length > 0) q = q.in("urgency", aciliyet);
@@ -309,9 +348,13 @@ export async function exportAppointmentsCsv(filters: AppointmentExportFilters = 
   let q = supabase
     .from("appointments")
     .select(
-      "appointment_type, scheduled_at, duration_min, location, status, customer:customers(full_name), property:properties(property_code, title)",
+      "appointment_type, scheduled_at, duration_min, location, status, customer:customers(full_name, tenant_id), property:properties(property_code, title, tenant_id)",
     )
+    .eq("tenant_id", gate.tenantId)
+    .eq("customer.tenant_id", gate.tenantId)
+    .eq("property.tenant_id", gate.tenantId)
     .neq("status", "cancelled");
+  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("assigned_to", gate.userId);
   if (filters.tip && APPT_TYPE_TR[filters.tip]) q = q.eq("appointment_type", filters.tip);
   if (filters.durum) q = q.eq("status", filters.durum);
   if (filters.customer) q = q.eq("customer_id", filters.customer);
@@ -344,13 +387,18 @@ export async function exportDealsCsv(): Promise<ExportResult> {
   const gate = await requirePermission("commissions", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let q = supabase
     .from("deals")
     .select(
-      "stage, deal_type, deal_value, probability, updated_at, property:properties(property_code, title), customer:customers(full_name)",
+      "stage, deal_type, deal_value, probability, updated_at, property:properties(property_code, title, tenant_id), customer:customers(full_name, tenant_id)",
     )
+    .eq("tenant_id", gate.tenantId)
+    .eq("property.tenant_id", gate.tenantId)
+    .eq("customer.tenant_id", gate.tenantId)
     .order("updated_at", { ascending: false })
     .limit(2000);
+  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("assigned_to", gate.userId);
+  const { data, error } = await q;
   if (error) {
     console.error("exportDealsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
@@ -380,7 +428,10 @@ export async function exportProjectsCsv(filters: { durum?: string } = {}): Promi
   const supabase = await createClient();
   let q = supabase
     .from("projects")
-    .select("name, developer_name, location, status, delivery_date, created_at, units:project_units(status)");
+    .select("name, developer_name, location, status, delivery_date, created_at, units:project_units(status)")
+    .eq("tenant_id", gate.tenantId)
+    .eq("units.tenant_id", gate.tenantId);
+  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("created_by", gate.userId);
   const durum = filters.durum ?? "";
   if (durum === "aktif") q = q.neq("status", "delivered");
   else if (durum && PROJECT_STATUS_TR[durum]) q = q.eq("status", durum);
@@ -428,19 +479,44 @@ export async function exportRentalsCsv(filters: RentalExportFilters = {}): Promi
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
 
-  const [{ data: rentalData, error }, { data: chargeData }, { data: maintData }] = await Promise.all([
-    supabase
-      .from("rentals")
-      .select(
-        "id, monthly_rent, due_day, start_date, end_date, status, created_at, property:properties(property_code, title), renter:customers(full_name)",
-      )
-      .order("created_at", { ascending: false })
-      .limit(2000),
-    supabase.from("rent_charges").select("rental_id, period, amount, status").order("period", { ascending: false }).limit(5000),
-    supabase.from("maintenance_requests").select("rental_id, status").limit(2000),
-  ]);
-  if (error) {
-    console.error("exportRentalsCsv", error);
+  let rentalQuery = supabase
+    .from("rentals")
+    .select(
+      "id, monthly_rent, due_day, start_date, end_date, status, created_at, property:properties!inner(property_code, title, tenant_id), renter:customers!inner(full_name, tenant_id)",
+    )
+    .eq("tenant_id", gate.tenantId)
+    .eq("property.tenant_id", gate.tenantId)
+    .eq("renter.tenant_id", gate.tenantId)
+    .order("created_at", { ascending: false })
+    .limit(2000);
+  let chargeQuery = supabase
+    .from("rent_charges")
+    .select("rental_id, period, amount, status, rental:rentals!inner(tenant_id, created_by)")
+    .eq("tenant_id", gate.tenantId)
+    .eq("rental.tenant_id", gate.tenantId)
+    .order("period", { ascending: false })
+    .limit(5000);
+  let maintenanceQuery = supabase
+    .from("maintenance_requests")
+    .select("rental_id, status, rental:rentals!inner(tenant_id, created_by)")
+    .eq("tenant_id", gate.tenantId)
+    .eq("rental.tenant_id", gate.tenantId)
+    .limit(2000);
+
+  if (!hasOfficeWideDataScope(gate.role)) {
+    rentalQuery = rentalQuery.eq("created_by", gate.userId);
+    chargeQuery = chargeQuery.eq("rental.created_by", gate.userId);
+    maintenanceQuery = maintenanceQuery.eq("rental.created_by", gate.userId);
+  }
+
+  const [
+    { data: rentalData, error: rentalError },
+    { data: chargeData, error: chargeError },
+    { data: maintData, error: maintError },
+  ] = await Promise.all([rentalQuery, chargeQuery, maintenanceQuery]);
+  const exportError = rentalError ?? chargeError ?? maintError;
+  if (exportError) {
+    console.error("exportRentalsCsv", exportError);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
 
@@ -515,11 +591,15 @@ export async function exportDuesCsv(): Promise<ExportResult> {
   const gate = await requirePermission("expenses", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let q = supabase
     .from("property_dues")
-    .select("title, amount, period, due_date, status, paid_at, property:properties(property_code, title)")
+    .select("title, amount, period, due_date, status, paid_at, property:properties(property_code, title, tenant_id)")
+    .eq("tenant_id", gate.tenantId)
+    .eq("property.tenant_id", gate.tenantId)
     .order("period", { ascending: false })
     .limit(2000);
+  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("created_by", gate.userId);
+  const { data, error } = await q;
   if (error) {
     console.error("exportDuesCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
@@ -543,11 +623,18 @@ export async function exportContractsCsv(): Promise<ExportResult> {
   const gate = await requirePermission("contracts", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let q = supabase
     .from("contracts")
-    .select("title, contract_type, status, created_at, signed_at, expires_at, property:properties(property_code, title), customer:customers(full_name)")
+    .select(
+      "title, contract_type, status, created_at, signed_at, expires_at, property:properties(property_code, title, tenant_id), customer:customers(full_name, tenant_id)",
+    )
+    .eq("tenant_id", gate.tenantId)
+    .eq("property.tenant_id", gate.tenantId)
+    .eq("customer.tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
     .limit(2000);
+  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("created_by", gate.userId);
+  const { data, error } = await q;
   if (error) {
     console.error("exportContractsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
@@ -572,11 +659,17 @@ export async function exportReferralsCsv(): Promise<ExportResult> {
   const gate = await requirePermission("customers", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let q = supabase
     .from("referrals")
-    .select("referred_name, referred_phone, referred_note, staff_note, status, created_at, referrer:customers!referrer_customer_id(full_name)")
+    .select(
+      "referred_name, referred_phone, referred_note, staff_note, status, created_at, referrer:customers!referrer_customer_id(full_name, tenant_id)",
+    )
+    .eq("tenant_id", gate.tenantId)
+    .eq("referrer.tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
     .limit(2000);
+  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("handled_by", gate.userId);
+  const { data, error } = await q;
   if (error) {
     console.error("exportReferralsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };

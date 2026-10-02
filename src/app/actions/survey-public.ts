@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { notifyTenant } from "@/lib/notify";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 export type PublicSurveyResult = {
   ok?: boolean;
@@ -38,17 +39,51 @@ export async function submitSurveyByToken(fd: FormData): Promise<PublicSurveyRes
 
   // Token tahmini / spam koruması — IP başına dakikada 10 deneme.
   const ip = await clientIp();
-  const { allowed } = await checkRateLimit(`anket:${ip}`, { limit: 10, windowSec: 60 });
+  const { allowed } = await checkRateLimit(`anket:${ip}`, {
+    limit: 10,
+    windowSec: 60,
+    failurePolicy: "deny",
+  });
   if (!allowed) return { error: "Çok fazla istek. Lütfen biraz sonra tekrar deneyin." };
 
   const admin = createAdminClient();
   const { data: survey } = await admin
     .from("surveys")
-    .select("id, tenant_id, agent_id, status, customer:customers(full_name)")
+    .select("id, tenant_id, customer_id, agent_id, status")
     .eq("public_token", token)
     .maybeSingle();
 
   if (!survey) return { error: "Bağlantı geçersiz veya anket bulunamadı." };
+  const { data: tenant } = await admin
+    .from("tenants")
+    .select("status")
+    .eq("id", survey.tenant_id)
+    .maybeSingle();
+  if (!tenant || !isPublicTenantActive(tenant.status)) {
+    return { error: "Bağlantı geçersiz veya anket bulunamadı." };
+  }
+
+  const [{ data: customer }, { data: agent }] = await Promise.all([
+    admin
+      .from("customers")
+      .select("full_name")
+      .eq("id", survey.customer_id)
+      .eq("tenant_id", survey.tenant_id)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    survey.agent_id
+      ? admin
+          .from("profiles")
+          .select("id")
+          .eq("id", survey.agent_id)
+          .eq("tenant_id", survey.tenant_id)
+          .eq("is_active", true)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  if (!customer || (survey.agent_id && !agent)) {
+    return { error: "Bağlantı geçersiz veya anket bulunamadı." };
+  }
   if (survey.status === "answered") return { ok: true, alreadyAnswered: true };
 
   // Yarışta ikinci yazımı da engelle: yalnız hâlâ 'pending' olan satır güncellenir.
@@ -61,6 +96,7 @@ export async function submitSurveyByToken(fd: FormData): Promise<PublicSurveyRes
       answered_at: new Date().toISOString(),
     })
     .eq("id", survey.id)
+    .eq("tenant_id", survey.tenant_id)
     .eq("status", "pending")
     .select("id")
     .maybeSingle();
@@ -74,10 +110,8 @@ export async function submitSurveyByToken(fd: FormData): Promise<PublicSurveyRes
   // Düşük puan alarmı — bildirim hatası teşekkür ekranını düşürmesin.
   if (score <= 6) {
     try {
-      const rel = survey.customer as { full_name?: string } | { full_name?: string }[] | null;
-      const customerName =
-        (Array.isArray(rel) ? rel[0]?.full_name : rel?.full_name) ?? "Müşteri";
-      const agentId = (survey.agent_id as string | null) ?? null;
+      const customerName = customer.full_name ?? "Müşteri";
+      const agentId = agent?.id ?? null;
       const targets = new Set<string>();
       if (agentId) targets.add(agentId);
       // Ofis sahibi de görsün (danışmanın kendisi değilse) — telafi süreci yönetim işi.

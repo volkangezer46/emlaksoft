@@ -58,12 +58,17 @@ export function LeadCapturePanel({
     <option value="kiralik">Kiralık</option>
   </select>
   <textarea name="message" placeholder="Mesajınız"></textarea>
+  <input name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px" />
+  <label>
+    <input type="checkbox" name="kvkk" required />
+    KVKK aydınlatma metnini okudum ve iletişim kurulmasına onay veriyorum.
+  </label>
   <button type="submit">Gönder</button>
 </form>`;
 
   const curl = `curl -X POST ${webhookUrl} \\
   -H "Content-Type: application/json" \\
-  -d '{"full_name":"Ahmet Yılmaz","phone":"05551112233","transaction_type":"satilik","source":"reklam"}'`;
+  -d '{"full_name":"Ahmet Yılmaz","phone":"05551112233","transaction_type":"satilik","source":"reklam","kvkk":true}'`;
 
   return (
     <div className="space-y-5">
@@ -156,7 +161,8 @@ export function LeadCapturePanel({
           <code>{curl}</code>
         </pre>
         <ul className="mt-3 space-y-1 text-xs text-text-muted">
-          <li>• Desteklenen alanlar: full_name, phone, email, message, source, transaction_type, property_type, province_id, budget_min, budget_max, rooms</li>
+          <li>• Desteklenen alanlar: full_name, phone, email, message, source, transaction_type, property_type, province_id, budget_min, budget_max, rooms, kvkk</li>
+          <li>• <code>kvkk</code> sunucuda zorunlu doğrulanır; tarayıcı entegrasyon alanları <code>LEAD_CORS_ORIGINS</code> listesine eklenmelidir.</li>
           <li>• Aynı telefon numarası tekrar gelirse mevcut müşteriye eşlenir (mükerrer kayıt önlenir).</li>
           <li>• Her aday, en az yüklü aktif danışmana otomatik atanır ve anında bildirim gönderilir.</li>
         </ul>

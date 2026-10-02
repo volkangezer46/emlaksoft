@@ -44,7 +44,7 @@ export default async function PublicPaymentLinkPage({
   const admin = createAdminClient();
   const { data: link } = await admin
     .from("payment_links")
-    .select("id, title, amount_try, status, expires_at, created_by, tenant:tenants(name, phone, status)")
+    .select("id, tenant_id, customer_id, title, amount_try, status, expires_at, created_by, tenant:tenants(name, phone, status)")
     .eq("token", token)
     .maybeSingle();
 
@@ -56,9 +56,27 @@ export default async function PublicPaymentLinkPage({
   const office = tenantRow?.name;
   const officePhone = tenantRow?.phone ?? null;
   const officeTel = toTelHref(officePhone);
-  const officeWhatsApp = toWhatsAppLink(officePhone, `Merhaba, süresi dolan ödeme bağlantısı hakkında yazıyorum (${link.title}).`);
+  const officeWhatsApp = toWhatsAppLink(officePhone, `Merhaba, kullanıma kapalı ödeme bağlantısı hakkında yazıyorum (${link.title}).`);
 
-  const expired = isPast(link.expires_at);
+  let buyerDefaults = { fullName: "", email: "", phone: "" };
+  if (link.customer_id) {
+    const { data: customer } = await admin
+      .from("customers")
+      .select("full_name, email, phone")
+      .eq("id", link.customer_id)
+      .eq("tenant_id", link.tenant_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (customer) {
+      buyerDefaults = {
+        fullName: customer.full_name ?? "",
+        email: customer.email ?? "",
+        phone: customer.phone ?? "",
+      };
+    }
+  }
+
+  const expired = link.status === "expired" || link.status === "cancelled" || isPast(link.expires_at);
   const iyzicoReady = isIyzicoConfigured();
   const justPaid = sp.paid === "1" || link.status === "paid";
   // Son 24 saat: kullanıcı bağlantıyı ertelemesin diye görünür uyarı
@@ -93,7 +111,7 @@ export default async function PublicPaymentLinkPage({
           ) : expired ? (
             <>
               <p className="rounded-[12px] border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-sm text-danger-600">
-                Bu linkin süresi dolmuş.
+                Bu bağlantının süresi dolmuş veya bağlantı kullanıma kapatılmış.
               </p>
               <div className="mt-4 rounded-[12px] border border-line bg-canvas px-4 py-3.5">
                 <p className="text-sm font-semibold text-ink-950">Ödemeye devam etmek ister misiniz?</p>
@@ -158,7 +176,7 @@ export default async function PublicPaymentLinkPage({
                 </p>
               ) : null}
               <div className="mt-4">
-                <PayButtons token={token} iyzicoReady={iyzicoReady} />
+                <PayButtons token={token} iyzicoReady={iyzicoReady} defaults={buyerDefaults} />
               </div>
               {/* Güven işaretleri — metin rozeti, abartısız */}
               <div className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t border-line pt-3 text-[11px] font-medium text-text-faint">

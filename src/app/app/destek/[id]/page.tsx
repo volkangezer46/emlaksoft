@@ -108,7 +108,7 @@ export default async function SupportTicketDetailPage({ params }: { params: Prom
       .select("id, message_id, uploaded_by, uploaded_by_kind, visibility, file_name, mime_type, file_size, scan_status, created_at")
       .eq("ticket_id", id)
       .eq("visibility", "public")
-      .eq("scan_status", "verified")
+      .eq("scan_status", "signature_verified")
       .is("deleted_at", null)
       .order("created_at", { ascending: true }),
     supabase

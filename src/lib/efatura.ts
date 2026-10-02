@@ -17,6 +17,17 @@
  */
 
 import { getPlatformSetting } from "@/lib/platform-settings";
+import {
+  normalizeProviderBaseUrl,
+  providerAllowedHosts,
+  PROVIDER_REQUEST_TIMEOUT_MS,
+} from "@/lib/integrations/provider-url";
+import {
+  discardExternalResponse,
+  externalErrorMetadata,
+  fetchExternal,
+  readExternalJson,
+} from "@/lib/external-fetch";
 
 // ---------------------------------------------------------------------------
 // Tipler
@@ -54,6 +65,34 @@ export type InvoiceResult = {
   error?:     string;
 };
 
+const IMPLEMENTED_EFATURA_PROVIDERS = new Set(["parasutu", "logo", "custom"]);
+const EFATURA_MAX_RESPONSE_BYTES = 512 * 1024;
+
+function efaturaTransportFailure(provider: string, error: unknown): InvoiceResult {
+  console.error("e-fatura provider request failed", {
+    provider,
+    ...externalErrorMetadata(error),
+  });
+  return { ok: false, error: "E-fatura sağlayıcısına erişilemedi." };
+}
+
+function safeArtifactUrl(raw: unknown, apiUrl: string): string | undefined {
+  if (typeof raw !== "string" || raw.length > 2_048) return undefined;
+  try {
+    const candidate = new URL(raw);
+    const provider = new URL(apiUrl);
+    if (
+      candidate.protocol !== "https:" ||
+      candidate.origin !== provider.origin ||
+      candidate.username ||
+      candidate.password
+    ) return undefined;
+    return candidate.toString();
+  } catch {
+    return undefined;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
@@ -66,13 +105,19 @@ export async function getEFaturaConfig(): Promise<EFaturaConfig | null> {
     getPlatformSetting("efatura_company_vkn"),
   ]);
 
-  const p = provider ?? process.env.EFATURA_PROVIDER ?? "";
+  const p = (provider ?? process.env.EFATURA_PROVIDER ?? "").trim().toLowerCase();
   const u = apiUrl   ?? process.env.EFATURA_API_URL  ?? "";
   const k = apiKey   ?? process.env.EFATURA_API_KEY  ?? "";
   const v = companyVkn ?? process.env.EFATURA_COMPANY_VKN ?? "";
 
-  if (!p || !u || !k) return null;
-  return { provider: p, apiUrl: u, apiKey: k, companyVkn: v };
+  if (!IMPLEMENTED_EFATURA_PROVIDERS.has(p) || !u || !k) return null;
+  const defaults = p === "parasutu" ? ["api.parasut.com"] : [];
+  const safeApiUrl = normalizeProviderBaseUrl(
+    u,
+    providerAllowedHosts(defaults, process.env.EFATURA_ALLOWED_HOSTS),
+  );
+  if (!safeApiUrl) return null;
+  return { provider: p, apiUrl: safeApiUrl, apiKey: k, companyVkn: v };
 }
 
 export async function isEFaturaConfigured(): Promise<boolean> {
@@ -121,24 +166,28 @@ async function parasutuCreateInvoice(
       })),
     };
 
-    const res = await fetch(`${cfg.apiUrl}/invoices`, {
+    const res = await fetchExternal(`${cfg.apiUrl}/invoices`, {
       method:  "POST",
+      redirect: "error",
       headers: {
         "Content-Type":  "application/json",
         Authorization:   `Bearer ${cfg.apiKey}`,
       },
       body: JSON.stringify(body),
-    });
+    }, { timeoutMs: PROVIDER_REQUEST_TIMEOUT_MS });
 
     if (!res.ok) {
-      const err = await res.text();
-      return { ok: false, error: `Parasüt hatası: ${res.status} ${err.slice(0, 100)}` };
+      await discardExternalResponse(res);
+      return { ok: false, error: `Parasüt hatası: ${res.status}` };
     }
 
-    const data = await res.json() as { id?: string; pdf_url?: string };
-    return { ok: true, invoiceId: String(data.id ?? ""), pdfUrl: data.pdf_url };
+    const data = await readExternalJson<{ id?: string; pdf_url?: string }>(
+      res,
+      EFATURA_MAX_RESPONSE_BYTES,
+    );
+    return { ok: true, invoiceId: String(data.id ?? ""), pdfUrl: safeArtifactUrl(data.pdf_url, cfg.apiUrl) };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Bağlantı hatası." };
+    return efaturaTransportFailure("parasutu", e);
   }
 }
 
@@ -151,8 +200,9 @@ async function logoCreateInvoice(
   cfg: EFaturaConfig,
 ): Promise<InvoiceResult> {
   try {
-    const res = await fetch(`${cfg.apiUrl}/api/efatura/create`, {
+    const res = await fetchExternal(`${cfg.apiUrl}/api/efatura/create`, {
       method:  "POST",
+      redirect: "error",
       headers: {
         "Content-Type": "application/json",
         "X-API-Key":    cfg.apiKey,
@@ -168,13 +218,19 @@ async function logoCreateInvoice(
           VAT:         l.vatRate,
         })),
       }),
-    });
+    }, { timeoutMs: PROVIDER_REQUEST_TIMEOUT_MS });
 
-    if (!res.ok) return { ok: false, error: `Logo hatası: ${res.status}` };
-    const data = await res.json() as { INVOICE_ID?: string };
+    if (!res.ok) {
+      await discardExternalResponse(res);
+      return { ok: false, error: `Logo hatası: ${res.status}` };
+    }
+    const data = await readExternalJson<{ INVOICE_ID?: string }>(
+      res,
+      EFATURA_MAX_RESPONSE_BYTES,
+    );
     return { ok: true, invoiceId: String(data.INVOICE_ID ?? "") };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Bağlantı hatası." };
+    return efaturaTransportFailure("logo", e);
   }
 }
 
@@ -187,19 +243,26 @@ async function customCreateInvoice(
   cfg: EFaturaConfig,
 ): Promise<InvoiceResult> {
   try {
-    const res = await fetch(cfg.apiUrl, {
+    const res = await fetchExternal(cfg.apiUrl, {
       method:  "POST",
+      redirect: "error",
       headers: {
         "Content-Type": "application/json",
         Authorization:  `Bearer ${cfg.apiKey}`,
       },
       body: JSON.stringify({ ...input, companyVkn: cfg.companyVkn }),
-    });
+    }, { timeoutMs: PROVIDER_REQUEST_TIMEOUT_MS });
 
-    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
-    const data = await res.json() as { id?: string; pdfUrl?: string };
-    return { ok: true, invoiceId: String(data.id ?? ""), pdfUrl: data.pdfUrl };
+    if (!res.ok) {
+      await discardExternalResponse(res);
+      return { ok: false, error: `HTTP ${res.status}` };
+    }
+    const data = await readExternalJson<{ id?: string; pdfUrl?: string }>(
+      res,
+      EFATURA_MAX_RESPONSE_BYTES,
+    );
+    return { ok: true, invoiceId: String(data.id ?? ""), pdfUrl: safeArtifactUrl(data.pdfUrl, cfg.apiUrl) };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Bağlantı hatası." };
+    return efaturaTransportFailure("custom", e);
   }
 }

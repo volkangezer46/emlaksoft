@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Check, Copy, Download, Loader2, MonitorSmartphone, Printer, QrCode } from "lucide-react";
+import { fetchTrustedQrPng } from "@/lib/client-download";
 
 /**
  * Açık ev kayıt QR kartı — public self check-in linki (/acik-ev-kayit/[token]).
@@ -36,9 +37,7 @@ export function RegistrationQrCard({ publicUrl }: { publicUrl: string }) {
   async function onDownload() {
     setDownloading(true);
     try {
-      const res = await fetch(qrPrintSrc);
-      if (!res.ok) throw new Error(String(res.status));
-      const blob = await res.blob();
+      const blob = await fetchTrustedQrPng(qrPrintSrc);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

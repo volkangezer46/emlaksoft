@@ -73,6 +73,8 @@ export default async function KampanyalarPage({
   const campaigns = await listCampaigns();
 
   const canCreate = perms.campaigns?.includes("create") ?? false;
+  const canSend = perms.campaigns?.includes("edit") ?? false;
+  const canDelete = perms.campaigns?.includes("delete") ?? false;
 
   const filtered = campaigns.filter(
     (c) => (!durum || c.status === durum) && (!kanal || c.channel === kanal),
@@ -107,7 +109,15 @@ export default async function KampanyalarPage({
   }));
 
   const campaignActions: Record<string, React.ReactNode> = Object.fromEntries(
-    filtered.map((c) => [c.id, <CampaignActions key={c.id} campaign={c} canSend={canCreate} />]),
+    filtered.map((c) => [
+      c.id,
+      <CampaignActions
+        key={c.id}
+        campaign={c}
+        canSend={canSend}
+        canDelete={canDelete}
+      />,
+    ]),
   );
 
   const total   = campaigns.length;
@@ -152,7 +162,7 @@ export default async function KampanyalarPage({
               SMS &amp; WhatsApp Kampanyaları
             </h1>
             <p className="mt-1 max-w-lg text-sm text-white/75">
-              Müşterilerinize toplu SMS veya WhatsApp mesajı gönderin. Netgsm entegrasyonu ile İYS uyumlu.
+              Kampanyalar küçük partilerle işlenir; her teslimattan hemen önce sistemde kayıtlı kanal izni yeniden doğrulanır.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:flex">
@@ -338,12 +348,14 @@ export default async function KampanyalarPage({
 
       {/* Bilgi kutusu */}
       <section className="rounded-[16px] border border-dashed border-line-strong bg-surface px-5 py-4 text-sm text-text-muted">
-        <p className="font-semibold text-ink-950">Netgsm &amp; WhatsApp API kurulumu</p>
+        <p className="font-semibold text-ink-950">Sağlayıcı ve İYS kapsamı</p>
         <p className="mt-1">
           SMS göndermek için{" "}
           <Link href="/app/ayarlar" className="font-medium text-brand-600 hover:underline">Ayarlar</Link>
           {" "}sayfasından Netgsm kullanıcı kodu, şifre ve gönderici başlığını tanımlayın.
-          WhatsApp için API URL ve token gereklidir.
+          WhatsApp için API URL ve token gereklidir. Gönderim güvenliği, uygulamadaki yerel İYS izin kaydını
+          fail-closed kontrol eder: açık izin yoksa mesaj çıkmaz. Resmî İYS dış sistem senkronu, kurum
+          kimlik bilgileri bağlanana kadar otomatik değildir.
         </p>
       </section>
     </div>

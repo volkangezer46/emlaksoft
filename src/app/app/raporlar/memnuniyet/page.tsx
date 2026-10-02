@@ -12,10 +12,11 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { EmptyState } from "@/components/app/empty-state";
+import { getBaseUrl } from "@/lib/base-url";
 import { CopySurveyLinkButton, CreateSurveyButton } from "./survey-actions";
 
 function appUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return getBaseUrl();
 }
 
 function fmtDate(iso: string) {

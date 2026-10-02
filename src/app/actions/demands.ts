@@ -6,16 +6,10 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
+import { parseMoneyInput } from "@/lib/money-input";
+import { isDemandStatus } from "@/lib/workflow-state";
 
 export type DemandResult = { error?: string; ok?: boolean; id?: string };
-
-function parseMoney(raw: FormDataEntryValue | null): number | null {
-  if (raw == null) return null;
-  const cleaned = String(raw).replace(/\./g, "").replace(",", ".").replace(/[^\d.]/g, "").trim();
-  if (!cleaned) return null;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
 
 function revalidateDemandPaths(customerId: string) {
   revalidatePath("/app/talepler");
@@ -39,13 +33,19 @@ export async function createDemand(
   const neighborhoodId = String(formData.get("neighborhood_id") ?? "").trim();
   const rooms = String(formData.get("rooms") ?? "").trim();
   const urgency = String(formData.get("urgency") ?? "").trim();
-  const budgetMin = parseMoney(formData.get("budget_min"));
-  const budgetMax = parseMoney(formData.get("budget_max"));
+  const budgetMinResult = parseMoneyInput(formData.get("budget_min"), { allowZero: true, max: 100_000_000_000 });
+  const budgetMaxResult = parseMoneyInput(formData.get("budget_max"), { allowZero: true, max: 100_000_000_000 });
   const minSqmRaw = String(formData.get("min_sqm") ?? "").trim();
   const minSqm = minSqmRaw ? Number(minSqmRaw.replace(",", ".")) : null;
 
   if (!customerId) return { error: "Müşteri bulunamadı." };
   if (!transactionType) return { error: "İşlem türü zorunlu." };
+  if (!budgetMinResult.ok || !budgetMaxResult.ok) return { error: "Bütçe alanlarından biri geçersiz." };
+  const budgetMin = budgetMinResult.value;
+  const budgetMax = budgetMaxResult.value;
+  if (minSqm != null && (!Number.isFinite(minSqm) || minSqm <= 0 || minSqm > 1_000_000)) {
+    return { error: "Geçerli bir minimum metrekare girin." };
+  }
   if (budgetMin != null && budgetMax != null && budgetMin > budgetMax) {
     return { error: "Minimum bütçe, maksimumdan büyük olamaz." };
   }
@@ -135,7 +135,6 @@ export async function updateDemand(
   if (!gate.ok) return { error: gate.error };
 
   const id = String(formData.get("id") ?? "").trim();
-  const customerId = String(formData.get("customer_id") ?? "").trim();
   const transactionType = String(formData.get("transaction_type") ?? "").trim();
   const propertyType = String(formData.get("property_type") ?? "").trim();
   const provinceId = String(formData.get("province_id") ?? "").trim();
@@ -144,19 +143,26 @@ export async function updateDemand(
   const rooms = String(formData.get("rooms") ?? "").trim();
   const urgency = String(formData.get("urgency") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
-  const budgetMin = parseMoney(formData.get("budget_min"));
-  const budgetMax = parseMoney(formData.get("budget_max"));
+  const budgetMinResult = parseMoneyInput(formData.get("budget_min"), { allowZero: true, max: 100_000_000_000 });
+  const budgetMaxResult = parseMoneyInput(formData.get("budget_max"), { allowZero: true, max: 100_000_000_000 });
   const minSqmRaw = String(formData.get("min_sqm") ?? "").trim();
   const minSqm = minSqmRaw ? Number(minSqmRaw.replace(",", ".")) : null;
 
   if (!id) return { error: "Talep bulunamadı." };
   if (!transactionType) return { error: "İşlem türü zorunlu." };
+  if (status && !isDemandStatus(status)) return { error: "Geçersiz talep durumu." };
+  if (!budgetMinResult.ok || !budgetMaxResult.ok) return { error: "Bütçe alanlarından biri geçersiz." };
+  const budgetMin = budgetMinResult.value;
+  const budgetMax = budgetMaxResult.value;
+  if (minSqm != null && (!Number.isFinite(minSqm) || minSqm <= 0 || minSqm > 1_000_000)) {
+    return { error: "Geçerli bir minimum metrekare girin." };
+  }
   if (budgetMin != null && budgetMax != null && budgetMin > budgetMax) {
     return { error: "Minimum bütçe, maksimumdan büyük olamaz." };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("customer_demands")
     .update({
       transaction_type: transactionType,
@@ -172,12 +178,15 @@ export async function updateDemand(
       ...(status ? { status } : {}),
     })
     .eq("id", id)
-    .eq("tenant_id", gate.tenantId);
+    .eq("tenant_id", gate.tenantId)
+    .select("id, customer_id")
+    .maybeSingle();
 
   if (error) {
     console.error("updateDemand", error);
     return { error: "Talep güncellenemedi." };
   }
+  if (!updated) return { error: "Talep bulunamadı veya başka bir ofise ait." };
 
   await logActivity({
     tenantId: gate.tenantId,
@@ -188,11 +197,7 @@ export async function updateDemand(
     newValue: { transaction_type: transactionType, status: status || undefined },
   });
 
-  if (customerId) revalidateDemandPaths(customerId);
-  else {
-    revalidatePath("/app/talepler");
-    revalidatePath("/app/eslestirme");
-  }
+  revalidateDemandPaths(updated.customer_id);
   return { ok: true, id };
 }
 
@@ -201,27 +206,24 @@ export async function setDemandStatus(formData: FormData): Promise<DemandResult>
   if (!gate.ok) return { error: gate.error };
 
   const id = String(formData.get("id") ?? "").trim();
-  const customerId = String(formData.get("customer_id") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
-  const allowed = new Set(["new", "active", "matched", "closed"]);
-  if (!id || !allowed.has(status)) return { error: "Geçersiz durum." };
+  if (!id || !isDemandStatus(status)) return { error: "Geçersiz durum." };
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("customer_demands")
     .update({ status })
     .eq("id", id)
-    .eq("tenant_id", gate.tenantId);
+    .eq("tenant_id", gate.tenantId)
+    .select("id, customer_id")
+    .maybeSingle();
 
   if (error) {
     console.error("setDemandStatus", error);
     return { error: "Durum güncellenemedi." };
   }
+  if (!updated) return { error: "Talep bulunamadı veya başka bir ofise ait." };
 
-  if (customerId) revalidateDemandPaths(customerId);
-  else {
-    revalidatePath("/app/talepler");
-    revalidatePath("/app/eslestirme");
-  }
+  revalidateDemandPaths(updated.customer_id);
   return { ok: true, id };
 }

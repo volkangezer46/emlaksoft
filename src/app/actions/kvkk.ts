@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 
@@ -38,10 +39,12 @@ export async function requestCustomerErasure(formData: FormData): Promise<KvkkRe
   const reason = String(formData.get("reason") ?? "").trim();
   if (!customerId) return { error: "Müşteri seçilmedi." };
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("anonymize_customer", {
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("anonymize_customer", {
+    p_tenant_id: gate.tenantId,
     p_customer_id: customerId,
     p_reason: reason || null,
+    p_actor_id: gate.userId,
   });
 
   if (error) {
@@ -85,8 +88,12 @@ export async function purgeStaleCustomers(formData: FormData): Promise<KvkkResul
     return { error: "Saklama süresi en az 30 gün olmalı." };
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("purge_stale_customers", { p_days: Math.round(gun) });
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("purge_stale_customers", {
+    p_tenant_id: gate.tenantId,
+    p_days: Math.round(gun),
+    p_actor_id: gate.userId,
+  });
   if (error) return { error: error.message || "Temizlik çalıştırılamadı." };
 
   const adet = Number(data ?? 0);

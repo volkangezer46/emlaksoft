@@ -26,6 +26,9 @@ import { PurchaseCalculator } from "./purchase-calculator";
 import { InvestmentPanel } from "./investment-panel";
 import { DAY_MS, msSince, now } from "@/lib/clock";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
+import { isPublicTenantActive } from "@/lib/public-tenant";
+import { getBaseUrl } from "@/lib/base-url";
+import { normalizeExternalHref } from "@/lib/external-href";
 
 // Lightbox etkileşimli client komponenti — dynamic import ile ayrı chunk'a
 // alınır, galeri alanı yüklenene dek en-boy oranını koruyan iskelet görünür.
@@ -35,9 +38,9 @@ const GalleryLightbox = dynamicImport(
 );
 
 // ISR: vitrin herkese acik — CDN onbellekli, 2 dk tazelenir (jet hiz)
-export const revalidate = 120;
+export const revalidate = 60;
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const BASE_URL = getBaseUrl();
 
 function money(n: number | null, tx?: string | null) {
   if (n == null) return "Fiyat için sorun";
@@ -86,7 +89,7 @@ export async function generateMetadata({
   const admin = createAdminClient();
 
   const [{ data: tenant }, { data: cover }] = await Promise.all([
-    admin.from("tenants").select("id, name").eq("slug", slug).maybeSingle(),
+    admin.from("tenants").select("id, name, status").eq("slug", slug).maybeSingle(),
     admin
       .from("property_media")
       .select("id")
@@ -97,7 +100,7 @@ export async function generateMetadata({
       .limit(1)
       .maybeSingle(),
   ]);
-  if (!tenant) return { title: "İlan bulunamadı" };
+  if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "İlan bulunamadı" };
 
   const { data: property } = await admin
     .from("properties")
@@ -150,7 +153,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
   const [{ data: tenant }, { data: mediaRows }, { data: provinces }] = await Promise.all([
     admin
       .from("tenants")
-      .select("id, name, phone, lead_capture_token, lead_capture_enabled")
+      .select("id, name, status, phone, lead_capture_token, lead_capture_enabled")
       .eq("slug", slug)
       .maybeSingle(),
     admin
@@ -161,7 +164,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
       .order("sort_order", { ascending: true }),
     admin.from("geo_provinces").select("id, name").eq("is_active", true).order("name"),
   ]);
-  if (!tenant) notFound();
+  if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
 
   const { data: property } = await admin
     .from("properties")
@@ -236,7 +239,12 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
 
   const media = mediaRows ?? [];
   const images = media.filter((m) => m.kind === "image");
-  const tours = media.filter((m) => m.kind !== "image");
+  const tours = media.flatMap((item) => {
+    const externalUrl = normalizeExternalHref(item.external_url);
+    return item.kind !== "image" && externalUrl
+      ? [{ ...item, external_url: externalUrl }]
+      : [];
+  });
 
   const feat = (property.features ?? {}) as Feat;
   const loc = buildLoc(property);
@@ -300,7 +308,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
         // JSON-LD: arama motorları için yapılandırılmış ilan verisi ("<" kaçışı script kırılmasını önler)
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
-      <div className="mx-auto max-w-5xl px-4 py-8">
+      <main id="main-content" className="mx-auto max-w-5xl px-4 py-8">
         <div className="flex items-center justify-between gap-3">
           <Link href={`/vitrin/${slug}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600">
             <ArrowLeft className="h-4 w-4" /> Tüm portföyler
@@ -333,7 +341,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                 {tours.map((m) => (
                   <a
                     key={m.id}
-                    href={m.external_url ?? "#"}
+                    href={m.external_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 rounded-full border border-brand-300 bg-brand-600/5 px-4 py-2 text-xs font-bold text-brand-600 transition hover:bg-brand-600/10"
@@ -518,6 +526,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                           alt={p.title || "Portföy"}
                           fill
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                          unoptimized
                           className="object-cover transition group-hover:scale-105"
                         />
                       ) : (
@@ -560,7 +569,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
           </Link>{" "}
           — Türkiye&apos;nin emlak işletim sistemi
         </p>
-      </div>
+      </main>
     </div>
   );
 }

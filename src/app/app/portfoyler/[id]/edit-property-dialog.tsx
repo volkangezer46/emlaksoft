@@ -127,7 +127,7 @@ export function EditPropertyDialog({
               </label>
               <label className="text-xs font-medium text-text-muted">
                 Komisyon %
-                <input name="commission_rate" defaultValue={property.commission_rate ?? ""} className={field} />
+                <input name="commission_rate" inputMode="decimal" required min="0.01" max="100" step="0.01" defaultValue={property.commission_rate ?? ""} className={field} />
               </label>
               <label className="text-xs font-medium text-text-muted">
                 Oda

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 
 export type DefinitionResult = { ok?: boolean; error?: string; id?: string };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const CATEGORIES = ["customer_type", "customer_source", "property_type", "transaction_type", "contract_type", "expense_category", "appointment_type", "demand_urgency", "ticket_category"] as const;
 
@@ -20,16 +21,23 @@ export async function addDefinition(_prev: DefinitionResult, fd: FormData): Prom
 
   if (!(CATEGORIES as readonly string[]).includes(category)) return { error: "Geçersiz kategori." };
   if (!label) return { error: "Etiket zorunludur." };
+  if (label.length > 120 || value.length > 120) {
+    return { error: "Etiket ve değer en fazla 120 karakter olabilir." };
+  }
 
   const supabase = await createClient();
   // sonraki sıra numarası
-  const { data: last } = await supabase
+  const { data: last, error: orderError } = await supabase
     .from("definitions")
     .select("sort_order")
     .eq("category", category)
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (orderError) {
+    console.error("addDefinition sort lookup", { code: orderError.code || "unknown" });
+    return { error: "Tanım sırası güvenli şekilde belirlenemedi." };
+  }
   const nextSort = (last?.sort_order ?? 0) + 1;
 
   const { data, error } = await supabase
@@ -52,13 +60,17 @@ export async function addDefinition(_prev: DefinitionResult, fd: FormData): Prom
 export async function toggleDefinition(id: string, active: boolean): Promise<DefinitionResult> {
   const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return { error: gate.error };
+  if (!UUID_RE.test(id)) return { error: "Tanım kaydı geçersiz." };
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("definitions")
     .update({ is_active: active })
     .eq("id", id)
-    .eq("tenant_id", gate.tenantId);
+    .eq("tenant_id", gate.tenantId)
+    .select("id")
+    .maybeSingle();
   if (error) return { error: "Güncellenemedi." };
+  if (!data) return { error: "Tanım bulunamadı veya sistem tanımı değiştirilemez." };
   revalidatePath("/app/ayarlar/tanimlar");
   revalidateTag(`definitions:${gate.tenantId}`, "max");
   revalidateTag("definitions", "max");
@@ -69,15 +81,20 @@ export async function toggleDefinition(id: string, active: boolean): Promise<Def
 export async function renameDefinition(id: string, label: string): Promise<DefinitionResult> {
   const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return { error: gate.error };
+  if (!UUID_RE.test(id)) return { error: "Tanım kaydı geçersiz." };
   const trimmed = label.trim();
   if (!trimmed) return { error: "Etiket zorunludur." };
+  if (trimmed.length > 120) return { error: "Etiket en fazla 120 karakter olabilir." };
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("definitions")
     .update({ label: trimmed })
     .eq("id", id)
-    .eq("tenant_id", gate.tenantId);
+    .eq("tenant_id", gate.tenantId)
+    .select("id")
+    .maybeSingle();
   if (error) return { error: "Güncellenemedi." };
+  if (!data) return { error: "Tanım bulunamadı veya sistem tanımı değiştirilemez." };
   revalidatePath("/app/ayarlar/tanimlar");
   revalidateTag(`definitions:${gate.tenantId}`, "max");
   revalidateTag("definitions", "max");
@@ -88,8 +105,17 @@ export async function renameDefinition(id: string, label: string): Promise<Defin
 export async function deleteDefinition(id: string): Promise<DefinitionResult> {
   const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return { error: gate.error };
+  if (!UUID_RE.test(id)) return { error: "Tanım kaydı geçersiz." };
   const supabase = await createClient();
-  await supabase.from("definitions").delete().eq("id", id).eq("tenant_id", gate.tenantId);
+  const { data, error } = await supabase
+    .from("definitions")
+    .delete()
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .select("id")
+    .maybeSingle();
+  if (error) return { error: "Tanım silinemedi." };
+  if (!data) return { error: "Tanım bulunamadı veya sistem tanımı silinemez." };
   revalidatePath("/app/ayarlar/tanimlar");
   revalidateTag(`definitions:${gate.tenantId}`, "max");
   revalidateTag("definitions", "max");

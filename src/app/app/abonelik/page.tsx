@@ -7,6 +7,7 @@ import {
   Contact2,
   CreditCard,
   Gauge,
+  GitBranch,
   Sparkles,
   ShieldCheck,
   Users2,
@@ -14,7 +15,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DAY_MS, msUntil } from "@/lib/clock";
-import { PLANS, planAmountTry, planLabel, type BillingCycle } from "@/lib/billing/plans";
+import { PLANS, getPlan, planAmountTry, planLabel, type BillingCycle } from "@/lib/billing/plans";
 import { isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { CheckoutButton } from "./checkout-button";
@@ -54,6 +55,7 @@ export default async function BillingPage({
     { count: memberCount },
     { count: propertyCount },
     { count: customerCount },
+    { count: branchCount },
   ] = await Promise.all([
     tenantId
       ? supabase.from("tenants").select("id, name, plan, status").eq("id", tenantId).maybeSingle()
@@ -70,30 +72,35 @@ export default async function BillingPage({
           .from("invoices")
           .select("id, invoice_no, status, total_try, paid_at, created_at")
           .eq("tenant_id", tenantId)
+          .in("status", ["open", "paid", "void", "uncollectible"])
           .order("created_at", { ascending: false })
           .limit(8)
       : Promise.resolve({ data: [] }),
     tenantId
-      ? supabase.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId)
+      ? supabase
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId)
+          .eq("is_active", true)
       : Promise.resolve({ count: null }),
-    // Kullanım göstergeleri — gerçek kayıt sayıları (RLS tenant kapsamında)
-    supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null),
+    // Kullanım göstergeleri DB entitlement tetikleyicisiyle aynı kapsamı sayar.
+    supabase
+      .from("properties")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null)
+      .in("status", ["draft", "live", "reserved"]),
     supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
+    supabase.from("branches").select("id", { count: "exact", head: true }).eq("is_active", true),
   ]);
 
   const currentPlan = sub?.plan ?? tenant?.plan ?? "office";
 
-  /**
-   * Kullanım göstergeleri — plan tanımlarında yapısal kayıt limiti YOK;
-   * tek sayısal sınır Danışman paketinin "1 kullanıcı" özelliği (PLANS).
-   * Limitli metrikte doluluk çubuğu, limitsizde yalnız gerçek sayım gösterilir.
-   */
-  const USER_LIMIT_BY_PLAN: Partial<Record<string, number>> = { advisor: 1 };
-  const userLimit = USER_LIMIT_BY_PLAN[currentPlan] ?? null;
+  const currentPlanDef = getPlan(currentPlan);
   const usage = [
-    { label: "Kullanıcı", value: memberCount ?? 0, limit: userLimit, icon: Users2, href: "/app/ekip", tone: "text-brand-600 bg-brand-600/10" },
-    { label: "Portföy kaydı", value: propertyCount ?? 0, limit: null, icon: Building2, href: "/app/portfoyler", tone: "text-mint-600 bg-mint-500/10" },
-    { label: "Müşteri kaydı", value: customerCount ?? 0, limit: null, icon: Contact2, href: "/app/musteriler", tone: "text-amber-600 bg-amber-400/10" },
+    { label: "Kullanıcı", value: memberCount ?? 0, limit: currentPlanDef.limits.seats, icon: Users2, href: "/app/ekip", tone: "text-brand-600 bg-brand-600/10" },
+    { label: "Aktif portföy", value: propertyCount ?? 0, limit: currentPlanDef.limits.activeProperties, icon: Building2, href: "/app/portfoyler", tone: "text-mint-600 bg-mint-500/10" },
+    { label: "Müşteri kaydı", value: customerCount ?? 0, limit: currentPlanDef.limits.customers, icon: Contact2, href: "/app/musteriler", tone: "text-amber-600 bg-amber-400/10" },
+    { label: "Aktif şube", value: branchCount ?? 0, limit: currentPlanDef.limits.branches, icon: GitBranch, href: "/app/ekip", tone: "text-cyan-600 bg-cyan-400/10" },
   ];
 
   // Deneme geri sayımı — yalnızca trialing durumunda anlamlı
@@ -170,7 +177,7 @@ export default async function BillingPage({
           </div>
           <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">{planLabel(currentPlan)} paketi</span>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {usage.map((u) => {
             const doluluk = u.limit ? Math.min(100, Math.round((u.value / u.limit) * 100)) : null;
             return (

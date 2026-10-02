@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useQueryDialog } from "@/components/app/use-query-dialog";
 
 type Option = { id: string; full_name: string };
 
@@ -35,8 +36,8 @@ const recurrenceOptions = [
   { value: "monthly", label: "Her ay" },
 ];
 
-export function NewTaskDialog({ members, customers }: { members: Option[]; customers: Option[] }) {
-  const [open, setOpen] = useState(false);
+export function NewTaskDialog({ members, customers, defaultOpen = false }: { members: Option[]; customers: Option[]; defaultOpen?: boolean }) {
+  const [open, setOpen] = useQueryDialog(defaultOpen);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Tekrar yalnız terminli görevde seçilebilir — termin alanını izle.

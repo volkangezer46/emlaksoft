@@ -4,8 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Handshake, Link2, Loader2, Share2, ShieldCheck } from "lucide-react";
 import { convertWorkflow } from "@/app/actions/workflow";
+import { searchCustomers } from "@/app/actions/lookup";
 import { createPropertyShareLink } from "@/app/actions/shares";
 import { useToast } from "@/components/app/toast-provider";
+import { Combobox } from "@/components/ui/combobox";
 
 export function PropertyWorkflow({
   propertyId,
@@ -22,6 +24,7 @@ export function PropertyWorkflow({
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [advisorShare, setAdvisorShare] = useState(50);
   const [dealValue, setDealValue] = useState(listPrice != null ? String(listPrice) : "");
+  const [customerId, setCustomerId] = useState("");
   const [hasAuthority, setHasAuthority] = useState(false);
 
   async function createDeal() {
@@ -29,10 +32,15 @@ export function PropertyWorkflow({
       push("Önce yazılı yetki / EİDS onayını işaretleyin", "err");
       return;
     }
+    if (!customerId) {
+      push("Kapanış yapılan müşteriyi seçin", "err");
+      return;
+    }
     setBusy("deal");
     const fd = new FormData();
     fd.set("action", "create_deal_from_property");
     fd.set("property_id", propertyId);
+    fd.set("customer_id", customerId);
     fd.set("deal_type", transactionType === "rent" || transactionType === "Kiralık" ? "rent" : "sale");
     fd.set("deal_value", dealValue);
     fd.set("advisor_share", String(advisorShare));
@@ -76,6 +84,22 @@ export function PropertyWorkflow({
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="text-xs font-medium text-text-muted sm:col-span-2">
+          İşlem yapılan müşteri
+          <Combobox
+            className="mt-1.5"
+            options={[]}
+            value={customerId}
+            onValueChange={setCustomerId}
+            onSearch={searchCustomers}
+            required
+            clearable={false}
+            aria-label="İşlem yapılan müşteri"
+            placeholder="Müşteri seçin"
+            searchPlaceholder="Ad veya telefon ile ara…"
+            emptyText="Aramak için en az 2 karakter yazın"
+          />
+        </div>
         <label className="text-xs font-medium text-text-muted">
           Anlaşma tutarı (₺)
           <input

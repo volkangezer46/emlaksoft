@@ -22,6 +22,7 @@ import { now } from "@/lib/clock";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { computeDealScore, scoreGap } from "@/lib/deal-score";
+import { getBaseUrl } from "@/lib/base-url";
 import {
   ChecklistLoader,
   ChecklistSkeleton,
@@ -233,7 +234,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   } | null;
   const canCreateSurvey = (perms.reports ?? []).includes("view") && canSeeCommission;
   const surveyUrl = surveyRow
-    ? `${(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "")}/anket/${surveyRow.public_token}`
+    ? `${getBaseUrl()}/anket/${surveyRow.public_token}`
     : null;
   const surveyAnswered = Boolean(surveyRow && surveyRow.status === "answered" && surveyRow.score != null);
   // NPS eşikleri: 9-10 destekleyen, 7-8 pasif, 0-6 kötüleyen (bkz. migration 104)

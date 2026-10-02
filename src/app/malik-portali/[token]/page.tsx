@@ -14,6 +14,9 @@ import { getOwnerPortalData } from "@/app/actions/owner-portal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { OfferActions } from "./offer-actions";
+import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Malik Paneli",
@@ -57,7 +60,7 @@ function formatDateTime(iso: string) {
   }).format(new Date(iso));
 }
 
-type Advisor = { full_name?: string; phone?: string | null } | { full_name?: string; phone?: string | null }[] | null;
+type Advisor = { full_name?: string; phone?: string | null } | null;
 type TenantRel = { phone?: string | null } | { phone?: string | null }[] | null;
 
 export default async function MalikPortaliPage({
@@ -94,13 +97,16 @@ export default async function MalikPortaliPage({
   const [{ data: propertyRel }, { data: coverRow }, { data: priceRows }] = await Promise.all([
     admin
       .from("properties")
-      .select("assigned_to:profiles(full_name, phone), tenant:tenants(phone)")
+      .select("assigned_to, tenant:tenants(phone)")
       .eq("id", property.id)
+      .eq("tenant_id", tenant.id)
+      .is("deleted_at", null)
       .maybeSingle(),
     admin
       .from("property_media")
       .select("id")
       .eq("property_id", property.id)
+      .eq("tenant_id", tenant.id)
       .eq("kind", "image")
       .order("is_cover", { ascending: false })
       .order("sort_order", { ascending: true })
@@ -110,13 +116,22 @@ export default async function MalikPortaliPage({
       .from("property_price_history")
       .select("id, old_price, new_price, change_pct, created_at")
       .eq("property_id", property.id)
+      .eq("tenant_id", tenant.id)
       .eq("price_field", "list_price")
       .order("created_at", { ascending: false })
       .limit(10),
   ]);
 
-  const advisorRaw = (propertyRel?.assigned_to ?? null) as Advisor;
-  const advisor = Array.isArray(advisorRaw) ? advisorRaw[0] : advisorRaw;
+  const advisorId = (propertyRel?.assigned_to as string | null) ?? null;
+  const { data: advisor } = advisorId
+    ? await admin
+        .from("profiles")
+        .select("full_name, phone")
+        .eq("id", advisorId)
+        .eq("tenant_id", tenant.id)
+        .eq("is_active", true)
+        .maybeSingle()
+    : { data: null as Advisor };
   const tenantRelRaw = (propertyRel?.tenant ?? null) as TenantRel;
   const tenantRel = Array.isArray(tenantRelRaw) ? tenantRelRaw[0] : tenantRelRaw;
 
@@ -129,6 +144,9 @@ export default async function MalikPortaliPage({
     `Merhaba, ${property.title ?? property.code} malik paneli üzerinden yazıyorum.`,
   );
   const coverId = coverRow?.id ?? null;
+  const coverSrc = coverId
+    ? createShortLivedPropertyMediaUrl(coverId, "owner-portal")
+    : null;
 
   const priceHistory = (priceRows ?? []).map((h) => ({
     id:        h.id,
@@ -153,19 +171,20 @@ export default async function MalikPortaliPage({
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl space-y-6 p-4 py-6">
+      <main id="main-content" className="mx-auto max-w-3xl space-y-6 p-4 py-6">
         {/* Portföy özeti */}
         <section className="theme-dark relative overflow-hidden rounded-[20px] bg-[image:var(--grad-ink)] text-white shadow-[var(--shadow-lg)]">
           <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
           <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-brand-600/25 blur-[90px]" />
-          {coverId && (
+          {coverSrc && (
             <div className="relative aspect-[16/8] w-full">
               <Image
-                src={`/api/property-media/${coverId}`}
+                src={coverSrc}
                 alt={property.title ?? property.code}
                 fill
                 priority
                 sizes="(max-width: 768px) 100vw, 720px"
+                unoptimized
                 className="object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#071a38] to-transparent" />

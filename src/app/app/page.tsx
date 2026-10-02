@@ -42,6 +42,7 @@ import { TvAutoRefresh, TvClock } from "./tv-mode";
 import { ProductTour } from "./product-tour";
 import { DashboardWidgetProvider, Widget, WidgetEditToggle } from "./dashboard-widgets";
 import { AnnouncementsBanner } from "@/components/app/announcements-banner";
+import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 
 type Kpi = {
   label: string;
@@ -55,6 +56,42 @@ type Kpi = {
 };
 
 type TrendInfo = { label: string; dir: "up" | "down" | "flat" | "new"; good?: boolean };
+
+const DASHBOARD_QUERY_LABELS = [
+  "customer-count",
+  "latest-customers",
+  "property-count",
+  "live-listings",
+  "month-closures",
+  "recent-closures",
+  "commissions",
+  "calls-today",
+  "call-trend",
+  "demands",
+  "deals",
+  "profiles",
+  "customer-trend",
+  "expiring-authority",
+  "recent-customers",
+  "recent-calls",
+  "recent-appointments",
+  "recent-properties",
+  "today-appointments",
+  "customers-this-month",
+  "customers-previous-month",
+  "calls-yesterday",
+  "previous-month-closures",
+  "tasks-due-today",
+  "tasks-overdue",
+  "briefing-customers",
+  "lead-signals",
+  "open-tasks",
+  "tenant",
+  "office-target",
+  "active-rentals",
+  "rent-charges",
+  "projects",
+] as const;
 
 /**
  * Dönem karşılaştırma rozeti — "%+12" / "%-8" / "%0"; önceki dönem 0 ise
@@ -232,41 +269,7 @@ export default async function AppHomePage({
 
   const last24h = daysAgoIso(1);
 
-  const [
-    { count },
-    { data: latest },
-    { count: propertyCount },
-    { data: liveListings },
-    { data: monthClosures },
-    { data: recentClosures },
-    { data: commissions },
-    { count: callsToday },
-    { data: callDates },
-    { data: demandRows },
-    { data: dealRows },
-    { data: profiles },
-    { data: customerDates },
-    { data: expiringAuthority },
-    { data: recentCustomers24h },
-    { data: recentCalls24h },
-    { data: recentAppts24h },
-    { data: recentProperties24h },
-    { data: todayAppts, count: todayApptsTotal },
-    { count: customersThisMonth },
-    { count: customersPrevMonth },
-    { count: callsYesterday },
-    { data: prevMonthClosures },
-    { count: tasksDueToday },
-    { count: tasksOverdue },
-    { data: briefCustomers },
-    { data: leadSignals },
-    { data: openTasks },
-    { data: tenantRow },
-    { data: officeTarget },
-    { count: activeRentals },
-    { data: rentCharges },
-    { data: projectRows },
-  ] = await Promise.all([
+  const dashboardResults = await Promise.all([
     supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
     supabase
       .from("customers")
@@ -411,6 +414,44 @@ export default async function AppHomePage({
       ? supabase.from("projects").select("id, status, units:project_units(status)").limit(200)
       : Promise.resolve({ data: null }),
   ]);
+
+  assertQueryBatchSucceeded(dashboardResults, DASHBOARD_QUERY_LABELS, "Ana panel");
+
+  const [
+    { count },
+    { data: latest },
+    { count: propertyCount },
+    { data: liveListings },
+    { data: monthClosures },
+    { data: recentClosures },
+    { data: commissions },
+    { count: callsToday },
+    { data: callDates },
+    { data: demandRows },
+    { data: dealRows },
+    { data: profiles },
+    { data: customerDates },
+    { data: expiringAuthority },
+    { data: recentCustomers24h },
+    { data: recentCalls24h },
+    { data: recentAppts24h },
+    { data: recentProperties24h },
+    { data: todayAppts, count: todayApptsTotal },
+    { count: customersThisMonth },
+    { count: customersPrevMonth },
+    { count: callsYesterday },
+    { data: prevMonthClosures },
+    { count: tasksDueToday },
+    { count: tasksOverdue },
+    { data: briefCustomers },
+    { data: leadSignals },
+    { data: openTasks },
+    { data: tenantRow },
+    { data: officeTarget },
+    { count: activeRentals },
+    { data: rentCharges },
+    { data: projectRows },
+  ] = dashboardResults;
 
   const customerCount = count ?? 0;
   const overdueListings = (liveListings ?? []).filter((r) => daysSince(r.last_confirmed_at) >= 7);

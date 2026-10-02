@@ -9,6 +9,7 @@ import {
   PublicTokenPage,
 } from "@/components/public/token-page";
 import { CheckinForm } from "./checkin-form";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 // Kayıt linkleri etkinliğe özeldir → arama motorlarına kapalı (randevu-teyit deseni).
 export const metadata: Metadata = {
@@ -49,22 +50,25 @@ export default async function OpenHouseCheckinPage({
   const { data: event } = await admin
     .from("open_houses")
     .select(
-      "id, scheduled_at, duration_min, status, property:properties(title, property_code), tenant:tenants(name, logo_url, brand_color)",
+      "id, tenant_id, property_id, scheduled_at, duration_min, status, tenant:tenants(name, status, logo_url, brand_color)",
     )
     .eq("public_token", token)
     .maybeSingle();
 
   if (!event) notFound();
 
-  type TenantShape = { name?: string; logo_url?: string | null; brand_color?: string | null };
+  type TenantShape = { name?: string; status?: string; logo_url?: string | null; brand_color?: string | null };
   const tenant = rel(event.tenant as TenantShape | TenantShape[] | null);
+  if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
+  const { data: property } = await admin
+    .from("properties")
+    .select("title, property_code")
+    .eq("id", event.property_id)
+    .eq("tenant_id", event.tenant_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!property) notFound();
   const office = tenant?.name ?? "Emlak ofisi";
-  const property = rel(
-    event.property as
-      | { title?: string | null; property_code?: string | null }
-      | { title?: string | null; property_code?: string | null }[]
-      | null,
-  );
   const propLabel = property?.title ?? property?.property_code ?? "Açık ev";
   const date = new Date(event.scheduled_at);
   const tarih = new Intl.DateTimeFormat("tr-TR", { dateStyle: "full" }).format(date);

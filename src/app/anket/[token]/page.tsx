@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CheckCircle2, Star } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 import { PublicStateBox, PublicTokenPage } from "@/components/public/token-page";
 import { SurveyForm } from "./survey-form";
 
@@ -38,7 +39,7 @@ export default async function SurveyPage({
   const admin = createAdminClient();
   const { data: survey } = await admin
     .from("surveys")
-    .select("id, status, tenant:tenants(name, phone, logo_url, brand_color)")
+    .select("id, tenant_id, customer_id, status, tenant:tenants(name, status, phone, logo_url, brand_color)")
     .eq("public_token", token)
     .maybeSingle();
 
@@ -46,11 +47,21 @@ export default async function SurveyPage({
 
   type TenantShape = {
     name?: string;
+    status?: string;
     phone?: string | null;
     logo_url?: string | null;
     brand_color?: string | null;
   };
   const tenant = rel(survey.tenant as TenantShape | TenantShape[] | null);
+  if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
+  const { data: customer } = await admin
+    .from("customers")
+    .select("id")
+    .eq("id", survey.customer_id)
+    .eq("tenant_id", survey.tenant_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!customer) notFound();
   const office = tenant?.name ?? "Emlak ofisi";
   const officePhone = tenant?.phone ?? null;
   const answered = survey.status === "answered";

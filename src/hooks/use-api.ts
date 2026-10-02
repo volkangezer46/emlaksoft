@@ -1,4 +1,7 @@
+"use client";
+
 import { useCallback, useEffect, useState } from "react";
+import { normalizeInternalApiUrl } from "@/lib/client-download";
 
 type CacheEntry<T> = {
   data: T;
@@ -23,6 +26,7 @@ export function useApi<T>(
     enabled?: boolean;
   },
 ) {
+  const apiUrl = normalizeInternalApiUrl(url);
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,7 +46,7 @@ export function useApi<T>(
     }
 
     try {
-      const res = await fetch(url);
+      const res = await fetch(apiUrl, { credentials: "same-origin", redirect: "error" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = (await res.json()) as T;
 
@@ -55,7 +59,7 @@ export function useApi<T>(
     } finally {
       setLoading(false);
     }
-  }, [url, cacheKey, enabled]);
+  }, [apiUrl, cacheKey, enabled]);
 
   // Initial fetch
   //
@@ -95,9 +99,10 @@ export function useApi<T>(
  * Prefetch API endpoint
  */
 export async function prefetchApi(url: string, cacheKey?: string) {
+  const apiUrl = normalizeInternalApiUrl(url);
   const key = cacheKey ?? url;
   try {
-    const res = await fetch(url);
+    const res = await fetch(apiUrl, { credentials: "same-origin", redirect: "error" });
     if (res.ok) {
       const data = await res.json();
       cache.set(key, { data, timestamp: Date.now() });

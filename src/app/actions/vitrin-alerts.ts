@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 import { notifyTenant } from "@/lib/notify";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { isValidTurkishMobile, normalizeTurkishPhone, formatTurkishPhone } from "@/lib/phone";
@@ -44,12 +45,16 @@ export async function createVitrinPriceAlert(input: PriceAlertInput): Promise<Pr
   }
 
   const ip = await clientIp();
-  const { allowed } = await checkRateLimit(`vitrin-price-alert:${ip}`, { limit: 5, windowSec: 3600 });
+  const { allowed } = await checkRateLimit(`vitrin-price-alert:${ip}`, {
+    limit: 5,
+    windowSec: 3600,
+    failurePolicy: "deny",
+  });
   if (!allowed) return { ok: false, error: "Çok fazla deneme yapıldı. Lütfen daha sonra tekrar deneyin." };
 
   const admin = createAdminClient();
-  const { data: tenant } = await admin.from("tenants").select("id, name").eq("slug", slug).maybeSingle();
-  if (!tenant) return { ok: false, error: "Ofis bulunamadı." };
+  const { data: tenant } = await admin.from("tenants").select("id, name, status").eq("slug", slug).maybeSingle();
+  if (!tenant || !isPublicTenantActive(tenant.status)) return { ok: false, error: "Ofis bulunamadı." };
 
   // İlan bu tenant'a ait, yayında ve fiyatlı olmalı — baseline fiyatsız alarm anlamsız.
   const { data: property } = await admin

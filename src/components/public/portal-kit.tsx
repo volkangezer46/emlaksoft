@@ -24,7 +24,7 @@ export function PortalInvalidLink({
   description: string;
 }) {
   return (
-    <main className="grid min-h-screen place-items-center bg-canvas px-4 py-10">
+    <main id="main-content" className="grid min-h-screen place-items-center bg-canvas px-4 py-10">
       <div className="w-full max-w-sm text-center motion-safe:animate-[rise_0.26s_cubic-bezier(0.16,1,0.3,1)_both]">
         <div
           aria-hidden="true"

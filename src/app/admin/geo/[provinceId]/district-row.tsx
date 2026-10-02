@@ -46,18 +46,21 @@ export function DistrictRow({ district }: { district: DistrictRowData }) {
         <input type="hidden" name="province_id" value={district.province_id} />
         <input
           name="name"
+          aria-label="İlçe adı"
           defaultValue={district.name}
           required
           className="rounded-[9px] border border-line bg-surface px-2.5 py-1.5 text-sm font-semibold outline-none focus:border-brand-400"
         />
         <input
           name="lat"
+          aria-label={`${district.name} enlem`}
           defaultValue={district.lat ?? ""}
           placeholder="Enlem"
           className="w-24 rounded-[9px] border border-line bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
         />
         <input
           name="lng"
+          aria-label={`${district.name} boylam`}
           defaultValue={district.lng ?? ""}
           placeholder="Boylam"
           className="w-24 rounded-[9px] border border-line bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
@@ -68,13 +71,13 @@ export function DistrictRow({ district }: { district: DistrictRowData }) {
         </label>
         <div className="flex items-center gap-2">
           <button type="submit" disabled={pending} className="rounded-[9px] bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-ink-800 disabled:opacity-60">
-            {pending ? "..." : "Kaydet"}
+            {pending ? "Kaydediliyor…" : "Kaydet"}
           </button>
-          <button type="button" onClick={() => setEditing(false)} className="grid h-8 w-8 place-items-center rounded-[9px] text-text-muted hover:bg-canvas">
+          <button type="button" aria-label={`${district.name} düzenlemesini iptal et`} onClick={() => setEditing(false)} className="focus-ring grid h-8 w-8 place-items-center rounded-[9px] text-text-muted hover:bg-canvas">
             <X className="h-4 w-4" />
           </button>
         </div>
-        {state.error ? <p className="text-xs text-danger-500 lg:col-span-5">{state.error}</p> : null}
+        {state.error ? <p role="alert" className="text-xs text-danger-500 lg:col-span-5">{state.error}</p> : null}
       </form>
     );
   }
@@ -103,7 +106,7 @@ export function DistrictRow({ district }: { district: DistrictRowData }) {
       ) : (
         <span />
       )}
-      <button onClick={() => setEditing(true)} className="grid h-8 w-8 place-items-center rounded-[9px] text-text-muted hover:bg-canvas">
+      <button type="button" aria-label={`${district.name} ilçesini düzenle`} onClick={() => setEditing(true)} className="focus-ring grid h-8 w-8 place-items-center rounded-[9px] text-text-muted hover:bg-canvas">
         <Pencil className="h-3.5 w-3.5" />
       </button>
       {confirmingDelete ? (
@@ -124,7 +127,7 @@ export function DistrictRow({ district }: { district: DistrictRowData }) {
           </button>
         </form>
       ) : (
-        <button onClick={() => setConfirmingDelete(true)} className="grid h-8 w-8 place-items-center rounded-[9px] text-text-muted hover:bg-danger-500/10 hover:text-danger-500">
+        <button type="button" aria-label={`${district.name} ilçesini sil`} onClick={() => setConfirmingDelete(true)} className="focus-ring grid h-8 w-8 place-items-center rounded-[9px] text-text-muted hover:bg-danger-500/10 hover:text-danger-500">
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       )}
@@ -134,7 +137,7 @@ export function DistrictRow({ district }: { district: DistrictRowData }) {
       >
         Mahalleler <ChevronRight className="h-3.5 w-3.5" />
       </Link>
-      {delState.error ? <p className="text-xs text-danger-500 lg:col-span-5">{delState.error}</p> : null}
+      {delState.error ? <p role="alert" className="text-xs text-danger-500 lg:col-span-5">{delState.error}</p> : null}
     </div>
   );
 }

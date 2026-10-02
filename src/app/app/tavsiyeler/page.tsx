@@ -18,6 +18,7 @@ import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/tab
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportReferralsCsv } from "@/app/actions/export";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
+import { getBaseUrl } from "@/lib/base-url";
 import {
   ConvertReferralButton,
   CopyReferralLinkButton,
@@ -62,7 +63,7 @@ function rel<T>(value: T | T[] | null): T | null {
 }
 
 function appBase() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return getBaseUrl();
 }
 
 type ReferralRow = {

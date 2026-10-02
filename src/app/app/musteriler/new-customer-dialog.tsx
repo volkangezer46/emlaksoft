@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useActionState } from "react";
 import { Plus } from "lucide-react";
@@ -14,6 +14,7 @@ import {
 import { GeoSelect } from "@/components/app/geo-select";
 import { createCustomer, type CustomerResult } from "@/app/actions/customers";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { useQueryDialog } from "@/components/app/use-query-dialog";
 
 type Province = { id: string; name: string };
 type Branch = { id: string; name: string };
@@ -26,12 +27,14 @@ export function NewCustomerDialog({
   provinces,
   branches = [],
   types = DEFAULT_TYPES,
+  defaultOpen = false,
 }: {
   provinces: Province[];
   branches?: Branch[];
   types?: string[];
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useQueryDialog(defaultOpen);
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   // Başarı sonrası kapat + formu sıfırla + listeyi yenile: efekt gövdesinde

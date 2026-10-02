@@ -4,18 +4,11 @@ import { Activity, ArrowLeft, ArrowUpRight, Building2, CalendarClock, Download, 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { stopImpersonation } from "@/app/actions/platform";
-import { PLANS } from "@/lib/billing/plans";
+import { planLabel, PLANS } from "@/lib/billing/plans";
 import { auditActionLabel, relativeTimeTR } from "@/lib/admin-format";
 import { DAY_MS, daysAgoIso, now } from "@/lib/clock";
 import { SubscriptionPanel } from "./subscription-panel";
 import { CORE_MODULES, moduleForAction } from "./module-map";
-
-const planLabel: Record<string, string> = {
-  advisor: "Danışman",
-  office: "Ofis",
-  professional: "Profesyonel",
-  enterprise: "Kurumsal",
-};
 
 const tenantStatusLabel: Record<string, string> = {
   trial: "Deneme",
@@ -191,7 +184,7 @@ export default async function AdminTenantDetailPage({ params }: { params: Promis
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-amber-300">Ofis kimliğiyle önizleme</p>
             <h1 className="mt-2 font-display text-3xl font-extrabold">{tenant.name}</h1>
             <p className="mt-1 text-sm text-white/60">
-              {planLabel[tenant.plan] ?? tenant.plan} · {tenantStatusLabel[tenant.status] ?? tenant.status} · yönetici
+              {planLabel(tenant.plan)} · {tenantStatusLabel[tenant.status] ?? tenant.status} · yönetici
               erişimiyle güvenli okuma
             </p>
           </div>

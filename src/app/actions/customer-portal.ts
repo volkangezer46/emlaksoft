@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 import { fetchTenantMatchingWeights, scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
+import { getBaseUrl } from "@/lib/base-url";
 
 function relName(v: unknown): string | null {
   if (!v) return null;
@@ -32,6 +34,7 @@ export async function createCustomerPortalToken(
     .select("id, full_name")
     .eq("id", customerId)
     .eq("tenant_id", gate.tenantId)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (!customer) return { error: "Müşteri bulunamadı." };
@@ -71,8 +74,7 @@ export async function createCustomerPortalToken(
 }
 
 function buildPortalUrl(token: string): string {
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  return `${base}/musteri-portali/${token}`;
+  return `${getBaseUrl()}/musteri-portali/${token}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +123,7 @@ export type CustomerPortalData = {
     phone:    string | null;
   };
   tenant: {
+    id:   string;
     name: string;
   };
   demands: {
@@ -184,13 +187,16 @@ export async function getCustomerPortalData(
     // Son görülme zamanını güncelle (yalnızca token'a bağlı)
     admin.from("customer_portal_tokens")
       .update({ last_seen_at: new Date().toISOString() })
-      .eq("token", token),
+      .eq("token", token)
+      .eq("tenant_id", tenantId),
     admin.from("customers")
       .select("id, full_name, email, phone")
       .eq("id", customerId)
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
       .single(),
     admin.from("tenants")
-      .select("name")
+      .select("name, status")
       .eq("id", tenantId)
       .single(),
     admin.from("customer_demands")
@@ -218,7 +224,7 @@ export async function getCustomerPortalData(
     fetchTenantMatchingWeights(admin, tenantId),
   ]);
 
-  if (!customer || !tenant) return null;
+  if (!customer || !tenant || !isPublicTenantActive(tenant.status)) return null;
 
   const demandRows = demands ?? [];
 
@@ -252,7 +258,7 @@ export async function getCustomerPortalData(
       email:    customer.email ?? null,
       phone:    customer.phone ?? null,
     },
-    tenant: { name: tenant.name },
+    tenant: { id: tenantId, name: tenant.name },
     demands: demandRows.map((d) => ({
       id:        d.id,
       type:      [d.transaction_type, d.property_type].filter(Boolean).join(" · "),

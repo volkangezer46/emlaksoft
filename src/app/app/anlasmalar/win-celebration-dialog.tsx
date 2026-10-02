@@ -5,6 +5,13 @@ import { useState, useTransition } from "react";
 import { ArrowRight, Check, Copy, FileText, Info, KeyRound, PartyPopper, Star, X } from "lucide-react";
 import { SmsDialog } from "@/app/app/gelen-kutusu/sms-dialog";
 import { createSurveyForDeal } from "@/app/actions/surveys";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { BoardDeal } from "./deal-board";
 
 /**
@@ -116,9 +123,11 @@ function SurveyStep({ dealId }: { dealId: string }) {
 
 export function WinCelebrationDialog({
   deal,
+  returnFocus,
   onClose,
 }: {
   deal: BoardDeal;
+  returnFocus?: () => void;
   onClose: () => void;
 }) {
   const title = deal.property_title ?? deal.property_code ?? "Anlaşma";
@@ -141,16 +150,15 @@ export function WinCelebrationDialog({
   const smsText = `Sayın ${deal.customer_name ?? "müşterimiz"}, ${title} için anlaşmanız tamamlandı. Hayırlı olsun! 🎉 Sürecin kalanında yanınızdayız.`;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/40 p-4 backdrop-blur-sm sm:items-center"
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Anlaşma kazanıldı"
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        size="sm"
+        overlayClassName="bg-ink-950/40 backdrop-blur-sm"
         className="relative w-full max-w-sm overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-lg)]"
-        onClick={(e) => e.stopPropagation()}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          returnFocus?.();
+        }}
       >
         {/* Tek seferlik ölçülü konfeti — yalnız hareket tercihi açık kullanıcıda */}
         <style>{`
@@ -178,21 +186,22 @@ export function WinCelebrationDialog({
               <PartyPopper className="h-5 w-5" />
             </span>
             <div>
-              <h2 className="font-display text-lg font-bold text-ink-950">✅ Anlaşma kazanıldı!</h2>
-              <p className="text-xs text-text-muted">
+              <DialogTitle className="font-display text-lg font-bold text-ink-950">✅ Anlaşma kazanıldı!</DialogTitle>
+              <DialogDescription className="text-xs text-text-muted">
                 {title}
                 {deal.customer_name ? ` · ${deal.customer_name}` : ""}
-              </p>
+              </DialogDescription>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] text-text-muted hover:bg-canvas"
-            aria-label="Kapat"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <DialogClose asChild>
+            <button
+              type="button"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] text-text-muted hover:bg-canvas"
+              aria-label="Kapat"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </DialogClose>
         </div>
 
         <div className="space-y-2.5 p-6">
@@ -287,16 +296,17 @@ export function WinCelebrationDialog({
 
           {/* e) Kapat */}
           <div className="flex justify-end pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:bg-canvas"
-            >
-              Kapat
-            </button>
+            <DialogClose asChild>
+              <button
+                type="button"
+                className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+              >
+                Kapat
+              </button>
+            </DialogClose>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

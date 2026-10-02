@@ -4,13 +4,14 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Heart } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { FavorilerClient } from "./favoriler-client";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 /**
  * Vitrin favoriler sayfası — SSR kabuğu kişisel veri içermez (ISR güvenli):
  * favori id'leri client'ta localStorage'dan okunur, kart verisi public
  * /api/vitrin-favoriler ucundan gelir. Ziyaretçiye hesap gerekmez.
  */
-export const revalidate = 120;
+export const revalidate = 60;
 
 export async function generateMetadata({
   params,
@@ -19,8 +20,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const admin = createAdminClient();
-  const { data: tenant } = await admin.from("tenants").select("name").eq("slug", slug).maybeSingle();
-  if (!tenant) return { title: "Vitrin bulunamadı" };
+  const { data: tenant } = await admin.from("tenants").select("name, status").eq("slug", slug).maybeSingle();
+  if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "Vitrin bulunamadı" };
   const title = `Favorilerim | ${tenant.name}`;
   return {
     title: { absolute: title },
@@ -36,10 +37,10 @@ export default async function VitrinFavorilerPage({ params }: { params: Promise<
   const admin = createAdminClient();
   const { data: tenant } = await admin
     .from("tenants")
-    .select("id, name, brand_color")
+    .select("id, name, status, brand_color")
     .eq("slug", slug)
     .maybeSingle();
-  if (!tenant) notFound();
+  if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -79,7 +80,7 @@ export default async function VitrinFavorilerPage({ params }: { params: Promise<
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-10">
+      <main id="main-content" className="mx-auto max-w-6xl px-4 py-10">
         <FavorilerClient slug={slug} />
       </main>
 

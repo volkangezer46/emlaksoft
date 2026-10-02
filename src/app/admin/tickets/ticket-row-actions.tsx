@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, UserRound } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import { setTicketStatus } from "@/app/actions/tickets";
-import { assignTicketStaffAction } from "@/app/actions/admin-ticket-ops";
+import { updateTicketStatus } from "@/app/actions/tickets";
+import { assignTicketStaff } from "@/app/actions/admin-ticket-ops";
+import { isTicketTransitionAllowed } from "@/lib/support/ticket-contract";
 import { cn } from "@/lib/utils";
 
 /**
@@ -18,17 +19,17 @@ import { cn } from "@/lib/utils";
 const UNASSIGNED = "__unassigned";
 
 const STATUS_DOT: Record<string, string> = {
-  open: "bg-amber-500",
-  in_progress: "bg-brand-500",
-  waiting: "bg-violet-500",
+  open: "bg-brand-500",
+  in_progress: "bg-cyan-400",
+  waiting: "bg-amber-400",
   resolved: "bg-mint-500",
   closed: "bg-ink-950/30",
 };
 
 const STATUS_TONE: Record<string, string> = {
-  open: "border-amber-400/40 bg-amber-400/10 text-amber-700 hover:border-amber-400/70 data-[state=open]:border-amber-500",
-  in_progress: "border-brand-500/40 bg-brand-600/10 text-brand-700 hover:border-brand-500/70 data-[state=open]:border-brand-500",
-  waiting: "border-violet-400/40 bg-violet-400/10 text-violet-700 hover:border-violet-400/70 data-[state=open]:border-violet-500",
+  open: "border-brand-500/40 bg-brand-600/10 text-brand-700 hover:border-brand-500/70 data-[state=open]:border-brand-500",
+  in_progress: "border-cyan-400/40 bg-cyan-400/10 text-ink-800 hover:border-cyan-400/70 data-[state=open]:border-cyan-400",
+  waiting: "border-amber-400/40 bg-amber-400/10 text-amber-700 hover:border-amber-400/70 data-[state=open]:border-amber-500",
   resolved: "border-mint-500/40 bg-mint-500/10 text-mint-700 hover:border-mint-500/70 data-[state=open]:border-mint-500",
   closed: "border-line bg-canvas text-text-muted hover:border-line-strong data-[state=open]:border-brand-400",
 };
@@ -53,28 +54,45 @@ export function TicketRowActions({
   const router = useRouter();
   const [statusPending, startStatusTransition] = useTransition();
   const [assignPending, startAssignTransition] = useTransition();
+  const [statusError, setStatusError] = useState<string>();
+  const [assignError, setAssignError] = useState<string>();
 
   const statusLabelOf = useMemo(() => new Map(statusOptions.map((o) => [o.value, o.label])), [statusOptions]);
   const staffNameOf = useMemo(() => new Map(staff.map((s) => [s.id, s.full_name])), [staff]);
+  const allowedStatusOptions = useMemo(
+    () => statusOptions.filter(
+      (option) =>
+        option.value !== "resolved" &&
+        option.value !== "closed" &&
+        isTicketTransitionAllowed(status, option.value, "staff"),
+    ),
+    [status, statusOptions],
+  );
   const assignValue = assignedId ?? UNASSIGNED;
 
   function onStatusChange(next: string) {
+    setStatusError(undefined);
+    setAssignError(undefined);
     startStatusTransition(async () => {
       const fd = new FormData();
       fd.set("id", id);
       fd.set("status", next);
-      await setTicketStatus(fd);
-      router.refresh();
+      const result = await updateTicketStatus(fd);
+      if (result.ok) router.refresh();
+      else setStatusError(result.error ?? "Durum güncellenemedi.");
     });
   }
 
   function onAssignChange(next: string) {
+    setStatusError(undefined);
+    setAssignError(undefined);
     startAssignTransition(async () => {
       const fd = new FormData();
       fd.set("id", id);
       fd.set("staff_id", next === UNASSIGNED ? "" : next);
-      await assignTicketStaffAction(fd);
-      router.refresh();
+      const result = await assignTicketStaff(fd);
+      if (result.ok) router.refresh();
+      else setAssignError(result.error ?? "Personel ataması güncellenemedi.");
     });
   }
 
@@ -96,7 +114,7 @@ export function TicketRowActions({
           </span>
         </SelectTrigger>
         <SelectContent align="end">
-          {statusOptions.map((o) => (
+          {allowedStatusOptions.map((o) => (
             <SelectItem key={o.value} value={o.value}>
               <span className="flex items-center gap-2">
                 <span className={cn("h-2 w-2 shrink-0 rounded-full", STATUS_DOT[o.value] ?? STATUS_DOT.closed)} aria-hidden />
@@ -133,6 +151,12 @@ export function TicketRowActions({
           ))}
         </SelectContent>
       </Select>
+
+      {statusError || assignError ? (
+        <p role="alert" aria-live="polite" className="basis-full text-right text-[10px] font-semibold text-danger-600">
+          {statusError ?? assignError}
+        </p>
+      ) : null}
     </div>
   );
 }

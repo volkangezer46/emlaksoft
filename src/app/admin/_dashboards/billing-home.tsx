@@ -3,13 +3,7 @@ import { AlertTriangle, ArrowUpRight, CreditCard, FileText, TrendingUp, Wallet }
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CountUp } from "@/components/admin/count-up";
 import { now } from "@/lib/clock";
-
-const planLabel: Record<string, string> = {
-  advisor: "Danışman",
-  office: "Ofis",
-  professional: "Profesyonel",
-  enterprise: "Kurumsal",
-};
+import { PLANS } from "@/lib/billing/plans";
 
 const invStatusLabel: Record<string, string> = {
   draft: "Taslak",
@@ -79,11 +73,11 @@ export async function BillingHome({ staffName }: { staffName: string }) {
     .reduce((sum, i) => sum + Number(i.total_try || 0), 0);
 
   // Plan bazlı gelir dağılımı (aktif abonelikler)
-  const planRevenue = ["advisor", "office", "professional", "enterprise"].map((p) => ({
-    key: p,
-    label: planLabel[p],
+  const planRevenue = PLANS.map((plan) => ({
+    key: plan.id,
+    label: plan.name,
     value: subRows
-      .filter((s) => s.status === "active" && s.plan === p)
+      .filter((s) => s.status === "active" && s.plan === plan.id)
       .reduce((sum, s) => sum + Number(s.amount_try || 0), 0),
   }));
   const maxPlan = Math.max(1, ...planRevenue.map((p) => p.value));

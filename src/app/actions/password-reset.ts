@@ -2,11 +2,12 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
+import { getBaseUrl } from "@/lib/base-url";
 
 export type PasswordResetResult = { ok?: boolean; error?: string };
 
 function appUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return getBaseUrl();
 }
 
 /**
@@ -24,7 +25,11 @@ export async function requestPasswordReset(
 
   // Hız sınırı — IP başına saatte 5 istek (e-posta bombardımanını engelle)
   const ip = await clientIp();
-  const { allowed } = await checkRateLimit(`pwreset:${ip}`, { limit: 5, windowSec: 3600 });
+  const { allowed } = await checkRateLimit(`pwreset:${ip}`, {
+    limit: 5,
+    windowSec: 3600,
+    failurePolicy: "deny",
+  });
   if (!allowed) {
     return { error: "Çok fazla deneme yapıldı. Lütfen bir süre sonra tekrar deneyin." };
   }

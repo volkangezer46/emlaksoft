@@ -104,7 +104,7 @@ const FILTERABLE_STATUSES = ["pending", "confirmed", "signature", "completed"];
 export default async function AppointmentsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ tip?: string; durum?: string; customer?: string; property?: string; gorunum?: string; tarih?: string; gun?: string; danisman?: string }>;
+  searchParams?: Promise<{ tip?: string; durum?: string; customer?: string; property?: string; gorunum?: string; tarih?: string; gun?: string; danisman?: string; yeni?: string }>;
 }) {
   const gate = await requireModulePage("appointments");
   const supabase = await createClient();
@@ -521,7 +521,7 @@ export default async function AppointmentsPage({
               action={exportAppointmentsCsv.bind(null, { tip: tipF, durum: durumF, customer: customerF, property: propertyF })}
               className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
             />
-            <NewAppointmentDialog customers={customerOptions} properties={propertyOptions} typeOptions={appointmentTypeOptions} defaultCustomerId={filteredCustomer?.id} defaultPropertyId={filteredProperty?.id} />
+            <NewAppointmentDialog key={sp.yeni === "1" ? "new-appointment" : "appointment-dialog"} customers={customerOptions} properties={propertyOptions} typeOptions={appointmentTypeOptions} defaultCustomerId={filteredCustomer?.id} defaultPropertyId={filteredProperty?.id} defaultOpen={sp.yeni === "1"} />
           </div>
         </div>
         <div className="relative mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">

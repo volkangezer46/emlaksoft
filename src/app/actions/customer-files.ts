@@ -4,88 +4,108 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
+import {
+  finalizeDirectFileUpload,
+  prepareDirectFileUpload,
+} from "@/lib/direct-file-upload-server";
+import type {
+  DirectFileUploadFinalizeResult,
+  DirectFileUploadPrepareResult,
+} from "@/lib/direct-file-uploads";
+import { isSafeTenantObjectPath } from "@/lib/file-validation";
 
-export type FileUploadResult = { error?: string; ok?: boolean; fileId?: string };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-const ALLOWED_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-];
+export type PrepareCustomerFileUploadInput = {
+  customerId: string;
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  label?: string | null;
+};
 
-export async function uploadCustomerFile(formData: FormData): Promise<FileUploadResult> {
+async function customerBelongsToTenant(customerId: string, tenantId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("customers")
+    .select("id")
+    .eq("id", customerId)
+    .eq("tenant_id", tenantId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) console.error("customer direct upload ownership", { code: error.code });
+  return !error && Boolean(data);
+}
+
+/** Creates a one-object private Storage write token; no bytes cross the action. */
+export async function prepareCustomerFileUpload(
+  input: PrepareCustomerFileUploadInput,
+): Promise<DirectFileUploadPrepareResult> {
   const gate = await requirePermission("customers", "edit");
   if (!gate.ok) return { error: gate.error };
 
-  const customerId = String(formData.get("customer_id") ?? "").trim();
-  const label = String(formData.get("label") ?? "").trim() || null;
-  const file = formData.get("file") as File | null;
+  const customerId = String(input?.customerId ?? "").trim();
+  if (!UUID_RE.test(customerId)) return { error: "Geçerli bir müşteri seçin." };
+  if (!(await customerBelongsToTenant(customerId, gate.tenantId))) {
+    return { error: "Müşteri bu ofise ait değil veya artık aktif değil." };
+  }
 
-  if (!customerId) return { error: "Müşteri ID zorunlu." };
-  if (!file) return { error: "Dosya seçilmedi." };
-  if (file.size > MAX_FILE_SIZE) return { error: "Dosya çok büyük (max 10 MB)." };
-  if (!ALLOWED_TYPES.includes(file.type)) return { error: "Desteklenmeyen dosya tipi." };
+  return prepareDirectFileUpload(
+    {
+      kind: "customer_file",
+      tenantId: gate.tenantId,
+      parentId: customerId,
+      userId: gate.userId,
+    },
+    {
+      parentId: customerId,
+      fileName: input.fileName,
+      fileSize: input.fileSize,
+      fileType: input.fileType,
+      label: input.label,
+    },
+  );
+}
 
-  const supabase = await createClient();
+/** Finalizes only after the stored object passes bounded byte verification. */
+export async function finalizeCustomerFileUpload(
+  customerIdValue: string,
+  sessionIdValue: string,
+): Promise<DirectFileUploadFinalizeResult> {
+  const gate = await requirePermission("customers", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const customerId = String(customerIdValue ?? "").trim();
+  const sessionId = String(sessionIdValue ?? "").trim();
+  if (!UUID_RE.test(customerId) || !UUID_RE.test(sessionId)) {
+    return { error: "Yükleme oturumu geçersiz." };
+  }
+  if (!(await customerBelongsToTenant(customerId, gate.tenantId))) {
+    return { error: "Müşteri bu ofise ait değil veya artık aktif değil." };
+  }
 
-  // Dosya Supabase Storage'a yükle
-  const ext = file.name.split(".").pop() || "bin";
-  const timestamp = Date.now();
-  const storagePath = `${gate.tenantId}/${customerId}/${timestamp}.${ext}`;
+  const result = await finalizeDirectFileUpload(
+    {
+      kind: "customer_file",
+      tenantId: gate.tenantId,
+      parentId: customerId,
+      userId: gate.userId,
+    },
+    sessionId,
+  );
+  if (!result.ok) return result;
 
-  const { error: uploadError } = await supabase.storage
-    .from("customer-files")
-    .upload(storagePath, file, {
-      cacheControl: "3600",
-      upsert: false,
+  if (result.created) {
+    await logActivity({
+      tenantId: gate.tenantId,
+      actorId: gate.userId,
+      action: "customer_file.upload",
+      entityType: "customer",
+      entityId: customerId,
+      newValue: { file_id: result.id, upload_mode: "signed_direct" },
     });
-
-  if (uploadError) {
-    console.error("uploadCustomerFile storage", uploadError);
-    return { error: "Dosya yüklenemedi." };
   }
-
-  // Metadata kaydet
-  const { data, error: dbError } = await supabase
-    .from("customer_files")
-    .insert({
-      tenant_id: gate.tenantId,
-      customer_id: customerId,
-      file_name: file.name,
-      file_size: file.size,
-      file_type: file.type,
-      storage_path: storagePath,
-      label,
-      uploaded_by: gate.userId,
-    })
-    .select("id")
-    .single();
-
-  if (dbError) {
-    console.error("uploadCustomerFile db", dbError);
-    // Temizle storage
-    await supabase.storage.from("customer-files").remove([storagePath]);
-    return { error: "Dosya kaydedilemedi." };
-  }
-
-  await logActivity({
-    tenantId: gate.tenantId,
-    actorId: gate.userId,
-    action: "customer_file.upload",
-    entityType: "customer",
-    entityId: customerId,
-    newValue: { file_name: file.name, label },
-  });
-
   revalidatePath(`/app/musteriler/${customerId}`);
-  return { ok: true, fileId: data.id };
+  return result;
 }
 
 export async function deleteCustomerFile(fileId: string): Promise<{ error?: string; ok?: boolean }> {
@@ -101,9 +121,13 @@ export async function deleteCustomerFile(fileId: string): Promise<{ error?: stri
     .maybeSingle();
 
   if (!file) return { error: "Dosya bulunamadı." };
+  if (!isSafeTenantObjectPath(file.storage_path, gate.tenantId, file.customer_id)) {
+    console.error("deleteCustomerFile unsafe storage path", { fileId });
+    return { error: "Dosya yolu güvenlik doğrulamasından geçemedi." };
+  }
 
-  await supabase.storage.from("customer-files").remove([file.storage_path]);
-
+  // The AFTER DELETE trigger atomically records the object in the durable
+  // outbox. Storage removal happens asynchronously and may be retried safely.
   const { error } = await supabase
     .from("customer_files")
     .delete()

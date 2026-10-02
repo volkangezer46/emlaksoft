@@ -42,8 +42,8 @@ import { PropertyMap } from "@/components/app/property-map";
 import { computePriceHealth } from "@/lib/price-health";
 import { diagnoseSaleBlockers, isDiagnosable } from "@/lib/sale-diagnostics";
 import { SaleDiagnosticsCard } from "@/components/app/sale-diagnostics-card";
-import { isEndeksaConfigured } from "@/lib/integrations/endeksa";
-import { isTapusorConfigured } from "@/lib/integrations/tapusor";
+import { isEndeksaConfiguredFull } from "@/lib/integrations/endeksa";
+import { isTapusorConfiguredFull } from "@/lib/integrations/tapusor";
 import { daysAgoIso, msSince, now } from "@/lib/clock";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import {
@@ -102,8 +102,6 @@ const statusOptions = [
   { value: "draft", label: "Taslak" },
   { value: "live", label: "Yayında" },
   { value: "reserved", label: "Rezerve" },
-  { value: "sold", label: "Satıldı" },
-  { value: "rented", label: "Kiralandı" },
   { value: "archived", label: "Arşiv" },
 ];
 
@@ -238,8 +236,10 @@ export default async function PropertyDetailPage({
         ? Math.round(Number(property.list_price) * 0.02)
         : 0;
 
-  const endeksaOn = isEndeksaConfigured();
-  const tapusorOn = isTapusorConfigured();
+  const [endeksaOn, tapusorOn] = await Promise.all([
+    isEndeksaConfiguredFull(),
+    isTapusorConfiguredFull(),
+  ]);
 
   const priceSignal = computePriceHealth({
     listPrice: property.list_price != null ? Number(property.list_price) : null,
@@ -566,7 +566,7 @@ export default async function PropertyDetailPage({
               ["Oda", features.rooms ?? "—"],
               ["m²", features.sqm != null ? String(features.sqm) : "—"],
               ["Min. fiyat", property.min_price != null ? moneyTry(Number(property.min_price)) : "—"],
-              ["Komisyon", property.commission_rate != null ? `%${property.commission_rate}` : "%2 (varsayılan)"],
+              ["Komisyon", property.commission_rate != null ? `%${property.commission_rate}` : "Tanımlanmamış"],
               ["Ada / parsel", [property.parcel_block, property.parcel_lot].filter(Boolean).join(" / ") || "—"],
               ["Oluşturma", new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(property.created_at))],
             ].map(([k, v]) => (
@@ -597,7 +597,7 @@ export default async function PropertyDetailPage({
         <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
           <p className="text-xs font-semibold text-mint-600">Durum yönetimi</p>
           <h2 className="mt-1 font-display font-bold text-ink-950">Portföy durumu</h2>
-          {canEdit ? (
+          {canEdit && !["sold", "rented"].includes(property.status) ? (
             <form action={setPropertyStatus} className="mt-5 flex flex-wrap items-end gap-2">
               <input type="hidden" name="id" value={property.id} />
               <label className="min-w-[160px] flex-1 text-xs font-medium text-text-muted">

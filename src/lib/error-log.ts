@@ -19,6 +19,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 /** Tabloya yazılan metinlerin üst sınırı. Uzun yığın izleri satırı şişirir. */
 const MAX_MESSAGE = 500;
 const MAX_STACK = 4000;
+const MAX_DIGEST = 160;
+const MAX_PATH = 300;
+const MAX_USER_AGENT = 300;
 
 /** Süreç ömrü boyunca tek uyarı; aşağıdaki catch bloğunda gerekçesi var. */
 let uyarildi = false;
@@ -69,48 +72,29 @@ export type ErrorLogInput = {
  */
 export async function logError(input: ErrorLogInput): Promise<void> {
   try {
-    const message = (input.message ?? "").slice(0, MAX_MESSAGE);
+    const message = (input.message ?? "").trim().slice(0, MAX_MESSAGE);
     if (!message.trim()) return;
 
     const source = input.source ?? "client";
-    const path = input.path ?? null;
+    const path = input.path?.trim().slice(0, MAX_PATH) || null;
+    const digest = input.digest?.trim().slice(0, MAX_DIGEST) || null;
     const fp = fingerprint([input.tenantId ?? "-", source, normalize(message), path]);
 
     const admin = createAdminClient();
 
-    /*
-     * Önce artırmayı dene. Satır yoksa 0 kayıt güncellenir ve insert'e düşeriz.
-     * Bunu tek bir upsert ile yapamıyoruz çünkü `occurrences` ARTMALI, üzerine
-     * yazılmamalı — upsert eski değeri okuyamaz.
-     */
-    const { data: mevcut } = await admin
-      .from("error_logs")
-      .select("id, occurrences")
-      .eq("fingerprint", fp)
-      .is("resolved_at", null)
-      .limit(1)
-      .maybeSingle();
-
-    if (mevcut) {
-      await admin
-        .from("error_logs")
-        .update({ occurrences: (mevcut.occurrences ?? 1) + 1, last_seen: new Date().toISOString() })
-        .eq("id", mevcut.id);
-      return;
-    }
-
-    // supabase-js hata FIRLATMAZ, `{ error }` döndürür — catch bloğu bunu
-    // görmez. GRANT eksikliği tam olarak bu yoldan sessizce geçmişti.
-    const { error: yazmaHatasi } = await admin.from("error_logs").insert({
-      tenant_id: input.tenantId ?? null,
-      user_id: input.userId ?? null,
-      source,
-      digest: input.digest ?? null,
-      message,
-      stack: input.stack ? input.stack.slice(0, MAX_STACK) : null,
-      path,
-      user_agent: input.userAgent ? input.userAgent.slice(0, 300) : null,
-      fingerprint: fp,
+    // The database performs the insert/increment atomically. A client-side
+    // read-modify-write loses increments when several browsers report the same
+    // incident concurrently.
+    const { error: yazmaHatasi } = await admin.rpc("record_error_occurrence", {
+      p_tenant_id: input.tenantId ?? null,
+      p_user_id: input.userId ?? null,
+      p_source: source,
+      p_digest: digest,
+      p_message: message,
+      p_stack: input.stack?.trim().slice(0, MAX_STACK) || null,
+      p_path: path,
+      p_user_agent: input.userAgent?.trim().slice(0, MAX_USER_AGENT) || null,
+      p_fingerprint: fp,
     });
     if (yazmaHatasi && !uyarildi) {
       uyarildi = true;

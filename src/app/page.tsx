@@ -12,7 +12,6 @@ import {
   Building2,
   Check,
   CircleCheck,
-  Code2,
   CreditCard,
   Database,
   Download,
@@ -36,7 +35,6 @@ import {
   ShieldCheck,
   Siren,
   Sparkles,
-  Star,
   TrendingUp,
   Users,
   Wallet,
@@ -49,15 +47,17 @@ import { Pricing } from "@/components/pricing";
 import { DashboardMock } from "@/components/marketing/dashboard-mock";
 import { LiveAnalytics } from "@/components/marketing/live-analytics";
 import { IntegrationHub } from "@/components/marketing/integration-hub";
+import { getPlan } from "@/lib/billing/plans";
+import { getBaseUrl } from "@/lib/base-url";
 
 const portals = ["Sahibinden", "Hepsiemlak", "Emlakjet", "Zingat", "Hürriyet Emlak", "Milliyet Emlak"];
 
 const features = [
-  { icon: Siren, title: "Kayıp-kaçak motoru", text: "İlan yayından düşünce nedeni zorunlu sorulur. Ay sonunda kaçan komisyonu rakamla görürsünüz.", tone: "danger", span: "lg:col-span-2", href: "#kayip-kacak", metric: { label: "Aylık korunan", value: "₺95B", bars: [40, 55, 48, 68, 60, 82, 95] } },
-  { icon: PhoneIncoming, title: "Akıllı Arama OS", text: "Telefon çalınca müşteri kartı, eşleşen portföy ve önerilen sonuç kodu ekranda hazır.", tone: "mint", href: "#akilli-arama", metric: { label: "Yanıt hızı", value: "-42%", bars: [80, 70, 62, 55, 48, 40, 34] } },
-  { icon: TrendingUp, title: "Fiyat vicdanı", text: "TCMB, TÜİK ve kendi verinizle bölgeye göre pahalı/ucuz sinyali.", tone: "brand", href: "#veri-ortaklari", metric: { label: "Doğru fiyat", value: "%88", bars: [50, 58, 64, 70, 76, 82, 88] } },
-  { icon: Scale, title: "Mevzuat rayı", text: "İYS izin ve EİDS yetki akışı ürünün içinde; ceza riskini azaltın.", tone: "amber", href: "#guvenlik", metric: { label: "İYS uyum", value: "%94", bars: [60, 68, 74, 80, 86, 90, 94] } },
-  { icon: Wallet, title: "Komisyon & hakediş defteri", text: "Bölüşüm, ofis payı ve danışman hakedişi şeffaf; anlaşmazlık biter.", tone: "brand", href: "#analitik", metric: { label: "Şeffaflık", value: "%100", bars: [55, 62, 70, 78, 85, 93, 100] } },
+  { icon: Siren, title: "Kayıp-kaçak motoru", text: "İlan yayından düşünce nedeni zorunlu sorulur. Ay sonunda kaçan komisyonu rakamla görürsünüz.", tone: "danger", span: "lg:col-span-2", href: "#kayip-kacak", metric: { label: "Üretilen çıktı", value: "₺ bazlı özet", bars: [40, 55, 48, 68, 60, 82, 95] } },
+  { icon: PhoneIncoming, title: "Akıllı Arama OS", text: "Arama kaydında müşteri kartı, eşleşen portföy ve önerilen sonuç kodu aynı ekranda hazır.", tone: "mint", href: "#akilli-arama", metric: { label: "Üretilen çıktı", value: "Kişi kartı", bars: [80, 70, 62, 55, 48, 40, 34] } },
+  { icon: TrendingUp, title: "Fiyat vicdanı", text: "Ofis emsalleri, bölge istatistikleri ve yapılandırılan veri kaynaklarıyla fiyat sinyali üretin.", tone: "brand", href: "#veri-ortaklari", metric: { label: "Üretilen çıktı", value: "Fiyat aralığı", bars: [50, 58, 64, 70, 76, 82, 88] } },
+  { icon: Scale, title: "Mevzuat rayı", text: "KVKK kayıtları ile İYS ve EİDS hazırlık adımlarını görünür, denetlenebilir süreçlerde yönetin.", tone: "amber", href: "#guvenlik", metric: { label: "Üretilen çıktı", value: "Denetim izi", bars: [58, 64, 70, 76, 82, 88, 94] } },
+  { icon: Wallet, title: "Komisyon & hakediş defteri", text: "Bölüşüm, ofis payı ve danışman hakedişini açık kurallarla hesaplayıp kayıt altına alın.", tone: "brand", href: "#analitik", metric: { label: "Üretilen çıktı", value: "Pay dökümü", bars: [55, 62, 70, 78, 85, 93, 100] } },
 ];
 
 const toneBar: Record<string, string> = {
@@ -79,7 +79,7 @@ const propertyStories = [
     area: "620 m²",
     score: 92,
     signal: "Fiyat dengeli",
-    portal: "4 portalda canlı",
+    portal: "Portal teyit panelinde",
   },
   {
     image: "/listing-istanbul-penthouse.png",
@@ -92,7 +92,7 @@ const propertyStories = [
     area: "310 m²",
     score: 86,
     signal: "Yüksek talep",
-    portal: "3 portalda canlı",
+    portal: "Yayın durumu izleniyor",
   },
   {
     image: "/listing-aegean-villa.png",
@@ -117,41 +117,40 @@ const steps = [
 ];
 
 const personas = [
-  { icon: Users, title: "Bağımsız danışman", text: "Tek başına çalışıyorsanız bile kurumsal disiplin.", points: ["Akıllı arama kartı", "Kişisel portföy", "Basit komisyon"], fit: 96, scale: "1 kullanıcı" },
-  { icon: Building2, title: "Emlak ofisi", text: "2–50 kişilik ekiplerde tam kontrol.", points: ["Rol & yetki", "Kayıp-kaçak panosu", "Komisyon bölüşümü"], fit: 99, scale: "2–50 kullanıcı" },
-  { icon: Landmark, title: "Franchise", text: "Çok şube ve merkez finansı tek yerde.", points: ["Şube skorları", "Merkez raporları", "Beyaz etiket"], fit: 94, scale: "Çok şube" },
-  { icon: Briefcase, title: "Proje satış", text: "Konut projeleri için stok ve prim akışı.", points: ["Blok/daire stok", "Prim planı", "Bayi yönetimi"], fit: 92, scale: "Proje ekipleri" },
+  { icon: Users, title: "Bağımsız danışman", text: "Tek başına çalışıyorsanız bile kurumsal disiplin.", points: ["Akıllı arama kartı", "Kişisel portföy", "Basit komisyon"], scale: "1 kullanıcı" },
+  { icon: Building2, title: "Emlak ofisi", text: "2–50 kişilik ekiplerde tam kontrol.", points: ["Rol & yetki", "Kayıp-kaçak panosu", "Komisyon bölüşümü"], scale: "2–50 kullanıcı" },
+  { icon: Landmark, title: "Franchise", text: "Çok şube ve merkez finansı tek yerde.", points: ["Şube skorları", "Merkez raporları", "Merkezi rol & denetim"], scale: "Çok şube" },
+  { icon: Briefcase, title: "Proje satış", text: "Konut projeleri için stok ve prim akışı.", points: ["Blok/daire stok", "Prim planı", "Bayi yönetimi"], scale: "Proje ekipleri" },
 ];
 
 type Mark = boolean | "partial";
-const comparison: { f: string; es: Mark; reos: Mark; revy: Mark }[] = [
-  { f: "Tam Türkçe CRM", es: true, reos: true, revy: "partial" },
-  { f: "Portföy + portal takibi", es: true, reos: true, revy: true },
-  { f: "Kayıp-kaçak motoru", es: true, reos: false, revy: "partial" },
-  { f: "Komisyon & hakediş defteri", es: true, reos: "partial", revy: false },
-  { f: "İYS · EİDS · KVKK akışı", es: true, reos: false, revy: false },
-  { f: "Şeffaf fiyatlandırma", es: true, reos: false, revy: true },
-  { f: "Telefon OS (çoklu platform)", es: true, reos: "partial", revy: false },
-  { f: "Franchise & proje modülü", es: true, reos: "partial", revy: false },
+const comparison: { f: string; es: Mark; separate: Mark; general: Mark }[] = [
+  { f: "Türkçe emlak operasyon akışı", es: true, separate: "partial", general: "partial" },
+  { f: "Portföy + ilan bağlantısı takibi", es: true, separate: "partial", general: "partial" },
+  { f: "Kayıp-kaçak neden ve tutar kaydı", es: true, separate: false, general: false },
+  { f: "Komisyon & hakediş defteri", es: true, separate: "partial", general: "partial" },
+  { f: "KVKK kayıtları ve kanal izin takibi", es: true, separate: "partial", general: "partial" },
+  { f: "Arama kaydı ve müşteri kartı", es: true, separate: "partial", general: "partial" },
+  { f: "Franchise & proje modülleri", es: true, separate: false, general: "partial" },
 ];
 
 const integrations = [
-  { icon: Landmark, name: "TCMB", desc: "Kur & endeks" },
-  { icon: BarChart3, name: "TÜİK", desc: "Bölge verisi" },
-  { icon: CreditCard, name: "iyzico", desc: "Abonelik & tahsilat" },
-  { icon: MessageCircle, name: "WhatsApp", desc: "Mesaj akışı" },
-  { icon: Scale, name: "İYS / EİDS", desc: "İzin & yetki" },
-  { icon: Building2, name: "Portallar", desc: "İlan takibi" },
-  { icon: Code2, name: "API", desc: "Kendi akışın" },
-  { icon: Database, name: "Excel / CSV", desc: "İçe/dışa aktar" },
+  { icon: Landmark, name: "TCMB", desc: "Günlük kur akışı", ready: true },
+  { icon: CreditCard, name: "iyzico", desc: "Yapılandırılabilir ödeme", ready: false },
+  { icon: MessageCircle, name: "Netgsm", desc: "Yapılandırılabilir SMS", ready: false },
+  { icon: BarChart3, name: "Endeksa", desc: "Opsiyonel veri bağlantısı", ready: false },
+  { icon: MapPinned, name: "Tapusor", desc: "Opsiyonel parsel bağlantısı", ready: false },
+  { icon: MessageCircle, name: "WhatsApp", desc: "Yapılandırılabilir çıkış", ready: false },
+  { icon: Building2, name: "Portallar", desc: "İlan no/URL takibi", ready: true },
+  { icon: Database, name: "Excel / CSV", desc: "İçe/dışa aktar", ready: true },
 ];
 
 const security = [
-  { icon: Lock, title: "KVKK uyumlu", text: "Aydınlatma, rıza ve silme akışları ürünün içinde." },
-  { icon: ShieldCheck, title: "AB’de barındırma", text: "Veriler Frankfurt (eu-central-1) bölgesinde." },
-  { icon: Scale, title: "İYS & EİDS", text: "İzinli iletişim ve yetki takibi standart." },
+  { icon: Lock, title: "KVKK süreç desteği", text: "Aydınlatma, rıza, dışa aktarım ve silme iş akışları ürünün içinde." },
+  { icon: ShieldCheck, title: "Ana veritabanı Frankfurt’ta", text: "Ana uygulama veritabanı, seçili Supabase projesinin Frankfurt (eu-central-1) bölgesinde." },
+  { icon: Scale, title: "Uyum süreçleri", text: "KVKK kayıtları ile İYS/EİDS hazırlık adımları görünür." },
   { icon: Download, title: "Veri sahipliği", text: "Verileriniz sizin; istediğiniz an dışa aktarın." },
-  { icon: RefreshCw, title: "Otomatik yedek", text: "Günlük yedekleme ve noktada geri dönüş." },
+  { icon: RefreshCw, title: "Dışa aktarım & denetim", text: "Kritik kayıtları dışa aktarın ve işlem geçmişini izleyin." },
   { icon: Users, title: "Rol & yetki", text: "Danışman, muhasebe, yönetici erişim ayrımı." },
 ];
 
@@ -162,11 +161,11 @@ const quotes = [
 ];
 
 const faqs = [
-  { q: "Kurulum ne kadar sürer?", a: "Kayıt olun, ofis çalışma alanınız anında hazır olur. Demo verilerle 2 dakikada gezmeye başlarsınız; kredi kartı gerekmez." },
-  { q: "Verilerim nerede saklanıyor?", a: "Tüm veriler Avrupa (Frankfurt / eu-central-1) bölgesinde, KVKK’ya uygun şekilde barındırılır. Dilediğiniz an dışa aktarabilirsiniz." },
+  { q: "Kurulum ne kadar sürer?", a: "Geliştirme ortamında demo çalışma alanına tek tuşla girebilirsiniz. Gerçek ofis kurulumu; kullanıcı, veri aktarımı ve entegrasyon tercihlerinize göre tamamlanır." },
+  { q: "Verilerim nerede saklanıyor?", a: "Ana uygulama veritabanı seçili Supabase projesinin Avrupa (Frankfurt / eu-central-1) bölgesinde tutulur. Dosya depolama ve etkinleştirdiğiniz dış hizmetler kendi veri işleme koşullarına tabidir. Yetkilendirme, denetim ve veri yaşam döngüsü araçları sunulur; dilediğiniz an dışa aktarabilirsiniz." },
   { q: "Portal ilanlarımı otomatik çekiyor musunuz?", a: "Hayır, izinsiz veri kazımıyoruz. İlan numarası/URL ekliyorsunuz; sistem periyodik teyit ister ve ilan düştüğünde kapanış formuyla kaçağı ölçer." },
   { q: "Sözleşme veya taahhüt var mı?", a: "Taahhüt yok. Aylık kullanın, istediğiniz an iptal edin. Yıllık ödemede %20 indirim uygulanır." },
-  { q: "Mevcut CRM’den geçiş yapabilir miyim?", a: "Evet. Müşteri ve portföylerinizi Excel/CSV ile içeri aktarabilirsiniz; Profesyonel ve üzeri pakette API erişimi vardır." },
+  { q: "Mevcut CRM’den geçiş yapabilir miyim?", a: "Evet. Müşteri ve portföylerinizi Excel/CSV ile içeri aktarabilirsiniz. Özel entegrasyon ihtiyaçları teknik değerlendirme sonrasında planlanır." },
 ];
 
 const toneMap: Record<string, string> = {
@@ -197,7 +196,7 @@ function Cell({ v }: { v: boolean | "partial" }) {
 }
 
 export default function HomePage() {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://emlaksoft.com";
+  const baseUrl = getBaseUrl();
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
@@ -213,8 +212,8 @@ export default function HomePage() {
         name: "EmlakSoft",
         applicationCategory: "BusinessApplication",
         operatingSystem: "Web",
-        description: "Müşteriden tapuya, ilandan komisyona kadar emlak ofisinizi tek platformda yönetin. İYS/EİDS uyumlu, yapay zeka destekli emlak CRM.",
-        offers: { "@type": "Offer", price: "990", priceCurrency: "TRY" },
+        description: "Müşteriden tapuya, ilandan komisyona kadar emlak ofisinizi tek platformda yönetin. KVKK süreçlerini destekleyen, yapay zeka destekli emlak CRM.",
+        offers: { "@type": "Offer", price: String(getPlan("advisor").monthlyTry), priceCurrency: "TRY" },
         inLanguage: "tr-TR",
       },
     ],
@@ -247,8 +246,8 @@ export default function HomePage() {
           </div>
           <div className="pointer-events-none absolute right-[5%] top-44 hidden xl:block">
             <div className="animate-float-slow w-48 rounded-[18px] border border-white/80 bg-white/75 p-4 shadow-[var(--shadow-card)] backdrop-blur-xl">
-              <div className="flex items-center justify-between"><span className="grid h-9 w-9 place-items-center rounded-[11px] bg-mint-500/12 text-mint-600"><ShieldCheck className="h-4 w-4" /></span><span className="rounded-full bg-mint-500/10 px-2 py-1 text-[11px] font-bold text-mint-600">UYUMLU</span></div>
-              <p className="mt-3 text-[11px] font-semibold text-text-muted">İYS izin sağlığı</p>
+              <div className="flex items-center justify-between"><span className="grid h-9 w-9 place-items-center rounded-[11px] bg-mint-500/12 text-mint-600"><ShieldCheck className="h-4 w-4" /></span><span className="rounded-full bg-brand-600/10 px-2 py-1 text-[11px] font-bold text-brand-600">ÖRNEK</span></div>
+              <p className="mt-3 text-[11px] font-semibold text-text-muted">Kayıtlı kanal izni</p>
               <p className="font-display text-2xl font-extrabold text-ink-950">%94</p>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line"><div className="h-full w-[94%] rounded-full bg-[image:var(--grad-brand)]" /></div>
             </div>
@@ -270,7 +269,7 @@ export default function HomePage() {
 
             <p className="animate-rise mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-text-muted" style={{ animationDelay: "160ms" }}>
               Müşteri, portföy, komisyon, portal takibi ve kayıp-kaçak — hepsi{" "}
-              <span className="font-semibold text-ink-900">İYS/EİDS/KVKK uyumlu</span> tek yerde.
+              <span className="font-semibold text-ink-900">KVKK kayıtları ve İYS/EİDS hazırlık süreçleri</span> tek yerde.
               Bir CRM değil, tam bir işletim sistemi.
             </p>
 
@@ -279,7 +278,7 @@ export default function HomePage() {
                 14 gün ücretsiz dene <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </Link>
               <Link href="/demo" className="inline-flex items-center gap-2 rounded-[12px] border border-line-strong bg-surface px-6 py-3.5 text-sm font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600">
-                Canlı demo izle
+                Demo görüşmesi planla
               </Link>
             </div>
 
@@ -292,10 +291,10 @@ export default function HomePage() {
             {/* Kurumsal güvence şeridi — gerçek ürün nitelikleri, rafine premium */}
             <div className="animate-rise mx-auto mt-8 flex max-w-3xl flex-wrap items-center justify-center gap-2.5" style={{ animationDelay: "360ms" }}>
               {[
-                { icon: Lock, label: "KVKK uyumlu" },
-                { icon: FileCheck, label: "İYS & EİDS entegre" },
+                { icon: Lock, label: "KVKK süreç desteği" },
+                { icon: FileCheck, label: "İYS & EİDS hazırlık akışı" },
                 { icon: Database, label: "Türkiye veri altyapısı" },
-                { icon: Headphones, label: "7/24 uzman destek" },
+                { icon: Headphones, label: "Planınıza uygun uzman destek" },
               ].map((b) => (
                 <span
                   key={b.label}
@@ -525,11 +524,11 @@ export default function HomePage() {
         <section id="veri-ortaklari" className="scroll-mt-24 border-y border-line bg-surface-2">
           <div className="mx-auto max-w-6xl px-4 py-12 md:py-16">
             <Reveal className="mx-auto max-w-2xl text-center">
-              <span className="eyebrow bg-cyan-500/10 text-cyan-700"><Database className="h-3.5 w-3.5" /> Türkiye’nin veri devleriyle entegre</span>
-              <h2 className="mt-4 font-display text-3xl font-bold text-ink-950 md:text-4xl">Endeksa &amp; Tapusor gücü, ofisinizde</h2>
+              <span className="eyebrow bg-cyan-500/10 text-cyan-700"><Database className="h-3.5 w-3.5" /> Türkiye’nin veri servislerine bağlantıya hazır</span>
+              <h2 className="mt-4 font-display text-3xl font-bold text-ink-950 md:text-4xl">Endeksa &amp; Tapusor bağlantılarına hazır</h2>
               <p className="mt-3 text-text-muted">
-                Kendi comps motorumuza ek olarak Endeksa’nın bölgesel fiyat endeksini ve Tapusor’un yapay zeka “EDİ” parsel
-                değerlemesini değerleme motoruna ve portföy sayfalarına gömdük.
+                Dahili emsal motoru anahtarsız çalışır. Kurumsal API erişiminiz ve geçerli anahtarlarınız varsa Endeksa ve
+                Tapusor bağlayıcıları değerleme akışını ek kaynaklarla zenginleştirir.
               </p>
             </Reveal>
 
@@ -541,8 +540,8 @@ export default function HomePage() {
                 </div>
                 <h3 className="relative font-display text-lg font-bold text-ink-950">Endeksa bölge endeksi</h3>
                 <p className="relative mt-2 max-w-xl text-sm leading-relaxed text-text-muted">
-                  Konum ve tipe göre canlı fiyat endeksi, 12 aylık trend ve otomatik değerleme (AVM) — değerleme motoruna
-                  ağırlıklı kaynak olarak otomatik eklenir.
+                  Bağlantı yapılandırıldığında konum ve tipe göre fiyat endeksi, trend ve otomatik değerleme sonucu;
+                  kaynak adı ve ağırlığıyla birlikte değerleme motoruna eklenir.
                 </p>
                 <div className="relative mt-5 flex flex-wrap gap-2">
                   {["Bölgesel fiyat endeksi", "AVM değerleme", "12 aylık trend"].map((x) => (
@@ -558,8 +557,8 @@ export default function HomePage() {
                 </div>
                 <h3 className="relative font-display text-lg font-bold text-ink-950">Tapusor EDİ + yatırım puanı</h3>
                 <p className="relative mt-2 max-w-xl text-sm leading-relaxed text-text-muted">
-                  Ada/parsel bazlı yapay zeka “EDİ” değerlemesi, 0-100 yatırım puanı ve hukuki/teknik uyarılar — TKGM
-                  entegre parsel sorgulamasıyla birlikte.
+                  Kurumsal API erişimi yapılandırıldığında ada/parsel bazlı EDİ değerlemesi, yatırım puanı ve sağlayıcının
+                  döndürdüğü uyarılar portföy inceleme akışında gösterilir.
                 </p>
                 <div className="relative mt-5 flex flex-wrap gap-2">
                   {["Ada/parsel sorgulama", "EDİ yapay zeka değerleme", "Yatırım puanı"].map((x) => (
@@ -570,8 +569,8 @@ export default function HomePage() {
             </div>
 
             <Reveal delay={140} className="mt-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 rounded-[16px] border border-dashed border-line-strong bg-surface px-6 py-5 text-center">
-              <span className="text-xs font-semibold text-text-muted">Ayrıca beslenen resmi/kurumsal kaynaklar:</span>
-              {["TKGM", "TCMB", "TÜİK", "NVİ"].map((x) => (
+              <span className="text-xs font-semibold text-text-muted">Anahtarsız çalışan temel veri katmanı:</span>
+              {["Ofis emsalleri", "Bölge istatistikleri", "TCMB kurları"].map((x) => (
                 <span key={x} className="flex items-center gap-1.5 text-sm font-bold text-ink-950">
                   <ShieldCheck className="h-3.5 w-3.5 text-mint-600" /> {x}
                 </span>
@@ -588,9 +587,9 @@ export default function HomePage() {
           <div className="theme-dark relative mx-auto max-w-6xl px-4">
             <Reveal className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
               <div className="max-w-2xl">
-                <span className="eyebrow border border-white/10 bg-white/8 text-cyan-400"><Building2 className="h-3.5 w-3.5" /> Akıllı portföy vitrini</span>
+                <span className="eyebrow border border-white/10 bg-white/8 text-cyan-400"><Building2 className="h-3.5 w-3.5" /> Örnek akıllı portföy vitrini</span>
                 <h2 className="sda-title mt-4 font-display text-3xl font-extrabold text-white md:text-4xl">Her portföy yalnızca ilan değil,<br className="hidden md:block" /> canlı bir iş sinyali</h2>
-                <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/65 md:text-base">Fiyat sağlığı, portal durumu, yetki ve talep yoğunluğu görsel portföy kartında sürekli güncel.</p>
+                <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/65 md:text-base">Aşağıdaki temsili kartlar; fiyat sinyali, ilan bağlantısı, yetki ve talep bilgilerinin ürün içinde nasıl sunulduğunu gösterir.</p>
               </div>
               <Link href="/kayit" className="inline-flex w-fit items-center gap-2 rounded-[12px] border border-white/15 bg-white/8 px-5 py-3 text-sm font-semibold text-white backdrop-blur transition hover:border-white/30 hover:bg-white/12">
                 Portföy modülünü keşfet <ArrowRight className="h-4 w-4" />
@@ -628,7 +627,7 @@ export default function HomePage() {
                     </div>
                     <div className="mt-4 flex items-center justify-between text-[11px]">
                       <span className="flex items-center gap-1.5 text-white/45"><CircleCheck className="h-3.5 w-3.5 text-mint-400" /> {property.portal}</span>
-                      <Link href="/demo" aria-label={`${property.title} — canlı demoda incele`} className="font-bold text-cyan-400 transition hover:text-cyan-300">Detay →</Link>
+                      <Link href="/demo" aria-label={`${property.title} — demo görüşmesi planla`} className="font-bold text-cyan-400 transition hover:text-cyan-300">Demo görüşmesi planla →</Link>
                     </div>
                   </div>
                 </Reveal>
@@ -678,7 +677,7 @@ export default function HomePage() {
           <div className="grid items-center gap-12 lg:grid-cols-2">
             <Reveal>
               <span className="eyebrow bg-danger-500/10 text-danger-500"><Siren className="h-3.5 w-3.5" /> Kayıp-kaçak motoru</span>
-              <h2 className="mt-4 font-display text-3xl font-bold text-ink-950 md:text-4xl">Kaybettiğiniz komisyonu ilk kez rakamla görün</h2>
+              <h2 className="mt-4 font-display text-3xl font-bold text-ink-950 md:text-4xl">Kaybettiğiniz komisyonu net biçimde rakama dökün</h2>
               <p className="mt-4 text-text-muted">İlan yayından kalktığında sistem sebebini sorar: satıldı mı, rakip mi kapattı, yoksa danışman mı ihmal etti? Ay sonunda “tahmini kaçan komisyon” panosu masanızda.</p>
               <ul className="mt-6 space-y-3">
                 {["Zorunlu kapanış formu — boş geçilemez", "Rakip kapanışı vs. kendi satışınız ayrımı", "Danışman bazında kaçak karnesi"].map((t) => (
@@ -835,14 +834,7 @@ export default function HomePage() {
                   ))}
                 </ul>
                 <div className="relative mt-5 border-t border-line pt-4">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-semibold text-text-faint">Uygunluk</span>
-                    <span className="font-display font-bold text-mint-600">%{p.fit}</span>
-                  </div>
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-canvas">
-                    <div className="pipeline-fill h-full rounded-full bg-[image:var(--grad-brand)]" style={{ width: `${p.fit}%`, animationDelay: `${i * 120}ms` }} />
-                  </div>
-                  <div className="mt-3 flex items-center justify-between">
+                  <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold text-text-faint">{p.scale}</span>
                     <ArrowUpRight className="h-4 w-4 text-brand-600 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                   </div>
@@ -859,7 +851,7 @@ export default function HomePage() {
             <Reveal className="mx-auto max-w-2xl text-center">
               <span className="eyebrow bg-mint-500/12 text-mint-600"><Scale className="h-3.5 w-3.5" /> Karşılaştırma</span>
               <h2 className="mt-4 font-display text-3xl font-bold text-ink-950 md:text-4xl">Neden EmlakSoft?</h2>
-              <p className="mt-3 text-text-muted">Rakiplerin güçlü yanlarını kapsayıp eksik kalınan yerleri tamamlıyoruz.</p>
+              <p className="mt-3 text-text-muted">Tek ürün yaklaşımını, parçalı araç setleri ve genel amaçlı CRM iş akışlarıyla karşılaştırın.</p>
             </Reveal>
             <Reveal className="mt-10 overflow-hidden rounded-[18px] border border-line bg-surface">
               <div className="overflow-x-auto">
@@ -870,8 +862,8 @@ export default function HomePage() {
                       <th className="px-3 py-4 text-center">
                         <span className="inline-flex items-center gap-1.5 font-display font-bold text-brand-600"><span className="grid h-6 w-6 place-items-center rounded-[7px] bg-[image:var(--grad-brand)] text-[11px] font-bold text-white">E</span>EmlakSoft</span>
                       </th>
-                      <th className="px-3 py-4 text-center font-semibold text-text-muted">RE-OS</th>
-                      <th className="px-3 py-4 text-center font-semibold text-text-muted">Revy</th>
+                      <th className="px-3 py-4 text-center font-semibold text-text-muted">Ayrı araçlar</th>
+                      <th className="px-3 py-4 text-center font-semibold text-text-muted">Genel CRM</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -879,15 +871,15 @@ export default function HomePage() {
                       <tr key={row.f} className={i % 2 ? "bg-surface-2/60" : ""}>
                         <td className="px-5 py-3.5 font-medium text-ink-950">{row.f}</td>
                         <td className="px-3 py-3.5"><Cell v={row.es} /></td>
-                        <td className="px-3 py-3.5"><Cell v={row.reos} /></td>
-                        <td className="px-3 py-3.5"><Cell v={row.revy} /></td>
+                        <td className="px-3 py-3.5"><Cell v={row.separate} /></td>
+                        <td className="px-3 py-3.5"><Cell v={row.general} /></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             </Reveal>
-            <p className="mt-3 text-center text-xs text-text-faint">Karşılaştırma; kamuya açık ürün konumlandırmalarına dayalı genel değerlendirmedir.</p>
+            <p className="mt-3 text-center text-xs text-text-faint">Parçalı araç ve genel CRM sütunları tipik iş akışını temsil eder; seçilen ürün ve yapılandırmaya göre değişebilir.</p>
           </div>
         </section>
 
@@ -899,14 +891,17 @@ export default function HomePage() {
           <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 lg:grid-cols-[1fr_1.05fr]">
             <Reveal>
               <span className="eyebrow border border-white/10 bg-white/8 text-cyan-400"><Layers className="h-3.5 w-3.5" /> Entegrasyonlar</span>
-              <h2 className="mt-4 font-display text-3xl font-extrabold text-white md:text-4xl">Kullandığınız kaynaklarla<br className="hidden md:block" /> tek merkezden konuşur</h2>
-              <p className="mt-3 max-w-md text-sm leading-relaxed text-white/65 md:text-base">Veri kaynakları, ödeme ve iletişim kanalları EmlakSoft çekirdeğine canlı bağlanır; veriler tek akışta, gerçek zamanlı senkron.</p>
+              <h2 className="mt-4 font-display text-3xl font-extrabold text-white md:text-4xl">Hazır modüller ve<br className="hidden md:block" /> yapılandırılabilir bağlantılar</h2>
+              <p className="mt-3 max-w-md text-sm leading-relaxed text-white/65 md:text-base">Ürün içinde çalışan modülleri ve anahtar gerektiren dış servis bağlayıcılarını açıkça ayırın; yapılandırma durumu görünür kalsın.</p>
               <div className="mt-7 grid grid-cols-2 gap-2.5 sm:grid-cols-2">
                 {integrations.map((it) => (
                   <div key={it.name} title={`${it.name}: ${it.desc}`} className="integration-card group relative flex cursor-default items-center gap-3 overflow-hidden rounded-[14px] border border-white/10 bg-white/[0.05] p-3 backdrop-blur transition hover:border-white/25">
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-white/8 text-cyan-400 transition group-hover:scale-110"><it.icon className="h-4 w-4" /></span>
                     <div className="min-w-0"><p className="truncate text-sm font-bold text-white">{it.name}</p><p className="truncate text-[11px] text-white/50">{it.desc}</p></div>
-                    <span className="status-pulse absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-mint-400" />
+                    <span
+                      title={it.ready ? "Ürün içinde hazır" : "Yapılandırma gerekir"}
+                      className={`absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full ${it.ready ? "status-pulse bg-mint-400" : "bg-amber-400"}`}
+                    />
                   </div>
                 ))}
               </div>
@@ -923,8 +918,8 @@ export default function HomePage() {
           <div className="relative mx-auto max-w-6xl px-4">
             <Reveal className="mx-auto max-w-2xl text-center">
               <span className="eyebrow bg-white/10 text-mint-400"><ShieldCheck className="h-3.5 w-3.5" /> Güven & uyum</span>
-              <h2 className="mt-4 font-display text-3xl font-bold text-white md:text-4xl">Kurumsal güvenlik, Türkiye mevzuatı</h2>
-              <p className="mt-3 text-white/70">Verileriniz AB’de, uyum akışları ürünün içinde. Ceza riskini azaltın, güveni artırın.</p>
+              <h2 className="mt-4 font-display text-3xl font-bold text-white md:text-4xl">Kurumsal güvenlik ve mevzuat süreçleri</h2>
+              <p className="mt-3 text-white/70">Yetki, denetim ve veri yaşam döngüsü akışlarını tek yerde yönetin; mevzuat çalışmalarını kayıtlarla destekleyin.</p>
             </Reveal>
             <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {security.map((s, i) => (
@@ -936,7 +931,7 @@ export default function HomePage() {
                   <h3 className="relative mt-4 font-display text-base font-bold text-white">{s.title}</h3>
                   <p className="relative mt-1 text-sm text-white/65">{s.text}</p>
                   <span className="hover-action relative mt-4 inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-mint-400 opacity-0 transition duration-500 group-hover:opacity-100">
-                    <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-400" /> Aktif koruma
+                    <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-400" /> Kayıtlı süreç
                   </span>
                 </Reveal>
               ))}
@@ -956,8 +951,8 @@ export default function HomePage() {
               <Reveal key={q.role} delay={i * 90} className="quote-card lift relative flex flex-col overflow-hidden rounded-[20px] border border-line bg-surface p-6">
                 <Quote className="pointer-events-none absolute -right-3 -top-4 h-28 w-28 text-brand-600/[0.045]" />
                 <div className="relative flex items-center justify-between">
-                  <div className="flex items-center gap-1 text-amber-400">{Array.from({ length: 5 }).map((_, j) => (<Star key={j} className="h-4 w-4 fill-current" />))}</div>
-                  <span className="rounded-full bg-mint-500/10 px-2 py-1 text-[11px] font-bold text-mint-600">DOĞRULANDI</span>
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-600"><Quote className="h-4 w-4" /> Temsili anlatım</div>
+                  <span className="rounded-full bg-brand-600/10 px-2 py-1 text-[11px] font-bold text-brand-600">SAHA SENARYOSU</span>
                 </div>
                 <p className="relative mt-5 flex-1 text-sm font-medium leading-relaxed text-text">{q.text}</p>
                 <div className="relative mt-5 flex items-center gap-3 border-t border-line pt-4">
@@ -1023,11 +1018,11 @@ export default function HomePage() {
             <p className="mx-auto mt-4 max-w-xl text-white/70">14 gün ücretsiz. Kredi kartı yok. Verileriniz size ait, istediğiniz an dışa aktarın.</p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Link href="/kayit" className="btn-shine inline-flex items-center gap-2 rounded-[12px] bg-white px-7 py-3.5 text-sm font-bold text-ink-950 transition hover:bg-white/90">Hemen başla <ArrowRight className="h-4 w-4" /></Link>
-              <Link href="/demo" className="inline-flex items-center gap-2 rounded-[12px] border border-white/25 px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10">Canlı demo</Link>
+              <Link href="/demo" className="inline-flex items-center gap-2 rounded-[12px] border border-white/25 px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10">Demo görüşmesi planla</Link>
             </div>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-white/60">
-              <span className="flex items-center gap-2"><Lock className="h-4 w-4" /> KVKK & AB sunucu</span>
-              <span className="flex items-center gap-2"><Scale className="h-4 w-4" /> İYS/EİDS uyumlu</span>
+              <span className="flex items-center gap-2"><Lock className="h-4 w-4" /> KVKK süreçleri & AB sunucu</span>
+              <span className="flex items-center gap-2"><Scale className="h-4 w-4" /> KVKK süreç desteği</span>
               <span className="flex items-center gap-2"><Check className="h-4 w-4" /> Taahhütsüz</span>
             </div>
           </Reveal>
@@ -1039,8 +1034,8 @@ export default function HomePage() {
         <div className="mx-auto max-w-6xl px-4 py-12">
           <div className="mb-10 grid gap-4 border-b border-white/10 pb-8 sm:grid-cols-3">
             {[
-              { icon: ShieldCheck, title: "KVKK uyumlu", text: "AB bölgesinde güvenli veri" },
-              { icon: Scale, title: "İYS · EİDS hazır", text: "Mevzuat akışları ürün içinde" },
+              { icon: ShieldCheck, title: "KVKK süreç desteği", text: "AB bölgesinde yetkili ve denetlenebilir veri" },
+              { icon: Scale, title: "İYS · EİDS hazırlığı", text: "Mevzuat adımları görünür süreçlerde" },
               { icon: Headphones, title: "Yerel uzman destek", text: "Türkiye operasyon ekibi" },
             ].map((item) => (
               <div key={item.title} className="flex items-center gap-3 rounded-[14px] border border-white/8 bg-white/[0.035] p-4">
@@ -1055,14 +1050,14 @@ export default function HomePage() {
                 <span className="grid h-9 w-9 place-items-center rounded-[11px] bg-[image:var(--grad-brand)] font-display text-base font-extrabold text-white">E</span>
                 <span className="font-display text-lg font-extrabold text-white">EmlakSoft</span>
               </div>
-              <p className="mt-4 max-w-xs text-sm text-text-muted">Türkiye için en kapsamlı emlak işletim sistemi. Müşteri, portföy, komisyon ve uyumluluk tek platformda.</p>
+              <p className="mt-4 max-w-xs text-sm text-text-muted">Türkiye’deki emlak operasyonları için işletim sistemi. Müşteri, portföy, komisyon ve uyum süreçleri tek platformda.</p>
               <div className="mt-4 flex items-center gap-2 text-sm text-text-muted">
-                <span className="status-pulse h-2 w-2 rounded-full bg-mint-500" /> Frankfurt (eu-central-1)
+                <span className="status-pulse h-2 w-2 rounded-full bg-mint-500" /> Ana veritabanı · Frankfurt (eu-central-1)
               </div>
             </div>
 
             {[
-              { title: "Ürün", links: [["Özellikler", "#ozellikler"], ["Fiyatlandırma", "#fiyat"], ["Karşılaştırma", "#karsilastirma"], ["Canlı demo", "/demo"]] },
+              { title: "Ürün", links: [["Özellikler", "#ozellikler"], ["Fiyatlandırma", "#fiyat"], ["Karşılaştırma", "#karsilastirma"], ["Demo görüşmesi planla", "/demo"]] },
               { title: "Çözümler", links: [["Danışman", "#fiyat"], ["Ofis", "#fiyat"], ["Franchise", "#fiyat"], ["Proje satış", "#fiyat"]] },
               { title: "Şirket", links: [["Hakkımızda", "#ozellikler"], ["Ürün gündemi", "#nasil"], ["İletişim", "mailto:destek@emlaksoft.com.tr"], ["Kariyer", "mailto:destek@emlaksoft.com.tr"]] },
             ].map((col) => (

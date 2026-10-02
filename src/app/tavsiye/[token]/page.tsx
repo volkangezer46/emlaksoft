@@ -10,6 +10,7 @@ import {
   PublicTokenPage,
 } from "@/components/public/token-page";
 import { ReferralForm } from "./referral-form";
+import { isPublicTenantActive } from "@/lib/public-tenant";
 
 // Tavsiye linkleri kişiye özeldir → arama motorlarına kapalı (anket deseni).
 export const metadata: Metadata = {
@@ -47,7 +48,7 @@ export default async function ReferralPage({
   const { data: link } = await admin
     .from("referral_links")
     .select(
-      "id, is_active, reward_note, customer:customers(full_name), tenant:tenants(name, phone, logo_url, brand_color)",
+      "id, tenant_id, customer_id, is_active, reward_note, tenant:tenants(name, status, phone, logo_url, brand_color)",
     )
     .eq("public_token", token)
     .maybeSingle();
@@ -56,15 +57,25 @@ export default async function ReferralPage({
 
   type TenantShape = {
     name?: string;
+    status?: string;
     phone?: string | null;
     logo_url?: string | null;
     brand_color?: string | null;
   };
   const tenant = rel(link.tenant as TenantShape | TenantShape[] | null);
+  if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
+  const { data: customer } = await admin
+    .from("customers")
+    .select("full_name")
+    .eq("id", link.customer_id)
+    .eq("tenant_id", link.tenant_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!customer) notFound();
   const office = tenant?.name ?? "Emlak ofisi";
   const officePhone = tenant?.phone ?? null;
   const telHref = toTelHref(officePhone);
-  const referrer = rel(link.customer as { full_name?: string } | { full_name?: string }[] | null)?.full_name ?? "Bir müşterimiz";
+  const referrer = customer.full_name ?? "Bir müşterimiz";
   const firstName = referrer.split(" ")[0] || referrer;
   const active = link.is_active !== false;
   const reward = String(link.reward_note ?? "").trim();

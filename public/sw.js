@@ -1,52 +1,96 @@
-/* EmlakSoft PWA — sürümlü cache, offline fallback, push bildirimleri */
-const VERSION = "v4";
+/* EmlakSoft PWA: privacy-bounded offline shell and push notifications. */
+const VERSION = "v6";
+// v6 is a one-time privacy migration. It must take control immediately so any
+// legacy v4 worker/cache stops serving previously cached authenticated HTML.
+// Future versions can return to the normal waiting lifecycle by leaving this
+// migration marker at v6.
+const FORCE_ACTIVATE_VERSION = "v6";
+const MANAGED_CACHE_PREFIX = "emlaksoft-";
 const STATIC_CACHE = `emlaksoft-static-${VERSION}`;
 const PAGE_CACHE = `emlaksoft-pages-${VERSION}`;
 const CURRENT_CACHES = [STATIC_CACHE, PAGE_CACHE];
 
 const OFFLINE_URL = "/offline.html";
-const PRECACHE_STATIC = [OFFLINE_URL, "/manifest.webmanifest", "/window.svg"];
-const PRECACHE_PAGES = ["/"];
+const PRECACHE_STATIC = [OFFLINE_URL, "/manifest.webmanifest", "/icon.svg"];
 
-/**
- * Oturum gerektiren VEYA kişiye-özel token sayfaları ASLA cache'lenmez. /app,
- * /admin bir kez PAGE_CACHE'e yazılırsa çıkış yapmış (veya başka) kullanıcı
- * offline'da paneli görebilir. Aynı risk token'lı public sayfalarda daha da
- * ağır: paylaşılan/ortak bir cihazda birinin ödeme linki, malik/müşteri portalı,
- * sunum veya randevu-teyit sayfası cache'ten BAŞKASINA açılabilir. Bu path'ler
- * network-first yerine yalnız ağ + offline.html fallback alır.
+/*
+ * Page caching is fail-closed. New routes remain network-only until explicitly
+ * reviewed here, so a future token/portal route cannot leak private HTML on a
+ * shared device merely because somebody forgot to extend a deny-list.
  */
-const TOKEN_PREFIXES = [
-  "/paylas/",
-  "/sunum/",
-  "/tavsiye/",
-  "/musteri-portali/",
-  "/malik-portali/",
-  "/randevu-al/",
-  "/randevu-teyit/",
-  "/odeme-link/",
-  "/vitrin/",
-];
-function isPrivatePage(pathname) {
-  if (pathname === "/app" || pathname.startsWith("/app/") || pathname === "/admin" || pathname.startsWith("/admin/")) {
-    return true;
+const CACHEABLE_PUBLIC_PAGES = new Set([
+  "/",
+  "/cerez-politikasi",
+  "/gizlilik",
+  "/iptal-iade",
+  "/kullanim-sartlari",
+  "/kvkk-aydinlatma",
+  "/mesafeli-satis",
+  "/on-bilgilendirme",
+]);
+
+const CACHEABLE_PUBLIC_ASSETS = new Set([
+  OFFLINE_URL,
+  "/emlaksoft-premium-team.png",
+  "/file.svg",
+  "/globe.svg",
+  "/icon.svg",
+  "/listing-aegean-villa.png",
+  "/listing-bosphorus-villa.png",
+  "/listing-istanbul-penthouse.png",
+  "/manifest.webmanifest",
+  "/next.svg",
+  "/vercel.svg",
+  "/window.svg",
+]);
+
+function isCacheablePublicPage(pathname) {
+  return CACHEABLE_PUBLIC_PAGES.has(pathname);
+}
+
+function isStaticAsset(pathname) {
+  return pathname.startsWith("/_next/static/") || CACHEABLE_PUBLIC_ASSETS.has(pathname);
+}
+
+function responseMayBeCached(response, expectedKind) {
+  if (!response.ok || response.type === "opaque") return false;
+  const policy = (response.headers.get("Cache-Control") || "").toLowerCase();
+  if (policy.includes("no-store") || policy.includes("private")) return false;
+  const finalUrl = new URL(response.url || self.location.origin, self.location.origin);
+  if (finalUrl.origin !== self.location.origin) return false;
+  return expectedKind === "page"
+    ? isCacheablePublicPage(finalUrl.pathname) && !finalUrl.search
+    : isStaticAsset(finalUrl.pathname);
+}
+
+function safeNotificationHref(value) {
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) {
+    return "/app";
   }
-  return TOKEN_PREFIXES.some((p) => pathname.startsWith(p));
+  try {
+    const url = new URL(value, self.location.origin);
+    if (url.origin !== self.location.origin) return "/app";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "/app";
+  }
 }
 
 self.addEventListener("install", (event) => {
-  // skipWaiting BURADA çağrılmaz: yeni sürüm "waiting" durumunda bekler,
-  // kullanıcı sw-register'daki "Yenile" çubuğuyla onaylayınca geçilir.
   event.waitUntil(
     Promise.all([
-      caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE_STATIC)),
-      caches.open(PAGE_CACHE).then((cache) => cache.addAll(PRECACHE_PAGES)),
-    ]),
+      caches
+        .open(STATIC_CACHE)
+        .then((cache) => Promise.allSettled(PRECACHE_STATIC.map((url) => cache.add(url)))),
+      caches.open(PAGE_CACHE),
+    ]).then(() => {
+      if (VERSION === FORCE_ACTIVATE_VERSION) return self.skipWaiting();
+      return undefined;
+    }),
   );
 });
 
 self.addEventListener("message", (event) => {
-  // sw-register.tsx "Yenile" butonu: bekleyen sürümü hemen aktive et
   if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
@@ -55,105 +99,108 @@ self.addEventListener("activate", (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => !CURRENT_CACHES.includes(k)).map((k) => caches.delete(k))),
+        Promise.all(
+          keys
+            .filter(
+              (key) => key.startsWith(MANAGED_CACHE_PREFIX) && !CURRENT_CACHES.includes(key),
+            )
+            .map((key) => caches.delete(key)),
+        ),
       )
       .then(() => self.clients.claim()),
   );
 });
 
 self.addEventListener("push", (event) => {
-  let data = { title: "EmlakSoft", body: "Yeni bildirim" };
+  let payload = { title: "EmlakSoft", body: "Yeni bildirim", href: "/app" };
   try {
-    if (event.data) data = { ...data, ...event.data.json() };
+    if (event.data) payload = { ...payload, ...event.data.json() };
   } catch {
-    /* metin payload olabilir */
+    /* Invalid/non-JSON payload: use the safe defaults. */
   }
+  const title = String(payload.title || "EmlakSoft").slice(0, 100);
+  const body = String(payload.body || "Yeni bildirim").slice(0, 300);
+  const href = safeNotificationHref(payload.href);
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: "/window.svg",
-      badge: "/window.svg",
-      data: { href: data.href || "/app" },
+    self.registration.showNotification(title, {
+      body,
+      icon: "/icon.svg",
+      badge: "/icon.svg",
+      data: { href },
     }),
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const href = event.notification.data?.href || "/app";
+  const href = safeNotificationHref(event.notification.data?.href);
   event.waitUntil(
     self.clients.matchAll({ type: "window" }).then((clients) => {
+      const targetUrl = new URL(href, self.location.origin).href;
       for (const client of clients) {
-        if (client.url.includes(href) && "focus" in client) return client.focus();
+        if (client.url === targetUrl && "focus" in client) return client.focus();
       }
       return self.clients.openWindow(href);
     }),
   );
 });
 
-/** Hash'li _next/static dosyaları immutable, ikon/manifest de nadiren değişir → cache-first. */
-function isStaticAsset(pathname) {
-  return (
-    pathname.startsWith("/_next/static/") ||
-    pathname === "/manifest.webmanifest" ||
-    /\.(svg|png|ico|jpg|jpeg|webp|avif|woff2?)$/.test(pathname)
-  );
-}
-
-/** Statik varlık: cache-first (yoksa ağdan al ve cache'e koy). */
-function cacheFirst(req) {
-  return caches.match(req).then(
+function cacheFirst(request) {
+  return caches.match(request).then(
     (cached) =>
       cached ||
-      fetch(req).then((res) => {
-        if (res.ok) {
-          const clone = res.clone();
-          caches.open(STATIC_CACHE).then((c) => c.put(req, clone));
+      fetch(request).then((response) => {
+        if (responseMayBeCached(response, "asset")) {
+          const clone = response.clone();
+          void caches.open(STATIC_CACHE).then((cache) => cache.put(request, clone));
         }
-        return res;
+        return response;
       }),
   );
 }
 
-/** Sayfa gezinmesi: network-first → cache → offline.html. */
-function pageNetworkFirst(req) {
-  return fetch(req)
-    .then((res) => {
-      if (res.ok) {
-        const clone = res.clone();
-        caches.open(PAGE_CACHE).then((c) => c.put(req, clone));
+function pageNetworkFirst(request) {
+  return fetch(request)
+    .then((response) => {
+      if (responseMayBeCached(response, "page")) {
+        const clone = response.clone();
+        void caches.open(PAGE_CACHE).then((cache) => cache.put(request, clone));
       }
-      return res;
+      return response;
     })
     .catch(() =>
       caches
-        .match(req)
+        .match(request)
         .then((cached) => cached || caches.match(OFFLINE_URL))
         .then((fallback) => fallback || Response.error()),
     );
 }
 
+function networkWithOfflineFallback(request) {
+  return fetch(request).catch(() =>
+    caches.match(OFFLINE_URL).then((fallback) => fallback || Response.error()),
+  );
+}
+
 self.addEventListener("fetch", (event) => {
-  const req = event.request;
-  // POST / PUT / DELETE vb. ASLA cache'lenmez — service worker karışmaz
-  if (req.method !== "GET") return;
-  const url = new URL(req.url);
+  const request = event.request;
+  if (request.method !== "GET") return;
+
+  const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-  // API / auth asla cache'lenmez
   if (url.pathname.startsWith("/api") || url.pathname.startsWith("/giris")) return;
 
   if (isStaticAsset(url.pathname)) {
-    event.respondWith(cacheFirst(req));
+    event.respondWith(cacheFirst(request));
     return;
   }
 
-  if (req.mode === "navigate") {
-    if (isPrivatePage(url.pathname)) {
-      // Auth'lu sayfa: cache'e yazma, cache'ten okuma — yalnız offline fallback
-      event.respondWith(fetch(req).catch(() => caches.match(OFFLINE_URL).then((f) => f || Response.error())));
+  if (request.mode === "navigate") {
+    if (!isCacheablePublicPage(url.pathname) || url.search) {
+      event.respondWith(networkWithOfflineFallback(request));
       return;
     }
-    event.respondWith(pageNetworkFirst(req));
+    event.respondWith(pageNetworkFirst(request));
   }
-  // Diğer GET istekleri (RSC payload vb.) ağa bırakılır — cache'lenmez
+  // RSC payloads and every other GET stay on the network and are never cached.
 });

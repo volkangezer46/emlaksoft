@@ -26,12 +26,14 @@ import { clearSampleDataForm } from "@/app/actions/sample-data";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getNotificationPrefs } from "@/app/actions/notification-prefs";
 import { isNetgsmConfigured } from "@/lib/messaging/netgsm";
+import { platformMessagingFallbackAllowed } from "@/lib/messaging/tenant-providers";
 import { sanitizeMatchingWeights, type MatchingWeights } from "@/lib/matching";
 import { CompanyForm } from "./company-form";
 import { MatchingWeightsForm } from "./matching-weights-form";
 import { LogoUploadForm } from "./logo-upload-form";
 import { IntegrationsForm } from "./integrations-form";
 import { NotificationPrefsPanel } from "@/components/app/notification-prefs";
+import { planLabel } from "@/lib/billing/plans";
 
 type SettingCard = {
   title: string;
@@ -48,14 +50,14 @@ const SETUP_RING_C = 2 * Math.PI * 42;
 const cards: SettingCard[] = [
   { title: "Şube / ekip", desc: "Şubeler, ekipler ve bölge yetkilendirmeleri.", icon: Users2, tone: "bg-cyan-400/12 text-cyan-500", href: "/app/ekip" },
   { title: "Kullanıcı & roller", desc: "Danışman, yönetici ve broker rol izinleri.", icon: Fingerprint, tone: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/roller" },
-  { title: "Entegrasyonlar", desc: "TAKBİS, WhatsApp Business, İYS, Endeksa — dış servis bağlantı merkezi.", icon: Plug, tone: "bg-cyan-400/12 text-cyan-500", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/entegrasyonlar" },
+  { title: "Entegrasyonlar", desc: "Hazır, yapılandırma bekleyen ve planlanan dış servis bağlantıları.", icon: Plug, tone: "bg-cyan-400/12 text-cyan-500", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/entegrasyonlar" },
   { title: "Duyuru panosu", desc: "Ekibe duyuru yayınlayın, kim okudu takip edin.", icon: Megaphone, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/duyurular" },
   { title: "Mesaj şablonları", desc: "WhatsApp için hazır metinler — değişkenler tek tıkla dolar.", icon: MessageSquareText, tone: "bg-mint-500/12 text-mint-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/mesaj-sablonlari" },
   { title: "Güvenlik", desc: "SMS ile iki adımlı doğrulama ve giriş geçmişi.", icon: ShieldCheck, tone: "bg-mint-500/12 text-mint-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/guvenlik" },
   { title: "Çöp kutusu", desc: "Silinen müşteri ve portföyleri 90 gün içinde geri alın.", icon: Trash2, tone: "bg-danger-500/10 text-danger-500", href: "/app/ayarlar/cop-kutusu" },
   { title: "Tanımlar & seçim listeleri", desc: "Müşteri tipi, kaynak, portföy tipi gibi tüm dropdown seçeneklerini yönetin.", icon: Sliders, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/tanimlar" },
   { title: "Komisyon defteri", desc: "Hakediş kayıtları, danışman payı ve ödeme bağlantıları.", icon: Wallet, tone: "bg-amber-400/15 text-amber-500", href: "/app/komisyon" },
-  { title: "İYS / EİDS", desc: "İzin yönetimi ve elektronik ileti uyumu.", icon: ShieldCheck, tone: "bg-mint-500/12 text-mint-600", badge: "Manuel", badgeCls: "bg-ink-950/8 text-text-muted", href: "/app/uyum" },
+  { title: "İYS / EİDS", desc: "Kanal izin kayıtları ve EİDS hazırlık adımları.", icon: ShieldCheck, tone: "bg-mint-500/12 text-mint-600", badge: "Manuel", badgeCls: "bg-ink-950/8 text-text-muted", href: "/app/uyum" },
   { title: "Abonelik & iyzico", desc: "Paket, fatura ve ödeme yöntemi yönetimi.", icon: CreditCard, tone: "bg-brand-600/10 text-brand-600", badge: "Pro", badgeCls: "bg-brand-600/10 text-brand-600", href: "/app/abonelik" },
   { title: "Değerleme", desc: "Çok kaynaklı fiyat bandı ve ofis emsalleri.", icon: Sliders, tone: "bg-cyan-400/12 text-cyan-500", href: "/app/degerleme" },
   { title: "Raporlar", desc: "Ofis skoru, komisyon ve kayıp-kaçak özeti.", icon: ScrollText, tone: "bg-danger-500/10 text-danger-500", href: "/app/raporlar" },
@@ -71,7 +73,7 @@ export default async function SettingsPage() {
   await requireModulePage("settings");
   const supabase = await createClient();
 
-  const [{ data: { user } }, { data: tenantRow }, notifPrefs, { count: consentCount }, { count: activeConsentCount }, { count: auditCount }, { data: netgsmRow }, netgsmPlatformConfigured] = await Promise.all([
+  const [{ data: { user } }, { data: tenantRow }, notifPrefs, { count: consentCount }, { count: activeConsentCount }, { count: auditCount }, { data: netgsmRow }, { data: whatsappRow }, netgsmPlatformConfigured] = await Promise.all([
     supabase.auth.getUser(),
     supabase
       .from("tenants")
@@ -83,7 +85,13 @@ export default async function SettingsPage() {
     supabase.from("iys_consents").select("id", { count: "exact", head: true }).eq("status", "granted"),
     supabase.from("audit_logs").select("id", { count: "exact", head: true }),
     // Tablo henüz oluşmadıysa error döner, data null kalır — form boş başlar
-    supabase.from("tenant_integrations").select("credentials").eq("provider", "netgsm").limit(1).maybeSingle(),
+    supabase.from("tenant_integrations").select("credentials, external_account_id").eq("provider", "netgsm").limit(1).maybeSingle(),
+    supabase
+      .from("tenant_integrations")
+      .select("credentials, external_account_id, whatsapp_business_account_id, graph_api_version, connection_status")
+      .eq("provider", "whatsapp")
+      .limit(1)
+      .maybeSingle(),
     isNetgsmConfigured(),
   ]);
 
@@ -114,7 +122,25 @@ export default async function SettingsPage() {
   const netgsmCreds = (netgsmRow?.credentials ?? null) as { usercode?: string; password?: string; msgheader?: string } | null;
   // Şifre client'a asla gitmez — yalnızca var/yok bilgisi
   const netgsm = netgsmCreds && (netgsmCreds.usercode || netgsmCreds.msgheader)
-    ? { usercode: netgsmCreds.usercode ?? "", msgheader: netgsmCreds.msgheader ?? "", hasPassword: Boolean(netgsmCreds.password) }
+    ? {
+        usercode: netgsmCreds.usercode ?? "",
+        msgheader: netgsmCreds.msgheader ?? "",
+        inboundReceiver: String(netgsmRow?.external_account_id ?? ""),
+        hasPassword: Boolean(netgsmCreds.password),
+      }
+    : null;
+  const platformFallbackConfigured =
+    netgsmPlatformConfigured && platformMessagingFallbackAllowed();
+  const whatsappCreds = (whatsappRow?.credentials ?? null) as { configured?: boolean } | null;
+  // Erişim anahtarı hiçbir zaman sayfa verisine girmez; yalnız maskeli var/yok bilgisi aktarılır.
+  const whatsapp = whatsappRow
+    ? {
+        phoneNumberId: String(whatsappRow.external_account_id ?? ""),
+        wabaId: String(whatsappRow.whatsapp_business_account_id ?? ""),
+        graphVersion: String(whatsappRow.graph_api_version ?? ""),
+        hasAccessToken: whatsappCreds?.configured === true,
+        status: String(whatsappRow.connection_status ?? "configured"),
+      }
     : null;
 
   // Kurulum kontrol listesi — ilk madde her zaman tamam (hesap zaten açık),
@@ -133,8 +159,6 @@ export default async function SettingsPage() {
   ];
   const doneCount = checklist.filter((c) => c.done).length;
   const completion = Math.round((doneCount / checklist.length) * 100);
-  const planLabel: Record<string, string> = { advisor: "Danışman", office: "Ofis", professional: "Profesyonel", enterprise: "Kurumsal" };
-
   return (
     <div className="space-y-6">
       {/* premium header */}
@@ -145,7 +169,7 @@ export default async function SettingsPage() {
           <div>
             <span className="flex items-center gap-2 text-xs font-semibold text-mint-400"><Sliders className="h-4 w-4" /> Ofis yapılandırması</span>
             <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">{tenant.name || "Ayarlar"}</h1>
-            <p className="mt-1 text-sm text-white/60">{planLabel[tenant.plan] ?? "Ofis"} planı · ofis, ekip, uyum ve entegrasyonları tek merkezden yönetin.</p>
+            <p className="mt-1 text-sm text-white/60">{planLabel(tenant.plan)} planı · ofis, ekip, uyum ve entegrasyonları tek merkezden yönetin.</p>
           </div>
           <details className="group/ring text-left">
             <summary
@@ -246,11 +270,15 @@ export default async function SettingsPage() {
           <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-cyan-400/12 text-cyan-500"><Plug className="h-5 w-5" /></span>
           <div>
             <h2 className="font-display font-bold text-ink-950">Entegrasyonlar</h2>
-            <p className="text-xs text-text-muted">Kampanya SMS gönderimi için ofise özel Netgsm hesabı</p>
+            <p className="text-xs text-text-muted">Ofise özel Netgsm SMS ve WhatsApp Cloud API bağlantıları</p>
           </div>
         </div>
         <div className="mt-5">
-          <IntegrationsForm netgsm={netgsm} platformConfigured={netgsmPlatformConfigured} />
+          <IntegrationsForm
+            netgsm={netgsm}
+            platformConfigured={platformFallbackConfigured}
+            whatsapp={whatsapp}
+          />
         </div>
       </section>
 

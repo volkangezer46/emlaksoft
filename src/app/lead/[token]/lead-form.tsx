@@ -35,7 +35,6 @@ export function LeadForm({
       return;
     }
     delete payload.website;
-    delete payload.kvkk;
 
     setStatus("loading");
     setError(null);
@@ -44,7 +43,12 @@ export function LeadForm({
       const res = await fetch(`/api/leads/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, channel: "web_form", source: "web_form" }),
+        body: JSON.stringify({
+          ...payload,
+          request_id: crypto.randomUUID(),
+          channel: "web_form",
+          source: "web_form",
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {

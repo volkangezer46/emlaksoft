@@ -142,7 +142,7 @@ const PAGER_BTN_DISABLED =
 export default async function PropertiesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string; status?: string; saglik?: string; gorunum?: string; sayfa?: string; sirala?: string }>;
+  searchParams?: Promise<{ q?: string; status?: string; saglik?: string; gorunum?: string; sayfa?: string; sirala?: string; yeni?: string }>;
 }) {
   const { perms } = await requireModulePage("properties");
   const canCreate = (perms.properties ?? []).includes("create");
@@ -305,7 +305,7 @@ export default async function PropertiesPage({
   const fxTitle = fxRates ? `TCMB ${fxRates.rateDate} satış kuru — ${fxAgeLabel(fxRates.rateDate, now())}` : undefined;
 
   // Kapak görselleri — tek ek sorgu; property_id -> media id eşlemesi.
-  // Görsel /api/property-media/[id] üzerinden servis edilir (medya yöneticisiyle aynı yol).
+  // Görsel tenant/yetki kontrollü download ucu üzerinden servis edilir.
   const coverByProperty = new Map<string, string>();
   if (rows.length > 0) {
     const { data: covers } = await supabase
@@ -422,7 +422,7 @@ export default async function PropertiesPage({
               label="Dışa aktar"
               className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
             />
-            {canCreate ? <NewPropertyDialog provinces={provinceList} branches={branchList} propertyTypes={propertyTypeOptions} transactionTypes={transactionTypeOptions} /> : null}
+            {canCreate ? <NewPropertyDialog key={params.yeni === "1" ? "new-property" : "property-dialog"} provinces={provinceList} branches={branchList} propertyTypes={propertyTypeOptions} transactionTypes={transactionTypeOptions} defaultOpen={params.yeni === "1"} /> : null}
           </div>
         </div>
         {/* Toplam portföy değeri + döviz karşılığı — kur yoksa satır hiç çizilmez */}
@@ -608,6 +608,7 @@ export default async function PropertiesPage({
               title: `${property.title ?? property.property_code} · Fiyat sağlığı: ${healthLabel(property.price_health)}`,
               href: `/app/portfoyler/${property.id}`,
               coverId: coverId ?? null,
+              coverSrc: coverId ? `/api/property-media/${coverId}/download` : null,
               price: property.list_price != null ? Number(property.list_price) : null,
               tx: property.transaction_type,
               rooms: feat.rooms ?? null,
@@ -638,7 +639,7 @@ export default async function PropertiesPage({
                 <div className="relative flex h-36 items-center justify-center overflow-hidden bg-[image:var(--grad-brand-soft)]">
                   {coverId ? (
                     <Image
-                      src={`/api/property-media/${coverId}`}
+                      src={`/api/property-media/${coverId}/download`}
                       alt={property.title ?? property.property_code}
                       fill
                       sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"

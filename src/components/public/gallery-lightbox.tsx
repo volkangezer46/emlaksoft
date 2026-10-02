@@ -1,11 +1,16 @@
 "use client";
 
 import Image from "next/image";
-import { createPortal } from "react-dom";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { ChevronLeft, ChevronRight, Expand, X } from "lucide-react";
+import {
+  Dialog,
+  DialogDescription,
+  DialogFullscreenContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
-export type GalleryImage = { id: string; alt?: string | null };
+export type GalleryImage = { id: string; alt?: string | null; src?: string };
 
 const MAX_THUMBS = 10;
 
@@ -38,52 +43,14 @@ export function GalleryLightbox({
 }: GalleryLightboxProps) {
   const [index, setIndex] = useState(0);
   const [open, setOpen] = useState(false);
-  const dialogRef = useRef<HTMLDivElement>(null);
 
   const count = images.length;
   const prev = useCallback(() => setIndex((i) => (i - 1 + count) % count), [count]);
   const next = useCallback(() => setIndex((i) => (i + 1) % count), [count]);
 
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-      else if (e.key === "ArrowLeft") prev();
-      else if (e.key === "ArrowRight") next();
-      else if (e.key === "Tab") {
-        // Elle kurulmuş dialog: Tab odağı lightbox içinde döndürsün,
-        // arkadaki (scroll'u kilitli) sayfaya sızmasın.
-        const root = dialogRef.current;
-        if (!root) return;
-        const focusables = Array.from(root.querySelectorAll<HTMLElement>("button"));
-        if (focusables.length === 0) return;
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-        const current = document.activeElement;
-        if (e.shiftKey) {
-          if (current === first || !root.contains(current)) {
-            e.preventDefault();
-            last.focus();
-          }
-        } else if (current === last || !root.contains(current)) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialogRef.current?.focus();
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [open, prev, next]);
-
   if (count === 0) return null;
   const current = images[Math.min(index, count - 1)];
-  const srcOf = (img: GalleryImage) => `/api/property-media/${img.id}`;
+  const srcOf = (img: GalleryImage) => img.src ?? `/api/property-media/${img.id}`;
 
   return (
     <>
@@ -100,6 +67,7 @@ export function GalleryLightbox({
           fill
           priority={priority}
           sizes={sizes}
+          unoptimized
           className="object-cover"
         />
         <span className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-ink-950/70 px-2.5 py-1 text-[11px] font-bold text-white">
@@ -125,6 +93,7 @@ export function GalleryLightbox({
                 alt={img.alt ?? `${alt} — fotoğraf ${i + 1}`}
                 fill
                 sizes="120px"
+                unoptimized
                 className="object-cover"
               />
             </button>
@@ -145,17 +114,26 @@ export function GalleryLightbox({
         </div>
       ) : null}
 
-      {open
-        ? createPortal(
-            <div
-              ref={dialogRef}
-              role="dialog"
-              aria-modal="true"
-              aria-label={`${alt} fotoğraf galerisi`}
-              tabIndex={-1}
-              onClick={() => setOpen(false)}
-              className="fixed inset-0 z-[100] flex flex-col bg-ink-950/95 outline-none backdrop-blur-sm"
-            >
+      {open ? (
+        <Dialog open onOpenChange={setOpen}>
+          <DialogFullscreenContent
+            overlayClassName="bg-ink-950/95 backdrop-blur-sm"
+            className="flex flex-col bg-ink-950/95"
+            onClick={() => setOpen(false)}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowLeft") {
+                event.preventDefault();
+                prev();
+              } else if (event.key === "ArrowRight") {
+                event.preventDefault();
+                next();
+              }
+            }}
+          >
+              <DialogTitle className="sr-only">{alt} fotoğraf galerisi</DialogTitle>
+              <DialogDescription className="sr-only">
+                Galeride {count} fotoğraf var. Önceki ve sonraki fotoğrafa ok tuşlarıyla geçebilirsiniz.
+              </DialogDescription>
               <div className="flex items-center justify-between px-4 py-3 text-white" onClick={(e) => e.stopPropagation()}>
                 <span className="text-sm font-semibold text-white/80">
                   {index + 1} / {count}
@@ -177,6 +155,7 @@ export function GalleryLightbox({
                   alt={current.alt ?? alt}
                   fill
                   sizes="100vw"
+                  unoptimized
                   className="object-contain"
                 />
                 {count > 1 ? (
@@ -206,10 +185,9 @@ export function GalleryLightbox({
                   </>
                 ) : null}
               </div>
-            </div>,
-            document.body,
-          )
-        : null}
+          </DialogFullscreenContent>
+        </Dialog>
+      ) : null}
     </>
   );
 }

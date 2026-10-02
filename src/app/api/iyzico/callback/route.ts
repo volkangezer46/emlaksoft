@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { retrieveCheckoutForm, isIyzicoConfigured } from "@/lib/billing/iyzico";
-import { fulfillSuccessfulPayment } from "@/lib/billing/fulfillment";
+import {
+  IYZICO_CURRENCY,
+  isIyzicoConfigured,
+  retrieveCheckoutForm,
+  verifyCheckoutPayment,
+} from "@/lib/billing/iyzico";
+import { fulfillSuccessfulPayment, invoiceAmountsTry } from "@/lib/billing/fulfillment";
 import { fulfillPaymentLinkByConversation } from "@/lib/billing/payment-link-fulfill";
 import type { BillingCycle, PlanId } from "@/lib/billing/plans";
+import { getBaseUrl } from "@/lib/base-url";
 
 function appUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return getBaseUrl();
 }
 
 async function handle(token: string | null) {
@@ -18,13 +24,15 @@ async function handle(token: string | null) {
     return NextResponse.redirect(`${appUrl()}/app/abonelik?error=config`);
   }
 
+  let resolvedConversationId = "";
   try {
     const result = await retrieveCheckoutForm(token);
     const ok =
       result.status === "success" &&
       String(result.paymentStatus ?? "").toLowerCase() === "success";
 
-    const conversationId = String(result.conversationId ?? "");
+    const conversationId = String(result.conversationId ?? "").trim();
+    resolvedConversationId = conversationId;
 
     if (!ok) {
       if (conversationId.startsWith("plink-")) {
@@ -41,31 +49,56 @@ async function handle(token: string | null) {
     // Kaparo / komisyon ödeme linki
     if (conversationId.startsWith("plink-")) {
       const linkToken = conversationId.slice("plink-".length);
-      await fulfillPaymentLinkByConversation(conversationId, "callback");
+      await fulfillPaymentLinkByConversation(
+        conversationId,
+        "callback",
+        result,
+      );
       return NextResponse.redirect(`${appUrl()}/odeme-link/${linkToken}?paid=1`);
     }
 
     const admin = createAdminClient();
-    const { data: invoice } = await admin
+    const { data: invoice, error: invoiceError } = await admin
       .from("invoices")
-      .select("tenant_id, amount_try, meta")
+      .select("tenant_id, amount_try, tax_try, total_try, currency, meta")
       .filter("meta->>conversationId", "eq", conversationId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    if (invoiceError) {
+      throw new Error(`Fatura doğrulama sorgusu başarısız: ${invoiceError.message}`);
+    }
 
     if (!invoice) {
       return NextResponse.redirect(`${appUrl()}/app/abonelik?error=invoice`);
     }
 
     const meta = (invoice.meta ?? {}) as { plan?: PlanId; cycle?: BillingCycle };
+    const amounts = invoiceAmountsTry(Number(invoice.amount_try));
+    if (
+      String(invoice.currency ?? "").toUpperCase() !== IYZICO_CURRENCY ||
+      !Number.isFinite(Number(invoice.tax_try)) ||
+      !Number.isFinite(Number(invoice.total_try)) ||
+      Math.abs(Number(invoice.tax_try) - amounts.taxTry) > 0.01 ||
+      Math.abs(Number(invoice.total_try) - amounts.totalTry) > 0.01
+    ) {
+      throw new Error("Fatura toplamları ödeme sözleşmesiyle eşleşmedi.");
+    }
+    const verified = verifyCheckoutPayment(result, {
+      conversationId,
+      basketId: conversationId,
+      amountTry: amounts.totalTry,
+      currency: IYZICO_CURRENCY,
+    });
     await fulfillSuccessfulPayment({
       tenantId: invoice.tenant_id,
       plan: meta.plan ?? "office",
       cycle: meta.cycle ?? "monthly",
       conversationId,
-      paymentId: result.paymentId != null ? String(result.paymentId) : null,
-      amountTry: Number(invoice.amount_try) || 0,
+      paymentId: verified.paymentId,
+      expectedAmountTry: verified.amountTry,
+      expectedCurrency: verified.currency,
       source: "callback",
     });
 
@@ -74,6 +107,10 @@ async function handle(token: string | null) {
     );
   } catch (e) {
     console.error("iyzico callback", e);
+    if (resolvedConversationId.startsWith("plink-")) {
+      const linkToken = resolvedConversationId.slice("plink-".length);
+      return NextResponse.redirect(`${appUrl()}/odeme-link/${linkToken}?error=callback`);
+    }
     return NextResponse.redirect(`${appUrl()}/app/abonelik?error=callback`);
   }
 }

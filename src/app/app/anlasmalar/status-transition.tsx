@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import { Loader2, Workflow } from "lucide-react";
 import { updateDealStage, type DealStage } from "@/app/actions/deals";
 import { useToast } from "@/components/app/toast-provider";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const FLOW: { from: DealStage; to: DealStage; label: string; tone: string }[] = [
   { from: "new", to: "qualified", label: "Nitelikli yap", tone: "bg-brand-600" },
@@ -73,37 +80,34 @@ export function StatusTransitionBar({
   }
 
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 rounded-[8px] border border-line bg-surface px-2.5 py-1.5 text-[11px] font-bold text-ink-950 hover:border-brand-300"
-      >
-        {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Workflow className="h-3.5 w-3.5 text-brand-600" />}
-        Geçiş
-      </button>
-      {open ? (
-        <>
-          <button type="button" className="fixed inset-0 z-40" aria-label="Kapat" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-9 z-50 min-w-[200px] overflow-hidden rounded-[12px] border border-line bg-surface shadow-[var(--shadow-lg)]">
-            <p className="border-b border-line px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
-              Aşama geçişi
-            </p>
-            {options.map((o) => (
-              <button
-                key={o.to}
-                type="button"
-                disabled={pending}
-                onClick={() => run(o.to)}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-ink-950 hover:bg-canvas disabled:opacity-50"
-              >
-                <span className={`h-2 w-2 rounded-full ${o.tone}`} />
-                {o.label}
-              </button>
-            ))}
-          </div>
-        </>
-      ) : null}
-    </div>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          disabled={pending}
+          className="focus-ring inline-flex items-center gap-1 rounded-[8px] border border-line bg-surface px-2.5 py-1.5 text-[11px] font-bold text-ink-950 hover:border-brand-300 disabled:opacity-60"
+        >
+          {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Workflow className="h-3.5 w-3.5 text-brand-600" />}
+          Geçiş
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="min-w-[200px] p-1.5" align="end">
+        <DropdownMenuLabel className="border-b border-line px-2 py-2 tracking-[0.08em]">
+          Aşama geçişi
+        </DropdownMenuLabel>
+        {options.map((option) => (
+          <DropdownMenuItem
+            key={option.to}
+            disabled={pending}
+            danger={option.to === "lost"}
+            onSelect={() => run(option.to)}
+            className="text-xs font-semibold"
+          >
+            <span className={`h-2 w-2 rounded-full ${option.tone}`} aria-hidden="true" />
+            {option.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

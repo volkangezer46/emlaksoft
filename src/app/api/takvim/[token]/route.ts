@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
+import { getBaseUrl } from "@/lib/base-url";
 
 /**
  * Kişisel takvim aboneliği (ICS feed) — GET /api/takvim/[token]
@@ -18,7 +19,7 @@ import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+const APP_URL = getBaseUrl();
 
 const TYPE_LABEL: Record<string, string> = {
   showing: "Yer gösterme",

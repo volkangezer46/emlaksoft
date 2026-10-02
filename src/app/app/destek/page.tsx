@@ -17,6 +17,7 @@ import { getDefinitions } from "@/lib/definitions";
 import { safeLike } from "@/lib/pgrst";
 import { DAY_MS, daysAgoIso, msSince } from "@/lib/clock";
 import { relativeTimeTR } from "@/lib/admin-format";
+import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
 import { NewTicketDialog } from "./new-ticket-dialog";
 import type { CSSProperties } from "react";
 
@@ -88,13 +89,17 @@ export default async function SupportPage({
 }: {
   searchParams?: Promise<{ durum?: string; kategori?: string; ara?: string; sayfa?: string }>;
 }) {
-  await requireModulePage("support");
+  const gate = await requireModulePage("support");
   const sp = (await searchParams) ?? {};
-  const durum = sp.durum ?? "";
+  const requestedStatus = sp.durum ?? "";
+  const durum = requestedStatus === "acik" || statusKeys.includes(requestedStatus as (typeof statusKeys)[number])
+    ? requestedStatus
+    : "";
   const kategori = sp.kategori ?? "";
   const ara = (sp.ara ?? "").trim();
   const pageParam = Math.max(1, Number.parseInt(sp.sayfa ?? "1", 10) || 1);
   const offset = (pageParam - 1) * PAGE_SIZE;
+  const officeWide = hasOfficeWideDataScope(gate.role);
 
   const supabase = await createClient();
 
@@ -116,8 +121,9 @@ export default async function SupportPage({
   // sorguda, liste .range() ile sayfalanır, sayaçlar ayrı head-count'lardan.
   let listQuery = supabase
     .from("support_tickets")
-    .select("id, subject, category, priority, status, created_at, updated_at", { count: "exact" })
+    .select("id, ticket_no, subject, category, priority, status, created_at, updated_at, last_activity_at", { count: "exact" })
     .order("created_at", { ascending: false });
+  if (!officeWide) listQuery = listQuery.eq("created_by", gate.userId);
   if (durum === "acik") listQuery = listQuery.in("status", ACIK_STATUSES as unknown as string[]);
   else if (durum) listQuery = listQuery.eq("status", durum);
   if (kategori) listQuery = listQuery.eq("category", kategori);
@@ -126,64 +132,84 @@ export default async function SupportPage({
   const headCount = (patch: (b: ReturnType<typeof baseCount>) => ReturnType<typeof baseCount>) =>
     patch(baseCount());
   function baseCount() {
-    return supabase.from("support_tickets").select("id", { count: "exact", head: true });
+    let query = supabase.from("support_tickets").select("id", { count: "exact", head: true });
+    if (!officeWide) query = query.eq("created_by", gate.userId);
+    return query;
   }
 
   const weekAgoIso = daysAgoIso(7);
 
+  let oldestOpenQuery = supabase
+    .from("support_tickets")
+    .select("id, subject, created_at")
+    .in("status", ACIK_STATUSES as unknown as string[])
+    .order("created_at", { ascending: true })
+    .limit(1);
+  let lastUpdatedQuery = supabase
+    .from("support_tickets")
+    .select("id, subject, created_at, updated_at, last_activity_at")
+    .order("last_activity_at", { ascending: false, nullsFirst: false })
+    .limit(1);
+  if (!officeWide) {
+    oldestOpenQuery = oldestOpenQuery.eq("created_by", gate.userId);
+    lastUpdatedQuery = lastUpdatedQuery.eq("created_by", gate.userId);
+  }
+
   const [
-    { data: pageData, count: listCount },
-    { count: totalCount },
+    listResult,
+    totalResult,
     statusCountResults,
-    { count: weekCount },
-    { data: oldestOpenRows },
-    { data: lastUpdatedRows },
+    weekResult,
+    oldestOpenResult,
+    lastUpdatedResult,
     categoryCountResults,
   ] = await Promise.all([
     listQuery.range(offset, offset + PAGE_SIZE - 1),
     headCount((b) => b),
     Promise.all(
       statusKeys.map(async (k) => {
-        const { count } = await headCount((b) => b.eq("status", k));
-        return [k, count ?? 0] as const;
+        const { count, error } = await headCount((b) => b.eq("status", k));
+        return { key: k, count: count ?? 0, error };
       }),
     ),
     headCount((b) => b.gte("created_at", weekAgoIso)),
     // En eski açık talep — ayrı dar sorgu (en eskiden yeniye, ilk kayıt).
-    supabase
-      .from("support_tickets")
-      .select("id, subject, created_at")
-      .in("status", ACIK_STATUSES as unknown as string[])
-      .order("created_at", { ascending: true })
-      .limit(1),
+    oldestOpenQuery,
     // Son hareket — en yeni güncelleme.
-    supabase
-      .from("support_tickets")
-      .select("id, subject, created_at, updated_at")
-      .order("updated_at", { ascending: false })
-      .limit(1),
+    lastUpdatedQuery,
     Promise.all(
       candidateCategories.map(async (cat) => {
-        const { count } = await headCount((b) => b.eq("category", cat));
-        return [cat, count ?? 0] as const;
+        const { count, error } = await headCount((b) => b.eq("category", cat));
+        return { key: cat, count: count ?? 0, error };
       }),
     ),
   ]);
 
-  const pageRows = pageData ?? [];
-  const filteredCount = listCount ?? 0;
-  const grandTotal = totalCount ?? 0;
+  const queryError = [
+    listResult.error,
+    totalResult.error,
+    weekResult.error,
+    oldestOpenResult.error,
+    lastUpdatedResult.error,
+    ...statusCountResults.map((result) => result.error),
+    ...categoryCountResults.map((result) => result.error),
+  ].find(Boolean);
+  if (queryError) throw new Error(`Destek talepleri yüklenemedi: ${queryError.message}`);
 
-  const statusCountMap = new Map(statusCountResults);
+  const pageRows = listResult.data ?? [];
+  const filteredCount = listResult.count ?? 0;
+  const grandTotal = totalResult.count ?? 0;
+
+  const statusCountMap = new Map(statusCountResults.map((result) => [result.key, result.count] as const));
   const countOf = (k: string) => statusCountMap.get(k as (typeof statusKeys)[number]) ?? 0;
   const openCount = ACIK_STATUSES.reduce((s, k) => s + countOf(k), 0);
   const resolved = countOf("resolved");
   const waitingCount = countOf("waiting");
-  const week = weekCount ?? 0;
+  const week = weekResult.count ?? 0;
 
-  const oldestOpen = oldestOpenRows?.[0] ?? null;
+  const oldestOpen = oldestOpenResult.data?.[0] ?? null;
   const oldestOpenDays = oldestOpen ? Math.floor(msSince(oldestOpen.created_at) / DAY_MS) : null;
-  const lastUpdated = lastUpdatedRows?.[0] ?? null;
+  const lastUpdated = lastUpdatedResult.data?.[0] ?? null;
 
   /** Aktif filtreleri koruyarak href üretir — filtre değişince sayfa 1'e döner. */
   const buildHref = (patch: { durum?: string | null; kategori?: string | null; ara?: string | null }) => {
@@ -227,8 +253,9 @@ export default async function SupportPage({
 
   // Kategori dağılımı — çipler ?kategori= ile listeyi süzer (gerçek sayımlar).
   const categoryChips = categoryCountResults
-    .filter(([, n]) => n > 0)
-    .sort((a, b) => b[1] - a[1]);
+    .map((result) => [result.key, result.count] as const)
+    .filter(([, count]) => count > 0)
+    .sort((left, right) => right[1] - left[1]);
 
   const totalPages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
   const rangeStart = filteredCount === 0 ? 0 : offset + 1;
@@ -389,7 +416,7 @@ export default async function SupportPage({
                 <Clock3 className="h-3.5 w-3.5 text-cyan-600" /> Son hareket
               </span>
               <p className="mt-1.5 font-display text-lg font-extrabold text-ink-950">
-                {relativeTimeTR(lastUpdated.updated_at ?? lastUpdated.created_at)}
+                {relativeTimeTR(lastUpdated.last_activity_at ?? lastUpdated.updated_at ?? lastUpdated.created_at)}
               </p>
               <p className="mt-0.5 truncate text-[11px] text-text-muted">{lastUpdated.subject}</p>
             </Link>
@@ -497,7 +524,10 @@ export default async function SupportPage({
                     )}
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink-950">{t.subject}</p>
+                    <p className="flex min-w-0 items-center gap-2 text-sm font-semibold text-ink-950">
+                      <span className="shrink-0 font-mono text-[10px] font-bold text-brand-600">{t.ticket_no ?? t.id.slice(0, 8).toUpperCase()}</span>
+                      <span className="truncate">{t.subject}</span>
+                    </p>
                     <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-text-muted">
                       <span>{catName(t.category)}</span>
                       <span aria-hidden>·</span>
@@ -506,12 +536,12 @@ export default async function SupportPage({
                       </span>
                       <span aria-hidden>·</span>
                       <span>
-                        {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(t.created_at))}
+                        {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" }).format(new Date(t.created_at))}
                       </span>
-                      {t.updated_at && t.updated_at !== t.created_at ? (
+                      {(t.last_activity_at ?? t.updated_at) && (t.last_activity_at ?? t.updated_at) !== t.created_at ? (
                         <>
                           <span aria-hidden>·</span>
-                          <span className="text-text-faint">güncelleme {relativeTimeTR(t.updated_at)}</span>
+                          <span className="text-text-faint">son hareket {relativeTimeTR(t.last_activity_at ?? t.updated_at)}</span>
                         </>
                       ) : null}
                     </p>

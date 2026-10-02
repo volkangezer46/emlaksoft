@@ -23,10 +23,14 @@ export default async function DefinitionsPage() {
   const { tenantId } = await requireModulePage("settings");
   const supabase = await createClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("definitions")
     .select("id, tenant_id, category, value, label, color, sort_order, is_active")
     .order("sort_order", { ascending: true });
+  if (error) {
+    console.error("definitions page load failed", { code: error.code || "unknown" });
+    throw new Error("Tanımlar güvenli şekilde yüklenemedi.");
+  }
 
   const rows = (data ?? []) as DefRow[];
   const byCat = new Map<string, DefRow[]>();

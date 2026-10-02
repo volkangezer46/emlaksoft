@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { reportClientError } from "@/app/actions/report-error";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 
@@ -11,6 +11,8 @@ export default function AppError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
   useEffect(() => {
     console.error("App route error:", error);
     // Vercel loguna ek olarak DB'ye de yaz: log satirlari toplanmiyor ve
@@ -23,13 +25,23 @@ export default function AppError({
     });
   }, [error]);
 
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, []);
+
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4">
       <div className="w-full max-w-md text-center">
         <div className="mx-auto grid h-16 w-16 place-items-center rounded-[16px] bg-danger-500/10">
           <AlertTriangle className="h-8 w-8 text-danger-500" />
         </div>
-        <h2 className="mt-4 font-display text-lg font-bold text-ink-950">Bu sayfa yüklenemedi</h2>
+        <h2
+          ref={headingRef}
+          tabIndex={-1}
+          className="mt-4 font-display text-lg font-bold text-ink-950 outline-none"
+        >
+          Bu sayfa yüklenemedi
+        </h2>
         <p className="mt-2 text-sm text-text-muted">
           Beklenmeyen bir hata oluştu. Tekrar deneyebilir veya panele geri dönebilirsiniz.
         </p>

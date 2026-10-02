@@ -3,6 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Building2, Gauge, Info, Scale, ShieldCheck, TrendingUp } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPublicTenantActive } from "@/lib/public-tenant";
+
+export const dynamic = "force-dynamic";
 import {
   extractStoredComparables,
   isInternalSource,
@@ -66,7 +69,7 @@ export default async function PublicValuationReportPage({
   if (!valuation) notFound();
 
   const [{ data: office }, { data: property }, { data: author }] = await Promise.all([
-    admin.from("tenants").select("name").eq("id", valuation.tenant_id).maybeSingle(),
+    admin.from("tenants").select("name, status").eq("id", valuation.tenant_id).maybeSingle(),
     valuation.property_id
       ? admin
           .from("properties")
@@ -74,12 +77,21 @@ export default async function PublicValuationReportPage({
             "property_code, title, address_line, list_price, features, district_id, property_type, transaction_type, province:geo_provinces(name), district:geo_districts(name)",
           )
           .eq("id", valuation.property_id)
+          .eq("tenant_id", valuation.tenant_id)
+          .is("deleted_at", null)
           .maybeSingle()
       : Promise.resolve({ data: null }),
     valuation.created_by
-      ? admin.from("profiles").select("full_name").eq("id", valuation.created_by).maybeSingle()
+      ? admin
+          .from("profiles")
+          .select("full_name")
+          .eq("id", valuation.created_by)
+          .eq("tenant_id", valuation.tenant_id)
+          .eq("is_active", true)
+          .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
+  if (!office || !isPublicTenantActive(office.status)) notFound();
 
   const officeName = office?.name ?? "Emlak ofisi";
   // Emsal anlık görüntüsü sources jsonb'sinde saklanıyor; listelere sızmasın.

@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
-import { getPlatformStaff } from "@/lib/platform";
+import { getPlatformStaffIdentity } from "@/lib/platform";
 import { AppSidebar } from "@/components/app/app-sidebar";
 import { CommandSearch } from "@/components/app/command-search";
 import { NotificationBell } from "@/components/app/notification-bell";
@@ -24,9 +24,14 @@ import { listMyNotifications } from "@/app/actions/notifications";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { getOfficeScoreCached } from "@/lib/office-score";
 import { IMPERSONATE_COOKIE } from "@/lib/impersonation";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { effectiveCanAccessModule, getEffectivePermissions } from "@/lib/permissions-effective";
+import {
+  effectiveCanAccessModule,
+  effectiveHasPermission,
+  getEffectivePermissions,
+  immutableReadonlyPermissions,
+} from "@/lib/permissions-effective";
 import type { AppModule } from "@/lib/permissions";
+import { planLabel } from "@/lib/billing/plans";
 
 const NAV_MODULES: AppModule[] = [
   "dashboard",
@@ -60,6 +65,13 @@ const NAV_MODULES: AppModule[] = [
   "network",
 ];
 
+type OfficeSummary = {
+  name?: string;
+  plan?: string;
+  status?: string;
+  brand_color?: string | null;
+};
+
 export default async function AppLayout({
   children,
 }: {
@@ -68,9 +80,21 @@ export default async function AppLayout({
   const supabase = await createClient();
   const user = await getRequestUser();
 
+  const impersonating = user?.app_metadata?.impersonating === true;
+  const claimedTenantId = typeof user?.app_metadata?.tenant_id === "string"
+    ? user.app_metadata.tenant_id.trim() || null
+    : null;
+  const impersonatedTenantPromise = user && impersonating && claimedTenantId
+    ? supabase
+        .from("tenants")
+        .select("name, plan, status, brand_color")
+        .eq("id", claimedTenantId)
+        .maybeSingle()
+    : Promise.resolve({ data: null });
+
   // profile ve platformStaff ikisi de yalnız `user`'a bağlı, birbirine değil →
   // her navigasyonda seri iki round-trip yerine paralel (bootstrap hızlanır).
-  const [{ data: profile }, platformStaff] = await Promise.all([
+  const [{ data: profile }, platformStaff, { data: impersonatedTenant }] = await Promise.all([
     user
       ? supabase
           .from("profiles")
@@ -78,19 +102,24 @@ export default async function AppLayout({
           .eq("id", user.id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
-    getPlatformStaff(),
+    getPlatformStaffIdentity(),
+    impersonatedTenantPromise,
   ]);
 
   const tenant = profile?.tenants as
-    | { name?: string; plan?: string; status?: string; brand_color?: string | null }
-    | { name?: string; plan?: string; status?: string; brand_color?: string | null }[]
+    | OfficeSummary
+    | OfficeSummary[]
     | null
     | undefined;
-  const office =
-    (Array.isArray(tenant) ? tenant[0] : tenant) ?? undefined;
+  const profileOffice = (Array.isArray(tenant) ? tenant[0] : tenant) ?? undefined;
+  const office = (impersonating ? impersonatedTenant : profileOffice) ?? undefined;
+  const tenantId = impersonating
+    ? claimedTenantId
+    : ((profile?.tenant_id as string | undefined) ?? null);
+  const effectiveRole = impersonating ? "readonly" : (profile?.role ?? "advisor");
   // Beyaz etiket: ofisin marka rengi geçerliyse panel tema değişkenlerini override et
   const brandColor = office?.brand_color && /^#[0-9a-fA-F]{6}$/.test(office.brand_color) ? office.brand_color : null;
-  const fullName = String(profile?.full_name ?? "ES");
+  const fullName = String(profile?.full_name ?? platformStaff?.full_name ?? "ES");
   const initials = fullName
     .split(/\s+/)
     .map((part: string) => part[0] ?? "")
@@ -98,21 +127,14 @@ export default async function AppLayout({
     .slice(0, 2)
     .toUpperCase();
 
-  const planLabel: Record<string, string> = {
-    advisor: "Danışman",
-    office: "Ofis",
-    professional: "Profesyonel",
-    enterprise: "Kurumsal",
-  };
-
   let officeScore: number | null = null;
   let officeScoreLabel = "—";
   let notifications: Awaited<ReturnType<typeof listMyNotifications>> = [];
 
-  if (user && profile?.tenant_id) {
+  if (user && tenantId) {
     // Skor (navigasyonlar arası cache'li, 3 dk) + bildirimler paralel
     const [scoreComputed, notifResult] = await Promise.all([
-      getOfficeScoreCached(profile.tenant_id as string).catch(() => null),
+      getOfficeScoreCached(tenantId).catch(() => null),
       listMyNotifications().catch(() => []),
     ]);
     if (scoreComputed) {
@@ -122,33 +144,30 @@ export default async function AppLayout({
     notifications = notifResult;
   }
 
-  const tenantId = (profile?.tenant_id as string | undefined) ?? null;
-
-  const platformStaffFullAccess = platformStaff && !Boolean(user?.app_metadata?.impersonating);
+  const platformStaffFullAccess = Boolean(platformStaff && !impersonating);
   const effectivePerms = platformStaffFullAccess
     ? null
-    : await getEffectivePermissions(tenantId, profile?.role ?? "advisor");
+    : impersonating
+      ? immutableReadonlyPermissions()
+      : await getEffectivePermissions(tenantId, effectiveRole, user?.id);
   const accessibleModules = platformStaffFullAccess
     ? NAV_MODULES
     : NAV_MODULES.filter((mod) => effectiveCanAccessModule(effectivePerms ?? {}, mod));
+  const canCreate = (mod: AppModule) =>
+    platformStaffFullAccess || effectiveHasPermission(effectivePerms ?? {}, mod, "create");
+  const canCreateCustomer = canCreate("customers");
+  const canCreateProperty = canCreate("properties");
+  const canCreateCall = canCreate("calls");
+  const canCreateAppointment = canCreate("appointments");
+  const canCreateTask = canCreate("tasks");
+  const hasQuickCreate =
+    canCreateCustomer || canCreateProperty || canCreateCall || canCreateAppointment || canCreateTask;
 
   const jar = await cookies();
-  const impTenantId = jar.get(IMPERSONATE_COOKIE)?.value;
-  const impersonating = Boolean(user?.app_metadata?.impersonating) || Boolean(impTenantId);
-  let impName = jar.get("es_impersonate_name")?.value ?? "";
-  if (impersonating && !impName && (impTenantId || tenantId)) {
-    try {
-      const admin = createAdminClient();
-      const { data: t } = await admin
-        .from("tenants")
-        .select("name")
-        .eq("id", impTenantId || tenantId!)
-        .maybeSingle();
-      impName = t?.name ?? "Hedef ofis";
-    } catch {
-      impName = "Hedef ofis";
-    }
-  }
+  const impersonationCookieMatches = jar.get(IMPERSONATE_COOKIE)?.value === tenantId;
+  const impName = impersonationCookieMatches
+    ? (jar.get("es_impersonate_name")?.value ?? office?.name ?? "Hedef ofis")
+    : (office?.name ?? "Hedef ofis");
 
   return (
     <ToastProvider>
@@ -166,18 +185,18 @@ export default async function AppLayout({
           <KeyboardShortcuts />
         <AppSidebar
           officeName={office?.name ?? "EmlakSoft Ofis"}
-          plan={planLabel[office?.plan ?? "office"] ?? "Ofis"}
+          plan={planLabel(office?.plan ?? "office")}
           trial={office?.status === "trial"}
           officeScore={officeScore}
           accessibleModules={accessibleModules}
         />
         <div className="flex min-w-0 flex-1 flex-col">
           {impersonating && platformStaff ? <OpsImpersonationBanner tenantName={impName || office?.name || "Ofis"} /> : null}
-          <header className="sticky top-0 z-30 flex h-17 items-center justify-between border-b border-line/80 bg-surface/90 px-4 pl-16 backdrop-blur-xl md:px-6">
-            <CommandSearch />
+          <header className="sticky top-0 z-30 flex h-17 items-center justify-between border-b border-line/80 bg-surface/90 px-4 pl-16 backdrop-blur-xl lg:px-6">
+            <CommandSearch accessibleModules={accessibleModules} />
             <div className="ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
               {/* Hızlı eylem menüsü: en sık kullanılan kayıt akışlarına tek tıkla */}
-              <DropdownMenu>
+              {hasQuickCreate ? <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
@@ -189,33 +208,33 @@ export default async function AppLayout({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-52">
-                  <DropdownMenuItem asChild>
-                    <Link href="/app/musteriler">
+                  {canCreateCustomer ? <DropdownMenuItem asChild>
+                    <Link href="/app/musteriler?yeni=1">
                       <UserPlus /> Yeni müşteri
                     </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/app/portfoyler">
+                  </DropdownMenuItem> : null}
+                  {canCreateProperty ? <DropdownMenuItem asChild>
+                    <Link href="/app/portfoyler?yeni=1">
                       <Building2 /> Yeni portföy
                     </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
+                  </DropdownMenuItem> : null}
+                  {canCreateCall ? <DropdownMenuItem asChild>
                     <Link href="/app/arama">
                       <Phone /> Görüşme kaydet
                     </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/app/randevular">
+                  </DropdownMenuItem> : null}
+                  {canCreateAppointment ? <DropdownMenuItem asChild>
+                    <Link href="/app/randevular?yeni=1">
                       <CalendarDays /> Randevu
                     </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/app/gorevler">
+                  </DropdownMenuItem> : null}
+                  {canCreateTask ? <DropdownMenuItem asChild>
+                    <Link href="/app/gorevler?yeni=1">
                       <ListChecks /> Görev
                     </Link>
-                  </DropdownMenuItem>
+                  </DropdownMenuItem> : null}
                 </DropdownMenuContent>
-              </DropdownMenu>
+              </DropdownMenu> : null}
               <Link
                 href="/app/raporlar"
                 title="Rapor merkezini aç"
@@ -224,7 +243,7 @@ export default async function AppLayout({
                 <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-500" />
                 {officeScore != null ? `Ofis skoru ${officeScore} · ${officeScoreLabel}` : "Ofis skoru —"}
               </Link>
-              {platformStaff ? (
+              {platformStaffFullAccess ? (
                 <Link
                   href="/admin"
                   className="hidden items-center gap-1.5 rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-bold text-amber-700 transition hover:border-amber-400/50 lg:inline-flex"
@@ -243,7 +262,7 @@ export default async function AppLayout({
                 </div>
                 <div className="hidden text-left xl:block">
                   <p className="max-w-28 truncate text-xs font-semibold text-ink-950">{fullName}</p>
-                  <p className="text-[11px] text-text-faint">{planLabel[office?.plan ?? "office"] ?? "Ofis"} plan</p>
+                  <p className="text-[11px] text-text-faint">{planLabel(office?.plan ?? "office")} plan</p>
                 </div>
               </Link>
               <form action={signOut}>
@@ -264,7 +283,7 @@ export default async function AppLayout({
               kayıyordu) — minmax(0,1fr) track bunu kökten keser. */}
           <main
             id="main-content"
-            className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1fr)] content-start overflow-x-clip p-4 pb-28 md:p-6 lg:p-8"
+            className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1fr)] content-start overflow-x-clip p-4 pb-28 md:px-6 md:pt-6 lg:p-8"
           >
             <LiveOfficeStrip tenantId={tenantId} />
             {children}

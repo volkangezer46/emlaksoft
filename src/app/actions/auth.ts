@@ -1,42 +1,46 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { isValidOptionalTurkishMobile, normalizeTurkishPhone, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
+import { redirect } from "next/navigation";
+import { logLoginEvent } from "@/app/giris/_lib/login-events";
+import { sendSignerSms } from "@/app/imza/_lib/sms";
+import {
+  normalizeBillingCycle,
+} from "@/lib/billing/plans";
+import {
+  normalizeRegistrationTeamSize,
+  registrationPlanForTeamSize,
+} from "@/lib/billing/registration-plan";
+import { restoreImpersonationMetadata } from "@/lib/impersonation";
+import { bootstrapPlatformStaffIfAllowed } from "@/lib/platform";
+import { sendSms } from "@/lib/messaging/netgsm";
+import {
+  isValidOptionalTurkishMobile,
+  normalizeTurkishPhone,
+  TR_MOBILE_ERROR_MESSAGE,
+} from "@/lib/phone";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import {
   generateLoginCode,
   LOGIN_CODE_TTL_MS,
-  sha256Hex,
   TWO_FACTOR_COOKIE,
-  twoFactorCookieOptions,
-  twoFactorCookieValue,
 } from "@/lib/two-factor";
-import { sendSignerSms } from "@/app/imza/_lib/sms";
-import { sendSms } from "@/lib/messaging/netgsm";
-import { logLoginEvent } from "@/app/giris/_lib/login-events";
+import { hashOtpForStorage } from "@/lib/otp-hmac";
+
+const REGISTRATION_TERMS_VERSION = "kullanim-sartlari-2026-07-31";
+const REGISTRATION_KVKK_VERSION = "kvkk-aydinlatma-2026-07-31";
 
 function slugify(input: string) {
   return input
     .toLocaleLowerCase("tr-TR")
-    .replace(/ğ/g, "g")
-    .replace(/ü/g, "u")
-    .replace(/ş/g, "s")
-    .replace(/ı/g, "i")
-    .replace(/ö/g, "o")
-    .replace(/ç/g, "c")
+    .normalize("NFKD")
+    .replace(/\u0131/g, "i")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 48);
-}
-
-function planFromTeamSize(size: string) {
-  if (size === "1") return "advisor" as const;
-  if (size === "50+") return "enterprise" as const;
-  if (size === "10-50") return "professional" as const;
-  return "office" as const;
 }
 
 export type AuthResult = { error?: string; ok?: true };
@@ -55,66 +59,223 @@ export async function signIn(
 
   const ip = await clientIp();
   const userAgent = (await headers()).get("user-agent");
-
+  const { allowed: loginAllowed } = await checkRateLimit(
+    `signin:${ip}:${email.toLowerCase()}`,
+    {
+      limit: 10,
+      windowSec: 300,
+      failurePolicy: "deny",
+    },
+  );
+  if (!loginAllowed) {
+    await logLoginEvent({ ip, userAgent, result: "failed" });
+    return { error: "Çok fazla giriş denemesi yapıldı. Lütfen biraz sonra tekrar deneyin." };
+  }
   const supabase = await createClient();
-  const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data: signInData, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
 
   if (error) {
-    // Şifre yanlış → kullanıcı kimliği bilinmez, yalnız IP izi kalır
     await logLoginEvent({ ip, userAgent, result: "failed" });
     return { error: "Giriş başarısız. E-posta veya şifreyi kontrol edin." };
   }
 
   const userId = signInData.user?.id ?? null;
-  // Açık yönlendirme koruması: yalnız site-içi mutlak yol ("//evil.com" ve
-  // "/\evil.com" tarayıcıda şema-göreli dış URL sayılır — kabul edilmez).
   const target = /^\/(?![/\\])/.test(next) ? next : "/app";
   const cookieStore = await cookies();
+  cookieStore.delete(TWO_FACTOR_COOKIE);
+  let isPlatformStaff = false;
 
   if (userId) {
     const admin = createAdminClient();
-    const { data: profile, error: profileError } = await admin
-      .from("profiles")
-      .select("two_factor_sms, phone, tenant_id")
-      .eq("id", userId)
-      .maybeSingle();
-    if (profileError) {
-      // Fail-closed: profil okunamazsa 2FA'lı hesap kod atlamadan içeri giremesin
-      console.error("signIn profile", profileError);
+    const [{ data: profile, error: profileError }, { data: staff, error: staffError }] =
+      await Promise.all([
+        admin
+          .from("profiles")
+          .select("two_factor_sms, two_factor_version, phone, tenant_id, role, is_active")
+          .eq("id", userId)
+          .maybeSingle(),
+        admin
+          .from("platform_staff")
+          .select("id")
+          .eq("id", userId)
+          .eq("is_active", true)
+          .maybeSingle(),
+      ]);
+    if (profileError || staffError) {
+      console.error("signIn identity", profileError ?? staffError);
       await supabase.auth.signOut();
       return { error: "Giriş doğrulanamadı. Lütfen tekrar deneyin." };
     }
+
+    const bootstrappedStaff = !staff && signInData.user?.email
+      ? await bootstrapPlatformStaffIfAllowed(
+          userId,
+          signInData.user.email,
+          String(signInData.user.user_metadata?.full_name ?? signInData.user.email),
+        )
+      : null;
+    isPlatformStaff = Boolean(staff || bootstrappedStaff);
     const tenantId = (profile?.tenant_id as string | null) ?? null;
 
-    // SMS 2FA: oturum açık kalır ama es_2fa_ok çerezi olmadan middleware
-    // /app - /admin'i /giris/dogrulama'ya yönlendirir (bkz. src/lib/two-factor.ts).
-    if (profile?.two_factor_sms && profile.phone) {
-      cookieStore.delete(TWO_FACTOR_COOKIE); // her şifreli girişte yeniden doğrulanır
+    // app_metadata is user-global. A new password login must not inherit an
+    // impersonation snapshot owned by another/expired Supabase session.
+    const currentMeta = (signInData.user?.app_metadata ?? {}) as Record<string, unknown>;
+    if (isPlatformStaff && currentMeta.impersonating === true) {
+      const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+      const currentSessionId = claimsData?.claims?.session_id;
+      const { data: snapshot, error: snapshotError } = await admin
+        .from("platform_impersonation_sessions")
+        .select("auth_session_id, target_tenant_id, original_app_metadata, expires_at")
+        .eq("staff_id", userId)
+        .maybeSingle();
+      if (claimsError || snapshotError) {
+        console.error("signIn impersonation recovery read", claimsError ?? snapshotError);
+        await supabase.auth.signOut();
+        return { error: "Destek oturumu güvenli şekilde doğrulanamadı." };
+      }
 
-      const { allowed } = await checkRateLimit(`2fa-send:${userId}`, { limit: 5, windowSec: 300 });
+      if (
+        typeof currentSessionId !== "string" ||
+        !currentSessionId ||
+        !snapshot ||
+        snapshot.auth_session_id !== currentSessionId ||
+        snapshot.target_tenant_id !== currentMeta.tenant_id ||
+        new Date(snapshot.expires_at).getTime() <= Date.now()
+      ) {
+        let original: Record<string, unknown>;
+        if (
+          snapshot?.original_app_metadata &&
+          typeof snapshot.original_app_metadata === "object"
+        ) {
+          original = snapshot.original_app_metadata as Record<string, unknown>;
+        } else {
+          original = { ...currentMeta };
+          original.tenant_id = currentMeta.home_tenant_id ?? null;
+          original.role = currentMeta.home_role ?? null;
+          original.impersonating = false;
+          delete original.home_tenant_id;
+          delete original.home_role;
+          delete original.impersonation_session_id;
+        }
+
+        const restored = restoreImpersonationMetadata(currentMeta, original);
+        if (snapshot) {
+          const { error: cleanupError } = await admin
+            .from("platform_impersonation_sessions")
+            .delete()
+            .eq("staff_id", userId)
+            .eq("auth_session_id", snapshot.auth_session_id);
+          if (cleanupError) {
+            console.error("signIn impersonation recovery cleanup", cleanupError);
+            await supabase.auth.signOut();
+            return { error: "Eski destek oturumu temizlenemedi." };
+          }
+        }
+
+        const { error: restoreError } = await admin.auth.admin.updateUserById(userId, {
+          app_metadata: restored,
+        });
+        if (restoreError) {
+          console.error("signIn impersonation recovery claims", restoreError);
+          await supabase.auth.signOut();
+          return { error: "Eski destek oturumu sonlandırılamadı." };
+        }
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          console.error("signIn impersonation recovery refresh", refreshError);
+          await supabase.auth.signOut();
+          return { error: "Oturum yenilenemedi. Lütfen tekrar giriş yapın." };
+        }
+      }
+    }
+
+    if (!isPlatformStaff) {
+      const claimedTenant = signInData.user?.app_metadata?.tenant_id;
+      const claimedRole = signInData.user?.app_metadata?.role;
+      if (
+        !profile?.is_active ||
+        !tenantId ||
+        claimedTenant !== tenantId ||
+        claimedRole !== profile.role
+      ) {
+        await supabase.auth.signOut();
+        return { error: "Hesabınız pasif veya ofis kimliği geçersiz." };
+      }
+
+      const { data: tenant, error: tenantError } = await admin
+        .from("tenants")
+        .select("status")
+        .eq("id", tenantId)
+        .maybeSingle();
+      if (tenantError || !tenant) {
+        await supabase.auth.signOut();
+        return { error: "Ofis durumu doğrulanamadı." };
+      }
+    }
+
+    if (profile?.is_active && profile.two_factor_sms) {
+      if (!profile.phone) {
+        await supabase.auth.signOut();
+        return {
+          error: "İki adımlı doğrulama telefonu bulunamadı. Yöneticinize başvurun.",
+        };
+      }
+
+      const { data: claimsData } = await supabase.auth.getClaims();
+      const sessionId = claimsData?.claims?.session_id;
+      if (typeof sessionId === "string" && sessionId) {
+        const { error: proofClearError } = await admin
+          .from("two_factor_verified_sessions")
+          .delete()
+          .eq("session_id", sessionId)
+          .eq("user_id", userId);
+        if (proofClearError) {
+          console.error("signIn clear 2FA session proof", proofClearError);
+          await supabase.auth.signOut();
+          return { error: "İki adımlı doğrulama oturumu hazırlanamadı." };
+        }
+      }
+
+      const { allowed } = await checkRateLimit(`2fa-send:${userId}`, {
+        limit: 5,
+        windowSec: 300,
+        failurePolicy: "deny",
+      });
       if (!allowed) {
         await supabase.auth.signOut();
-        return { error: "Çok sık doğrulama kodu istendi. Lütfen birkaç dakika sonra tekrar deneyin." };
+        return { error: "Çok sık doğrulama kodu istendi. Lütfen biraz sonra tekrar deneyin." };
       }
 
       const code = generateLoginCode();
       await admin.from("login_challenges").delete().eq("user_id", userId);
-      const { error: chError } = await admin.from("login_challenges").insert({
+      let codeHash: string;
+      try {
+        codeHash = hashOtpForStorage(code, "login", userId);
+      } catch (hashError) {
+        console.error("signIn 2fa OTP configuration", {
+          error: hashError instanceof Error ? hashError.name : "unknown",
+        });
+        await supabase.auth.signOut();
+        return { error: "Doğrulama güvenli şekilde başlatılamadı. Lütfen yöneticinize başvurun." };
+      }
+      const { error: challengeError } = await admin.from("login_challenges").insert({
         user_id: userId,
-        code_hash: await sha256Hex(code),
+        code_hash: codeHash,
         expires_at: new Date(Date.now() + LOGIN_CODE_TTL_MS).toISOString(),
       });
-      if (chError) {
-        console.error("signIn 2fa challenge", chError);
+      if (challengeError) {
+        console.error("signIn 2fa challenge", challengeError);
         await supabase.auth.signOut();
         return { error: "Doğrulama başlatılamadı. Lütfen tekrar deneyin." };
       }
 
-      // Tenant Netgsm kaydı öncelikli; yoksa platform varsayılanı
-      const text = `EmlakSoft giriş kodunuz: ${code}`;
+      const message = `EmlakSoft giriş kodunuz: ${code}`;
       const sms = tenantId
-        ? await sendSignerSms(tenantId, profile.phone, text)
-        : await sendSms(profile.phone, text);
+        ? await sendSignerSms(tenantId, profile.phone, message)
+        : await sendSms(profile.phone, message);
       if (!sms.ok) {
         console.error("signIn 2fa sms", sms.error);
         await admin.from("login_challenges").delete().eq("user_id", userId);
@@ -126,25 +287,20 @@ export async function signIn(
       redirect(`/giris/dogrulama?next=${encodeURIComponent(target)}`);
     }
 
-    // 2FA kapalı → çerez hemen set edilir, middleware ek sorgu yapmaz
-    cookieStore.set(TWO_FACTOR_COOKIE, await twoFactorCookieValue(userId), twoFactorCookieOptions());
+    if (isPlatformStaff) {
+      const { data: assurance, error: assuranceError } =
+        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (assuranceError || assurance.currentLevel !== "aal2") {
+        const platformTarget = target === "/app" ? "/admin" : target;
+        redirect(`/giris/mfa?next=${encodeURIComponent(platformTarget)}`);
+      }
+    }
+
     await logLoginEvent({ userId, tenantId, ip, userAgent, result: "success" });
   }
 
-  // Akıllı yönlendirme: kullanıcı belirli bir sayfa istemediyse (varsayılan "/app"),
-  // EmlakSoft personeli /admin'e, ofis kullanıcıları /app'e iner. Aynı giriş kapısı.
   const explicitTarget = target !== "/app";
-  if (!explicitTarget && userId) {
-    const admin = createAdminClient();
-    const { data: staff } = await admin
-      .from("platform_staff")
-      .select("id")
-      .eq("id", userId)
-      .eq("is_active", true)
-      .maybeSingle();
-    if (staff) redirect("/admin");
-  }
-
+  if (!explicitTarget && isPlatformStaff) redirect("/admin");
   redirect(target);
 }
 
@@ -154,10 +310,13 @@ export async function signUp(
 ): Promise<AuthResult> {
   const fullName = String(formData.get("name") ?? "").trim();
   const rawPhone = String(formData.get("phone") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const company = String(formData.get("company") ?? "").trim();
-  const teamSize = String(formData.get("agents") ?? "2-10");
+  const requestedTeamSize = String(formData.get("agents") ?? "2-10");
+  const requestedPlan = String(formData.get("plan") ?? "").trim();
+  const requestedCycle = String(formData.get("cycle") ?? "").trim();
+  const legalConsent = String(formData.get("legal_consent") ?? "");
 
   if (!fullName || !email || !password || !company) {
     return { error: "Ad, e-posta, şifre ve firma adı zorunlu." };
@@ -165,131 +324,123 @@ export async function signUp(
   if (password.length < 8) {
     return { error: "Şifre en az 8 karakter olmalı." };
   }
+  if (legalConsent !== "accepted") {
+    return { error: "Kullanım şartları ve KVKK aydınlatma metni onayı zorunlu." };
+  }
 
-  // Hız sınırı — IP başına saatte 5 kayıt (sınırsız ofis/hesap oluşturmayı engelle)
   const ip = await clientIp();
-  const { allowed } = await checkRateLimit(`signup:${ip}`, { limit: 5, windowSec: 3600 });
+  const { allowed } = await checkRateLimit(`signup:${ip}`, {
+    limit: 5,
+    windowSec: 3600,
+    failurePolicy: "deny",
+  });
   if (!allowed) {
     return { error: "Çok fazla kayıt denemesi. Lütfen bir süre sonra tekrar deneyin." };
   }
   if (!isValidOptionalTurkishMobile(rawPhone)) {
     return { error: TR_MOBILE_ERROR_MESSAGE };
   }
+
   const phone = rawPhone ? normalizeTurkishPhone(rawPhone) : "";
-
-  const admin = createAdminClient();
+  const teamSize = normalizeRegistrationTeamSize(requestedTeamSize);
+  const plan = registrationPlanForTeamSize(requestedPlan, teamSize);
+  const billingCycle = normalizeBillingCycle(requestedCycle);
   const baseSlug = slugify(company) || "ofis";
-  let slug = baseSlug;
-  for (let i = 0; i < 5; i++) {
-    const { data: existing } = await admin
-      .from("tenants")
-      .select("id")
-      .eq("slug", slug)
-      .maybeSingle();
-    if (!existing) break;
-    slug = `${baseSlug}-${Math.floor(100 + Math.random() * 900)}`;
-  }
+  const userAgent = ((await headers()).get("user-agent") ?? "").slice(0, 512);
+  const admin = createAdminClient();
 
-  const plan = planFromTeamSize(teamSize);
-  const trialEnds = new Date();
-  trialEnds.setDate(trialEnds.getDate() + 14);
-
-  const { data: tenant, error: tenantError } = await admin
-    .from("tenants")
-    .insert({
-      name: company,
-      slug,
-      plan,
-      status: "trial",
-      trial_ends_at: trialEnds.toISOString(),
-    })
-    .select("id")
-    .single();
-
-  if (tenantError || !tenant) {
-    console.error(tenantError);
-    return { error: "Ofis oluşturulamadı. Şema yüklü mü kontrol edin." };
-  }
-
-  const { data: created, error: createError } =
-    await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name: fullName, phone },
-      app_metadata: { tenant_id: tenant.id, role: "owner" },
-    });
-
+  // Auth is the only resource outside the provisioning transaction. If the
+  // atomic RPC fails, this pending Auth user is the sole compensation target.
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: fullName, phone },
+    app_metadata: { role: "owner", account_active: true },
+  });
   if (createError || !created.user) {
-    await admin.from("tenants").delete().eq("id", tenant.id);
-    console.error(createError);
+    console.error("signUp auth", createError);
     return {
-      error:
-        createError?.message?.includes("already")
-          ? "Bu e-posta zaten kayıtlı."
-          : "Hesap oluşturulamadı.",
+      error: createError?.message?.includes("already")
+        ? "Bu e-posta zaten kayıtlı."
+        : "Hesap oluşturulamadı.",
     };
   }
 
-  const { error: profileError } = await admin.from("profiles").insert({
-    id: created.user.id,
-    tenant_id: tenant.id,
-    full_name: fullName,
-    phone: phone || null,
-    role: "owner",
-  });
+  const { data: provisioned, error: provisionError } = await admin.rpc(
+    "provision_registration",
+    {
+      p_user_id: created.user.id,
+      p_company: company,
+      p_slug_base: baseSlug,
+      p_full_name: fullName,
+      p_phone: phone || null,
+      p_plan: plan,
+      p_billing_cycle: billingCycle,
+      p_team_size: teamSize,
+      p_terms_version: REGISTRATION_TERMS_VERSION,
+      p_kvkk_version: REGISTRATION_KVKK_VERSION,
+      p_ip_address: ip ? ip.slice(0, 128) : null,
+      p_user_agent: userAgent || null,
+    },
+  );
+  const tenantId =
+    provisioned &&
+    typeof provisioned === "object" &&
+    !Array.isArray(provisioned) &&
+    typeof (provisioned as Record<string, unknown>).tenantId === "string"
+      ? ((provisioned as Record<string, unknown>).tenantId as string)
+      : null;
 
-  if (profileError) {
-    console.error(profileError);
-    await admin.auth.admin.deleteUser(created.user.id);
-    await admin.from("tenants").delete().eq("id", tenant.id);
-    return { error: "Profil oluşturulamadı." };
+  if (provisionError || !tenantId) {
+    console.error("signUp provision_registration", provisionError);
+    const { error: cleanupError } = await admin.auth.admin.deleteUser(created.user.id);
+    if (cleanupError) console.error("signUp auth compensation", cleanupError);
+    return { error: "Ofis hesabı güvenli şekilde oluşturulamadı. Lütfen tekrar deneyin." };
   }
-
-  const planPrices: Record<string, number> = {
-    advisor: 990,
-    office: 2490,
-    professional: 5990,
-    enterprise: 12900,
-  };
-  await admin.from("subscriptions").insert({
-    tenant_id: tenant.id,
-    plan,
-    status: "trialing",
-    billing_cycle: "monthly",
-    amount_try: planPrices[plan] ?? 2490,
-    trial_ends_at: trialEnds.toISOString(),
-    current_period_start: new Date().toISOString(),
-  });
 
   const supabase = await createClient();
   const { error: signInError } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
-
   if (signInError) {
-    return {
-      error: "Hesap oluştu ama giriş yapılamadı. /giris sayfasından deneyin.",
-    };
+    return { error: "Hesap oluştu ancak giriş yapılamadı. Giriş sayfasından deneyin." };
   }
 
-  // Yeni hesapta 2FA kapalı — çerez set edilir ki middleware ek sorgu yapmasın
-  const cookieStore = await cookies();
-  cookieStore.set(TWO_FACTOR_COOKIE, await twoFactorCookieValue(created.user.id), twoFactorCookieOptions());
+  (await cookies()).delete(TWO_FACTOR_COOKIE);
   await logLoginEvent({
     userId: created.user.id,
-    tenantId: tenant.id,
+    tenantId,
     ip,
-    userAgent: (await headers()).get("user-agent"),
+    userAgent,
     result: "success",
   });
-
   redirect("/app");
 }
 
 export async function signOut() {
   const supabase = await createClient();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const sessionId = claimsData?.claims?.session_id;
+  const userId = claimsData?.claims?.sub;
+  if (
+    typeof sessionId === "string" &&
+    sessionId &&
+    typeof userId === "string" &&
+    userId
+  ) {
+    try {
+      await createAdminClient()
+        .from("two_factor_verified_sessions")
+        .delete()
+        .eq("session_id", sessionId)
+        .eq("user_id", userId);
+    } catch (proofError) {
+      // Proof cleanup is best-effort; logout itself must always continue.
+      console.error("signOut clear 2FA session proof", proofError);
+    }
+  }
   await supabase.auth.signOut();
   (await cookies()).delete(TWO_FACTOR_COOKIE);
   redirect("/");

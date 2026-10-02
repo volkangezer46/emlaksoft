@@ -6,13 +6,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { isPast } from "@/lib/clock";
 import { notifyTenant } from "@/lib/notify";
-import dynamic from "next/dynamic";
+import dynamicImport from "next/dynamic";
 import { ShareFeedback } from "@/components/public/share-feedback";
 import { ShareButton } from "@/components/public/share-button";
+import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
+import { isPublicTenantActive } from "@/lib/public-tenant";
+import { normalizeExternalHref } from "@/lib/external-href";
+
+export const dynamic = "force-dynamic";
 
 // Lightbox etkileşimli client komponenti — dynamic import ile ayrı chunk'a
 // alınır, galeri alanı yüklenene dek en-boy oranını koruyan iskelet görünür.
-const GalleryLightbox = dynamic(
+const GalleryLightbox = dynamicImport(
   () => import("@/components/public/gallery-lightbox").then((m) => m.GalleryLightbox),
   { loading: () => <div className="aspect-[16/10] w-full animate-pulse rounded-[16px] bg-white/10" /> },
 );
@@ -30,9 +35,16 @@ function money(n: number | null) {
 async function fetchDescription(
   admin: ReturnType<typeof createAdminClient>,
   propertyId: string,
+  tenantId: string,
   features: unknown,
 ): Promise<string | null> {
-  const { data } = await admin.from("properties").select("description").eq("id", propertyId).maybeSingle();
+  const { data } = await admin
+    .from("properties")
+    .select("description")
+    .eq("id", propertyId)
+    .eq("tenant_id", tenantId)
+    .is("deleted_at", null)
+    .maybeSingle();
   const col = (data as { description?: string | null } | null)?.description;
   const feat = ((features ?? {}) as { description?: string }).description;
   const text = String(col ?? feat ?? "").trim();
@@ -52,34 +64,32 @@ export async function generateMetadata({
 
   const { data: share } = await admin
     .from("share_links")
-    .select("entity_type, entity_id, expires_at, tenant:tenants(name)")
+    .select("tenant_id, entity_type, entity_id, expires_at, tenant:tenants(name, status)")
     .eq("token", token)
     .maybeSingle();
-  if (!share || share.entity_type !== "property" || isPast(share.expires_at)) return noindex;
+  const metadataTenant = share && (Array.isArray(share.tenant) ? share.tenant[0] : share.tenant);
+  if (
+    !share ||
+    share.entity_type !== "property" ||
+    isPast(share.expires_at) ||
+    !metadataTenant ||
+    !isPublicTenantActive(metadataTenant.status)
+  ) return noindex;
 
-  const [{ data: property }, { data: cover }] = await Promise.all([
-    admin
-      .from("properties")
-      .select("title, property_code, transaction_type, property_type, list_price, features")
-      .eq("id", share.entity_id)
-      .maybeSingle(),
-    admin
-      .from("property_media")
-      .select("id")
-      .eq("property_id", share.entity_id)
-      .eq("kind", "image")
-      .order("is_cover", { ascending: false })
-      .order("sort_order", { ascending: true })
-      .limit(1)
-      .maybeSingle(),
-  ]);
+  const { data: property } = await admin
+    .from("properties")
+    .select("title, property_code, transaction_type, property_type, list_price, features")
+    .eq("id", share.entity_id)
+    .eq("tenant_id", share.tenant_id)
+    .is("deleted_at", null)
+    .maybeSingle();
   if (!property) return noindex;
 
-  const tenantRel = share.tenant as { name?: string } | { name?: string }[] | null;
+  const tenantRel = share.tenant as { name?: string; status?: string } | { name?: string; status?: string }[] | null;
   const office = (Array.isArray(tenantRel) ? tenantRel[0]?.name : tenantRel?.name) ?? "EmlakSoft";
   const priceText = money(property.list_price != null ? Number(property.list_price) : null);
   const title = `${property.title || property.property_code} - ${priceText}`;
-  const rawDesc = await fetchDescription(admin, share.entity_id, property.features);
+  const rawDesc = await fetchDescription(admin, share.entity_id, share.tenant_id, property.features);
   const description = (
     rawDesc ?? `${property.transaction_type} ${property.property_type} · ${priceText} — ${office} tarafından paylaşıldı.`
   )
@@ -96,12 +106,8 @@ export async function generateMetadata({
       siteName: office,
       title,
       description,
-      // metadataBase sayesinde mutlak URL'e çevrilir — WhatsApp önizleme kartı bunu okur
-      images: cover ? [{ url: `/api/property-media/${cover.id}`, width: 1200, height: 750, alt: title }] : undefined,
     },
-    twitter: cover
-      ? { card: "summary_large_image", title, description, images: [`/api/property-media/${cover.id}`] }
-      : { card: "summary", title, description },
+    twitter: { card: "summary", title, description },
   };
 }
 
@@ -119,11 +125,17 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
   const admin = createAdminClient();
   const { data: share } = await admin
     .from("share_links")
-    .select("id, tenant_id, entity_type, entity_id, expires_at, view_count, created_by, tenant:tenants(name)")
+    .select("id, tenant_id, entity_type, entity_id, expires_at, view_count, created_by, tenant:tenants(name, status)")
     .eq("token", token)
     .maybeSingle();
 
-  if (!share || share.entity_type !== "property") notFound();
+  const shareTenant = share && (Array.isArray(share.tenant) ? share.tenant[0] : share.tenant);
+  if (
+    !share ||
+    share.entity_type !== "property" ||
+    !shareTenant ||
+    !isPublicTenantActive(shareTenant.status)
+  ) notFound();
   if (isPast(share.expires_at)) {
     return (
       <div className="grid min-h-screen place-items-center bg-canvas px-4">
@@ -138,24 +150,37 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
   }
 
   // view_count update + property + media hepsi yalnızca share'e bağlı → paralel
-  const [, { data: property }, { data: mediaRows }] = await Promise.all([
+  const [, { data: property }, { data: mediaRows }, { data: shareCreator }] = await Promise.all([
     admin
       .from("share_links")
       .update({ view_count: (share.view_count ?? 0) + 1 })
-      .eq("id", share.id),
+      .eq("id", share.id)
+      .eq("tenant_id", share.tenant_id),
     admin
       .from("properties")
       .select(
-        "title, property_code, transaction_type, property_type, list_price, address_line, lat, lng, features, assigned_to:profiles(full_name, phone), province:geo_provinces(name), district:geo_districts(name)",
+        "title, property_code, transaction_type, property_type, list_price, address_line, lat, lng, features, assigned_to, province:geo_provinces(name), district:geo_districts(name)",
       )
       .eq("id", share.entity_id)
+      .eq("tenant_id", share.tenant_id)
+      .is("deleted_at", null)
       .maybeSingle(),
     admin
       .from("property_media")
       .select("id, kind, external_url, is_cover")
       .eq("property_id", share.entity_id)
+      .eq("tenant_id", share.tenant_id)
       .order("is_cover", { ascending: false })
       .order("sort_order", { ascending: true }),
+    share.created_by
+      ? admin
+          .from("profiles")
+          .select("id")
+          .eq("id", share.created_by)
+          .eq("tenant_id", share.tenant_id)
+          .eq("is_active", true)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   if (!property) notFound();
@@ -163,11 +188,11 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
   // Paylaşım istihbaratı: İLK açılışta (view_count 0→1 geçişi) linki oluşturan
   // danışmana bildirim — "link gitti mi, açıldı mı?" sorusunun cevabı.
   // Fire-and-forget: bildirim hatası ziyaretçi sayfasını düşürmez.
-  if ((share.view_count ?? 0) === 0 && share.created_by) {
+  if ((share.view_count ?? 0) === 0 && shareCreator) {
     const label = property.title || property.property_code || "Portföy";
     void notifyTenant({
       tenantId: share.tenant_id,
-      userId: share.created_by as string,
+      userId: shareCreator.id,
       title: "Paylaştığınız portföy linki açıldı",
       body: `"${label}" paylaşım linki ilk kez görüntülendi.`,
       href: `/app/portfoyler/${share.entity_id}`,
@@ -176,11 +201,16 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
     }).catch((e) => console.error("share first-view notify", e));
   }
 
-  const description = await fetchDescription(admin, share.entity_id, property.features);
+  const description = await fetchDescription(admin, share.entity_id, share.tenant_id, property.features);
 
   const media = mediaRows ?? [];
   const images = media.filter((m) => m.kind === "image");
-  const tours = media.filter((m) => m.kind !== "image");
+  const tours = media.flatMap((item) => {
+    const externalUrl = normalizeExternalHref(item.external_url);
+    return item.kind !== "image" && externalUrl
+      ? [{ ...item, external_url: externalUrl }]
+      : [];
+  });
 
   const tenant = share.tenant as { name?: string } | { name?: string }[] | null;
   const office = Array.isArray(tenant) ? tenant[0]?.name : tenant?.name;
@@ -189,8 +219,16 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
   const pName = Array.isArray(province) ? province[0]?.name : province?.name;
   const dName = Array.isArray(district) ? district[0]?.name : district?.name;
   const feat = property.features as { rooms?: string; sqm?: number; baths?: number } | null;
-  const agentRaw = property.assigned_to as { full_name?: string; phone?: string } | { full_name?: string; phone?: string }[] | null;
-  const agent = Array.isArray(agentRaw) ? agentRaw[0] : agentRaw;
+  const assignedTo = (property.assigned_to as string | null) ?? null;
+  const { data: agent } = assignedTo
+    ? await admin
+        .from("profiles")
+        .select("full_name, phone")
+        .eq("id", assignedTo)
+        .eq("tenant_id", share.tenant_id)
+        .eq("is_active", true)
+        .maybeSingle()
+    : { data: null };
   const agentTelHref = toTelHref(agent?.phone);
   const agentWhatsAppLink = toWhatsAppLink(agent?.phone);
 
@@ -265,7 +303,10 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
           {images.length > 0 ? (
             <div className="border-b border-white/10 p-4">
               <GalleryLightbox
-                images={images.map((m) => ({ id: m.id }))}
+                images={images.map((m) => ({
+                  id: m.id,
+                  src: createShortLivedPropertyMediaUrl(m.id, "share"),
+                }))}
                 alt={property.title || property.property_code || "Portföy"}
                 priority
                 sizes="(max-width: 640px) 100vw, 600px"
@@ -277,7 +318,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
                   {tours.map((m) => (
                     <a
                       key={m.id}
-                      href={m.external_url ?? "#"}
+                      href={m.external_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 rounded-full border border-mint-400/30 bg-mint-500/10 px-3 py-1.5 text-xs font-bold text-mint-300 transition hover:bg-mint-500/20"

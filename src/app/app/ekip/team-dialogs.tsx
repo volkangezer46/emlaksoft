@@ -30,9 +30,8 @@ const roleOptions: { value: string; label: string }[] = [
 
 function randomPassword() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-  let out = "";
-  for (let i = 0; i < 12; i++) out += chars[Math.floor(Math.random() * chars.length)];
-  return out;
+  const values = globalThis.crypto.getRandomValues(new Uint32Array(16));
+  return Array.from(values, (value) => chars[value % chars.length]).join("");
 }
 
 export function AddMemberDialog({ branches }: { branches: Branch[] }) {

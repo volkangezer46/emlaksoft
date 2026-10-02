@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
+import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { createClient } from "@/lib/supabase/server";
 import { daysAgoIso } from "@/lib/clock";
 import { ImportWizard } from "./import-wizard";
@@ -32,7 +33,8 @@ const nf = new Intl.NumberFormat("tr-TR");
  * hedef sayfalar bu ekranın alanı dışında olduğundan parametresiz link verilir.
  */
 export default async function ImportPage() {
-  await requireModulePage("customers");
+  const { perms } = await requireModulePage("customers");
+  const canImportProperties = effectiveHasPermission(perms, "properties", "create");
   const supabase = await createClient();
   const since30 = daysAgoIso(30);
 
@@ -192,7 +194,7 @@ export default async function ImportPage() {
         })}
       </section>
 
-      <ImportWizard />
+      <ImportWizard canImportProperties={canImportProperties} />
 
       {/* Güvence kartları — aktarımın teknik garantileri */}
       <section className="grid gap-3 md:grid-cols-3">

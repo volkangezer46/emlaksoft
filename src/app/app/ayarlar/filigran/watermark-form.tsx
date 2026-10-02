@@ -108,7 +108,7 @@ export function WatermarkForm({
       };
       // 404 (taslak portföy) veya ağ hatası → yerleşik örnek görsel kullanılır
       img.onerror = () => {};
-      img.src = `/api/property-media/${sampleMediaId}`;
+      img.src = `/api/property-media/${sampleMediaId}/download`;
     }
     return () => {
       alive = false;

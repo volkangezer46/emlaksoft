@@ -9,14 +9,23 @@ import {
   applyDocFieldsToProperty,
   bulkDeletePropertyMedia,
   deletePropertyMedia,
+  finalizePropertyMediaUpload,
   ocrPropertyMediaDocument,
+  preparePropertyMediaUpload,
   reorderPropertyMedia,
   setCoverPropertyMedia,
-  uploadPropertyMedia,
   type MediaResult,
   type PropertyDocFields,
 } from "@/app/actions/property-media";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { uploadToDirectFileTarget } from "@/lib/direct-file-upload-client";
 import { DEFAULT_WATERMARK, type WatermarkSettings } from "@/lib/watermark";
 import { applyWatermarkToFile, loadWatermarkLogo } from "@/lib/watermark-canvas";
 
@@ -178,16 +187,30 @@ export function PropertyMediaManager({
         stamped = res.applied;
         patchQueue(item.key, { status: "uploading" });
       }
-      const fd = new FormData();
-      fd.set("property_id", propertyId);
-      fd.set("file", file);
-      fd.set("has_watermark", stamped ? "1" : "0");
-      const r = await uploadPropertyMedia(fd);
-      if (r.error) {
-        patchQueue(item.key, { status: "error", error: r.error });
-      } else {
-        patchQueue(item.key, { status: "done" });
+      const prepared = await preparePropertyMediaUpload({
+        propertyId,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        hasWatermark: stamped,
+      });
+      if (!prepared.ok) {
+        patchQueue(item.key, { status: "error", error: prepared.error });
+        return;
       }
+
+      const uploaded = await uploadToDirectFileTarget(prepared.upload, file);
+      if (!uploaded.ok) {
+        patchQueue(item.key, { status: "error", error: uploaded.error });
+        return;
+      }
+
+      const finalized = await finalizePropertyMediaUpload(propertyId, prepared.upload.sessionId);
+      if (!finalized.ok) {
+        patchQueue(item.key, { status: "error", error: finalized.error });
+        return;
+      }
+      patchQueue(item.key, { status: "done" });
     } catch {
       patchQueue(item.key, { status: "error", error: "Yükleme başarısız — bağlantıyı kontrol edin." });
     }
@@ -231,6 +254,7 @@ export function PropertyMediaManager({
   const [ocrBusyId, setOcrBusyId] = useState<string | null>(null);
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [ocrValues, setOcrValues] = useState<Record<string, string>>({});
+  const ocrReturnFocusRef = useRef<HTMLElement | null>(null);
   const [ocrGuven, setOcrGuven] = useState<string | null>(null);
   const [ocrNote, setOcrNote] = useState<string | null>(null);
   const [applyMsg, setApplyMsg] = useState<string | null>(null);
@@ -241,6 +265,7 @@ export function PropertyMediaManager({
 
   function runOcr(mediaId: string) {
     setOcrBusyId(mediaId);
+    ocrReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setOcrOpen(true);
     setOcrError(null);
     setOcrValues({});
@@ -637,7 +662,7 @@ export function PropertyMediaManager({
                 } ${canEdit ? "cursor-grab active:cursor-grabbing" : ""}`}
               >
                 <Image
-                  src={`/api/property-media/${m.id}`}
+                  src={`/api/property-media/${m.id}/download`}
                   alt="Portföy görseli"
                   fill
                   sizes="(max-width: 640px) 50vw, 25vw"
@@ -799,32 +824,36 @@ export function PropertyMediaManager({
       </div>
 
       {/* C8: Belge OCR sonuç dialogu */}
-      {ocrOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/40 p-4 backdrop-blur-sm sm:items-center"
-          onClick={() => setOcrOpen(false)}
+      <Dialog open={ocrOpen} onOpenChange={setOcrOpen}>
+        <DialogContent
+          size="lg"
+          overlayClassName="bg-ink-950/40 backdrop-blur-sm"
+          className="max-w-xl rounded-[20px] border-line p-5 shadow-none"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            const target = ocrReturnFocusRef.current;
+            ocrReturnFocusRef.current = null;
+            target?.focus();
+          }}
         >
-          <div
-            className="w-full max-w-xl rounded-[20px] border border-line bg-surface p-5"
-            onClick={(e) => e.stopPropagation()}
-          >
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <h3 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                <DialogTitle className="flex items-center gap-2 font-display font-bold text-ink-950">
                   <Sparkles className="h-4 w-4 text-brand-600" /> Belgeden okunan bilgiler
-                </h3>
-                <p className="mt-0.5 text-xs text-text-muted">
+                </DialogTitle>
+                <DialogDescription className="mt-0.5 text-xs text-text-muted">
                   AI çıktısıdır, hata içerebilir — uygulamadan önce kontrol edip düzeltin. Bulunamayan alanlar boş bırakılır.
-                </p>
+                </DialogDescription>
               </div>
-              <button
-                type="button"
-                aria-label="Kapat"
-                onClick={() => setOcrOpen(false)}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] border border-line text-text-muted hover:text-ink-950"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <DialogClose asChild>
+                <button
+                  type="button"
+                  aria-label="Kapat"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] border border-line text-text-muted hover:text-ink-950"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </DialogClose>
             </div>
 
             {ocrPending ? (
@@ -889,9 +918,8 @@ export function PropertyMediaManager({
                 </div>
               </>
             )}
-          </div>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

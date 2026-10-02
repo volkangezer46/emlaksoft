@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
-import { calculateCommission, buildSplits } from "@/lib/commission";
 
 export type ProjectResult = { ok?: boolean; error?: string; id?: string };
 
@@ -395,6 +395,9 @@ export async function sellUnit(unitId: string, customerId?: string): Promise<Pro
   const gate = await requirePermission("projects", "edit");
   if (!gate.ok) return { error: gate.error };
 
+  const financialGate = await requirePermission("commissions", "create");
+  if (!financialGate.ok) return { error: financialGate.error };
+
   const unit = await getUnitForUpdate(gate.tenantId, unitId);
   if (!unit) return { error: "Daire bulunamadı." };
   if (unit.status === "sold") return { error: "Daire zaten satılmış." };
@@ -405,93 +408,26 @@ export async function sellUnit(unitId: string, customerId?: string): Promise<Pro
     return { error: "Müşteri bulunamadı." };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("project_units")
-    .update({ status: "sold", customer_id: customer, sold_at: new Date().toISOString(), reserved_until: null })
-    .eq("id", unitId)
-    .eq("tenant_id", gate.tenantId);
-  if (error) return { error: "Satış kaydedilemedi." };
-
-  await auditStatusChange(gate.tenantId, gate.userId, unit, { status: "sold", customer_id: customer });
-
-  // C.1 — Proje dairesi satışı `deals` + `commissions`'a yazılır. Aksi halde
-  // proje satışları ciro/komisyon/lig raporlarında GÖRÜNMÜYORDU (yalnız
-  // project_units.status='sold' oluyordu). Hata satışı bozmaz (best-effort + log).
-  try {
-    await recordProjectSaleDeal(gate.tenantId, gate.userId, unitId, customer);
-  } catch (e) {
-    console.error("sellUnit deal/commission", e);
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("sell_project_unit_atomic", {
+    p_tenant_id: gate.tenantId,
+    p_actor_id: gate.userId,
+    p_unit_id: unitId,
+    p_customer_id: customer,
+  });
+  if (error) {
+    console.error("sellUnit atomic", { code: error.code });
+    return { error: "Daire satışı, anlaşma ve komisyon birlikte kaydedilemedi." };
   }
+  const outcome = String((data as { outcome?: string } | null)?.outcome ?? "");
+  if (outcome === "not_found") return { error: "Daire bulunamadı." };
+  if (outcome === "customer_not_found") return { error: "Müşteri bulunamadı." };
+  if (outcome === "price_required") return { error: "Satıştan önce daire için geçerli bir liste fiyatı girin." };
+  if (outcome === "already_sold") return { error: "Daire zaten satılmış." };
+  if (outcome !== "applied" && outcome !== "replay") return { error: "Daire satışı tamamlanamadı." };
 
   revalidateUnit(unit.project_id);
   return { ok: true };
-}
-
-/**
- * Proje dairesi satışını normal anlaşma hattına bağlar: property'siz `won`+`sale`
- * deal + komisyon (satılık portföyle BİREBİR aynı `calculateCommission`/`buildSplits`,
- * oran verilmezse ofis varsayılanı). İzlenebilirlik için proje/daire bilgisi
- * deal notuna yazılır (deal'ın property_id'si yok). deal_value = dairenin list_price.
- */
-async function recordProjectSaleDeal(
-  tenantId: string,
-  userId: string,
-  unitId: string,
-  customerId: string,
-) {
-  const supabase = await createClient();
-  const { data: u } = await supabase
-    .from("project_units")
-    .select("list_price, unit_no, block, project:projects(name)")
-    .eq("id", unitId)
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
-
-  const value = Number(u?.list_price);
-  const dealValue = Number.isFinite(value) && value > 0 ? value : null;
-
-  const { data: deal, error: dealErr } = await supabase
-    .from("deals")
-    .insert({
-      tenant_id: tenantId,
-      customer_id: customerId,
-      property_id: null,
-      deal_type: "sale",
-      stage: "won",
-      deal_value: dealValue,
-      probability: 100,
-      assigned_to: userId,
-    })
-    .select("id")
-    .single();
-  if (dealErr || !deal) return;
-
-  // Komisyon — yalnız değer varsa. gross_amount alanı mevcut kod deseninde net'i
-  // tutar (isim yanıltıcı ama tutarlılık için birebir korundu, bkz. deals.ts).
-  if (dealValue) {
-    const calc = calculateCommission({ amount: dealValue });
-    const splits = buildSplits(calc.net);
-    await supabase.from("commissions").insert({
-      tenant_id: tenantId,
-      deal_id: deal.id,
-      gross_amount: calc.net,
-      vat_amount: calc.vat,
-      status: "calculated",
-      splits,
-    });
-  }
-
-  // İzlenebilirlik: deal'ın property'si olmadığından proje/daire notu düşülür.
-  const proj = u?.project as { name?: string } | { name?: string }[] | null | undefined;
-  const projectName = Array.isArray(proj) ? proj[0]?.name : proj?.name;
-  const unitLabel = [u?.block, u?.unit_no].filter(Boolean).join(" / ") || "Daire";
-  await supabase.from("deal_notes").insert({
-    tenant_id: tenantId,
-    deal_id: deal.id,
-    author_id: userId,
-    body: `Proje satışı — ${projectName ?? "Proje"} · ${unitLabel}`,
-  });
 }
 
 // ============================================================

@@ -54,7 +54,7 @@ export function normalizeCloseFlags(input: {
 /** Rakip / ofis dışı kapanışta tahmini kaçan komisyon. */
 export function estimateLostCommission(input: LeakCalcInput): LeakCalcResult {
   const flags = normalizeCloseFlags(input);
-  const rate = Number.isFinite(input.commissionRate) && (input.commissionRate ?? 0) > 0
+  const rate = Number.isFinite(input.commissionRate) && input.commissionRate != null && input.commissionRate >= 0
     ? Number(input.commissionRate)
     : DEFAULT_COMMISSION_RATE;
   const baseAmount =

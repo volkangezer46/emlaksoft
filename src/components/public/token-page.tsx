@@ -190,7 +190,7 @@ export function PublicTokenPage({
       >
         <PublicBrandBand office={office} logoUrl={logoUrl} className="mb-5" />
 
-        <main className="surface-card overflow-hidden rounded-[22px]">
+        <main id="main-content" className="surface-card overflow-hidden rounded-[22px]">
           <PublicCardHeader icon={icon} title={title} subtitle={subtitle} />
           <div className="px-5 py-5 sm:px-6">{children}</div>
         </main>

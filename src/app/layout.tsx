@@ -33,7 +33,7 @@ const geistMono = Geist_Mono({
 const SITE_NAME = "EmlakSoft";
 const SITE_TITLE = "EmlakSoft — Türkiye’nin emlak işletim sistemi";
 const SITE_DESC =
-  "Müşteriden tapuya, ilandan komisyona kadar emlak ofisinizi tek platformda yönetin. İYS/EİDS uyumlu, yapay zeka destekli emlak CRM.";
+  "Müşteriden tapuya, ilandan komisyona kadar emlak ofisinizi tek platformda yönetin. İYS/EİDS hazırlık süreçleri ve yapay zeka destekli emlak CRM.";
 
 export const metadata: Metadata = {
   title: {
@@ -44,10 +44,14 @@ export const metadata: Metadata = {
   applicationName: SITE_NAME,
   metadataBase: new URL(getBaseUrl()),
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: "/icon.svg",
+  },
   keywords: [
     "emlak CRM", "emlak yazılımı", "emlak ofis yönetimi", "portföy yönetimi",
-    "İYS uyum", "EİDS", "emlak komisyon", "gayrimenkul CRM", "emlak danışmanı yazılımı",
-    "sahibinden entegrasyon", "hepsiemlak", "kira artış hesaplama",
+    "İYS süreç yönetimi", "EİDS hazırlığı", "emlak komisyon", "gayrimenkul CRM", "emlak danışmanı yazılımı",
+    "sahibinden ilan takibi", "hepsiemlak ilan takibi", "kira artış hesaplama",
   ],
   authors: [{ name: "EmlakSoft" }],
   creator: "EmlakSoft",

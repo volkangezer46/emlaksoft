@@ -39,7 +39,7 @@ export function AuthShell({
                 { icon: Building2, text: "Portföy, müşteri ve randevu — tek panelde" },
                 { icon: Wallet, text: "Komisyon ve kayıp-kaçak takibi otomatik" },
                 { icon: TrendingUp, text: "Portal ilanları ve dönüşüm raporları canlı" },
-                { icon: ShieldCheck, text: "İYS · EİDS · KVKK uyumu hazır" },
+                { icon: ShieldCheck, text: "KVKK kayıtları ve İYS/EİDS hazırlık akışları" },
               ].map((f) => (
                 <li key={f.text} className="flex items-center gap-3 text-sm text-white/80">
                   <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] border border-white/10 bg-white/6 text-cyan-300">
@@ -68,7 +68,7 @@ export function AuthShell({
       </aside>
 
       {/* Sağ: form alanı */}
-      <main className="flex items-center justify-center px-4 py-10 sm:px-8">
+      <main id="main-content" className="flex items-center justify-center px-4 py-10 sm:px-8">
         <div className="w-full max-w-md">
           <Link href="/" className="font-display text-lg font-extrabold text-ink-950 lg:hidden">
             EmlakSoft

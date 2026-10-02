@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, Clock, FileText, Loader2, MapPin, Phone, Repeat, RotateCcw, Trash2, User } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { completeTask, deleteTask, reopenTask } from "@/app/actions/tasks";
 import { useToast } from "@/components/app/toast-provider";
 import { TaskEditDialog } from "./task-edit-dialog";
@@ -94,6 +95,22 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
         router.refresh();
       }
     });
+  }
+
+  async function removeTask() {
+    const fd = new FormData();
+    fd.set("id", task.id);
+    try {
+      const result = await deleteTask(fd);
+      if (result.error) {
+        push(result.error, "err");
+        return;
+      }
+      push("Görev silindi", "ok");
+      router.refresh();
+    } catch {
+      push("Görev silinemedi. Lütfen tekrar deneyin.", "err");
+    }
   }
 
   const meta = KIND_META[task.kind] ?? KIND_META.other;
@@ -209,14 +226,17 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
           )
         ) : null}
         {canDelete ? (
-          <form action={deleteTask}>
-            <input type="hidden" name="id" value={task.id} />
-            <Tip label="Sil">
-              <button type="submit" aria-label="Görevi sil" className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line text-danger-500 transition hover:border-danger-500/40">
+          <ConfirmDialog
+            title="Görevi sil"
+            description={`“${task.title}” kalıcı olarak silinecek. Bu işlem geri alınamaz.`}
+            confirmLabel="Sil"
+            onConfirm={removeTask}
+            trigger={
+              <button type="button" aria-label="Görevi sil" className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line text-danger-500 transition hover:border-danger-500/40">
                 <Trash2 className="h-4 w-4" />
               </button>
-            </Tip>
-          </form>
+            }
+          />
         ) : null}
       </div>
     </article>

@@ -1,449 +1,770 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, Clock, Inbox, LifeBuoy, Siren, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import {
+  CheckCircle2,
+  Clock3,
+  Inbox,
+  LifeBuoy,
+  Search,
+  Siren,
+  TimerReset,
+  X,
+} from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
-import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
-import { daysAgoIso } from "@/lib/clock";
+import { PAGE_SIZE, Pagination, pageRange } from "@/app/admin/_components/pagination";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { ExportButton } from "@/components/admin/export-button";
-import { ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { exportTicketsCsv } from "@/app/actions/platform-export";
-import { slaSortRank, slaStateOf } from "./sla";
-import { SlaBadge } from "./sla-badge";
-import { TicketRowActions } from "./ticket-row-actions";
+import { inFilter, orIlike, safeLike } from "@/lib/pgrst";
 import { cn } from "@/lib/utils";
+import type { TicketStatus } from "@/lib/support/ticket-contract";
+import { slaStateOf } from "./sla";
+import { TicketStatusDonut, TicketResolutionGauge } from "./ticket-dashboard-visuals";
+import { TicketQueueView, type TicketQueueRow } from "./ticket-queue-view";
+import { NewAdminTicketDialog, type TicketTenantOption } from "./new-admin-ticket-dialog";
+import {
+  buildTicketListHref,
+  formatDurationHours,
+  isUuid,
+  normalizeTicketFilters,
+  TICKET_CATEGORY_KEYS,
+  TICKET_CATEGORY_LABEL,
+  TICKET_OPEN_STATUSES,
+  TICKET_PRIORITY_KEYS,
+  TICKET_PRIORITY_LABEL,
+  TICKET_STATUS_KEYS,
+  TICKET_STATUS_LABEL,
+  type TicketListFilters,
+} from "./ticket-list-model";
 
-const statusLabel: Record<string, string> = {
-  open: "Açık",
-  in_progress: "İşleniyor",
-  waiting: "Yanıt bekliyor",
-  resolved: "Çözüldü",
-  closed: "Kapalı",
-};
-
-const statusColor: Record<string, string> = {
+const STATUS_COLOR: Record<string, string> = {
   open: "var(--brand-500)",
   in_progress: "var(--cyan-400)",
   waiting: "var(--amber-400)",
   resolved: "var(--mint-500)",
-  closed: "rgba(10,18,36,0.28)",
+  closed: "rgba(10,34,71,0.25)",
 };
 
-const priorityCls: Record<string, string> = {
-  low: "text-text-muted",
-  normal: "text-brand-600",
-  high: "text-amber-600",
-  urgent: "text-danger-500",
+const TENANT_STATUS_LABEL: Record<string, string> = {
+  trial: "Deneme",
+  active: "Aktif",
+  past_due: "Ödeme bekliyor",
 };
 
-const priorityLabel: Record<string, string> = {
-  low: "Düşük",
-  normal: "Normal",
-  high: "Yüksek",
-  urgent: "Acil",
+const SLA_FILTER_LABEL: Record<string, string> = {
+  normal: "SLA normal",
+  warning: "SLA riskte",
+  breached: "SLA aşıldı",
 };
 
-const categoryLabel: Record<string, string> = {
-  general: "Genel",
-  billing: "Fatura",
-  bug: "Hata",
-  feature: "Özellik isteği",
-  compliance: "Uyum",
-  onboarding: "Kurulum",
+type TenantRelation = { name?: string } | { name?: string }[] | null;
+
+type TicketQueueSourceRow = {
+  id: string;
+  ticket_no: string | null;
+  subject: string;
+  body?: string | null;
+  category: string;
+  priority: string;
+  status: TicketStatus;
+  created_at: string;
+  updated_at: string;
+  last_activity_at?: string | null;
+  first_response_due_at: string | null;
+  first_response_at: string | null;
+  first_response_breached_at?: string | null;
+  resolution_due_at: string | null;
+  resolution_breached_at?: string | null;
+  tenant_id: string | null;
+  tenant_name?: string | null;
+  tenant?: TenantRelation;
+  assigned_staff_id: string | null;
+  assigned_staff_name?: string | null;
+  message_count?: number | null;
 };
 
-/** Açık kuyruğu tek tıkta filtrelemek için birleşik durum değeri. */
-const OPEN_STATUSES = ["open", "in_progress", "waiting"] as const;
+type TicketMetricsPayload = {
+  total: number;
+  open: number;
+  urgent: number;
+  resolved: number;
+  resolutionRate: number;
+  avgResolutionSeconds: number | null;
+  firstResponseBreached: number;
+  resolutionBreached: number;
+  statusCounts: Record<string, number>;
+  priorityCounts: Record<string, number>;
+  categoryCounts: Record<string, number>;
+  last14Days: { date: string; value: number }[];
+  slaPolicy: string;
+};
 
-type Rel = { name?: string } | { name?: string }[] | null;
-function nameOf(v: Rel) {
-  if (!v) return "—";
-  return Array.isArray(v) ? (v[0]?.name ?? "—") : (v.name ?? "—");
+type TicketQueuePayload = {
+  items: TicketQueueSourceRow[];
+  total: number;
+  limit: number;
+  offset: number;
+  slaPolicy: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function buildHref(p: { durum?: string; oncelik?: string; tenant?: string; sayfa?: number }) {
-  const sp = new URLSearchParams();
-  if (p.durum) sp.set("durum", p.durum);
-  if (p.oncelik) sp.set("oncelik", p.oncelik);
-  if (p.tenant) sp.set("tenant", p.tenant);
-  if (p.sayfa && p.sayfa > 1) sp.set("sayfa", String(p.sayfa));
-  const s = sp.toString();
-  return s ? `/admin/tickets?${s}` : "/admin/tickets";
+function readMetricsPayload(value: unknown): TicketMetricsPayload {
+  if (!isRecord(value) || !isRecord(value.statusCounts) || !Array.isArray(value.last14Days)) {
+    throw new Error("Destek metrik servisi geçersiz bir yanıt döndürdü.");
+  }
+  return value as TicketMetricsPayload;
 }
 
-/** TEK segment-pill stili — durum + öncelik filtreleri aynı dili konuşur. */
-function segCls(active: boolean) {
-  return cn(
-    "focus-ring press inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition",
-    active ? "bg-ink-950 text-white shadow-[var(--shadow-xs)]" : "text-text-muted hover:bg-surface hover:text-ink-950",
+function readQueuePayload(value: unknown): TicketQueuePayload {
+  if (!isRecord(value) || !Array.isArray(value.items) || typeof value.total !== "number") {
+    throw new Error("Destek kuyruğu servisi geçersiz bir yanıt döndürdü.");
+  }
+  return value as TicketQueuePayload;
+}
+
+function relationName(value: TenantRelation) {
+  if (!value) return "—";
+  return Array.isArray(value) ? (value[0]?.name ?? "—") : (value.name ?? "—");
+}
+
+function MetricCard({
+  label,
+  value,
+  hint,
+  icon: Icon,
+  tone,
+  href,
+}: {
+  label: string;
+  value: number | string;
+  hint: string;
+  icon: LucideIcon;
+  tone: "brand" | "amber" | "danger" | "cyan" | "mint";
+  href?: string;
+}) {
+  const toneClass = {
+    brand: "bg-brand-600/10 text-brand-700",
+    amber: "bg-amber-400/15 text-amber-700",
+    danger: "bg-danger-500/10 text-danger-700",
+    cyan: "bg-cyan-400/12 text-ink-800",
+    mint: "bg-mint-500/12 text-mint-700",
+  }[tone];
+  const accentClass = {
+    brand: "from-brand-500/70",
+    amber: "from-amber-400/80",
+    danger: "from-danger-500/75",
+    cyan: "from-cyan-400/75",
+    mint: "from-mint-500/75",
+  }[tone];
+
+  const content = (
+    <>
+      <span className={cn("absolute inset-x-0 top-0 h-px bg-gradient-to-r to-transparent", accentClass)} aria-hidden />
+      <div className="flex items-start justify-between gap-3">
+        <span className={cn("grid h-10 w-10 place-items-center rounded-[12px]", toneClass)}>
+          <Icon className="h-5 w-5" aria-hidden />
+        </span>
+        {href ? <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Görüntüle</span> : null}
+      </div>
+      <p className="numeric mt-3 font-display text-2xl font-extrabold leading-none text-ink-950">
+        {typeof value === "number" ? value.toLocaleString("tr-TR") : value}
+      </p>
+      <p className="mt-1 text-xs font-bold text-ink-950">{label}</p>
+      <p className="mt-1 truncate text-[11px] text-text-muted">{hint}</p>
+    </>
+  );
+
+  const className = "surface-card group relative block min-h-[136px] overflow-hidden rounded-[16px] p-4 transition";
+  return href ? (
+    <Link href={href} className={cn(className, "focus-ring press lift hover:border-brand-300")}>
+      {content}
+    </Link>
+  ) : (
+    <div className={className}>{content}</div>
   );
 }
 
-/** Sayaç rozeti — pill içinde, aktifken beyaz zeminli. */
-function CountBadge({ n, active }: { n: number; active: boolean }) {
+function StatusCount({ count, active }: { count: number; active: boolean }) {
   return (
-    <span className={cn("rounded-full px-1.5 text-[10px] font-bold tabular-nums", active ? "bg-white/20 text-white" : "bg-ink-950/6 text-text-muted")}>
-      {n}
+    <span className={cn("numeric rounded-full px-1.5 py-0.5 text-[10px] font-extrabold", active ? "bg-white/18 text-white" : "bg-ink-950/[0.06] text-text-muted")}>
+      {count}
     </span>
   );
 }
 
-/** Kompakt, tıklanabilir KPI kartı — ikon rozeti + değer + etiket, hepsi filtrelenmiş hedefe götürür. */
-function MetricTile({
-  label,
-  value,
-  href,
-  icon: Icon,
-  tone = "default",
-  active = false,
-  pulse = false,
-}: {
-  label: string;
-  value: string | number;
-  href: string;
-  icon: LucideIcon;
-  tone?: "default" | "amber" | "danger" | "mint";
-  active?: boolean;
-  pulse?: boolean;
-}) {
-  const toneCls =
-    tone === "amber" ? "text-amber-600" : tone === "danger" ? "text-danger-600" : tone === "mint" ? "text-mint-600" : "text-ink-950";
-  const iconToneCls =
-    tone === "amber"
-      ? "bg-amber-400/12 text-amber-600"
-      : tone === "danger"
-        ? "bg-danger-500/12 text-danger-600"
-        : tone === "mint"
-          ? "bg-mint-500/12 text-mint-600"
-          : "bg-brand-600/10 text-brand-600";
-  return (
-    <Link
-      href={href}
-      aria-current={active ? "page" : undefined}
-      className={cn(
-        "lift focus-ring group inline-flex items-center gap-2.5 rounded-xl border px-3 py-2 transition",
-        active ? "border-ink-950 bg-ink-950/[0.04]" : "border-line bg-surface hover:border-brand-300/60 hover:bg-canvas",
-      )}
-    >
-      <span className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-transform group-hover:scale-105", iconToneCls)}>
-        <Icon className="h-3.5 w-3.5" aria-hidden />
-      </span>
-      <span className="flex items-baseline gap-1.5">
-        <span className={cn("font-display text-base font-extrabold leading-none tabular-nums", toneCls)}>
-          {pulse ? <span className="status-pulse mr-1 inline-block h-1.5 w-1.5 rounded-full bg-danger-500 align-middle" /> : null}
-          {value}
-        </span>
-        <span className="text-[11px] font-medium text-text-muted">{label}</span>
-      </span>
-    </Link>
+function statusPillClass(active: boolean) {
+  return cn(
+    "focus-ring press inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition",
+    active ? "bg-ink-950 text-white shadow-[var(--elev-2)]" : "text-text-muted hover:bg-surface hover:text-ink-950",
   );
+}
+
+function queryFailure(errors: unknown[]) {
+  const failed = errors.filter(Boolean);
+  if (failed.length === 0) return;
+  console.error(
+    "admin tickets query failed",
+    failed.map((error) => {
+      if (typeof error !== "object" || error === null) return { code: "unknown" };
+      const value = error as { code?: string; message?: string };
+      return { code: value.code ?? "unknown", message: value.message ?? "query failed" };
+    }),
+  );
+  throw new Error("Destek kuyruğu verileri yüklenemedi. Lütfen tekrar deneyin.");
 }
 
 export default async function AdminTicketsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; oncelik?: string; tenant?: string; sayfa?: string }>;
+  searchParams?: Promise<{
+    q?: string;
+    durum?: string;
+    oncelik?: string;
+    kategori?: string;
+    atanan?: string;
+    tenant?: string;
+    sla?: string;
+    sirala?: string;
+    yon?: string;
+    sayfa?: string;
+  }>;
 }) {
-  await requirePlatformModule("tickets");
-  const sp = (await searchParams) ?? {};
-  const durum = sp.durum && (statusLabel[sp.durum] || sp.durum === "acik") ? sp.durum : undefined;
-  const oncelik = sp.oncelik && priorityLabel[sp.oncelik] ? sp.oncelik : undefined;
-  const tenantId = (sp.tenant ?? "").trim() || undefined;
-  const page = parsePage(sp.sayfa);
-  const filtered = Boolean(durum || oncelik || tenantId);
-
+  const currentStaff = await requirePlatformModule("tickets");
+  const filters = normalizeTicketFilters((await searchParams) ?? {});
+  const page = filters.sayfa ?? 1;
   const admin = createAdminClient();
+
+  const hasSearch = Boolean(filters.q && filters.q.length >= 2);
+  const usesCanonicalQueue = filters.sirala === "queue";
+
+  // Queue RPC; SLA aşımı, aciliyet, hedef süre ve son hareketi birlikte değerlendirir.
+  // Kullanıcı açıkça farklı bir kolon sırası seçerse güvenli doğrudan sorguya düşer.
+  const searchPattern = filters.q ? safeLike(filters.q) : "%%";
+  const searchedTenantResult = !usesCanonicalQueue && hasSearch
+    ? await admin.from("tenants").select("id").ilike("name", searchPattern).limit(100)
+    : { data: [] as { id: string }[], error: null };
+  queryFailure([searchedTenantResult.error]);
+  const searchedTenantIds = (searchedTenantResult.data ?? []).map((tenant) => tenant.id);
 
   let listQuery = admin
     .from("support_tickets")
-    .select("id, subject, body, category, priority, status, created_at, tenant_id, assigned_staff_id, tenant:tenants(name)", { count: "exact" })
-    .order("created_at", { ascending: false })
-    .range(...pageRange(page));
-  if (durum === "acik") listQuery = listQuery.in("status", [...OPEN_STATUSES]);
-  else if (durum) listQuery = listQuery.eq("status", durum);
-  if (oncelik) listQuery = listQuery.eq("priority", oncelik);
-  if (tenantId) listQuery = listQuery.eq("tenant_id", tenantId);
+    .select(
+      "id, ticket_no, subject, body, category, priority, status, created_at, updated_at, last_activity_at, first_response_due_at, first_response_at, first_response_breached_at, resolution_due_at, resolution_breached_at, tenant_id, assigned_staff_id, tenant:tenants(name)",
+      { count: "exact" },
+    );
 
-  // KPI/sayaçlar her zaman tüm kuyruğu gösterir — filtre yalnızca listeyi daraltır
-  const [{ data, count: listCount }, { data: statRows }, tenantRes, { data: staffList }] = await Promise.all([
-    listQuery,
-    admin.from("support_tickets").select("status, priority, created_at, resolved_at").order("created_at", { ascending: false }).limit(2000),
-    tenantId
-      ? admin.from("tenants").select("id, name").eq("id", tenantId).maybeSingle()
-      : Promise.resolve({ data: null as { id: string; name: string } | null }),
-    admin.from("platform_staff").select("id, full_name").eq("is_active", true).order("full_name"),
+  if (filters.durum === "acik") listQuery = listQuery.in("status", [...TICKET_OPEN_STATUSES]);
+  else if (filters.durum === "cozulmus") listQuery = listQuery.in("status", ["resolved", "closed"]);
+  else if (filters.durum) listQuery = listQuery.eq("status", filters.durum);
+  if (filters.oncelik) listQuery = listQuery.eq("priority", filters.oncelik);
+  if (filters.kategori) listQuery = listQuery.eq("category", filters.kategori);
+  if (filters.tenant) listQuery = listQuery.eq("tenant_id", filters.tenant);
+  if (filters.atanan === "atanmadi") listQuery = listQuery.is("assigned_staff_id", null);
+  else if (filters.atanan) listQuery = listQuery.eq("assigned_staff_id", filters.atanan);
+
+  if (hasSearch && filters.q) {
+    const parts = [orIlike(["ticket_no", "subject", "body"], filters.q)];
+    const tenantClause = inFilter("tenant_id", searchedTenantIds);
+    if (tenantClause) parts.push(tenantClause);
+    if (isUuid(filters.q)) parts.push(`id.eq.${filters.q}`);
+    listQuery = listQuery.or(parts.join(","));
+  }
+
+  const sortKey = filters.sirala === "queue" ? "created_at" : (filters.sirala ?? "created_at");
+  const sortAscending = filters.yon === "asc";
+  listQuery = listQuery
+    .order(sortKey, { ascending: sortAscending })
+    .order("id", { ascending: false })
+    .range(...pageRange(page));
+
+  const selectedTenantPromise = filters.tenant
+    ? admin.from("tenants").select("id, name").eq("id", filters.tenant).maybeSingle()
+    : Promise.resolve({ data: null as { id: string; name: string } | null, error: null });
+  let categoryDefinitionsQuery = admin
+    .from("definitions")
+    .select("value, label, tenant_id, sort_order")
+    .eq("category", "ticket_category")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+  if (filters.tenant) {
+    categoryDefinitionsQuery = categoryDefinitionsQuery.or(`tenant_id.is.null,tenant_id.eq.${filters.tenant}`);
+  }
+
+  const [
+    queueResult,
+    directListResult,
+    metricsResult,
+    selectedTenantResult,
+    staffResult,
+    tenantOptionsResult,
+    categoryDefinitionsResult,
+  ] = await Promise.all([
+    usesCanonicalQueue
+      ? admin.rpc("support_ticket_queue_v2", {
+          p_status: filters.durum ?? null,
+          p_priority: filters.oncelik ?? null,
+          p_tenant_id: filters.tenant ?? null,
+          p_assigned_staff_id: filters.atanan === "atanmadi" ? null : (filters.atanan ?? null),
+          p_search: filters.q ?? null,
+          p_limit: PAGE_SIZE,
+          p_offset: (page - 1) * PAGE_SIZE,
+          p_category: filters.kategori ?? null,
+          p_unassigned: filters.atanan === "atanmadi",
+          p_sla: filters.sla ?? null,
+        })
+      : Promise.resolve({ data: null, error: null }),
+    usesCanonicalQueue
+      ? Promise.resolve({ data: null, count: null, error: null })
+      : listQuery,
+    admin.rpc("support_ticket_metrics_v2", { p_tenant_id: filters.tenant ?? null }),
+    selectedTenantPromise,
+    admin
+      .from("platform_staff")
+      .select("id, full_name")
+      .eq("is_active", true)
+      .in("role", ["super_admin", "ops", "support"])
+      .order("full_name"),
+    admin
+      .from("tenants")
+      .select("id, name, status")
+      .in("status", ["trial", "active", "past_due"])
+      .order("name")
+      .limit(2000),
+    categoryDefinitionsQuery,
   ]);
 
-  const fetched = data ?? [];
-  const stats = statRows ?? [];
-  const filterTenant = tenantRes.data;
-  const staff = staffList ?? [];
+  queryFailure([
+    queueResult.error,
+    directListResult.error,
+    metricsResult.error,
+    selectedTenantResult.error,
+    staffResult.error,
+    tenantOptionsResult.error,
+    categoryDefinitionsResult.error,
+  ]);
 
-  // SLA: sayfadaki ticket'lar için ilk personel yanıtı var mı? (tek sorgu)
-  const pageIds = fetched.map((t) => t.id);
-  const { data: staffMsgRows } = pageIds.length
-    ? await admin
-        .from("support_ticket_messages")
-        .select("ticket_id")
-        .in("ticket_id", pageIds)
-        .eq("author_kind", "staff")
-    : { data: [] as { ticket_id: string }[] };
-  const repliedIds = new Set((staffMsgRows ?? []).map((m) => m.ticket_id));
+  const queuePayload = usesCanonicalQueue ? readQueuePayload(queueResult.data) : null;
+  const metrics = readMetricsPayload(metricsResult.data);
+  const fetched = (queuePayload?.items ?? directListResult.data ?? []) as TicketQueueSourceRow[];
+  const listTotal = queuePayload?.total ?? directListResult.count ?? 0;
+  const pageIds = fetched.map((ticket) => ticket.id);
+  const needsBodySupplement = fetched.some((ticket) => typeof ticket.body !== "string");
+  const [bodyResult, messageResult] = await Promise.all([
+    pageIds.length && needsBodySupplement
+      ? admin.from("support_tickets").select("id, body").in("id", pageIds)
+      : Promise.resolve({ data: [] as { id: string; body: string }[], error: null }),
+    pageIds.length && !usesCanonicalQueue
+      ? admin.from("support_ticket_messages").select("ticket_id, author_kind").in("ticket_id", pageIds)
+      : Promise.resolve({ data: [] as { ticket_id: string; author_kind: string }[], error: null }),
+  ]);
+  queryFailure([bodyResult.error, messageResult.error]);
 
-  // Acil + SLA aşımı öne (sayfa içi sıralama); grup içinde tarih sırası korunur
-  const rows = fetched
-    .map((t) => ({
-      ...t,
-      sla: slaStateOf({ status: t.status, createdAt: t.created_at, hasStaffReply: repliedIds.has(t.id) }),
-    }))
-    .sort((a, b) => slaSortRank(a.priority, a.sla) - slaSortRank(b.priority, b.sla));
-
-  const open = stats.filter((t) => (OPEN_STATUSES as readonly string[]).includes(t.status)).length;
-  const urgent = stats.filter((t) => t.priority === "urgent" && !["resolved", "closed"].includes(t.status)).length;
-
-  const statusKeys = ["open", "in_progress", "waiting", "resolved", "closed"] as const;
-  const statusCount = (k: string) => stats.filter((t) => t.status === k).length;
-  const priorityKeys = ["urgent", "high", "normal", "low"] as const;
-  const priorityCount = (k: string) => stats.filter((t) => t.priority === k).length;
-
-  // Çözüm oranı + ort. çözüm süresi
-  const totalReal = stats.length;
-  const resolvedCount = stats.filter((t) => t.status === "resolved" || t.status === "closed").length;
-  const resolutionRate = totalReal > 0 ? Math.round((resolvedCount / totalReal) * 100) : 0;
-  const resolvedWithTime = stats.filter(
-    (t) => (t.status === "resolved" || t.status === "closed") && t.resolved_at && t.created_at,
-  );
-  const avgResolveHours =
-    resolvedWithTime.length > 0
-      ? Math.round(
-          resolvedWithTime.reduce(
-            (s, t) => s + Math.max(0, new Date(t.resolved_at as string).getTime() - new Date(t.created_at as string).getTime()) / 3_600_000,
-            0,
-          ) / resolvedWithTime.length,
-        )
-      : null;
-  const avgResolveLabel =
-    avgResolveHours == null ? "—" : avgResolveHours >= 48 ? `${Math.round(avgResolveHours / 24)} gün` : `${avgResolveHours} sa`;
-
-  // Son 14 gün · günlük yeni talep (kompakt sparkline). clock kuralı: daysAgoIso.
-  const dayKeys = Array.from({ length: 14 }, (_, i) => daysAgoIso(13 - i).slice(0, 10));
-  const dailyMap = new Map<string, number>(dayKeys.map((k) => [k, 0]));
-  for (const t of stats) {
-    const k = String(t.created_at).slice(0, 10);
-    if (dailyMap.has(k)) dailyMap.set(k, (dailyMap.get(k) ?? 0) + 1);
+  const bodyById = new Map((bodyResult.data ?? []).map((ticket) => [ticket.id, ticket.body]));
+  const messageCount = new Map<string, number>();
+  for (const message of messageResult.data ?? []) {
+    messageCount.set(message.ticket_id, (messageCount.get(message.ticket_id) ?? 0) + 1);
   }
-  const dailyNew = dayKeys.map((k) => ({ label: `${k.slice(8, 10)}.${k.slice(5, 7)}`, value: dailyMap.get(k) ?? 0 }));
-  const newLast14 = dailyNew.reduce((s, d) => s + d.value, 0);
 
-  const statusOptions = Object.entries(statusLabel).map(([value, label]) => ({ value, label }));
-  const resolvedHref = buildHref({ durum: durum === "resolved" ? undefined : "resolved", oncelik, tenant: tenantId });
+  const staff = staffResult.data ?? [];
+  const staffName = new Map(staff.map((person) => [person.id, person.full_name]));
+  const rows: TicketQueueRow[] = fetched.map((ticket) => ({
+    id: ticket.id,
+    ticketNo: ticket.ticket_no ?? null,
+    subject: ticket.subject,
+    body: ticket.body ?? bodyById.get(ticket.id) ?? "",
+    category: ticket.category,
+    priority: ticket.priority,
+    status: ticket.status,
+    createdAt: ticket.created_at,
+    updatedAt: ticket.last_activity_at ?? ticket.updated_at,
+    tenantId: ticket.tenant_id,
+    tenantName: ticket.tenant_name ?? relationName(ticket.tenant ?? null),
+    assignedStaffId: ticket.assigned_staff_id ?? null,
+    assignedStaffName: ticket.assigned_staff_name ?? (ticket.assigned_staff_id ? (staffName.get(ticket.assigned_staff_id) ?? "Personel") : null),
+    messageCount: ticket.message_count ?? messageCount.get(ticket.id) ?? 0,
+    sla: slaStateOf({
+      status: ticket.status,
+      createdAt: ticket.created_at,
+      hasStaffReply: Boolean(ticket.first_response_at),
+      priority: ticket.priority,
+      firstResponseDueAt: ticket.first_response_due_at,
+      firstResponseAt: ticket.first_response_at,
+      firstResponseBreachedAt: ticket.first_response_breached_at,
+      resolutionDueAt: ticket.resolution_due_at,
+      resolutionBreachedAt: ticket.resolution_breached_at,
+    }),
+  }));
+
+  const statusCounts = new Map(TICKET_STATUS_KEYS.map((status) => [status, metrics.statusCounts[status] ?? 0]));
+  const countOf = (status: TicketStatus) => statusCounts.get(status) ?? 0;
+  const total = metrics.total;
+  const open = metrics.open;
+  const urgent = metrics.urgent;
+  const resolved = metrics.resolved;
+  const solveRate = metrics.resolutionRate;
+  const averageHours = metrics.avgResolutionSeconds === null
+    ? null
+    : Math.round(metrics.avgResolutionSeconds / 3_600);
+  const averageLabel = formatDurationHours(averageHours);
+
+  const dailyNew = metrics.last14Days.map((day) => ({
+    label: `${day.date.slice(8, 10)}.${day.date.slice(5, 7)}`,
+    value: day.value,
+  }));
+  const newLast14 = dailyNew.reduce((sum, day) => sum + day.value, 0);
+
+  const selectedTenant = selectedTenantResult.data;
+  const tenantOptions: TicketTenantOption[] = (tenantOptionsResult.data ?? []).map((tenant) => ({
+    value: tenant.id,
+    label: tenant.name,
+    hint: TENANT_STATUS_LABEL[tenant.status] ?? tenant.status,
+  }));
+  const staticCategoryOptions = TICKET_CATEGORY_KEYS.map((value, index) => ({
+    value,
+    label: TICKET_CATEGORY_LABEL[value],
+    sort: index + 1,
+  }));
+  const definitionRows = categoryDefinitionsResult.data ?? [];
+  const globalDefinitions = definitionRows.filter((definition) => definition.tenant_id === null);
+  const dialogCategoryByValue = new Map<
+    string,
+    { value: string; label: string; sort: number; tenantScoped: boolean }
+  >();
+  for (const definition of (filters.tenant ? definitionRows : globalDefinitions)) {
+    const tenantScoped = definition.tenant_id !== null;
+    const existing = dialogCategoryByValue.get(definition.value);
+    if (!existing || (tenantScoped && !existing.tenantScoped)) {
+      dialogCategoryByValue.set(definition.value, {
+        value: definition.value,
+        label: definition.label,
+        sort: definition.sort_order ?? 0,
+        tenantScoped,
+      });
+    }
+  }
+  if (dialogCategoryByValue.size === 0) {
+    for (const category of staticCategoryOptions) {
+      dialogCategoryByValue.set(category.value, { ...category, tenantScoped: false });
+    }
+  }
+  const dialogCategoryOptions = [...dialogCategoryByValue.values()]
+    .sort((left, right) => left.sort - right.sort || left.label.localeCompare(right.label, "tr-TR"))
+    .map(({ value, label }) => ({ value, label }));
+
+  const categoryByValue = new Map<string, { value: string; label: string; sort: number; tenantScoped: boolean }>();
+  for (const definition of definitionRows) {
+    const tenantScoped = definition.tenant_id !== null;
+    const existing = categoryByValue.get(definition.value);
+    if (
+      !existing ||
+      (Boolean(filters.tenant) && tenantScoped && !existing.tenantScoped) ||
+      (!filters.tenant && !tenantScoped && existing.tenantScoped)
+    ) {
+      categoryByValue.set(definition.value, {
+        value: definition.value,
+        label: definition.label,
+        sort: definition.sort_order ?? 0,
+        tenantScoped,
+      });
+    }
+  }
+  for (const value of Object.keys(metrics.categoryCounts ?? {})) {
+    if (!categoryByValue.has(value)) {
+      categoryByValue.set(value, {
+        value,
+        label: TICKET_CATEGORY_LABEL[value] ?? value,
+        sort: 10_000,
+        tenantScoped: false,
+      });
+    }
+  }
+  if (categoryByValue.size === 0) {
+    for (const category of staticCategoryOptions) {
+      categoryByValue.set(category.value, { ...category, tenantScoped: false });
+    }
+  }
+  const categoryOptions = [...categoryByValue.values()]
+    .sort((left, right) => left.sort - right.sort || left.label.localeCompare(right.label, "tr-TR"))
+    .map(({ value, label }) => ({ value, label }));
+  const categoryLabels = Object.fromEntries(categoryOptions.map((category) => [category.value, category.label]));
+  const statusOptions = TICKET_STATUS_KEYS.map((status) => ({ value: status, label: TICKET_STATUS_LABEL[status] }));
+  const filtered = Boolean(filters.q || filters.durum || filters.oncelik || filters.kategori || filters.atanan || filters.tenant || filters.sla);
+  const hrefFor = (patch: Partial<Record<keyof TicketListFilters, string | number | null | undefined>>) =>
+    buildTicketListHref(filters, patch);
+  const metricHrefFor = (patch: Partial<Record<keyof TicketListFilters, string | number | null | undefined>> = {}) =>
+    buildTicketListHref({ tenant: filters.tenant, sirala: "queue", yon: "desc", sayfa: 1 }, patch);
+
+  const donutSegments = TICKET_STATUS_KEYS.map((status) => ({
+    key: status,
+    label: TICKET_STATUS_LABEL[status],
+    count: countOf(status),
+    color: STATUS_COLOR[status],
+    href: hrefFor({ durum: filters.durum === status ? null : status }),
+    active: filters.durum === status,
+  }));
 
   return (
-    <div className="space-y-3">
-      {/* Kompakt komuta başlığı — başlık + tıklanabilir KPI şeridi + trend + CSV */}
-      <header className="flex flex-col gap-3 rounded-xl border border-line bg-surface px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="min-w-0">
-          <h1 className="flex items-center gap-2 font-display text-base font-bold text-ink-950">
-            <LifeBuoy className="h-4 w-4 text-brand-600" /> Destek kuyruğu
-          </h1>
-          <p className="mt-0.5 text-xs text-text-muted">
-            {stats.length} talep · {open} açık/bekleyen{filtered ? ` · listede ${listCount ?? rows.length} sonuç` : ""}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <MetricTile label="Toplam" value={stats.length} icon={Inbox} href={buildHref({ tenant: tenantId })} active={!filtered} />
-          <MetricTile
-            label="Açık"
-            value={open}
-            icon={Clock}
-            tone="amber"
-            active={durum === "acik"}
-            href={buildHref({ durum: durum === "acik" ? undefined : "acik", oncelik, tenant: tenantId })}
-          />
-          <MetricTile
-            label="Acil"
-            value={urgent}
-            icon={Siren}
-            tone="danger"
-            pulse={urgent > 0}
-            active={oncelik === "urgent"}
-            href={buildHref({ oncelik: oncelik === "urgent" ? undefined : "urgent", durum, tenant: tenantId })}
-          />
-          <ExportButton action={exportTicketsCsv} label="CSV" variant="light" />
+    <div className="space-y-4">
+      <header className="surface-card relative overflow-hidden rounded-[18px] p-5">
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-amber-400/12 blur-[70px]" aria-hidden />
+        <div className="relative flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 items-start gap-3.5">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[14px] bg-[linear-gradient(145deg,var(--amber-300),var(--amber-500))] text-ink-950 shadow-[var(--inner-top),var(--elev-2)]">
+              <LifeBuoy className="h-6 w-6" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700">Müşteri operasyon merkezi</p>
+              <h1 className="mt-1 font-display text-xl font-extrabold text-ink-950 sm:text-2xl">Destek talepleri</h1>
+              <p className="mt-1 text-sm text-text-muted">
+                SLA, durum ve sorumlu atamalarını tek kuyruktan yönetin.
+                {filtered ? ` ${listTotal} filtrelenmiş sonuç gösteriliyor.` : ` ${open} aktif talep izleniyor.`}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+            <ExportButton action={exportTicketsCsv} label="CSV dışa aktar" variant="light" />
+            <NewAdminTicketDialog
+              tenants={tenantOptions}
+              categories={dialogCategoryOptions}
+              defaultTenantId={filters.tenant}
+            />
+          </div>
         </div>
       </header>
 
-      {/* Profesyonel insights şeridi — durum dağılımı · 14 günlük akış · çözüm performansı */}
-      <section className="grid gap-4 rounded-xl border border-line bg-surface p-4 lg:grid-cols-[1.4fr_1.5fr_1fr]">
-        {/* Durum dağılımı — yatay yığılı bar + tıklanabilir açıklama */}
-        <div className="min-w-0">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-text-faint">Durum dağılımı</p>
-          <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-canvas ring-1 ring-inset ring-line">
-            {statusKeys.map((k) => {
-              const c = statusCount(k);
-              if (c === 0) return null;
-              return <div key={k} style={{ width: `${(c / Math.max(1, stats.length)) * 100}%`, background: statusColor[k] }} title={`${statusLabel[k]}: ${c}`} />;
-            })}
+      <section aria-label="Destek özeti" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <MetricCard label="Toplam talep" value={total} hint="Tüm zamanlar" icon={Inbox} tone="brand" href={metricHrefFor()} />
+        <MetricCard
+          label="Açık kuyruk"
+          value={open}
+          hint={metrics.firstResponseBreached > 0 ? `${metrics.firstResponseBreached} ilk yanıt SLA aşımı` : "Aktif ve bekleyen"}
+          icon={Clock3}
+          tone="amber"
+          href={metricHrefFor({ durum: "acik" })}
+        />
+        <MetricCard label="Acil talep" value={urgent} hint={urgent > 0 ? "Öncelikli müdahale" : "Kritik bekleyen yok"} icon={Siren} tone="danger" href={metricHrefFor({ oncelik: "urgent", durum: "acik" })} />
+        <MetricCard label="Ort. çözüm süresi" value={averageLabel} hint="Tüm sonuçlanan kayıtlardan" icon={TimerReset} tone="cyan" />
+        <MetricCard label="Çözüm oranı" value={`%${solveRate}`} hint={`${resolved}/${total} sonuçlandırıldı`} icon={CheckCircle2} tone="mint" href={metricHrefFor({ durum: "cozulmus" })} />
+      </section>
+
+      <section aria-label="Destek analitiği" className="grid gap-4 xl:grid-cols-3 2xl:grid-cols-[0.95fr_1.45fr_0.9fr]">
+        <TicketStatusDonut segments={donutSegments} total={total} />
+
+        <section className="surface-card min-w-0 rounded-[18px] p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">Talep akışı</p>
+              <h2 className="mt-1 font-display text-base font-extrabold text-ink-950">Son 14 gün · yeni talepler</h2>
+              <p className="mt-0.5 text-xs text-text-muted">Günlük oluşturulan destek talebi</p>
+            </div>
+            <span className="rounded-[10px] bg-brand-600/[0.07] px-2.5 py-1.5 text-right">
+              <span className="numeric block font-display text-lg font-extrabold leading-none text-brand-700">{newLast14}</span>
+              <span className="text-[9px] font-bold uppercase tracking-[0.05em] text-text-faint">14 gün</span>
+            </span>
           </div>
-          <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1">
-            {statusKeys.map((k) => {
-              const active = durum === k;
+          <div className="mt-4">
+            <InteractiveChart
+              data={dailyNew}
+              color="var(--brand-600)"
+              name="Yeni talep"
+              format="number"
+              height={146}
+              labelEvery={3}
+              showLegend={false}
+            />
+          </div>
+        </section>
+
+        <TicketResolutionGauge
+          rate={solveRate}
+          resolved={resolved}
+          total={total}
+          averageLabel={averageLabel}
+          href={metricHrefFor({ durum: "cozulmus" })}
+        />
+      </section>
+
+      <section className="surface-card overflow-hidden rounded-[18px]">
+        <nav aria-label="Talep durumları" className="border-b border-hairline bg-canvas/65 px-2 py-2">
+          <div className="flex max-w-full items-center gap-1 overflow-x-auto pb-0.5">
+            <Link href={hrefFor({ durum: null })} aria-current={!filters.durum ? "page" : undefined} className={statusPillClass(!filters.durum)}>
+              Tümü <StatusCount count={total} active={!filters.durum} />
+            </Link>
+            <Link href={hrefFor({ durum: "acik" })} aria-current={filters.durum === "acik" ? "page" : undefined} className={statusPillClass(filters.durum === "acik")}>
+              Açık kuyruk <StatusCount count={open} active={filters.durum === "acik"} />
+            </Link>
+            {TICKET_STATUS_KEYS.map((status) => {
+              const active = filters.durum === status;
               return (
-                <Link
-                  key={k}
-                  href={buildHref({ durum: active ? undefined : k, oncelik, tenant: tenantId })}
-                  className={`focus-ring inline-flex items-center gap-1.5 rounded px-1 text-[11px] transition hover:text-ink-950 ${active ? "font-bold text-ink-950" : "text-text-muted"}`}
-                >
-                  <span className="h-2 w-2 rounded-full" style={{ background: statusColor[k] }} />
-                  {statusLabel[k]}
-                  <span className="font-bold tabular-nums text-ink-950">{statusCount(k)}</span>
+                <Link key={status} href={hrefFor({ durum: active ? null : status })} aria-current={active ? "page" : undefined} className={statusPillClass(active)}>
+                  {TICKET_STATUS_LABEL[status]} <StatusCount count={countOf(status)} active={active} />
                 </Link>
               );
             })}
-          </div>
-        </div>
-
-        {/* 14 günlük akış — kompakt interaktif alan grafiği */}
-        <div className="min-w-0 border-t border-line pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
-          <div className="mb-1 flex items-baseline justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-text-faint">Son 14 gün · yeni talep</p>
-            <span className="font-display text-sm font-extrabold tabular-nums text-brand-600">{newLast14}</span>
-          </div>
-          <InteractiveChart data={dailyNew} color="var(--brand-600)" name="Yeni talep" format="number" height={72} labelEvery={3} />
-        </div>
-
-        {/* Çözüm performansı */}
-        <div className="min-w-0 border-t border-line pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-text-faint">Çözüm performansı</p>
-          <div className="flex items-baseline gap-2">
-            <Link href={resolvedHref} className="focus-ring font-display text-2xl font-extrabold leading-none text-mint-600 transition hover:opacity-80">
-              %{resolutionRate}
+            <span className="mx-1 h-5 w-px shrink-0 bg-line" aria-hidden />
+            <Link
+              href={hrefFor({ atanan: filters.atanan === currentStaff.id ? null : currentStaff.id })}
+              aria-current={filters.atanan === currentStaff.id ? "page" : undefined}
+              className={statusPillClass(filters.atanan === currentStaff.id)}
+            >
+              Bana atanmış
             </Link>
-            <span className="text-[11px] text-text-muted">{resolvedCount}/{totalReal} çözüldü</span>
+            <Link
+              href={hrefFor({ atanan: filters.atanan === "atanmadi" ? null : "atanmadi" })}
+              aria-current={filters.atanan === "atanmadi" ? "page" : undefined}
+              className={statusPillClass(filters.atanan === "atanmadi")}
+            >
+              Atanmamış
+            </Link>
+            <span className="mx-1 h-5 w-px shrink-0 bg-line" aria-hidden />
+            <Link
+              href={hrefFor({ sla: filters.sla === "breached" ? null : "breached", sirala: "queue", yon: "desc" })}
+              aria-current={filters.sla === "breached" ? "page" : undefined}
+              className={statusPillClass(filters.sla === "breached")}
+            >
+              SLA aşıldı
+            </Link>
+            <Link
+              href={hrefFor({ sla: filters.sla === "warning" ? null : "warning", sirala: "queue", yon: "desc" })}
+              aria-current={filters.sla === "warning" ? "page" : undefined}
+              className={statusPillClass(filters.sla === "warning")}
+            >
+              SLA riskte
+            </Link>
+            <Link
+              href={hrefFor({ sla: filters.sla === "normal" ? null : "normal", sirala: "queue", yon: "desc" })}
+              aria-current={filters.sla === "normal" ? "page" : undefined}
+              className={statusPillClass(filters.sla === "normal")}
+            >
+              SLA normal
+            </Link>
           </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-canvas ring-1 ring-inset ring-line">
-            <div className="h-full rounded-full bg-mint-500" style={{ width: `${resolutionRate}%` }} />
+        </nav>
+
+        <form
+          action="/admin/tickets"
+          role="search"
+          className="grid items-end gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[minmax(220px,1.4fr)_repeat(5,minmax(110px,0.65fr))_auto]"
+        >
+          {filters.durum ? <input type="hidden" name="durum" value={filters.durum} /> : null}
+          {filters.tenant ? <input type="hidden" name="tenant" value={filters.tenant} /> : null}
+          {filters.sla ? <input type="hidden" name="sla" value={filters.sla} /> : null}
+          <div className="relative min-w-0 sm:col-span-2 xl:col-span-2 2xl:col-span-1">
+            <label htmlFor="ticket-search" className="mb-1 block text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Ara</label>
+            <Search className="pointer-events-none absolute bottom-2.5 left-3 h-4 w-4 text-text-faint" aria-hidden />
+            <input
+              id="ticket-search"
+              name="q"
+              type="search"
+              defaultValue={filters.q}
+              minLength={2}
+              maxLength={80}
+              placeholder="Talep no, konu veya ofis…"
+              className="focus-ring h-10 w-full rounded-[10px] border border-line bg-canvas pl-9 pr-3 text-sm text-ink-950 outline-none transition placeholder:text-text-faint focus:border-brand-400 focus:bg-surface"
+            />
           </div>
-          <p className="mt-2 flex items-baseline gap-1.5 text-[11px] text-text-muted">
-            Ort. çözüm süresi <span className="font-display text-sm font-bold text-ink-950">{avgResolveLabel}</span>
-          </p>
-        </div>
+
+          <div>
+            <label htmlFor="ticket-priority" className="mb-1 block text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Öncelik</label>
+            <select id="ticket-priority" name="oncelik" defaultValue={filters.oncelik ?? ""} className="focus-ring h-10 w-full rounded-[10px] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
+              <option value="">Tüm öncelikler</option>
+              {TICKET_PRIORITY_KEYS.map((priority) => <option key={priority} value={priority}>{TICKET_PRIORITY_LABEL[priority]}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="ticket-category" className="mb-1 block text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Kategori</label>
+            <select id="ticket-category" name="kategori" defaultValue={filters.kategori ?? ""} className="focus-ring h-10 w-full rounded-[10px] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
+              <option value="">Tüm kategoriler</option>
+              {categoryOptions.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="ticket-assignee" className="mb-1 block text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Atanan</label>
+            <select id="ticket-assignee" name="atanan" defaultValue={filters.atanan ?? ""} className="focus-ring h-10 w-full rounded-[10px] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
+              <option value="">Tüm personel</option>
+              <option value="atanmadi">Atanmamış</option>
+              {staff.map((person) => <option key={person.id} value={person.id}>{person.full_name}</option>)}
+            </select>
+          </div>
+
+          {filters.sla ? (
+            <>
+              <input type="hidden" name="sirala" value="queue" />
+              <input type="hidden" name="yon" value="desc" />
+              <div className="sm:col-span-2">
+                <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Sıralama</span>
+                <div className="flex h-10 items-center rounded-[10px] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950">
+                  SLA riskine göre otomatik sıralanır
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label htmlFor="ticket-sort" className="mb-1 block text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Sıralama</label>
+                <select id="ticket-sort" name="sirala" defaultValue={filters.sirala ?? "queue"} className="focus-ring h-10 w-full rounded-[10px] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
+                  <option value="queue">SLA öncelikli kuyruk</option>
+                  <option value="created_at">Oluşturma</option>
+                  <option value="updated_at">Son hareket</option>
+                  <option value="subject">Konu</option>
+                  <option value="status">Durum</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="ticket-direction" className="mb-1 block text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Yön</label>
+                <select id="ticket-direction" name="yon" defaultValue={filters.yon ?? "desc"} className="focus-ring h-10 w-full rounded-[10px] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
+                  <option value="desc">Azalan</option>
+                  <option value="asc">Artan</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          <Button type="submit" size="md" className="h-10 justify-self-start sm:col-span-2 xl:col-span-3 2xl:col-span-1">Uygula</Button>
+        </form>
+
+        {(filtered || selectedTenant) ? (
+          <div className="flex flex-wrap items-center gap-2 border-t border-hairline px-3 py-2.5">
+            <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Aktif görünüm</span>
+            {selectedTenant ? (
+              <Link href={hrefFor({ tenant: null })} className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/[0.08] px-2.5 py-1 text-[11px] font-bold text-brand-700">
+                {selectedTenant.name} <X className="h-3 w-3" aria-hidden />
+              </Link>
+            ) : null}
+            {filters.sla ? (
+              <Link href={hrefFor({ sla: null })} className="focus-ring inline-flex items-center gap-1 rounded-full bg-amber-400/12 px-2.5 py-1 text-[11px] font-bold text-amber-700">
+                {SLA_FILTER_LABEL[filters.sla]} <X className="h-3 w-3" aria-hidden />
+              </Link>
+            ) : null}
+            <span className="numeric text-xs font-semibold text-text-muted">{listTotal.toLocaleString("tr-TR")} sonuç</span>
+            <Link href="/admin/tickets" className="focus-ring ml-auto rounded-[8px] px-2 py-1 text-xs font-bold text-danger-600 transition hover:bg-danger-500/[0.06]">Filtreleri temizle</Link>
+          </div>
+        ) : null}
       </section>
 
-      {/* TEK dilde segment filtre çubuğu — durum + öncelik, sayaçlı */}
-      <nav aria-label="Talep filtreleri" className="flex flex-wrap items-center gap-1 rounded-xl border border-line bg-canvas/50 p-1.5">
-        <Link href={buildHref({ tenant: tenantId })} aria-current={!durum && !oncelik ? "page" : undefined} className={segCls(!durum && !oncelik)}>
-          Tümü
-        </Link>
-        <Link
-          href={buildHref({ durum: "acik", oncelik, tenant: tenantId })}
-          aria-current={durum === "acik" ? "page" : undefined}
-          className={segCls(durum === "acik")}
-        >
-          Açık kuyruk <CountBadge n={open} active={durum === "acik"} />
-        </Link>
-        {statusKeys.map((k) => {
-          const active = durum === k;
-          return (
-            <Link
-              key={k}
-              href={buildHref({ durum: active ? undefined : k, oncelik, tenant: tenantId })}
-              aria-current={active ? "page" : undefined}
-              className={segCls(active)}
-            >
-              {statusLabel[k]} <CountBadge n={statusCount(k)} active={active} />
-            </Link>
-          );
-        })}
-        <span className="mx-1 h-5 w-px bg-line" aria-hidden />
-        {priorityKeys.map((k) => {
-          const active = oncelik === k;
-          return (
-            <Link
-              key={k}
-              href={buildHref({ oncelik: active ? undefined : k, durum, tenant: tenantId })}
-              aria-current={active ? "page" : undefined}
-              className={segCls(active)}
-            >
-              {priorityLabel[k]} <CountBadge n={priorityCount(k)} active={active} />
-            </Link>
-          );
-        })}
-        {filterTenant ? (
-          <Link
-            href={buildHref({ durum, oncelik })}
-            className="focus-ring ml-auto inline-flex items-center gap-1 rounded-lg bg-brand-600/10 px-2.5 py-1.5 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
-          >
-            {filterTenant.name} <X className="h-3 w-3" />
-          </Link>
-        ) : null}
-      </nav>
+      <TicketQueueView
+        key={rows.map((row) => row.id).join(":")}
+        rows={rows}
+        staff={staff}
+        statusOptions={statusOptions}
+        categoryLabels={categoryLabels}
+        filters={filters}
+        filtered={filtered}
+      />
 
-      {/* Yoğun kuyruk — hızlı taranır satırlar */}
-      <div className="overflow-hidden rounded-xl border border-line bg-surface">
-        {rows.length === 0 ? (
-          <p className="px-5 py-14 text-center text-sm text-text-muted">
-            {filtered ? "Filtreyle eşleşen destek talebi yok." : "Henüz destek talebi yok."}
-          </p>
-        ) : (
-          <div className="divide-y divide-line">
-            {rows.map((t) => (
-              <article
-                key={t.id}
-                className={cn(
-                  "flex flex-col gap-2 border-l-2 px-4 py-2.5 transition-colors hover:bg-canvas/50 lg:flex-row lg:items-center lg:gap-4",
-                  t.priority === "urgent" ? "border-l-danger-500/50" : "border-l-transparent",
-                )}
-              >
-                {/* Bilgi */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    {t.priority === "urgent" ? <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-danger-500" /> : null}
-                    <Link href={`/admin/tickets/${t.id}`} className="truncate text-sm font-semibold text-ink-950 transition hover:text-brand-600">
-                      {t.subject}
-                    </Link>
-                  </div>
-                  <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-text-faint">
-                    {t.tenant_id ? (
-                      <Link href={`/admin/tenants/${t.tenant_id}`} className="font-semibold text-brand-600 transition hover:underline">
-                        {nameOf(t.tenant as Rel)}
-                      </Link>
-                    ) : (
-                      <span>{nameOf(t.tenant as Rel)}</span>
-                    )}
-                    <span aria-hidden>·</span>
-                    <span>{categoryLabel[t.category] ?? t.category}</span>
-                    <span aria-hidden>·</span>
-                    <span className={`font-semibold ${priorityCls[t.priority] ?? ""}`}>{priorityLabel[t.priority] ?? t.priority}</span>
-                    <span aria-hidden>·</span>
-                    <span className="whitespace-nowrap">{new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(t.created_at))}</span>
-                  </p>
-                </div>
-
-                {/* SLA + konuşma */}
-                <div className="flex shrink-0 items-center gap-2">
-                  <SlaBadge sla={t.sla} />
-                  <ButtonLink href={`/admin/tickets/${t.id}`} variant="secondary" size="xs" iconRight={ArrowUpRight}>
-                    Konuşma
-                  </ButtonLink>
-                </div>
-
-                {/* Aksiyonlar — durum + atama, değişince otomatik uygulanır (inline) */}
-                <TicketRowActions
-                  id={t.id}
-                  status={t.status}
-                  statusOptions={statusOptions}
-                  assignedId={t.assigned_staff_id ?? null}
-                  staff={staff}
-                />
-              </article>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <Pagination page={page} total={listCount ?? 0} hrefFor={(p) => buildHref({ durum, oncelik, tenant: tenantId, sayfa: p })} />
+      <Pagination
+        page={page}
+        total={listTotal}
+        hrefFor={(nextPage) => buildTicketListHref(filters, { sayfa: nextPage })}
+      />
     </div>
   );
 }

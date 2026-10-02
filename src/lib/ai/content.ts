@@ -1,4 +1,13 @@
 import "server-only";
+import {
+  discardExternalResponse,
+  externalErrorMetadata,
+  fetchExternal,
+  readExternalJson,
+} from "@/lib/external-fetch";
+
+const OPENAI_TIMEOUT_MS = 45_000;
+const OPENAI_MAX_RESPONSE_BYTES = 512 * 1024;
 
 export type ContentKind = "listing" | "whatsapp" | "social" | "email";
 
@@ -170,7 +179,7 @@ async function openAiContent(kind: ContentKind, input: PropertyContentInput): Pr
   );
 
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const res = await fetchExternal("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({
@@ -185,12 +194,18 @@ async function openAiContent(kind: ContentKind, input: PropertyContentInput): Pr
           { role: "user", content: `${PROMPTS[kind]}\n\nPortföy bilgileri (JSON): ${facts}` },
         ],
       }),
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    }, { timeoutMs: OPENAI_TIMEOUT_MS });
+    if (!res.ok) {
+      await discardExternalResponse(res);
+      return null;
+    }
+    const json = await readExternalJson<{ choices?: { message?: { content?: string } }[] }>(
+      res,
+      OPENAI_MAX_RESPONSE_BYTES,
+    );
     return json.choices?.[0]?.message?.content?.trim() || null;
   } catch (e) {
-    console.error("openAiContent", e);
+    console.error("openAiContent", externalErrorMetadata(e));
     return null;
   }
 }

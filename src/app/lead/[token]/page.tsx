@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPublicTenantActive } from "@/lib/public-tenant";
+
+export const revalidate = 60;
 import { LeadForm } from "./lead-form";
 
 export const dynamic = "force-dynamic";
@@ -13,13 +16,13 @@ export default async function PublicLeadPage({ params }: { params: Promise<{ tok
   const [{ data: tenant }, { data: provinces }] = await Promise.all([
     admin
       .from("tenants")
-      .select("name, slug, logo_url, brand_color, lead_capture_enabled")
+      .select("name, slug, status, logo_url, brand_color, lead_capture_enabled")
       .eq("lead_capture_token", token)
       .maybeSingle(),
     admin.from("geo_provinces").select("id, name").eq("is_active", true).order("name"),
   ]);
 
-  if (!tenant) notFound();
+  if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
 
   const closed = tenant.lead_capture_enabled === false;
 

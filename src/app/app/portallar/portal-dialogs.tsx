@@ -4,6 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Combobox } from "@/components/ui/combobox";
 import { searchProperties } from "@/app/actions/lookup";
+import { searchCustomers } from "@/app/actions/lookup";
 import {
   Check,
   Link2,
@@ -144,6 +145,19 @@ export function ClosePortalDialog({
               İşlem bedeli
               <input name="deal_amount" inputMode="decimal" className={`${inputClass} mt-1.5`} placeholder="6.750.000" />
             </label>
+            <div className="text-sm font-medium text-ink-950">
+              İşlem yapılan müşteri
+              <Combobox
+                className="mt-1.5"
+                name="customer_id"
+                aria-label="İşlem yapılan müşteri"
+                placeholder="Yalnız bizim kapanışımızda zorunlu"
+                searchPlaceholder="Ad veya telefon ile ara…"
+                emptyText="Aramak için en az 2 karakter yazın"
+                onSearch={searchCustomers}
+                options={[]}
+              />
+            </div>
             <div className="grid gap-2 sm:grid-cols-3">
               {[
                 ["deal_happened", "İşlem gerçekleşti"],
@@ -155,6 +169,10 @@ export function ClosePortalDialog({
                 </label>
               ))}
             </div>
+            <label className="flex items-start gap-2 rounded-[10px] border border-mint-500/25 bg-mint-500/5 px-3 py-2.5 text-xs font-medium text-text-muted">
+              <input type="checkbox" name="has_authority" className="mt-0.5 accent-mint-600" />
+              <span><strong className="text-mint-700">Yazılı yetki / EİDS onaylı</strong><br />Bizim kapanışımızda müşteri seçimiyle birlikte zorunludur.</span>
+            </label>
             <div className="rounded-[11px] border border-danger-500/20 bg-danger-500/5 px-4 py-3 text-xs text-danger-500">Bu kayıt kayıp-kaçak analizine dahil edilir ve sonradan denetlenebilir.</div>
             {error ? <p role="alert" className="text-sm text-danger-500">{error}</p> : null}
             <DialogActions pending={pending} submitLabel="Kapanışı kaydet" danger />

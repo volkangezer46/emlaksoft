@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { LeadCapturePanel } from "./lead-capture-panel";
 import { VitrinQr } from "@/components/public/vitrin-qr";
+import { getBaseUrl } from "@/lib/base-url";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,7 @@ export default async function LeadCaptureSettingsPage() {
       .eq("auto_assigned", true),
   ]);
 
-  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const baseUrl = getBaseUrl();
   const token = tenant?.lead_capture_token ?? "";
   const enabled = tenant?.lead_capture_enabled !== false;
   const vitrinUrl = tenant?.slug ? `${baseUrl}/vitrin/${tenant.slug}` : "";
