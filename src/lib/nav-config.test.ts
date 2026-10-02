@@ -80,3 +80,32 @@ describe("menü yapısı", () => {
     }
   });
 });
+
+describe("sekmeli menü öğeleri", () => {
+  const tabsOf = (mods: AppModule[], href: string) =>
+    visibleSections(mods).flatMap((s) => s.items).find((i) => i.href === href)?.tabs?.map((t) => t.href);
+
+  it("birleşen sayfalar menüde tek öğedir ama yolları sekme olarak durur", () => {
+    const menu = NAV_SECTIONS.flatMap((s) => s.items.map((i) => i.href));
+    for (const gone of ["/app/cuzdan", "/app/onaylar", "/app/lig", "/app/kira-artis", "/app/yatirim"]) {
+      expect(menu, gone).not.toContain(gone);
+      expect(ALL_NAV_HREFS, gone).toContain(gone);
+    }
+  });
+
+  it("sekmeler kendi modül yetkisiyle süzülür", () => {
+    expect(tabsOf(ALL_MODULES, "/app/komisyon")).toEqual(["/app/komisyon", "/app/cuzdan", "/app/onaylar"]);
+    expect(tabsOf(["rentals"], "/app/kiralama")).toEqual(["/app/kiralama"]);
+    expect(tabsOf(["rentals", "valuation"], "/app/kiralama")).toEqual(["/app/kiralama", "/app/kira-artis"]);
+    expect(tabsOf(["valuation"], "/app/kira-artis")).toEqual(["/app/kira-artis"]);
+  });
+
+  it("sekme yolu sahibi menü öğesini etkin yapar", () => {
+    const sections = visibleSections(ALL_MODULES);
+    expect(resolveActiveNav("/app/cuzdan", sections).href).toBe("/app/komisyon");
+    expect(resolveActiveNav("/app/onaylar", sections).href).toBe("/app/komisyon");
+    expect(resolveActiveNav("/app/lig", sections).href).toBe("/app/danisman-kpi");
+    expect(resolveActiveNav("/app/kira-artis", sections).href).toBe("/app/kiralama");
+    expect(resolveActiveNav("/app/hesaplayici", sections).href).toBe("/app/hesaplayici");
+  });
+});

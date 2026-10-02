@@ -36,6 +36,7 @@ export function getAppActions(accessible: readonly AppModule[], q = ""): Palette
 export function getAppGoItems(accessible: readonly AppModule[], q = ""): PaletteEntry[] {
   return visibleSections(accessible)
     .flatMap((s) => s.items)
+    .flatMap((i) => (i.tabs && i.tabs.length > 1 ? i.tabs : [i]))
     .filter((i) => matchesQuery(i.label, q))
     .map(({ label, href, icon }) => ({ label, href, icon }));
 }
