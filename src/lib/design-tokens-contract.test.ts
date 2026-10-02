@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { ACCENTS, THEME_BOOT_SCRIPT } from "./theme";
 
 // Tasarım sistemi v3 kuralları. Bu test, codemod ile temizlenen sapmaların
 // geri gelmesini engeller. Kural değişecekse önce docs/ROADMAP.md'de karar verilir.
@@ -52,5 +53,118 @@ describe("tasarım token sözleşmesi", () => {
     expect(fontSubsets.length).toBeGreaterThanOrEqual(2);
     // Geist Mono yalnız kod/sayı için; Manrope ve Inter latin-ext içermeli.
     expect(fontSubsets.filter((s) => s.includes("latin-ext")).length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ---- Tema paleti: tanım bütünlüğü + WCAG AA kontrast --------------------------
+
+function luminance(hex: string): number {
+  const h = hex.replace("#", "");
+  const [r, g, b] = [0, 2, 4]
+    .map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
+    .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrast(a: string, b: string): number {
+  const [x, y] = [luminance(a), luminance(b)];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+
+/** `selector { ... }` bloğunun gövdesi (iç içe süslü parantez yok varsayımıyla). */
+function block(css: string, selector: string): string {
+  const start = css.indexOf(`${selector} {`);
+  if (start < 0) throw new Error(`blok yok: ${selector}`);
+  return css.slice(start, css.indexOf("}", start));
+}
+
+function hex(body: string, token: string): string {
+  const m = body.match(new RegExp(`${token}:\\s*(#[0-9a-fA-F]{6})`));
+  if (!m) throw new Error(`hex token yok: ${token}`);
+  return m[1];
+}
+
+const read = (p: string) => readFileSync(p, "utf8");
+const tokensCss = read("src/app/tokens.css");
+const darkCss = read("src/app/theme-dark.css");
+const themesCss = read("src/app/themes.css");
+
+const LIGHT = block(tokensCss, ":root");
+const DARK = block(darkCss, 'html[data-theme="dark"]');
+const LIGHT_SURFACES = ["--surface", "--canvas", "--surface-sunken", "--surface-2"].map((t) => hex(LIGHT, t));
+const DARK_SURFACES = ["--surface", "--canvas", "--surface-raised", "--surface-2", "--surface-sunken"].map((t) =>
+  hex(DARK, t),
+);
+
+describe("tema paleti", () => {
+  it("semantik token katmanı tokens.css'te tanımlı", () => {
+    for (const t of ["--bg", "--border", "--accent-fg", "--accent-text", "--ring", "--heading", "--success", "--warning", "--danger", "--info", "--selection-bg", "--scrollbar-thumb", "--fs-display", "--fs-caption"]) {
+      expect(tokensCss, t).toContain(`${t}:`);
+    }
+  });
+
+  it("koyu tema yüzey, metin, çizgi, odak ve başlık token'larını tanımlar", () => {
+    for (const t of ["--canvas", "--surface", "--surface-2", "--surface-raised", "--surface-sunken", "--text", "--text-muted", "--text-faint", "--line", "--accent", "--accent-text", "--ring", "--heading", "--selection-bg", "--scrollbar-thumb", "--elev-1", "--elev-5"]) {
+      expect(DARK, t).toContain(`${t}:`);
+    }
+  });
+
+  it("metin tokenları iki temada tüm yüzeylerde AA (≥4.5:1)", () => {
+    for (const t of ["--text", "--text-muted", "--text-faint"]) {
+      for (const s of LIGHT_SURFACES) expect(contrast(hex(LIGHT, t), s), `açık ${t} / ${s}`).toBeGreaterThanOrEqual(4.5);
+      for (const s of DARK_SURFACES) expect(contrast(hex(DARK, t), s), `koyu ${t} / ${s}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("5 vurgu teması var ve varsayılan dışındakilerin CSS bloğu iki temada tanımlı", () => {
+    expect(ACCENTS.map((a) => a.value)).toEqual(["ocean", "emerald", "indigo", "amber", "graphite"]);
+    for (const a of ACCENTS.filter((x) => x.value !== "ocean")) {
+      const light = block(themesCss, `html[data-accent="${a.value}"]`);
+      const dark = block(themesCss, `html[data-theme="dark"][data-accent="${a.value}"]`);
+      expect(hex(light, "--brand-600")).toBe(a.fill);
+      expect(hex(light, "--brand-700")).toBe(a.text);
+      expect(hex(dark, "--brand-700")).toBe(a.textDark);
+      // Koyuda dolgu açıkta ile aynıysa ayrıca yazılmaz; farklıysa yazılmıştır.
+      if (a.fillDark !== a.fill) expect(hex(dark, "--brand-600")).toBe(a.fillDark);
+      for (const t of ["--brand-500", "--brand-400", "--brand-300", "--brand-50"]) expect(light, t).toContain(`${t}:`);
+      expect(dark).toContain("--brand-50:");
+    }
+  });
+
+  it("varsayılan (Okyanus) değerleri tablo ile aynı", () => {
+    const ocean = ACCENTS[0];
+    expect(hex(LIGHT, "--brand-600")).toBe(ocean.fill);
+    expect(hex(LIGHT, "--brand-700")).toBe(ocean.text);
+    expect(hex(DARK, "--brand-700")).toBe(ocean.textDark);
+  });
+
+  for (const a of ACCENTS) {
+    it(`${a.label}: dolgu üstünde beyaz yazı ve metin tonu AA (açık + koyu)`, () => {
+      expect(contrast("#ffffff", a.fill), "açık dolgu/beyaz").toBeGreaterThanOrEqual(4.5);
+      expect(contrast("#ffffff", a.fillDark), "koyu dolgu/beyaz").toBeGreaterThanOrEqual(4.5);
+      for (const s of LIGHT_SURFACES) expect(contrast(a.text, s), `açık metin/${s}`).toBeGreaterThanOrEqual(4.5);
+      for (const s of DARK_SURFACES) expect(contrast(a.textDark, s), `koyu metin/${s}`).toBeGreaterThanOrEqual(4.5);
+    });
+  }
+
+  it("--accent-fg beyaz (dolgu tonları beyaz yazıya göre seçildi)", () => {
+    expect(hex(tokensCss, "--accent-fg").toLowerCase()).toBe("#ffffff");
+  });
+
+  it("açılış script'i vurgu anahtarını okur, yalnız bilinen vurguları uygular", () => {
+    expect(THEME_BOOT_SCRIPT).toContain("es-accent");
+    expect(THEME_BOOT_SCRIPT).toContain("emerald|indigo|amber|graphite");
+  });
+
+  it("themes.css ve theme-dark.css public sayfaya uygulanmaz: öznitelik yalnız tema script'iyle gelir", () => {
+    // Öznitelikleri yalnız boot script (yol kuralı korumalı) ve ThemeController yazar.
+    const writers = FILES.filter((f) => /setAttribute\("data-(theme|accent)"/.test(read(f))).map((f) => f.split("\\").join("/"));
+    expect(writers.sort()).toEqual(["src/lib/theme.ts"]);
+  }, 60000);
+
+  it("hareket azaltma ve forced-colors desteği globals.css'te var", () => {
+    const css = read("src/app/globals.css");
+    expect(css).toContain("@media (forced-colors: active)");
+    expect(css).toContain("prefers-reduced-motion: no-preference");
   });
 });
