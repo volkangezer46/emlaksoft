@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   LineChart,
   ListFilter,
+  ListChecks,
   Presentation,
   Sunrise,
   Trophy,
@@ -48,6 +49,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     items: [
       { href: "/app", label: "Ana ekran", icon: ICONS.dashboard, module: "dashboard" },
       { href: "/app/brifing", label: "Günlük Brifing", icon: Sunrise, module: "dashboard" },
+      { href: "/app/baslangic", label: "Ofis kurulumu", icon: ListChecks, module: "dashboard" },
       { href: "/app/asistan", label: "AI Asistan", icon: ICONS.ai, module: "dashboard" },
     ],
   },

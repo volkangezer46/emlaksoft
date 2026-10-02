@@ -10,6 +10,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { calculateCommission } from "@/lib/commission";
+import { CommissionCapNotice } from "@/components/app/commission-cap-notice";
 
 const DONUT_C = 2 * Math.PI * 42;
 
@@ -143,6 +144,7 @@ export function CommissionSimulator() {
               <input value={otherDeductions} onChange={(event) => setOtherDeductions(event.target.value)} inputMode="decimal" placeholder="₺" className="mt-1.5 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm font-semibold tabular-nums outline-none focus:border-brand-400" />
             </label>
           </div>
+          <CommissionCapNotice kind="sale" amount={result.deal} commissionAmount={result.gross} />
           <div className="rounded-[var(--radius-card)] border border-brand-300/35 bg-brand-600/5 p-4">
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">Komisyon (KDV hariç)</p>
             <p className="mt-1 font-display text-3xl font-extrabold tabular-nums text-ink-950">{money(result.gross)}</p>
