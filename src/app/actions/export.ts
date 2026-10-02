@@ -3,7 +3,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
-import { escapeCsvCell } from "@/lib/csv";
+import {
+  mapAppointment, mapAudit, mapCommission, mapContract, mapCustomer, mapDeal, mapDemand, mapDue, mapExpense,
+  mapOffer, mapPortalListing, mapProject, mapProperty, mapReferral, relOne, toCsv,
+} from "@/lib/export-entities";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
 import { logActivity } from "@/lib/activity";
 
@@ -14,27 +17,12 @@ export type ExportResult = {
   /** Sonuç sınıra takıldı: dosyada yalnız ilk EXPORT_LIMIT kayıt var. */
   truncated?: boolean;
   rowCount?: number;
+  /** Varlık anahtarı; tam akış dışa aktarma (/api/export/[entity]) bağlantısı için. */
+  entity?: string;
 };
 
 /** Tek dışa aktarmada en fazla satır. Aşılırsa dosyaya uyarı satırı eklenir ve kullanıcıya bildirilir. */
 const EXPORT_LIMIT = 2000;
-
-function toCsv(rows: Record<string, unknown>[]) {
-  if (rows.length === 0) return "";
-  const keys = Object.keys(rows[0]!);
-  const esc = (v: unknown) => {
-    let s = v == null ? "" : String(v);
-    // CSV formül enjeksiyonu: Excel/Sheets, = @ + - (ve tab/CR) ile başlayan
-    // hücreyi FORMÜL sanır (ör. =HYPERLINK, =cmd|…, @SUM). Ad/not gibi kullanıcı
-    // verisi export'a girdiğinden, tehlikeli önekli hücrenin başına ' eklenir.
-    // Saf sayılar (negatif tutar dâhil) bozulmasın diye +/- yalnız sayı-olmayan
-    // değerlerde korunur.
-    const dangerous = /^[\t\r\n]/.test(s) || /^\s*[=@]/.test(s) || (/^\s*[+-]/.test(s) && !/^\s*[+-]?[\d.,\s]+$/.test(s));
-    if (dangerous) s = `'${s}`;
-    return escapeCsvCell(s);
-  };
-  return [keys.join(","), ...rows.map((r) => keys.map((k) => esc(r[k])).join(","))].join("\n");
-}
 
 /**
  * Dışa aktarma sonucunu üretir: sınıra takıldıysa dosyaya uyarı satırı ekler ve
@@ -59,13 +47,7 @@ async function exportResult(
     entityType: entity,
     newValue: { rows: rows.length, truncated, filename },
   });
-  return { csv, filename, truncated, rowCount: rows.length };
-}
-
-/** supabase-js gömülü ilişkiyi obje ya da dizi tipler — tek kayda indirge. */
-function relOne<T>(value: T | T[] | null | undefined): T | null {
-  if (!value) return null;
-  return Array.isArray(value) ? (value[0] ?? null) : value;
+  return { csv, filename, truncated, rowCount: rows.length, entity };
 }
 
 export async function exportCustomersCsv(): Promise<ExportResult> {
@@ -85,15 +67,7 @@ export async function exportCustomersCsv(): Promise<ExportResult> {
     console.error("exportCustomersCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
-  const rows = (data ?? []).map((c) => ({
-    ad: c.full_name,
-    telefon: c.phone,
-    email: c.email,
-    tur: (c.customer_types ?? []).join("|"),
-    etiketler: (c.tags ?? []).join("|"),
-    kaynak: c.source,
-    kayit: c.created_at,
-  }));
+  const rows = (data ?? []).map((r) => mapCustomer(r));
   return exportResult(gate, "musteriler", rows, `musteriler-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
@@ -114,12 +88,7 @@ export async function exportCommissionsCsv(): Promise<ExportResult> {
     console.error("exportCommissionsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
-  const rows = (data ?? []).map((c) => ({
-    brut: c.gross_amount,
-    kdv: c.vat_amount,
-    durum: c.status,
-    tarih: c.created_at,
-  }));
+  const rows = (data ?? []).map((r) => mapCommission(r));
   return exportResult(gate, "komisyonlar", rows, `komisyonlar-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
@@ -151,15 +120,7 @@ export async function exportAuditCsv(): Promise<ExportResult> {
     for (const p of profiles ?? []) names.set(p.id, p.full_name);
   }
 
-  const rows = (data ?? []).map((r) => ({
-    aksiyon: r.action,
-    entity: r.entity_type,
-    entity_id: r.entity_id,
-    aktor: r.actor_id ? (names.get(r.actor_id) ?? r.actor_id.slice(0, 8)) : "",
-    eski: r.old_value ? JSON.stringify(r.old_value) : "",
-    yeni: r.new_value ? JSON.stringify(r.new_value) : "",
-    tarih: r.created_at,
-  }));
+  const rows = (data ?? []).map((r) => mapAudit(r, names));
   return exportResult(gate, "denetim", rows, `denetim-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
@@ -194,18 +155,7 @@ export async function exportPropertiesCsv(): Promise<ExportResult> {
     for (const p of profiles ?? []) names.set(p.id, p.full_name);
   }
 
-  const rows = (data ?? []).map((p) => ({
-    kod: p.property_code,
-    baslik: p.title,
-    islem: p.transaction_type,
-    tip: p.property_type,
-    durum: p.status,
-    fiyat: p.list_price,
-    il: relOne(p.province)?.name ?? "",
-    ilce: relOne(p.district)?.name ?? "",
-    danisman: p.assigned_to ? (names.get(p.assigned_to) ?? p.assigned_to.slice(0, 8)) : "",
-    olusturma: p.created_at,
-  }));
+  const rows = (data ?? []).map((r) => mapProperty(r, names));
   return exportResult(gate, "portfoyler", rows, `portfoyler-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
@@ -225,14 +175,7 @@ export async function exportExpensesCsv(): Promise<ExportResult> {
     console.error("exportExpensesCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
-  const rows = (data ?? []).map((e) => ({
-    baslik: e.title,
-    tutar: e.amount,
-    kategori: e.category,
-    tarih: e.expense_date,
-    not: e.notes,
-    kayit: e.created_at,
-  }));
+  const rows = (data ?? []).map((r) => mapExpense(r));
   return exportResult(gate, "giderler", rows, `giderler-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
@@ -256,19 +199,7 @@ export async function exportOffersCsv(): Promise<ExportResult> {
     console.error("exportOffersCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
-  const rows = (data ?? []).map((o) => {
-    const property = relOne(o.property);
-    const customer = relOne(o.customer);
-    return {
-      portfoy: property?.title ?? property?.property_code ?? "",
-      portfoy_kodu: property?.property_code ?? "",
-      musteri: customer?.full_name ?? "",
-      teklif: o.amount,
-      karsi_teklif: o.counter_amount,
-      durum: o.status,
-      tarih: o.created_at,
-    };
-  });
+  const rows = (data ?? []).map((r) => mapOffer(r));
   return exportResult(gate, "teklifler", rows, `teklifler-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
@@ -291,20 +222,13 @@ export async function exportPortalListingsCsv(): Promise<ExportResult> {
     console.error("exportPortalListingsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
-  const rows = (data ?? []).map((l) => ({
-    portal: l.portal_name,
-    ilan_no: l.portal_listing_id,
-    portfoy_kodu: relOne(l.property)?.property_code ?? "",
-    durum: l.status,
-    son_teyit: l.last_confirmed_at,
-  }));
+  const rows = (data ?? []).map((r) => mapPortalListing(r));
   return exportResult(gate, "portal-ilanlari", rows, `portal-ilanlari-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
 const today10 = () => new Date().toISOString().slice(0, 10);
 
 // ── Talepler (müşteri talepleri) — ekranın aktif filtresini uygular ──────────
-const DEMAND_STATUS_TR: Record<string, string> = { new: "Yeni", active: "Aktif", matched: "Eşleşti", closed: "Kapalı" };
 const DEMAND_URGENCY_TR: Record<string, string> = { low: "Düşük", normal: "Normal", high: "Yüksek", urgent: "Acil" };
 const DEMAND_URGENCY_VALUES = Object.keys(DEMAND_URGENCY_TR);
 const DEMAND_AGING_DAYS = 30;
@@ -355,25 +279,12 @@ export async function exportDemandsCsv(filters: DemandExportFilters = {}): Promi
     console.error("exportDemandsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
-  const rows = (data ?? []).map((d) => ({
-    musteri: relOne(d.customer)?.full_name ?? "",
-    islem: d.transaction_type,
-    tip: d.property_type ?? "",
-    butce_min: d.budget_min ?? "",
-    butce_max: d.budget_max ?? "",
-    oda: d.rooms ?? "",
-    min_m2: d.min_sqm ?? "",
-    il: relOne(d.province)?.name ?? "",
-    aciliyet: d.urgency ? (DEMAND_URGENCY_TR[d.urgency] ?? d.urgency) : "",
-    durum: DEMAND_STATUS_TR[d.status] ?? d.status,
-    kayit: d.created_at,
-  }));
+  const rows = (data ?? []).map((r) => mapDemand(r));
   return exportResult(gate, "talepler", rows, `talepler-${today10()}.csv`);
 }
 
 // ── Randevular — ekranın tip/durum/müşteri/portföy filtresini uygular ────────
 const APPT_TYPE_TR: Record<string, string> = { showing: "Yer gösterme", office: "Ofis görüşmesi", valuation: "Değerleme", contract: "Sözleşme" };
-const APPT_STATUS_TR: Record<string, string> = { pending: "Teyit bekliyor", confirmed: "Onaylandı", signature: "İmza eksik", completed: "Tamamlandı", cancelled: "İptal" };
 
 export type AppointmentExportFilters = { tip?: string; durum?: string; customer?: string; property?: string };
 
@@ -402,23 +313,11 @@ export async function exportAppointmentsCsv(filters: AppointmentExportFilters = 
     console.error("exportAppointmentsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
-  const rows = (data ?? []).map((a) => {
-    const property = relOne(a.property);
-    return {
-      tur: APPT_TYPE_TR[a.appointment_type] ?? a.appointment_type,
-      tarih: a.scheduled_at,
-      sure_dk: a.duration_min ?? "",
-      musteri: relOne(a.customer)?.full_name ?? "",
-      portfoy: property?.title ?? property?.property_code ?? "",
-      konum: a.location ?? "",
-      durum: APPT_STATUS_TR[a.status] ?? a.status,
-    };
-  });
+  const rows = (data ?? []).map((r) => mapAppointment(r));
   return exportResult(gate, "randevular", rows, `randevular-${today10()}.csv`);
 }
 
 // ── Anlaşmalar (satış hattı) — tahta filtresiz; tüm anlaşmalar ────────────────
-const DEAL_STAGE_TR: Record<string, string> = { new: "Yeni", qualified: "Nitelikli", negotiation: "Müzakere", won: "Kazanıldı", lost: "Kaybedildi" };
 
 export async function exportDealsCsv(): Promise<ExportResult> {
   const gate = await requirePermission("commissions", "view");
@@ -440,19 +339,7 @@ export async function exportDealsCsv(): Promise<ExportResult> {
     console.error("exportDealsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
-  const rows = (data ?? []).map((d) => {
-    const property = relOne(d.property);
-    return {
-      asama: DEAL_STAGE_TR[d.stage] ?? d.stage,
-      tur: d.deal_type ?? "",
-      deger: d.deal_value ?? "",
-      olasilik: d.probability ?? "",
-      musteri: relOne(d.customer)?.full_name ?? "",
-      portfoy: property?.title ?? property?.property_code ?? "",
-      portfoy_kodu: property?.property_code ?? "",
-      guncelleme: d.updated_at,
-    };
-  });
+  const rows = (data ?? []).map((r) => mapDeal(r));
   return exportResult(gate, "anlasmalar", rows, `anlasmalar-${today10()}.csv`);
 }
 
@@ -478,22 +365,7 @@ export async function exportProjectsCsv(filters: { durum?: string } = {}): Promi
     console.error("exportProjectsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
-  const rows = (data ?? []).map((p) => {
-    const units = (p.units ?? []) as { status: string }[];
-    const satilan = units.filter((u) => u.status === "sold").length;
-    const rezerve = units.filter((u) => u.status === "reserved" || u.status === "deposit").length;
-    return {
-      proje: p.name,
-      muteahhit: p.developer_name ?? "",
-      konum: p.location ?? "",
-      durum: PROJECT_STATUS_TR[p.status] ?? p.status,
-      teslim: p.delivery_date ?? "",
-      toplam_daire: units.length,
-      satilan,
-      rezerve,
-      kayit: p.created_at,
-    };
-  });
+  const rows = (data ?? []).map((r) => mapProject(r));
   return exportResult(gate, "projeler", rows, `projeler-${today10()}.csv`);
 }
 
@@ -641,18 +513,7 @@ export async function exportDuesCsv(): Promise<ExportResult> {
     console.error("exportDuesCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
-  const rows = (data ?? []).map((d) => {
-    const prop = relOne(d.property);
-    return {
-      baslik: d.title,
-      portfoy: prop?.title ?? prop?.property_code ?? "",
-      tutar: d.amount,
-      donem: d.period,
-      son_odeme: d.due_date ?? "",
-      durum: d.status === "paid" ? "Ödendi" : "Ödenmedi",
-      odendi_tarih: d.paid_at ?? "",
-    };
-  });
+  const rows = (data ?? []).map((r) => mapDue(r));
   return exportResult(gate, "aidatlar", rows, `aidatlar-${today10()}.csv`);
 }
 
@@ -676,19 +537,7 @@ export async function exportContractsCsv(): Promise<ExportResult> {
     console.error("exportContractsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
-  const rows = (data ?? []).map((k) => {
-    const prop = relOne(k.property);
-    return {
-      baslik: k.title,
-      tur: k.contract_type,
-      durum: k.status,
-      musteri: relOne(k.customer)?.full_name ?? "",
-      portfoy: prop?.title ?? prop?.property_code ?? "",
-      olusturuldu: k.created_at,
-      imzalandi: k.signed_at ?? "",
-      bitis: k.expires_at ?? "",
-    };
-  });
+  const rows = (data ?? []).map((r) => mapContract(r));
   return exportResult(gate, "sozlesmeler", rows, `sozlesmeler-${today10()}.csv`);
 }
 
@@ -711,15 +560,6 @@ export async function exportReferralsCsv(): Promise<ExportResult> {
     console.error("exportReferralsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
-  const durum: Record<string, string> = { yeni: "Yeni", iletisim: "İletişimde", musteri: "Müşteri oldu", kazanildi: "Kazanıldı", kayip: "Kayıp" };
-  const rows = (data ?? []).map((r) => ({
-    tavsiye_edilen: r.referred_name,
-    telefon: r.referred_phone,
-    tavsiye_eden: relOne(r.referrer)?.full_name ?? "",
-    durum: durum[r.status as string] ?? r.status,
-    not: r.referred_note ?? "",
-    ofis_notu: r.staff_note ?? "",
-    tarih: r.created_at,
-  }));
+  const rows = (data ?? []).map((r) => mapReferral(r));
   return exportResult(gate, "tavsiyeler", rows, `tavsiyeler-${today10()}.csv`);
 }
