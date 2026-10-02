@@ -72,3 +72,18 @@ En çok beklenen ve eksik: ilan portalı içe/dışa aktarma (XML/CSV), WhatsApp
 
 ## 4. Otomatik kontrol (sürekli)
 Her birleşmeden sonra: `type-check`, `lint`, `vitest`, `check:links`, `check:cron`, `audit:actions`, `check:migrations`, `audit:deps`, `build`. Bu turda nightly iş akışı ve bundle bütçesi eklenir.
+
+## 5. Tanım yönetimi (taranan bulgular ve kararlar, 2026-10-02)
+
+Tarama: ofis düzeyi sabit listeler, mevcut ayarlar paneli, platform düzeyi parametreler.
+
+**Mevcut iskelet:** `definitions` tablosu (global + ofise özel, ofis satırı global değeri ezer), `getDefinitions`, `/app/ayarlar/tanimlar`. 9 kategori: müşteri tipi/kaynağı, portföy tipi, işlem tipi, sözleşme tipi, gider kategorisi, randevu tipi, talep aciliyeti, destek kategorisi.
+
+**Tespit edilen sorunlar:** `lookup_values` ile çift şema (daire/Daire); sabit kopyalar (`lead-sources.ts`, `expense-categories.ts`, ekleme diyaloğu varsayılanları); sıralama/renk düzenleme/denetim kaydı yok; kullanımdaki değer silinebiliyor; global kayıt ofiste gizlenemiyor; kategori listesi 3 yerde. Platform tarafı: `plans.ts` ile `plan_entitlements`, `permissions.ts` ile `permission_defaults` çift kopya; fiyat, kilit, mevzuat parametreleri kodda; ortak `platform_audit_log` yok.
+
+**Kararlar (kullanıcı):**
+- Bu tur: yalnız "çift kaynağı bitir" (kod) + gider kategorisi enum → text ve randevu tipi CHECK kaldırma migration'ı (yazılır, dry-run; canlıya yalnız backup/PITR doğrulanınca ve ayrı onayla).
+- Mevzuat parametreleri: süper admin + ofis sahibi override (uyarılı). Tasarım ayrı turda.
+- Özel pipeline aşamaları ve özel alan/etiket: ayrı tur, önce tasarım belgesi, onay sonrası.
+
+**Sonraki tur adayları (onaya bağlı):** kayıp/iptal nedeni dropdown, ofis eşik ve komisyon varsayılanları (`tenant_settings`), `platform_audit_log`, `plans`/`page_gates` tabloları (yürürlük tarihli, sürümlü), özellik bayrakları, sistem anahtarı kilidi (`is_system`).
