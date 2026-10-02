@@ -3,6 +3,7 @@
 import { useState, useTransition, useCallback } from "react";
 import { CheckSquare, Square, ChevronDown, Loader2, X } from "lucide-react";
 import { bulkUpdatePropertyStatus } from "@/app/actions/bulk-property";
+import { propertyStatusLabel } from "@/lib/property-labels";
 
 const STATUS_OPTIONS = [
   { value: "live",      label: "Yayında" },
@@ -166,7 +167,7 @@ export function PropertyBulkActions({
                   <span className="ml-2 text-xs text-text-faint">{p.property_code}</span>
                 </span>
                 <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-text-muted">
-                  {p.status}
+                  {propertyStatusLabel(p.status)}
                 </span>
               </label>
             );

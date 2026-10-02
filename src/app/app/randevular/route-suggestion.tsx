@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatTrTime } from "@/lib/clock";
 import { ExternalLink, MapPinned, Route } from "lucide-react";
 
 /**
@@ -89,7 +90,7 @@ export function RouteSuggestion({ dateLabel, stops }: { dateLabel: string; stops
               {i + 1}
             </span>
             <span className="text-xs font-semibold tabular-nums text-text-muted">
-              {new Date(s.time).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+              {formatTrTime(s.time)}
             </span>
             <Link
               href={`/app/portfoyler/${s.propertyId}`}

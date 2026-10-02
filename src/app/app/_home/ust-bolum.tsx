@@ -26,7 +26,7 @@ export function SayfaBasligi({ firstName, hasName }: { firstName: string; hasNam
           {hasName ? `${greeting}, ${firstName}` : greeting}
         </h1>
         <p className="mt-0.5 text-sm text-text-muted">
-          {new Intl.DateTimeFormat("tr-TR", { weekday: "long", day: "numeric", month: "long" }).format(at)}
+          {new Intl.DateTimeFormat("tr-TR", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Istanbul" }).format(at)}
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">

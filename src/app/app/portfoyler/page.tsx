@@ -30,6 +30,7 @@ import { PropertySortSelect } from "./property-sort-select";
 import { OwnerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { EmptyState } from "@/components/app/empty-state";
+import { propertyStatusLabel } from "@/lib/property-labels";
 import { ICONS } from "@/lib/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
@@ -676,7 +677,7 @@ export default async function PropertiesPage({
                   </div>
                   <p className="mt-4 font-display text-2xl font-extrabold text-ink-950">{formatPrice(property.list_price, property.transaction_type)}</p>
                   <div className="mt-4 grid grid-cols-2 gap-2 border-t border-line pt-4">
-                    <span className="flex items-center gap-2 text-xs text-text-muted"><FileCheck2 className="h-4 w-4 text-mint-600" />{property.status}</span>
+                    <span className="flex items-center gap-2 text-xs text-text-muted"><FileCheck2 className="h-4 w-4 text-mint-600" />{propertyStatusLabel(property.status)}</span>
                     <span className="flex items-center justify-end gap-2 text-xs text-text-muted"><Gauge className="h-4 w-4 text-brand-600" />{portals.length} portal</span>
                   </div>
                 </div>

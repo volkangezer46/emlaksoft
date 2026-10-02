@@ -17,7 +17,7 @@ import { redirect } from "next/navigation";
 import { ButtonLink } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { now } from "@/lib/clock";
+import { calendarDateToTrIso, formatTrTime, trDayKey, trTodayCalendarDate } from "@/lib/clock";
 import { setAppointmentStatus } from "@/app/actions/appointments";
 import { CompleteAppointmentDialog } from "./complete-appointment-dialog";
 import { APPOINTMENT_OUTCOME_META, isAppointmentOutcome } from "@/lib/appointment-outcome";
@@ -135,10 +135,10 @@ export default async function AppointmentsPage({
   const isYonetici = YONETICI_ROLES.includes(gate.role);
   const danismanF = isYonetici ? ((sp.danisman ?? "").trim() || "") : "";
   const tarihMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(sp.tarih ?? "");
-  const todayStart = (() => {
-    const n = new Date(now());
-    return new Date(n.getFullYear(), n.getMonth(), n.getDate());
-  })();
+  // todayStart: TR takvim günü (sunucu UTC'de olsa da gece 00–03 TRT arası doğru gün).
+  // "Sahte yerel" Date — yalnız gün bileşenleri anlamlı; DB sınırı için toIso() kullan.
+  const todayStart = trTodayCalendarDate();
+  const toIso = calendarDateToTrIso;
   const selectedDate = tarihMatch
     ? new Date(Number(tarihMatch[1]), Number(tarihMatch[2]) - 1, Number(tarihMatch[3]))
     : todayStart;
@@ -186,8 +186,8 @@ export default async function AppointmentsPage({
       { count: "exact" },
     )
     .neq("status", "cancelled")
-    .gte("scheduled_at", windowStart.toISOString())
-    .lt("scheduled_at", windowEnd.toISOString());
+    .gte("scheduled_at", toIso(windowStart))
+    .lt("scheduled_at", toIso(windowEnd));
   if (tipF) apptQuery = apptQuery.eq("appointment_type", tipF);
   if (durumF) apptQuery = apptQuery.eq("status", durumF);
   if (customerF) apptQuery = apptQuery.eq("customer_id", customerF);
@@ -197,13 +197,13 @@ export default async function AppointmentsPage({
   // iptaller hariç. Hero/panel çipleri bu sayıları filtreye çevirir.
   const countBase = () =>
     supabase.from("appointments").select("id", { count: "exact", head: true }).neq("status", "cancelled");
-  const todayEndIso = new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + 1).toISOString();
-  const weekAheadIso = new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + 7).toISOString();
+  const todayEndIso = toIso(new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + 1));
+  const weekAheadIso = toIso(new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + 7));
 
   // Rota verisi (yalnız ?gorunum=rota) ana sorgulardan bağımsız: aynı turda başlatılır.
   const rotaSelectedAdvisor = danismanF || gate.userId;
-  const rotaDayStart = new Date(todayStart.getTime() + (rotaGun === "yarin" ? 86_400_000 : 0));
-  const rotaDayEnd = new Date(rotaDayStart.getTime() + 86_400_000);
+  const rotaDayStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + (rotaGun === "yarin" ? 1 : 0));
+  const rotaDayEnd = new Date(rotaDayStart.getFullYear(), rotaDayStart.getMonth(), rotaDayStart.getDate() + 1);
   const rotaFetch =
     gorunum === "rota"
       ? (async () => {
@@ -219,8 +219,8 @@ export default async function AppointmentsPage({
         if (durumF) rotaQuery = rotaQuery.eq("status", durumF);
         return Promise.all([
           rotaQuery
-            .gte("scheduled_at", rotaDayStart.toISOString())
-            .lt("scheduled_at", rotaDayEnd.toISOString())
+            .gte("scheduled_at", toIso(rotaDayStart))
+            .lt("scheduled_at", toIso(rotaDayEnd))
             .order("scheduled_at", { ascending: true })
             .limit(50),
           isYonetici
@@ -279,7 +279,7 @@ export default async function AppointmentsPage({
     propertyF
       ? supabase.from("properties").select("id, title, property_code").eq("id", propertyF).maybeSingle()
       : Promise.resolve({ data: null }),
-    countBase().gte("scheduled_at", todayStart.toISOString()).lt("scheduled_at", todayEndIso),
+    countBase().gte("scheduled_at", toIso(todayStart)).lt("scheduled_at", todayEndIso),
     countBase().eq("status", "signature"),
     countBase().eq("status", "completed"),
     countBase().eq("appointment_type", "showing"),
@@ -291,7 +291,7 @@ export default async function AppointmentsPage({
       .from("appointments")
       .select("scheduled_at")
       .neq("status", "cancelled")
-      .gte("scheduled_at", todayStart.toISOString())
+      .gte("scheduled_at", toIso(todayStart))
       .lt("scheduled_at", weekAheadIso)
       .limit(1000),
     // Takvim aboneliği (ICS) için kullanıcının gizli token'ı — diğerlerinden bağımsız.
@@ -356,18 +356,14 @@ export default async function AppointmentsPage({
   // Haftalık yoğunluk — ayrı "önümüzdeki 7 gün" penceresinden (görünümden bağımsız).
   const week = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date(startOfDay.getFullYear(), startOfDay.getMonth(), startOfDay.getDate() + i);
-    const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
-    const count = ((weekBarRows ?? []) as { scheduled_at: string }[]).filter((r) => {
-      const t = new Date(r.scheduled_at);
-      return t >= d && t < next;
-    }).length;
+    const dKey = fmtTarih(d);
+    const count = ((weekBarRows ?? []) as { scheduled_at: string }[]).filter((r) => trDayKey(r.scheduled_at) === dKey).length;
     return { label: d.toLocaleDateString("tr-TR", { weekday: "short" }), day: d.getDate(), count, isToday: i === 0 };
   });
   const maxWeek = Math.max(1, ...week.map((w) => w.count));
 
   const sameLocalDay = (iso: string, d: Date) => {
-    const t = new Date(iso);
-    return t.getFullYear() === d.getFullYear() && t.getMonth() === d.getMonth() && t.getDate() === d.getDate();
+    return trDayKey(iso) === fmtTarih(d);
   };
 
   // Hafta/gün ızgarası için sadeleştirilmiş satırlar
@@ -437,7 +433,7 @@ export default async function AppointmentsPage({
     const plan = buildRoutePlan(planStops);
     rotaTotalKm = plan.totalKm;
     rotaTightCount = plan.tightCount;
-    const timeFmt = new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit" });
+    
     rotaDuraklar = plan.stops.flatMap((s, i) => {
       const r = byId.get(s.id);
       if (!r) return [];
@@ -452,7 +448,7 @@ export default async function AppointmentsPage({
       return [{
         id: r.id,
         order: i + 1,
-        timeLabel: timeFmt.format(new Date(r.scheduled_at)),
+        timeLabel: formatTrTime(r.scheduled_at),
         typeLabel: typeLabel[r.appointment_type] ?? r.appointment_type,
         typeToneCls: typeTone[r.appointment_type] ?? typeTone.showing,
         customerId: c?.id ?? null,
@@ -666,6 +662,7 @@ export default async function AppointmentsPage({
 
         {gorunum === "ay" ? (
           <AppointmentCalendar
+            todayKey={fmtTarih(todayStart)}
             appointments={rows.map((r) => ({
               id: r.id,
               scheduled_at: r.scheduled_at,
@@ -760,8 +757,8 @@ export default async function AppointmentsPage({
                       <Link href={cardHref} className="absolute inset-0" aria-label={`${customerName} randevusu detayı`} />
                     ) : null}
                     <div className="flex flex-col items-center justify-center rounded-[var(--radius-card)] border border-line bg-canvas py-2">
-                      <span className="font-display text-base font-extrabold tabular-nums text-ink-950">{new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit" }).format(date)}</span>
-                      <span className="text-xs uppercase tracking-[0.08em] text-text-faint">{new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short" }).format(date)}</span>
+                      <span className="font-display text-base font-extrabold tabular-nums text-ink-950">{formatTrTime(date)}</span>
+                      <span className="text-xs uppercase tracking-[0.08em] text-text-faint">{new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", timeZone: "Europe/Istanbul" }).format(date)}</span>
                     </div>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">

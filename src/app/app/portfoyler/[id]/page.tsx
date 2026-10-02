@@ -75,6 +75,7 @@ import {
   TimelineSkeleton,
 } from "./sections";
 import type { CSSProperties } from "react";
+import { priceHealthLabel, propertyStatusLabel } from "@/lib/property-labels";
 
 const RING_C = 2 * Math.PI * 42;
 
@@ -353,9 +354,9 @@ export default async function PropertyDetailPage({
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-bold text-white/80">{property.property_code}</span>
               <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${healthGood ? "bg-mint-500/20 text-mint-300" : healthWarn ? "bg-amber-400/20 text-amber-300" : "bg-white/10 text-white/60"}`}>
-                Fiyat {property.price_health ?? "bekliyor"}
+                Fiyat {priceHealthLabel(property.price_health)}
               </span>
-              <span className="rounded-full bg-brand-600/20 px-2.5 py-1 text-xs font-bold text-cyan-300">{property.status}</span>
+              <span className="rounded-full bg-brand-600/20 px-2.5 py-1 text-xs font-bold text-cyan-300">{propertyStatusLabel(property.status)}</span>
             </div>
             <h1 className="mt-3 font-display text-2xl font-extrabold text-white md:text-3xl">
               {property.title ?? property.property_code}

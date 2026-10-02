@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { now } from "@/lib/clock";
+import { DAY_MS, TR_OFFSET_MS, now, trDayStartMs, trParts } from "@/lib/clock";
 
 /**
  * /app/asistan komuta merkezi — ek KPI sayıları.
@@ -22,12 +22,11 @@ export async function getAsistanInsights(): Promise<AsistanInsights> {
   const supabase = await createClient();
 
   // Zaman okumaları clock.now() üzerinden (render'da doğrudan Date.now yok)
-  const dayStart = new Date(now());
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
-  const monthStart = new Date(dayStart);
-  monthStart.setDate(1);
+  // Türkiye gün/ay başı (sunucu UTC'de olsa da doğru gün)
+  const tp = trParts(now());
+  const dayStart = new Date(trDayStartMs(now()));
+  const dayEnd = new Date(dayStart.getTime() + DAY_MS);
+  const monthStart = new Date(Date.UTC(tp.year, tp.month, 1) - TR_OFFSET_MS);
 
   const [
     { count: todayAppointments },

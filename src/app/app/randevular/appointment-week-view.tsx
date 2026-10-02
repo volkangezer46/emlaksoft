@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatTrTime, trParts, trDayKey, trTodayCalendarDate } from "@/lib/clock";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 /**
@@ -45,8 +46,9 @@ function sameDay(a: Date, b: Date) {
 }
 
 /** 07:00 öncesi/21:00 sonrası taşan bloklar ızgara sınırına kırpılır. */
-function blockPos(start: Date, durationMin: number | null) {
-  const startMin = start.getHours() * 60 + start.getMinutes();
+function blockPos(startIso: string, durationMin: number | null) {
+  const tp = trParts(startIso);
+  const startMin = tp.hour * 60 + tp.minute;
   const endMin = startMin + (durationMin ?? 60);
   const lo = HOUR_START * 60;
   const hi = HOUR_END * 60;
@@ -58,8 +60,9 @@ function blockPos(start: Date, durationMin: number | null) {
   };
 }
 
-function timeLabel(d: Date) {
-  return d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+/** Takvim günü (sahte yerel Date) → "YYYY-MM-DD"; randevuların TR gün anahtarıyla karşılaştırılır. */
+function dayKeyOf(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export function AppointmentWeekView({
@@ -78,7 +81,7 @@ export function AppointmentWeekView({
   nextHref: string;
   todayHref: string;
 }) {
-  const today = new Date();
+  const today = trTodayCalendarDate();
 
   // Hafta: seçili günü içeren Pazartesi–Pazar; gün: tek kolon.
   const weekStart = new Date(date);
@@ -165,7 +168,7 @@ export function AppointmentWeekView({
 
             {days.map((d, i) => {
               const dayAppts = appointments
-                .filter((a) => sameDay(new Date(a.scheduled_at), d))
+                .filter((a) => trDayKey(a.scheduled_at) === dayKeyOf(d))
                 .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
               return (
                 <div key={i} className="relative border-l border-line" style={{ height: GRID_H }}>
@@ -178,8 +181,8 @@ export function AppointmentWeekView({
                     />
                   ))}
                   {dayAppts.map((a) => {
-                    const start = new Date(a.scheduled_at);
-                    const { top, height } = blockPos(start, a.duration_min);
+                    const startLabel = formatTrTime(a.scheduled_at);
+                    const { top, height } = blockPos(a.scheduled_at, a.duration_min);
                     const color = TYPE_COLOR[a.appointment_type] ?? "bg-brand-600";
                     const cancelled = a.status === "cancelled";
                     return (
@@ -187,12 +190,12 @@ export function AppointmentWeekView({
                       <a
                         key={a.id}
                         href={`#randevu-${a.id}`}
-                        title={`${timeLabel(start)} · ${TYPE_LABEL[a.appointment_type] ?? a.appointment_type}${a.customerName ? ` · ${a.customerName}` : ""}`}
+                        title={`${startLabel} · ${TYPE_LABEL[a.appointment_type] ?? a.appointment_type}${a.customerName ? ` · ${a.customerName}` : ""}`}
                         className={`focus-ring absolute inset-x-1 overflow-hidden rounded-[var(--radius-control)] ${color} px-1.5 py-1 text-white transition hover:brightness-110 ${cancelled ? "opacity-50" : ""}`}
                         style={{ top, height }}
                       >
                         <p className="truncate text-xs font-bold leading-tight">
-                          {timeLabel(start)}
+                          {startLabel}
                           {mode === "gun" ? ` · ${TYPE_LABEL[a.appointment_type] ?? a.appointment_type}` : ""}
                         </p>
                         {height >= 32 ? (
