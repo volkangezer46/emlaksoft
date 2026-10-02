@@ -524,7 +524,7 @@ export default async function SozlesmelerPage({
 
       {/* Bilgi kutusu */}
       <section className="rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface px-5 py-4 text-sm text-text-muted">
-        <p className="font-semibold text-ink-950">E-imza nasıl çalışır?</p>
+        <p className="font-semibold text-ink-950">SMS onaylı dijital imza nasıl çalışır?</p>
         <p className="mt-1">
           Sözleşme taslağı oluşturun → imzalayan kişileri ekleyin → sistem benzersiz bir imza linki oluşturur →
           kişi linke tıklayıp onayladığında sözleşme “İmzalandı” durumuna geçer.

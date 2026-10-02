@@ -68,7 +68,7 @@ export default async function PublicContractSignPage({ params }: { params: Promi
           </div>
           <h1 className="mt-2 font-display text-2xl font-extrabold sm:text-3xl">{contract.title}</h1>
           <p className="mt-2 flex items-center gap-2 text-sm text-white/60">
-            <FileText className="h-4 w-4" /> Elektronik imza · Sayın {signer.full_name}
+            <FileText className="h-4 w-4" /> SMS onaylı dijital imza · Sayın {signer.full_name}
           </p>
         </div>
 

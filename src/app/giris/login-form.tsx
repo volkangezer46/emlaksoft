@@ -16,7 +16,7 @@ export function LoginForm({ next, demoEnabled }: { next: string; demoEnabled: bo
   return (
     <AuthShell
       panelTitle="Ofisinizi yönetmenin en hızlı yolu"
-      panelDesc="Müşteriden komisyona, portal takibinden e-imzaya — günlük tüm ofis operasyonu tek güvenli panelde."
+      panelDesc="Müşteriden komisyona, portal takibinden dijital imzaya — günlük tüm ofis operasyonu tek güvenli panelde."
     >
       <div className="mt-8 lg:mt-0">
         <h1 className="font-display text-3xl font-extrabold text-ink-950">Tekrar hoş geldiniz</h1>

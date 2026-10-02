@@ -280,7 +280,7 @@ export function NewContractForm({
     <form onSubmit={handleSubmit}>
       <FormPage
         title="Yeni sözleşme"
-        description="Taslağı oluşturun; imzalayanları ekleyip e-imza linki gönderin."
+        description="Taslağı oluşturun; imzalayanları ekleyip imza linki gönderin."
         breadcrumbs={crumbs}
         actions={
           templates.length > 0 && !hasPrefill ? (
