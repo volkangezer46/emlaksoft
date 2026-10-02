@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Building2, CalendarClock, TrendingUp, User } from "lucide-react";
+import { ArrowLeft, Banknote, Building2, CalendarClock, StickyNote, TrendingUp, User, Wrench } from "lucide-react";
+import { ContactActions, DetailTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
+import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DepositReturnControl } from "./deposit-return";
@@ -25,11 +27,21 @@ function rel<T>(v: Rel<T>): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : v;
 }
 
-export default async function KiraDetayPage({ params }: { params: Promise<{ id: string }> }) {
+const RENTAL_TAB_IDS = ["tahakkuk", "bakim", "notlar"] as const;
+
+export default async function KiraDetayPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { perms } = await requireModulePage("rentals", "/app/kiralama");
   const canCreate = perms.rentals?.includes("create") ?? false;
   const canEdit = perms.rentals?.includes("edit") ?? false;
   const { id } = await params;
+  // Seçili sekme sunucuda çözülür; yalnız aktif sekmenin paneli çizilir
+  const tab = resolveTab(await searchParams, RENTAL_TAB_IDS, "tahakkuk", { bakım: "bakim" });
 
   const supabase = await createClient();
   const { data: rental } = await supabase
@@ -59,6 +71,31 @@ export default async function KiraDetayPage({ params }: { params: Promise<{ id: 
   const daysToEnd = rental.end_date
     ? Math.ceil((new Date(`${rental.end_date}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86_400_000)
     : null;
+
+  const overdueCount = charges.filter((c) => c.status === "overdue").length;
+  const pendingCount = charges.filter((c) => c.status === "pending").length;
+  const openMaintenance = maintenance.filter((m) => m.status !== "done").length;
+  const sekmeHref = (t: string) => `/app/kiralama/${rental.id}?sekme=${t}`;
+
+  /** Sağ sütun — tek "sonraki en iyi eylem". */
+  const nba: { title: string; reason: string; href: string | null; label: string } =
+    active && ended
+      ? { title: "Süresi dolan kaydı sonlandırın", reason: `Bitiş tarihi (${dateLabel(rental.end_date!)}) geçti.`, href: null, label: "" }
+      : overdueCount > 0
+        ? { title: `${overdueCount} geciken tahakkuk`, reason: "Kiracıyla görüşüp ödemeyi işaretleyin.", href: sekmeHref("tahakkuk"), label: "Tahakkuklara git" }
+        : endingSoon
+          ? { title: "Kira artışını hesaplayın", reason: `Sözleşme ${daysToEnd === 0 ? "bugün" : `${daysToEnd} gün içinde`} bitiyor.`, href: "/app/kira-artis", label: "Kira artışı" }
+          : openMaintenance > 0
+            ? { title: `${openMaintenance} açık bakım talebi`, reason: "Bekleyen talepleri takip edin.", href: sekmeHref("bakim"), label: "Bakım taleplerine git" }
+            : pendingCount > 0
+              ? { title: `${pendingCount} bekleyen tahakkuk`, reason: "Vadesi gelen kiraları tahsil edildi olarak işaretleyin.", href: sekmeHref("tahakkuk"), label: "Tahakkuklara git" }
+              : { title: "Her şey yolunda", reason: "Geciken tahakkuk, açık bakım veya yaklaşan bitiş yok.", href: null, label: "" };
+
+  const tabDefs: DetailTabDef[] = [
+    { id: "tahakkuk", label: "Tahakkuklar", icon: Banknote, count: charges.length },
+    { id: "bakim", label: "Bakım talepleri", icon: Wrench, count: maintenance.length },
+    { id: "notlar", label: "Notlar & araçlar", icon: StickyNote },
+  ];
 
   return (
     <div className="space-y-6">
@@ -143,37 +180,83 @@ export default async function KiraDetayPage({ params }: { params: Promise<{ id: 
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <div className="space-y-6">
-          {/* Tahakkuklar */}
-          <ChargesPanel rentalId={rental.id} charges={charges} canCreate={canCreate} canEdit={canEdit} />
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0 space-y-4">
+          <DetailTabs basePath={`/app/kiralama/${rental.id}`} tabs={tabDefs} active={tab} label="Kira sekmeleri" />
 
-          {rental.notes ? (
-            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-              <h2 className="font-display text-sm font-bold text-ink-950">Notlar</h2>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-text-muted">{rental.notes}</p>
-            </section>
+          {tab === "tahakkuk" ? (
+            <div className="space-y-4">
+              {/* Tahakkuklar */}
+              <ChargesPanel rentalId={rental.id} charges={charges} canCreate={canCreate} canEdit={canEdit} />
+            </div>
+          ) : null}
+
+          {tab === "bakim" ? (
+            <div className="space-y-4">
+              {/* Bakım talepleri */}
+              <MaintenancePanel rentalId={rental.id} requests={maintenance} canCreate={canCreate} canEdit={canEdit} />
+            </div>
+          ) : null}
+
+          {tab === "notlar" ? (
+            <div className="space-y-4">
+              <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+                <h2 className="font-display text-sm font-bold text-ink-950">Notlar</h2>
+                {rental.notes ? (
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-text-muted">{rental.notes}</p>
+                ) : (
+                  <EmptyStateV3
+                    variant="compact"
+                    title="Bu kira kaydına not eklenmemiş."
+                    description="Kiracıyla ilgili notlar kayıt oluşturulurken girilir."
+                  />
+                )}
+              </section>
+
+              {/* Kira artış hesaplayıcı kısayolu */}
+              <Link
+                href="/app/kira-artis"
+                className="focus-ring press lift group flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-4 transition hover:border-brand-300"
+              >
+                <span className="grid h-10 w-10 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
+                  <TrendingUp className="h-5 w-5" />
+                </span>
+                <span>
+                  <span className="block text-sm font-bold text-ink-950">Kira artış hesaplayıcı</span>
+                  <span className="block text-xs text-text-muted">TÜFE bazlı yasal artış oranıyla yeni kirayı hesaplayın.</span>
+                </span>
+              </Link>
+            </div>
           ) : null}
         </div>
 
-        <div className="space-y-4">
-          {/* Bakım talepleri */}
-          <MaintenancePanel rentalId={rental.id} requests={maintenance} canCreate={canCreate} canEdit={canEdit} />
-
-          {/* Kira artış hesaplayıcı kısayolu */}
-          <Link
-            href="/app/kira-artis"
-            className="focus-ring press lift group flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-4 transition hover:border-brand-300"
-          >
-            <span className="grid h-10 w-10 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
-              <TrendingUp className="h-5 w-5" />
-            </span>
-            <span>
-              <span className="block text-sm font-bold text-ink-950">Kira artış hesaplayıcı</span>
-              <span className="block text-xs text-text-muted">TÜFE bazlı yasal artış oranıyla yeni kirayı hesaplayın.</span>
-            </span>
-          </Link>
-        </div>
+        {/* Sağ sütun — her sekmede görünür */}
+        <aside aria-label="Özet ve sonraki eylem" className="space-y-4 lg:sticky lg:top-4">
+          <NextActionCard title={nba.title} reason={nba.reason} href={nba.href} label={nba.label} />
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+            <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-muted">
+              {renter?.full_name ?? "Kiracı bağlı değil"}
+            </p>
+            <div className="mt-3">
+              <ContactActions
+                phone={renter?.phone}
+                name={renter?.full_name}
+                appointmentHref={renter?.id ? `/app/randevular?customer=${renter.id}${prop?.id ? `&property=${prop.id}` : ""}` : null}
+                noteHref={`/app/kiralama/${rental.id}?sekme=notlar`}
+              />
+            </div>
+            <dl className="mt-4 space-y-1.5 border-t border-line pt-3 text-sm">
+              <div className="flex justify-between gap-3">
+                <dt className="text-text-muted">Geciken / bekleyen</dt>
+                <dd className="font-semibold text-ink-950">{overdueCount} / {pendingCount}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-text-muted">Açık bakım</dt>
+                <dd className="font-semibold text-ink-950">{openMaintenance}</dd>
+              </div>
+            </dl>
+          </section>
+        </aside>
       </div>
     </div>
   );
