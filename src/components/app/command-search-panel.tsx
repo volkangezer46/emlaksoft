@@ -343,7 +343,7 @@ export function CommandSearchPanel({
   return (
     /* Panel arama kutusuna bağlı açılıyor (admin paletiyle aynı desen).
        Öncesinde ekran ortasında modal olarak açılıp kutudan kopuk duruyordu. */
-    <div className="relative w-full min-w-0 max-w-lg">
+    <div className="relative min-w-0 shrink-0 sm:w-full sm:max-w-lg sm:shrink">
       <button
         type="button"
         onClick={() => {
@@ -355,10 +355,9 @@ export function CommandSearchPanel({
         aria-haspopup="listbox"
         aria-controls="app-command-results"
         aria-label="Müşteri, portföy, anlaşma, görev veya ilan ara"
-        className="focus-ring relative flex w-full items-center rounded-[var(--radius-control)] border border-hairline bg-canvas py-2.5 pl-10 pr-4 text-left text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300 hover:bg-surface hover:shadow-[var(--elev-2)] sm:pr-20"
+        className="focus-ring relative flex w-full items-center rounded-[var(--radius-control)] border border-hairline bg-canvas h-10 w-10 justify-center text-left text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300 hover:bg-surface hover:shadow-[var(--elev-2)] sm:h-auto sm:w-full sm:justify-start sm:py-2.5 sm:pl-10 sm:pr-20"
       >
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-        <span className="truncate sm:hidden">Ara…</span>
+        <Search className="pointer-events-none absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 text-text-faint sm:left-3 sm:translate-x-0" aria-hidden />
         <span className="hidden truncate sm:inline">Müşteri, portföy, anlaşma, görev, ilan no ara…</span>
         <span className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded-md border border-hairline bg-surface px-2 py-1 text-xs text-text-faint sm:flex">
           <Command className="h-3 w-3" /> K
@@ -373,7 +372,7 @@ export function CommandSearchPanel({
             className="fixed inset-0 z-40 cursor-default"
             onClick={() => setOpen(false)}
           />
-          <div className="popover-in absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-[var(--radius-card)] border border-hairline bg-surface shadow-[var(--inner-top),var(--elev-5)]">
+          <div className="popover-in fixed inset-x-2 top-[4.5rem] z-50 sm:absolute sm:inset-x-auto sm:left-0 sm:right-0 sm:top-[calc(100%+8px)] overflow-hidden rounded-[var(--radius-card)] border border-hairline bg-surface shadow-[var(--inner-top),var(--elev-5)]">
             <div className="hairline-b flex items-center gap-2 px-4">
               <Search className="h-4 w-4 text-text-faint" />
               <input

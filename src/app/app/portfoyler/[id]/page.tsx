@@ -54,6 +54,7 @@ import { daysAgoIso, msSince, now } from "@/lib/clock";
 import { generateListingText } from "@/lib/listing-text";
 import { CopyListingText } from "@/components/app/copy-listing-text";
 import { WhatsAppLink } from "@/components/app/whatsapp-link";
+import { MoreActions } from "@/components/app/more-actions";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import {
   ClosuresSection,
@@ -401,6 +402,10 @@ export default async function PropertyDetailPage({
               <Link href={`/app/portallar?property=${property.id}`} className="btn-shine inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950">
                 <RadioTower className="h-4 w-4" /> Portal bağla
               </Link>
+              <Link href={`/app/randevular?property=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
+                Randevular
+              </Link>
+              <MoreActions>
               {canEdit ? (
                 <EditPropertyDialog
                   property={{
@@ -445,9 +450,6 @@ export default async function PropertyDetailPage({
               <Link href={`/app/portfoyler/sunumlar?portfoy=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
                 Sunuma ekle
               </Link>
-              <Link href={`/app/randevular?property=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
-                Randevular
-              </Link>
               <Link href="/app/kayip-kacak" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
                 <Siren className="h-4 w-4" /> Kayıp-kaçak
               </Link>
@@ -459,6 +461,7 @@ export default async function PropertyDetailPage({
               </Link>
               <WhatsAppLink share label="Müşteriye WhatsApp ile gönder" message={listingText.description ? `${listingText.title}\n\n${listingText.description}` : null} />
               {canDelete ? <DeletePropertyButton propertyId={property.id} /> : null}
+              </MoreActions>
             </div>
             {/* Portal ara çözümü: ilan metnini üret, portala yapıştır */}
             <div className="mt-3">

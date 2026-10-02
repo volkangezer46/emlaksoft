@@ -26,6 +26,7 @@ import { CustomerTasks, type CustomerTaskRow } from "./customer-tasks";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 import { WaTemplateMenu } from "@/components/app/wa-template-menu";
 import { WhatsAppLink } from "@/components/app/whatsapp-link";
+import { MoreActions } from "@/components/app/more-actions";
 import { computeLeadScore, leadTierCls } from "@/lib/lead-score";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
 import { MatchedSection, MatchedSkeleton, SatisfactionSection } from "./sections";
@@ -592,6 +593,10 @@ export default async function CustomerDetailPage({
                     }}
                   />
                 ) : null}
+                <Link href={`/app/randevular?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                  <CalendarDays className="h-4 w-4" /> Randevu ver
+                </Link>
+                <MoreActions>
                 {customer.phone ? (
                   <WhatsAppLink
                     phone={customer.phone}
@@ -614,9 +619,6 @@ export default async function CustomerDetailPage({
                 </a>
                 <Link href={`/app/arama?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <PhoneCall className="h-4 w-4" /> Görüşme kaydet
-                </Link>
-                <Link href={`/app/randevular?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
-                  <CalendarDays className="h-4 w-4" /> Randevu ver
                 </Link>
                 <Link href={`/app/musteriler/${customer.id}?sekme=iletisim`} scroll={false} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <MessageSquare className="h-4 w-4" /> Not ekle
@@ -644,6 +646,7 @@ export default async function CustomerDetailPage({
                   />
                 ) : null}
                 {canDelete ? <DeleteCustomerButton customerId={customer.id} /> : null}
+                </MoreActions>
               </div>
             </div>
           </div>
