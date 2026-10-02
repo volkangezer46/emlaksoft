@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { ArrowUpRight, BarChart3, CheckCircle2, Loader2, MessageSquare, Send } from "lucide-react";
+import { redirect } from "next/navigation";
+import { ArrowUpRight, BarChart3, CheckCircle2, Loader2, MessageSquare, Plus, Send } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { msSince } from "@/lib/clock";
 import { listCampaigns } from "@/app/actions/campaigns";
-import { NewCampaignDialog } from "./new-campaign-dialog";
+import { ButtonLink } from "@/components/ui/button";
 import { CampaignActions } from "./campaign-actions";
 import { EmptyState } from "@/components/app/empty-state";
 import { DataTable, type DataTableColumn, type DataTableRow } from "@/components/ui/data-table";
@@ -65,10 +66,11 @@ function relativeDate(iso: string) {
 export default async function KampanyalarPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; kanal?: string }>;
+  searchParams?: Promise<{ durum?: string; kanal?: string; yeni?: string }>;
 }) {
   const { perms } = await requireModulePage("campaigns", "/app/kampanyalar");
   const params = (await searchParams) ?? {};
+  if (params.yeni) redirect("/app/kampanyalar/yeni");
   const durum = params.durum ?? "";
   const kanal = params.kanal ?? "";
   const campaigns = await listCampaigns();
@@ -269,7 +271,7 @@ export default async function KampanyalarPage({
             `${total} kampanya`
           )}
         </p>
-        {canCreate && <NewCampaignDialog />}
+        {canCreate && <ButtonLink href="/app/kampanyalar/yeni" icon={Plus}>Yeni kampanya</ButtonLink>}
       </div>
 
       {/* Filtre çipleri — ?durum= & ?kanal= (linkler diğer parametreyi korur) */}
@@ -312,7 +314,7 @@ export default async function KampanyalarPage({
           title="Henüz kampanya yok"
           description="İlk kampanyanızı oluşturun. Müşteri listenizdeki herkese SMS veya WhatsApp gönderin."
           tone="brand"
-          action={canCreate ? { label: "Yeni kampanya", node: <NewCampaignDialog /> } : undefined}
+          action={canCreate ? { label: "Yeni kampanya", href: "/app/kampanyalar/yeni" } : undefined}
         />
       ) : filtered.length === 0 ? (
         <EmptyState
