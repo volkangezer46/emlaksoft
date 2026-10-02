@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import {
   AlarmClock,
   ArrowUpRight,
@@ -25,6 +26,7 @@ import { NewDemandListDialog } from "./new-demand-list-dialog";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton, SkeletonBlock } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/page-header";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportDemandsCsv } from "@/app/actions/export";
@@ -145,6 +147,31 @@ const PAGER_BTN =
 const PAGER_BTN_DISABLED =
   "inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
+type DemandHref = (patch: { status?: string; aciliyet?: string; il?: string; butce?: string; yas?: string }) => string;
+
+type Matches = Map<string, { strong: number; good: number; best: number }>;
+
+type PoolRow = { status: string; budget_min: number | null; budget_max: number | null; province_id: string | null; province: Rel };
+
+/** Sayfa düzeyinde BAŞLATILAN (await edilmeyen) sorgular — her bölüm kendi Suspense sınırında bekler. */
+type Pending = {
+  /** Sayfa dilimi + gerçek toplam + eşleşme potansiyeli (liste, portföy havuzu ve ofis ağırlıklarından türer). */
+  listP: Promise<{ rows: DemandRow[]; total: number; matchByDemand: Matches }>;
+  urgentP: Promise<number>;
+  agingP: Promise<number>;
+  poolP: Promise<PoolRow[]>;
+};
+
+type Ctx = {
+  yasF: boolean;
+  ilF: string;
+  butceF: BandKey | "";
+  canCreate: boolean;
+  page: number;
+  demandHref: DemandHref;
+  pageHref: (n: number) => string;
+};
+
 export default async function DemandsPage({
   searchParams,
 }: {
@@ -201,39 +228,10 @@ export default async function DemandsPage({
     .order("created_at", { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1);
 
-  // "Yeni talep" dialogu için müşteri + il listesi — yalnız create yetkisi varken çekilir.
-  // Eşleşme potansiyeli rozetleri için yayındaki portföyler + ofis ağırlıkları
-  // aynı turda çekilir (eşleştirme motorunun aday havuzu deseni, dar select).
-  const [
-    { data, count: demandTotal },
-    { count: urgentTotal },
-    { count: agingTotal },
-    { data: poolData },
-    { data: customersData },
-    { data: provincesData },
-    { data: propsData },
-    weights,
-  ] = await Promise.all([
-    listQuery,
-    // Hero "Acil / yüksek" — filtrelenmiş kümedeki gerçek toplam (sayfa dilimi değil).
-    buildList("id", { count: "exact", head: true }).in("urgency", ["urgent", "high"]),
-    // Yaşlanan uyarı şeridi — temel filtreler + 30+ gün açık (yaş filtresinden bağımsız).
-    buildBase("id", { count: "exact", head: true })
-      .lte("created_at", daysAgoIso(AGING_DAYS))
-      .neq("status", "closed"),
-    // Segment şeridi havuzu (bütçe bantları + en yoğun iller) — türetilmiş, ilk POOL_LIMIT.
-    buildBase("id, status, budget_min, budget_max, province_id, province:geo_provinces(name)").limit(POOL_LIMIT),
-    canCreate
-      ? supabase
-          .from("customers")
-          .select("id, full_name")
-          .is("deleted_at", null)
-          .order("created_at", { ascending: false })
-          .limit(300)
-      : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
-    canCreate
-      ? supabase.from("geo_provinces").select("id, name").order("name", { ascending: true })
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+
+  // Sorgular burada BAŞLATILIR ama await edilmez: başlık/filtreler hemen akar,
+  // ağır havuz/liste bölümleri kendi Suspense sınırında bekler (bağımsız, paralel).
+  const propsP = Promise.resolve(
     supabase
       .from("properties")
       .select("id, property_code, title, transaction_type, property_type, status, list_price, province_id, district_id, features")
@@ -241,15 +239,13 @@ export default async function DemandsPage({
       .in("status", ["live", "draft", "reserved", "Yayında"])
       .order("created_at", { ascending: false })
       .limit(300),
-    fetchTenantMatchingWeights(supabase),
-  ]);
-  const rows = (data ?? []) as unknown as DemandRow[];
-  const dialogCustomers = customersData ?? [];
-  const dialogProvinces = provincesData ?? [];
+  ).then((res) => res.data);
+  const weightsP = fetchTenantMatchingWeights(supabase);
+  const rawListP = Promise.resolve(listQuery);
 
-  // ── Eşleşme potansiyeli: görünen sayfadaki her açık talep portföy havuzuna
-  // karşı skorlanır. Gerçek eşleştirme motorundaki formül (lib/matching,
-  // ofis ağırlıklarıyla); güçlü ≥ 75 · iyi 55–74. Kapalı talepler skorlanmaz.
+  const pending: Pending = {
+    listP: Promise.all([rawListP, propsP, weightsP]).then(([{ data, count }, propsData, weights]) => {
+      const rows = (data ?? []) as unknown as DemandRow[];
   const matchProps = (propsData ?? []).map((p) => ({
     ...p,
     list_price: p.list_price != null ? Number(p.list_price) : null,
@@ -269,39 +265,38 @@ export default async function DemandsPage({
     }
     matchByDemand.set(d.id, { strong, good, best });
   }
+      return { rows, total: count ?? rows.length, matchByDemand };
+    }),
+    // Hero "Acil / yüksek" — filtrelenmiş kümedeki gerçek toplam (sayfa dilimi değil).
+    urgentP: Promise.resolve(buildList("id", { count: "exact", head: true }).in("urgency", ["urgent", "high"])).then(
+      (res) => res.count ?? 0,
+    ),
+    // Yaşlanan uyarı şeridi — temel filtreler + 30+ gün açık (yaş filtresinden bağımsız).
+    agingP: Promise.resolve(
+      buildBase("id", { count: "exact", head: true })
+        .lte("created_at", daysAgoIso(AGING_DAYS))
+        .neq("status", "closed"),
+    ).then((res) => res.count ?? 0),
+    // Segment şeridi havuzu (bütçe bantları + en yoğun iller) — türetilmiş, ilk POOL_LIMIT.
+    poolP: Promise.resolve(
+      buildBase("id, status, budget_min, budget_max, province_id, province:geo_provinces(name)").limit(POOL_LIMIT),
+    ).then((res) => (res.data ?? []) as unknown as PoolRow[]),
+  };
 
-  // ── Sayfalama + hero KPI'ları (gerçek toplamlar) ──────────────────────────
-  const totalFiltered = demandTotal ?? rows.length;
-  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
-  const rangeStart = totalFiltered === 0 ? 0 : offset + 1;
-  const rangeEnd = Math.min(offset + rows.length, totalFiltered);
-  // Hero: "Listelenen" = filtrelenmiş toplam, "Acil/yüksek" = ayrı sayaç.
-  // "Eşleşme hazır" türetilmiş (skor motoru) → görünen sayfadan hesaplanır.
-  const openCount = totalFiltered;
-  const urgentCount = urgentTotal ?? 0;
-  const matchReadyCount = rows.filter((r) => (matchByDemand.get(r.id)?.strong ?? 0) > 0).length;
-  const agingCount = agingTotal ?? 0;
-
-  // ── Segmentasyon şeridi: bütçe bantları + en yoğun 5 il (havuzdan, türetilmiş) ──
-  type PoolRow = { status: string; budget_min: number | null; budget_max: number | null; province_id: string | null; province: Rel };
-  const poolRows = (poolData ?? []) as unknown as PoolRow[];
-  const bandCounts = new Map<BandKey, number>();
-  // İl sayaçları province_id ile tutulur (ad değil) — ?il= sunucuda .eq ile kesilsin.
-  const provinceCounts = new Map<string, { name: string; count: number }>();
-  for (const d of poolRows) {
-    if (d.status === "closed") continue;
-    const b = bandOf(d);
-    if (b) bandCounts.set(b, (bandCounts.get(b) ?? 0) + 1);
-    const pid = d.province_id;
-    const pn = relOne<{ name: string }>(d.province)?.name;
-    if (pid && pn) {
-      const e = provinceCounts.get(pid) ?? { name: pn, count: 0 };
-      e.count += 1;
-      provinceCounts.set(pid, e);
-    }
-  }
-  const topProvinces = [...provinceCounts.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 5);
-  const poolLimited = poolRows.length >= POOL_LIMIT;
+  // "Yeni talep" dialogu için müşteri + il listesi — yalnız create yetkisi varken çekilir.
+  const dialogP = canCreate
+    ? Promise.all([
+        Promise.resolve(
+          supabase
+            .from("customers")
+            .select("id, full_name")
+            .is("deleted_at", null)
+            .order("created_at", { ascending: false })
+            .limit(300),
+        ),
+        Promise.resolve(supabase.from("geo_provinces").select("id, name").order("name", { ascending: true })),
+      ]).then(([c, pr]) => ({ customers: c.data ?? [], provinces: pr.data ?? [] }))
+    : null;
 
   // Filtre linkleri diğer parametreleri korur (status ⇄ aciliyet ⇄ il ⇄ bütçe ⇄ yaş).
   // Filtre değişince sayfa 1'e döner: demandHref sayfa parametresini taşımaz.
@@ -341,6 +336,7 @@ export default async function DemandsPage({
     { key: "urgent", label: "Acil" },
     { key: "high", label: "Yüksek" },
   ];
+  const ctx: Ctx = { yasF, ilF, butceF, canCreate, page, demandHref, pageHref };
 
   return (
     <div className="space-y-6">
@@ -362,50 +358,22 @@ export default async function DemandsPage({
                 yas: yasF ? String(AGING_DAYS) : "",
               })}
             />
-            {canCreate ? <NewDemandListDialog customers={dialogCustomers} provinces={dialogProvinces} /> : null}
+            {dialogP ? (
+              <Suspense fallback={<Skeleton className="h-9 w-32" />}>
+                <DemandDialog dialogP={dialogP} />
+              </Suspense>
+            ) : null}
           </>
         }
       />
 
-      {/* Kompakt KPI satırı — her sayı filtreli bir hedefe gider */}
-      <Card className="grid grid-cols-1 divide-line sm:grid-cols-3 sm:divide-x">
-        {[
-          { label: "Listelenen", value: openCount, href: "/app/talepler" },
-          { label: "Acil / yüksek", value: urgentCount, href: demandHref({ aciliyet: "high,urgent" }) },
-          { label: "Eşleşme hazır", value: matchReadyCount, href: "/app/eslestirme" },
-        ].map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            className="focus-ring group flex items-center justify-between gap-3 px-4 py-3 transition hover:bg-canvas"
-          >
-            <span>
-              <span className="numeric block font-display text-lg font-bold text-ink-950">{item.value.toLocaleString("tr-TR")}</span>
-              <span className="block text-xs text-text-muted">{item.label}</span>
-            </span>
-            <ArrowUpRight aria-hidden="true" className="h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" />
-          </Link>
-        ))}
-      </Card>
+      <Suspense fallback={<StatsSkeleton />}>
+        <DemandStats ctx={ctx} pending={pending} />
+      </Suspense>
 
-      {/* ── Yaşlanan talepler uyarısı — 30+ gündür açık, hâlâ kapanmamış ────── */}
-      {agingCount > 0 && !yasF ? (
-        <Link
-          href={demandHref({ yas: String(AGING_DAYS) })}
-          className="focus-ring press group flex min-h-[44px] items-center gap-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 transition hover:border-amber-500/60"
-        >
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-amber-400/20 text-amber-600">
-            <AlarmClock className="h-4.5 w-4.5" />
-          </span>
-          <span className="min-w-0 flex-1 text-sm">
-            <span className="font-bold text-ink-950">{agingCount} talep {AGING_DAYS}+ gündür açık.</span>{" "}
-            <span className="text-text-muted">Yaşlanan talepte müşteri soğur — arayıp kriterleri tazeleyin veya kapatın.</span>
-          </span>
-          <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-amber-600">
-            Yaşlananları göster <ArrowUpRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-          </span>
-        </Link>
-      ) : null}
+      <Suspense fallback={null}>
+        <AgingAlert ctx={ctx} pending={pending} />
+      </Suspense>
       {yasF ? (
         <p className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-xs font-semibold text-amber-700">
           <AlarmClock className="h-3.5 w-3.5" /> Yalnız {AGING_DAYS}+ gündür açık talepler gösteriliyor.
@@ -460,8 +428,119 @@ export default async function DemandsPage({
         ) : null}
       </div>
 
-      {/* ── Segmentasyon şeridi: bütçe bantları + en yoğun iller (açık talepler) ── */}
-      {bandCounts.size > 0 || topProvinces.length > 0 ? (
+      <Suspense fallback={<Skeleton className="h-20 w-full rounded-[var(--radius-card)]" />}>
+        <SegmentStrip ctx={ctx} pending={pending} />
+      </Suspense>
+
+      <Suspense fallback={<ListSkeleton />}>
+        <DemandList ctx={ctx} pending={pending} />
+      </Suspense>
+    </div>
+  );
+}
+
+function StatsSkeleton() {
+  return (
+    <SkeletonBlock label="Talep özeti yükleniyor">
+      <Skeleton className="h-[68px] w-full rounded-[var(--radius-card)]" />
+    </SkeletonBlock>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <SkeletonBlock label="Talepler yükleniyor" className="grid gap-3">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Skeleton key={i} className="h-[120px] w-full rounded-[var(--radius-panel)]" />
+      ))}
+    </SkeletonBlock>
+  );
+}
+
+async function DemandDialog({
+  dialogP,
+}: {
+  dialogP: Promise<{ customers: { id: string; full_name: string }[]; provinces: { id: string; name: string }[] }>;
+}) {
+  const { customers, provinces } = await dialogP;
+  return <NewDemandListDialog customers={customers} provinces={provinces} />;
+}
+
+async function DemandStats({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
+  const { demandHref } = ctx;
+  const [{ rows, total, matchByDemand }, urgentTotal] = await Promise.all([pending.listP, pending.urgentP]);
+  // "Eşleşme hazır" türetilmiş (skor motoru) → görünen sayfadan hesaplanır.
+  const openCount = total;
+  const urgentCount = urgentTotal;
+  const matchReadyCount = rows.filter((r) => (matchByDemand.get(r.id)?.strong ?? 0) > 0).length;
+  return (
+    <Card className="grid grid-cols-1 divide-line sm:grid-cols-3 sm:divide-x">
+        {[
+          { label: "Listelenen", value: openCount, href: "/app/talepler" },
+          { label: "Acil / yüksek", value: urgentCount, href: demandHref({ aciliyet: "high,urgent" }) },
+          { label: "Eşleşme hazır", value: matchReadyCount, href: "/app/eslestirme" },
+        ].map((item) => (
+          <Link
+            key={item.label}
+            href={item.href}
+            className="focus-ring group flex items-center justify-between gap-3 px-4 py-3 transition hover:bg-canvas"
+          >
+            <span>
+              <span className="numeric block font-display text-lg font-bold text-ink-950">{item.value.toLocaleString("tr-TR")}</span>
+              <span className="block text-xs text-text-muted">{item.label}</span>
+            </span>
+            <ArrowUpRight aria-hidden="true" className="h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" />
+          </Link>
+        ))}
+      </Card>
+  );
+}
+
+async function AgingAlert({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
+  const { yasF, demandHref } = ctx;
+  const agingCount = await pending.agingP;
+  if (!(agingCount > 0 && !yasF)) return null;
+  return (
+        <Link
+          href={demandHref({ yas: String(AGING_DAYS) })}
+          className="focus-ring press group flex min-h-[44px] items-center gap-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 transition hover:border-amber-500/60"
+        >
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-amber-400/20 text-amber-600">
+            <AlarmClock className="h-4.5 w-4.5" />
+          </span>
+          <span className="min-w-0 flex-1 text-sm">
+            <span className="font-bold text-ink-950">{agingCount} talep {AGING_DAYS}+ gündür açık.</span>{" "}
+            <span className="text-text-muted">Yaşlanan talepte müşteri soğur — arayıp kriterleri tazeleyin veya kapatın.</span>
+          </span>
+          <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-amber-600">
+            Yaşlananları göster <ArrowUpRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+          </span>
+        </Link>
+  );
+}
+
+async function SegmentStrip({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
+  const { ilF, butceF, demandHref } = ctx;
+  const poolRows = await pending.poolP;
+  const bandCounts = new Map<BandKey, number>();
+  // İl sayaçları province_id ile tutulur (ad değil) — ?il= sunucuda .eq ile kesilsin.
+  const provinceCounts = new Map<string, { name: string; count: number }>();
+  for (const d of poolRows) {
+    if (d.status === "closed") continue;
+    const b = bandOf(d);
+    if (b) bandCounts.set(b, (bandCounts.get(b) ?? 0) + 1);
+    const pid = d.province_id;
+    const pn = relOne<{ name: string }>(d.province)?.name;
+    if (pid && pn) {
+      const e = provinceCounts.get(pid) ?? { name: pn, count: 0 };
+      e.count += 1;
+      provinceCounts.set(pid, e);
+    }
+  }
+  const topProvinces = [...provinceCounts.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 5);
+  const poolLimited = poolRows.length >= POOL_LIMIT;
+  if (!(bandCounts.size > 0 || topProvinces.length > 0)) return null;
+  return (
         <Card className="px-4 py-3.5">
           <div className="flex flex-col gap-2.5">
             {bandCounts.size > 0 ? (
@@ -526,8 +605,20 @@ export default async function DemandsPage({
             </p>
           ) : null}
         </Card>
-      ) : null}
+  );
+}
 
+async function DemandList({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
+  const { canCreate, page, pageHref } = ctx;
+  const { rows, total, matchByDemand } = await pending.listP;
+  const offset = (page - 1) * PAGE_SIZE;
+  // ── Sayfalama (gerçek toplamlar) ──────────────────────────────────────────
+  const totalFiltered = total;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
+  const rangeStart = totalFiltered === 0 ? 0 : offset + 1;
+  const rangeEnd = Math.min(offset + rows.length, totalFiltered);
+  return (
+    <>
       {rows.length === 0 ? (
         <div className="rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
           <Target className="mx-auto h-8 w-8 text-text-faint" />
@@ -660,6 +751,6 @@ export default async function DemandsPage({
           </div>
         </div>
       ) : null}
-    </div>
+    </>
   );
 }

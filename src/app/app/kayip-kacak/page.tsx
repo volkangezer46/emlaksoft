@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -15,6 +16,7 @@ import { moneyTry } from "@/lib/leak-shield";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import type { CSSProperties } from "react";
 import { now } from "@/lib/clock";
+import { Skeleton, SkeletonBlock, SkeletonTable } from "@/components/ui/skeleton";
 
 const RING_C = 2 * Math.PI * 42;
 
@@ -89,6 +91,38 @@ function safeDate(value: string | undefined) {
   return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "";
 }
 
+type Listing = {
+  id: string;
+  portal_name: string;
+  portal_listing_id: string | null;
+  status: string;
+  last_confirmed_at: string | null;
+  property: { id: string; property_code: string; title: string | null } | { id: string; property_code: string; title: string | null }[] | null;
+};
+
+type FilterHref = (over: { neden?: string | null; tip?: string | null; siddet?: string | null; from?: string | null; to?: string | null; sayfa?: number }) => string;
+
+type Ctx = {
+  nedenF: string;
+  tipF: "" | TipFilter;
+  sevF: "" | SevFilter;
+  fromF: string;
+  toF: string;
+  rangeActive: boolean;
+  hasFilter: boolean;
+  pageParam: number;
+  filterHref: FilterHref;
+  canConfirm: boolean;
+};
+
+/** Sayfa düzeyinde BAŞLATILAN (await edilmeyen) sorgular — her bölüm kendi Suspense sınırında bekler. */
+type Pending = {
+  closuresP: Promise<Closure[]>;
+  liveP: Promise<Listing[]>;
+  listP: Promise<{ rows: Closure[]; count: number }>;
+  totalP: Promise<number>;
+};
+
 export default async function LeakShieldPage({
   searchParams,
 }: {
@@ -106,9 +140,6 @@ export default async function LeakShieldPage({
   const toF = safeDate(params.to);
   const rangeActive = Boolean(fromF || toF);
   const supabase = await createClient();
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
 
   const pageParam = Math.max(1, Number.parseInt(params.sayfa ?? "1", 10) || 1);
   const offset = (pageParam - 1) * PAGE_SIZE;
@@ -146,95 +177,26 @@ export default async function LeakShieldPage({
   if (fromF) totalQuery = totalQuery.gte("created_at", fromF);
   if (toF) totalQuery = totalQuery.lte("created_at", `${toF}T23:59:59.999`);
 
-  const [
-    { data: closures },
-    { data: listings },
-    { data: listData, count: listTotal },
-    { count: totalClosures },
-  ] = await Promise.all([
-    closuresQuery,
-    supabase
-      .from("portal_listings")
-      // property id: teyit gecikmiş ilan kartlarından portföy detayına gidiş için
-      .select("id, portal_name, portal_listing_id, status, last_confirmed_at, property:properties(id, property_code, title)")
-      .eq("status", "live")
-      .limit(200),
-    listQuery.range(offset, offset + PAGE_SIZE - 1),
-    totalQuery,
-  ]);
-
-  const pageRows = (listData ?? []) as Closure[];
-  const listCount = listTotal ?? 0;
-  const totalClosuresCount = totalClosures ?? 0;
-
-  const nowMs = now();
-  const rows = (closures ?? []) as Closure[];
-  const live = listings ?? [];
-  const overdue = live.filter((r) => daysSince(r.last_confirmed_at, nowMs) >= 7);
-
-  // ── Teyit SLA şeridi: canlı ilanların son teyit yaşına göre dağılımı ──────
-  // Taze ≤ 3 gün · Yaklaşan 4–6 gün · Gecikmiş ≥ 7 gün (portal teyit SLA'sı).
-  const slaFresh = live.filter((r) => daysSince(r.last_confirmed_at, nowMs) <= 3).length;
-  const slaDue = live.filter((r) => {
-    const d = daysSince(r.last_confirmed_at, nowMs);
-    return d >= 4 && d <= 6;
-  }).length;
-  const slaOverdue = overdue.length;
-  const slaTotal = live.length;
-  const slaHealth = slaTotal > 0 ? Math.round(((slaFresh + slaDue) / slaTotal) * 100) : null;
-
-  // Risk sıralaması: en uzun süredir teyitsiz canlı ilanlar (en riskli önce)
-  const riskRanking = [...overdue]
-    .sort((a, b) => daysSince(b.last_confirmed_at, nowMs) - daysSince(a.last_confirmed_at, nowMs))
-    .slice(0, 8);
-  const maxOverdueDays = Math.max(7, ...riskRanking.map((r) => Math.min(daysSince(r.last_confirmed_at, nowMs), 60)));
-
-  const monthRows = rows.filter((r) => new Date(r.created_at) >= monthStart);
-  const lostMonth = monthRows.reduce((s, r) => s + Number(r.estimated_lost_commission || 0), 0);
-  const lostAll = rows.reduce((s, r) => s + Number(r.estimated_lost_commission || 0), 0);
-  const competitor = rows.filter((r) => r.competitor_closed).length;
-  const ours = rows.filter((r) => r.closed_by_us).length;
-  const leakRows = rows.filter((r) => Number(r.estimated_lost_commission || 0) > 0);
-
-  // 8-week lost commission buckets
-  const weekMs = 7 * 86_400_000;
-  const buckets = Array.from({ length: 8 }, () => 0);
-  rows.forEach((r) => {
-    const idx = 7 - Math.floor((nowMs - new Date(r.created_at).getTime()) / weekMs);
-    if (idx >= 0 && idx < 8) buckets[idx] += Number(r.estimated_lost_commission || 0);
-  });
-  // Hafta etiketi: kovanın başladığı günün kısa tarihi (etkileşimli grafik + tooltip)
-  const weekFmt = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short" });
-  const trendWeeks = buckets.map((b, i) => ({
-    label: weekFmt.format(new Date(nowMs - (7 - i) * weekMs)),
-    value: b,
-  }));
-
-  const reasonCounts = new Map<string, number>();
-  rows.forEach((r) => reasonCounts.set(r.reason, (reasonCounts.get(r.reason) ?? 0) + 1));
-  const reasonBars = [...reasonCounts.entries()]
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-  const maxReason = Math.max(1, ...reasonBars.map((r) => r.count));
-
-  const leakShare = rows.length ? leakRows.length / rows.length : 0;
+  // Sorgular burada BAŞLATILIR ama await edilmez: başlık/hero iskeleti hemen akar,
+  // her bölüm kendi Suspense sınırında ilgili promise'i bekler (bağımsız, paralel).
+  const pending: Pending = {
+    closuresP: Promise.resolve(closuresQuery).then((res) => (res.data ?? []) as Closure[]),
+    liveP: Promise.resolve(
+      supabase
+        .from("portal_listings")
+        // property id: teyit gecikmiş ilan kartlarından portföy detayına gidiş için
+        .select("id, portal_name, portal_listing_id, status, last_confirmed_at, property:properties(id, property_code, title)")
+        .eq("status", "live")
+        .limit(200),
+    ).then((res) => (res.data ?? []) as unknown as Listing[]),
+    listP: Promise.resolve(listQuery.range(offset, offset + PAGE_SIZE - 1)).then((res) => ({
+      rows: (res.data ?? []) as unknown as Closure[],
+      count: res.count ?? 0,
+    })),
+    totalP: Promise.resolve(totalQuery).then((res) => res.count ?? 0),
+  };
 
   const hasFilter = Boolean(nedenF || tipF || sevF || rangeActive);
-
-  // Ciddiyet dağılımı — aggregate havuzdan (filtre üstü sabit rozet sayacı).
-  const sevCounts = rows.reduce(
-    (acc, r) => {
-      if (r.leak_severity) acc[r.leak_severity] = (acc[r.leak_severity] ?? 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>,
-  );
-
-  // ?sayfa= — kapanış listesi sunucuda 50'şer sayfalanır (count:"exact"); filtre
-  // linkleri sayfayı sıfırlar. pageRows/listCount yukarıdaki sorgudan gelir.
-  const totalPages = Math.max(1, Math.ceil(listCount / PAGE_SIZE));
-  const page = Math.min(pageParam, totalPages);
 
   /** Mevcut filtreyi koruyarak tek parametreyi değiştiren link üretici (sayfa sıfırlanır). */
   const filterHref = (over: { neden?: string | null; tip?: string | null; siddet?: string | null; from?: string | null; to?: string | null; sayfa?: number }) => {
@@ -254,6 +216,8 @@ export default async function LeakShieldPage({
     return qs ? `/app/kayip-kacak?${qs}#kapanislar` : "/app/kayip-kacak#kapanislar";
   };
 
+  const ctx: Ctx = { nedenF, tipF, sevF, fromF, toF, rangeActive, hasFilter, pageParam, filterHref, canConfirm };
+
   return (
     <div className="space-y-6">
       <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
@@ -268,6 +232,76 @@ export default async function LeakShieldPage({
             <p className="mt-1 max-w-lg text-sm text-white/60">
               Portal kapanışlarından otomatik hesaplanan tahmini kayıp. Rakip / ofis dışı işlemler burada görünür.
             </p>
+            <Suspense fallback={<HeroKpisSkeleton />}>
+              <HeroKpis ctx={ctx} pending={pending} />
+            </Suspense>
+          </div>
+
+          <Suspense fallback={<Skeleton className="h-[148px] w-full rounded-[var(--radius-card)] opacity-30" />}>
+            <HeroTrend pending={pending} />
+          </Suspense>
+        </div>
+      </section>
+
+      <Suspense fallback={<Skeleton className="h-40 w-full rounded-[var(--radius-panel)]" />}>
+        <SlaSection pending={pending} />
+      </Suspense>
+
+      <Suspense fallback={<RateReasonsSkeleton />}>
+        <RateReasons ctx={ctx} pending={pending} />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <RiskSection ctx={ctx} pending={pending} />
+      </Suspense>
+
+      <Suspense fallback={<ClosuresSkeleton />}>
+        <ClosuresSection ctx={ctx} pending={pending} />
+      </Suspense>
+    </div>
+  );
+}
+
+function HeroKpisSkeleton() {
+  return (
+    <SkeletonBlock label="Kayıp özeti yükleniyor" className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Skeleton key={i} className="h-[62px] rounded-[var(--radius-card)] opacity-30" />
+      ))}
+    </SkeletonBlock>
+  );
+}
+
+function RateReasonsSkeleton() {
+  return (
+    <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+      <Skeleton className="h-52 rounded-[var(--radius-panel)]" />
+      <Skeleton className="h-52 rounded-[var(--radius-panel)]" />
+    </div>
+  );
+}
+
+function ClosuresSkeleton() {
+  return (
+    <SkeletonBlock label="Kapanış kayıtları yükleniyor">
+      <SkeletonTable rows={6} cols={3} />
+    </SkeletonBlock>
+  );
+}
+
+async function HeroKpis({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
+  const { rangeActive, filterHref } = ctx;
+  const [rows, live, totalClosuresCount] = await Promise.all([pending.closuresP, pending.liveP, pending.totalP]);
+  const nowMs = now();
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const overdue = live.filter((r) => daysSince(r.last_confirmed_at, nowMs) >= 7);
+  const monthRows = rows.filter((r) => new Date(r.created_at) >= monthStart);
+  const lostMonth = monthRows.reduce((s, r) => s + Number(r.estimated_lost_commission || 0), 0);
+  const lostAll = rows.reduce((s, r) => s + Number(r.estimated_lost_commission || 0), 0);
+  const competitor = rows.filter((r) => r.competitor_closed).length;
+  return (
             <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
                 // Tarih aralığı seçiliyken KPI'lar o aralıktan hesaplanır
@@ -293,8 +327,26 @@ export default async function LeakShieldPage({
                 </Link>
               ))}
             </div>
-          </div>
+  );
+}
 
+async function HeroTrend({ pending }: { pending: Pending }) {
+  const rows = await pending.closuresP;
+  const nowMs = now();
+  // 8-week lost commission buckets
+  const weekMs = 7 * 86_400_000;
+  const buckets = Array.from({ length: 8 }, () => 0);
+  rows.forEach((r) => {
+    const idx = 7 - Math.floor((nowMs - new Date(r.created_at).getTime()) / weekMs);
+    if (idx >= 0 && idx < 8) buckets[idx] += Number(r.estimated_lost_commission || 0);
+  });
+  // Hafta etiketi: kovanın başladığı günün kısa tarihi (etkileşimli grafik + tooltip)
+  const weekFmt = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short" });
+  const trendWeeks = buckets.map((b, i) => ({
+    label: weekFmt.format(new Date(nowMs - (7 - i) * weekMs)),
+    value: b,
+  }));
+  return (
           <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="flex items-center justify-between">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-white/75">
@@ -315,11 +367,25 @@ export default async function LeakShieldPage({
               labelEvery={2}
             />
           </div>
-        </div>
-      </section>
+  );
+}
 
-      {/* ── Teyit SLA durumu şeridi ─────────────────────────────────────────── */}
-      {slaTotal > 0 ? (
+async function SlaSection({ pending }: { pending: Pending }) {
+  const live = await pending.liveP;
+  const nowMs = now();
+  const overdue = live.filter((r) => daysSince(r.last_confirmed_at, nowMs) >= 7);
+  // ── Teyit SLA şeridi: canlı ilanların son teyit yaşına göre dağılımı ──────
+  // Taze ≤ 3 gün · Yaklaşan 4–6 gün · Gecikmiş ≥ 7 gün (portal teyit SLA'sı).
+  const slaFresh = live.filter((r) => daysSince(r.last_confirmed_at, nowMs) <= 3).length;
+  const slaDue = live.filter((r) => {
+    const d = daysSince(r.last_confirmed_at, nowMs);
+    return d >= 4 && d <= 6;
+  }).length;
+  const slaOverdue = overdue.length;
+  const slaTotal = live.length;
+  const slaHealth = slaTotal > 0 ? Math.round(((slaFresh + slaDue) / slaTotal) * 100) : null;
+  if (slaTotal === 0) return null;
+  return (
         <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -369,8 +435,25 @@ export default async function LeakShieldPage({
             ))}
           </div>
         </section>
-      ) : null}
+  );
+}
 
+async function RateReasons({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
+  const { nedenF, filterHref } = ctx;
+  const rows = await pending.closuresP;
+  const competitor = rows.filter((r) => r.competitor_closed).length;
+  const ours = rows.filter((r) => r.closed_by_us).length;
+  const leakRows = rows.filter((r) => Number(r.estimated_lost_commission || 0) > 0);
+  const reasonCounts = new Map<string, number>();
+  rows.forEach((r) => reasonCounts.set(r.reason, (reasonCounts.get(r.reason) ?? 0) + 1));
+  const reasonBars = [...reasonCounts.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+  const maxReason = Math.max(1, ...reasonBars.map((r) => r.count));
+
+  const leakShare = rows.length ? leakRows.length / rows.length : 0;
+  return (
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-xs font-semibold text-danger-500">
@@ -445,8 +528,21 @@ export default async function LeakShieldPage({
           )}
         </section>
       </div>
+  );
+}
 
-      {riskRanking.length > 0 ? (
+async function RiskSection({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
+  const { canConfirm } = ctx;
+  const live = await pending.liveP;
+  const nowMs = now();
+  const overdue = live.filter((r) => daysSince(r.last_confirmed_at, nowMs) >= 7);
+  // Risk sıralaması: en uzun süredir teyitsiz canlı ilanlar (en riskli önce)
+  const riskRanking = [...overdue]
+    .sort((a, b) => daysSince(b.last_confirmed_at, nowMs) - daysSince(a.last_confirmed_at, nowMs))
+    .slice(0, 8);
+  const maxOverdueDays = Math.max(7, ...riskRanking.map((r) => Math.min(daysSince(r.last_confirmed_at, nowMs), 60)));
+  if (riskRanking.length === 0) return null;
+  return (
         <section className="rounded-[var(--radius-panel)] border border-warn-500/30 bg-warn-500/5 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -533,8 +629,30 @@ export default async function LeakShieldPage({
             })}
           </div>
         </section>
-      ) : null}
+  );
+}
 
+async function ClosuresSection({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
+  const { nedenF, tipF, sevF, fromF, toF, rangeActive, hasFilter, pageParam, filterHref } = ctx;
+  const [rows, { rows: pageRows, count: listCount }, totalClosuresCount] = await Promise.all([
+    pending.closuresP,
+    pending.listP,
+    pending.totalP,
+  ]);
+  // Ciddiyet dağılımı — aggregate havuzdan (filtre üstü sabit rozet sayacı).
+  const sevCounts = rows.reduce(
+    (acc, r) => {
+      if (r.leak_severity) acc[r.leak_severity] = (acc[r.leak_severity] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+
+  // ?sayfa= — kapanış listesi sunucuda 50'şer sayfalanır (count:"exact"); filtre
+  // linkleri sayfayı sıfırlar. pageRows/listCount yukarıdaki sorgudan gelir.
+  const totalPages = Math.max(1, Math.ceil(listCount / PAGE_SIZE));
+  const page = Math.min(pageParam, totalPages);
+  return (
       <section id="kapanislar" className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
           <div>
@@ -731,6 +849,5 @@ export default async function LeakShieldPage({
           </nav>
         ) : null}
       </section>
-    </div>
   );
 }
