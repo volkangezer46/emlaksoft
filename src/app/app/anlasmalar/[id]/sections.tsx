@@ -47,7 +47,7 @@ export async function ChecklistLoader({
   const supabase = await createClient();
   const { data } = await supabase
     .from("deal_checklist_items")
-    .select("id, label, is_required, is_done, done_at, note, sort_order, done_by:profiles(full_name)")
+    .select("id, label, is_required, is_done, done_at, note, sort_order, done_by:profiles!deal_checklist_items_done_by_fkey(full_name)")
     .eq("deal_id", dealId)
     .order("sort_order", { ascending: true });
 
@@ -101,7 +101,7 @@ export async function NotesLoader({
   const supabase = await createClient();
   const { data } = await supabase
     .from("deal_notes")
-    .select("id, body, author_id, created_at, author:profiles(full_name)")
+    .select("id, body, author_id, created_at, author:profiles!deal_notes_author_id_fkey(full_name)")
     .eq("deal_id", dealId)
     .order("created_at", { ascending: true })
     .limit(200);

@@ -371,7 +371,7 @@ export default async function DocumentsPage({
     // BAĞIMSIZ olduğu için ayrı round-trip yerine bu batch'te toplanır.
     supabase
       .from("deal_checklist_items")
-      .select("deal_id, label, deal:deals(id, stage, customer:customers(id, full_name), property:properties(id, property_code, title))")
+      .select("deal_id, label, deal:deals!deal_checklist_items_deal_id_fkey(id, stage, customer:customers!deals_customer_id_fkey(id, full_name), property:properties!deals_property_id_fkey(id, property_code, title))")
       .eq("is_required", true)
       .eq("is_done", false)
       .limit(500),

@@ -89,7 +89,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
   const { data: demandData } = await supabase
     .from("customer_demands")
     .select(
-      "id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, criteria, created_at, province_id, district_id, neighborhood_id, customer:customers(id, full_name, phone, assigned_to), province:geo_provinces(name), district:geo_districts(name), neighborhood:geo_neighborhoods(name)",
+      "id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, criteria, created_at, province_id, district_id, neighborhood_id, customer:customers!customer_demands_customer_id_fkey(id, full_name, phone, assigned_to), province:geo_provinces(name), district:geo_districts(name), neighborhood:geo_neighborhoods(name)",
     )
     .eq("id", id)
     .maybeSingle();

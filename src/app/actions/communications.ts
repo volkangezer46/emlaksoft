@@ -70,7 +70,7 @@ export async function listCustomerCommunications(customerId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("communications")
-    .select("id, channel, direction, subject, body, outcome, duration_sec, scheduled_at, created_at, created_by:profiles(full_name)")
+    .select("id, channel, direction, subject, body, outcome, duration_sec, scheduled_at, created_at, created_by:profiles!communications_created_by_fkey(full_name)")
     .eq("customer_id", customerId)
     .eq("tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
@@ -90,7 +90,7 @@ export async function listPropertyCommunications(propertyId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("communications")
-    .select("id, channel, direction, subject, body, outcome, duration_sec, scheduled_at, created_at, created_by:profiles(full_name), customer:customers(full_name)")
+    .select("id, channel, direction, subject, body, outcome, duration_sec, scheduled_at, created_at, created_by:profiles!communications_created_by_fkey(full_name), customer:customers!communications_customer_id_fkey(full_name)")
     .eq("property_id", propertyId)
     .eq("tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })

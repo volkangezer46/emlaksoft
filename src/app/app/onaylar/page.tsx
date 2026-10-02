@@ -171,7 +171,7 @@ export default async function OnaylarPage({
     supabase.from("approval_requests").select("kind").eq("status", durum).limit(1000),
     supabase
       .from("deals")
-      .select("id, deal_value, stage, deal_type, property:properties(property_code, title)")
+      .select("id, deal_value, stage, deal_type, property:properties!deals_property_id_fkey(property_code, title)")
       .order("created_at", { ascending: false })
       .limit(50),
     supabase.from("expenses").select("id, title, amount, expense_date").order("expense_date", { ascending: false }).limit(50),

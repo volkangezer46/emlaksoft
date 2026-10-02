@@ -78,7 +78,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   const { data: appts, error } = await admin
     .from("appointments")
     .select(
-      "id, appointment_type, scheduled_at, duration_min, location, notes, status, updated_at, customer:customers(full_name), property:properties(title, property_code, address_line)",
+      "id, appointment_type, scheduled_at, duration_min, location, notes, status, updated_at, customer:customers!appointments_customer_id_fkey(full_name), property:properties!appointments_property_id_fkey(title, property_code, address_line)",
     )
     .eq("tenant_id", profile.tenant_id)
     .eq("assigned_to", profile.id)

@@ -66,7 +66,7 @@ export async function exportCommissionsCsv(): Promise<ExportResult> {
   const supabase = await createClient();
   let q = supabase
     .from("commissions")
-    .select("gross_amount, vat_amount, status, created_at, deal:deals!inner(tenant_id, assigned_to)")
+    .select("gross_amount, vat_amount, status, created_at, deal:deals!commissions_deal_id_fkey!inner(tenant_id, assigned_to)")
     .eq("tenant_id", gate.tenantId)
     .eq("deal.tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
@@ -206,7 +206,7 @@ export async function exportOffersCsv(): Promise<ExportResult> {
   let q = supabase
     .from("offers")
     .select(
-      "amount, counter_amount, status, created_at, property:properties(property_code, title, tenant_id), customer:customers(full_name, tenant_id)",
+      "amount, counter_amount, status, created_at, property:properties!offers_property_id_fkey(property_code, title, tenant_id), customer:customers!offers_customer_id_fkey(full_name, tenant_id)",
     )
     .eq("tenant_id", gate.tenantId)
     .eq("property.tenant_id", gate.tenantId)
@@ -242,7 +242,7 @@ export async function exportPortalListingsCsv(): Promise<ExportResult> {
   let q = supabase
     .from("portal_listings")
     .select(
-      "portal_name, portal_listing_id, status, last_confirmed_at, property:properties!inner(property_code, tenant_id, assigned_to)",
+      "portal_name, portal_listing_id, status, last_confirmed_at, property:properties!portal_listings_property_id_fkey!inner(property_code, tenant_id, assigned_to)",
     )
     .eq("tenant_id", gate.tenantId)
     .eq("property.tenant_id", gate.tenantId)
@@ -301,7 +301,7 @@ export async function exportDemandsCsv(filters: DemandExportFilters = {}): Promi
   let q = supabase
     .from("customer_demands")
     .select(
-      "transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, customer:customers!inner(full_name, tenant_id, assigned_to), province:geo_provinces(name)",
+      "transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, customer:customers!customer_demands_customer_id_fkey!inner(full_name, tenant_id, assigned_to), province:geo_provinces(name)",
     )
     .eq("tenant_id", gate.tenantId)
     .eq("customer.tenant_id", gate.tenantId);
@@ -348,7 +348,7 @@ export async function exportAppointmentsCsv(filters: AppointmentExportFilters = 
   let q = supabase
     .from("appointments")
     .select(
-      "appointment_type, scheduled_at, duration_min, location, status, customer:customers(full_name, tenant_id), property:properties(property_code, title, tenant_id)",
+      "appointment_type, scheduled_at, duration_min, location, status, customer:customers!appointments_customer_id_fkey(full_name, tenant_id), property:properties!appointments_property_id_fkey(property_code, title, tenant_id)",
     )
     .eq("tenant_id", gate.tenantId)
     .eq("customer.tenant_id", gate.tenantId)
@@ -390,7 +390,7 @@ export async function exportDealsCsv(): Promise<ExportResult> {
   let q = supabase
     .from("deals")
     .select(
-      "stage, deal_type, deal_value, probability, updated_at, property:properties(property_code, title, tenant_id), customer:customers(full_name, tenant_id)",
+      "stage, deal_type, deal_value, probability, updated_at, property:properties!deals_property_id_fkey(property_code, title, tenant_id), customer:customers!deals_customer_id_fkey(full_name, tenant_id)",
     )
     .eq("tenant_id", gate.tenantId)
     .eq("property.tenant_id", gate.tenantId)
@@ -428,7 +428,7 @@ export async function exportProjectsCsv(filters: { durum?: string } = {}): Promi
   const supabase = await createClient();
   let q = supabase
     .from("projects")
-    .select("name, developer_name, location, status, delivery_date, created_at, units:project_units(status)")
+    .select("name, developer_name, location, status, delivery_date, created_at, units:project_units!project_units_project_id_fkey(status)")
     .eq("tenant_id", gate.tenantId)
     .eq("units.tenant_id", gate.tenantId);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("created_by", gate.userId);
@@ -482,7 +482,7 @@ export async function exportRentalsCsv(filters: RentalExportFilters = {}): Promi
   let rentalQuery = supabase
     .from("rentals")
     .select(
-      "id, monthly_rent, due_day, start_date, end_date, status, created_at, property:properties!inner(property_code, title, tenant_id), renter:customers!inner(full_name, tenant_id)",
+      "id, monthly_rent, due_day, start_date, end_date, status, created_at, property:properties!rentals_property_id_fkey!inner(property_code, title, tenant_id), renter:customers!rentals_renter_customer_id_fkey!inner(full_name, tenant_id)",
     )
     .eq("tenant_id", gate.tenantId)
     .eq("property.tenant_id", gate.tenantId)
@@ -491,14 +491,14 @@ export async function exportRentalsCsv(filters: RentalExportFilters = {}): Promi
     .limit(2000);
   let chargeQuery = supabase
     .from("rent_charges")
-    .select("rental_id, period, amount, status, rental:rentals!inner(tenant_id, created_by)")
+    .select("rental_id, period, amount, status, rental:rentals!rent_charges_rental_id_fkey!inner(tenant_id, created_by)")
     .eq("tenant_id", gate.tenantId)
     .eq("rental.tenant_id", gate.tenantId)
     .order("period", { ascending: false })
     .limit(5000);
   let maintenanceQuery = supabase
     .from("maintenance_requests")
-    .select("rental_id, status, rental:rentals!inner(tenant_id, created_by)")
+    .select("rental_id, status, rental:rentals!maintenance_requests_rental_id_fkey!inner(tenant_id, created_by)")
     .eq("tenant_id", gate.tenantId)
     .eq("rental.tenant_id", gate.tenantId)
     .limit(2000);
@@ -593,7 +593,7 @@ export async function exportDuesCsv(): Promise<ExportResult> {
   const supabase = await createClient();
   let q = supabase
     .from("property_dues")
-    .select("title, amount, period, due_date, status, paid_at, property:properties(property_code, title, tenant_id)")
+    .select("title, amount, period, due_date, status, paid_at, property:properties!property_dues_property_id_fkey(property_code, title, tenant_id)")
     .eq("tenant_id", gate.tenantId)
     .eq("property.tenant_id", gate.tenantId)
     .order("period", { ascending: false })
@@ -626,7 +626,7 @@ export async function exportContractsCsv(): Promise<ExportResult> {
   let q = supabase
     .from("contracts")
     .select(
-      "title, contract_type, status, created_at, signed_at, expires_at, property:properties(property_code, title, tenant_id), customer:customers(full_name, tenant_id)",
+      "title, contract_type, status, created_at, signed_at, expires_at, property:properties!contracts_property_id_fkey(property_code, title, tenant_id), customer:customers!contracts_customer_id_fkey(full_name, tenant_id)",
     )
     .eq("tenant_id", gate.tenantId)
     .eq("property.tenant_id", gate.tenantId)
@@ -662,7 +662,7 @@ export async function exportReferralsCsv(): Promise<ExportResult> {
   let q = supabase
     .from("referrals")
     .select(
-      "referred_name, referred_phone, referred_note, staff_note, status, created_at, referrer:customers!referrer_customer_id(full_name, tenant_id)",
+      "referred_name, referred_phone, referred_note, staff_note, status, created_at, referrer:customers!referrals_referrer_customer_id_fkey(full_name, tenant_id)",
     )
     .eq("tenant_id", gate.tenantId)
     .eq("referrer.tenant_id", gate.tenantId)

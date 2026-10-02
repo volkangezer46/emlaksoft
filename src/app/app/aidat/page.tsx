@@ -92,7 +92,7 @@ export default async function AidatPage({
   //      bellek filtresi → 300'ü aşan ofiste ?durum/?donem "kayıt yok" diyordu).
   let listQuery = supabase
     .from("property_dues")
-    .select("id, title, amount, period, due_date, status, notes, property:properties(id, property_code, title)", { count: "exact" });
+    .select("id, title, amount, period, due_date, status, notes, property:properties!property_dues_property_id_fkey(id, property_code, title)", { count: "exact" });
   if (tenantId) listQuery = listQuery.eq("tenant_id", tenantId);
   if (donemF) listQuery = listQuery.gte("period", `${donemF}-01`).lt("period", nextMonthFirst(donemF));
   if (durumF === "paid") listQuery = listQuery.eq("status", "paid");
@@ -108,7 +108,7 @@ export default async function AidatPage({
   //      sorgu (en yakın vadeli ilk 20 geciken); tüm havuzu çekmeye gerek yok.
   let overdueStripQuery = supabase
     .from("property_dues")
-    .select("id, title, amount, period, due_date, status, property:properties(id, property_code, title)")
+    .select("id, title, amount, period, due_date, status, property:properties!property_dues_property_id_fkey(id, property_code, title)")
     .neq("status", "paid")
     .lte("due_date", todayStr)
     .order("due_date", { ascending: true })

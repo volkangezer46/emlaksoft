@@ -53,7 +53,7 @@ async function findConflictWarning(opts: {
 
   let query = supabase
     .from("appointments")
-    .select("id, scheduled_at, duration_min, customer:customers(full_name)")
+    .select("id, scheduled_at, duration_min, customer:customers!appointments_customer_id_fkey(full_name)")
     .eq("tenant_id", tenantId)
     .eq("assigned_to", advisorId)
     .neq("status", "cancelled")

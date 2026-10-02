@@ -639,8 +639,8 @@ export async function listContracts() {
     .from("contracts")
     .select(`
       id, title, contract_type, status, created_at, signed_at, expires_at,
-      property:properties(property_code, title),
-      customer:customers(full_name)
+      property:properties!contracts_property_id_fkey(property_code, title),
+      customer:customers!contracts_customer_id_fkey(full_name)
     `)
     .eq("tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })

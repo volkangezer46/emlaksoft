@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await admin
       .from("property_keys")
       .select(
-        "id, tenant_id, property_id, label, status, holder_staff_id, holder_name, due_at, returned_at, property:properties(property_code, title, assigned_to), holder:profiles!property_keys_holder_staff_id_fkey(full_name)",
+        "id, tenant_id, property_id, label, status, holder_staff_id, holder_name, due_at, returned_at, property:properties!property_keys_property_id_fkey(property_code, title, assigned_to), holder:profiles!property_keys_holder_staff_id_fkey(full_name)",
       )
       .in("status", ["danisanda", "musteride"])
       .is("returned_at", null)

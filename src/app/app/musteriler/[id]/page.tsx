@@ -206,7 +206,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .order("created_at", { ascending: false }),
     supabase
       .from("customer_files")
-      .select("id, file_name, file_size, file_type, storage_path, label, created_at, uploader:profiles(full_name)")
+      .select("id, file_name, file_size, file_type, storage_path, label, created_at, uploader:profiles!customer_files_uploaded_by_fkey(full_name)")
       .eq("customer_id", id)
       .order("created_at", { ascending: false }),
     supabase
@@ -218,7 +218,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .limit(50),
     supabase
       .from("communications")
-      .select("id, channel, direction, subject, body, outcome, duration_sec, scheduled_at, created_at, created_by:profiles(full_name)")
+      .select("id, channel, direction, subject, body, outcome, duration_sec, scheduled_at, created_at, created_by:profiles!communications_created_by_fkey(full_name)")
       .eq("customer_id", id)
       .order("created_at", { ascending: false })
       .limit(100),

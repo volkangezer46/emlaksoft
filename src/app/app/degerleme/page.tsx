@@ -92,7 +92,7 @@ export default async function ValuationPage({
     // D5 — satış süresi: tenant'ın kendi kapanan anlaşmaları + bağlı portföy
     supabase
       .from("deals")
-      .select("id, deal_type, created_at, updated_at, property:properties(district_id, property_type, created_at)")
+      .select("id, deal_type, created_at, updated_at, property:properties!deals_property_id_fkey(district_id, property_type, created_at)")
       .eq("stage", "won")
       .order("updated_at", { ascending: false })
       .limit(500),

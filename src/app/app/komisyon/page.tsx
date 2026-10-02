@@ -155,7 +155,7 @@ export default async function CommissionPage({
   let ledgerQuery = supabase
     .from("commissions")
     .select(
-      "id, gross_amount, vat_amount, status, splits, created_at, deal_id, deal:deals(id,deal_value,stage,property:properties(id,property_code,title))",
+      "id, gross_amount, vat_amount, status, splits, created_at, deal_id, deal:deals!commissions_deal_id_fkey(id,deal_value,stage,property:properties!deals_property_id_fkey(id,property_code,title))",
       { count: "exact" },
     )
     .order("created_at", { ascending: false })

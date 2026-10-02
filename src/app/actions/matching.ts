@@ -24,7 +24,7 @@ export async function saveMatchAndNotify(formData: FormData): Promise<MatchActio
     supabase
       .from("customer_demands")
       .select(
-        "id, transaction_type, property_type, province_id, district_id, budget_min, budget_max, rooms, min_sqm, urgency, status, customer_id, customer:customers(full_name)",
+        "id, transaction_type, property_type, province_id, district_id, budget_min, budget_max, rooms, min_sqm, urgency, status, customer_id, customer:customers!customer_demands_customer_id_fkey(full_name)",
       )
       .eq("id", demandId)
       .eq("tenant_id", gate.tenantId)

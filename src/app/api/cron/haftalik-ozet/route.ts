@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
       // updated_at'i yazar (gunluk-ozet'teki "anlaşma hareketi" vekiliyle aynı).
       admin
         .from("deals")
-        .select("deal_value, advisor:profiles(full_name)")
+        .select("deal_value, advisor:profiles!deals_assigned_to_fkey(full_name)")
         .eq("tenant_id", t.id)
         .eq("stage", "won")
         .gte("updated_at", startIso)

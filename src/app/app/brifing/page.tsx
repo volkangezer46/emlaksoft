@@ -20,7 +20,7 @@ export default async function BrifingPage() {
 
   let apptQ = supabase
     .from("appointments")
-    .select("id, appointment_type, scheduled_at, location, customer:customers(full_name)")
+    .select("id, appointment_type, scheduled_at, location, customer:customers!appointments_customer_id_fkey(full_name)")
     .gte("scheduled_at", daysAgoIso(0))
     .lte("scheduled_at", daysFromNowIso(2))
     .in("status", ["pending", "confirmed"])
@@ -28,7 +28,7 @@ export default async function BrifingPage() {
     .limit(12);
   let taskQ = supabase
     .from("tasks")
-    .select("id, title, due_at, priority, customer:customers(full_name)")
+    .select("id, title, due_at, priority, customer:customers!tasks_customer_id_fkey(full_name)")
     .eq("status", "open")
     .lte("due_at", daysFromNowIso(1))
     .order("due_at", { ascending: true })

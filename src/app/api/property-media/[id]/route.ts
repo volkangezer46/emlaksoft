@@ -10,7 +10,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const { data: media } = await admin
     .from("property_media")
-    .select("storage_path, file_type, property:properties(status, deleted_at, tenant_id)")
+    .select("storage_path, file_type, property:properties!property_media_property_id_fkey(status, deleted_at, tenant_id)")
     .eq("id", id)
     .eq("kind", "image")
     .maybeSingle();

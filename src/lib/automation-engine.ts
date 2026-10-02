@@ -575,7 +575,7 @@ async function collectScheduledCandidates(
       const cutoff = new Date(now - days * DAY_MS).toISOString();
       const { data } = await admin
         .from("customer_demands")
-        .select("id, customer_id, status, transaction_type, created_at, customer:customers(full_name, phone, assigned_to)")
+        .select("id, customer_id, status, transaction_type, created_at, customer:customers!customer_demands_customer_id_fkey(full_name, phone, assigned_to)")
         .eq("tenant_id", automation.tenant_id)
         .in("status", ["new", "active"])
         .lt("created_at", cutoff)
@@ -637,7 +637,7 @@ async function collectScheduledCandidates(
       const lookback = new Date(now - 7 * DAY_MS).toISOString();
       const { data } = await admin
         .from("appointments")
-        .select("id, customer_id, property_id, assigned_to, scheduled_at, status, customer:customers(full_name, phone)")
+        .select("id, customer_id, property_id, assigned_to, scheduled_at, status, customer:customers!appointments_customer_id_fkey(full_name, phone)")
         .eq("tenant_id", automation.tenant_id)
         .in("status", ["pending", "confirmed"])
         .lt("scheduled_at", graceEnd)

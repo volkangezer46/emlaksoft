@@ -17,7 +17,7 @@ export async function generatePropertyContent(propertyId: string, kind: ContentK
   const { data: property } = await supabase
     .from("properties")
     .select(
-      "title, transaction_type, property_type, list_price, address_line, features, assigned_to:profiles(full_name, phone), province:geo_provinces(name), district:geo_districts(name)",
+      "title, transaction_type, property_type, list_price, address_line, features, assigned_to:profiles!properties_assigned_to_fkey(full_name, phone), province:geo_provinces(name), district:geo_districts(name)",
     )
     .eq("id", propertyId)
     .eq("tenant_id", gate.tenantId)

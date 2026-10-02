@@ -49,19 +49,19 @@ describe("CSV export tenant and actor scope contract", () => {
 
   it("uses inner parent joins when ownership only exists on the parent row", () => {
     const commissions = exportFunction("exportCommissionsCsv");
-    expect(commissions).toContain("deal:deals!inner");
+    expect(commissions).toMatch(/deal:deals(?:![a-z_]+)?!inner/);
     expect(commissions).toContain('.eq("deal.tenant_id", gate.tenantId)');
 
     const portals = exportFunction("exportPortalListingsCsv");
-    expect(portals).toContain("property:properties!inner");
+    expect(portals).toMatch(/property:properties(?:![a-z_]+)?!inner/);
     expect(portals).toContain('.eq("property.tenant_id", gate.tenantId)');
 
     const demands = exportFunction("exportDemandsCsv");
-    expect(demands).toContain("customer:customers!inner");
+    expect(demands).toMatch(/customer:customers(?:![a-z_]+)?!inner/);
     expect(demands).toContain('.eq("customer.tenant_id", gate.tenantId)');
 
     const rentals = exportFunction("exportRentalsCsv");
-    expect(rentals.match(/rental:rentals!inner/g)).toHaveLength(2);
+    expect(rentals.match(/rental:rentals(?:![a-z_]+)?!inner/g)).toHaveLength(2);
     expect(rentals.match(/\.eq\("rental\.tenant_id", gate\.tenantId\)/g)).toHaveLength(2);
     expect(rentals).toContain('.eq("rental.created_by", gate.userId)');
   });

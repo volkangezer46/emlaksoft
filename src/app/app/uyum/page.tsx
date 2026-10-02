@@ -55,7 +55,7 @@ export default async function CompliancePage({
     listErasureLog(50),
     supabase
       .from("iys_consents")
-      .select("id, channel, status, granted_at, revoked_at, created_at, customer:customers(id, full_name)")
+      .select("id, channel, status, granted_at, revoked_at, created_at, customer:customers!iys_consents_customer_id_fkey(id, full_name)")
       .order("created_at", { ascending: false })
       .limit(100),
     supabase

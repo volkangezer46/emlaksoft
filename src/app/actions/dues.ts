@@ -124,7 +124,7 @@ export async function listDues() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("property_dues")
-    .select("id, title, amount, period, due_date, status, notes, property:properties(id, property_code, title)")
+    .select("id, title, amount, period, due_date, status, notes, property:properties!property_dues_property_id_fkey(id, property_code, title)")
     .eq("tenant_id", gate.tenantId)
     .order("period", { ascending: false })
     .limit(300);

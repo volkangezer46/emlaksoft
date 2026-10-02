@@ -59,7 +59,7 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
 
   const { data } = await supabase
     .from("contracts")
-    .select("id, title, contract_type, body, status, signed_at, expires_at, created_at, updated_at, property:properties(id,property_code,title,commission_rate,address_line,list_price), customer:customers(id,full_name,phone,email)")
+    .select("id, title, contract_type, body, status, signed_at, expires_at, created_at, updated_at, property:properties!contracts_property_id_fkey(id,property_code,title,commission_rate,address_line,list_price), customer:customers!contracts_customer_id_fkey(id,full_name,phone,email)")
     .eq("id", id)
     .maybeSingle();
 

@@ -88,7 +88,7 @@ async function loadKpisForRange(
     supabase.from("offers").select("created_by, status").gte("created_at", startIso).lt("created_at", endIso).not("created_by", "is", null).limit(5000),
     supabase
       .from("commissions")
-      .select("gross_amount, deal:deals(assigned_to)")
+      .select("gross_amount, deal:deals!commissions_deal_id_fkey(assigned_to)")
       .gte("created_at", startIso)
       .lt("created_at", endIso)
       .in("status", ["paid", "collected"])

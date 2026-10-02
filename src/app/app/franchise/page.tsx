@@ -85,7 +85,7 @@ export default async function FranchiseBiPage({
   if (toIso) dealsQuery = dealsQuery.lte("created_at", toIso);
   let closuresQuery = supabase
     .from("listing_closures")
-    .select("estimated_lost_commission, deal_happened, created_at, portal_listing:portal_listings(property:properties(branch_id))")
+    .select("estimated_lost_commission, deal_happened, created_at, portal_listing:portal_listings!listing_closures_portal_listing_id_fkey(property:properties!portal_listings_property_id_fkey(branch_id))")
     .limit(500);
   if (fromIso) closuresQuery = closuresQuery.gte("created_at", fromIso);
   if (toIso) closuresQuery = closuresQuery.lte("created_at", toIso);

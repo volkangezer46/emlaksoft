@@ -94,7 +94,7 @@ async function notifyPriceDropToMatchingDemands(input: {
     const { data: demands } = await admin
       .from("customer_demands")
       .select(
-        "id, transaction_type, property_type, province_id, district_id, budget_min, budget_max, rooms, min_sqm, urgency, status, customer:customers(full_name, assigned_to)",
+        "id, transaction_type, property_type, province_id, district_id, budget_min, budget_max, rooms, min_sqm, urgency, status, customer:customers!customer_demands_customer_id_fkey(full_name, assigned_to)",
       )
       .eq("tenant_id", input.tenantId)
       .in("status", ["new", "active", "matched"])

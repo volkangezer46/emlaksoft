@@ -83,7 +83,7 @@ export async function summarizeCallNotes(callId: string): Promise<CallSummaryRes
   const supabase = await createClient();
   const { data: call } = await supabase
     .from("calls")
-    .select("id, direction, disposition, notes, duration_sec, started_at, customer:customers(full_name)")
+    .select("id, direction, disposition, notes, duration_sec, started_at, customer:customers!calls_customer_id_fkey(full_name)")
     .eq("id", id)
     .maybeSingle();
 

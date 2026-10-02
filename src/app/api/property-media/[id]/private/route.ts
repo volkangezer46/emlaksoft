@@ -52,7 +52,7 @@ export async function GET(
   const admin = createAdminClient();
   const { data: media, error: mediaError } = await admin
     .from("property_media")
-    .select("storage_path, file_type, property:properties(deleted_at, tenant:tenants(status))")
+    .select("storage_path, file_type, property:properties!property_media_property_id_fkey(deleted_at, tenant:tenants(status))")
     .eq("id", id)
     .eq("kind", "image")
     .maybeSingle();

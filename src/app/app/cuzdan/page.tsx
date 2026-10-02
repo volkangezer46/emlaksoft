@@ -118,7 +118,7 @@ export default async function CuzdanPage() {
     supabase
       .from("commissions")
       .select(
-        "id, gross_amount, status, splits, created_at, deal_id, deal:deals(id,assigned_to,property:properties(id,property_code,title))",
+        "id, gross_amount, status, splits, created_at, deal_id, deal:deals!commissions_deal_id_fkey(id,assigned_to,property:properties!deals_property_id_fkey(id,property_code,title))",
       )
       .order("created_at", { ascending: false })
       .limit(1000),

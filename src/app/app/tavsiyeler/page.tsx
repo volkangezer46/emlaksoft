@@ -154,7 +154,7 @@ export default async function ReferralsPage({
     supabase
       .from("referral_links")
       .select(
-        "id, public_token, is_active, click_count, reward_note, created_at, customer_id, staff_id, customer:customers(id, full_name)",
+        "id, public_token, is_active, click_count, reward_note, created_at, customer_id, staff_id, customer:customers!referral_links_customer_id_fkey(id, full_name)",
       )
       .order("created_at", { ascending: false })
       .limit(200),
@@ -169,7 +169,7 @@ export default async function ReferralsPage({
     // NPS entegrasyonu: destekleyenler (9-10) — linki olmayanlar önerilecek.
     supabase
       .from("surveys")
-      .select("customer_id, score, answered_at, customer:customers(id, full_name)")
+      .select("customer_id, score, answered_at, customer:customers!surveys_customer_id_fkey(id, full_name)")
       .gte("score", 9)
       .eq("status", "answered")
       .order("answered_at", { ascending: false })

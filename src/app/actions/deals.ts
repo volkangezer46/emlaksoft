@@ -477,7 +477,7 @@ export async function listDealNotes(dealId: string): Promise<DealNote[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("deal_notes")
-    .select("id, body, author_id, created_at, author:profiles(full_name)")
+    .select("id, body, author_id, created_at, author:profiles!deal_notes_author_id_fkey(full_name)")
     .eq("deal_id", dealId)
     .eq("tenant_id", gate.tenantId)
     .order("created_at", { ascending: true })

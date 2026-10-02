@@ -88,7 +88,7 @@ export async function searchWorkspace(query: string, limit: number = 20): Promis
   let demandQuery = supabase
     .from("customer_demands")
     .select(
-      "id, transaction_type, property_type, rooms, customer:customers!inner(full_name, assigned_to)",
+      "id, transaction_type, property_type, rooms, customer:customers!customer_demands_customer_id_fkey!inner(full_name, assigned_to)",
     )
     .eq("tenant_id", gate.tenantId)
     .or(orIlike(["transaction_type", "property_type", "rooms"], q))
@@ -102,7 +102,7 @@ export async function searchWorkspace(query: string, limit: number = 20): Promis
   let dealsByCustomerQuery = supabase
     .from("deals")
     .select(
-      "id, stage, deal_type, deal_value, customer:customers!inner(full_name), property:properties(title, property_code)",
+      "id, stage, deal_type, deal_value, customer:customers!deals_customer_id_fkey!inner(full_name), property:properties!deals_property_id_fkey(title, property_code)",
     )
     .eq("tenant_id", gate.tenantId)
     .ilike("customer.full_name", like)
@@ -110,7 +110,7 @@ export async function searchWorkspace(query: string, limit: number = 20): Promis
   let dealsByPropertyQuery = supabase
     .from("deals")
     .select(
-      "id, stage, deal_type, deal_value, customer:customers(full_name), property:properties!inner(title, property_code)",
+      "id, stage, deal_type, deal_value, customer:customers!deals_customer_id_fkey(full_name), property:properties!deals_property_id_fkey!inner(title, property_code)",
     )
     .eq("tenant_id", gate.tenantId)
     .or(orIlike(["title", "property_code"], q), { referencedTable: "property" })

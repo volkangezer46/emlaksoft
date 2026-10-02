@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   const to = new Date(Date.now() + 24 * 86_400_000);
   const { data: appts } = await admin
     .from("appointments")
-    .select("id, tenant_id, appointment_type, scheduled_at, confirm_token, customer:customers(full_name)")
+    .select("id, tenant_id, appointment_type, scheduled_at, confirm_token, customer:customers!appointments_customer_id_fkey(full_name)")
     .gte("scheduled_at", from.toISOString())
     .lte("scheduled_at", to.toISOString())
     .neq("status", "cancelled")

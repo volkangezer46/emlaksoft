@@ -172,7 +172,7 @@ export async function listTargets(period?: string) {
   const supabase = await createClient();
   let query = supabase
     .from("targets")
-    .select("id, period, period_start, target_deals, target_revenue, actual_deals, actual_revenue, profile:profiles(id, full_name)")
+    .select("id, period, period_start, target_deals, target_revenue, actual_deals, actual_revenue, profile:profiles!targets_profile_id_fkey(id, full_name)")
     .eq("tenant_id", gate.tenantId)
     .order("period_start", { ascending: false })
     .limit(50);
@@ -330,7 +330,7 @@ export async function getOpenHouse(openHouseId: string) {
   const { data } = await supabase
     .from("open_houses")
     .select(
-      "id, scheduled_at, duration_min, location, status, visitor_count, max_visitors, notes, created_at, public_token, property:properties(id, property_code, title, address_line, list_price)",
+      "id, scheduled_at, duration_min, location, status, visitor_count, max_visitors, notes, created_at, public_token, property:properties!open_houses_property_id_fkey(id, property_code, title, address_line, list_price)",
     )
     .eq("id", openHouseId)
     .eq("tenant_id", gate.tenantId)
@@ -346,7 +346,7 @@ export async function listOpenHouses() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("open_houses")
-    .select("id, scheduled_at, duration_min, location, status, visitor_count, max_visitors, notes, property:properties(id, property_code, title)")
+    .select("id, scheduled_at, duration_min, location, status, visitor_count, max_visitors, notes, property:properties!open_houses_property_id_fkey(id, property_code, title)")
     .eq("tenant_id", gate.tenantId)
     .order("scheduled_at", { ascending: false })
     .limit(50);

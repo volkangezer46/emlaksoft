@@ -85,7 +85,7 @@ export default async function ForeignSalePage() {
       .is("deleted_at", null),
     supabase
       .from("deals")
-      .select("id, stage, customer_id, deal_type, updated_at, property:properties(property_code, title), customer:customers(full_name)")
+      .select("id, stage, customer_id, deal_type, updated_at, property:properties!deals_property_id_fkey(property_code, title), customer:customers!deals_customer_id_fkey(full_name)")
       .order("updated_at", { ascending: false })
       .limit(500),
     // Kur DB'den okunur; yoksa null döner ve döviz satırları hiç basılmaz.

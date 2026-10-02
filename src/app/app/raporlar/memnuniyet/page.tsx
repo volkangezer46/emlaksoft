@@ -76,12 +76,12 @@ export default async function SatisfactionReportPage() {
   const [{ data: surveys }, { data: wonDeals }, { data: profiles }] = await Promise.all([
     supabase
       .from("surveys")
-      .select("id, deal_id, agent_id, public_token, score, comment, status, sent_at, answered_at, customer:customers(id, full_name)")
+      .select("id, deal_id, agent_id, public_token, score, comment, status, sent_at, answered_at, customer:customers!surveys_customer_id_fkey(id, full_name)")
       .order("sent_at", { ascending: false })
       .limit(1000),
     supabase
       .from("deals")
-      .select("id, deal_value, deal_type, customer_id, assigned_to, updated_at, customer:customers(id, full_name)")
+      .select("id, deal_value, deal_type, customer_id, assigned_to, updated_at, customer:customers!deals_customer_id_fkey(id, full_name)")
       .eq("stage", "won")
       .order("updated_at", { ascending: false })
       .limit(200),

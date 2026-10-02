@@ -84,7 +84,7 @@ export default async function MatchingPage({
   const { data: demandsData } = await supabase
     .from("customer_demands")
     .select(
-      "id, transaction_type, property_type, province_id, district_id, budget_min, budget_max, rooms, min_sqm, urgency, status, customer:customers(id, full_name)",
+      "id, transaction_type, property_type, province_id, district_id, budget_min, budget_max, rooms, min_sqm, urgency, status, customer:customers!customer_demands_customer_id_fkey(id, full_name)",
     )
     .neq("status", "closed")
     .order("created_at", { ascending: false })

@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
   // ---- 1) Bu ayın eksik tahakkuklarını oluştur ----
   const { data: rentals, error: rentalsErr } = await admin
     .from("rentals")
-    .select("id, tenant_id, monthly_rent, due_day, start_date, end_date, property:properties(property_code, title)")
+    .select("id, tenant_id, monthly_rent, due_day, start_date, end_date, property:properties!rentals_property_id_fkey(property_code, title)")
     .eq("status", "active")
     .limit(2000);
 
@@ -126,7 +126,7 @@ export async function GET(req: NextRequest) {
   // ---- 2) Vadesi 7+ gün geçmiş pending → overdue + bildirim ----
   const { data: pending, error: pendingErr } = await admin
     .from("rent_charges")
-    .select("id, tenant_id, rental_id, period, amount, rental:rentals(due_day, property:properties(property_code, title))")
+    .select("id, tenant_id, rental_id, period, amount, rental:rentals!rent_charges_rental_id_fkey(due_day, property:properties!rentals_property_id_fkey(property_code, title))")
     .eq("status", "pending")
     .lte("period", period)
     .limit(2000);

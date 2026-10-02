@@ -109,7 +109,7 @@ export default async function TeamPage() {
     { data: leaveRows },
     loginRows,
   ] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, phone, role, is_active, created_at, branch_id, public_slug, is_public, branch:branches(name)").order("created_at", { ascending: true }).limit(500),
+    supabase.from("profiles").select("id, full_name, phone, role, is_active, created_at, branch_id, public_slug, is_public, branch:branches!profiles_branch_id_fkey(name)").order("created_at", { ascending: true }).limit(500),
     supabase.from("branches").select("id, name, is_active, province_id, province:geo_provinces(name)").order("created_at", { ascending: true }).limit(200),
     supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
     // Danışman başına müşteri sayısı — aggregate (10.000 satır yerine ~N satır)

@@ -56,7 +56,7 @@ export async function getPropertyStatusHistory(propertyId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("property_status_history")
-    .select("id, old_status, new_status, reason, created_at, changed_by:profiles(full_name)")
+    .select("id, old_status, new_status, reason, created_at, changed_by:profiles!property_status_history_changed_by_fkey(full_name)")
     .eq("property_id", propertyId)
     .eq("tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })

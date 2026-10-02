@@ -22,7 +22,7 @@ export default async function WatermarkSettingsPage() {
     // uygulanır — 404 dönecek bir görsel seçilmez. Yoksa yerleşik örnek çizilir.
     supabase
       .from("property_media")
-      .select("id, property:properties!inner(status, deleted_at)")
+      .select("id, property:properties!property_media_property_id_fkey!inner(status, deleted_at)")
       .eq("tenant_id", ctx.tenantId)
       .eq("kind", "image")
       .neq("property.status", "draft")

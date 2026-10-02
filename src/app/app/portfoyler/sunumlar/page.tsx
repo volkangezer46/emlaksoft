@@ -110,13 +110,13 @@ export default async function PresentationsPage({
   const [{ data: ownerTokenData }, { data: customerTokenData }] = await Promise.all([
     supabase
       .from("owner_portal_tokens")
-      .select("id, token, owner_name, property_id, expires_at, created_at, last_seen_at, property:properties(property_code, title)")
+      .select("id, token, owner_name, property_id, expires_at, created_at, last_seen_at, property:properties!owner_portal_tokens_property_id_fkey(property_code, title)")
       .order("created_at", { ascending: false })
       .limit(100),
     canSeeCustomers
       ? supabase
           .from("customer_portal_tokens")
-          .select("id, token, customer_id, expires_at, created_at, last_seen_at, customer:customers(full_name)")
+          .select("id, token, customer_id, expires_at, created_at, last_seen_at, customer:customers!customer_portal_tokens_customer_id_fkey(full_name)")
           .order("created_at", { ascending: false })
           .limit(100)
       : Promise.resolve({ data: null }),

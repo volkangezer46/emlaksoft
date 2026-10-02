@@ -97,7 +97,7 @@ export default async function KiralamaPage({
       supabase
         .from("rentals")
         .select(
-          "id, monthly_rent, due_day, start_date, end_date, status, created_at, property:properties(id, property_code, title), renter:customers(id, full_name)",
+          "id, monthly_rent, due_day, start_date, end_date, status, created_at, property:properties!rentals_property_id_fkey(id, property_code, title), renter:customers!rentals_renter_customer_id_fkey(id, full_name)",
         )
         .order("created_at", { ascending: false })
         .limit(300),

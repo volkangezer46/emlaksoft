@@ -51,7 +51,7 @@ export async function listProjects(): Promise<ProjectRow[]> {
   const { data, error } = await supabase
     .from("projects")
     .select(
-      "id, name, developer_name, location, delivery_date, description, status, created_at, units:project_units(status)",
+      "id, name, developer_name, location, delivery_date, description, status, created_at, units:project_units!project_units_project_id_fkey(status)",
     )
     .eq("tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
@@ -86,7 +86,7 @@ export async function listProjectUnits(projectId: string): Promise<UnitRow[]> {
   const { data, error } = await supabase
     .from("project_units")
     .select(
-      "id, project_id, block, floor, unit_no, rooms, gross_m2, list_price, status, customer_id, reserved_until, sold_at, notes, customer:customers(id, full_name)",
+      "id, project_id, block, floor, unit_no, rooms, gross_m2, list_price, status, customer_id, reserved_until, sold_at, notes, customer:customers!project_units_customer_id_fkey(id, full_name)",
     )
     .eq("project_id", projectId)
     .eq("tenant_id", gate.tenantId)
@@ -663,7 +663,7 @@ export async function togglePaymentPaid(paymentId: string): Promise<ProjectResul
   const supabase = await createClient();
   const { data: payment } = await supabase
     .from("unit_payments")
-    .select("id, unit_id, kind, seq, due_date, amount, status, unit:project_units(project_id)")
+    .select("id, unit_id, kind, seq, due_date, amount, status, unit:project_units!unit_payments_unit_id_fkey(project_id)")
     .eq("id", paymentId)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
@@ -708,7 +708,7 @@ export async function getProjectPaymentSummary(projectId: string): Promise<{
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("unit_payments")
-    .select("amount, status, due_date, unit:project_units!inner(project_id)")
+    .select("amount, status, due_date, unit:project_units!unit_payments_unit_id_fkey!inner(project_id)")
     .eq("tenant_id", gate.tenantId)
     .eq("unit.project_id", projectId)
     .neq("status", "paid")

@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
   const { data: closures, error } = await admin
     .from("listing_closures")
     .select(
-      "id, tenant_id, reason, deal_amount, estimated_lost_commission, created_at, portal_listing:portal_listings(property:properties(property_code,title))",
+      "id, tenant_id, reason, deal_amount, estimated_lost_commission, created_at, portal_listing:portal_listings!listing_closures_portal_listing_id_fkey(property:properties!portal_listings_property_id_fkey(property_code,title))",
     )
     .is("sla_warning_sent_at", null)
     .not("deal_happened", "is", true)

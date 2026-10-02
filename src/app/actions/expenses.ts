@@ -113,7 +113,7 @@ export async function listExpenses(
   const supabase = await createClient();
   let query = supabase
     .from("expenses")
-    .select("id, title, amount, category, expense_date, notes, created_at, property:properties(property_code, title)")
+    .select("id, title, amount, category, expense_date, notes, created_at, property:properties!expenses_property_id_fkey(property_code, title)")
     .eq("tenant_id", gate.tenantId)
     .order("expense_date", { ascending: false })
     .limit(200);

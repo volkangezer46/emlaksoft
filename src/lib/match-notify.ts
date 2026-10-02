@@ -20,7 +20,7 @@ export async function notifyMatchingDemandsForProperty(
     const weightsPromise = fetchTenantMatchingWeights(admin, tenantId);
     const { data: demands } = await admin
       .from("customer_demands")
-      .select("id, transaction_type, property_type, province_id, district_id, budget_min, budget_max, rooms, min_sqm, urgency, status, customer:customers(full_name)")
+      .select("id, transaction_type, property_type, province_id, district_id, budget_min, budget_max, rooms, min_sqm, urgency, status, customer:customers!customer_demands_customer_id_fkey(full_name)")
       .eq("tenant_id", tenantId)
       .in("status", ["new", "active", "matched"])
       .limit(500);

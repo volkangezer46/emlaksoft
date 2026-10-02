@@ -243,7 +243,7 @@ export async function getOffer(id: string) {
   const { data } = await supabase
     .from("offers")
     .select(
-      "id, amount, currency, status, counter_amount, valid_until, notes, submitted_at, responded_at, created_at, updated_at, property_id, customer_id, property:properties(id, property_code, title, list_price, transaction_type, property_type), customer:customers(id, full_name, phone, email)",
+      "id, amount, currency, status, counter_amount, valid_until, notes, submitted_at, responded_at, created_at, updated_at, property_id, customer_id, property:properties!offers_property_id_fkey(id, property_code, title, list_price, transaction_type, property_type), customer:customers!offers_customer_id_fkey(id, full_name, phone, email)",
     )
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
@@ -316,7 +316,7 @@ export async function listOffers(propertyId?: string) {
   const supabase = await createClient();
   let query = supabase
     .from("offers")
-    .select("id, amount, currency, status, counter_amount, valid_until, notes, submitted_at, responded_at, created_at, property:properties(property_code, title, list_price), customer:customers(full_name)")
+    .select("id, amount, currency, status, counter_amount, valid_until, notes, submitted_at, responded_at, created_at, property:properties!offers_property_id_fkey(property_code, title, list_price), customer:customers!offers_customer_id_fkey(full_name)")
     .eq("tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
     .limit(100);

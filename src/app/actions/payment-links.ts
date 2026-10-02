@@ -49,7 +49,7 @@ export async function createPaymentLink(formData: FormData): Promise<PayLinkResu
   if (commissionId) {
     const { data: commission, error: commissionError } = await supabase
       .from("commissions")
-      .select("id, status, gross_amount, deal:deals(customer_id)")
+      .select("id, status, gross_amount, deal:deals!commissions_deal_id_fkey(customer_id)")
       .eq("id", commissionId)
       .eq("tenant_id", gate.tenantId)
       .maybeSingle();

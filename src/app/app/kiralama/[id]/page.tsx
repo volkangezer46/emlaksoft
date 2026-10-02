@@ -34,7 +34,7 @@ export default async function KiraDetayPage({ params }: { params: Promise<{ id: 
   const { data: rental } = await supabase
     .from("rentals")
     .select(
-      "id, monthly_rent, due_day, start_date, end_date, deposit, deposit_returned, deposit_returned_at, status, notes, created_at, property:properties(id, property_code, title), renter:customers(id, full_name, phone), charges:rent_charges(id, period, amount, status, paid_at), maintenance:maintenance_requests(id, title, description, status, cost, created_at)",
+      "id, monthly_rent, due_day, start_date, end_date, deposit, deposit_returned, deposit_returned_at, status, notes, created_at, property:properties!rentals_property_id_fkey(id, property_code, title), renter:customers!rentals_renter_customer_id_fkey(id, full_name, phone), charges:rent_charges!rent_charges_rental_id_fkey(id, period, amount, status, paid_at), maintenance:maintenance_requests!maintenance_requests_rental_id_fkey(id, title, description, status, cost, created_at)",
     )
     .eq("id", id)
     .maybeSingle();

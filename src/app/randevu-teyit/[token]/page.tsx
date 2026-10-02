@@ -53,7 +53,7 @@ export default async function AppointmentConfirmPage({
   const { data: appt } = await admin
     .from("appointments")
     .select(
-      "id, appointment_type, scheduled_at, duration_min, status, customer_response, customer:customers(full_name), tenant:tenants(name, status, logo_url, brand_color)",
+      "id, appointment_type, scheduled_at, duration_min, status, customer_response, customer:customers!appointments_customer_id_fkey(full_name), tenant:tenants(name, status, logo_url, brand_color)",
     )
     .eq("confirm_token", token)
     .maybeSingle();

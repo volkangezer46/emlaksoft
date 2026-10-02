@@ -58,12 +58,12 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
     { count: callCount },
     { data: advisorRows },
   ] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, phone, role, is_active, created_at, branch:branches(name)").eq("id", id).maybeSingle(),
+    supabase.from("profiles").select("id, full_name, phone, role, is_active, created_at, branch:branches!profiles_branch_id_fkey(name)").eq("id", id).maybeSingle(),
     supabase.from("customers").select("id", { count: "exact", head: true }).eq("assigned_to", id).is("deleted_at", null),
     supabase.from("customers").select("id, full_name, phone, customer_types, created_at").eq("assigned_to", id).is("deleted_at", null).order("created_at", { ascending: false }).limit(8),
     supabase.from("properties").select("id", { count: "exact", head: true }).eq("assigned_to", id).is("deleted_at", null),
     supabase.from("properties").select("id, property_code, title, status, list_price").eq("assigned_to", id).is("deleted_at", null).order("created_at", { ascending: false }).limit(8),
-    supabase.from("commissions").select("gross_amount, status, deal:deals(assigned_to)").gte("created_at", monthStart.toISOString()).limit(500),
+    supabase.from("commissions").select("gross_amount, status, deal:deals!commissions_deal_id_fkey(assigned_to)").gte("created_at", monthStart.toISOString()).limit(500),
     supabase.from("appointments").select("id", { count: "exact", head: true }).eq("assigned_to", id).gte("scheduled_at", monthStart.toISOString()),
     supabase.from("calls").select("id", { count: "exact", head: true }).eq("handled_by", id).gte("started_at", monthStart.toISOString()),
     // Devralabilecek aktif danışmanlar (bu üye hariç) — iş yükü devri paneli için

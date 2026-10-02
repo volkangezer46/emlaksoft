@@ -292,7 +292,7 @@ export default async function AppHomePage({
       .limit(50),
     supabase
       .from("listing_closures")
-      .select("id, reason, competitor_closed, estimated_lost_commission, created_at, portal_listing:portal_listings(portal_name, portal_listing_id)")
+      .select("id, reason, competitor_closed, estimated_lost_commission, created_at, portal_listing:portal_listings!listing_closures_portal_listing_id_fkey(portal_name, portal_listing_id)")
       .order("created_at", { ascending: false })
       .limit(5),
     // Sadece son 6 ay komisyonları — limit ekle, deal join kaldır (gereksiz)
@@ -328,16 +328,13 @@ export default async function AppHomePage({
       .gte("created_at", daysAgoIso(49))
       .order("created_at", { ascending: false })
       .limit(100),
-    // Yetki belgesi 15 gün içinde dolacak portföyler
-    supabase
-      .from("properties")
-      .select("id, property_code, title, authority_expires_at")
-      .is("deleted_at", null)
-      .not("authority_expires_at", "is", null)
-      .lte("authority_expires_at", fifteenDaysFromNow.toISOString())
-      .gte("authority_expires_at", new Date().toISOString())
-      .order("authority_expires_at", { ascending: true })
-      .limit(10),
+    // Yetki belgesi 15 gün içinde dolacak portföyler.
+    // NOT: `properties.authority_expires_at` kolonu veritabanında YOK (hiçbir migration eklemedi,
+    // hiçbir form yazmıyor); sorgu 42703 verip ana paneli düşürüyordu. Yetki belgesi takibi
+    // (yol haritası A2) kolonu eklediğinde bu sorgu geri bağlanacak; o zamana kadar boş döner.
+    Promise.resolve({
+      data: [] as { id: string; property_code: string | null; title: string | null; authority_expires_at: string | null }[],
+    }),
     // Son 24s — müşteri eklemeler (telefon: hızlı ara/WhatsApp aksiyonu için)
     supabase.from("customers").select("id, full_name, phone, created_at").is("deleted_at", null)
       .gte("created_at", last24h).order("created_at", { ascending: false }).limit(5),
@@ -351,7 +348,7 @@ export default async function AppHomePage({
     supabase.from("properties").select("id, property_code, title, created_at").is("deleted_at", null)
       .gte("created_at", last24h).order("created_at", { ascending: false }).limit(5),
     // Bugünkü randevular (widget + brifing) — count: brifingde gerçek toplam gerekir
-    supabase.from("appointments").select("id, appointment_type, scheduled_at, status, customer:customers(full_name, phone)", { count: "exact" })
+    supabase.from("appointments").select("id, appointment_type, scheduled_at, status, customer:customers!appointments_customer_id_fkey(full_name, phone)", { count: "exact" })
       .gte("scheduled_at", dayStart.toISOString()).lt("scheduled_at", dayEnd.toISOString())
       .order("scheduled_at", { ascending: true }).limit(5),
     // Trend rozetleri — yalnız sayaç (head:true), satır çekilmez
@@ -411,7 +408,7 @@ export default async function AppHomePage({
       : Promise.resolve({ data: null }),
     // Proje + birim durumları tek gidiş-dönüşte (bkz. actions/projects.ts listProjects)
     canSeeProjects
-      ? supabase.from("projects").select("id, status, units:project_units(status)").limit(200)
+      ? supabase.from("projects").select("id, status, units:project_units!project_units_project_id_fkey(status)").limit(200)
       : Promise.resolve({ data: null }),
   ]);
 
