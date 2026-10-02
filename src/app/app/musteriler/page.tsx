@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { daysAgoIso, msSince, now } from "@/lib/clock";
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import {
   MessageCircle,
   Moon,
   Phone,
+  Plus,
   Search,
   Snowflake,
   Sparkles,
@@ -33,7 +35,6 @@ import { exportCustomersCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
-import { NewCustomerDialog } from "./new-customer-dialog";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { CustomerRowDelete } from "./customer-row-delete";
 import { CustomerPortalLinkButton } from "@/components/app/portal-link-dialog";
@@ -219,6 +220,8 @@ export default async function CustomersPage({
   // Bağımsız: sorgularla aynı turda beklenir (aşağıdaki Promise.all).
   const savedViewsPromise = listSavedViews("/app/musteriler");
   const sp = await searchParams;
+  // Eski popup adresi (?yeni=1; komut paleti, kısayollar) → tam sayfa form.
+  if (sp.yeni === "1") redirect("/app/musteriler/yeni");
   const q        = sp.q        ?? "";
   const typeF    = sp.type     ?? "";
   const sourceF  = sp.source   ?? "";
@@ -303,8 +306,6 @@ export default async function CustomersPage({
   const [
     { data: customers, count: customerTotal },
     { data: heatPool },
-    { data: provinces },
-    { data: branches },
     { data: advisors },
     { data: signals },
     { count: totalAll },
@@ -323,8 +324,6 @@ export default async function CustomersPage({
       ? Promise.resolve({ data: null, count: null })
       : listQuery.range(offset, offset + PAGE_SIZE - 1),
     heatPoolQuery.limit(HEAT_POOL_LIMIT),
-    supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
-    supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
     tenantId
       ? supabase.rpc("customer_lead_signals", { p_tenant_id: tenantId })
@@ -365,7 +364,6 @@ export default async function CustomersPage({
 
   // DB-driven tanımlar (boşsa definition-defaults.ts yedeği getDefinitionsOrDefault içinde)
   const customerTypes = typeDefs;
-  const customerTypeValues = customerTypes.map((t) => t.value);
   const sourceEntries = sourceDefs.map((s) => [s.value, s.label] as const);
 
   // ---- Sıcaklık skorlama (tek toplu RPC — N+1 yok) ------------------------
@@ -489,8 +487,6 @@ export default async function CustomersPage({
     : rows;
   const hotCount = rows.filter((c) => leadMap.get(c.id)?.tier === "hot").length;
 
-  const provinceList = provinces ?? [];
-  const branchList = branches ?? [];
   const advisorList = (advisors ?? []).map((a) => ({
     id: String(a.id),
     full_name: String(a.full_name ?? ""),
@@ -566,7 +562,7 @@ export default async function CustomersPage({
               Çift kayıt kontrolü
             </ButtonLink>
             <ExportCsvButton action={exportCustomersCsv} label="Dışa aktar" />
-            {canCreate ? <NewCustomerDialog key={sp.yeni === "1" ? "new-customer" : "customer-dialog"} provinces={provinceList} branches={branchList} types={customerTypeValues} defaultOpen={sp.yeni === "1"} /> : null}
+            {canCreate ? <ButtonLink href="/app/musteriler/yeni" icon={Plus}>Yeni müşteri</ButtonLink> : null}
           </>
         }
       />
@@ -791,7 +787,7 @@ export default async function CustomersPage({
           description="İlk müşterinizi ekleyin. Arayan, mülk sahibi ve yatırımcıları tek yerde toplayın; hiçbir talebi kaçırmayın."
           action={
             canCreate
-              ? { node: <NewCustomerDialog provinces={provinceList} branches={branchList} types={customerTypeValues} /> }
+              ? { href: "/app/musteriler/yeni", label: "Yeni müşteri" }
               : undefined
           }
           secondary={{ href: "/app/gelen-kutusu", label: "Gelen kutusundan aktar" }}

@@ -8,6 +8,7 @@ import {
   Clock3,
   Crosshair,
   MapPin,
+  Plus,
   Sparkles,
   Target,
   Users,
@@ -22,7 +23,6 @@ import {
   type MatchDemand,
   type MatchProperty,
 } from "@/lib/matching";
-import { NewDemandListDialog } from "./new-demand-list-dialog";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -283,21 +283,6 @@ export default async function DemandsPage({
     ).then((res) => (res.data ?? []) as unknown as PoolRow[]),
   };
 
-  // "Yeni talep" dialogu için müşteri + il listesi — yalnız create yetkisi varken çekilir.
-  const dialogP = canCreate
-    ? Promise.all([
-        Promise.resolve(
-          supabase
-            .from("customers")
-            .select("id, full_name")
-            .is("deleted_at", null)
-            .order("created_at", { ascending: false })
-            .limit(300),
-        ),
-        Promise.resolve(supabase.from("geo_provinces").select("id, name").order("name", { ascending: true })),
-      ]).then(([c, pr]) => ({ customers: c.data ?? [], provinces: pr.data ?? [] }))
-    : null;
-
   // Filtre linkleri diğer parametreleri korur (status ⇄ aciliyet ⇄ il ⇄ bütçe ⇄ yaş).
   // Filtre değişince sayfa 1'e döner: demandHref sayfa parametresini taşımaz.
   const demandHref = (patch: { status?: string; aciliyet?: string; il?: string; butce?: string; yas?: string }) => {
@@ -358,11 +343,7 @@ export default async function DemandsPage({
                 yas: yasF ? String(AGING_DAYS) : "",
               })}
             />
-            {dialogP ? (
-              <Suspense fallback={<Skeleton className="h-9 w-32" />}>
-                <DemandDialog dialogP={dialogP} />
-              </Suspense>
-            ) : null}
+            {canCreate ? <ButtonLink href="/app/talepler/yeni" size="sm" icon={Plus}>Yeni talep</ButtonLink> : null}
           </>
         }
       />
@@ -455,15 +436,6 @@ function ListSkeleton() {
       ))}
     </SkeletonBlock>
   );
-}
-
-async function DemandDialog({
-  dialogP,
-}: {
-  dialogP: Promise<{ customers: { id: string; full_name: string }[]; provinces: { id: string; name: string }[] }>;
-}) {
-  const { customers, provinces } = await dialogP;
-  return <NewDemandListDialog customers={customers} provinces={provinces} />;
 }
 
 async function DemandStats({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
