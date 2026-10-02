@@ -136,7 +136,7 @@ export async function KpiSatiri({ ctx }: { ctx: HomeCtx }) {
           </div>
           <p className="mt-4 text-sm text-text-muted">{kpi.label}</p>
           <div className="mt-1 flex items-end justify-between gap-3">
-            <p className={`font-display text-2xl font-extrabold tabular-nums ${valueTone[kpi.tone ?? ""] ?? "text-ink-950"}`}>
+            <p title={kpi.value} className={`whitespace-nowrap font-display text-2xl font-extrabold tabular-nums ${valueTone[kpi.tone ?? ""] ?? "text-ink-950"}`}>
               <OdometerNumber value={kpi.value} />
             </p>
             <div className="w-24">

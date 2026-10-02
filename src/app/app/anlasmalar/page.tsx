@@ -12,6 +12,7 @@ import { exportDealsCsv } from "@/app/actions/export";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
+import { MoneyValue } from "@/components/ui/money-value";
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
 }
@@ -196,9 +197,9 @@ export default async function DealsPage({ searchParams }: { searchParams?: Promi
           {/* KPI'lar tahtaya çapa: açık metrikler tahtanın başına, kazanılanlar
               doğrudan "Kazanıldı" sütununa götürür. */}
           {[
-            { label: "Açık hat", value: money(pipelineValue), icon: TrendingUp, tone: "text-cyan-300", href: "#tahta" },
-            { label: "Ağırlıklı tahmin", value: money(Math.round(weightedForecast)), icon: Target, tone: "text-brand-300", href: "#huni" },
-            { label: "Kazanılan", value: money(wonValue), icon: Trophy, tone: "text-mint-300", href: "#sutun-won" },
+            { label: "Açık hat", value: <MoneyValue amount={pipelineValue} symbol="suffix" />, icon: TrendingUp, tone: "text-cyan-300", href: "#tahta" },
+            { label: "Ağırlıklı tahmin", value: <MoneyValue amount={Math.round(weightedForecast)} symbol="suffix" />, icon: Target, tone: "text-brand-300", href: "#huni" },
+            { label: "Kazanılan", value: <MoneyValue amount={wonValue} symbol="suffix" />, icon: Trophy, tone: "text-mint-300", href: "#sutun-won" },
             { label: "Açık kart", value: String(open.length), icon: Handshake, tone: "text-amber-300", href: "#tahta" },
             { label: "Kazanma oranı", value: `%${winRate}`, icon: Wallet, tone: "text-white", href: "#sutun-won" },
           ].map((k) => (

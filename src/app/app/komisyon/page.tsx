@@ -26,6 +26,7 @@ import { BulkCollectBar, BulkCollectCheckbox, BulkCollectProvider } from "./bulk
 import { requireReportingCount, requireReportingData } from "@/lib/reporting/result";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { MoneyValue } from "@/components/ui/money-value";
 type CommissionRow = {
   id: string;
   gross_amount: number;
@@ -249,8 +250,21 @@ export default async function CommissionPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Komisyon & hakediş" eyebrow="Finans merkezi" description="Çok taraflı paylaşım, KDV ve tahsilat görünümü tek defterde." />
-<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative"><Link href="/app/onaylar?durum=bekliyor" className="focus-ring press mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:border-white/30 hover:text-white">Onaylar{bekleyenOnay > 0 ? <span className="numeric rounded-full bg-amber-400/90 px-1.5 py-0.5 text-xs font-bold text-ink-950">{bekleyenOnay}</span> : null}<ArrowUpRight className="h-3.5 w-3.5 opacity-60" /></Link></div></section>
+      <PageHeader
+        title="Komisyon & hakediş"
+        eyebrow="Finans merkezi"
+        description="Çok taraflı paylaşım, KDV ve tahsilat görünümü tek defterde."
+        actions={
+          <Link
+            href="/app/onaylar?durum=bekliyor"
+            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-line-strong hover:text-text"
+          >
+            Onaylar
+            {bekleyenOnay > 0 ? <span className="numeric rounded-full bg-amber-400/90 px-1.5 py-0.5 text-xs font-bold text-ink-950">{bekleyenOnay}</span> : null}
+            <ArrowUpRight className="h-3.5 w-3.5 opacity-60" aria-hidden />
+          </Link>
+        }
+      />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-amber-400/20 blur-[80px]" />
@@ -258,9 +272,9 @@ export default async function CommissionPage({
         <div className="relative mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           {/* KPI kartları defter filtresine bağlı: tıklayınca ?durum= uygulanır (tarih aralığı korunur) */}
           {[
-            { label: "Toplam komisyon", value: money(total), icon: Wallet, tone: "text-cyan-400", href: filterHref({ durum: null }), active: durum === null },
-            { label: "Tahsil edilen", value: money(paid), icon: CheckCircle2, tone: "text-mint-400", href: filterHref({ durum: "tahsil" }), active: durum === "tahsil" },
-            { label: "Bekleyen", value: money(pending), icon: Clock3, tone: "text-amber-400", href: filterHref({ durum: "bekleyen" }), active: durum === "bekleyen" },
+            { label: "Toplam komisyon", value: <MoneyValue amount={total} />, icon: Wallet, tone: "text-cyan-400", href: filterHref({ durum: null }), active: durum === null },
+            { label: "Tahsil edilen", value: <MoneyValue amount={paid} />, icon: CheckCircle2, tone: "text-mint-400", href: filterHref({ durum: "tahsil" }), active: durum === "tahsil" },
+            { label: "Bekleyen", value: <MoneyValue amount={pending} />, icon: Clock3, tone: "text-amber-400", href: filterHref({ durum: "bekleyen" }), active: durum === "bekleyen" },
           ].map((item) => (
             <Link
               key={item.label}
@@ -288,9 +302,9 @@ export default async function CommissionPage({
         </p>
         <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
-            { label: "Dönem komisyonu", value: money(donemToplam), href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "text-ink-950" },
-            { label: "Tahsil edilen", value: money(donemTahsil), href: filterHref({ durum: "tahsil", from: presets[0].from, to: presets[0].to }), tone: "text-mint-600" },
-            { label: "Bekleyen", value: money(donemBekleyen), href: filterHref({ durum: "bekleyen", from: presets[0].from, to: presets[0].to }), tone: "text-amber-600" },
+            { label: "Dönem komisyonu", value: <MoneyValue amount={donemToplam} />, href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "text-ink-950" },
+            { label: "Tahsil edilen", value: <MoneyValue amount={donemTahsil} />, href: filterHref({ durum: "tahsil", from: presets[0].from, to: presets[0].to }), tone: "text-mint-600" },
+            { label: "Bekleyen", value: <MoneyValue amount={donemBekleyen} />, href: filterHref({ durum: "bekleyen", from: presets[0].from, to: presets[0].to }), tone: "text-amber-600" },
             { label: "Kayıt", value: Number(aggregate.month_record_count).toLocaleString("tr-TR"), href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "text-brand-600" },
           ].map((k) => (
             <Link

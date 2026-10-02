@@ -73,12 +73,15 @@ export function FormSection({
   );
 }
 
-/** Sayfa altında yapışkan eylem çubuğu: iptal (sol/ikincil) + kaydet (birincil). */
+/**
+ * Sayfa altında yapışkan eylem çubuğu: iptal (sol/ikincil) + kaydet (birincil).
+ * Mobilde (< lg) sabit alt gezinme çubuğunun (~4,3rem + güvenli alan) üstünde yapışır; üst üste binmez.
+ */
 export function FormActions({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div
       className={cn(
-        "sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center justify-end gap-2 border-t border-line bg-surface/95 px-1 py-3 backdrop-blur supports-[padding:max(0px)]:pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+        "sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] z-10 -mx-1 flex flex-wrap items-center justify-end gap-2 border-t border-line bg-surface/95 px-1 py-3 backdrop-blur lg:bottom-0 lg:supports-[padding:max(0px)]:pb-[max(0.75rem,env(safe-area-inset-bottom))]",
         className,
       )}
     >

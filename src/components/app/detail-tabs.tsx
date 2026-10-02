@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ComponentType } from "react";
 import { ArrowUpRight, CalendarDays, MessageCircle, PhoneCall, Sparkles, StickyNote } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
+import { MoreActions } from "@/components/app/more-actions";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { cn } from "@/lib/utils";
 
@@ -148,15 +149,19 @@ export function ContactActions({
           <MessageCircle className="h-3.5 w-3.5" aria-hidden /> WhatsApp
         </a>
       ) : null}
-      {appointmentHref ? (
-        <ButtonLink href={appointmentHref} variant="secondary" size="sm" icon={CalendarDays}>
-          Randevu
-        </ButtonLink>
-      ) : null}
-      {noteHref ? (
-        <ButtonLink href={noteHref} scroll={false} variant="secondary" size="sm" icon={StickyNote}>
-          Not
-        </ButtonLink>
+      {appointmentHref || noteHref ? (
+        <MoreActions tone="light">
+          {appointmentHref ? (
+            <ButtonLink href={appointmentHref} variant="secondary" size="sm" icon={CalendarDays}>
+              Randevu
+            </ButtonLink>
+          ) : null}
+          {noteHref ? (
+            <ButtonLink href={noteHref} scroll={false} variant="secondary" size="sm" icon={StickyNote}>
+              Not
+            </ButtonLink>
+          ) : null}
+        </MoreActions>
       ) : null}
     </div>
   );
