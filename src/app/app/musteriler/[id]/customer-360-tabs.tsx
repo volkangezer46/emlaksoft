@@ -12,12 +12,13 @@ import {
   History,
   MessageSquare,
   PhoneCall,
+  Plus,
   ShieldCheck,
   Sparkles,
   Tag,
   Target,
 } from "lucide-react";
-import { NewDemandDialog } from "./new-demand-dialog";
+import { ButtonLink } from "@/components/ui/button";
 import { DemandStatusButtons } from "./demand-status-buttons";
 import { EditDemandDialog } from "./edit-demand-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -130,12 +131,7 @@ type TabId = (typeof tabs)[number]["id"];
 
 export function Customer360Tabs({
   customerId,
-  customerName,
-  defaultProvinceId,
   provinces,
-  transactionTypes,
-  propertyTypes,
-  urgencyOptions,
   demands,
   activity,
   timeline = [],
@@ -254,15 +250,7 @@ export function Customer360Tabs({
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <Target className="h-4 w-4 text-brand-600" /> Talepler
             </h2>
-            <NewDemandDialog
-              customerId={customerId}
-              customerName={customerName}
-              provinces={provinces}
-              defaultProvinceId={defaultProvinceId}
-              transactionTypes={transactionTypes}
-              propertyTypes={propertyTypes}
-              urgencyOptions={urgencyOptions}
-            />
+            <ButtonLink href={`/app/musteriler/${customerId}/talep/yeni`} size="sm" icon={Plus}>Talep ekle</ButtonLink>
           </div>
           {demands.length === 0 ? (
             <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
