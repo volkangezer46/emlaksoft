@@ -161,7 +161,10 @@ describe("core workflow invariant contract", () => {
     expect(contractPage).toContain("canEdit && s.status === \"pending\"");
     expect(contractPage).not.toContain("signers:contract_signers");
     expect(contracts).toContain('admin.rpc("store_contract_signer_otp_atomic"');
-    expect(migration).toContain("select c, t.status::text into v_contract, v_tenant_status");
+    // %rowtype değişkenler çok öğeli INTO listesinde kullanılamaz: sözleşme satırı ve tenant durumu ayrı okunur.
+    expect(migration).toContain("select c.* into v_contract");
+    expect(migration).toContain("select t.status::text into v_tenant_status from public.tenants t where t.id = v_contract.tenant_id;");
+    expect(migration).not.toMatch(/into v_contract,\s*v_tenant_status/);
     expect(migration).toContain("^hmac-sha256-v1:[0-9a-f]{64}$");
     expect(migration).not.toMatch(/grant select[\s\S]{0,300}on public\.contract_signers to authenticated/);
   });

@@ -163,13 +163,18 @@ begin
     return jsonb_build_object('outcome', 'invalid_input');
   end if;
 
-  select cs, c, t.status::text
-    into v_signer, v_contract, v_tenant_status
+  select cs.*
+    into v_signer
   from public.contract_signers cs
   inner join public.contracts c on c.id = cs.contract_id
   inner join public.tenants t on t.id = c.tenant_id
   where cs.token = btrim(p_token)
   for update of c, cs;
+  if found then
+    -- %rowtype değişkenler çok öğeli INTO listesinde kullanılamaz; satırlar kilitliyken ayrı okunur.
+    select c.* into v_contract from public.contracts c where c.id = v_signer.contract_id;
+    select t.status::text into v_tenant_status from public.tenants t where t.id = v_contract.tenant_id;
+  end if;
   if not found then
     return jsonb_build_object('outcome', 'invalid_link');
   end if;
@@ -1700,11 +1705,14 @@ begin
     return jsonb_build_object('outcome', 'invalid_link');
   end if;
 
-  select c, t.status::text into v_contract, v_tenant_status
+  select c.* into v_contract
   from public.contracts c
   join public.tenants t on t.id = c.tenant_id
   where c.id = v_contract_id
   for update of c;
+  if found then
+    select t.status::text into v_tenant_status from public.tenants t where t.id = v_contract.tenant_id;
+  end if;
   if not found or v_tenant_status not in ('trial', 'active', 'past_due') then
     return jsonb_build_object('outcome', 'invalid_link');
   end if;
