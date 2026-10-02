@@ -340,7 +340,7 @@ export default async function PropertyKeysBoardPage({
                   >
                     <div className="min-w-0">
                       {property ? (
-                        <Link href={`/app/portfoyler/${property.id}#anahtarlar`} className="focus-ring group/prop block">
+                        <Link href={`/app/portfoyler/${property.id}?sekme=anahtarlar`} className="focus-ring group/prop block">
                           <p className="truncate text-sm font-semibold text-ink-950 transition group-hover/prop:text-brand-600">
                             {property.title ?? "İsimsiz portföy"}
                             <ArrowUpRight className="ml-1 inline h-3 w-3 text-text-faint opacity-0 transition group-hover/prop:text-brand-600 group-hover/prop:opacity-100" />
