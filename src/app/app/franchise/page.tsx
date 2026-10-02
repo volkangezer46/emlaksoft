@@ -49,7 +49,7 @@ export default async function FranchiseBiPage({
 }: {
   searchParams?: Promise<{ from?: string; to?: string }>;
 }) {
-  await requireModulePage("reports");
+  await requireModulePage("reports", "/app/franchise");
   const supabase = await createClient();
 
   // Dönem filtresi — geçersiz değer sessizce yok sayılır, tüm zamanlara düşer.

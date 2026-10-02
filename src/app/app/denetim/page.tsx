@@ -156,7 +156,7 @@ export default async function AuditPage({
 }: {
   searchParams?: Promise<{ sayfa?: string; from?: string; to?: string; aktor?: string; risk?: string }>;
 }) {
-  await requireModulePage("settings");
+  await requireModulePage("settings", "/app/denetim");
   const params = (await searchParams) ?? {};
   const fromF = safeDate(params.from);
   const toF = safeDate(params.to);

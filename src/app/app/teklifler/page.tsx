@@ -78,7 +78,7 @@ export default async function TekliflerPage({
 }: {
   searchParams?: Promise<{ durum?: string; from?: string; to?: string; musteri?: string; portfoy?: string; sayfa?: string }>;
 }) {
-  const { perms } = await requireModulePage("offers");
+  const { perms } = await requireModulePage("offers", "/app/teklifler");
   const canCreate = perms.offers?.includes("create") ?? perms.commissions?.includes("create") ?? false;
   const params = (await searchParams) ?? {};
   /*

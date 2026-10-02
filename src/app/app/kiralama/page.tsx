@@ -74,7 +74,7 @@ export default async function KiralamaPage({
 }: {
   searchParams?: Promise<{ durum?: string; ariza?: string; evre?: string; portfoy?: string; musteri?: string; tutar?: string }>;
 }) {
-  const { perms } = await requireModulePage("rentals");
+  const { perms } = await requireModulePage("rentals", "/app/kiralama");
   const params = (await searchParams) ?? {};
   /*
    * Kazanılan KİRA anlaşmasının köprüsü: kazanma sihirbazı

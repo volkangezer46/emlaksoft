@@ -90,7 +90,7 @@ export default async function CampaignDetailPage({
   params: Promise<{ id: string }>;
   searchParams?: Promise<{ durum?: string }>;
 }) {
-  await requireModulePage("campaigns");
+  await requireModulePage("campaigns", "/app/kampanyalar");
   const { id } = await params;
   const { durum = "" } = (await searchParams) ?? {};
 

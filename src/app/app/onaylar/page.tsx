@@ -104,7 +104,7 @@ export default async function OnaylarPage({
 }: {
   searchParams?: Promise<{ durum?: string; tur?: string; kim?: string; sayfa?: string }>;
 }) {
-  const { userId, role } = await requireModulePage("commissions");
+  const { userId, role } = await requireModulePage("commissions", "/app/onaylar");
   const params = (await searchParams) ?? {};
 
   // Varsayılan sekme "bekliyor": bu ekranın işi karar bekleyenleri öne almak.

@@ -150,7 +150,7 @@ export default async function DanismanKpiPage({
 }: {
   searchParams?: Promise<{ ay?: string }>;
 }) {
-  const { tenantId, userId } = await requireModulePage("reports");
+  const { tenantId, userId } = await requireModulePage("reports", "/app/danisman-kpi");
   const supabase = await createClient();
 
   // ?ay=YYYY-MM — dönem seçici. Geçersiz/gelecek değer bu aya düşer;

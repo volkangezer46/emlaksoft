@@ -48,7 +48,7 @@ type ForeignCustomer = {
 };
 
 export default async function ForeignSalePage() {
-  const { perms } = await requireModulePage("properties");
+  const { perms } = await requireModulePage("properties", "/app/yabanci-satis");
   const canApplyChecklist = effectiveHasPermission(perms, "commissions", "edit");
   const canMarkForeign = effectiveHasPermission(perms, "customers", "edit");
   const supabase = await createClient();

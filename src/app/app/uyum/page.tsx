@@ -40,7 +40,7 @@ export default async function CompliancePage({
 }: {
   searchParams?: Promise<{ kanal?: string; durum?: string }>;
 }) {
-  const { perms } = await requireModulePage("compliance");
+  const { perms } = await requireModulePage("compliance", "/app/uyum");
   const params = (await searchParams) ?? {};
   const kanal = CHANNELS.includes(params.kanal ?? "") ? params.kanal : undefined;
   const durum = STATUSES.includes(params.durum ?? "") ? params.durum : undefined;

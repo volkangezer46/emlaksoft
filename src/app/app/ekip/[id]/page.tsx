@@ -38,7 +38,7 @@ function initials(name: string) {
 }
 
 export default async function TeamMemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { perms } = await requireModulePage("team");
+  const { perms } = await requireModulePage("team", "/app/ekip");
   const canHandoff = (perms.team ?? []).includes("edit");
   const { id } = await params;
   const supabase = await createClient();

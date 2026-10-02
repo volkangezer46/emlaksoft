@@ -63,7 +63,7 @@ export default async function GiderlerPage({
 }: {
   searchParams?: Promise<{ kategori?: string; from?: string; to?: string }>;
 }) {
-  const { perms } = await requireModulePage("expenses");
+  const { perms } = await requireModulePage("expenses", "/app/giderler");
   const params = (await searchParams) ?? {};
   const fromF = ISO_DATE.test(params.from ?? "") ? params.from! : null;
   const toF = ISO_DATE.test(params.to ?? "") ? params.to! : null;

@@ -94,7 +94,7 @@ export default async function LeakShieldPage({
 }: {
   searchParams?: Promise<{ neden?: string; tip?: string; siddet?: string; from?: string; to?: string; sayfa?: string }>;
 }) {
-  const { perms } = await requireModulePage("leak");
+  const { perms } = await requireModulePage("leak", "/app/kayip-kacak");
   // Kurtarma aksiyonu (teyit) yalnız portal düzenleme yetkisi olana gösterilir;
   // action zaten kendi kapısını da kontrol eder (portals:edit).
   const canConfirm = (perms.portals ?? []).includes("edit");

@@ -27,7 +27,7 @@ function money(n: number) {
 }
 
 export default async function ProjeDetayPage({ params }: { params: Promise<{ id: string }> }) {
-  const { perms } = await requireModulePage("projects");
+  const { perms } = await requireModulePage("projects", "/app/projeler");
   const { id } = await params;
 
   const [project, units, payments] = await Promise.all([

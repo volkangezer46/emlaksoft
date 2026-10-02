@@ -70,7 +70,7 @@ export default async function TalepArzPage({
 }: {
   searchParams: Promise<{ islem?: string; il?: string; donem?: string }>;
 }) {
-  await requireModulePage("reports");
+  await requireModulePage("reports", "/app/raporlar");
   const sp = await searchParams;
   const supabase = await createClient();
 

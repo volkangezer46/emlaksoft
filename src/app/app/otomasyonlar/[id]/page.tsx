@@ -51,7 +51,7 @@ const RESULT_BADGES: Record<string, { label: string; className: string }> = {
 };
 
 export default async function AutomationDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { perms } = await requireModulePage("settings");
+  const { perms } = await requireModulePage("settings", "/app/otomasyonlar");
   const canEdit = (perms.settings ?? []).includes("edit");
   const { id } = await params;
   const supabase = await createClient();

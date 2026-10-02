@@ -61,7 +61,7 @@ export default async function AcikEvPage({
 }: {
   searchParams?: Promise<{ durum?: string }>;
 }) {
-  const { perms } = await requireModulePage("open_house");
+  const { perms } = await requireModulePage("open_house", "/app/acik-ev");
   const params = (await searchParams) ?? {};
   const durum = Object.keys(FILTER_LABELS).includes(params.durum ?? "") ? params.durum : undefined;
   const events = await listOpenHouses();

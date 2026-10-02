@@ -64,7 +64,7 @@ export default async function AidatPage({
 }: {
   searchParams?: Promise<{ durum?: string; donem?: string; sayfa?: string }>;
 }) {
-  const { perms, tenantId } = await requireModulePage("expenses");
+  const { perms, tenantId } = await requireModulePage("expenses", "/app/aidat");
   const params = (await searchParams) ?? {};
   const durumF = DURUM_FILTERS.includes(params.durum as DurumFilter) ? (params.durum as DurumFilter) : "";
   const donemF = DONEM_RE.test(params.donem ?? "") ? params.donem! : "";

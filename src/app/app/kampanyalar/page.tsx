@@ -66,7 +66,7 @@ export default async function KampanyalarPage({
 }: {
   searchParams?: Promise<{ durum?: string; kanal?: string }>;
 }) {
-  const { perms } = await requireModulePage("campaigns");
+  const { perms } = await requireModulePage("campaigns", "/app/kampanyalar");
   const params = (await searchParams) ?? {};
   const durum = params.durum ?? "";
   const kanal = params.kanal ?? "";

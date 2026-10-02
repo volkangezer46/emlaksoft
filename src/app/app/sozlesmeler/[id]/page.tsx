@@ -52,7 +52,7 @@ function entityName(v: { full_name?: string; title?: string; property_code?: str
 }
 
 export default async function ContractDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { perms } = await requireModulePage("contracts");
+  const { perms } = await requireModulePage("contracts", "/app/sozlesmeler");
   const canEdit = perms.contracts?.includes("edit") ?? false;
   const { id } = await params;
   const supabase = await createClient();

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { ChevronRight, Menu, Sparkles, X } from "lucide-react";
+import { ChevronRight, Lock, Menu, Sparkles, X } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar `src/lib/icons.ts` sözlüğünden gelir.
 import { ICONS } from "@/lib/icons";
 import { findActiveNavigationHref } from "@/lib/navigation";
@@ -17,6 +17,7 @@ export function AppSidebar({
   trial,
   officeScore = null,
   accessibleModules,
+  lockedHrefs = [],
 }: {
   officeName: string;
   plan: string;
@@ -24,6 +25,8 @@ export function AppSidebar({
   officeScore?: number | null;
   /** Etkin izinlere göre erişilebilir modüller (bkz. `getEffectivePermissions`, tenant override'larını içerir) */
   accessibleModules: AppModule[];
+  /** Pakete dahil olmayan sayfalar: menüde kilit simgesi, tıklayınca yükseltme sayfası. */
+  lockedHrefs?: string[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -50,6 +53,9 @@ export function AppSidebar({
       >
         <item.icon className={`h-3.5 w-3.5 shrink-0 ${active ? "text-mint-400" : "text-white/45"}`} />
         <span className="flex-1 truncate">{item.label}</span>
+        {lockedHrefs.some((h) => item.href === h || item.href.startsWith(`${h}/`)) ? (
+          <Lock className="h-3 w-3 shrink-0 text-amber-400/80" aria-label="Paketinize dahil değil" />
+        ) : null}
       </Link>
     );
   };

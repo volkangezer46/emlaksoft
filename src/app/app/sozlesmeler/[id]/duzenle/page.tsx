@@ -11,7 +11,7 @@ import { EditContractForm } from "./edit-contract-form";
  * içerik sürüm geçmişine yazılır (updateContract).
  */
 export default async function ContractEditPage({ params }: { params: Promise<{ id: string }> }) {
-  const { perms } = await requireModulePage("contracts");
+  const { perms } = await requireModulePage("contracts", "/app/sozlesmeler");
   const canEdit = perms.contracts?.includes("edit") ?? false;
   const { id } = await params;
 

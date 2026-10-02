@@ -115,7 +115,7 @@ export default async function LigPage({
 }: {
   searchParams?: Promise<{ donem?: string; kapsam?: string; tv?: string }>;
 }) {
-  const { tenantId, userId } = await requireModulePage("reports");
+  const { tenantId, userId } = await requireModulePage("reports", "/app/lig");
   const sp = (await searchParams) ?? {};
   const tvMode = sp.tv === "1";
 

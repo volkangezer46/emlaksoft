@@ -50,7 +50,7 @@ export default async function ProjelerPage({
 }: {
   searchParams?: Promise<{ durum?: string }>;
 }) {
-  const { perms } = await requireModulePage("projects");
+  const { perms } = await requireModulePage("projects", "/app/projeler");
   const canCreate = (perms.projects ?? []).includes("create");
   const params = (await searchParams) ?? {};
   const durum = Object.keys(FILTER_LABELS).includes(params.durum ?? "") ? params.durum : undefined;

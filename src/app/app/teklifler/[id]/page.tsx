@@ -82,7 +82,7 @@ function one<T>(v: T | T[] | null): T | null {
 }
 
 export default async function OfferDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { perms } = await requireModulePage("offers");
+  const { perms } = await requireModulePage("offers", "/app/teklifler");
   const canEdit = (perms.offers ?? perms.commissions ?? []).includes("edit");
   const { id } = await params;
 

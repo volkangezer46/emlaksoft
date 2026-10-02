@@ -25,7 +25,7 @@ function rel<T>(v: Rel<T>): T | null {
 }
 
 export default async function KiraDetayPage({ params }: { params: Promise<{ id: string }> }) {
-  const { perms } = await requireModulePage("rentals");
+  const { perms } = await requireModulePage("rentals", "/app/kiralama");
   const canCreate = perms.rentals?.includes("create") ?? false;
   const canEdit = perms.rentals?.includes("edit") ?? false;
   const { id } = await params;

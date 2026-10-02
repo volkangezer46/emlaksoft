@@ -11,7 +11,7 @@ describe("target permission semantic contract", () => {
   it("keeps the page and every target action on the targets capability", () => {
     const pageSource = read("src/app/app/hedefler/page.tsx");
 
-    expect(pageSource).toContain('requireModulePage("targets")');
+    expect(pageSource).toContain('requireModulePage("targets"');
     expect(targetSection).toContain('requirePermission("targets", "view")');
     expect(targetSection.match(/requirePermission\("targets", "create"\)/g)).toHaveLength(2);
     expect(targetSection).toContain('requirePermission("targets", "edit")');

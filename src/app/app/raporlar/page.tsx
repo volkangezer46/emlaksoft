@@ -97,7 +97,7 @@ function TrendBadge({ trend }: { trend: TrendInfo }) {
 }
 
 export default async function ReportsPage() {
-  await requireModulePage("reports");
+  await requireModulePage("reports", "/app/raporlar");
   const supabase = await createClient();
   const asOf = new Date(clockNow());
   const aggregateResult = await supabase.rpc("tenant_reporting_aggregates", {

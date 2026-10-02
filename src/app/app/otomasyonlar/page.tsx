@@ -74,7 +74,7 @@ export default async function OtomasyonlarPage({
 }: {
   searchParams?: Promise<{ durum?: string }>;
 }) {
-  const { perms } = await requireModulePage("settings");
+  const { perms } = await requireModulePage("settings", "/app/otomasyonlar");
   const canEdit = (perms.settings ?? []).includes("edit");
   const params = (await searchParams) ?? {};
   const durum = params.durum ?? "";

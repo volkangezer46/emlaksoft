@@ -98,7 +98,7 @@ export default async function LeavesPage({
 }: {
   searchParams?: Promise<{ ay?: string; gecmis?: string }>;
 }) {
-  const gate = await requireModulePage("team");
+  const gate = await requireModulePage("team", "/app/ekip");
   const canManage = (gate.perms.team ?? []).includes("edit");
   const supabase = await createClient();
   const sp = (await searchParams) ?? {};

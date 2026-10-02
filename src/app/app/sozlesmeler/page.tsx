@@ -102,7 +102,7 @@ export default async function SozlesmelerPage({
 }: {
   searchParams?: Promise<{ durum?: string; customer?: string; property?: string; from?: string; to?: string; yenileme?: string; sayfa?: string }>;
 }) {
-  const { perms } = await requireModulePage("contracts");
+  const { perms } = await requireModulePage("contracts", "/app/sozlesmeler");
   const params = (await searchParams) ?? {};
   // Filtre değerleri DB'deki gerçek durum enum'ları (draft/sent/signed/…)
   const durum = params.durum && STATUS_LABELS[params.durum] ? params.durum : null;

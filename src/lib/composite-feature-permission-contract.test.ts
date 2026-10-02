@@ -9,7 +9,7 @@ describe("composite feature permission truthfulness", () => {
     const page = read("src/app/app/yabanci-satis/page.tsx");
     const forms = read("src/app/app/yabanci-satis/foreign-sale-forms.tsx");
 
-    expect(page).toContain('requireModulePage("properties")');
+    expect(page).toContain('requireModulePage("properties"');
     expect(page).toContain('effectiveHasPermission(perms, "commissions", "edit")');
     expect(page).toContain('effectiveHasPermission(perms, "customers", "edit")');
     expect(page).toContain("canEdit={canApplyChecklist}");

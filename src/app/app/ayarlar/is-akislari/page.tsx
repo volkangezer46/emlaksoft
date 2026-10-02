@@ -32,7 +32,7 @@ type StepRow = {
 };
 
 export default async function IsAkislariPage() {
-  const { tenantId, perms } = await requireModulePage("settings");
+  const { tenantId, perms } = await requireModulePage("settings", "/app/ayarlar/is-akislari");
   const canEdit = (perms.settings ?? []).includes("edit");
   const supabase = await createClient();
 

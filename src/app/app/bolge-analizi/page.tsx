@@ -58,7 +58,7 @@ export default async function RegionAnalysisPage({
 }: {
   searchParams?: Promise<{ tx?: string; months?: string; district?: string }>;
 }) {
-  const { tenantId } = await requireModulePage("reports");
+  const { tenantId } = await requireModulePage("reports", "/app/bolge-analizi");
   const params = (await searchParams) ?? {};
   const tx = TX_FILTERS.some((f) => f.value === params.tx) ? (params.tx ?? "") : "";
   // Serbest metni doğrudan RPC'ye geçirmiyoruz: yalnızca beyaz listedeki değer.

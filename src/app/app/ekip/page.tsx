@@ -67,7 +67,7 @@ function initials(name: string) {
 }
 
 export default async function TeamPage() {
-  const { perms, tenantId } = await requireModulePage("team");
+  const { perms, tenantId } = await requireModulePage("team", "/app/ekip");
   const canManage = (perms.team ?? []).includes("create");
   const supabase = await createClient();
 

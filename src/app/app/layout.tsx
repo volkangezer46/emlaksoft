@@ -34,6 +34,7 @@ import {
 } from "@/lib/permissions-effective";
 import type { AppModule } from "@/lib/permissions";
 import { planLabel } from "@/lib/billing/plans";
+import { lockedHrefs } from "@/lib/billing/page-gates";
 
 const NAV_MODULES: AppModule[] = [
   "dashboard",
@@ -72,6 +73,7 @@ type OfficeSummary = {
   plan?: string;
   status?: string;
   brand_color?: string | null;
+  created_at?: string | null;
 };
 
 export default async function AppLayout({
@@ -89,7 +91,7 @@ export default async function AppLayout({
   const impersonatedTenantPromise = user && impersonating && claimedTenantId
     ? supabase
         .from("tenants")
-        .select("name, plan, status, brand_color")
+        .select("name, plan, status, brand_color, created_at")
         .eq("id", claimedTenantId)
         .maybeSingle()
     : Promise.resolve({ data: null });
@@ -100,7 +102,7 @@ export default async function AppLayout({
     user
       ? supabase
           .from("profiles")
-          .select("full_name, role, tenant_id, tenants(name, plan, status, brand_color)")
+          .select("full_name, role, tenant_id, tenants(name, plan, status, brand_color, created_at)")
           .eq("id", user.id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -147,6 +149,10 @@ export default async function AppLayout({
   }
 
   const platformStaffFullAccess = Boolean(platformStaff && !impersonating);
+  // Paket kilidi: menüde kilit simgesi gösterilecek sayfalar (platform personeli hariç)
+  const lockedNavHrefs = platformStaffFullAccess
+    ? []
+    : lockedHrefs({ plan: office?.plan, trial: office?.status === "trial", tenantCreatedAt: office?.created_at });
   const effectivePerms = platformStaffFullAccess
     ? null
     : impersonating
@@ -192,6 +198,7 @@ export default async function AppLayout({
           trial={office?.status === "trial"}
           officeScore={officeScore}
           accessibleModules={accessibleModules}
+          lockedHrefs={lockedNavHrefs}
         />
         <div className="flex min-w-0 flex-1 flex-col">
           {impersonating && platformStaff ? <OpsImpersonationBanner tenantName={impName || office?.name || "Ofis"} /> : null}
@@ -289,7 +296,7 @@ export default async function AppLayout({
             id="main-content"
             className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1fr)] content-start overflow-x-clip p-4 pb-28 md:px-6 md:pt-6 lg:p-8"
           >
-            <SectionTabs accessibleModules={accessibleModules} />
+            <SectionTabs accessibleModules={accessibleModules} lockedHrefs={lockedNavHrefs} />
             {children}
           </main>
         </div>

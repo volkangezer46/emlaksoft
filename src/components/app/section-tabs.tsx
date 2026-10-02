@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
+import { Lock } from "lucide-react";
 import { resolveActiveNav, visibleSections } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -12,7 +13,14 @@ import { cn } from "@/lib/utils";
  * Talepler → Eşleştirme). Menü 9 başlığa indiği için sayfalar arası geçiş burada.
  * Başlıkta tek sayfa varsa görünmez. Kaynak: src/lib/nav-config.ts.
  */
-export function SectionTabs({ accessibleModules }: { accessibleModules: AppModule[] }) {
+export function SectionTabs({
+  accessibleModules,
+  lockedHrefs = [],
+}: {
+  accessibleModules: AppModule[];
+  /** Pakete dahil olmayan sayfalar (kilit simgesi). */
+  lockedHrefs?: string[];
+}) {
   const pathname = usePathname();
   const sections = useMemo(() => visibleSections(accessibleModules), [accessibleModules]);
   const { section, href: activeHref } = resolveActiveNav(pathname, sections);
@@ -38,6 +46,9 @@ export function SectionTabs({ accessibleModules }: { accessibleModules: AppModul
               >
                 <item.icon className="h-3.5 w-3.5" aria-hidden />
                 {item.label}
+                {lockedHrefs.some((h) => item.href === h || item.href.startsWith(`${h}/`)) ? (
+                  <Lock className="h-3 w-3 text-amber-600" aria-label="Paketinize dahil değil" />
+                ) : null}
               </Link>
             </li>
           );

@@ -133,7 +133,7 @@ function buildLossInsights(deals: DealRow[], now: number) {
 }
 
 export default async function KayipSatisPage() {
-  const ctx = await requireModulePage("customers");
+  const ctx = await requireModulePage("customers", "/app/kayip-satis");
 
   // Snooze/arandı filtresi: dismissed_until gelecekte olanlar ve son 30 günde
   // "called" işaretlenenler listeden düşer (bkz. lost_sale_dismissals).

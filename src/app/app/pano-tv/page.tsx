@@ -13,7 +13,7 @@ const compact = (n: number) =>
   n >= 1_000_000 ? `₺${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `₺${(n / 1_000).toFixed(0)}B` : `₺${nf.format(n)}`;
 
 export default async function PanoTvPage() {
-  const { tenantId } = await requireModulePage("reports");
+  const { tenantId } = await requireModulePage("reports", "/app/pano-tv");
   const supabase = await createClient();
   const since = daysAgoIso(30);
 

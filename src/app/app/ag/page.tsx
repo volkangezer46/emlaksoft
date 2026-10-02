@@ -134,7 +134,7 @@ export default async function AgPage({
     talep_il?: string; talep_tip?: string; talep_min?: string; talep_max?: string;
   }>;
 }) {
-  const { perms } = await requireModulePage("network");
+  const { perms } = await requireModulePage("network", "/app/ag");
   const networkPerms = perms.network ?? [];
   const canCreate = networkPerms.includes("create");
   const canEdit = networkPerms.includes("edit");

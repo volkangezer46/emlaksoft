@@ -74,7 +74,7 @@ function profileLabel(p: { id: string; full_name: string } | { id: string; full_
 }
 
 export default async function HedeflerPage() {
-  const ctx = await requireModulePage("targets");
+  const ctx = await requireModulePage("targets", "/app/hedefler");
   const canCreate = (ctx.perms.targets ?? []).includes("create");
   const canEdit   = (ctx.perms.targets ?? []).includes("edit");
   const canDelete = (ctx.perms.targets ?? []).includes("delete");

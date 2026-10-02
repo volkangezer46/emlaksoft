@@ -60,7 +60,7 @@ function money(n: number | null | undefined) {
  * doğrudan sayfaya koyuyor (dialog değil — gerekçesi visitor-form.tsx'te).
  */
 export default async function OpenHouseDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { perms } = await requireModulePage("open_house");
+  const { perms } = await requireModulePage("open_house", "/app/acik-ev");
   const { id } = await params;
 
   const [event, visitors] = await Promise.all([getOpenHouse(id), listOpenHouseVisitors(id)]);

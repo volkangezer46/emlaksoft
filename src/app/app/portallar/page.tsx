@@ -95,7 +95,7 @@ export default async function PortalsPage({
 }: {
   searchParams?: Promise<{ durum?: string; portal?: string; sayfa?: string; property?: string }>;
 }) {
-  await requireModulePage("portals");
+  await requireModulePage("portals", "/app/portallar");
   const sp = (await searchParams) ?? {};
   const durum = (DURUM_VALUES as readonly string[]).includes(sp.durum ?? "") ? sp.durum! : "";
   const portal = sp.portal ?? "";

@@ -70,7 +70,7 @@ function ScoreBadge({ score }: { score: number }) {
  * ekleme yok — o alan başka modülün; kapanan anlaşmalar burada listelenir).
  */
 export default async function SatisfactionReportPage() {
-  await requireModulePage("reports");
+  await requireModulePage("reports", "/app/raporlar");
   const supabase = await createClient();
 
   const [{ data: surveys }, { data: wonDeals }, { data: profiles }] = await Promise.all([

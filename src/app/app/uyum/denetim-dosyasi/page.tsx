@@ -34,7 +34,7 @@ function tarih(iso: string | null) {
  * dosyası denetime hazırlık değil, kendini kandırmadır. Eksikler en üstte.
  */
 export default async function AuditDossierPage() {
-  await requireModulePage("compliance");
+  await requireModulePage("compliance", "/app/uyum");
   const d = await buildAuditDossier();
   if (!d) notFound();
 
