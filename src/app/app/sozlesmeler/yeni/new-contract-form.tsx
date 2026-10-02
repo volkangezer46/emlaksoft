@@ -6,6 +6,7 @@ import { ArrowLeft, FilePlus2, FileSignature } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { FormActions, FormPage, FormSection } from "@/components/ui/form-page";
+import { FormError, FormField, FormInput, FormSelect, fieldClass } from "@/components/ui/form-controls";
 import { useToast } from "@/components/app/toast-provider";
 import {
   createContract,
@@ -147,9 +148,6 @@ Müşteri:  ___________________________  Tarih: _______`,
 };
 
 const init: ContractResult = {};
-
-const inputCls =
-  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300";
 
 export function NewContractForm({
   contractTypes = CONTRACT_TYPES,
@@ -307,40 +305,30 @@ export function NewContractForm({
         ) : null}
 
         <FormSection title="Sözleşme bilgileri">
-          <div className="sm:col-span-2">
-            <label htmlFor="sozl-title" className="mb-1.5 block text-sm font-semibold text-ink-950">
-              Sözleşme başlığı
-            </label>
-            <input
-              id="sozl-title"
+          <FormField label="Sözleşme başlığı" htmlFor="sozl-title" required className="sm:col-span-2">
+            <FormInput
               name="title"
               type="text"
               required
               defaultValue={isYerGosterme ? "Yer Gösterme Tutanağı" : undefined}
               placeholder="ör. Daire Kira Sözleşmesi — Ahmet Yılmaz"
-              className={inputCls}
             />
-          </div>
-          <div>
-            <label htmlFor="sozl-type" className="mb-1.5 block text-sm font-semibold text-ink-950">Tür</label>
-            <select
-              id="sozl-type"
+          </FormField>
+          <FormField label="Tür" htmlFor="sozl-type">
+            <FormSelect
               name="contract_type"
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
-              className={`${inputCls} appearance-none`}
+              className="appearance-none"
             >
               {contractTypes.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="sozl-expires" className="mb-1.5 block text-sm font-semibold text-ink-950">
-              Son geçerlilik tarihi <span className="font-normal text-text-faint">(opsiyonel)</span>
-            </label>
-            <input id="sozl-expires" name="expires_at" type="date" className={inputCls} />
-          </div>
+            </FormSelect>
+          </FormField>
+          <FormField label="Son geçerlilik tarihi (opsiyonel)" htmlFor="sozl-expires">
+            <FormInput name="expires_at" type="date" />
+          </FormField>
         </FormSection>
 
         <FormSection title="Sözleşme içeriği" description="Metni yazın veya türe uygun şablonu uygulayın.">
@@ -365,7 +353,7 @@ export function NewContractForm({
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="Sözleşme metnini buraya yazın veya şablonu kullanın…"
-              className={`${inputCls} resize-y font-mono text-xs`}
+              className={`${fieldClass} resize-y font-mono text-xs`}
             />
           </div>
           <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3.5 py-2.5 sm:col-span-2">
@@ -384,11 +372,7 @@ export function NewContractForm({
           </label>
         </FormSection>
 
-        {localError && (
-          <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
-            {localError}
-          </p>
-        )}
+        <FormError error={localError} />
 
         <FormActions>
           <ButtonLink href="/app/sozlesmeler" variant="secondary">İptal</ButtonLink>

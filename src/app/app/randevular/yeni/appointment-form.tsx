@@ -1,20 +1,14 @@
 "use client";
 
-import { useActionState } from "react";
-import { useRouter } from "next/navigation";
 import { Check, MapPin, Sparkles, TriangleAlert } from "lucide-react";
-import { createAppointment, type AppointmentResult } from "@/app/actions/appointments";
+import { createAppointment } from "@/app/actions/appointments";
 import { searchCustomers, searchProperties } from "@/app/actions/lookup";
-import { useToast } from "@/components/app/toast-provider";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { useCreateForm } from "@/components/app/use-create-form";
 import { Combobox } from "@/components/ui/combobox";
-import { FormActions, FormPage, FormSection } from "@/components/ui/form-page";
-import { FormField, Input, Textarea } from "@/components/ui/input";
+import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
+import { FormSection, FormShell } from "@/components/ui/form-page";
 
 type Option = { id: string; label: string };
-
-const selectClass =
-  "surface-sunken w-full rounded-[var(--radius-control)] border border-hairline px-3.5 py-2.5 text-sm text-ink-950 transition focus:border-brand-400 focus:bg-surface focus:outline-none";
 
 export function AppointmentForm({
   customers,
@@ -37,94 +31,29 @@ export function AppointmentForm({
   /** ?saat= (HH:MM) ya da 10:00. */
   defaultTime: string;
 }) {
-  const router = useRouter();
-  const { push } = useToast();
-
   // Sunucu çakışma bulursa kayıt YAPILMAZ ve conflictWarning döner; form uyarı
   // bandı + gizli confirm_conflict=1 ile ikinci gönderimde kayıt geçer.
-  const [state, formAction, pending] = useActionState(
-    async (_prev: AppointmentResult, formData: FormData): Promise<AppointmentResult> => {
-      const result = await createAppointment(formData);
-      if (result.ok) {
-        push("Randevu planlandı", "ok");
-        router.push("/app/randevular");
-      }
-      return result;
-    },
-    {},
-  );
+  const { state, onSubmit, pending } = useCreateForm((fd) => createAppointment(fd), {
+    successMessage: "Randevu planlandı",
+    redirectTo: () => "/app/randevular",
+  });
   const conflictWarning = state.conflictWarning ?? null;
   const error = !conflictWarning && state.error ? state.error : null;
 
   return (
-    <form action={formAction}>
-      <FormPage
-        title="Yeni randevu planla"
-        description="Yer gösterme, değerleme veya ofis görüşmesi ekleyin."
-        breadcrumbs={[{ label: "Randevular", href: "/app/randevular" }, { label: "Yeni randevu" }]}
-      >
-        <FormSection title="Zaman" description="Randevunun türü, günü ve süresi.">
-          <FormField label="Randevu türü" required htmlFor="appointment-type">
-            <select id="appointment-type" name="appointment_type" required defaultValue="showing" className={selectClass}>
-              {typeOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Süre (dk)" htmlFor="appointment-duration">
-            <Input id="appointment-duration" name="duration_min" inputMode="numeric" placeholder="45" />
-          </FormField>
-          <FormField label="Tarih" required htmlFor="appointment-date">
-            <Input id="appointment-date" name="date" type="date" required defaultValue={defaultDate} />
-          </FormField>
-          <FormField label="Saat" required htmlFor="appointment-time">
-            <Input id="appointment-time" name="time" type="time" required defaultValue={defaultTime} />
-          </FormField>
-        </FormSection>
-
-        <FormSection title="Katılımcılar ve yer" description="Müşteri ve portföy yazarak aranır (Türkçe karakter duyarsız).">
-          <FormField label="Müşteri">
-            <Combobox
-              name="customer_id"
-              aria-label="Müşteri"
-              placeholder="Seçiniz"
-              searchPlaceholder="Müşteri ara…"
-              emptyText="Eşleşen müşteri yok"
-              onSearch={searchCustomers}
-              defaultValue={defaultCustomerId}
-              options={customers.map((c) => ({ value: c.id, label: c.label }))}
-            />
-          </FormField>
-          <FormField label="Portföy">
-            <Combobox
-              name="property_id"
-              aria-label="Portföy"
-              placeholder="Seçiniz"
-              searchPlaceholder="Portföy ara…"
-              emptyText="Eşleşen portföy yok"
-              onSearch={searchProperties}
-              defaultValue={defaultPropertyId}
-              options={properties.map((p) => ({ value: p.id, label: p.label }))}
-            />
-          </FormField>
-          <FormField label="Konum" htmlFor="appointment-location" className="sm:col-span-2">
-            <div className="relative">
-              <Input id="appointment-location" name="location" className="pr-9" placeholder="Onikişubat, Kahramanmaraş" />
-              <MapPin className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-            </div>
-          </FormField>
-          <FormField label="Not" htmlFor="appointment-notes" className="sm:col-span-2">
-            <Textarea id="appointment-notes" name="notes" rows={3} placeholder="Talep, hazırlık, dikkat edilecekler…" />
-          </FormField>
-        </FormSection>
-
-        <p className="flex items-center gap-2 rounded-[var(--radius-card)] border border-brand-300/40 bg-brand-600/5 px-4 py-3 text-xs font-semibold text-brand-600">
-          <Sparkles className="h-4 w-4 shrink-0" /> Randevu “teyit bekliyor” olarak açılır; onaylayıp tamamlandığında komisyon akışına kaynak olur.
-        </p>
-
-        {error ? <p className="text-sm font-medium text-danger-600" role="alert">{error}</p> : null}
-
-        {conflictWarning ? (
+    <FormShell
+      title="Yeni randevu planla"
+      description="Yer gösterme, değerleme veya ofis görüşmesi ekleyin."
+      breadcrumbs={[{ label: "Randevular", href: "/app/randevular" }, { label: "Yeni randevu" }]}
+      cancelHref="/app/randevular"
+      submitLabel={conflictWarning ? "Yine de kaydet" : "Randevuyu planla"}
+      pendingLabel="Planlanıyor…"
+      submitIcon={Check}
+      pending={pending}
+      error={error}
+      onSubmit={onSubmit}
+      notice={
+        conflictWarning ? (
           <div
             className="flex items-start gap-2.5 rounded-[var(--radius-card)] border border-amber-400/50 bg-amber-400/10 px-4 py-3 text-xs font-medium leading-relaxed text-amber-700"
             role="alert"
@@ -136,15 +65,67 @@ export function AppointmentForm({
             </span>
             <input type="hidden" name="confirm_conflict" value="1" />
           </div>
-        ) : null}
+        ) : null
+      }
+    >
+      <FormSection title="Zaman" description="Randevunun türü, günü ve süresi.">
+        <FormField label="Randevu türü" htmlFor="appointment-type" required>
+          <FormSelect name="appointment_type" required defaultValue="showing">
+            {typeOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </FormSelect>
+        </FormField>
+        <FormField label="Süre (dk)" htmlFor="appointment-duration">
+          <FormInput name="duration_min" inputMode="numeric" placeholder="45" />
+        </FormField>
+        <FormField label="Tarih" htmlFor="appointment-date" required>
+          <FormInput name="date" type="date" required defaultValue={defaultDate} />
+        </FormField>
+        <FormField label="Saat" htmlFor="appointment-time" required>
+          <FormInput name="time" type="time" required defaultValue={defaultTime} />
+        </FormField>
+      </FormSection>
 
-        <FormActions>
-          <ButtonLink href="/app/randevular" variant="secondary">İptal</ButtonLink>
-          <Button type="submit" loading={pending} icon={Check}>
-            {pending ? "Planlanıyor…" : conflictWarning ? "Yine de kaydet" : "Randevuyu planla"}
-          </Button>
-        </FormActions>
-      </FormPage>
-    </form>
+      <FormSection title="Katılımcılar ve yer" description="Müşteri ve portföy yazarak aranır (Türkçe karakter duyarsız).">
+        <FormField label="Müşteri" htmlFor="appointment-customer">
+          <Combobox
+            name="customer_id"
+            aria-label="Müşteri"
+            placeholder="Seçiniz"
+            searchPlaceholder="Müşteri ara…"
+            emptyText="Eşleşen müşteri yok"
+            onSearch={searchCustomers}
+            defaultValue={defaultCustomerId}
+            options={customers.map((c) => ({ value: c.id, label: c.label }))}
+          />
+        </FormField>
+        <FormField label="Portföy" htmlFor="appointment-property">
+          <Combobox
+            name="property_id"
+            aria-label="Portföy"
+            placeholder="Seçiniz"
+            searchPlaceholder="Portföy ara…"
+            emptyText="Eşleşen portföy yok"
+            onSearch={searchProperties}
+            defaultValue={defaultPropertyId}
+            options={properties.map((p) => ({ value: p.id, label: p.label }))}
+          />
+        </FormField>
+        <FormField label="Konum" htmlFor="appointment-location" inject={false} className="sm:col-span-2">
+          <div className="relative">
+            <FormInput id="appointment-location" name="location" className="pr-9" placeholder="Onikişubat, Kahramanmaraş" />
+            <MapPin className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+          </div>
+        </FormField>
+        <FormField label="Not" htmlFor="appointment-notes" className="sm:col-span-2">
+          <FormTextarea name="notes" rows={3} placeholder="Talep, hazırlık, dikkat edilecekler…" />
+        </FormField>
+      </FormSection>
+
+      <p className="flex items-center gap-2 rounded-[var(--radius-card)] border border-brand-300/40 bg-brand-600/5 px-4 py-3 text-xs font-semibold text-brand-600">
+        <Sparkles className="h-4 w-4 shrink-0" /> Randevu “teyit bekliyor” olarak açılır; onaylayıp tamamlandığında komisyon akışına kaynak olur.
+      </p>
+    </FormShell>
   );
 }

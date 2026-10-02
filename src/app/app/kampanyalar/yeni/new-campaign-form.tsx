@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, RefreshCw, Sparkles } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { FormActions, FormPage, FormSection } from "@/components/ui/form-page";
+import { FormError, FormField, FormInput, FormSelect, fieldClass } from "@/components/ui/form-controls";
 import { useToast } from "@/components/app/toast-provider";
 import {
   createCampaign,
@@ -21,10 +22,6 @@ const FILTERS = [
 ];
 
 const init: CampaignResult = {};
-
-const labelCls = "mb-1.5 block text-sm font-semibold text-ink-950";
-const inputCls =
-  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300";
 
 export function NewCampaignForm() {
   const router = useRouter();
@@ -78,22 +75,16 @@ export function NewCampaignForm() {
         breadcrumbs={[{ label: "Kampanyalar", href: "/app/kampanyalar" }, { label: "Yeni kampanya" }]}
       >
         <FormSection title="Kampanya ve kanal">
-          <div className="sm:col-span-2">
-            <label htmlFor="kamp-title" className={labelCls}>Kampanya başlığı</label>
-            <input
-              id="kamp-title"
-              name="title"
-              type="text"
-              required
-              placeholder="ör. Temmuz Fırsat Kampanyası"
-              className={inputCls}
-            />
-          </div>
+          <FormField label="Kampanya başlığı" htmlFor="kamp-title" required className="sm:col-span-2">
+            <FormInput name="title" type="text" required placeholder="ör. Temmuz Fırsat Kampanyası" />
+          </FormField>
 
-          <div>
-            <label htmlFor="kamp-channel" className={labelCls}>Kanal</label>
-            <select
-              id="kamp-channel"
+          <FormField
+            label="Kanal"
+            htmlFor="kamp-channel"
+            hint="WhatsApp kampanyaları yalnızca Meta tarafından onaylanmış mesaj şablonuyla gönderilir."
+          >
+            <FormSelect
               name="channel"
               value={channel}
               onChange={(event) => {
@@ -103,25 +94,21 @@ export function NewCampaignForm() {
                 setState(init);
                 if (nextChannel === "whatsapp") loadApprovedTemplates();
               }}
-              className={`${inputCls} appearance-none`}
+              className="appearance-none"
             >
               <option value="sms">SMS (Netgsm)</option>
               <option value="whatsapp">WhatsApp</option>
               <option value="email" disabled>E-posta (yakında)</option>
-            </select>
-            <p className="mt-1.5 text-xs text-text-faint">
-              WhatsApp kampanyaları yalnızca Meta tarafından onaylanmış mesaj şablonuyla gönderilir.
-            </p>
-          </div>
+            </FormSelect>
+          </FormField>
 
-          <div>
-            <label htmlFor="kamp-filter" className={labelCls}>Hedef kitle</label>
-            <select id="kamp-filter" name="filter" defaultValue="all" className={`${inputCls} appearance-none`}>
+          <FormField label="Hedef kitle" htmlFor="kamp-filter">
+            <FormSelect name="filter" defaultValue="all" className="appearance-none">
               {FILTERS.map((f) => (
                 <option key={f.value} value={f.value}>{f.label}</option>
               ))}
-            </select>
-          </div>
+            </FormSelect>
+          </FormField>
         </FormSection>
 
         {channel === "whatsapp" && (
@@ -153,7 +140,7 @@ export function NewCampaignForm() {
                   setWhatsAppTemplateName(selected.name);
                   setWhatsAppTemplateLanguage(selected.language);
                 }}
-                className={`${inputCls} appearance-none disabled:cursor-not-allowed disabled:opacity-60`}
+                className={`${fieldClass} appearance-none`}
               >
                 <option value="">
                   {templatesPending
@@ -181,10 +168,8 @@ export function NewCampaignForm() {
                 </p>
               ) : null}
             </div>
-            <div>
-              <label htmlFor="kamp-whatsapp-template" className={labelCls}>Onaylı şablon adı</label>
-              <input
-                id="kamp-whatsapp-template"
+            <FormField label="Onaylı şablon adı" htmlFor="kamp-whatsapp-template" required>
+              <FormInput
                 name="whatsappTemplateName"
                 type="text"
                 required
@@ -193,13 +178,10 @@ export function NewCampaignForm() {
                 value={whatsappTemplateName}
                 onChange={(event) => setWhatsAppTemplateName(event.target.value)}
                 placeholder="örn. portfoy_duyurusu"
-                className={inputCls}
               />
-            </div>
-            <div>
-              <label htmlFor="kamp-whatsapp-language" className={labelCls}>Dil kodu</label>
-              <input
-                id="kamp-whatsapp-language"
+            </FormField>
+            <FormField label="Dil kodu" htmlFor="kamp-whatsapp-language" required>
+              <FormInput
                 name="whatsappTemplateLanguage"
                 type="text"
                 required
@@ -208,9 +190,8 @@ export function NewCampaignForm() {
                 value={whatsappTemplateLanguage}
                 onChange={(event) => setWhatsAppTemplateLanguage(event.target.value)}
                 placeholder="tr"
-                className={inputCls}
               />
-            </div>
+            </FormField>
             <p className="text-xs leading-relaxed text-text-faint sm:col-span-2">
               Ad ve dil kodu Meta Business Manager&apos;daki onaylı şablonla birebir aynı olmalıdır. Onaysız veya uyuşmayan şablon gönderilmez.
             </p>
@@ -259,7 +240,7 @@ export function NewCampaignForm() {
               placeholder={channel === "sms"
                 ? "Mesajınızı buraya yazın… ({ad} ve {ofis} otomatik değişir)"
                 : "Şablonda tek bir {{1}} gövde alanı varsa değerini yazın"}
-              className={`${inputCls} resize-none`}
+              className={`${fieldClass} resize-none`}
             />
             {channel === "sms" && charCount > 0 && charCount <= 160 && (
               <p className="mt-1 text-xs text-text-faint">1 SMS kredisi kullanılacak</p>
@@ -272,11 +253,7 @@ export function NewCampaignForm() {
           </div>
         </FormSection>
 
-        {state?.error && (
-          <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
-            {state.error}
-          </p>
-        )}
+        <FormError error={state?.error} />
 
         <FormActions>
           <ButtonLink href="/app/kampanyalar" variant="secondary">İptal</ButtonLink>

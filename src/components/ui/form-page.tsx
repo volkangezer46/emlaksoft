@@ -1,4 +1,8 @@
-import type { ReactNode } from "react";
+import type { FormEventHandler, ReactNode, Ref } from "react";
+import type { LucideIcon } from "lucide-react";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { FormError } from "@/components/ui/form-controls";
+import type { NextStep } from "@/lib/form-logic";
 import { PageHeader } from "@/components/ui/page-header";
 import type { BreadcrumbItem } from "@/components/ui/breadcrumb";
 import { cn } from "@/lib/utils";
@@ -80,5 +84,73 @@ export function FormActions({ children, className }: { children: ReactNode; clas
     >
       {children}
     </div>
+  );
+}
+
+/**
+ * FormShell — `<form>` + FormPage + üst hata alert'i + FormActions tek parça.
+ *
+ * Tipik kullanım (useCreateForm ile):
+ *   const { onSubmit, pending, error } = useCreateForm(...);
+ *   <FormShell title="Yeni X" breadcrumbs={[...]} cancelHref="/app/x" submitLabel="Kaydet"
+ *     pendingLabel="Kaydediliyor…" onSubmit={onSubmit} pending={pending} error={error}>
+ *     <FormSection …>…</FormSection>
+ *   </FormShell>
+ * Hata bandı eylem çubuğunun hemen üstünde, role=alert ile basılır; `notice`
+ * hata dışı uyarılar (çakışma, dosya uyarısı) içindir.
+ */
+export function FormShell({
+  title,
+  description,
+  eyebrow,
+  breadcrumbs,
+  headerActions,
+  cancelHref,
+  submitLabel,
+  pendingLabel,
+  submitIcon,
+  submitDisabled,
+  pending,
+  error,
+  errorNextStep,
+  notice,
+  onSubmit,
+  formRef,
+  children,
+}: {
+  title: string;
+  description?: string;
+  eyebrow?: string;
+  breadcrumbs?: BreadcrumbItem[];
+  headerActions?: ReactNode;
+  cancelHref: string;
+  submitLabel: string;
+  pendingLabel?: string;
+  submitIcon?: LucideIcon;
+  submitDisabled?: boolean;
+  pending: boolean;
+  error?: string | null;
+  /** undefined: hata metninden türetilir; null: bağlantı yok. */
+  errorNextStep?: NextStep | null;
+  /** Hata dışı uyarı bandı (hatanın altı, eylem çubuğunun üstü). */
+  notice?: ReactNode;
+  onSubmit: FormEventHandler<HTMLFormElement>;
+  formRef?: Ref<HTMLFormElement>;
+  children: ReactNode;
+}) {
+  return (
+    <form ref={formRef} onSubmit={onSubmit}>
+      <FormPage title={title} description={description} eyebrow={eyebrow} breadcrumbs={breadcrumbs} actions={headerActions}>
+        {children}
+        <FormError error={error} nextStep={errorNextStep} />
+        {notice}
+        <FormActions>
+          <ButtonLink href={cancelHref} variant="secondary">İptal</ButtonLink>
+          <Button type="submit" loading={pending} disabled={submitDisabled} icon={submitIcon}>
+            {pending && pendingLabel ? pendingLabel : submitLabel}
+          </Button>
+        </FormActions>
+      </FormPage>
+    </form>
   );
 }
