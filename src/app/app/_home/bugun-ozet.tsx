@@ -4,7 +4,7 @@ import { ArrowUpRight, CheckCircle2, Sparkles } from "lucide-react";
 import { buildDailyBriefing, type BriefingItem } from "@/lib/briefing";
 import { generateBriefingSummary } from "@/lib/ai/briefing-summary";
 import {
-  loadCommissions,
+  loadCommissionSummary,
   loadExpiringAuthority,
   loadHotLeadCount,
   loadLiveListings,
@@ -12,7 +12,7 @@ import {
   loadTodayAppointments,
   type HomeCtx,
 } from "./data";
-import { commissionTotals, overdueListingsOf } from "./helpers";
+import { overdueListingsOf } from "./helpers";
 import { apptTypeLabel, timeFmt } from "./format";
 import { toneBg } from "./ortak";
 
@@ -36,12 +36,12 @@ async function BriefingAiLine({ items }: { items: BriefingItem[] }) {
  * bekleyen komisyon. İlk ekranda ilk akan bölümdür; kural tabanlı (bkz. lib/briefing).
  */
 export async function BugunOzet({ ctx }: { ctx: HomeCtx }) {
-  const [tasks, appts, hotLeadCount, listings, commissions, expiring] = await Promise.all([
+  const [tasks, appts, hotLeadCount, listings, commissionSummary, expiring] = await Promise.all([
     loadTaskSummary(ctx),
     loadTodayAppointments(ctx),
     loadHotLeadCount(ctx),
     loadLiveListings(),
-    loadCommissions(ctx),
+    loadCommissionSummary(ctx),
     loadExpiringAuthority(),
   ]);
 
@@ -56,7 +56,7 @@ export async function BugunOzet({ ctx }: { ctx: HomeCtx }) {
     tasksOverdue: tasks.overdue,
     unconfirmedListings: overdueListingsOf(listings).length,
     hotLeads: hotLeadCount,
-    pendingCommission: commissionTotals(commissions).pending,
+    pendingCommission: commissionSummary.pending,
   });
 
   return (

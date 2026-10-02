@@ -4,12 +4,9 @@ import { moneyTry } from "@/lib/leak-shield";
 import { now } from "@/lib/clock";
 import { ICONS } from "@/lib/icons";
 import { OdometerNumber } from "../odometer-number";
-import { loadClosures, loadCommissions, loadKpiCounts, loadLiveListings, type HomeCtx } from "./data";
+import { loadClosures, loadCommissionSummary, loadCommissionWeekDates, loadKpiCounts, loadLiveListings, type HomeCtx } from "./data";
 import {
   calcTrend,
-  commissionTotals,
-  lastSixMonthKeys,
-  monthTotalsFor,
   overdueListingsOf,
   sumLost,
   weekBuckets,
@@ -42,16 +39,16 @@ const sparkColor: Record<string, string> = {
 };
 
 export async function KpiSatiri({ ctx }: { ctx: HomeCtx }) {
-  const [counts, listings, commissions, closures] = await Promise.all([
+  const [counts, listings, commissionSummary, commissionDates, closures] = await Promise.all([
     loadKpiCounts(ctx),
     loadLiveListings(),
-    loadCommissions(ctx),
+    loadCommissionSummary(ctx),
+    loadCommissionWeekDates(),
     loadClosures(ctx),
   ]);
   const nowMs = now();
   const overdueCount = overdueListingsOf(listings).length;
-  const { pending: pendingCommission } = commissionTotals(commissions);
-  const monthTotals = monthTotalsFor(commissions, lastSixMonthKeys(nowMs));
+  const { pending: pendingCommission, monthTotals } = commissionSummary;
   const lostMonth = sumLost(closures.thisMonth);
   const lostPrevMonth = sumLost(closures.prevMonth);
 
@@ -100,7 +97,7 @@ export async function KpiSatiri({ ctx }: { ctx: HomeCtx }) {
       // Komisyon trendi mevcut aylık seriden (son 2 ay), ek sorgu yok.
       trendData: calcTrend(monthTotals[5] ?? 0, monthTotals[4] ?? 0),
       tone: "amber",
-      spark: weekBuckets(commissions.map((c) => c.created_at ?? ""), nowMs),
+      spark: weekBuckets(commissionDates, nowMs),
       href: "/app/komisyon?durum=bekleyen",
     },
     {

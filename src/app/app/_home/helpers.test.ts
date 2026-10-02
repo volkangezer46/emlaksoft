@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calcTrend,
   chartGeometry,
+  commissionSummaryFromAggregate,
   commissionTotals,
   greetingFor,
   initials,
@@ -95,5 +96,22 @@ describe("pipeline ve ekip", () => {
     expect(t[0]).toMatchObject({ id: "a", value: 150, initials: "AY" });
     expect(t[1]).toMatchObject({ id: "b", name: "Danışman" });
     expect(initials("ali veli")).toBe("AV");
+  });
+});
+
+describe("commissionSummaryFromAggregate", () => {
+  it("6 aylık tahakkuk/tahsil toplamını ve aylık seriyi RPC çıktısından üretir", () => {
+    const monthly = [100, 0, 50, 0, 200, 300].map((accrued, i) => ({
+      month_start: `2026-0${i + 1}-01T00:00:00+03:00`,
+      accrued,
+      paid: i === 5 ? "120" : i === 0 ? 100 : 0,
+    }));
+    const s = commissionSummaryFromAggregate({ monthly });
+    expect(s.monthTotals).toEqual([100, 0, 50, 0, 200, 300]);
+    expect(s.paid).toBe(220);
+    expect(s.pending).toBe(430); // 650 - 220: eski commissionTotals ile aynı anlam
+  });
+  it("boş veride sıfır döner", () => {
+    expect(commissionSummaryFromAggregate(null)).toEqual({ paid: 0, pending: 0, monthTotals: [0, 0, 0, 0, 0, 0] });
   });
 });

@@ -1,15 +1,14 @@
 import Link from "next/link";
 import { Trophy } from "lucide-react";
 import { moneyTry } from "@/lib/leak-shield";
-import { msSince, now } from "@/lib/clock";
-import { loadCommissions, loadDeals, loadOfficeTarget, type HomeCtx } from "./data";
-import { lastSixMonthKeys, monthTotalsFor } from "./helpers";
+import { msSince } from "@/lib/clock";
+import { loadCommissionSummary, loadDeals, loadOfficeTarget, type HomeCtx } from "./data";
 
 /** Aylık ofis hedefi — targets (profile_id null, bu ay); tanımlı hedef yoksa gizli. */
 export async function HedefKarti({ ctx }: { ctx: HomeCtx }) {
-  const [officeTarget, commissions, deals] = await Promise.all([
+  const [officeTarget, commissionSummary, deals] = await Promise.all([
     loadOfficeTarget(ctx),
-    loadCommissions(ctx),
+    loadCommissionSummary(ctx),
     loadDeals(),
   ]);
 
@@ -19,7 +18,7 @@ export async function HedefKarti({ ctx }: { ctx: HomeCtx }) {
 
   // Gerçekleşen gelir: bu ay oluşan komisyon toplamı; anlaşma: bu ay won'a geçen kartlar
   // (deals.updated_at yaklaşımı — won sonrası güncelleme nadir).
-  const monthCommission = monthTotalsFor(commissions, lastSixMonthKeys(now()))[5] ?? 0;
+  const monthCommission = commissionSummary.monthTotals[5] ?? 0;
   const wonThisMonth = deals.filter((d) => d.stage === "won" && (d.updated_at ?? "") >= ctx.monthStartIso).length;
   const targetRevenuePct = targetRevenue > 0 ? Math.round((monthCommission / targetRevenue) * 100) : 0;
   const targetDealsPct = targetDeals > 0 ? Math.round((wonThisMonth / targetDeals) * 100) : 0;
