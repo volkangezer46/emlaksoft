@@ -8,6 +8,7 @@ import { createSupportTicket, type TicketResult } from "@/app/actions/tickets";
 import { TicketAttachmentInput, uploadTicketFiles } from "../ticket-attachment-input";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { FormActions, FormPage, FormSection } from "@/components/ui/form-page";
+import { FormError, FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import { useToast } from "@/components/app/toast-provider";
 
 type CreateState = TicketResult & { warning?: string };
@@ -21,10 +22,6 @@ const DEFAULT_CATEGORY_OPTIONS: { value: string; label: string }[] = [
   { value: "compliance", label: "İYS / KVKK" },
   { value: "onboarding", label: "Kurulum" },
 ];
-
-const labelCls = "mb-1.5 block text-sm text-text-muted";
-const fieldCls =
-  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
 export function NewTicketForm({
   categoryOptions = DEFAULT_CATEGORY_OPTIONS,
@@ -97,46 +94,39 @@ export function NewTicketForm({
         breadcrumbs={[{ label: "Destek", href: "/app/destek" }, { label: "Yeni talep" }]}
       >
         <FormSection title="Talep bilgileri">
-          <div className="sm:col-span-2">
-            <label className={labelCls} htmlFor="subject">Konu *</label>
-            <input
-              id="subject"
+          <FormField label="Konu" htmlFor="subject" required className="sm:col-span-2">
+            <FormInput
               name="subject"
               required
               minLength={3}
               maxLength={200}
-              className={fieldCls}
               placeholder="Örn. Portal ilanım yayına gitmiyor"
             />
-          </div>
-          <div>
-            <label className={labelCls} htmlFor="category">Kategori</label>
-            <select id="category" name="category" defaultValue="general" className={fieldCls}>
+          </FormField>
+          <FormField label="Kategori" htmlFor="category">
+            <FormSelect name="category" defaultValue="general">
               {categoryOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={labelCls} htmlFor="priority">Öncelik</label>
-            <select id="priority" name="priority" defaultValue="normal" className={fieldCls}>
+            </FormSelect>
+          </FormField>
+          <FormField label="Öncelik" htmlFor="priority">
+            <FormSelect name="priority" defaultValue="normal">
               <option value="low">Düşük</option>
               <option value="normal">Normal</option>
               <option value="high">Yüksek</option>
               <option value="urgent">Acil</option>
-            </select>
-          </div>
-          <div className="sm:col-span-2">
-            <label className={labelCls} htmlFor="body">Açıklama *</label>
-            <textarea
-              id="body"
+            </FormSelect>
+          </FormField>
+          <FormField label="Açıklama" htmlFor="body" required className="sm:col-span-2">
+            <FormTextarea
               name="body"
               required
               minLength={3}
               maxLength={20_000}
               rows={8}
-              className={`${fieldCls} resize-y leading-relaxed`}
+              className="resize-y leading-relaxed"
               placeholder="Ne oldu, ne olmasını bekliyordunuz ve hangi adımları denediniz?"
             />
-          </div>
+          </FormField>
         </FormSection>
 
         <FormSection title="Ekler" description="İsteğe bağlı: ekran görüntüsü veya belge ekleyebilirsiniz.">
@@ -148,7 +138,7 @@ export function NewTicketForm({
           </div>
         </FormSection>
 
-        {state.error ? <p className="text-sm font-medium text-danger-600" role="alert">{state.error}</p> : null}
+        <FormError error={state.error} />
         {state.warning ? (
           <div className="rounded-[var(--radius-control)] border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-800" role="status">
             <p>{state.warning}</p>

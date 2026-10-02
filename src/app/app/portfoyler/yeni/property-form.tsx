@@ -6,6 +6,7 @@ import { Check, ChevronDown, Sparkles } from "lucide-react";
 import { createProperty } from "@/app/actions/properties";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { FormActions, FormPage, FormSection } from "@/components/ui/form-page";
+import { FormError, FormField, FormInput, FormSelect, fieldClass } from "@/components/ui/form-controls";
 import { LatLngPicker } from "@/components/app/lat-lng-picker";
 import { GeoSelect } from "@/components/app/geo-select";
 import { useToast } from "@/components/app/toast-provider";
@@ -13,10 +14,6 @@ import { FACADE_OPTIONS, HEATING_OPTIONS } from "./property-options";
 
 type Province = { id: string; name: string };
 type Branch = { id: string; name: string };
-
-const fieldClass =
-  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
-const labelClass = "mb-1.5 block text-sm font-medium text-ink-950";
 
 const SECTIONS = [
   { id: "temel", label: "Temel bilgi" },
@@ -44,15 +41,14 @@ function SelectField({
   className?: string;
 }) {
   return (
-    <div className={className}>
-      <label className={labelClass} htmlFor={id}>{label}{required ? " *" : ""}</label>
+    <FormField label={label} htmlFor={id} required={required} inject={false} className={className}>
       <div className="relative">
-        <select id={id} name={name} required={required} defaultValue={defaultValue} className={`${fieldClass} appearance-none`}>
+        <FormSelect id={id} name={name} required={required} aria-required={required || undefined} defaultValue={defaultValue} className="appearance-none">
           {children}
-        </select>
+        </FormSelect>
         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
       </div>
-    </div>
+    </FormField>
   );
 }
 
@@ -106,24 +102,21 @@ export function PropertyForm({
 
         <div id="temel" className="scroll-mt-24">
           <FormSection title="Temel bilgi" description="İlanın başlığı ve türü.">
-            <div className="sm:col-span-2">
-              <label className={labelClass} htmlFor="property-title">Portföy başlığı *</label>
-              <input id="property-title" name="title" required className={fieldClass} placeholder="Örn. Onikişubat Tekerek 4+1" />
-            </div>
+            <FormField label="Portföy başlığı" htmlFor="property-title" required className="sm:col-span-2">
+              <FormInput name="title" required placeholder="Örn. Onikişubat Tekerek 4+1" />
+            </FormField>
             <SelectField id="transaction-type" name="transaction_type" label="İşlem türü" required defaultValue="Satılık">
               {transactionTypes.map((type) => <option key={type}>{type}</option>)}
             </SelectField>
             <SelectField id="property-type" name="property_type" label="Portföy türü" required defaultValue="Daire">
               {propertyTypes.map((type) => <option key={type}>{type}</option>)}
             </SelectField>
-            <div>
-              <label className={labelClass} htmlFor="rooms">Oda</label>
-              <input id="rooms" name="rooms" className={fieldClass} placeholder="4+1" />
-            </div>
-            <div>
-              <label className={labelClass} htmlFor="sqm">Brüt m²</label>
-              <input id="sqm" name="sqm" inputMode="decimal" className={fieldClass} placeholder="185" />
-            </div>
+            <FormField label="Oda" htmlFor="rooms">
+              <FormInput name="rooms" placeholder="4+1" />
+            </FormField>
+            <FormField label="Brüt m²" htmlFor="sqm">
+              <FormInput name="sqm" inputMode="decimal" placeholder="185" />
+            </FormField>
             {branches.length > 0 ? (
               <SelectField id="property-branch" name="branch_id" label="Şube" defaultValue="" className="sm:col-span-2">
                 <option value="">Şube atanmadı</option>
@@ -137,54 +130,47 @@ export function PropertyForm({
           {/* İl/İlçe/Mahalle: emsal motoru (find_comparables) ilçe üzerinden çalışır. */}
           <FormSection title="Konum" description="İl, ilçe, mahalle ve harita noktası emsal analizini besler.">
             <GeoSelect provinces={provinces} className="sm:col-span-2" />
-            <div className="sm:col-span-2">
-              <label className={labelClass} htmlFor="address-line">Adres özeti</label>
-              <input id="address-line" name="address_line" className={fieldClass} placeholder="Cadde, sokak, kapı no…" />
-            </div>
+            <FormField label="Adres özeti" htmlFor="address-line" className="sm:col-span-2">
+              <FormInput name="address_line" placeholder="Cadde, sokak, kapı no…" />
+            </FormField>
             <LatLngPicker fieldClass={fieldClass} />
           </FormSection>
         </div>
 
         <div id="fiyat" className="scroll-mt-24">
           <FormSection title="Fiyat ve komisyon">
-            <div>
-              <label className={labelClass} htmlFor="list-price">Liste fiyatı *</label>
-              <input id="list-price" name="list_price" required inputMode="decimal" className={fieldClass} placeholder="6.750.000" />
-            </div>
-            <div>
-              <label className={labelClass} htmlFor="commission-rate">Komisyon oranı (%)</label>
-              <input id="commission-rate" name="commission_rate" inputMode="decimal" required min="0.01" max="100" step="0.01" className={fieldClass} placeholder="3" />
-            </div>
+            <FormField label="Liste fiyatı" htmlFor="list-price" required>
+              <FormInput name="list_price" required inputMode="decimal" placeholder="6.750.000" />
+            </FormField>
+            <FormField label="Komisyon oranı (%)" htmlFor="commission-rate" required>
+              <FormInput name="commission_rate" required inputMode="decimal" min="0.01" max="100" step="0.01" placeholder="3" />
+            </FormField>
           </FormSection>
         </div>
 
         <div id="ozellikler" className="scroll-mt-24">
           {/* features jsonb'ye portal/broşürle AYNI anahtarlarla yazılır (floor, heating, building_age, facade) + tapu ada/parsel. */}
           <FormSection title="Özellikler" description="Kat, ısınma, bina yaşı ve tapu bilgileri (isteğe bağlı).">
-            <div>
-              <label className={labelClass} htmlFor="floor">Bulunduğu kat</label>
-              <input id="floor" name="floor" inputMode="numeric" className={fieldClass} placeholder="Örn. 3 (bodrum için -1)" />
-            </div>
+            <FormField label="Bulunduğu kat" htmlFor="floor">
+              <FormInput name="floor" inputMode="numeric" placeholder="Örn. 3 (bodrum için -1)" />
+            </FormField>
             <SelectField id="heating" name="heating" label="Isınma" defaultValue="">
               <option value="">Seçilmedi</option>
               {HEATING_OPTIONS.map((h) => <option key={h}>{h}</option>)}
             </SelectField>
-            <div>
-              <label className={labelClass} htmlFor="building-age">Bina yaşı</label>
-              <input id="building-age" name="building_age" inputMode="numeric" className={fieldClass} placeholder="Örn. 5" />
-            </div>
+            <FormField label="Bina yaşı" htmlFor="building-age">
+              <FormInput name="building_age" inputMode="numeric" placeholder="Örn. 5" />
+            </FormField>
             <SelectField id="facade" name="facade" label="Cephe (ops.)" defaultValue="">
               <option value="">Seçilmedi</option>
               {FACADE_OPTIONS.map((f) => <option key={f}>{f}</option>)}
             </SelectField>
-            <div>
-              <label className={labelClass} htmlFor="parcel-block">Tapu — Ada</label>
-              <input id="parcel-block" name="parcel_block" className={fieldClass} placeholder="Örn. 1234" />
-            </div>
-            <div>
-              <label className={labelClass} htmlFor="parcel-lot">Tapu — Parsel</label>
-              <input id="parcel-lot" name="parcel_lot" className={fieldClass} placeholder="Örn. 56" />
-            </div>
+            <FormField label="Tapu — Ada" htmlFor="parcel-block">
+              <FormInput name="parcel_block" placeholder="Örn. 1234" />
+            </FormField>
+            <FormField label="Tapu — Parsel" htmlFor="parcel-lot">
+              <FormInput name="parcel_lot" placeholder="Örn. 56" />
+            </FormField>
           </FormSection>
         </div>
 
@@ -194,7 +180,7 @@ export function PropertyForm({
           </p>
         </div>
 
-        {error ? <p className="text-sm font-medium text-danger-600" role="alert">{error}</p> : null}
+        <FormError error={error} />
 
         <FormActions>
           <ButtonLink href="/app/portfoyler" variant="secondary">İptal</ButtonLink>
