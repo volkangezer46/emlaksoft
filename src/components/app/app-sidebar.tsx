@@ -117,6 +117,16 @@ export function AppSidebar({
               {officeScore != null ? `Skor ${officeScore}` : "Skor —"}
             </span>
           </div>
+          {accessibleModules.includes("billing") ? (
+            <Link
+              href="/app/abonelik"
+              onClick={() => setOpen(false)}
+              className="relative mt-3 flex items-center justify-between rounded-[var(--radius-control)] bg-white/8 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/14"
+            >
+              {trial ? "Paketini seç" : "Paket ve kullanım"}
+              <ChevronRight className="h-3.5 w-3.5 text-mint-400" aria-hidden />
+            </Link>
+          ) : null}
         </div>
       </div>
     </>
