@@ -24,7 +24,7 @@ function Trigger({ onOpen, onWarm }: { onOpen?: () => void; onWarm?: () => void 
         aria-haspopup="listbox"
         aria-controls="app-command-results"
         aria-label="Müşteri, portföy, anlaşma, görev veya ilan ara"
-        className="focus-ring relative flex w-full items-center rounded-[var(--radius-control)] border border-hairline bg-canvas h-10 w-10 justify-center text-left text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300 hover:bg-surface hover:shadow-[var(--elev-2)] sm:h-auto sm:w-full sm:justify-start sm:py-2.5 sm:pl-10 sm:pr-20"
+        className="focus-ring relative flex shrink-0 items-center rounded-[var(--radius-control)] border border-hairline bg-canvas h-10 w-10 justify-center text-left text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300 hover:bg-surface hover:shadow-[var(--elev-2)] sm:h-auto sm:w-full sm:justify-start sm:py-2.5 sm:pl-10 sm:pr-20"
       >
         <Search className="pointer-events-none absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 text-text-faint sm:left-3 sm:translate-x-0" aria-hidden />
         <span className="hidden truncate sm:inline">Müşteri, portföy, anlaşma, görev, ilan no ara…</span>

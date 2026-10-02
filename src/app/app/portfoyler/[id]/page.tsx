@@ -593,7 +593,7 @@ export default async function PropertyDetailPage({
                   </button>
                 </form>
               ) : (
-                <p className="mt-3 text-sm text-text-muted">Durum: <span className="font-semibold text-ink-950">{statusOptions.find((o) => o.value === property.status)?.label ?? property.status}</span></p>
+                <p className="mt-3 text-sm text-text-muted">Durum: <span className="font-semibold text-ink-950">{statusOptions.find((o) => o.value === property.status)?.label ?? propertyStatusLabel(property.status)}</span></p>
               )}
               <p className="mt-4 text-xs leading-relaxed text-text-muted">
                 Yayına alındığında Portal Kontrol üzerinden ilan no/URL bağlayın. Kapanış formu zorunlu tutulur; rakip kapanışlar kayıp-kaçağa düşer.
@@ -832,7 +832,7 @@ export default async function PropertyDetailPage({
                 <div className="flex items-start gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-4 py-3">
                   <Eye className="mt-0.5 h-4 w-4 shrink-0 text-text-faint" />
                   <p className="text-xs text-text-muted">
-                    Portföy vitrinde yayında değil (durum: {statusOptions.find((o) => o.value === property.status)?.label ?? property.status}). Sayaç, ilan tekrar yayına alındığında işlemeye devam eder.
+                    Portföy vitrinde yayında değil (durum: {statusOptions.find((o) => o.value === property.status)?.label ?? propertyStatusLabel(property.status)}). Sayaç, ilan tekrar yayına alındığında işlemeye devam eder.
                   </p>
                 </div>
               ) : (

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { daysAgoIso } from "@/lib/clock";
+import { trDayKey } from "@/lib/clock";
 import { RentalForm } from "./rental-form";
 
 export const metadata = { title: "Yeni kira kaydı" };
@@ -72,7 +72,7 @@ export default async function NewRentalPage({
       defaultPropertyId={validProperty}
       defaultCustomerId={validCustomer}
       defaultMonthlyRent={prefillRent}
-      defaultStartDate={daysAgoIso(0).slice(0, 10)}
+      defaultStartDate={trDayKey()}
     />
   );
 }

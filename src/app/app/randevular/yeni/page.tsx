@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { daysAgoIso } from "@/lib/clock";
+import { trDayKey } from "@/lib/clock";
 import { getDefinitions } from "@/lib/definitions";
 import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
 import { AppointmentForm } from "./appointment-form";
@@ -53,7 +53,7 @@ export default async function NewAppointmentPage({
       : [...DEFAULT_DEFINITIONS.appointment_type];
 
   // Takvimden gelen tarih/saat ön dolgusu (?tarih=YYYY-MM-DD&saat=HH:MM).
-  const defaultDate = DATE_RE.test(sp.tarih ?? "") ? sp.tarih! : daysAgoIso(0).slice(0, 10);
+  const defaultDate = DATE_RE.test(sp.tarih ?? "") ? sp.tarih! : trDayKey();
   const defaultTime = TIME_RE.test(sp.saat ?? "") ? sp.saat! : "10:00";
 
   return (
