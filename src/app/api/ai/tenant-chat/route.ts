@@ -211,6 +211,7 @@ export async function POST(req: Request) {
               ...(allowTools ? { tools: ADVISOR_TOOLS, tool_choice: "auto" as const } : {}),
             },
             req.signal,
+            { purpose: "tenant_chat", audit: { tenantId: prep.tenantId, actorId: prep.userId } },
           )) {
             if (evt.type === "delta") {
               reply += evt.text;

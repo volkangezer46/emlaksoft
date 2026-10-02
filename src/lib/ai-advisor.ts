@@ -2,12 +2,8 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformSetting } from "@/lib/platform-settings";
 import { getPlan } from "@/lib/billing/plans";
-import {
-  externalErrorMetadata,
-  fetchExternal,
-  readExternalJson,
-  requireExternalSuccess,
-} from "@/lib/external-fetch";
+import { externalErrorMetadata } from "@/lib/external-fetch";
+import { getOpenAiChatModel, openAiChat } from "@/lib/ai/openai-client";
 
 export type AdvisorMessage = { role: "user" | "assistant"; content: string };
 
@@ -27,7 +23,7 @@ export type AdvisorContext = {
   members: number;
 };
 
-export const OPENAI_MODEL = "gpt-4o-mini";
+export const OPENAI_MODEL = getOpenAiChatModel();
 const OPENAI_TIMEOUT_MS = 45_000;
 const OPENAI_MAX_RESPONSE_BYTES = 1024 * 1024;
 
@@ -140,23 +136,16 @@ async function callOpenAI(apiKey: string, messages: AdvisorMessage[], context: A
     ],
   };
 
-  const res = await fetchExternal("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(payload),
-  }, { timeoutMs: OPENAI_TIMEOUT_MS });
-
-  await requireExternalSuccess(res);
-  const json = await readExternalJson<{ choices?: { message?: { content?: unknown } }[] }>(
-    res,
-    OPENAI_MAX_RESPONSE_BYTES,
-  );
-  const content = json?.choices?.[0]?.message?.content;
+  // Platform yöneticisi çağrısı: tenant yok → denetim kaydı yazılmaz (maskeleme yine uygulanır).
+  const { content } = await openAiChat({
+    apiKey,
+    purpose: "admin_advisor",
+    body: payload,
+    timeoutMs: OPENAI_TIMEOUT_MS,
+    maxResponseBytes: OPENAI_MAX_RESPONSE_BYTES,
+  });
   if (!content) throw new Error("OpenAI boş yanıt döndü.");
-  return String(content).trim();
+  return content.trim();
 }
 
 /** OpenAI anahtarı yoksa çalışan kural-tabanlı danışman. Bağlama göre içgörü üretir. */

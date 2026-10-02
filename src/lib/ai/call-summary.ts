@@ -1,13 +1,8 @@
 import "server-only";
 import { getOpenAiKey } from "@/lib/ai-advisor";
-import {
-  discardExternalResponse,
-  externalErrorMetadata,
-  fetchExternal,
-  readExternalJson,
-} from "@/lib/external-fetch";
+import { externalErrorMetadata } from "@/lib/external-fetch";
+import { getOpenAiChatModel, openAiChat, type OpenAiAudit } from "@/lib/ai/openai-client";
 
-const OPENAI_MODEL = "gpt-4o-mini";
 const OPENAI_TIMEOUT_MS = 30_000;
 const OPENAI_MAX_RESPONSE_BYTES = 256 * 1024;
 
@@ -35,7 +30,10 @@ const DIR_LABEL: Record<string, string> = { inbound: "Gelen", outbound: "Giden",
  * başarısız olursa `null` döner — UI'da buton/sonuç hiç görünmez.
  * Sonuç kaydedilmez; anlık üretilir.
  */
-export async function generateCallSummary(input: CallSummaryInput): Promise<CallSummary | null> {
+export async function generateCallSummary(
+  input: CallSummaryInput,
+  audit?: OpenAiAudit,
+): Promise<CallSummary | null> {
   if (!input.notes.trim()) return null;
 
   const apiKey = await getOpenAiKey();
@@ -53,14 +51,14 @@ export async function generateCallSummary(input: CallSummaryInput): Promise<Call
   ].join("\n");
 
   try {
-    const res = await fetchExternal("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
+    const { content } = await openAiChat({
+      apiKey,
+      purpose: "call_summary",
+      audit,
+      timeoutMs: OPENAI_TIMEOUT_MS,
+      maxResponseBytes: OPENAI_MAX_RESPONSE_BYTES,
+      body: {
+        model: getOpenAiChatModel(),
         temperature: 0.4,
         max_tokens: 220,
         response_format: { type: "json_object" },
@@ -78,17 +76,9 @@ export async function generateCallSummary(input: CallSummaryInput): Promise<Call
             content: `Çağrı bilgisi:\n${meta}\n\nGörüşme notu:\n${input.notes}`,
           },
         ],
-      }),
-    }, { timeoutMs: OPENAI_TIMEOUT_MS });
-    if (!res.ok) {
-      await discardExternalResponse(res);
-      return null;
-    }
-    const json = await readExternalJson<{ choices?: { message?: { content?: string } }[] }>(
-      res,
-      OPENAI_MAX_RESPONSE_BYTES,
-    );
-    const raw = json.choices?.[0]?.message?.content?.trim();
+      },
+    });
+    const raw = content?.trim();
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { ozet?: string; sonraki_adim?: string };
     const summary = parsed.ozet?.trim();

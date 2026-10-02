@@ -51,7 +51,7 @@ export async function generatePropertyContent(propertyId: string, kind: ContentK
     agentName: agent?.full_name ?? null,
     agentPhone: agent?.phone ?? null,
     features,
-  });
+  }, { tenantId: gate.tenantId, actorId: gate.userId });
 
   return { text, source };
 }
