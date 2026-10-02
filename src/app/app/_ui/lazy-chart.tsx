@@ -12,6 +12,8 @@
  * ÇÖZÜM: `next/dynamic` (docs: 01-app/02-guides/lazy-loading.md). Recharts ayrı
  * bir parçaya (chunk) taşınıyor. `ssr` KAPATILMADI — sunucu HTML'i aynı kalıyor,
  * yani görünüm ve ilk boyama değişmiyor; yalnız ilk JS paketi küçülüyor.
+ * ChartFrame artık ayrı (recharts'sız) modülde: statik export edilir, böylece
+ * kart çerçevesi için bile grafik parçası indirilmez.
  *
  * NOT: Sunucu bileşeninden doğrudan `dynamic()` çağırmak kod bölmez
  * (lazy-loading.md: "When a Server Component dynamically imports a Client
@@ -21,9 +23,22 @@
 
 import dynamic from "next/dynamic";
 
+export { ChartFrame } from "@/components/ui/chart-frame";
+
 const chartModule = () => import("@/components/ui/chart");
 
-export const ChartFrame = dynamic(() => chartModule().then((m) => m.ChartFrame));
-export const AreaTrend = dynamic(() => chartModule().then((m) => m.AreaTrend));
-export const BarCompare = dynamic(() => chartModule().then((m) => m.BarCompare));
-export const DonutSplit = dynamic(() => chartModule().then((m) => m.DonutSplit));
+// Grafik parçası inerken ChartFrame'in sabit yüksekliğini dolduran sakin iskelet
+// (düzen kayması yok; reduced-motion global kuralla animasyonu kapatır).
+function ChartSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-label="Grafik yükleniyor"
+      className="h-full w-full animate-pulse rounded-[var(--radius-control)] bg-line"
+    />
+  );
+}
+
+export const AreaTrend = dynamic(() => chartModule().then((m) => m.AreaTrend), { loading: ChartSkeleton });
+export const BarCompare = dynamic(() => chartModule().then((m) => m.BarCompare), { loading: ChartSkeleton });
+export const DonutSplit = dynamic(() => chartModule().then((m) => m.DonutSplit), { loading: ChartSkeleton });
