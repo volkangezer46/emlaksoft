@@ -578,6 +578,9 @@ p {
   --text: #fff;
   --ink-950: #fff;
   --ink-900: #fff;
+  /* --heading :root'ta var(--ink-950) olarak çözülür; yukarıdaki yeniden tanım ona yansımaz.
+     Koyu hero/bölümlerde başlıklar beyaz kalsın diye burada ayrıca verilir. */
+  --heading: #fff;
   --text-muted: rgba(255, 255, 255, 0.62);
   --text-faint: rgba(255, 255, 255, 0.4);
   --line: rgba(255, 255, 255, 0.1);
@@ -589,6 +592,7 @@ p {
 .theme-dark :is(.bg-white, .bg-amber-400) {
   --ink-950: #071a38;
   --ink-900: #0a2147;
+  --heading: #071a38;
 }
 
 .photo-stage {
