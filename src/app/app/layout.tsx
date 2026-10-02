@@ -204,7 +204,7 @@ export default async function AppLayout({
         <div className="flex min-w-0 flex-1 flex-col">
           {impersonating && platformStaff ? <OpsImpersonationBanner tenantName={impName || office?.name || "Ofis"} /> : null}
           <header className="sticky top-0 z-30 flex h-17 items-center justify-between border-b border-line/80 bg-surface/90 px-4 pl-16 backdrop-blur-xl lg:px-6">
-            <CommandSearch accessibleModules={accessibleModules} />
+            <CommandSearch accessibleModules={accessibleModules} storageScope={user && tenantId ? `${tenantId}:${user.id}` : undefined} />
             <div className="ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
               <ThemeToggle />
               {/* Hızlı eylem menüsü: en sık kullanılan kayıt akışlarına tek tıkla */}

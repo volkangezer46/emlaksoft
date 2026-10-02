@@ -61,6 +61,7 @@ export function parseRecents(raw: string | null): RecentItem[] {
           typeof x === "object" &&
           typeof (x as RecentItem).label === "string" &&
           typeof (x as RecentItem).href === "string" &&
+          /^\/app(\/|\?|$)/.test((x as RecentItem).href) &&
           typeof (x as RecentItem).kind === "string",
       )
       .slice(0, MAX_RECENTS);

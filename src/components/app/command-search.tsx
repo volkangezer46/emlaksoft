@@ -37,7 +37,7 @@ function Trigger({ onOpen, onWarm }: { onOpen?: () => void; onWarm?: () => void 
   );
 }
 
-export function CommandSearch({ accessibleModules }: { accessibleModules: AppModule[] }) {
+export function CommandSearch({ accessibleModules, storageScope }: { accessibleModules: AppModule[]; storageScope?: string }) {
   const [mounted, setMounted] = useState(false);
   const [openOnMount, setOpenOnMount] = useState(false);
 
@@ -67,7 +67,7 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
   }
   return (
     <Suspense fallback={<Trigger />}>
-      <Panel accessibleModules={accessibleModules} initialOpen={openOnMount} />
+      <Panel accessibleModules={accessibleModules} initialOpen={openOnMount} storageScope={storageScope} />
     </Suspense>
   );
 }

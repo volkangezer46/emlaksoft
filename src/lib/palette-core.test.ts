@@ -23,6 +23,16 @@ describe("palette-core", () => {
     expect(getAppActions([])).toEqual([]);
   });
 
+  it("son görülenler: /app dışı veya protokol-göreli href'ler okunurken elenir", () => {
+    const raw = JSON.stringify([
+      { label: "ok", href: "/app/musteriler/1", kind: "customer" },
+      { label: "dış", href: "https://kotu.example/app", kind: "customer" },
+      { label: "göreli", href: "//kotu.example", kind: "customer" },
+      { label: "başka", href: "/admin/x", kind: "customer" },
+    ]);
+    expect(parseRecents(raw).map((r) => r.label)).toEqual(["ok"]);
+  });
+
   it("son görülenler: bozuk veri güvenli, tekrar yok, en fazla 8", () => {
     expect(parseRecents("{bozuk")).toEqual([]);
     expect(parseRecents('{"a":1}')).toEqual([]);

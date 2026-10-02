@@ -55,7 +55,18 @@ const RECENT_KIND_MODULE: Record<SearchHit["kind"], AppModule> = {
   ticket: "support",
 };
 
-const recentsStore = createRecentsStore("palette_recents");
+const LEGACY_RECENTS_KEY = "palette_recents";
+const recentsStores = new Map<string, ReturnType<typeof createRecentsStore>>();
+/** Son görülenler müşteri adı içerir (KVKK): anahtar ofis+kullanıcı kapsamlıdır, kapsam yoksa tutulmaz. */
+function getRecentsStore(scope: string | undefined) {
+  const key = scope ? `${LEGACY_RECENTS_KEY}:${scope}` : `${LEGACY_RECENTS_KEY}:anon`;
+  let store = recentsStores.get(key);
+  if (!store) {
+    store = createRecentsStore(key);
+    recentsStores.set(key, store);
+  }
+  return store;
+}
 
 function isSearchKind(kind: string): kind is SearchHit["kind"] {
   return kind in kindMeta;
@@ -68,9 +79,12 @@ function isSearchKind(kind: string): kind is SearchHit["kind"] {
 export function CommandSearchPanel({
   accessibleModules,
   initialOpen = false,
+  storageScope,
 }: {
   accessibleModules: AppModule[];
   initialOpen?: boolean;
+  /** `${tenantId}:${userId}` — son görülenlerin yerel depolama anahtarı. */
+  storageScope?: string;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -82,6 +96,7 @@ export function CommandSearchPanel({
   const [active, setActive] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchSequence = useRef(0);
+  const recentsStore = getRecentsStore(storageScope);
   const recents = useSyncExternalStore(recentsStore.subscribe, recentsStore.read, recentsStore.getServerSnapshot);
   const allowedModules = useMemo(() => new Set(accessibleModules), [accessibleModules]);
   // Yetki süzgeci: Eylemler ve Git, menüyle aynı kaynaktan (nav-config) ve erişilebilir modüllerden gelir.
@@ -142,6 +157,15 @@ export function CommandSearchPanel({
   useEffect(() => {
     if (initialOpen) inputRef.current?.focus();
   }, [initialOpen]);
+
+  // Eski sürüm "son görülenler"i kapsamsız anahtarda (başka kullanıcıya görünebilir) tutuyordu: bir kez sil.
+  useEffect(() => {
+    try {
+      window.localStorage.removeItem(LEGACY_RECENTS_KEY);
+    } catch {
+      // depolama kapalı — yapılacak bir şey yok
+    }
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

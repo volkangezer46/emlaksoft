@@ -4,8 +4,10 @@ import type { ComboboxOption } from "@/components/ui/combobox";
 import { NewApprovalForm } from "./new-approval-form";
 
 export default async function YeniOnayTalebiPage() {
-  await requireModulePage("commissions", "/app/onaylar");
+  const { perms } = await requireModulePage("commissions", "/app/onaylar");
   const supabase = await createClient();
+  // Gider havuzu yalnız gider görme yetkisi olana (komisyon yetkisi gider listesini açmaz).
+  const canSeeExpenses = (perms.expenses ?? []).includes("view");
 
   // "İlgili kayıt" havuzu (anlaşma + gider, aramalı) — RLS tenant izolasyonunu sağlar.
   const [{ data: deals }, { data: expenses }] = await Promise.all([
@@ -14,7 +16,9 @@ export default async function YeniOnayTalebiPage() {
       .select("id, deal_value, stage, deal_type, property:properties!deals_property_id_fkey(property_code, title)")
       .order("created_at", { ascending: false })
       .limit(50),
-    supabase.from("expenses").select("id, title, amount, expense_date").order("expense_date", { ascending: false }).limit(50),
+    canSeeExpenses
+      ? supabase.from("expenses").select("id, title, amount, expense_date").order("expense_date", { ascending: false }).limit(50)
+      : Promise.resolve({ data: [] as { id: string; title: string; amount: number; expense_date: string }[] }),
   ]);
 
   const entityOptions: ComboboxOption[] = [
