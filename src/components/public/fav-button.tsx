@@ -30,7 +30,7 @@ export function FavButton({
           ? "border-red-200 bg-red-50 text-red-600"
           : "border-line bg-surface text-text-muted hover:border-red-200 hover:text-red-500"
       }`
-    : `grid h-9 w-9 place-items-center rounded-full border shadow-sm backdrop-blur ${
+    : `grid h-9 w-9 place-items-center rounded-full border shadow-[var(--shadow-sm)] backdrop-blur ${
         active
           ? "border-red-200 bg-white text-red-500"
           : "border-white/40 bg-white/85 text-ink-950/60 hover:text-red-500"

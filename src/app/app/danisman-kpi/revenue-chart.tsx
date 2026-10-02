@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { CHART_COLORS } from "@/components/ui/chart";
+import { CHART_COLORS } from "@/components/ui/chart-colors";
 
 /**
  * Danışman gelir grafiği — paylaşılan BarCompare'in tıklanabilir sürümü.

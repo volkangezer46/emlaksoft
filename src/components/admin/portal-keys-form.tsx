@@ -50,7 +50,7 @@ function PortalKeyCard({
           <RadioTower className="h-4 w-4" /> {label}
         </p>
         <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
-          configured ? "bg-mint-500/12 text-mint-600" : "bg-zinc-100 text-zinc-500"
+          configured ? "bg-mint-500/12 text-mint-600" : "bg-zinc-100 text-text-muted"
         }`}>
           {configured ? "Bağlı" : "Tanımsız"}
         </span>

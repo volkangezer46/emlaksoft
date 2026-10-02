@@ -161,14 +161,14 @@ export function SavedViews({
                 <button
                   type="button"
                   onClick={() => onDelete(view.id)}
-                  className="rounded-[7px] bg-danger-500 px-2 py-0.5 text-xs font-bold text-white transition hover:opacity-90"
+                  className="rounded-md bg-danger-500 px-2 py-0.5 text-xs font-bold text-white transition hover:opacity-90"
                 >
                   Sil
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmId(null)}
-                  className="rounded-[7px] border border-line px-2 py-0.5 text-xs font-semibold text-text-muted transition hover:text-ink-950"
+                  className="rounded-md border border-line px-2 py-0.5 text-xs font-semibold text-text-muted transition hover:text-ink-950"
                 >
                   Vazgeç
                 </button>

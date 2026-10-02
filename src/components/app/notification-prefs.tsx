@@ -102,7 +102,7 @@ export function NotificationPrefsPanel({ initial }: { initial?: NotifPrefs }) {
             className="flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-3 text-left transition hover:border-brand-300 disabled:opacity-60"
           >
             <span
-              className={`grid h-5 w-5 place-items-center rounded-[6px] border ${
+              className={`grid h-5 w-5 place-items-center rounded-md border ${
                 prefs[row.key] ? "border-mint-500 bg-mint-500 text-white" : "border-line bg-surface"
               }`}
             >

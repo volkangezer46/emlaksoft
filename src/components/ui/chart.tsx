@@ -16,6 +16,7 @@ import {
   YAxis,
 } from "recharts";
 import { ChartFrame } from "@/components/ui/chart-frame";
+import { CHART_COLORS } from "@/components/ui/chart-colors";
 
 /**
  * Grafikler — Recharts üzerine EmlakSoft teması.
@@ -29,14 +30,7 @@ import { ChartFrame } from "@/components/ui/chart-frame";
  * Component sayfalardan doğrudan çağrılabilir.
  */
 
-export const CHART_COLORS = [
-  "var(--brand-600)",
-  "var(--mint-500)",
-  "var(--cyan-400)",
-  "var(--amber-400)",
-  "var(--ink-700)",
-  "var(--danger-500)",
-] as const;
+export { CHART_COLORS };
 
 const numberFormatter = new Intl.NumberFormat("tr-TR");
 const compactFormatter = new Intl.NumberFormat("tr-TR", {

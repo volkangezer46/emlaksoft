@@ -168,14 +168,14 @@ export function PortalFooterNote({ office }: { office: string }) {
       <p>
         <Link
           href="/kvkk-aydinlatma"
-          className="focus-ring rounded-[4px] underline-offset-2 transition hover:text-text-muted hover:underline"
+          className="focus-ring rounded-sm underline-offset-2 transition hover:text-text-muted hover:underline"
         >
           KVKK Aydınlatma Metni
         </Link>
         <span aria-hidden="true"> · </span>
         <Link
           href="/gizlilik"
-          className="focus-ring rounded-[4px] underline-offset-2 transition hover:text-text-muted hover:underline"
+          className="focus-ring rounded-sm underline-offset-2 transition hover:text-text-muted hover:underline"
         >
           Gizlilik Politikası
         </Link>

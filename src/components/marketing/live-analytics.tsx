@@ -197,7 +197,7 @@ export function LiveAnalytics() {
                   <div key={b.m} className="flex flex-1 flex-col items-center gap-1.5">
                     <div className="flex h-20 w-full items-end justify-center">
                       <span
-                        className="bar-live w-full max-w-[16px] rounded-t-[5px] bg-[linear-gradient(180deg,var(--cyan-400),var(--brand-600))]"
+                        className="bar-live w-full max-w-[16px] rounded-t-sm bg-[linear-gradient(180deg,var(--cyan-400),var(--brand-600))]"
                         style={{ height: `${b.v}%`, animationDelay: `${i * 90}ms, ${i * 200}ms` }}
                       />
                     </div>

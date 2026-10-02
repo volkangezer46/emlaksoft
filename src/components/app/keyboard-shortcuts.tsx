@@ -156,7 +156,7 @@ export function KeyboardShortcuts() {
                   {k.tuslar.split(" ").map((t, i) => (
                     <kbd
                       key={`${k.tuslar}-${i}`}
-                      className="numeric min-w-[22px] rounded-[6px] border border-line bg-surface px-1.5 py-0.5 text-center text-xs font-semibold text-text-muted shadow-[var(--shadow-xs)]"
+                      className="numeric min-w-[22px] rounded-md border border-line bg-surface px-1.5 py-0.5 text-center text-xs font-semibold text-text-muted shadow-[var(--shadow-xs)]"
                     >
                       {t}
                     </kbd>

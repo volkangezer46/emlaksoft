@@ -163,8 +163,8 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
         className="focus-ring group flex h-10 w-full items-center gap-3 rounded-[var(--radius-card)] border border-hairline bg-canvas/80 px-4 text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300/70 hover:bg-surface hover:text-text-muted hover:shadow-[var(--elev-2)]"
       >
         <Search className="h-4 w-4 shrink-0 transition group-hover:text-brand-500" />
-        <span className="hidden flex-1 truncate text-left text-[13px] sm:block">Ara… ofis, üye, destek talebi</span>
-        <kbd className="ml-auto hidden shrink-0 items-center gap-1 rounded-[7px] border border-hairline bg-surface px-2 py-1 text-xs font-semibold text-text-faint lg:inline-flex">
+        <span className="hidden flex-1 truncate text-left text-sm sm:block">Ara… ofis, üye, destek talebi</span>
+        <kbd className="ml-auto hidden shrink-0 items-center gap-1 rounded-md border border-hairline bg-surface px-2 py-1 text-xs font-semibold text-text-faint lg:inline-flex">
           Ctrl <span className="font-bold">K</span>
         </kbd>
       </button>

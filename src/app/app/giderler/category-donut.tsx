@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { CHART_COLORS } from "@/components/ui/chart";
+import { CHART_COLORS } from "@/components/ui/chart-colors";
 
 /**
  * Gider kategori dağılımı — paylaşılan DonutSplit'in tıklanabilir sürümü.

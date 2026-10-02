@@ -79,13 +79,7 @@ html[data-theme="dark"] {
   --neutral-soft: rgba(255, 255, 255, 0.06);
   --neutral-strong: var(--text);
 
-  /* Koyu zeminde gölge görünmez; derinliği koyu ve geniş gölge + ince üst ışık verir */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
-  --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.45);
-  --shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.6);
-  --shadow-xl: 0 32px 80px -24px rgba(0, 0, 0, 0.65);
-  --shadow-modal: 0 28px 70px -18px rgba(0, 0, 0, 0.7);
+  /* (--shadow-* takma adları globals.css'te --elev-*'a bağlı) Koyu zeminde gölge görünmez; derinliği koyu ve geniş gölge + ince üst ışık verir */
   --elev-1: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 6px -1px rgba(0, 0, 0, 0.3);
   --elev-2: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 16px -4px rgba(0, 0, 0, 0.4);
   --elev-3: 0 1px 3px rgba(0, 0, 0, 0.4), 0 12px 28px -8px rgba(0, 0, 0, 0.5);
