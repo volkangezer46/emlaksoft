@@ -81,7 +81,7 @@ const PAGE_SIZE = 50;
 
 /** Kapanış kaydı select'i — hem aggregate havuzda hem sayfalı listede aynı kolonlar. */
 const CLOSURE_SELECT =
-  "id, reason, deal_happened, deal_amount, closed_by_us, competitor_closed, estimated_lost_commission, leak_severity, created_at, portal_listing:portal_listings(portal_name, portal_listing_id, property:properties(id, property_code, title))";
+  "id, reason, deal_happened, deal_amount, closed_by_us, competitor_closed, estimated_lost_commission, leak_severity, created_at, portal_listing:portal_listings!listing_closures_portal_listing_id_fkey(portal_name, portal_listing_id, property:properties!portal_listings_property_id_fkey(id, property_code, title))";
 
 /** YYYY-MM-DD biçimindeyse döndür, aksi halde boş — sorguya ham girdi gitmesin. */
 function safeDate(value: string | undefined) {

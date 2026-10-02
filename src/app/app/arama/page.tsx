@@ -44,7 +44,7 @@ function duration(value: number | null) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-const CALL_SELECT = "id, direction, phone, duration_sec, disposition, notes, started_at, customer:customers(id, full_name)";
+const CALL_SELECT = "id, direction, phone, duration_sec, disposition, notes, started_at, customer:customers!calls_customer_id_fkey(id, full_name)";
 
 const YON_LABELS: Record<string, string> = { inbound: "Gelen", outbound: "Giden", missed: "Cevapsız" };
 

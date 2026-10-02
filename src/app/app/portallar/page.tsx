@@ -118,7 +118,7 @@ export default async function PortalsPage({
   const OVERDUE_OR = `last_confirmed_at.is.null,last_confirmed_at.lt."${overdueCutoff}"`;
 
   const LIST_COLS =
-    "id, portal_name, portal_listing_id, portal_url, status, last_confirmed_at, published_at, removed_at, removal_reason, property:properties(id,property_code,title,list_price)";
+    "id, portal_name, portal_listing_id, portal_url, status, last_confirmed_at, published_at, removed_at, removal_reason, property:properties!portal_listings_property_id_fkey(id,property_code,title,list_price)";
 
   // Aynı filtre seti hem sayfalı listeye hem gerçek-toplam sayımına uygulanır.
   const buildFilteredQuery = (select: string, opts?: { count: "exact"; head?: boolean }) => {

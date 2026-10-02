@@ -223,13 +223,13 @@ export default async function DocumentsPage({
   // --- Kaynak sorguları -----------------------------------------------------
   // Her kaynak için: (a) sayfa penceresi, (b) head-only exact count.
   const CUSTOMER_COLS =
-    "id, file_name, file_size, file_type, label, created_at, customer_id, uploaded_by, customer:customers(id, full_name), uploader:profiles!customer_files_uploaded_by_fkey(id, full_name)";
+    "id, file_name, file_size, file_type, label, created_at, customer_id, uploaded_by, customer:customers!customer_files_customer_id_fkey(id, full_name), uploader:profiles!customer_files_uploaded_by_fkey(id, full_name)";
   const MEDIA_COLS =
-    "id, file_name, file_size, file_type, kind, storage_path, external_url, created_at, property_id, uploaded_by, property:properties(id, property_code, title), uploader:profiles!property_media_uploaded_by_fkey(id, full_name)";
+    "id, file_name, file_size, file_type, kind, storage_path, external_url, created_at, property_id, uploaded_by, property:properties!property_media_property_id_fkey(id, property_code, title), uploader:profiles!property_media_uploaded_by_fkey(id, full_name)";
   const CONTRACT_COLS =
-    "id, title, status, contract_type, created_at, created_by, customer_id, property_id, customer:customers(id, full_name), property:properties(id, property_code, title), creator:profiles!contracts_created_by_fkey(id, full_name)";
+    "id, title, status, contract_type, created_at, created_by, customer_id, property_id, customer:customers!contracts_customer_id_fkey(id, full_name), property:properties!contracts_property_id_fkey(id, property_code, title), creator:profiles!contracts_created_by_fkey(id, full_name)";
   const CHECKLIST_COLS =
-    "id, label, file_url, created_at, deal_id, done_by, deal:deals(id, deal_type, stage, customer:customers(id, full_name), property:properties(id, property_code, title)), marker:profiles!deal_checklist_items_done_by_fkey(id, full_name)";
+    "id, label, file_url, created_at, deal_id, done_by, deal:deals!deal_checklist_items_deal_id_fkey(id, deal_type, stage, customer:customers!deals_customer_id_fkey(id, full_name), property:properties!deals_property_id_fkey(id, property_code, title)), marker:profiles!deal_checklist_items_done_by_fkey(id, full_name)";
 
   /**
    * Aynı filtre setinin hem satır hem `count` sorgusuna uygulanabilmesi için

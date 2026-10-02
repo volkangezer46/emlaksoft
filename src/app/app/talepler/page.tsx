@@ -172,7 +172,7 @@ export default async function DemandsPage({
 
   // Ana sorgunun kolonları — hem sayfa dilimi hem segment havuzu bu setten çeker.
   const LIST_COLS =
-    "id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, province_id, district_id, customer:customers(id, full_name), province:geo_provinces(name)";
+    "id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, province_id, district_id, customer:customers!customer_demands_customer_id_fkey(id, full_name), province:geo_provinces(name)";
 
   // Temel filtreler (status + aciliyet) — hem listeye hem segment şeridi havuzuna.
   const buildBase = (select: string, opts?: { count: "exact"; head?: boolean }) => {

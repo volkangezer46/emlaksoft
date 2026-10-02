@@ -219,7 +219,7 @@ export default async function PropertiesPage({
   };
 
   const LIST_COLS =
-    "id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, published_at, province_id, district_id, lat, lng, province:geo_provinces(name), district:geo_districts(name), portal_listings(portal_name,status,last_confirmed_at)";
+    "id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, published_at, province_id, district_id, lat, lng, province:geo_provinces(name), district:geo_districts(name), portal_listings!portal_listings_property_id_fkey(portal_name,status,last_confirmed_at)";
   const MAP_COLS = "id, property_code, title, transaction_type, list_price, lat, lng";
 
   // Liste görünümü sunucu-sayfalı; harita görünümü tüm konumlu sonuçları (cap) çeker.

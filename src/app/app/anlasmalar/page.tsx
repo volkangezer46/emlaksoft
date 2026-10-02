@@ -41,7 +41,7 @@ export default async function DealsPage() {
       // limitte maliyet ihmal edilebilir; idx_deal_notes_tenant_deal indeksi
       // (tenant_id, deal_id, created_at desc) sayımı da karşılar.
       .select(
-        "id, stage, deal_type, deal_value, probability, assigned_to, updated_at, property_id, customer_id, property:properties(id, title, property_code), customer:customers(id, full_name, phone), deal_notes(count)",
+        "id, stage, deal_type, deal_value, probability, assigned_to, updated_at, property_id, customer_id, property:properties!deals_property_id_fkey(id, title, property_code), customer:customers!deals_customer_id_fkey(id, full_name, phone), deal_notes!deal_notes_deal_id_fkey(count)",
         { count: "exact" },
       )
       .order("updated_at", { ascending: false })

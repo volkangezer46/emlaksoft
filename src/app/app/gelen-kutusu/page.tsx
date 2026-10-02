@@ -149,8 +149,8 @@ export default async function InboxPage({
   // Müşteri araması gömülü tabloda ilike ister → !inner join (arama yokken
   // left join: müşterisiz kayıtlar da akışta görünmeli).
   const commSelect = term
-    ? "id, channel, direction, subject, body, outcome, created_at, customer:customers!inner(id, full_name, phone)"
-    : "id, channel, direction, subject, body, outcome, created_at, customer:customers(id, full_name, phone)";
+    ? "id, channel, direction, subject, body, outcome, created_at, customer:customers!communications_customer_id_fkey!inner(id, full_name, phone)"
+    : "id, channel, direction, subject, body, outcome, created_at, customer:customers!communications_customer_id_fkey(id, full_name, phone)";
   let commQuery = supabase
     .from("communications")
     .select(commSelect, { count: "exact" })
@@ -165,8 +165,8 @@ export default async function InboxPage({
 
   // ---- calls sorgusu (yalnız "Tümü" veya "Telefon" filtresinde) -----------
   const callSelect = term
-    ? "id, direction, phone, disposition, notes, duration_sec, started_at, customer:customers!inner(id, full_name, phone)"
-    : "id, direction, phone, disposition, notes, duration_sec, started_at, customer:customers(id, full_name, phone)";
+    ? "id, direction, phone, disposition, notes, duration_sec, started_at, customer:customers!calls_customer_id_fkey!inner(id, full_name, phone)"
+    : "id, direction, phone, disposition, notes, duration_sec, started_at, customer:customers!calls_customer_id_fkey(id, full_name, phone)";
   let callQuery = supabase
     .from("calls")
     .select(callSelect, { count: "exact" })
