@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 import { useToast } from "@/components/app/toast-provider";
 import type { ExportResult } from "@/app/actions/export";
+import { isFullExportEntity } from "@/lib/export-entities";
 
 export function ExportCsvButton({
   label = "CSV",
@@ -18,6 +19,7 @@ export function ExportCsvButton({
 }) {
   const { push } = useToast();
   const [busy, setBusy] = useState(false);
+  const [fullEntity, setFullEntity] = useState<string | null>(null);
 
   async function onClick() {
     setBusy(true);
@@ -39,7 +41,12 @@ export function ExportCsvButton({
       a.click();
       URL.revokeObjectURL(url);
       if (res.truncated) {
-        push(`Yalnızca ilk ${res.rowCount ?? 0} kayıt indirildi (üst sınır). Tamamı için filtreyi daraltın.`, "err");
+        if (isFullExportEntity(res.entity)) {
+          setFullEntity(res.entity ?? null);
+          push(`Hızlı dışa aktarma ilk ${res.rowCount ?? 0} kayıtla sınırlı. Yanındaki "Tümünü indir" ile eksiksiz dosyayı alın.`, "err");
+        } else {
+          push(`Yalnızca ilk ${res.rowCount ?? 0} kayıt indirildi (üst sınır). Tamamı için filtreyi daraltın.`, "err");
+        }
       } else {
         push("CSV indirildi", "ok");
       }
@@ -51,6 +58,17 @@ export function ExportCsvButton({
   }
 
   return (
+    <>
+    {fullEntity ? (
+      <a
+        href={`/api/export/${fullEntity}`}
+        download
+        className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-brand-300 bg-surface px-3 py-2 text-xs font-semibold text-brand-600 transition hover:bg-brand-50"
+      >
+        <Download className="h-4 w-4" />
+        Tümünü indir
+      </a>
+    ) : null}
     <button
       type="button"
       onClick={onClick}
@@ -66,5 +84,6 @@ export function ExportCsvButton({
       {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
       {!iconOnly ? label : null}
     </button>
+    </>
   );
 }
