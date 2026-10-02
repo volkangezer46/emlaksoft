@@ -11,7 +11,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { computeLeadScore } from "@/lib/lead-score";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
-import { daysAgoIso, now } from "@/lib/clock";
+import { TR_OFFSET_MS, daysAgoIso, now, trParts } from "@/lib/clock";
 import { buildOnboarding } from "@/lib/onboarding-checklist";
 import {
   commissionSummaryFromAggregate,
@@ -50,22 +50,19 @@ export function buildHomeBounds(): Pick<
   | "sixMonthsAgoIso"
   | "last24hIso"
 > {
+  // Gün/ay sınırları Türkiye saatine göre (sunucu UTC'de olsa da 00:00–03:00 TRT
+  // arasında "bugün" doğru günü gösterir). Sınırlar gerçek anlara (ISO) çevrilir.
   const nowMs = now();
-  const monthStart = new Date(nowMs);
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
-  const dayStart = new Date(nowMs);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
-  const sixMonthsAgo = new Date(monthStart);
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
-  const prevMonthStart = new Date(monthStart);
-  prevMonthStart.setMonth(prevMonthStart.getMonth() - 1);
-  const yesterdayStart = new Date(dayStart);
-  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+  const p = trParts(nowMs);
+  const trMidnight = (y: number, m: number, d: number) => new Date(Date.UTC(y, m, d) - TR_OFFSET_MS);
+  const monthStart = trMidnight(p.year, p.month, 1);
+  const dayStart = trMidnight(p.year, p.month, p.day);
+  const dayEnd = trMidnight(p.year, p.month, p.day + 1);
+  const sixMonthsAgo = trMidnight(p.year, p.month - 5, 1);
+  const prevMonthStart = trMidnight(p.year, p.month - 1, 1);
+  const yesterdayStart = trMidnight(p.year, p.month, p.day - 1);
   return {
-    monthStartKey: `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, "0")}-01`,
+    monthStartKey: `${p.year}-${String(p.month + 1).padStart(2, "0")}-01`,
     monthStartIso: monthStart.toISOString(),
     prevMonthStartIso: prevMonthStart.toISOString(),
     dayStartIso: dayStart.toISOString(),

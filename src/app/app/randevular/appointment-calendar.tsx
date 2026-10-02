@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { trDayKey, formatTrTime } from "@/lib/clock";
 import { ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
 
 type AppointmentItem = {
@@ -30,43 +31,65 @@ const TR_MONTHS = [
 ];
 const TR_DAYS_SHORT = ["Pt","Sa","Ça","Pe","Cu","Ct","Pz"];
 
-function sameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() &&
-         a.getMonth() === b.getMonth() &&
-         a.getDate() === b.getDate();
-}
+const TR_DAYS_LONG = ["Pazar","Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi"];
 
-export function AppointmentCalendar({ appointments }: { appointments: AppointmentItem[] }) {
-  const today = new Date();
-  const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
-  const [selected, setSelected] = useState<Date | null>(today);
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const keyOf = (y: number, m: number, d: number) => `${y}-${pad2(m + 1)}-${pad2(d)}`;
 
-  function prevMonth() {
-    setViewDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1));
+/**
+ * Hidrasyon güvenliği: bileşen içinde `new Date()` / yerel saat dilimi YOK.
+ * "Bugün" sunucudan (TR günü, `todayKey`) gelir; randevuların günü TR saatine
+ * göre hesaplanır; tüm tarih/saat metinleri saat diliminden bağımsız üretilir.
+ * Sunucu (UTC) ile tarayıcı (TR) aynı çıktıyı verir → React #418 oluşmaz.
+ */
+export function AppointmentCalendar({
+  appointments,
+  todayKey,
+}: {
+  appointments: AppointmentItem[];
+  /** Sunucudaki TR bugünü, "YYYY-MM-DD". */
+  todayKey: string;
+}) {
+  const [ty, tm] = todayKey.split("-").map(Number);
+  const [view, setView] = useState({ year: ty, month: tm - 1 });
+  const [selected, setSelected] = useState<string | null>(todayKey);
+
+  function shiftMonth(delta: number) {
+    setView((v) => {
+      const d = new Date(Date.UTC(v.year, v.month + delta, 1));
+      return { year: d.getUTCFullYear(), month: d.getUTCMonth() };
+    });
   }
-  function nextMonth() {
-    setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1));
+
+  // Randevuları TR gün anahtarına göre bir kez grupla
+  const byDay = new Map<string, AppointmentItem[]>();
+  for (const a of appointments) {
+    const k = trDayKey(a.scheduled_at);
+    const list = byDay.get(k);
+    if (list) list.push(a);
+    else byDay.set(k, [a]);
   }
 
   // Grid hesapla
-  const year  = viewDate.getFullYear();
-  const month = viewDate.getMonth();
-  const firstDay = new Date(year, month, 1);
-  const lastDay  = new Date(year, month + 1, 0);
+  const { year, month } = view;
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  // Pazartesi başlangıç — getUTCDay() 0=Pazar, adjust
+  const startOffset = (new Date(Date.UTC(year, month, 1)).getUTCDay() + 6) % 7; // 0=Pt, 6=Pz
+  const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
 
-  // Pazartesi başlangıç — getDay() 0=Pazar, adjust
-  const startOffset = (firstDay.getDay() + 6) % 7; // 0=Pt, 6=Pz
-  const totalCells  = Math.ceil((startOffset + lastDay.getDate()) / 7) * 7;
-
-  const cells: (Date | null)[] = Array.from({ length: totalCells }, (_, i) => {
+  const cells: (string | null)[] = Array.from({ length: totalCells }, (_, i) => {
     const dayNum = i - startOffset + 1;
-    if (dayNum < 1 || dayNum > lastDay.getDate()) return null;
-    return new Date(year, month, dayNum);
+    if (dayNum < 1 || dayNum > daysInMonth) return null;
+    return keyOf(year, month, dayNum);
   });
 
-  const selectedAppts = selected
-    ? appointments.filter((a) => sameDay(new Date(a.scheduled_at), selected))
-    : [];
+  const selectedAppts = selected ? byDay.get(selected) ?? [] : [];
+  let selectedLabel = "";
+  if (selected) {
+    const [sy, sm, sd] = selected.split("-").map(Number);
+    const wd = new Date(Date.UTC(sy, sm - 1, sd)).getUTCDay();
+    selectedLabel = `${sd} ${TR_MONTHS[sm - 1]} ${TR_DAYS_LONG[wd]}`;
+  }
 
   return (
     <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
@@ -78,7 +101,7 @@ export function AppointmentCalendar({ appointments }: { appointments: Appointmen
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={prevMonth}
+            onClick={() => shiftMonth(-1)}
             className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-canvas"
             aria-label="Önceki ay"
           >
@@ -86,14 +109,14 @@ export function AppointmentCalendar({ appointments }: { appointments: Appointmen
           </button>
           <button
             type="button"
-            onClick={() => setViewDate(new Date(today.getFullYear(), today.getMonth(), 1))}
+            onClick={() => setView({ year: ty, month: tm - 1 })}
             className="rounded-[var(--radius-control)] border border-line px-2.5 py-1 text-xs font-semibold text-text-muted transition hover:bg-canvas"
           >
             Bugün
           </button>
           <button
             type="button"
-            onClick={nextMonth}
+            onClick={() => shiftMonth(1)}
             className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-canvas"
             aria-label="Sonraki ay"
           >
@@ -113,10 +136,10 @@ export function AppointmentCalendar({ appointments }: { appointments: Appointmen
       <div className="mt-1 grid grid-cols-7 gap-px">
         {cells.map((cell, i) => {
           if (!cell) return <div key={i} className="h-10" />;
-          const isToday    = sameDay(cell, today);
-          const isSelected = selected ? sameDay(cell, selected) : false;
-          const dayAppts   = appointments.filter((a) => sameDay(new Date(a.scheduled_at), cell));
-          const isPast     = cell < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          const isToday    = cell === todayKey;
+          const isSelected = selected === cell;
+          const dayAppts   = byDay.get(cell) ?? [];
+          const isPast     = cell < todayKey;
 
           return (
             <button
@@ -130,7 +153,7 @@ export function AppointmentCalendar({ appointments }: { appointments: Appointmen
                                 "text-ink-950 hover:bg-canvas"}
               `}
             >
-              {cell.getDate()}
+              {Number(cell.slice(8))}
               {dayAppts.length > 0 && (
                 <span className={`absolute bottom-1 flex gap-0.5 ${isSelected ? "opacity-80" : ""}`}>
                   {dayAppts.slice(0, 3).map((a, j) => (
@@ -150,7 +173,7 @@ export function AppointmentCalendar({ appointments }: { appointments: Appointmen
       {selected && (
         <div className="mt-4 border-t border-line pt-4">
           <p className="mb-2 text-xs font-semibold text-text-muted">
-            {selected.toLocaleDateString("tr-TR", { day: "numeric", month: "long", weekday: "long" })}
+            {selectedLabel}
             {" — "}{selectedAppts.length} randevu
           </p>
           {selectedAppts.length === 0 ? (
@@ -166,7 +189,7 @@ export function AppointmentCalendar({ appointments }: { appointments: Appointmen
                 >
                   <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${TYPE_COLOR[a.appointment_type] ?? "bg-brand-600"}`} />
                   <span className="text-xs font-semibold text-ink-950">
-                    {new Date(a.scheduled_at).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                    {formatTrTime(a.scheduled_at)}
                   </span>
                   <span className="text-xs text-text-muted">{TYPE_LABEL[a.appointment_type] ?? a.appointment_type}</span>
                   <ArrowDown className="hover-action ml-auto h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />

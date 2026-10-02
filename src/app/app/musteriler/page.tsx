@@ -877,8 +877,11 @@ export default async function CustomersPage({
                           katmanına promote ediyor (overlay'in varlığı yeter, genişliği
                           değil) → sayfa yana kayıyordu. Mobilde tıklama için isim bloğu
                           Link (aşağıda); tablo kendi kabında güvenle kaydırılır. */}
-                      <Link href={`/app/musteriler/${c.id}`} className="absolute inset-0 hidden sm:block" aria-label={`${c.full_name} detayları`} />
-                      <Link href={`/app/musteriler/${c.id}`} className="flex items-center gap-3 sm:pointer-events-none">
+                      {/* prefetch={false}: sayfa başına 50 satır × dinamik [id] rotası (loading.tsx
+                          sınırı) viewport girişinde 50 RSC isteği tetikliyor, networkidle'a
+                          ulaşılmıyordu. Tıklamada loading.tsx zaten anında açılır. */}
+                      <Link prefetch={false} href={`/app/musteriler/${c.id}`} className="absolute inset-0 hidden sm:block" aria-label={`${c.full_name} detayları`} />
+                      <Link prefetch={false} href={`/app/musteriler/${c.id}`} className="flex items-center gap-3 sm:pointer-events-none">
                         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[image:var(--grad-brand)] text-xs font-bold text-white shadow-[var(--shadow-xs)]">
                           {c.full_name.split(/\s+/).map((part) => part[0] ?? "").join("").slice(0, 2).toUpperCase()}
                         </span>

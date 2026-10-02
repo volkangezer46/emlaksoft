@@ -1,5 +1,6 @@
 "use client";
 
+import { formatTrTime, trDayKey } from "@/lib/clock";
 import { useState, useTransition } from "react";
 import { CalendarClock, TriangleAlert } from "lucide-react";
 import { updateAppointment } from "@/app/actions/appointments";
@@ -24,13 +25,10 @@ type Appointment = {
 
 const DEFAULT_TYPES: TypeOption[] = [...DEFAULT_DEFINITIONS.appointment_type];
 
-// UTC ISO → yerel tarih & saat parçaları (kaymayı önlemek için yerel bileşenler)
+// UTC ISO → Türkiye duvar saati tarih & saat parçaları (tarayıcı saat diliminden bağımsız;
+// sunucu eylemi de girdiyi +03:00 olarak yorumlar).
 function localParts(iso: string) {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  return { date, time };
+  return { date: trDayKey(iso), time: formatTrTime(iso) };
 }
 
 export function AppointmentEditDialog({

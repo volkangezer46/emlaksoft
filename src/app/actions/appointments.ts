@@ -102,7 +102,7 @@ export async function createAppointment(formData: FormData): Promise<Appointment
     return { error: "Tarih ve saat zorunlu." };
   }
 
-  const scheduledAt = new Date(`${date}T${time}`);
+  const scheduledAt = new Date(`${date}T${time}+03:00`);
   if (Number.isNaN(scheduledAt.getTime())) {
     return { error: "Geçerli bir tarih/saat girin." };
   }
@@ -288,7 +288,7 @@ export async function updateAppointment(formData: FormData): Promise<Appointment
   }
   if (!date || !time) return { error: "Tarih ve saat zorunlu." };
 
-  const scheduledAt = new Date(`${date}T${time}`);
+  const scheduledAt = new Date(`${date}T${time}+03:00`);
   if (Number.isNaN(scheduledAt.getTime())) {
     return { error: "Geçerli bir tarih/saat girin." };
   }

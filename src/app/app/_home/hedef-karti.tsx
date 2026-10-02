@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Trophy } from "lucide-react";
 import { moneyTry } from "@/lib/leak-shield";
-import { msSince } from "@/lib/clock";
+import { TR_OFFSET_MS, msSince, trParts } from "@/lib/clock";
 import { loadCommissionSummary, loadDeals, loadOfficeTarget, type HomeCtx } from "./data";
 
 /** Aylık ofis hedefi — targets (profile_id null, bu ay); tanımlı hedef yoksa gizli. */
@@ -23,8 +23,9 @@ export async function HedefKarti({ ctx }: { ctx: HomeCtx }) {
   const targetRevenuePct = targetRevenue > 0 ? Math.round((monthCommission / targetRevenue) * 100) : 0;
   const targetDealsPct = targetDeals > 0 ? Math.round((wonThisMonth / targetDeals) * 100) : 0;
   const monthStart = new Date(ctx.monthStartIso);
-  const monthEnd = new Date(monthStart);
-  monthEnd.setMonth(monthEnd.getMonth() + 1);
+  // monthStart TR ay başı (UTC 21:00); sonraki ay başı TR takvimiyle hesaplanır.
+  const tp = trParts(monthStart);
+  const monthEnd = new Date(Date.UTC(tp.year, tp.month + 1, 1) - TR_OFFSET_MS);
   const monthElapsedPct = Math.max(
     0,
     Math.min(100, Math.round((msSince(monthStart) / (monthEnd.getTime() - monthStart.getTime())) * 100)),

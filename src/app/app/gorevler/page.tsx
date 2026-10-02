@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { AlarmClock, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Plus, Repeat, Sunrise } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { DAY_MS, daysFromNowIso, now } from "@/lib/clock";
+import { DAY_MS, daysFromNowIso, now, trDayStartMs } from "@/lib/clock";
 import { QuickTask } from "./quick-task";
 import { TaskCard, type TaskRow } from "./task-card";
 import { TaskBulkList } from "./task-bulk-list";
@@ -42,14 +42,11 @@ const KIND_FILTERS = [
 
 // Zaman okuması clock.ts üzerinden (render'da doğrudan Date.now/new Date yok)
 function startOfToday() {
-  const d = new Date(now());
-  d.setHours(0, 0, 0, 0);
-  return d;
+  // Türkiye gün başı (sunucu UTC'de olsa da doğru gün)
+  return new Date(trDayStartMs(now()));
 }
 function endOfToday() {
-  const d = new Date(now());
-  d.setHours(23, 59, 59, 999);
-  return d;
+  return new Date(trDayStartMs(now()) + DAY_MS - 1);
 }
 
 export default async function TasksPage({

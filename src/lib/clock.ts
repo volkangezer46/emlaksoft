@@ -55,3 +55,76 @@ export function isPast(value: DateInput | null | undefined): boolean {
   const t = ms(value);
   return Number.isNaN(t) ? false : t < Date.now();
 }
+
+// ---------------------------------------------------------------------------
+// Türkiye (Europe/Istanbul, UTC+3, DST yok) duvar saati yardımcıları.
+//
+// Sunucu (Vercel) UTC'de çalışır; `new Date().getDate()` gece 00:00–03:00 TRT
+// arasında bir önceki günü verir. İstemci ise tarayıcı saat dilimini kullanır,
+// bu da SSR/hidrasyon uyuşmazlığına (React #418) yol açar. Gün sınırı
+// gerektiren her yer bu yardımcıları kullanmalıdır; hepsi saat diliminden
+// bağımsızdır (saf epoch aritmetiği, Intl'e dayanmaz).
+// ---------------------------------------------------------------------------
+
+export const TR_OFFSET_MS = 3 * 3_600_000;
+
+export type TrParts = {
+  year: number;
+  /** 0 tabanlı ay (Date ile aynı). */
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  /** 0=Pazar … 6=Cumartesi (Date.getDay ile aynı). */
+  weekday: number;
+};
+
+/** Verilen anın Türkiye duvar saatindeki bileşenleri. */
+export function trParts(value: DateInput = Date.now()): TrParts {
+  const d = new Date(ms(value) + TR_OFFSET_MS);
+  return {
+    year: d.getUTCFullYear(),
+    month: d.getUTCMonth(),
+    day: d.getUTCDate(),
+    hour: d.getUTCHours(),
+    minute: d.getUTCMinutes(),
+    weekday: d.getUTCDay(),
+  };
+}
+
+/** Türkiye gününe göre "YYYY-MM-DD". Argümansız: bugün (TR). */
+export function trDayKey(value: DateInput = Date.now()): string {
+  return new Date(ms(value) + TR_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/** Verilen anın TR gün başlangıcı (gerçek an, epoch ms). */
+export function trDayStartMs(value: DateInput = Date.now()): number {
+  const t = ms(value) + TR_OFFSET_MS;
+  return Math.floor(t / DAY_MS) * DAY_MS - TR_OFFSET_MS;
+}
+
+/** Verilen anın TR gün başlangıcının ISO karşılığı — `gte` filtreleri için. */
+export function trDayStartIso(value: DateInput = Date.now()): string {
+  return new Date(trDayStartMs(value)).toISOString();
+}
+
+/**
+ * Takvim günü olarak kullanılan "sahte yerel" Date: TR bugününün yıl/ay/gün
+ * bileşenleriyle çalışma ortamının yerel saatinde gece yarısı. Yalnız
+ * getFullYear/getMonth/getDate/getDay okumak için; gerçek an DEĞİLDİR.
+ */
+export function trTodayCalendarDate(value: DateInput = Date.now()): Date {
+  const p = trParts(value);
+  return new Date(p.year, p.month, p.day);
+}
+
+/** `trTodayCalendarDate` türü takvim gününü TR gün başlangıcının gerçek anına çevirir (ISO). */
+export function calendarDateToTrIso(d: Date): string {
+  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - TR_OFFSET_MS).toISOString();
+}
+
+/** Türkiye duvar saatiyle "SS:DD". */
+export function formatTrTime(value: DateInput): string {
+  const p = trParts(value);
+  return `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
+}

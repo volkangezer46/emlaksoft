@@ -1,7 +1,7 @@
 /**
  * "Bugün" ana ekranı — saf yardımcılar (DB'ye ve React'e bağımlı değil; vitest kapsamında).
  */
-import { DAY_MS, msSince } from "@/lib/clock";
+import { DAY_MS, msSince, trDayKey, trParts } from "@/lib/clock";
 
 export type TrendInfo = { label: string; dir: "up" | "down" | "flat" | "new"; good?: boolean };
 
@@ -82,10 +82,10 @@ export function commissionTotals(rows: CommissionRow[]) {
 export function lastSixMonthKeys(nowMs: number): string[] {
   const keys: string[] = [];
   for (let i = 5; i >= 0; i--) {
-    const d = new Date(nowMs);
-    d.setDate(1); // 31 → kısa ay taşmasını önler
-    d.setMonth(d.getMonth() - i);
-    keys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    // Türkiye ayına göre; Date.UTC ay taşmasını (31 → kısa ay) kendisi çözer.
+    const p = trParts(nowMs);
+    const d = new Date(Date.UTC(p.year, p.month - i, 1));
+    keys.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
   }
   return keys;
 }
@@ -93,7 +93,7 @@ export function lastSixMonthKeys(nowMs: number): string[] {
 export function monthTotalsFor(rows: CommissionRow[], keys: string[]): number[] {
   const totals = new Map<string, number>(keys.map((k) => [k, 0]));
   for (const c of rows) {
-    const key = (c.created_at ?? "").slice(0, 7);
+    const key = c.created_at ? trDayKey(c.created_at).slice(0, 7) : "";
     if (totals.has(key)) totals.set(key, (totals.get(key) ?? 0) + Number(c.gross_amount || 0));
   }
   return keys.map((k) => totals.get(k) ?? 0);

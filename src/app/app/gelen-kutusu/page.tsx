@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { DAY_MS, daysAgoIso, msSince, now } from "@/lib/clock";
+import { DAY_MS, daysAgoIso, msSince, now, trDayStartMs } from "@/lib/clock";
 import { COMM_CHANNELS, COMM_OUTCOMES } from "@/lib/comm-types";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { EmptyState } from "@/components/app/empty-state";
@@ -183,8 +183,7 @@ export default async function InboxPage({
   if (term) callQuery = callQuery.ilike("customer.full_name", `%${term}%`);
 
   // ---- KPI head-count sorguları -------------------------------------------
-  const todayStart = new Date(now());
-  todayStart.setHours(0, 0, 0, 0);
+  const todayStart = new Date(trDayStartMs(now()));
   const todayIso = todayStart.toISOString();
   const weekAgoIso = daysAgoIso(7);
 
