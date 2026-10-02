@@ -10,7 +10,7 @@ export type PresentationResult = { error?: string; ok?: boolean; id?: string; ur
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // "use server" dosyası yalnız async fonksiyon export edebilir → sabit içeride kalır
-// (UI tarafındaki eşi: sunumlar/new-presentation-dialog.tsx MAX_SELECT).
+// (UI tarafındaki eşi: sunumlar/yeni/presentation-form.tsx MAX_SELECT).
 const MAX_PRESENTATION_PROPERTIES = 5;
 
 function appUrl() {

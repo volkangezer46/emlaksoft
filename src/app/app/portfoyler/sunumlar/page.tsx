@@ -1,13 +1,10 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowLeft, Eye, MonitorPlay, Presentation, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import {
-  NewPresentationDialog,
-  type SelectableCustomer,
-  type SelectableProperty,
-} from "./new-presentation-dialog";
+import { ButtonLink } from "@/components/ui/button";
 import { CopyLinkButton, DeletePresentationButton } from "./presentation-actions";
 import { SharedPortals, type SharedPortalRow } from "./shared-portals";
 import { now } from "@/lib/clock";
@@ -49,14 +46,16 @@ export default async function PresentationsPage({
   // Müşteri seçici yalnız müşteri görebilenlere; göremeyene liste sızmasın.
   const canSeeCustomers = (perms.customers ?? []).includes("view");
   const params = (await searchParams) ?? {};
-  // Portföy detayındaki "Sunum oluştur" girişi ?portfoy= ile gelir → dialog ön seçili açılır.
-  const preselectedId = (params.portfoy ?? "").trim() || null;
-  // Eşleştirme ekranındaki "Sunum hazırla" ?portfoy=&musteri= ile gelir —
-  // müşteri de ön seçili olsun ki danışman adı elle yazmasın.
-  const preselectedCustomerId = (params.musteri ?? "").trim() || null;
+  // Eski girişler (?portfoy= / ?musteri=) tam sayfa forma taşınır, ön seçim korunur.
+  if (params.portfoy || params.musteri) {
+    const sp = new URLSearchParams();
+    if (params.portfoy) sp.set("portfoy", params.portfoy);
+    if (params.musteri) sp.set("musteri", params.musteri);
+    redirect(`/app/portfoyler/sunumlar/yeni?${sp.toString()}`);
+  }
 
   const supabase = await createClient();
-  const [{ data: presentationData }, { data: liveData }, { data: customerData }] = await Promise.all([
+  const [{ data: presentationData }] = await Promise.all([
     supabase
       .from("presentations")
       .select(
@@ -64,43 +63,9 @@ export default async function PresentationsPage({
       )
       .order("created_at", { ascending: false })
       .limit(100),
-    // Dialog seçim havuzu: yalnız yayındaki portföyler (action da aynı kuralı zorlar).
-    supabase
-      .from("properties")
-      .select("id, property_code, title, list_price, transaction_type, district:geo_districts(name)")
-      .in("status", ["live", "Yayında"])
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(300),
-    // Dialog müşteri seçici havuzu — arama client'ta, ek gidiş-dönüş yok.
-    canSeeCustomers
-      ? supabase
-          .from("customers")
-          .select("id, full_name, phone")
-          .is("deleted_at", null)
-          .order("full_name", { ascending: true })
-          .limit(500)
-      : Promise.resolve({ data: null }),
   ]);
 
   const presentations = (presentationData ?? []) as PresentationRow[];
-  const customerOptions: SelectableCustomer[] = (customerData ?? []).map((c) => ({
-    id: c.id as string,
-    name: c.full_name as string,
-    phone: (c.phone as string | null) ?? null,
-  }));
-  const liveProperties: SelectableProperty[] = (liveData ?? []).map((p) => {
-    const rel = p.district as { name?: string } | { name?: string }[] | null;
-    return {
-      id: p.id as string,
-      code: p.property_code as string,
-      title: (p.title as string | null) ?? null,
-      price: p.list_price != null ? Number(p.list_price) : null,
-      tx: p.transaction_type as string,
-      district: (Array.isArray(rel) ? rel[0]?.name : rel?.name) ?? null,
-    };
-  });
-
   const base = appUrl();
   const totalViews = presentations.reduce((sum, p) => sum + (p.view_count ?? 0), 0);
 
@@ -190,12 +155,7 @@ export default async function PresentationsPage({
               <p className="font-display text-xl font-extrabold text-mint-400">{totalViews}</p>
               <p className="text-xs text-white/50">Görüntülenme</p>
             </div>
-            <NewPresentationDialog
-              properties={liveProperties}
-              customers={customerOptions}
-              preselectedId={preselectedId}
-              preselectedCustomerId={preselectedCustomerId}
-            />
+            <ButtonLink href="/app/portfoyler/sunumlar/yeni">Yeni sunum</ButtonLink>
           </div>
         </div>
       </section>
@@ -211,12 +171,7 @@ export default async function PresentationsPage({
             sunum linki saniyeler içinde hazır olsun.
           </p>
           <div className="mt-5">
-            {/* preselectedId yalnız üstteki örneğe verilir — iki dialog birden otomatik açılmasın */}
-            <NewPresentationDialog
-              properties={liveProperties}
-              customers={customerOptions}
-              preselectedId={null}
-            />
+            <ButtonLink href="/app/portfoyler/sunumlar/yeni">Yeni sunum</ButtonLink>
           </div>
         </div>
       ) : (
