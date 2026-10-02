@@ -5,8 +5,19 @@ import { requirePermission } from "@/lib/require-permission";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { escapeCsvCell } from "@/lib/csv";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
+import { logActivity } from "@/lib/activity";
 
-export type ExportResult = { error?: string; csv?: string; filename?: string };
+export type ExportResult = {
+  error?: string;
+  csv?: string;
+  filename?: string;
+  /** Sonuç sınıra takıldı: dosyada yalnız ilk EXPORT_LIMIT kayıt var. */
+  truncated?: boolean;
+  rowCount?: number;
+};
+
+/** Tek dışa aktarmada en fazla satır. Aşılırsa dosyaya uyarı satırı eklenir ve kullanıcıya bildirilir. */
+const EXPORT_LIMIT = 2000;
 
 function toCsv(rows: Record<string, unknown>[]) {
   if (rows.length === 0) return "";
@@ -25,6 +36,32 @@ function toCsv(rows: Record<string, unknown>[]) {
   return [keys.join(","), ...rows.map((r) => keys.map((k) => esc(r[k])).join(","))].join("\n");
 }
 
+/**
+ * Dışa aktarma sonucunu üretir: sınıra takıldıysa dosyaya uyarı satırı ekler ve
+ * "kim, neyi, kaç satır indirdi" izini audit_logs'a yazar (kişisel veri içermez).
+ */
+async function exportResult(
+  gate: { tenantId: string; userId: string },
+  entity: string,
+  rows: Record<string, unknown>[],
+  filename: string,
+): Promise<ExportResult> {
+  const truncated = rows.length >= EXPORT_LIMIT;
+  let csv = toCsv(rows);
+  if (truncated) {
+    csv += `
+"UYARI: Yalnızca ilk ${EXPORT_LIMIT} kayıt dışa aktarıldı. Tamamı için filtreyi daraltın."`;
+  }
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "export.csv",
+    entityType: entity,
+    newValue: { rows: rows.length, truncated, filename },
+  });
+  return { csv, filename, truncated, rowCount: rows.length };
+}
+
 /** supabase-js gömülü ilişkiyi obje ya da dizi tipler — tek kayda indirge. */
 function relOne<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
@@ -41,7 +78,7 @@ export async function exportCustomersCsv(): Promise<ExportResult> {
     .eq("tenant_id", gate.tenantId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
-    .limit(2000);
+    .limit(EXPORT_LIMIT);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("assigned_to", gate.userId);
   const { data, error } = await q;
   if (error) {
@@ -57,7 +94,7 @@ export async function exportCustomersCsv(): Promise<ExportResult> {
     kaynak: c.source,
     kayit: c.created_at,
   }));
-  return { csv: toCsv(rows), filename: `musteriler-${new Date().toISOString().slice(0, 10)}.csv` };
+  return exportResult(gate, "musteriler", rows, `musteriler-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
 export async function exportCommissionsCsv(): Promise<ExportResult> {
@@ -70,7 +107,7 @@ export async function exportCommissionsCsv(): Promise<ExportResult> {
     .eq("tenant_id", gate.tenantId)
     .eq("deal.tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
-    .limit(2000);
+    .limit(EXPORT_LIMIT);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("deal.assigned_to", gate.userId);
   const { data, error } = await q;
   if (error) {
@@ -83,7 +120,7 @@ export async function exportCommissionsCsv(): Promise<ExportResult> {
     durum: c.status,
     tarih: c.created_at,
   }));
-  return { csv: toCsv(rows), filename: `komisyonlar-${new Date().toISOString().slice(0, 10)}.csv` };
+  return exportResult(gate, "komisyonlar", rows, `komisyonlar-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
 export async function exportAuditCsv(): Promise<ExportResult> {
@@ -95,7 +132,7 @@ export async function exportAuditCsv(): Promise<ExportResult> {
     .select("action, entity_type, entity_id, actor_id, old_value, new_value, created_at")
     .eq("tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
-    .limit(2000);
+    .limit(EXPORT_LIMIT);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("actor_id", gate.userId);
   const { data, error } = await q;
   if (error) {
@@ -123,7 +160,7 @@ export async function exportAuditCsv(): Promise<ExportResult> {
     yeni: r.new_value ? JSON.stringify(r.new_value) : "",
     tarih: r.created_at,
   }));
-  return { csv: toCsv(rows), filename: `denetim-${new Date().toISOString().slice(0, 10)}.csv` };
+  return exportResult(gate, "denetim", rows, `denetim-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
 export async function exportPropertiesCsv(): Promise<ExportResult> {
@@ -138,7 +175,7 @@ export async function exportPropertiesCsv(): Promise<ExportResult> {
     .eq("tenant_id", gate.tenantId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
-    .limit(2000);
+    .limit(EXPORT_LIMIT);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("assigned_to", gate.userId);
   const { data, error } = await q;
   if (error) {
@@ -169,7 +206,7 @@ export async function exportPropertiesCsv(): Promise<ExportResult> {
     danisman: p.assigned_to ? (names.get(p.assigned_to) ?? p.assigned_to.slice(0, 8)) : "",
     olusturma: p.created_at,
   }));
-  return { csv: toCsv(rows), filename: `portfoyler-${new Date().toISOString().slice(0, 10)}.csv` };
+  return exportResult(gate, "portfoyler", rows, `portfoyler-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
 export async function exportExpensesCsv(): Promise<ExportResult> {
@@ -181,7 +218,7 @@ export async function exportExpensesCsv(): Promise<ExportResult> {
     .select("title, amount, category, expense_date, notes, created_at")
     .eq("tenant_id", gate.tenantId)
     .order("expense_date", { ascending: false })
-    .limit(2000);
+    .limit(EXPORT_LIMIT);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("created_by", gate.userId);
   const { data, error } = await q;
   if (error) {
@@ -196,7 +233,7 @@ export async function exportExpensesCsv(): Promise<ExportResult> {
     not: e.notes,
     kayit: e.created_at,
   }));
-  return { csv: toCsv(rows), filename: `giderler-${new Date().toISOString().slice(0, 10)}.csv` };
+  return exportResult(gate, "giderler", rows, `giderler-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
 export async function exportOffersCsv(): Promise<ExportResult> {
@@ -212,7 +249,7 @@ export async function exportOffersCsv(): Promise<ExportResult> {
     .eq("property.tenant_id", gate.tenantId)
     .eq("customer.tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
-    .limit(2000);
+    .limit(EXPORT_LIMIT);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("created_by", gate.userId);
   const { data, error } = await q;
   if (error) {
@@ -232,7 +269,7 @@ export async function exportOffersCsv(): Promise<ExportResult> {
       tarih: o.created_at,
     };
   });
-  return { csv: toCsv(rows), filename: `teklifler-${new Date().toISOString().slice(0, 10)}.csv` };
+  return exportResult(gate, "teklifler", rows, `teklifler-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
 export async function exportPortalListingsCsv(): Promise<ExportResult> {
@@ -247,7 +284,7 @@ export async function exportPortalListingsCsv(): Promise<ExportResult> {
     .eq("tenant_id", gate.tenantId)
     .eq("property.tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
-    .limit(2000);
+    .limit(EXPORT_LIMIT);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("property.assigned_to", gate.userId);
   const { data, error } = await q;
   if (error) {
@@ -261,7 +298,7 @@ export async function exportPortalListingsCsv(): Promise<ExportResult> {
     durum: l.status,
     son_teyit: l.last_confirmed_at,
   }));
-  return { csv: toCsv(rows), filename: `portal-ilanlari-${new Date().toISOString().slice(0, 10)}.csv` };
+  return exportResult(gate, "portal-ilanlari", rows, `portal-ilanlari-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
 const today10 = () => new Date().toISOString().slice(0, 10);
@@ -313,7 +350,7 @@ export async function exportDemandsCsv(filters: DemandExportFilters = {}): Promi
   if (butce) q = q.or(demandBudgetOrFilter(butce));
   if (yas) q = q.lte("created_at", daysAgoIso(DEMAND_AGING_DAYS)).neq("status", "closed");
 
-  const { data, error } = await q.order("created_at", { ascending: false }).limit(2000);
+  const { data, error } = await q.order("created_at", { ascending: false }).limit(EXPORT_LIMIT);
   if (error) {
     console.error("exportDemandsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
@@ -331,7 +368,7 @@ export async function exportDemandsCsv(filters: DemandExportFilters = {}): Promi
     durum: DEMAND_STATUS_TR[d.status] ?? d.status,
     kayit: d.created_at,
   }));
-  return { csv: toCsv(rows), filename: `talepler-${today10()}.csv` };
+  return exportResult(gate, "talepler", rows, `talepler-${today10()}.csv`);
 }
 
 // ── Randevular — ekranın tip/durum/müşteri/portföy filtresini uygular ────────
@@ -360,7 +397,7 @@ export async function exportAppointmentsCsv(filters: AppointmentExportFilters = 
   if (filters.customer) q = q.eq("customer_id", filters.customer);
   if (filters.property) q = q.eq("property_id", filters.property);
 
-  const { data, error } = await q.order("scheduled_at", { ascending: false }).limit(2000);
+  const { data, error } = await q.order("scheduled_at", { ascending: false }).limit(EXPORT_LIMIT);
   if (error) {
     console.error("exportAppointmentsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
@@ -377,7 +414,7 @@ export async function exportAppointmentsCsv(filters: AppointmentExportFilters = 
       durum: APPT_STATUS_TR[a.status] ?? a.status,
     };
   });
-  return { csv: toCsv(rows), filename: `randevular-${today10()}.csv` };
+  return exportResult(gate, "randevular", rows, `randevular-${today10()}.csv`);
 }
 
 // ── Anlaşmalar (satış hattı) — tahta filtresiz; tüm anlaşmalar ────────────────
@@ -396,7 +433,7 @@ export async function exportDealsCsv(): Promise<ExportResult> {
     .eq("property.tenant_id", gate.tenantId)
     .eq("customer.tenant_id", gate.tenantId)
     .order("updated_at", { ascending: false })
-    .limit(2000);
+    .limit(EXPORT_LIMIT);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("assigned_to", gate.userId);
   const { data, error } = await q;
   if (error) {
@@ -416,7 +453,7 @@ export async function exportDealsCsv(): Promise<ExportResult> {
       guncelleme: d.updated_at,
     };
   });
-  return { csv: toCsv(rows), filename: `anlasmalar-${today10()}.csv` };
+  return exportResult(gate, "anlasmalar", rows, `anlasmalar-${today10()}.csv`);
 }
 
 // ── Projeler — ekranın durum filtresini uygular ──────────────────────────────
@@ -436,7 +473,7 @@ export async function exportProjectsCsv(filters: { durum?: string } = {}): Promi
   if (durum === "aktif") q = q.neq("status", "delivered");
   else if (durum && PROJECT_STATUS_TR[durum]) q = q.eq("status", durum);
 
-  const { data, error } = await q.order("created_at", { ascending: false }).limit(2000);
+  const { data, error } = await q.order("created_at", { ascending: false }).limit(EXPORT_LIMIT);
   if (error) {
     console.error("exportProjectsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
@@ -457,7 +494,7 @@ export async function exportProjectsCsv(filters: { durum?: string } = {}): Promi
       kayit: p.created_at,
     };
   });
-  return { csv: toCsv(rows), filename: `projeler-${today10()}.csv` };
+  return exportResult(gate, "projeler", rows, `projeler-${today10()}.csv`);
 }
 
 // ── Kiralama — ekranın evre/durum/arıza filtresini uygular (sayfayla birebir) ─
@@ -488,7 +525,7 @@ export async function exportRentalsCsv(filters: RentalExportFilters = {}): Promi
     .eq("property.tenant_id", gate.tenantId)
     .eq("renter.tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
-    .limit(2000);
+    .limit(EXPORT_LIMIT);
   let chargeQuery = supabase
     .from("rent_charges")
     .select("rental_id, period, amount, status, rental:rentals!rent_charges_rental_id_fkey!inner(tenant_id, created_by)")
@@ -501,7 +538,7 @@ export async function exportRentalsCsv(filters: RentalExportFilters = {}): Promi
     .select("rental_id, status, rental:rentals!maintenance_requests_rental_id_fkey!inner(tenant_id, created_by)")
     .eq("tenant_id", gate.tenantId)
     .eq("rental.tenant_id", gate.tenantId)
-    .limit(2000);
+    .limit(EXPORT_LIMIT);
 
   if (!hasOfficeWideDataScope(gate.role)) {
     rentalQuery = rentalQuery.eq("created_by", gate.userId);
@@ -584,7 +621,7 @@ export async function exportRentalsCsv(filters: RentalExportFilters = {}): Promi
       acik_ariza: openMaintRentals.has(r.id as string) ? "Evet" : "Hayır",
     };
   });
-  return { csv: toCsv(rows), filename: `kiralama-${today10()}.csv` };
+  return exportResult(gate, "kiralama", rows, `kiralama-${today10()}.csv`);
 }
 
 export async function exportDuesCsv(): Promise<ExportResult> {
@@ -597,7 +634,7 @@ export async function exportDuesCsv(): Promise<ExportResult> {
     .eq("tenant_id", gate.tenantId)
     .eq("property.tenant_id", gate.tenantId)
     .order("period", { ascending: false })
-    .limit(2000);
+    .limit(EXPORT_LIMIT);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("created_by", gate.userId);
   const { data, error } = await q;
   if (error) {
@@ -616,7 +653,7 @@ export async function exportDuesCsv(): Promise<ExportResult> {
       odendi_tarih: d.paid_at ?? "",
     };
   });
-  return { csv: toCsv(rows), filename: `aidatlar-${today10()}.csv` };
+  return exportResult(gate, "aidatlar", rows, `aidatlar-${today10()}.csv`);
 }
 
 export async function exportContractsCsv(): Promise<ExportResult> {
@@ -632,7 +669,7 @@ export async function exportContractsCsv(): Promise<ExportResult> {
     .eq("property.tenant_id", gate.tenantId)
     .eq("customer.tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
-    .limit(2000);
+    .limit(EXPORT_LIMIT);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("created_by", gate.userId);
   const { data, error } = await q;
   if (error) {
@@ -652,7 +689,7 @@ export async function exportContractsCsv(): Promise<ExportResult> {
       bitis: k.expires_at ?? "",
     };
   });
-  return { csv: toCsv(rows), filename: `sozlesmeler-${today10()}.csv` };
+  return exportResult(gate, "sozlesmeler", rows, `sozlesmeler-${today10()}.csv`);
 }
 
 export async function exportReferralsCsv(): Promise<ExportResult> {
@@ -667,7 +704,7 @@ export async function exportReferralsCsv(): Promise<ExportResult> {
     .eq("tenant_id", gate.tenantId)
     .eq("referrer.tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
-    .limit(2000);
+    .limit(EXPORT_LIMIT);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("handled_by", gate.userId);
   const { data, error } = await q;
   if (error) {
@@ -684,5 +721,5 @@ export async function exportReferralsCsv(): Promise<ExportResult> {
     ofis_notu: r.staff_note ?? "",
     tarih: r.created_at,
   }));
-  return { csv: toCsv(rows), filename: `tavsiyeler-${today10()}.csv` };
+  return exportResult(gate, "tavsiyeler", rows, `tavsiyeler-${today10()}.csv`);
 }

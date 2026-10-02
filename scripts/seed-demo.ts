@@ -1529,7 +1529,7 @@ async function main() {
   await section("Duyurular", "announcements", tenantId, 3, async () => {
     const rows = [
       { level: "success", title: "Temmuz rekoru!", body: "Bu ay 6 satış kapattık — geçen ayın 2 katı. Herkese teşekkürler 🎉", pinned: true, daysAgo: 1 },
-      { level: "info", title: "Yeni portal entegrasyonu", body: "Artık ilanlarınızı tek tıkla Sahibinden ve Hepsiemlak'a gönderebilirsiniz.", pinned: false, daysAgo: 4 },
+      { level: "info", title: "Ofis duyuru panosu", body: "Ekibinize önemli duyuruları buradan yayınlayabilir, okunma durumunu takip edebilirsiniz.", pinned: false, daysAgo: 4 },
       { level: "warning", title: "İYS izin kontrolü", body: "Toplu mesaj öncesi müşteri İYS izinlerini kontrol edin; izinsiz gönderim yasal risk.", pinned: false, daysAgo: 8 },
     ].map((a) => ({
       tenant_id: tenantId,

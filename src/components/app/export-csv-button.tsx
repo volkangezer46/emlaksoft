@@ -38,7 +38,11 @@ export function ExportCsvButton({
       a.download = res.filename ?? "export.csv";
       a.click();
       URL.revokeObjectURL(url);
-      push("CSV indirildi", "ok");
+      if (res.truncated) {
+        push(`Yalnızca ilk ${res.rowCount ?? 0} kayıt indirildi (üst sınır). Tamamı için filtreyi daraltın.`, "err");
+      } else {
+        push("CSV indirildi", "ok");
+      }
     } catch {
       push("Dışa aktarma hatası", "err");
     } finally {
