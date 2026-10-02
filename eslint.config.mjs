@@ -47,6 +47,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Yerel çalışma/denetim artıkları (ör. bozuk node_modules kopyaları) — depoda değil,
+    // taranırsa yüz binlerce sahte bulgu üretir.
+    ".tmp/**",
+    "test-results/**",
   ]),
 ]);
 
