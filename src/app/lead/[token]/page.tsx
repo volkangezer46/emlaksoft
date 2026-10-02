@@ -38,21 +38,21 @@ export default async function PublicLeadPage({ params }: { params: Promise<{ tok
             href={`/vitrin/${tenant.slug}`}
             className="mb-5 flex items-center justify-center gap-2 text-xs font-semibold text-white/60 transition hover:text-white"
           >
-            <span className="grid h-7 w-7 place-items-center rounded-[9px] bg-white/10 text-[12px] font-bold text-white">
+            <span className="grid h-7 w-7 place-items-center rounded-[var(--radius-control)] bg-white/10 text-xs font-bold text-white">
               {tenant.name ? tenant.name[0] : "E"}
             </span>
             {tenant.name || "EmlakSoft"}
           </Link>
         ) : (
           <div className="mb-5 flex items-center justify-center gap-2 text-xs font-semibold text-white/60">
-            <span className="grid h-7 w-7 place-items-center rounded-[9px] bg-white/10 text-[12px] font-bold text-white">
+            <span className="grid h-7 w-7 place-items-center rounded-[var(--radius-control)] bg-white/10 text-xs font-bold text-white">
               {tenant.name ? tenant.name[0] : "E"}
             </span>
             {tenant.name || "EmlakSoft"}
           </div>
         )}
 
-        <div className="overflow-hidden rounded-[24px] border border-white/15 bg-white/[0.06] p-6 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.7)] backdrop-blur-xl sm:p-8">
+        <div className="overflow-hidden rounded-[var(--radius-hero)] border border-white/15 bg-white/[0.06] p-6 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.7)] backdrop-blur-xl sm:p-8">
           <h1 className="font-display text-2xl font-extrabold leading-tight sm:text-3xl">
             Size en uygun mülkü bulalım
           </h1>
@@ -61,7 +61,7 @@ export default async function PublicLeadPage({ params }: { params: Promise<{ tok
           </p>
 
           {closed ? (
-            <p className="mt-6 rounded-[12px] border border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-white/60">
+            <p className="mt-6 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-white/60">
               Bu form şu anda kapalı. Lütfen daha sonra tekrar deneyin.
             </p>
           ) : (
@@ -69,7 +69,7 @@ export default async function PublicLeadPage({ params }: { params: Promise<{ tok
           )}
         </div>
 
-        <p className="mt-6 text-center text-[11px] text-white/30">
+        <p className="mt-6 text-center text-xs text-white/30">
           <Link href="/" className="font-semibold underline-offset-2 transition hover:text-white/70 hover:underline">
             Powered by EmlakSoft
           </Link>{" "}

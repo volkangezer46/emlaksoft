@@ -300,12 +300,12 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
       type="button"
       onClick={() => goHref(allHref)}
       onMouseEnter={() => setActive(allIndex)}
-      className={`flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-left transition ${
+      className={`flex w-full items-center gap-3 rounded-[var(--radius-card)] px-3 py-2.5 text-left transition ${
         allIndex === active ? "bg-brand-600/8" : "hover:bg-canvas"
       }`}
     >
       <span
-        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[10px] transition ${
+        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] transition ${
           allIndex === active ? "bg-brand-600/10 text-brand-600" : "bg-canvas text-text-muted"
         }`}
       >
@@ -325,12 +325,12 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
       type="button"
       onClick={() => goHref(askHref)}
       onMouseEnter={() => setActive(askIndex)}
-      className={`flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-left transition ${
+      className={`flex w-full items-center gap-3 rounded-[var(--radius-card)] px-3 py-2.5 text-left transition ${
         askIndex === active ? "bg-brand-600/8" : "hover:bg-canvas"
       }`}
     >
       <span
-        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[10px] transition ${
+        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] transition ${
           askIndex === active ? "bg-brand-600/10 text-brand-600" : "bg-canvas text-text-muted"
         }`}
       >
@@ -351,12 +351,12 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
       type="button"
       onClick={copyCalc}
       onMouseEnter={() => setActive(0)}
-      className={`flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-left transition ${
+      className={`flex w-full items-center gap-3 rounded-[var(--radius-card)] px-3 py-2.5 text-left transition ${
         active === 0 ? "bg-brand-600/8" : "hover:bg-canvas"
       }`}
     >
       <span
-        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[10px] transition ${
+        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] transition ${
           active === 0 ? "bg-brand-600/10 text-brand-600" : "bg-canvas text-text-muted"
         }`}
       >
@@ -366,7 +366,7 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
         <span className="block truncate text-base font-bold tabular-nums text-ink-950">= {calc.display}</span>
         <span className="block truncate text-xs text-text-muted">{calc.currency} · Enter panoya kopyalar</span>
       </span>
-      <span className="ml-2 shrink-0 rounded-[6px] bg-brand-600/10 px-1.5 py-0.5 text-[10px] font-bold text-brand-600">
+      <span className="ml-2 shrink-0 rounded-[6px] bg-brand-600/10 px-1.5 py-0.5 text-xs font-bold text-brand-600">
         Hesap
       </span>
     </button>
@@ -387,12 +387,12 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
         aria-haspopup="listbox"
         aria-controls="app-command-results"
         aria-label="Müşteri, portföy, anlaşma, görev veya ilan ara"
-        className="focus-ring relative flex w-full items-center rounded-[11px] border border-hairline bg-canvas py-2.5 pl-10 pr-4 text-left text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300 hover:bg-surface hover:shadow-[var(--elev-2)] sm:pr-20"
+        className="focus-ring relative flex w-full items-center rounded-[var(--radius-control)] border border-hairline bg-canvas py-2.5 pl-10 pr-4 text-left text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300 hover:bg-surface hover:shadow-[var(--elev-2)] sm:pr-20"
       >
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
         <span className="truncate sm:hidden">Ara…</span>
         <span className="hidden truncate sm:inline">Müşteri, portföy, anlaşma, görev, ilan no ara…</span>
-        <span className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded-[7px] border border-hairline bg-surface px-2 py-1 text-[11px] text-text-faint sm:flex">
+        <span className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded-[7px] border border-hairline bg-surface px-2 py-1 text-xs text-text-faint sm:flex">
           <Command className="h-3 w-3" /> K
         </span>
       </button>
@@ -405,7 +405,7 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
             className="fixed inset-0 z-40 cursor-default"
             onClick={() => setOpen(false)}
           />
-          <div className="popover-in absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-[16px] border border-hairline bg-surface shadow-[var(--inner-top),var(--elev-5)]">
+          <div className="popover-in absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-[var(--radius-card)] border border-hairline bg-surface shadow-[var(--inner-top),var(--elev-5)]">
             <div className="hairline-b flex items-center gap-2 px-4">
               <Search className="h-4 w-4 text-text-faint" />
               <input
@@ -439,7 +439,7 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
                 autoFocus
               />
               {pending ? <Loader2 className="h-4 w-4 animate-spin text-brand-600" /> : null}
-              <button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-[8px] text-text-muted hover:bg-canvas" aria-label="Kapat">
+              <button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-canvas" aria-label="Kapat">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -447,7 +447,7 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
             <div id="app-command-results" role="listbox" aria-label="Arama sonuçları" className="max-h-[min(60vh,28rem)] overflow-y-auto p-2">
               {calcVisible ? (
                 <div>
-                  <p className="px-3 pb-1.5 pt-2 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">Hesap makinesi</p>
+                  <p className="px-3 pb-1.5 pt-2 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Hesap makinesi</p>
                   {calcRow}
                   {askRow ? <div className="mt-1 border-t border-line pt-1">{askRow}</div> : null}
                 </div>
@@ -455,7 +455,7 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
                 <div>
                   {visibleRecents.length > 0 ? (
                     <>
-                      <p className="px-3 pb-1.5 pt-2 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">Son kullanılanlar</p>
+                      <p className="px-3 pb-1.5 pt-2 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Son kullanılanlar</p>
                       <ul className="space-y-1">
                         {visibleRecents.map((item, i) => {
                           const Icon = recentIcon(item);
@@ -469,12 +469,12 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
                                 type="button"
                                 onClick={() => goRecent(item)}
                                 onMouseEnter={() => setActive(i)}
-                                className={`flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-left transition ${
+                                className={`flex w-full items-center gap-3 rounded-[var(--radius-card)] px-3 py-2.5 text-left transition ${
                                   i === active ? "bg-brand-600/8" : "hover:bg-canvas"
                                 }`}
                               >
                                 <span
-                                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-[10px] transition ${
+                                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] transition ${
                                     i === active ? "bg-brand-600/10 text-brand-600" : "bg-canvas text-text-muted"
                                   }`}
                                 >
@@ -482,7 +482,7 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
                                 </span>
                                 <span className="flex-1 truncate text-sm font-semibold text-ink-950">{item.label}</span>
                                 {meta ? (
-                                  <span className={`ml-2 shrink-0 rounded-[6px] px-1.5 py-0.5 text-[10px] font-bold ${meta.tone}`}>
+                                  <span className={`ml-2 shrink-0 rounded-[6px] px-1.5 py-0.5 text-xs font-bold ${meta.tone}`}>
                                     {meta.label}
                                   </span>
                                 ) : null}
@@ -493,7 +493,7 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
                       </ul>
                     </>
                   ) : null}
-                  <p className="px-3 pb-1.5 pt-2 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">Hızlı eylemler</p>
+                  <p className="px-3 pb-1.5 pt-2 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Hızlı eylemler</p>
                   <ul className="space-y-1">
                     {quickActions.map((action, i) => {
                       const Icon = action.icon;
@@ -507,12 +507,12 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
                             type="button"
                             onClick={() => goRecent({ label: action.label, href: action.href, kind: "page" })}
                             onMouseEnter={() => setActive(idx)}
-                            className={`flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-left transition ${
+                            className={`flex w-full items-center gap-3 rounded-[var(--radius-card)] px-3 py-2.5 text-left transition ${
                               idx === active ? "bg-brand-600/8" : "hover:bg-canvas"
                             }`}
                           >
                             <span
-                              className={`grid h-9 w-9 place-items-center rounded-[10px] transition ${
+                              className={`grid h-9 w-9 place-items-center rounded-[var(--radius-control)] transition ${
                                 idx === active ? "bg-brand-600/10 text-brand-600" : "bg-canvas text-text-muted"
                               }`}
                             >
@@ -548,11 +548,11 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
                           type="button"
                           onClick={() => go(hit)}
                           onMouseEnter={() => setActive(i)}
-                          className={`flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-left transition ${
+                          className={`flex w-full items-center gap-3 rounded-[var(--radius-card)] px-3 py-2.5 text-left transition ${
                             i === active ? "bg-brand-600/8" : "hover:bg-canvas"
                           }`}
                         >
-                          <span className={`grid h-9 w-9 place-items-center rounded-[10px] ${meta.tone}`}>
+                          <span className={`grid h-9 w-9 place-items-center rounded-[var(--radius-control)] ${meta.tone}`}>
                             <Icon className="h-4 w-4" />
                           </span>
                           <span className="min-w-0 flex-1">
@@ -560,7 +560,7 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
                             <span className="block truncate text-xs text-text-muted">{hit.subtitle}</span>
                           </span>
                           {/* Sonuç tipi rozeti */}
-                          <span className={`ml-2 shrink-0 rounded-[6px] px-1.5 py-0.5 text-[10px] font-bold ${meta.tone}`}>
+                          <span className={`ml-2 shrink-0 rounded-[6px] px-1.5 py-0.5 text-xs font-bold ${meta.tone}`}>
                             {meta.label}
                           </span>
                         </button>
@@ -574,16 +574,16 @@ export function CommandSearch({ accessibleModules }: { accessibleModules: AppMod
             </div>
 
             {/* Klavye ipuçları çubuğu */}
-            <div className="flex items-center gap-3 border-t border-line px-4 py-2 text-[11px] text-text-faint">
+            <div className="flex items-center gap-3 border-t border-line px-4 py-2 text-xs text-text-faint">
               <span className="flex items-center gap-1">
-                <kbd className="rounded-[5px] border border-hairline bg-canvas px-1 py-0.5 text-[10px]">↑↓</kbd> gezin
+                <kbd className="rounded-[5px] border border-hairline bg-canvas px-1 py-0.5 text-xs">↑↓</kbd> gezin
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="rounded-[5px] border border-hairline bg-canvas px-1 py-0.5 text-[10px]">Enter</kbd>
+                <kbd className="rounded-[5px] border border-hairline bg-canvas px-1 py-0.5 text-xs">Enter</kbd>
                 {calcVisible ? "kopyala" : "aç"}
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="rounded-[5px] border border-hairline bg-canvas px-1 py-0.5 text-[10px]">Esc</kbd> kapat
+                <kbd className="rounded-[5px] border border-hairline bg-canvas px-1 py-0.5 text-xs">Esc</kbd> kapat
               </span>
             </div>
           </div>

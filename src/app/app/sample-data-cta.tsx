@@ -17,9 +17,9 @@ export function SampleDataCta() {
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <section className="surface-card flex flex-wrap items-center justify-between gap-4 rounded-[18px] border border-brand-300/60 bg-brand-600/[0.04] p-5">
+    <section className="surface-card flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-panel)] border border-brand-300/60 bg-brand-600/[0.04] p-5">
       <div className="flex min-w-0 items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-brand-600/10 text-brand-600">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
           <Sparkles className="h-5 w-5" />
         </span>
         <div className="min-w-0">
@@ -48,7 +48,7 @@ export function SampleDataCta() {
               router.refresh();
             });
           }}
-          className="focus-ring press btn-shine inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+          className="focus-ring press btn-shine inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
         >
           <Sparkles className="h-4 w-4" />
           {pending ? "Yükleniyor…" : "Örnek veri yükle"}

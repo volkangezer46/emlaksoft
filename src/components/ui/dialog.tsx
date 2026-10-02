@@ -90,7 +90,7 @@ export function DialogContent({
             className={cn(
               // Modal en yüksek katman: elev-5 + üst iç ışık. Tek katmanlı
               // shadow-lg modalı arka plandan yeterince ayırmıyordu.
-              "dialog-content w-full overflow-hidden rounded-[22px] border border-white/20 bg-surface shadow-[var(--inner-top),var(--elev-5)]",
+              "dialog-content w-full overflow-hidden rounded-[var(--radius-panel)] border border-white/20 bg-surface shadow-[var(--inner-top),var(--elev-5)]",
               sizeClass[size],
               className,
             )}
@@ -173,7 +173,7 @@ export function DialogHeader({
           {icon ? (
             <span
               className={cn(
-                "grid h-11 w-11 shrink-0 place-items-center rounded-[13px] [&_svg]:h-5 [&_svg]:w-5",
+                "grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] [&_svg]:h-5 [&_svg]:w-5",
                 tone === "danger"
                   ? "bg-danger-500/20 text-danger-300"
                   : "bg-white/10 text-mint-400",
@@ -194,7 +194,7 @@ export function DialogHeader({
           </div>
         </div>
         <DialogPrimitive.Close
-          className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-white/8 text-white/70 transition hover:bg-white/15 hover:text-white"
+          className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-white/8 text-white/70 transition hover:bg-white/15 hover:text-white"
           aria-label="Kapat"
         >
           <X className="h-5 w-5" />

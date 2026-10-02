@@ -106,7 +106,7 @@ export function DealChecklistSection({
         <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
           <FileCheck2 className="h-4 w-4 text-brand-600" /> Evrak dosyası
           {complete ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-mint-500/12 px-2.5 py-0.5 text-[11px] font-bold text-mint-700 ring-1 ring-inset ring-mint-600/25">
+            <span className="inline-flex items-center gap-1 rounded-full bg-mint-500/12 px-2.5 py-0.5 text-xs font-bold text-mint-700 ring-1 ring-inset ring-mint-600/25">
               <BadgeCheck className="h-3.5 w-3.5" /> Dosya tamam ✓
             </span>
           ) : null}
@@ -117,7 +117,7 @@ export function DealChecklistSection({
           </p>
         ) : null}
       </div>
-      <p className="mt-1 text-[11px] text-text-faint">
+      <p className="mt-1 text-xs text-text-faint">
         Kapanışta gereken belgeler — tapu, kimlik, DASK vb. Yüzde yalnız zorunlu evraklardan hesaplanır.
       </p>
 
@@ -139,7 +139,7 @@ export function DealChecklistSection({
       ) : null}
 
       {items.length === 0 ? (
-        <div className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center">
+        <div className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center">
           <p className="text-sm text-text-muted">
             Henüz evrak listesi yok. {dealType === "rent" ? "Kiralama" : "Satış"} kapanışının
             standart evraklarıyla başlayın.
@@ -151,7 +151,7 @@ export function DealChecklistSection({
               <button
                 type="submit"
                 disabled={templatePending}
-                className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+                className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
               >
                 <FileCheck2 className="h-4 w-4" />
                 {templatePending
@@ -173,7 +173,7 @@ export function DealChecklistSection({
             return (
               <li
                 key={item.id}
-                className="rounded-[12px] border border-line bg-canvas px-4 py-2.5"
+                className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5"
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex min-w-0 flex-1 items-center gap-2.5">
@@ -203,18 +203,18 @@ export function DealChecklistSection({
                       {item.label}
                     </span>
                     {item.is_required ? (
-                      <span className="shrink-0 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                      <span className="shrink-0 rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide text-amber-700 ring-1 ring-inset ring-amber-600/20">
                         Zorunlu
                       </span>
                     ) : (
-                      <span className="shrink-0 rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 ring-1 ring-inset ring-zinc-500/10">
+                      <span className="shrink-0 rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs font-semibold text-zinc-500 ring-1 ring-inset ring-zinc-500/10">
                         Opsiyonel
                       </span>
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
                     {item.is_done && item.done_by_name ? (
-                      <span className="text-[11px] text-text-faint" title={item.done_at ?? undefined}>
+                      <span className="text-xs text-text-faint" title={item.done_at ?? undefined}>
                         {item.done_by_name}
                       </span>
                     ) : null}
@@ -224,7 +224,7 @@ export function DealChecklistSection({
                         onClick={() => setNoteFor((v) => (v === item.id ? null : item.id))}
                         aria-expanded={noteFor === item.id}
                         title={item.note ? "Notu düzenle" : "Not ekle"}
-                        className={`focus-ring press grid h-7 w-7 place-items-center rounded-[8px] transition hover:bg-brand-600/10 hover:text-brand-600 ${
+                        className={`focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] transition hover:bg-brand-600/10 hover:text-brand-600 ${
                           item.note ? "text-brand-600" : "text-text-faint"
                         }`}
                       >
@@ -242,7 +242,7 @@ export function DealChecklistSection({
                           <button
                             type="button"
                             aria-label={`${item.label} maddesini sil`}
-                            className="focus-ring press grid h-7 w-7 place-items-center rounded-[8px] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600"
+                            className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -269,19 +269,19 @@ export function DealChecklistSection({
                       defaultValue={item.note ?? ""}
                       placeholder="Kısa not… (boş bırakmak notu siler)"
                       autoFocus
-                      className="min-w-0 flex-1 rounded-[8px] border border-line bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-brand-300"
+                      className="min-w-0 flex-1 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-brand-300"
                     />
                     <button
                       type="submit"
                       disabled={notePending}
-                      className="focus-ring press rounded-[8px] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+                      className="focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
                     >
                       {notePending ? "Kaydediliyor…" : "Kaydet"}
                     </button>
                     <button
                       type="button"
                       onClick={() => setNoteFor(null)}
-                      className="rounded-[8px] px-2 py-1.5 text-xs font-semibold text-text-muted hover:bg-canvas"
+                      className="rounded-[var(--radius-control)] px-2 py-1.5 text-xs font-semibold text-text-muted hover:bg-canvas"
                     >
                       Vazgeç
                     </button>
@@ -314,17 +314,17 @@ export function DealChecklistSection({
               required
               maxLength={200}
               placeholder="Örn. tapu randevu belgesi"
-              className="mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+              className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
             />
           </label>
-          <label className="flex h-[38px] shrink-0 cursor-pointer items-center gap-1.5 rounded-[10px] border border-line px-3 text-xs font-semibold text-text-muted">
+          <label className="flex h-[38px] shrink-0 cursor-pointer items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 text-xs font-semibold text-text-muted">
             <input type="checkbox" name="is_required" value="1" defaultChecked className="accent-brand-600" />
             Zorunlu
           </label>
           <button
             type="submit"
             disabled={addPending}
-            className="btn-shine focus-ring press inline-flex h-[38px] shrink-0 items-center gap-1.5 rounded-[10px] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+            className="btn-shine focus-ring press inline-flex h-[38px] shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
           >
             <Plus className="h-4 w-4" /> {addPending ? "Ekleniyor…" : "Ekle"}
           </button>

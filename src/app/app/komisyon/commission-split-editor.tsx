@@ -71,7 +71,7 @@ export function CommissionSplitEditor({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline px-2.5 py-1.5 text-[11px] font-bold text-ink-950 transition hover:border-brand-300"
+          className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline px-2.5 py-1.5 text-xs font-bold text-ink-950 transition hover:border-brand-300"
         >
           <Split className="h-3.5 w-3.5 text-brand-600" /> Paylaşım
         </button>
@@ -95,7 +95,7 @@ export function CommissionSplitEditor({
                         value={r.label}
                         onChange={(e) => update(i, { label: e.target.value })}
                         placeholder="Taraf (ör. Danışman, Ofis, Referans)"
-                        className="min-w-0 flex-1 rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400"
+                        className="min-w-0 flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400"
                       />
                       <div className="relative w-20 shrink-0">
                         <input
@@ -103,12 +103,12 @@ export function CommissionSplitEditor({
                           value={r.rate}
                           onChange={(e) => update(i, { rate: e.target.value })}
                           placeholder="%"
-                          className="w-full rounded-[10px] border border-line bg-canvas px-2 py-2 pr-6 text-sm outline-none focus:border-brand-400"
+                          className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2 py-2 pr-6 text-sm outline-none focus:border-brand-400"
                         />
                         <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-text-faint">%</span>
                       </div>
                       <span className="w-24 shrink-0 text-right text-xs font-semibold tabular-nums text-ink-950">{money(amt)}</span>
-                      <button type="button" onClick={() => removeRow(i)} aria-label="Sil" className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] text-text-faint hover:bg-danger-500/10 hover:text-danger-500">
+                      <button type="button" onClick={() => removeRow(i)} aria-label="Sil" className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-faint hover:bg-danger-500/10 hover:text-danger-500">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -120,7 +120,7 @@ export function CommissionSplitEditor({
                 <Plus className="h-3.5 w-3.5" /> Taraf ekle
               </button>
 
-              <div className={`mt-3 flex items-center justify-between rounded-[10px] px-3 py-2 text-xs font-semibold ${totalRate > 100 ? "bg-danger-500/10 text-danger-600" : remaining === 0 ? "bg-mint-500/10 text-mint-700" : "bg-canvas text-text-muted"}`}>
+              <div className={`mt-3 flex items-center justify-between rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold ${totalRate > 100 ? "bg-danger-500/10 text-danger-600" : remaining === 0 ? "bg-mint-500/10 text-mint-700" : "bg-canvas text-text-muted"}`}>
                 <span>Toplam: %{totalRate.toFixed(0)}</span>
                 <span>{remaining >= 0 ? `Kalan: %${remaining.toFixed(0)}` : `%${Math.abs(remaining).toFixed(0)} fazla`}</span>
               </div>
@@ -131,11 +131,11 @@ export function CommissionSplitEditor({
 
               <div className="hairline-t mt-4 flex justify-end gap-2 pt-4">
                 <DialogClose asChild>
-                  <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-medium text-ink-950 transition hover:bg-canvas">
+                  <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-sm font-medium text-ink-950 transition hover:bg-canvas">
                     Vazgeç
                   </button>
                 </DialogClose>
-                <button type="button" onClick={save} disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60">
+                <button type="button" onClick={save} disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60">
                   {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Kaydet
                 </button>
               </div>

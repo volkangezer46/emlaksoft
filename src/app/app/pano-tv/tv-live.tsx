@@ -52,7 +52,7 @@ export function TvLive({ intervalSec = 45 }: { intervalSec?: number }) {
       <button
         type="button"
         onClick={toggleFullscreen}
-        className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/8 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-white/15"
+        className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/8 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-white/15"
       >
         <Maximize2 className="h-3.5 w-3.5" /> {fs ? "Çık" : "Tam ekran"}
       </button>

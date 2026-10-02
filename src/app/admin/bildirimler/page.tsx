@@ -29,7 +29,7 @@ const kindLabel: Record<string, string> = {
 };
 
 const chipCls = (active: boolean) =>
-  `focus-ring press rounded-[9px] px-3 py-1.5 text-xs font-semibold transition ${
+  `focus-ring press rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold transition ${
     active ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
   }`;
 
@@ -99,7 +99,7 @@ export default async function AdminNotificationsPage({
             <form action={markAllPlatformNotificationsReadForm}>
               <button
                 type="submit"
-                className="focus-ring press inline-flex items-center gap-2 rounded-[10px] border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white backdrop-blur-sm transition hover:border-white/35 hover:bg-white/15"
+                className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white backdrop-blur-sm transition hover:border-white/35 hover:bg-white/15"
               >
                 <CheckCheck className="h-3.5 w-3.5" /> Tümünü okundu işaretle
               </button>
@@ -150,7 +150,7 @@ export default async function AdminNotificationsPage({
         </AdminStatGrid>
       </AdminPageHeader>
 
-      <nav aria-label="Tür filtresi" className="flex flex-wrap gap-2 rounded-[16px] border border-line bg-surface p-3">
+      <nav aria-label="Tür filtresi" className="flex flex-wrap gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-3">
         <Link href={buildHref({ durum })} aria-current={!tur ? "page" : undefined} className={chipCls(!tur)}>
           Tümü
         </Link>
@@ -189,7 +189,7 @@ export default async function AdminNotificationsPage({
               filtered ? (
                 <Link
                   href="/admin/bildirimler"
-                  className="focus-ring press inline-flex rounded-[10px] border border-line px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-400"
+                  className="focus-ring press inline-flex rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-400"
                 >
                   Filtreyi temizle
                 </Link>
@@ -226,14 +226,14 @@ export default async function AdminNotificationsPage({
                     <Link
                       href={buildHref({ tur: tur === n.kind ? undefined : n.kind, durum })}
                       title={`"${kindLabel[n.kind] ?? n.kind}" türünü filtrele`}
-                      className="relative z-10 shrink-0 rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-text-faint transition hover:bg-brand-600/10 hover:text-brand-600"
+                      className="relative z-10 shrink-0 rounded-full bg-canvas px-1.5 py-0.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint transition hover:bg-brand-600/10 hover:text-brand-600"
                     >
                       {kindLabel[n.kind] ?? n.kind}
                     </Link>
                   </div>
                   {n.body ? <p className="mt-0.5 truncate text-xs text-text-muted">{n.body}</p> : null}
                 </div>
-                <span className="shrink-0 text-[11px] text-text-faint">{relativeTimeTR(n.created_at)}</span>
+                <span className="shrink-0 text-xs text-text-faint">{relativeTimeTR(n.created_at)}</span>
               </div>
             ))}
           </div>

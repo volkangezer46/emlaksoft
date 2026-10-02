@@ -52,7 +52,7 @@ function subscribeNoop() {
 }
 
 const inputCls =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 outline-none transition focus:border-brand-400";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 outline-none transition focus:border-brand-400";
 
 /** Çip (etiket) girişi — Enter/virgül ile ekler, çarpı ile siler. */
 function ChipInput({
@@ -84,7 +84,7 @@ function ChipInput({
   return (
     <div>
       <label className="text-xs font-semibold text-ink-950">{label}</label>
-      <p className="mt-0.5 text-[11px] text-text-muted">{hint}</p>
+      <p className="mt-0.5 text-xs text-text-muted">{hint}</p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {values.map((v) => (
           <span
@@ -120,13 +120,13 @@ function ChipInput({
           <button
             type="button"
             onClick={() => add(draft)}
-            className="inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-line px-3 py-2 text-xs font-bold text-brand-600 transition hover:border-brand-300"
+            className="inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-bold text-brand-600 transition hover:border-brand-300"
           >
             <Plus className="h-3.5 w-3.5" /> Ekle
           </button>
         </div>
       ) : (
-        <p className="mt-2 text-[11px] text-text-faint">En fazla {max} etiket eklenebilir.</p>
+        <p className="mt-2 text-xs text-text-faint">En fazla {max} etiket eklenebilir.</p>
       )}
     </div>
   );
@@ -222,7 +222,7 @@ export function KartvizitForm({ view }: { view: KartvizitView }) {
   return (
     <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr] lg:items-start">
       {/* ------------------------------------------------------------- Form */}
-      <form action={save} className="space-y-5 rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <form action={save} className="space-y-5 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         {/* Fotoğraf */}
         <div className="flex flex-wrap items-center gap-4">
           {view.photoUrl ? (
@@ -231,10 +231,10 @@ export function KartvizitForm({ view }: { view: KartvizitView }) {
               alt={view.fullName}
               width={88}
               height={88}
-              className="h-[88px] w-[88px] rounded-[20px] border border-line object-cover"
+              className="h-[88px] w-[88px] rounded-[var(--radius-panel)] border border-line object-cover"
             />
           ) : (
-            <span className="grid h-[88px] w-[88px] place-items-center rounded-[20px] bg-[image:var(--grad-brand)] font-display text-2xl font-extrabold text-white">
+            <span className="grid h-[88px] w-[88px] place-items-center rounded-[var(--radius-panel)] bg-[image:var(--grad-brand)] font-display text-2xl font-extrabold text-white">
               {agentInitials(view.fullName)}
             </span>
           )}
@@ -256,7 +256,7 @@ export function KartvizitForm({ view }: { view: KartvizitView }) {
                 type="button"
                 disabled={uploading}
                 onClick={() => fileRef.current?.click()}
-                className="inline-flex items-center gap-1.5 rounded-[10px] border border-line px-3 py-2 text-xs font-bold text-brand-600 transition hover:border-brand-300 disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-bold text-brand-600 transition hover:border-brand-300 disabled:opacity-60"
               >
                 {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
                 {view.photoUrl ? "Fotoğrafı değiştir" : "Fotoğraf yükle"}
@@ -266,13 +266,13 @@ export function KartvizitForm({ view }: { view: KartvizitView }) {
                   type="button"
                   disabled={uploading}
                   onClick={onPhotoRemove}
-                  className="inline-flex items-center gap-1.5 rounded-[10px] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-danger-500/40 hover:text-danger-500 disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-danger-500/40 hover:text-danger-500 disabled:opacity-60"
                 >
                   <Trash2 className="h-3.5 w-3.5" /> Kaldır
                 </button>
               ) : null}
             </div>
-            <p className="mt-1.5 text-[11px] text-text-faint">JPEG, PNG veya WebP · en fazla 3MB · kare kırpım önerilir</p>
+            <p className="mt-1.5 text-xs text-text-faint">JPEG, PNG veya WebP · en fazla 3MB · kare kırpım önerilir</p>
           </div>
         </div>
 
@@ -305,7 +305,7 @@ export function KartvizitForm({ view }: { view: KartvizitView }) {
             placeholder="Hangi bölgede, hangi tip portföylerde çalıştığınızı ve müşteriye ne sağladığınızı 2-3 cümlede anlatın."
             className={`mt-1.5 ${inputCls} resize-y`}
           />
-          <p className="mt-1 text-right text-[11px] text-text-faint">
+          <p className="mt-1 text-right text-xs text-text-faint">
             {bio.length} / {AGENT_BIO_MAX}
           </p>
         </div>
@@ -334,7 +334,7 @@ export function KartvizitForm({ view }: { view: KartvizitView }) {
             Kartvizit adresi
           </label>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <span className="rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-xs text-text-muted">
+            <span className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-xs text-text-muted">
               /danisman/
             </span>
             <input
@@ -348,25 +348,25 @@ export function KartvizitForm({ view }: { view: KartvizitView }) {
               <button
                 type="button"
                 onClick={() => setSlug(view.suggestedSlug)}
-                className="rounded-[10px] border border-line px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
+                className="rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
               >
                 Adımdan üret
               </button>
             ) : null}
           </div>
           {!slugValid ? (
-            <p className="mt-1.5 text-[11px] font-semibold text-danger-500">
+            <p className="mt-1.5 text-xs font-semibold text-danger-500">
               Adres yalnız küçük harf, rakam ve tire içerebilir; 3-60 karakter olmalı ve tire ile başlayıp bitmemeli.
             </p>
           ) : (
-            <p className="mt-1.5 text-[11px] text-text-faint">
+            <p className="mt-1.5 text-xs text-text-faint">
               Adres benzersizdir; başkası kullanıyorsa kaydederken uyarılırsınız.
             </p>
           )}
         </div>
 
         {/* Yayın anahtarı */}
-        <label className="flex cursor-pointer items-start gap-3 rounded-[14px] border border-line bg-canvas px-4 py-3">
+        <label className="flex cursor-pointer items-start gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3">
           <input
             type="checkbox"
             name="is_public"
@@ -389,7 +389,7 @@ export function KartvizitForm({ view }: { view: KartvizitView }) {
           <button
             type="submit"
             disabled={saving || !slugValid}
-            className="inline-flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-600/90 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-600/90 disabled:opacity-60"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Kaydet
@@ -402,18 +402,18 @@ export function KartvizitForm({ view }: { view: KartvizitView }) {
 
       {/* ------------------------------------------------------- Link + QR */}
       <div className="space-y-4">
-        <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="font-display font-bold text-ink-950">Paylaşılabilir link</h2>
           {view.slug && view.isPublic ? (
             <>
-              <code className="mt-3 block truncate rounded-[10px] border border-line bg-canvas px-3 py-2 text-xs text-ink-950">
+              <code className="mt-3 block truncate rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs text-ink-950">
                 {publicUrl || `/danisman/${view.slug}`}
               </code>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={copyLink}
-                  className="inline-flex items-center gap-1.5 rounded-[10px] border border-line px-3 py-2 text-xs font-bold text-brand-600 transition hover:border-brand-300"
+                  className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-bold text-brand-600 transition hover:border-brand-300"
                 >
                   {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                   {copied ? "Kopyalandı" : "Linki kopyala"}
@@ -422,14 +422,14 @@ export function KartvizitForm({ view }: { view: KartvizitView }) {
                   href={`/danisman/${view.slug}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-[10px] border border-line px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
+                  className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
                 >
                   <ExternalLink className="h-3.5 w-3.5" /> Canlı önizleme
                 </a>
               </div>
             </>
           ) : (
-            <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-6 text-center text-xs text-text-muted">
+            <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-xs text-text-muted">
               {view.slug
                 ? "Kartvizit kayıtlı ama yayında değil. “Kartvizitim yayında” anahtarını açıp kaydedin."
                 : "Adres belirleyip kaydedin; link ve QR kodu burada oluşacak."}
@@ -448,7 +448,7 @@ export function KartvizitForm({ view }: { view: KartvizitView }) {
         ) : null}
 
         {view.officeSlug ? (
-          <p className="px-1 text-[11px] text-text-faint">
+          <p className="px-1 text-xs text-text-faint">
             Kartvizitiniz, size atanmış yayındaki portföyleri ve ofis vitrininizi (
             <span className="font-semibold">/vitrin/{view.officeSlug}</span>) otomatik gösterir.
           </p>

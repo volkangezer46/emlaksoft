@@ -13,6 +13,8 @@ import { getPlatformStaffIdentity } from "@/lib/platform";
 import { AppSidebar } from "@/components/app/app-sidebar";
 import { CommandSearch } from "@/components/app/command-search";
 import { NotificationBell } from "@/components/app/notification-bell";
+import { ThemeController } from "@/components/theme-controller";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { cookies } from "next/headers";
 import { AppPrefetcher } from "@/components/app/app-prefetcher";
 import { ToastProvider } from "@/components/app/toast-provider";
@@ -171,6 +173,7 @@ export default async function AppLayout({
 
   return (
     <ToastProvider>
+      <ThemeController />
       <ErrorBoundary>
         {brandColor ? (
           <style>{`.brand-scope{--brand-600:${brandColor};--brand-700:color-mix(in srgb,${brandColor} 80%,#000);--brand-500:color-mix(in srgb,${brandColor} 86%,#fff);--brand-400:color-mix(in srgb,${brandColor} 68%,#fff);--brand-300:color-mix(in srgb,${brandColor} 42%,#fff);--grad-brand:linear-gradient(120deg,${brandColor},var(--cyan-400) 55%,var(--mint-500));--shadow-glow-brand:0 20px 50px -18px color-mix(in srgb,${brandColor} 55%,transparent);}`}</style>
@@ -195,12 +198,13 @@ export default async function AppLayout({
           <header className="sticky top-0 z-30 flex h-17 items-center justify-between border-b border-line/80 bg-surface/90 px-4 pl-16 backdrop-blur-xl lg:px-6">
             <CommandSearch accessibleModules={accessibleModules} />
             <div className="ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
+              <ThemeToggle />
               {/* Hızlı eylem menüsü: en sık kullanılan kayıt akışlarına tek tıkla */}
               {hasQuickCreate ? <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="focus-ring press inline-flex h-10 items-center gap-1.5 rounded-[11px] bg-brand-600 px-3 text-xs font-bold text-white transition hover:bg-brand-700"
+                    className="focus-ring press inline-flex h-10 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 text-xs font-bold text-white transition hover:bg-brand-700"
                     aria-label="Hızlı yeni kayıt menüsü"
                   >
                     <Plus className="h-4 w-4" />
@@ -246,29 +250,29 @@ export default async function AppLayout({
               {platformStaffFullAccess ? (
                 <Link
                   href="/admin"
-                  className="hidden items-center gap-1.5 rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-bold text-amber-700 transition hover:border-amber-400/50 lg:inline-flex"
+                  className="hidden items-center gap-1.5 rounded-[var(--radius-control)] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-bold text-amber-700 transition hover:border-amber-400/50 lg:inline-flex"
                   title="EmlakSoft Süper Admin"
                 >
                   <Shield className="h-3.5 w-3.5" /> Ops
                 </Link>
               ) : null}
               <NotificationBell initial={notifications} />
-              <Link href="/app/ayarlar" className="flex items-center gap-2 rounded-[11px] border border-line bg-surface p-1.5 sm:pr-3 transition hover:border-brand-300">
+              <Link href="/app/ayarlar" className="flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface p-1.5 sm:pr-3 transition hover:border-brand-300">
                 <div
-                  className="grid h-8 w-8 place-items-center rounded-[9px] bg-[image:var(--grad-brand)] text-xs font-bold text-white"
+                  className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] text-xs font-bold text-white"
                   title={profile?.full_name ?? ""}
                 >
                   {initials}
                 </div>
                 <div className="hidden text-left xl:block">
                   <p className="max-w-28 truncate text-xs font-semibold text-ink-950">{fullName}</p>
-                  <p className="text-[11px] text-text-faint">{planLabel(office?.plan ?? "office")} plan</p>
+                  <p className="text-xs text-text-faint">{planLabel(office?.plan ?? "office")} plan</p>
                 </div>
               </Link>
               <form action={signOut}>
                 <button
                   type="submit"
-                  className="grid h-10 w-10 place-items-center rounded-[11px] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-500"
+                  className="grid h-10 w-10 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-500"
                   aria-label="Çıkış yap"
                 >
                   <LogOut className="h-4 w-4" />

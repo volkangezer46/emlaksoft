@@ -72,7 +72,7 @@ export function THead({ className, ...props }: ComponentProps<"thead">) {
       className={cn(
         // Başlık satırı: saç teli alt kenar + hafif gömülü zemin.
         // Kalın `border-line` çizgisi tabloyu ağırlaştırıyordu.
-        "hairline-b bg-canvas/70 text-[11px] font-semibold uppercase tracking-[0.04em] text-text-faint",
+        "hairline-b bg-canvas/70 text-xs font-semibold uppercase tracking-[0.04em] text-text-faint",
         className,
       )}
     />

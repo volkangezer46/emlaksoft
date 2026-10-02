@@ -146,7 +146,7 @@ export function RotaMap({ markers }: { markers: RotaMarker[] }) {
   const activePoint = px.find((p) => p.id === activeId) ?? null;
 
   return (
-    <div className="overflow-hidden rounded-[16px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+    <div className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-xs)]">
       <div
         ref={boxRef}
         className="relative w-full cursor-grab touch-none select-none overflow-hidden bg-canvas active:cursor-grabbing"
@@ -216,7 +216,7 @@ export function RotaMap({ markers }: { markers: RotaMarker[] }) {
         {activePoint ? (
           <div
             onPointerDown={(e) => e.stopPropagation()}
-            className="absolute z-20 w-[220px] -translate-x-1/2 -translate-y-full rounded-[12px] border border-line bg-surface p-3 shadow-[var(--shadow-card)]"
+            className="absolute z-20 w-[220px] -translate-x-1/2 -translate-y-full rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-card)]"
             style={{
               left: Math.min(Math.max(activePoint.x, 115), Math.max(width - 115, 115)),
               top: Math.max(activePoint.y - 24, 92),
@@ -237,7 +237,7 @@ export function RotaMap({ markers }: { markers: RotaMarker[] }) {
           </div>
         ) : null}
 
-        <div className="absolute right-3 top-3 z-20 flex flex-col overflow-hidden rounded-[10px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+        <div className="absolute right-3 top-3 z-20 flex flex-col overflow-hidden rounded-[var(--radius-control)] border border-line bg-surface shadow-[var(--shadow-xs)]">
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}

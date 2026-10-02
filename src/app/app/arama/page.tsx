@@ -182,7 +182,7 @@ export default async function PhoneOsPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-mint-500/25 blur-[80px]" />
         <div className="relative grid gap-6 lg:grid-cols-[1.1fr_1fr] lg:items-center">
@@ -199,23 +199,23 @@ export default async function PhoneOsPage({
                 <Link
                   key={item.label}
                   href={item.href}
-                  className={`focus-ring press lift block rounded-[14px] border p-3 backdrop-blur transition ${
+                  className={`focus-ring press lift block rounded-[var(--radius-card)] border p-3 backdrop-blur transition ${
                     item.active ? "border-mint-400/50 bg-white/12" : "border-white/10 bg-white/5 hover:border-white/30"
                   }`}
                 >
                   <item.icon className={`h-4 w-4 ${item.tone}`} />
                   <p className="mt-2 font-display text-xl font-extrabold text-white">{item.value}</p>
-                  <p className="text-[11px] text-white/45 sm:text-xs">{item.label}</p>
+                  <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
                 </Link>
               ))}
             </div>
           </div>
 
           {/* live call volume */}
-          <div className="rounded-[16px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
+          <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="flex items-center justify-between">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-white/75"><Activity className="h-3.5 w-3.5 text-cyan-400" /> Arama hacmi · son 7 gün</p>
-              <span className="rounded-full bg-mint-500/15 px-2 py-0.5 text-[11px] font-bold text-mint-400">cevap %{Math.round(answerRate * 100)}</span>
+              <span className="rounded-full bg-mint-500/15 px-2 py-0.5 text-xs font-bold text-mint-400">cevap %{Math.round(answerRate * 100)}</span>
             </div>
             <div className="mt-4 flex h-24 items-end gap-2">
               {volume.map((v, i) => (
@@ -226,7 +226,7 @@ export default async function PhoneOsPage({
                       style={{ height: `${Math.max((v.count / maxVol) * 100, 6)}%`, animationDelay: `${i * 0.08}s` }}
                     />
                   </div>
-                  <span className="text-[10px] text-white/40">{v.label}</span>
+                  <span className="text-xs text-white/40">{v.label}</span>
                 </div>
               ))}
             </div>
@@ -236,7 +236,7 @@ export default async function PhoneOsPage({
                   <span key={i} className="wave-bar h-full w-[2px] rounded-full bg-mint-400/70" style={{ animationDelay: `${i * 0.08}s` }} />
                 ))}
               </span>
-              <span className="text-[11px] text-white/55">Ort. görüşme {duration(avgDur)} · {rows.length} kayıt</span>
+              <span className="text-xs text-white/55">Ort. görüşme {duration(avgDur)} · {rows.length} kayıt</span>
             </div>
           </div>
         </div>
@@ -244,30 +244,30 @@ export default async function PhoneOsPage({
 
       <CallConsole customers={customerList} demandCounts={demandCounts} matchCounts={matchCounts} initialCustomerId={preCustomerId} />
 
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-4">
           <div><p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Clock3 className="h-4 w-4" /> Gerçek kayıtlar</p><h2 className="mt-1 font-display font-bold text-ink-950">Çağrı geçmişi</h2></div>
           <div className="flex flex-wrap items-center gap-2">
             {filtersActive ? (
               <>
-                {yon ? <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">{YON_LABELS[yon]}</span> : null}
-                {sonuc ? <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">Randevu aldı</span> : null}
+                {yon ? <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">{YON_LABELS[yon]}</span> : null}
+                {sonuc ? <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">Randevu aldı</span> : null}
                 {danisman ? (
-                  <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">
+                  <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
                     {danismanProfile?.full_name ?? "Danışman"}
                   </span>
                 ) : null}
                 {fromF || toF ? (
-                  <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">
+                  <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
                     {fromF || "…"} — {toF || "…"}
                   </span>
                 ) : null}
-                <Link href="/app/arama" className="text-[11px] font-semibold text-text-muted underline-offset-2 hover:text-brand-600 hover:underline">
+                <Link href="/app/arama" className="text-xs font-semibold text-text-muted underline-offset-2 hover:text-brand-600 hover:underline">
                   Temizle
                 </Link>
               </>
             ) : null}
-            <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">
+            <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
               {total} çağrı{totalPages > 1 ? ` · sayfa ${page}/${totalPages}` : ""}
             </span>
           </div>
@@ -283,7 +283,7 @@ export default async function PhoneOsPage({
             type="date"
             defaultValue={fromF}
             aria-label="Başlangıç tarihi"
-            className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+            className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
           />
           <span className="text-text-faint">—</span>
           <input
@@ -291,14 +291,14 @@ export default async function PhoneOsPage({
             type="date"
             defaultValue={toF}
             aria-label="Bitiş tarihi"
-            className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+            className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
           />
-          <button type="submit" className="focus-ring press rounded-[9px] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700">
+          <button type="submit" className="focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700">
             Uygula
           </button>
         </form>
         {listRows.length === 0 ? (
-          <div className="grid place-items-center px-6 py-14 text-center"><span className="grid h-14 w-14 place-items-center rounded-[16px] bg-brand-600/10 text-brand-600"><PhoneIncoming className="h-7 w-7" /></span><h3 className="mt-4 font-display text-lg font-bold text-ink-950">{filtersActive ? "Filtreye uyan çağrı yok" : total > 0 ? "Bu sayfada kayıt yok" : "Henüz çağrı kaydı yok"}</h3><p className="mt-1 text-sm text-text-muted">{filtersActive ? "Filtreyi temizleyip tüm kayıtları görebilirsiniz." : total > 0 ? <>Sayfa numarası aralık dışında. <Link href={pageHref(1)} className="font-semibold text-brand-600 hover:underline">İlk sayfaya dön</Link></> : "İlk görüşmeyi kaydettiğinizde çağrı geçmişi burada oluşacak."}</p></div>
+          <div className="grid place-items-center px-6 py-14 text-center"><span className="grid h-14 w-14 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600"><PhoneIncoming className="h-7 w-7" /></span><h3 className="mt-4 font-display text-lg font-bold text-ink-950">{filtersActive ? "Filtreye uyan çağrı yok" : total > 0 ? "Bu sayfada kayıt yok" : "Henüz çağrı kaydı yok"}</h3><p className="mt-1 text-sm text-text-muted">{filtersActive ? "Filtreyi temizleyip tüm kayıtları görebilirsiniz." : total > 0 ? <>Sayfa numarası aralık dışında. <Link href={pageHref(1)} className="font-semibold text-brand-600 hover:underline">İlk sayfaya dön</Link></> : "İlk görüşmeyi kaydettiğinizde çağrı geçmişi burada oluşacak."}</p></div>
         ) : (
           <div className="divide-y divide-line">
             {listRows.map((call) => {
@@ -311,7 +311,7 @@ export default async function PhoneOsPage({
                     <Link href={`/app/musteriler/${custId}`} className="absolute inset-0" aria-label={`${customerName(call.customer)} müşterisini aç`} />
                   ) : null}
                   <div className="flex items-center gap-3">
-                    <span className={`grid h-10 w-10 place-items-center rounded-[11px] ${call.direction === "missed" ? "bg-danger-500/10 text-danger-500" : "bg-brand-600/10 text-brand-600"}`}><DirectionIcon className="h-4 w-4" /></span>
+                    <span className={`grid h-10 w-10 place-items-center rounded-[var(--radius-control)] ${call.direction === "missed" ? "bg-danger-500/10 text-danger-500" : "bg-brand-600/10 text-brand-600"}`}><DirectionIcon className="h-4 w-4" /></span>
                     <div>
                       <p className="text-sm font-semibold text-ink-950">{customerName(call.customer)}</p>
                       {/* Ortu linkin ustunde kalmasi icin relative z-10 */}
@@ -325,15 +325,15 @@ export default async function PhoneOsPage({
                       {!custId ? (
                         <Link
                           href="/app/musteriler"
-                          className="relative z-10 mt-0.5 block text-[11px] font-semibold text-brand-600 underline-offset-2 hover:underline"
+                          className="relative z-10 mt-0.5 block text-xs font-semibold text-brand-600 underline-offset-2 hover:underline"
                         >
                           Müşteri oluştur
                         </Link>
                       ) : null}
                     </div>
                   </div>
-                  <div><p className="text-[11px] text-text-faint">Sonuç</p><p className="text-xs font-semibold text-ink-950">{call.disposition ?? "Cevapsız"}</p></div>
-                  <div><p className="text-[11px] text-text-faint">Süre</p><p className="text-xs font-semibold tabular-nums text-ink-950">{duration(call.duration_sec)}</p></div>
+                  <div><p className="text-xs text-text-faint">Sonuç</p><p className="text-xs font-semibold text-ink-950">{call.disposition ?? "Cevapsız"}</p></div>
+                  <div><p className="text-xs text-text-faint">Süre</p><p className="text-xs font-semibold tabular-nums text-ink-950">{duration(call.duration_sec)}</p></div>
                   <div className="text-xs text-text-muted">{new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(new Date(call.started_at))}</div>
                   {/* AI özet — yalnız notu olan çağrılarda ve anahtar server'da doğrulanınca */}
                   {aiEnabled && call.notes?.trim() ? <CallAiSummary callId={call.id} /> : null}
@@ -345,19 +345,19 @@ export default async function PhoneOsPage({
         {totalPages > 1 ? (
           <nav aria-label="Sayfalama" className="flex items-center justify-between gap-3 border-t border-line px-5 py-3">
             {page > 1 ? (
-              <Link href={pageHref(page - 1)} className="focus-ring press rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+              <Link href={pageHref(page - 1)} className="focus-ring press rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
                 ← Önceki
               </Link>
             ) : (
-              <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">← Önceki</span>
+              <span className="rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">← Önceki</span>
             )}
             <span className="text-xs tabular-nums text-text-muted">Sayfa {page} / {totalPages}</span>
             {page < totalPages ? (
-              <Link href={pageHref(page + 1)} className="focus-ring press rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+              <Link href={pageHref(page + 1)} className="focus-ring press rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
                 Sonraki →
               </Link>
             ) : (
-              <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">Sonraki →</span>
+              <span className="rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">Sonraki →</span>
             )}
           </nav>
         ) : null}

@@ -28,17 +28,17 @@ export function NewNeighborhoodForm({ provinceId, districtId }: { provinceId: st
         name="name"
         required
         placeholder="Yeni mahalle adı…"
-        className="flex-1 min-w-[160px] rounded-[9px] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400"
+        className="flex-1 min-w-[160px] rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400"
       />
       <input
         name="postal_code"
         placeholder="Posta kodu (ops.)"
-        className="w-32 rounded-[9px] border border-line bg-surface px-3 py-2 text-xs outline-none focus:border-brand-400"
+        className="w-32 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs outline-none focus:border-brand-400"
       />
       <button
         type="submit"
         disabled={pending}
-        className="inline-flex items-center gap-1.5 rounded-[9px] bg-brand-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+        className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
       >
         <Plus className="h-3.5 w-3.5" /> {pending ? "Ekleniyor…" : "Mahalle ekle"}
       </button>

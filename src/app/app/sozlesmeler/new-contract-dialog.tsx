@@ -231,7 +231,7 @@ export function NewContractDialog({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="focus-ring press inline-flex items-center gap-2 rounded-[12px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+          className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-card)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
         >
           <Plus className="h-4 w-4" /> Yeni sözleşme
         </button>
@@ -254,7 +254,7 @@ export function NewContractDialog({
             <button
               type="button"
               onClick={() => setStep("form")}
-              className="focus-ring press flex w-full items-center gap-3 rounded-[14px] border border-dashed border-line-strong bg-canvas/60 px-4 py-3 text-left transition hover:border-brand-300"
+              className="focus-ring press flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-dashed border-line-strong bg-canvas/60 px-4 py-3 text-left transition hover:border-brand-300"
             >
               <FilePlus2 className="h-5 w-5 shrink-0 text-brand-600" />
               <span>
@@ -267,7 +267,7 @@ export function NewContractDialog({
             {templates.map((t) => (
               <div
                 key={t.id}
-                className="rounded-[14px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] transition hover:border-brand-300"
+                className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] transition hover:border-brand-300"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-950">{t.title}</p>
@@ -280,7 +280,7 @@ export function NewContractDialog({
                   <summary className="cursor-pointer text-xs font-semibold text-brand-600 hover:underline">
                     Önizleme
                   </summary>
-                  <pre className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-[10px] border border-line bg-canvas/60 p-3 font-mono text-[11px] leading-relaxed text-text-muted">
+                  <pre className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3 font-mono text-xs leading-relaxed text-text-muted">
                     {t.content}
                   </pre>
                 </details>
@@ -288,7 +288,7 @@ export function NewContractDialog({
                   <button
                     type="button"
                     onClick={() => applyDbTemplate(t)}
-                    className="focus-ring press rounded-[9px] bg-brand-600/10 px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-600/15"
+                    className="focus-ring press rounded-[var(--radius-control)] bg-brand-600/10 px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-600/15"
                   >
                     Bu şablonla başla
                   </button>
@@ -310,7 +310,7 @@ export function NewContractDialog({
               {prefillCustomer ? <input type="hidden" name="customer_id" value={prefillCustomer} /> : null}
               {prefillProperty ? <input type="hidden" name="property_id" value={prefillProperty} /> : null}
               {prefillCustomer || prefillProperty ? (
-                <p className="rounded-[8px] bg-brand-600/8 px-3 py-2 text-xs font-medium text-brand-700">
+                <p className="rounded-[var(--radius-control)] bg-brand-600/8 px-3 py-2 text-xs font-medium text-brand-700">
                   {isYerGosterme
                     ? "Randevu akışından gelindi — müşteri ve portföy bağı otomatik eklenecek; içerikte yer gösterme tutanağı şablonu hazır."
                     : "Teklif akışından gelindi — portföy ve müşteri bağı sözleşmeye otomatik eklenecek."}
@@ -329,7 +329,7 @@ export function NewContractDialog({
                     required
                     defaultValue={isYerGosterme ? "Yer Gösterme Tutanağı" : undefined}
                     placeholder="ör. Daire Kira Sözleşmesi — Ahmet Yılmaz"
-                    className="w-full rounded-[10px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300"
+                    className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300"
                   />
                 </div>
 
@@ -343,7 +343,7 @@ export function NewContractDialog({
                     name="contract_type"
                     value={selectedType}
                     onChange={(e) => setSelectedType(e.target.value)}
-                    className="w-full appearance-none rounded-[10px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300"
+                    className="w-full appearance-none rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300"
                   >
                     {contractTypes.map((t) => (
                       <option key={t.value} value={t.value}>{t.label}</option>
@@ -360,7 +360,7 @@ export function NewContractDialog({
                     id="sozl-expires"
                     name="expires_at"
                     type="date"
-                    className="w-full rounded-[10px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300"
+                    className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300"
                   />
                 </div>
               </div>
@@ -389,12 +389,12 @@ export function NewContractDialog({
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   placeholder="Sözleşme metnini buraya yazın veya şablonu kullanın…"
-                  className="w-full resize-y rounded-[10px] border border-line bg-canvas px-3.5 py-2.5 font-mono text-xs text-ink-950 outline-none focus:border-brand-300"
+                  className="w-full resize-y rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 font-mono text-xs text-ink-950 outline-none focus:border-brand-300"
                 />
               </div>
 
               {/* Ofis şablonu olarak kaydet */}
-              <label className="flex cursor-pointer items-start gap-2.5 rounded-[10px] border border-line bg-canvas/60 px-3.5 py-2.5">
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3.5 py-2.5">
                 <input
                   type="checkbox"
                   checked={saveAsTemplate}
@@ -413,7 +413,7 @@ export function NewContractDialog({
 
               {/* Palet dışı red-50/red-600 yerine danger tonları */}
               {(localError ?? state?.error) && (
-                <p className="rounded-[8px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
+                <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
                   {localError ?? state?.error}
                 </p>
               )}
@@ -422,7 +422,7 @@ export function NewContractDialog({
                 <DialogClose asChild>
                   <button
                     type="button"
-                    className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+                    className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
                   >
                     Vazgeç
                   </button>
@@ -430,7 +430,7 @@ export function NewContractDialog({
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+                  className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
                 >
                   <FileSignature className="h-4 w-4" />
                   {isPending ? "Kaydediliyor…" : "Sözleşme oluştur"}

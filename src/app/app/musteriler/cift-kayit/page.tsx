@@ -109,7 +109,7 @@ export default async function DuplicateCustomersPage({
         <ArrowLeft className="h-4 w-4" /> Müşterilere dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-amber-400/25 blur-[80px]" />
         <div className="relative">
@@ -132,14 +132,14 @@ export default async function DuplicateCustomersPage({
               <Link
                 key={k.label}
                 href={k.href}
-                className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
+                className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
               >
                 <div className="flex items-start justify-between">
                   <k.icon className="h-4 w-4 text-amber-400" />
                   <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                 </div>
                 <p className="numeric mt-2 font-display text-lg font-extrabold text-white">{k.value}</p>
-                <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+                <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
               </Link>
             ))}
           </div>
@@ -170,12 +170,12 @@ export default async function DuplicateCustomersPage({
       ) : null}
 
       {error ? (
-        <p className="rounded-[14px] border border-danger-500/30 bg-danger-500/5 px-4 py-3 text-sm text-danger-600" role="alert">
+        <p className="rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 px-4 py-3 text-sm text-danger-600" role="alert">
           Çift kayıt taraması çalıştırılamadı. Lütfen sayfayı yenileyin.
         </p>
       ) : liste.length === 0 ? (
-        <div className="grid place-items-center rounded-[20px] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
-          <span className="grid h-16 w-16 place-items-center rounded-[18px] bg-mint-500/12 text-mint-600">
+        <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
+          <span className="grid h-16 w-16 place-items-center rounded-[var(--radius-panel)] bg-mint-500/12 text-mint-600">
             <CheckCircle2 className="h-8 w-8" />
           </span>
           <h2 className="mt-5 font-display text-xl font-bold text-ink-950">Çift kayıt bulunamadı</h2>
@@ -186,7 +186,7 @@ export default async function DuplicateCustomersPage({
           </p>
         </div>
       ) : gosterilen.length === 0 ? (
-        <div className="grid place-items-center rounded-[20px] border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
+        <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
           <CheckCircle2 className="h-8 w-8 text-mint-600" />
           <h2 className="mt-3 font-display text-lg font-bold text-ink-950">Bu sinyalde çift kayıt yok</h2>
           <p className="mt-1 text-sm text-text-muted">
@@ -213,7 +213,7 @@ export default async function DuplicateCustomersPage({
         />
       )}
 
-      <p className="flex items-start gap-2 rounded-[14px] border border-line bg-canvas px-4 py-3 text-xs leading-relaxed text-text-muted">
+      <p className="flex items-start gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-xs leading-relaxed text-text-muted">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
         <span>
           Birleştirme; talep, randevu, çağrı, görüşme, anlaşma, teklif ve görev kayıtlarını taşıyan{" "}

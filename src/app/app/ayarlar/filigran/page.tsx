@@ -43,7 +43,7 @@ export default async function WatermarkSettingsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/35 blur-[80px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -57,7 +57,7 @@ export default async function WatermarkSettingsPage() {
               başka bir ilanda kullanılsa bile kaynağı belli olur.
             </p>
           </div>
-          <div className="flex items-center gap-2 rounded-[14px] border border-white/12 bg-white/[0.05] px-4 py-3 text-xs text-white/70">
+          <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-4 py-3 text-xs text-white/70">
             <ShieldCheck className="h-4 w-4 text-mint-400" />
             <span>
               Damga <strong className="text-white">yüklenen kopyaya</strong> basılır;
@@ -68,7 +68,7 @@ export default async function WatermarkSettingsPage() {
         </div>
       </section>
 
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-4 md:p-6">
+      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
         <WatermarkForm
           initial={settings}
           officeName={tenant?.name ?? ""}
@@ -77,7 +77,7 @@ export default async function WatermarkSettingsPage() {
         />
       </section>
 
-      <section className="rounded-[20px] border border-line bg-canvas p-5 text-sm text-text-muted">
+      <section className="rounded-[var(--radius-panel)] border border-line bg-canvas p-5 text-sm text-text-muted">
         <h2 className="font-display font-bold text-ink-950">Nasıl çalışır?</h2>
         <ul className="mt-2 list-disc space-y-1.5 pl-5 text-xs leading-relaxed">
           <li>Filigran, fotoğraf yüklenirken tarayıcıda basılır — sunucuya zaten damgalı gider.</li>

@@ -45,7 +45,7 @@ export function RentCalculator({ months, latestMonth }: { months: string[]; late
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
       {/* Girdi kartı */}
-      <div className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <div className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <h2 className="flex items-center gap-2 text-sm font-bold text-ink-950">
           <Calculator className="h-4 w-4 text-brand-600" /> Hesaplama girdileri
         </h2>
@@ -62,7 +62,7 @@ export function RentCalculator({ months, latestMonth }: { months: string[]; late
               value={rent}
               onChange={(e) => setRent(e.target.value)}
               placeholder="Örn. 25000"
-              className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+              className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
             />
           </div>
 
@@ -72,7 +72,7 @@ export function RentCalculator({ months, latestMonth }: { months: string[]; late
               id="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+              className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
             >
               {months.map((m) => (
                 <option key={m} value={m}>
@@ -93,7 +93,7 @@ export function RentCalculator({ months, latestMonth }: { months: string[]; late
           {/* Resmi oranı olan aylarda opsiyonel manuel giriş; olmayan (2026) aylarda
               manuel zorunlu, o yüzden onay kutusu gizlenir. */}
           {!forceManual ? (
-            <label className="flex items-center gap-2 rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm">
+            <label className="flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm">
               <input type="checkbox" checked={useManual} onChange={(e) => setUseManual(e.target.checked)} className="h-4 w-4 accent-brand-600" />
               <span>Kendi oranımı gir (yasal tavan yine uygulanır)</span>
             </label>
@@ -112,13 +112,13 @@ export function RentCalculator({ months, latestMonth }: { months: string[]; late
                 value={manualRate}
                 onChange={(e) => setManualRate(e.target.value)}
                 placeholder={legalCap != null ? `Örn. ${legalCap.toFixed(0)}` : "TÜİK'in açıkladığı oran"}
-                className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
               />
             </div>
           ) : null}
         </div>
 
-        <div className="mt-4 flex items-start gap-2 rounded-[12px] border border-brand-600/15 bg-brand-600/5 px-3 py-2.5 text-xs text-text-muted">
+        <div className="mt-4 flex items-start gap-2 rounded-[var(--radius-card)] border border-brand-600/15 bg-brand-600/5 px-3 py-2.5 text-xs text-text-muted">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600" />
           <span>
             Yasal tavan: bir önceki kira yılının <strong>12 aylık ortalama TÜFE</strong> oranı (TBK m.344).
@@ -128,48 +128,48 @@ export function RentCalculator({ months, latestMonth }: { months: string[]; late
       </div>
 
       {/* Sonuç kartı */}
-      <div className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <div className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <h2 className="flex items-center gap-2 text-sm font-bold text-ink-950">
           <TrendingUp className="h-4 w-4 text-mint-600" /> Sonuç
         </h2>
 
         {result ? (
           <div className="mt-4 space-y-4">
-            <div className="flex items-center justify-center gap-3 rounded-[14px] bg-[image:var(--grad-ink)] p-5 text-white theme-dark">
+            <div className="flex items-center justify-center gap-3 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-5 text-white theme-dark">
               <div className="text-center">
-                <p className="text-[11px] text-white/60">Mevcut</p>
+                <p className="text-xs text-white/60">Mevcut</p>
                 <p className="font-display text-xl font-extrabold">{money(result.currentRent)}</p>
               </div>
               <ArrowRight className="h-5 w-5 text-cyan-400" />
               <div className="text-center">
-                <p className="text-[11px] text-white/60">Yeni kira</p>
+                <p className="text-xs text-white/60">Yeni kira</p>
                 <p className="font-display text-2xl font-extrabold text-mint-300">{money(result.newRent)}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-[12px] border border-line bg-canvas p-3">
+              <div className="rounded-[var(--radius-card)] border border-line bg-canvas p-3">
                 <p className="font-display text-lg font-extrabold text-ink-950">%{result.cappedRatePct.toFixed(2)}</p>
-                <p className="text-[11px] text-text-muted">Uygulanan oran</p>
+                <p className="text-xs text-text-muted">Uygulanan oran</p>
               </div>
-              <div className="rounded-[12px] border border-line bg-canvas p-3">
+              <div className="rounded-[var(--radius-card)] border border-line bg-canvas p-3">
                 <p className="font-display text-lg font-extrabold text-brand-600">{money(result.monthlyDiff)}</p>
-                <p className="text-[11px] text-text-muted">Aylık fark</p>
+                <p className="text-xs text-text-muted">Aylık fark</p>
               </div>
-              <div className="rounded-[12px] border border-line bg-canvas p-3">
+              <div className="rounded-[var(--radius-card)] border border-line bg-canvas p-3">
                 <p className="font-display text-lg font-extrabold text-mint-600">{money(result.annualDiff)}</p>
-                <p className="text-[11px] text-text-muted">Yıllık fark</p>
+                <p className="text-xs text-text-muted">Yıllık fark</p>
               </div>
             </div>
 
             {result.capApplied ? (
-              <p className="rounded-[10px] border border-amber-300/50 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+              <p className="rounded-[var(--radius-control)] border border-amber-300/50 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
                 Girdiğiniz oran (%{result.ratePct.toFixed(2)}) yasal tavanı aşıyor; hesaplama %{result.cappedRatePct.toFixed(2)} ile sınırlandı.
               </p>
             ) : null}
           </div>
         ) : (
-          <div className="mt-4 grid place-items-center rounded-[14px] border border-dashed border-line-strong bg-canvas px-6 py-12 text-center">
+          <div className="mt-4 grid place-items-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-canvas px-6 py-12 text-center">
             <Calculator className="h-8 w-8 text-text-faint" />
             <p className="mt-3 text-sm text-text-muted">Kira tutarını girin, yeni kira anında hesaplansın.</p>
           </div>

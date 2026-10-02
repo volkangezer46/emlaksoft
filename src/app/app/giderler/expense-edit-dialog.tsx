@@ -85,7 +85,7 @@ export function ExpenseEditDialog({
                   maxLength={160}
                   defaultValue={expense.title}
                   placeholder="Başlık"
-                  className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                  className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                 />
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -99,7 +99,7 @@ export function ExpenseEditDialog({
                       step="0.01"
                       required
                       defaultValue={expense.amount}
-                      className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                      className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                     />
                   </div>
                   <div>
@@ -111,7 +111,7 @@ export function ExpenseEditDialog({
                       min="1900-01-01"
                       max="2100-12-31"
                       defaultValue={expense.expense_date?.slice(0, 10)}
-                      className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                      className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                     />
                   </div>
                 </div>
@@ -120,7 +120,7 @@ export function ExpenseEditDialog({
                   id={`expense-category-${expense.id}`}
                   name="category"
                   defaultValue={expense.category}
-                  className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                  className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                 >
                   {categories.map((c) => (
                     <option key={c.value} value={c.value}>
@@ -135,7 +135,7 @@ export function ExpenseEditDialog({
                   maxLength={2000}
                   defaultValue={expense.notes ?? ""}
                   placeholder="Not (opsiyonel)"
-                  className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                  className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                 />
                 {/* Palet disi red-600 -> danger-600, role="alert" eklendi */}
                 {state.error && (
@@ -145,7 +145,7 @@ export function ExpenseEditDialog({
                   <DialogClose asChild>
                     <button
                       type="button"
-                      className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+                      className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
                     >
                       Vazgeç
                     </button>
@@ -153,7 +153,7 @@ export function ExpenseEditDialog({
                   <button
                     type="submit"
                     disabled={pending}
-                    className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+                    className="btn-shine focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
                   >
                     {pending ? "Kaydediliyor…" : "Kaydet"}
                   </button>

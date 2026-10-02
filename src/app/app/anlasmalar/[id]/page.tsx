@@ -283,7 +283,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         <ArrowLeft className="h-4 w-4" /> Pipeline&apos;a dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-mint-500/25 blur-[80px]" />
         <div className="relative">
@@ -337,20 +337,20 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 <Link
                   key={k.label}
                   href={k.href}
-                  className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
+                  className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
                 >
                   <div className="flex items-start justify-between">
                     <k.icon className="h-4 w-4 text-mint-400" />
                     <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                   </div>
                   <p className="numeric mt-2 truncate font-display text-lg font-extrabold text-white">{k.value}</p>
-                  <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+                  <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
                 </Link>
               ) : (
-                <div key={k.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur">
+                <div key={k.label} className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur">
                   <k.icon className="h-4 w-4 text-mint-400" />
                   <p className="numeric mt-2 truncate font-display text-lg font-extrabold text-white">{k.value}</p>
-                  <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+                  <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
                 </div>
               ),
             )}
@@ -360,7 +360,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
 
       {kayip && deal.loss_reason ? (
         <p
-          className="flex items-start gap-2 rounded-[14px] border border-danger-500/30 bg-danger-500/5 px-4 py-3 text-sm text-danger-600"
+          className="flex items-start gap-2 rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 px-4 py-3 text-sm text-danger-600"
           role="status"
         >
           <span className="font-bold">Kayıp nedeni:</span> {deal.loss_reason}
@@ -374,7 +374,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
                 <Gauge className="h-4 w-4 text-brand-600" /> Kapanma tahmini
               </h2>
-              <p className="mt-0.5 text-[11px] text-text-faint">
+              <p className="mt-0.5 text-xs text-text-faint">
                 Kural tabanlı puanlama — istatistiksel model değil. Her faktör aşağıda gerekçesiyle.
               </p>
             </div>
@@ -390,7 +390,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               >
                 %{skor.score}
               </p>
-              <p className="text-[11px] text-text-muted">sistem tahmini</p>
+              <p className="text-xs text-text-muted">sistem tahmini</p>
             </div>
           </div>
 
@@ -399,7 +399,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             {skor.factors.map((f) => (
               <li
                 key={f.label}
-                className="flex items-center justify-between gap-3 rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm"
+                className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm"
               >
                 <span className="text-text-muted">{f.label}</span>
                 <span
@@ -415,7 +415,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
           {/* Sapma uyarisi: 20 puan altindaki fark gurultu sayiliyor. */}
           {sapma != null ? (
             <p
-              className="mt-3 rounded-[12px] border border-amber-400/35 bg-amber-400/[0.07] px-4 py-2.5 text-xs leading-relaxed text-ink-950"
+              className="mt-3 rounded-[var(--radius-card)] border border-amber-400/35 bg-amber-400/[0.07] px-4 py-2.5 text-xs leading-relaxed text-ink-950"
               role="status"
             >
               Kayıtlı olasılık <strong className="numeric">%{Math.round(olasilik ?? 0)}</strong>, sistem
@@ -439,7 +439,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
                 <HeartHandshake className="h-4 w-4 text-mint-600" /> Memnuniyet anketi
               </h2>
-              <p className="mt-0.5 text-[11px] text-text-faint">
+              <p className="mt-0.5 text-xs text-text-faint">
                 Tek soruluk 0-10 anketi. SMS gönderilmez — linki müşteriye siz iletirsiniz.
               </p>
             </div>
@@ -451,14 +451,14 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                       {surveyRow.score}
                     </span>
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 ring-inset ${surveyTone.cls}`}
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${surveyTone.cls}`}
                     >
                       {surveyTone.label}
                     </span>
                   </>
                 ) : (
                   <>
-                    <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-[11px] font-bold text-brand-600">
+                    <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-xs font-bold text-brand-600">
                       Yanıt bekliyor
                     </span>
                     <CopySurveyLinkButton url={surveyUrl} />
@@ -478,7 +478,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             )}
           </div>
           {surveyRow?.comment ? (
-            <p className="mt-3 flex items-start gap-2 rounded-[12px] border border-line bg-canvas px-4 py-2.5 text-sm italic leading-relaxed text-text-muted">
+            <p className="mt-3 flex items-start gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5 text-sm italic leading-relaxed text-text-muted">
               <MessageSquareQuote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-text-faint" />
               {surveyRow.comment}
             </p>
@@ -495,11 +495,11 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
           {property ? (
             <Link
               href={`/app/portfoyler/${property.id}`}
-              className="lift-hover focus-ring group mt-3 block rounded-[14px] border border-line bg-canvas p-4 transition hover:border-brand-300"
+              className="lift-hover focus-ring group mt-3 block rounded-[var(--radius-card)] border border-line bg-canvas p-4 transition hover:border-brand-300"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">
+                  <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">
                     {property.property_code}
                   </p>
                   <p className="mt-0.5 truncate font-semibold text-ink-950">{property.title ?? "Başlıksız"}</p>
@@ -512,13 +512,13 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                     {money(property.list_price != null ? Number(property.list_price) : null)}
                   </p>
                 </div>
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-surface text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-surface text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
                   <ArrowUpRight className="h-4 w-4" />
                 </span>
               </div>
             </Link>
           ) : (
-            <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+            <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
               Bu anlaşmaya portföy bağlanmamış.
             </p>
           )}
@@ -532,7 +532,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
           {customer ? (
             <Link
               href={`/app/musteriler/${customer.id}`}
-              className="lift-hover focus-ring group mt-3 block rounded-[14px] border border-line bg-canvas p-4 transition hover:border-brand-300"
+              className="lift-hover focus-ring group mt-3 block rounded-[var(--radius-card)] border border-line bg-canvas p-4 transition hover:border-brand-300"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -540,13 +540,13 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                   <p className="numeric mt-1 text-xs text-text-muted">{customer.phone ?? "Telefon yok"}</p>
                   <p className="mt-0.5 truncate text-xs text-text-muted">{customer.email ?? "E-posta yok"}</p>
                 </div>
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-surface text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-surface text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
                   <ArrowUpRight className="h-4 w-4" />
                 </span>
               </div>
             </Link>
           ) : (
-            <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+            <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
               Bu anlaşmaya müşteri bağlanmamış.
             </p>
           )}
@@ -586,7 +586,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             </Link>
           </div>
           {komisyonlar.length === 0 ? (
-            <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+            <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
               {kazanildi
                 ? "Anlaşma kazanıldı ama komisyon kaydı açılmamış."
                 : "Bu anlaşmaya bağlı komisyon kaydı yok."}
@@ -599,8 +599,8 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                   ["KDV", money(kdvToplam)],
                   ["Tahsil edilen", money(tahsilEdilen)],
                 ].map(([k, v]) => (
-                  <div key={k} className="rounded-[12px] border border-line bg-canvas px-4 py-2.5">
-                    <p className="text-[11px] text-text-faint">{k}</p>
+                  <div key={k} className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
+                    <p className="text-xs text-text-faint">{k}</p>
                     <p className="numeric text-sm font-bold text-ink-950">{v}</p>
                   </div>
                 ))}
@@ -674,11 +674,11 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <Tag className="h-4 w-4 text-brand-600" /> Teklifler
           </h2>
-          <p className="mt-1 text-[11px] text-text-faint">
+          <p className="mt-1 text-xs text-text-faint">
             Teklif kaydında anlaşma bağı yok; aynı portföy + müşteri ikilisine göre listeleniyor.
           </p>
           {(offers ?? []).length === 0 ? (
-            <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
+            <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
               Eşleşen teklif yok.
             </p>
           ) : (
@@ -687,7 +687,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 <li key={o.id}>
                   <Link
                     href={`/app/teklifler/${o.id}`}
-                    className="focus-ring flex items-center justify-between gap-3 rounded-[12px] border border-line bg-canvas px-4 py-2.5 transition hover:border-brand-300"
+                    className="focus-ring flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5 transition hover:border-brand-300"
                   >
                     <span className="numeric font-semibold text-ink-950">{money(Number(o.amount))}</span>
                     <span className="flex items-center gap-2 text-xs text-text-muted">
@@ -705,11 +705,11 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <CalendarClock className="h-4 w-4 text-brand-600" /> Sözleşmeler
           </h2>
-          <p className="mt-1 text-[11px] text-text-faint">
+          <p className="mt-1 text-xs text-text-faint">
             Aynı portföy + müşteri ikilisine göre listeleniyor.
           </p>
           {(contracts ?? []).length === 0 ? (
-            <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
+            <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
               Eşleşen sözleşme yok.
             </p>
           ) : (
@@ -718,7 +718,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 <li key={c.id}>
                   <Link
                     href={`/app/sozlesmeler/${c.id}`}
-                    className="focus-ring flex items-center justify-between gap-3 rounded-[12px] border border-line bg-canvas px-4 py-2.5 transition hover:border-brand-300"
+                    className="focus-ring flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5 transition hover:border-brand-300"
                   >
                     <span className="min-w-0 truncate font-semibold text-ink-950">{c.title ?? c.contract_type}</span>
                     <span className="flex shrink-0 items-center gap-2 text-xs text-text-muted">
@@ -744,7 +744,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
           </Link>
         </div>
         {(tasks ?? []).length === 0 ? (
-          <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+          <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
             Bu anlaşmaya bağlı görev yok.
           </p>
         ) : (
@@ -755,7 +755,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 <li key={t.id}>
                   <Link
                     href={`/app/gorevler?filter=${bitti ? "done" : "open"}`}
-                    className="focus-ring flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-line bg-canvas px-4 py-2.5 transition hover:border-brand-300"
+                    className="focus-ring flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5 transition hover:border-brand-300"
                   >
                     <span className={`font-medium ${bitti ? "text-text-faint line-through" : "text-ink-950"}`}>
                       {t.title}

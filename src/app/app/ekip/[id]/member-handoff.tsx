@@ -75,7 +75,7 @@ export function MemberHandoff({
             setTo(e.target.value);
             setConfirming(false);
           }}
-          className="min-w-[200px] flex-1 rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-400"
+          className="min-w-[200px] flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-400"
         >
           <option value="">Devralan danışmanı seçin…</option>
           {advisors.map((a) => (
@@ -90,7 +90,7 @@ export function MemberHandoff({
             type="button"
             disabled={!to}
             onClick={() => setConfirming(true)}
-            className="focus-ring press inline-flex min-h-[42px] items-center gap-2 rounded-[11px] bg-brand-600 px-4 text-sm font-bold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="focus-ring press inline-flex min-h-[42px] items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-bold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ArrowLeftRight className="h-4 w-4" /> Devret
           </button>
@@ -100,7 +100,7 @@ export function MemberHandoff({
               type="button"
               disabled={pending}
               onClick={run}
-              className="focus-ring press inline-flex min-h-[42px] items-center gap-2 rounded-[11px] bg-danger-500 px-4 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60"
+              className="focus-ring press inline-flex min-h-[42px] items-center gap-2 rounded-[var(--radius-control)] bg-danger-500 px-4 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60"
             >
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Onayla — {targetName}
@@ -109,7 +109,7 @@ export function MemberHandoff({
               type="button"
               disabled={pending}
               onClick={() => setConfirming(false)}
-              className="focus-ring press inline-flex min-h-[42px] items-center rounded-[11px] border border-line px-3 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+              className="focus-ring press inline-flex min-h-[42px] items-center rounded-[var(--radius-control)] border border-line px-3 text-sm font-semibold text-text-muted transition hover:bg-canvas"
             >
               Vazgeç
             </button>

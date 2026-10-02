@@ -44,7 +44,7 @@ export function ListLimitNotice({
   const gizli = total - shown;
 
   return (
-    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[12px] border border-amber-400/35 bg-amber-400/[0.07] px-4 py-2.5 text-xs text-ink-950">
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[var(--radius-card)] border border-amber-400/35 bg-amber-400/[0.07] px-4 py-2.5 text-xs text-ink-950">
       <Info className="h-3.5 w-3.5 shrink-0 text-amber-500" />
       <span>
         Toplam <strong className="numeric">{total.toLocaleString("tr-TR")}</strong> kayıttan{" "}

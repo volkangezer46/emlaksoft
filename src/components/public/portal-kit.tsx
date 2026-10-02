@@ -38,7 +38,7 @@ export function PortalInvalidLink({
         </p>
         <Link
           href="/"
-          className="focus-ring press mt-6 inline-flex min-h-11 items-center justify-center rounded-[12px] border border-hairline-strong bg-surface px-5 text-sm font-bold text-ink-950 transition hover:bg-canvas"
+          className="focus-ring press mt-6 inline-flex min-h-11 items-center justify-center rounded-[var(--radius-card)] border border-hairline-strong bg-surface px-5 text-sm font-bold text-ink-950 transition hover:bg-canvas"
         >
           EmlakSoft ana sayfası
         </Link>
@@ -88,7 +88,7 @@ export function PortalEmpty({
   hint?: string;
 }) {
   return (
-    <div className="rounded-[16px] border border-dashed border-line bg-surface px-4 py-10 text-center">
+    <div className="rounded-[var(--radius-card)] border border-dashed border-line bg-surface px-4 py-10 text-center">
       <span
         aria-hidden="true"
         className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-canvas text-text-faint"
@@ -130,7 +130,7 @@ export function PortalContactBar({
         {telHref ? (
           <a
             href={telHref}
-            className="focus-ring press inline-flex min-h-12 items-center justify-center gap-2 rounded-[12px] bg-brand-600 px-4 text-sm font-bold text-white transition hover:bg-brand-700"
+            className="focus-ring press inline-flex min-h-12 items-center justify-center gap-2 rounded-[var(--radius-card)] bg-brand-600 px-4 text-sm font-bold text-white transition hover:bg-brand-700"
           >
             <Phone className="h-4 w-4" aria-hidden="true" /> {callLabel}
           </a>
@@ -140,7 +140,7 @@ export function PortalContactBar({
             href={whatsAppHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="focus-ring press inline-flex min-h-12 items-center justify-center gap-2 rounded-[12px] border border-mint-500/40 bg-mint-500/10 px-4 text-sm font-bold text-mint-700 transition hover:bg-mint-500/20"
+            className="focus-ring press inline-flex min-h-12 items-center justify-center gap-2 rounded-[var(--radius-card)] border border-mint-500/40 bg-mint-500/10 px-4 text-sm font-bold text-mint-700 transition hover:bg-mint-500/20"
           >
             <MessageCircle className="h-4 w-4" aria-hidden="true" /> WhatsApp
           </a>

@@ -25,7 +25,7 @@ export function TooltipContent({
         {...props}
         sideOffset={sideOffset}
         className={cn(
-          "popover-in z-[70] max-w-xs rounded-[9px] bg-ink-950 px-2.5 py-1.5 text-xs font-medium text-white shadow-[var(--shadow-card)]",
+          "popover-in z-[70] max-w-xs rounded-[var(--radius-control)] bg-ink-950 px-2.5 py-1.5 text-xs font-medium text-white shadow-[var(--shadow-card)]",
           className,
         )}
       />

@@ -162,7 +162,7 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       {/* premium header */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/35 blur-[80px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -194,13 +194,13 @@ export default async function SettingsPage() {
                 </svg>
                 <div className="absolute text-center">
                   <p className="font-display text-xl font-extrabold text-white">%{completion}</p>
-                  <p className="text-[10px] text-white/55">Kurulum</p>
-                  <p className="text-[8px] text-mint-400/80 opacity-0 transition group-hover/ring:opacity-100">detay için tıkla</p>
+                  <p className="text-xs text-white/55">Kurulum</p>
+                  <p className="text-xs text-mint-400/80 opacity-0 transition group-hover/ring:opacity-100">detay için tıkla</p>
                 </div>
               </div>
             </summary>
-            <div className="mt-3 w-72 rounded-[14px] border border-white/12 bg-white/8 p-4 backdrop-blur">
-              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-white/55">
+            <div className="mt-3 w-72 rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-4 backdrop-blur">
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-white/55">
                 Kurulum kontrol listesi ({doneCount}/{checklist.length})
               </p>
               <ul className="mt-2.5 space-y-2">
@@ -215,7 +215,7 @@ export default async function SettingsPage() {
                       <span className={`truncate ${item.done ? "text-white/55" : "text-white/85"}`}>{item.label}</span>
                     </span>
                     {!item.done && item.href ? (
-                      <a href={item.href} className="shrink-0 text-[11px] font-semibold text-mint-400 hover:text-mint-300">
+                      <a href={item.href} className="shrink-0 text-xs font-semibold text-mint-400 hover:text-mint-300">
                         Tamamla →
                       </a>
                     ) : null}
@@ -231,7 +231,7 @@ export default async function SettingsPage() {
       </section>
 
       {/* Logo + company form */}
-      <section id="marka-kimlik" className="dashboard-panel scroll-mt-24 rounded-[20px] border border-line bg-surface p-4 md:p-6">
+      <section id="marka-kimlik" className="dashboard-panel scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center gap-3 border-b border-line pb-4">
           <div>
             <h2 className="font-display font-bold text-ink-950">Marka & kimlik</h2>
@@ -245,10 +245,10 @@ export default async function SettingsPage() {
       </section>
 
       {/* Eşleştirme ağırlıkları */}
-      <section id="eslestirme-agirliklari" className="dashboard-panel scroll-mt-24 rounded-[20px] border border-line bg-surface p-4 md:p-6">
+      <section id="eslestirme-agirliklari" className="dashboard-panel scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
           <div className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-cyan-400/12 text-cyan-500"><Crosshair className="h-5 w-5" /></span>
+            <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-cyan-400/12 text-cyan-500"><Crosshair className="h-5 w-5" /></span>
             <div>
               <h2 className="font-display font-bold text-ink-950">Eşleştirme ağırlıkları</h2>
               <p className="text-xs text-text-muted">
@@ -265,9 +265,9 @@ export default async function SettingsPage() {
       </section>
 
       {/* Entegrasyonlar */}
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-4 md:p-6">
+      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center gap-3 border-b border-line pb-4">
-          <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-cyan-400/12 text-cyan-500"><Plug className="h-5 w-5" /></span>
+          <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-cyan-400/12 text-cyan-500"><Plug className="h-5 w-5" /></span>
           <div>
             <h2 className="font-display font-bold text-ink-950">Entegrasyonlar</h2>
             <p className="text-xs text-text-muted">Ofise özel Netgsm SMS ve WhatsApp Cloud API bağlantıları</p>
@@ -284,7 +284,7 @@ export default async function SettingsPage() {
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
         <NotificationPrefsPanel initial={notifPrefs} />
-        <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="font-display font-bold text-ink-950">Hızlı bağlantılar</h2>
           <p className="mt-1 text-xs text-text-muted">Operasyon ve uyum kısayolları</p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -297,7 +297,7 @@ export default async function SettingsPage() {
               <Link
                 key={l.href}
                 href={l.href}
-                className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
+                className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
               >
                 {l.label}
               </Link>
@@ -311,14 +311,14 @@ export default async function SettingsPage() {
         {cards.map((card) => {
           const inner = (
             <>
-              <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-[13px] ${card.tone}`}>
+              <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] ${card.tone}`}>
                 <card.icon className="h-5 w-5" />
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <h2 className="font-display font-bold text-ink-950">{card.title}</h2>
                   {card.badge ? (
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${card.badgeCls}`}>{card.badge}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${card.badgeCls}`}>{card.badge}</span>
                   ) : (
                     <ArrowUpRight className="h-4 w-4 text-text-faint transition group-hover:text-brand-600" />
                   )}
@@ -327,7 +327,7 @@ export default async function SettingsPage() {
               </div>
             </>
           );
-          const cls = "lift group flex items-start gap-4 rounded-[18px] border border-line bg-surface p-5 text-left transition hover:border-brand-300";
+          const cls = "lift group flex items-start gap-4 rounded-[var(--radius-panel)] border border-line bg-surface p-5 text-left transition hover:border-brand-300";
           return card.href ? (
             <Link key={card.title} href={card.href} className={cls}>{inner}</Link>
           ) : (
@@ -337,9 +337,9 @@ export default async function SettingsPage() {
       </div>
 
       {/* Örnek veriler — onboarding seti durumu + kalıcı temizleme */}
-      <section className="dashboard-panel flex flex-wrap items-center justify-between gap-4 rounded-[20px] border border-line bg-surface p-5">
+      <section className="dashboard-panel flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
         <div className="flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-amber-400/15 text-amber-500">
+          <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-amber-400/15 text-amber-500">
             <Sparkles className="h-5 w-5" />
           </span>
           <div>
@@ -358,7 +358,7 @@ export default async function SettingsPage() {
               trigger={
                 <button
                   type="button"
-                  className="focus-ring press inline-flex items-center gap-2 rounded-[10px] border border-danger-500/30 bg-danger-500/10 px-4 py-2 text-xs font-semibold text-danger-500 transition hover:bg-danger-500/15"
+                  className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-danger-500/30 bg-danger-500/10 px-4 py-2 text-xs font-semibold text-danger-500 transition hover:bg-danger-500/15"
                 >
                   <Trash2 className="h-3.5 w-3.5" /> Örnek verileri temizle
                 </button>
@@ -375,9 +375,9 @@ export default async function SettingsPage() {
       </section>
 
       {/* compliance strip */}
-      <section className="dashboard-panel flex flex-wrap items-center justify-between gap-4 rounded-[20px] border border-line bg-surface p-5">
+      <section className="dashboard-panel flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
         <div className="flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-mint-500/12 text-mint-600"><ShieldCheck className="h-5 w-5" /></span>
+          <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-mint-500/12 text-mint-600"><ShieldCheck className="h-5 w-5" /></span>
           <div>
             <h2 className="font-display font-bold text-ink-950">KVKK & uyum durumu</h2>
             <p className="text-xs text-text-muted">İYS izinleri ve denetim kayıtları canlı verilerden hesaplanır.</p>
@@ -388,16 +388,16 @@ export default async function SettingsPage() {
             <Link
               key={item.label}
               href={item.href}
-              className="focus-ring press lift group block rounded-[12px] border border-line bg-canvas px-4 py-2.5 text-center transition hover:border-brand-300"
+              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5 text-center transition hover:border-brand-300"
             >
-              <p className="flex items-center justify-center gap-1 text-[11px] text-text-faint">
+              <p className="flex items-center justify-center gap-1 text-xs text-text-faint">
                 {item.label}
                 <ArrowUpRight className="hover-action h-3 w-3 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
               </p>
               <p className={`text-sm font-bold ${item.ok ? "text-mint-600" : "text-amber-600"}`}>{item.value}</p>
             </Link>
           ))}
-          <Link href="/app/uyum" className="rounded-[10px] bg-ink-950 px-4 py-2.5 text-xs font-semibold text-white hover:bg-ink-800">
+          <Link href="/app/uyum" className="rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-xs font-semibold text-white hover:bg-ink-800">
             Uyum merkezine git
           </Link>
         </div>

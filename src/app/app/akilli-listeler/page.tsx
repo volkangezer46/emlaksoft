@@ -173,7 +173,7 @@ export default async function AkilliListelerPage() {
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/30 blur-[70px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -192,10 +192,10 @@ export default async function AkilliListelerPage() {
               <a
                 key={s.key}
                 href={`#${s.key}`}
-                className="focus-ring press rounded-[14px] border border-white/12 bg-white/8 px-3 py-2.5 text-center transition hover:border-white/30"
+                className="focus-ring press rounded-[var(--radius-card)] border border-white/12 bg-white/8 px-3 py-2.5 text-center transition hover:border-white/30"
               >
                 <p className="font-display text-xl font-extrabold text-white">{s.rows.length}</p>
-                <p className="text-[11px] text-white/60">{s.title}</p>
+                <p className="text-xs text-white/60">{s.title}</p>
               </a>
             ))}
           </div>
@@ -206,10 +206,10 @@ export default async function AkilliListelerPage() {
         const tone = TONE[s.tone];
         const Icon = s.icon;
         return (
-          <section key={s.key} id={s.key} className="scroll-mt-24 rounded-[20px] border border-line bg-surface p-5">
+          <section key={s.key} id={s.key} className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2.5">
-                <span className={`grid h-9 w-9 place-items-center rounded-[11px] bg-canvas ${tone.ico}`}>
+                <span className={`grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-canvas ${tone.ico}`}>
                   <Icon className="h-4.5 w-4.5" />
                 </span>
                 <div>
@@ -223,7 +223,7 @@ export default async function AkilliListelerPage() {
             </div>
 
             {s.rows.length === 0 ? (
-              <p className="mt-4 rounded-[12px] border border-dashed border-line bg-canvas/60 px-4 py-6 text-center text-sm text-text-muted">
+              <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line bg-canvas/60 px-4 py-6 text-center text-sm text-text-muted">
                 Bu segmentte müşteri yok — temiz iş 👏
               </p>
             ) : (
@@ -231,7 +231,7 @@ export default async function AkilliListelerPage() {
                 {s.rows.slice(0, 10).map((e) => (
                   <li
                     key={e.c.id}
-                    className="group flex flex-wrap items-center gap-3 rounded-[13px] border border-line bg-canvas/50 px-3 py-2.5 transition hover:border-brand-300"
+                    className="group flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-2.5 transition hover:border-brand-300"
                   >
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[image:var(--grad-brand)] text-xs font-bold text-white">
                       {e.c.full_name.split(/\s+/).map((p) => p[0] ?? "").join("").slice(0, 2).toUpperCase()}
@@ -240,7 +240,7 @@ export default async function AkilliListelerPage() {
                       <p className="truncate text-sm font-semibold text-ink-950">{e.c.full_name}</p>
                       <p className="truncate text-xs text-text-muted">{s.reason(e)}</p>
                     </div>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ring-inset ${tone.chip}`}>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ring-1 ring-inset ${tone.chip}`}>
                       {s.metric(e)}
                     </span>
                     <div className="flex shrink-0 items-center gap-1">
@@ -248,14 +248,14 @@ export default async function AkilliListelerPage() {
                         <a
                           href={`tel:${e.c.phone}`}
                           aria-label={`${e.c.full_name} ara`}
-                          className="grid h-8 w-8 place-items-center rounded-[9px] border border-line text-mint-600 transition hover:bg-mint-500/10"
+                          className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-mint-600 transition hover:bg-mint-500/10"
                         >
                           <Phone className="h-3.5 w-3.5" />
                         </a>
                       ) : null}
                       <Link
                         href={`/app/musteriler/${e.c.id}`}
-                        className="inline-flex items-center gap-1 rounded-[9px] border border-line px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                        className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
                       >
                         Kart <ArrowUpRight className="h-3.5 w-3.5" />
                       </Link>

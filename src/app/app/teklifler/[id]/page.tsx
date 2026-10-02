@@ -192,7 +192,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
       </Link>
 
       {/* Hero */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/30 blur-[70px]" />
         <div className="relative flex flex-wrap items-start justify-between gap-4">
@@ -213,13 +213,13 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-[14px] border border-white/12 bg-white/8 p-3 text-center">
+            <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 text-center">
               <p className="font-display text-lg font-extrabold text-white">{money(listPrice)}</p>
-              <p className="text-[11px] text-white/70">Liste fiyatı</p>
+              <p className="text-xs text-white/70">Liste fiyatı</p>
             </div>
-            <div className="rounded-[14px] border border-white/12 bg-white/8 p-3 text-center">
+            <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 text-center">
               <p className="font-display text-lg font-extrabold text-white">{offer.counter_amount ? money(Number(offer.counter_amount)) : "—"}</p>
-              <p className="text-[11px] text-white/70">Karşı teklif</p>
+              <p className="text-xs text-white/70">Karşı teklif</p>
             </div>
           </div>
         </div>
@@ -229,10 +229,10 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
         {/* Sol: ilişkili kayıtlar + detaylar */}
         <div className="space-y-6 lg:col-span-2">
           {/* İlişkili portföy */}
-          <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
             <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950"><Building2 className="h-4 w-4 text-brand-600" /> Portföy</h2>
             {property ? (
-              <Link href={`/app/portfoyler/${property.id}`} className="group flex items-center justify-between rounded-[12px] border border-line bg-canvas px-4 py-3 transition hover:border-brand-400 hover:bg-brand-600/[0.03]">
+              <Link href={`/app/portfoyler/${property.id}`} className="group flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 transition hover:border-brand-400 hover:bg-brand-600/[0.03]">
                 <div>
                   <p className="font-semibold text-ink-950 group-hover:text-brand-600">{property.title ?? property.property_code}</p>
                   <p className="mt-0.5 text-xs text-text-muted">{property.property_code} · {property.property_type ?? "—"} · {property.transaction_type ?? "—"}</p>
@@ -245,15 +245,15 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
           </section>
 
           {/* İlişkili müşteri */}
-          <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
             <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950"><User className="h-4 w-4 text-brand-600" /> Müşteri</h2>
             {customer ? (
               /* Örtü link müşteri detayına; telefon/WhatsApp/e-posta z-10 ile
                  üstte kalır — iç içe <a> üretmemek için Link sarmalı bırakıldı. */
-              <div className="group relative flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-line bg-canvas px-4 py-3 transition hover:border-brand-400 hover:bg-brand-600/[0.03]">
+              <div className="group relative flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 transition hover:border-brand-400 hover:bg-brand-600/[0.03]">
                 <Link
                   href={`/app/musteriler/${customer.id}`}
-                  className="focus-ring absolute inset-0 rounded-[12px]"
+                  className="focus-ring absolute inset-0 rounded-[var(--radius-card)]"
                   aria-label={`${customer.full_name} müşteri detayı`}
                 />
                 <p className="font-semibold text-ink-950 group-hover:text-brand-600">{customer.full_name}</p>
@@ -286,7 +286,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
           </section>
 
           {/* Pazarlık geçmişi */}
-          <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="flex items-center gap-2 text-sm font-bold text-ink-950">
                 <History className="h-4 w-4 text-brand-600" /> Pazarlık geçmişi
@@ -295,7 +295,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
             </div>
 
             {/* Özet: liste fiyatı vs son teklif */}
-            <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-[12px] border border-line bg-canvas px-4 py-3 text-sm">
+            <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-sm">
               <span className="text-text-muted">
                 Liste fiyatı: <span className="font-semibold text-ink-950">{money(listPrice)}</span>
               </span>
@@ -332,7 +332,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
                         aria-hidden
                       />
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${SIDE_STYLE[round.side]}`}>
+                        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${SIDE_STYLE[round.side]}`}>
                           {SIDE_LABELS[round.side]}
                         </span>
                         <span className="font-semibold text-ink-950">{money(cur)}</span>
@@ -358,7 +358,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
 
           {/* Not */}
           {offer.notes ? (
-            <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <h2 className="mb-2 text-sm font-bold text-ink-950">Not</h2>
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-800">{offer.notes}</p>
             </section>
@@ -368,7 +368,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
         {/* Sağ: zaman çizelgesi + aksiyonlar */}
         <div className="space-y-6">
           {offer.status === "accepted" ? (
-            <section className="rounded-[18px] border border-mint-500/30 bg-mint-500/[0.06] p-5">
+            <section className="rounded-[var(--radius-panel)] border border-mint-500/30 bg-mint-500/[0.06] p-5">
               <h2 className="flex items-center gap-2 text-sm font-bold text-mint-700">
                 <FileSignature className="h-4 w-4" /> Sonraki adım
               </h2>
@@ -387,13 +387,13 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
           ) : null}
 
           {relatedDeal ? (
-            <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950">
                 <Handshake className="h-4 w-4 text-brand-600" /> İlgili anlaşma
               </h2>
               <Link
                 href={`/app/anlasmalar/${relatedDeal.id}`}
-                className="focus-ring group flex items-center justify-between gap-3 rounded-[12px] border border-line bg-canvas px-4 py-3 transition hover:border-brand-400"
+                className="focus-ring group flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 transition hover:border-brand-400"
               >
                 <span className="text-sm font-semibold text-ink-950 group-hover:text-brand-600">
                   Anlaşma detayını aç
@@ -403,7 +403,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
                   <ArrowUpRight className="h-3.5 w-3.5" />
                 </span>
               </Link>
-              <p className="mt-2 text-[11px] text-text-faint">
+              <p className="mt-2 text-xs text-text-faint">
                 {exactLink
                   ? "Bu teklif anlaşmaya doğrudan bağlı."
                   : "Aynı portföy + müşteri ikilisine bağlı anlaşma."}
@@ -411,7 +411,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
             </section>
           ) : null}
 
-          <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
             <h2 className="mb-3 text-sm font-bold text-ink-950">Zaman çizelgesi</h2>
             <ul className="space-y-3 text-sm">
               <li className="flex items-start gap-2.5">
@@ -440,7 +440,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
           </section>
 
           {canEdit ? (
-            <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <h2 className="mb-3 text-sm font-bold text-ink-950">İşlemler</h2>
               <OfferStatusActions offerId={offer.id} status={offer.status} />
               {!["accepted", "rejected", "withdrawn"].includes(offer.status) ? (

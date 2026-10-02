@@ -49,7 +49,7 @@ export function StatusSelect({ openHouseId, status }: { openHouseId: string; sta
         value={status}
         disabled={pending || nextStatuses.length === 0}
         onChange={(e) => onChange(e.target.value)}
-        className="focus-ring rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink-950 outline-none transition hover:border-brand-300 disabled:opacity-60"
+        className="focus-ring rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink-950 outline-none transition hover:border-brand-300 disabled:opacity-60"
       >
         {visibleOptions.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>

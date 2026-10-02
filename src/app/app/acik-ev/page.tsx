@@ -91,7 +91,7 @@ export default async function AcikEvPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-mint-500/25 blur-[70px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -112,14 +112,14 @@ export default async function AcikEvPage({
           {live.length > 0 ? (
             <Link
               href="/app/acik-ev?durum=active"
-              className="focus-ring press lift flex items-center gap-3 rounded-[14px] border border-mint-400/40 bg-mint-500/15 px-4 py-3"
+              className="focus-ring press lift flex items-center gap-3 rounded-[var(--radius-card)] border border-mint-400/40 bg-mint-500/15 px-4 py-3"
             >
               <span className="relative flex h-2.5 w-2.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint-400 opacity-75" />
                 <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-mint-400" />
               </span>
               <div>
-                <p className="text-[11px] text-white/70">Şu an canlı</p>
+                <p className="text-xs text-white/70">Şu an canlı</p>
                 <p className="text-sm font-bold text-white">{live.length} etkinlik devam ediyor</p>
               </div>
             </Link>
@@ -151,15 +151,15 @@ export default async function AcikEvPage({
 
       {/* Sıradaki etkinlik — spot kart */}
       {nextEvent ? (
-        <section className="relative overflow-hidden rounded-[18px] border border-mint-500/30 bg-mint-500/6 p-5">
+        <section className="relative overflow-hidden rounded-[var(--radius-panel)] border border-mint-500/30 bg-mint-500/6 p-5">
           <div className="pointer-events-none absolute -right-10 -top-14 h-44 w-44 rounded-full bg-mint-500/15 blur-[60px]" />
           <div className="relative flex flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-4">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[14px] bg-mint-500/15 text-mint-600">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[var(--radius-card)] bg-mint-500/15 text-mint-600">
                 <DoorOpen className="h-6 w-6" />
               </span>
               <div className="min-w-0">
-                <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.1em] text-mint-600">
+                <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.1em] text-mint-600">
                   Sıradaki etkinlik
                   {countdownLabel(String(nextEvent.scheduled_at)) ? (
                     <Badge variant="success" size="sm">{countdownLabel(String(nextEvent.scheduled_at))}</Badge>
@@ -187,7 +187,7 @@ export default async function AcikEvPage({
             </div>
             <Link
               href={`/app/acik-ev/${nextEvent.id}`}
-              className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[11px] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-ink-900"
+              className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-ink-900"
             >
               Etkinliği yönet <ArrowUpRight className="h-4 w-4" />
             </Link>
@@ -274,27 +274,27 @@ export default async function AcikEvPage({
               ? Math.min(100, Math.round(((e.visitor_count ?? 0) / e.max_visitors) * 100))
               : null;
             return (
-              <div key={e.id} className="lift group relative rounded-[20px] border border-line bg-surface p-5 transition hover:border-brand-300">
+              <div key={e.id} className="lift group relative rounded-[var(--radius-panel)] border border-line bg-surface p-5 transition hover:border-brand-300">
                 {/* Ortu-link ONCEDEN PORTFOYE gidiyordu: acik ev kartina
                     tiklayinca etkinlik degil portfoy aciliyordu ve ziyaretci
                     listesine ulasilacak HICBIR yol yoktu. Artik acik ev
                     detayina gidiyor; portfoy bagi detay sayfasinda ayri kart. */}
                 <Link
                   href={`/app/acik-ev/${e.id}`}
-                  className="focus-ring absolute inset-0 rounded-[20px]"
+                  className="focus-ring absolute inset-0 rounded-[var(--radius-panel)]"
                   aria-label={`${propertyLabel(e.property)} açık ev detayını aç`}
                 />
                 <div className="flex items-start justify-between gap-2">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-brand-600/10 text-brand-600">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
                     <DoorOpen className="h-5 w-5" />
                   </span>
                   <span className="flex items-center gap-1.5">
                     {countdown ? (
-                      <span className="rounded-full bg-amber-400/14 px-2.5 py-1 text-[11px] font-bold text-amber-700">
+                      <span className="rounded-full bg-amber-400/14 px-2.5 py-1 text-xs font-bold text-amber-700">
                         {countdown}
                       </span>
                     ) : null}
-                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusColor[e.status] ?? statusColor.planned}`}>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusColor[e.status] ?? statusColor.planned}`}>
                       {e.status === "active" ? (
                         <span className="inline-flex items-center gap-1.5">
                           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-mint-500" />
@@ -330,7 +330,7 @@ export default async function AcikEvPage({
                 {/* Kapasite doluluk çubuğu */}
                 {fillPct !== null ? (
                   <div className="mt-3">
-                    <div className="flex items-center justify-between text-[11px] font-semibold">
+                    <div className="flex items-center justify-between text-xs font-semibold">
                       <span className="text-text-muted">Doluluk</span>
                       <span className={fillPct >= 90 ? "text-amber-600" : "text-mint-600"}>%{fillPct}</span>
                     </div>

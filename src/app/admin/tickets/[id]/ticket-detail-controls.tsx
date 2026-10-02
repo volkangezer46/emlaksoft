@@ -164,7 +164,7 @@ export function TicketDetailControls({
   return (
     <div className="space-y-3.5">
       <div>
-        <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.06em] text-text-faint">Durum</label>
+        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Durum</label>
         <Select value={selectedStatus} onValueChange={onStatusChange}>
           <SelectTrigger aria-label="Durum güncelle" disabled={statusPending} className={cn("font-semibold", statusPending && "opacity-70")}>
             <span className="flex min-w-0 items-center gap-2">
@@ -183,14 +183,14 @@ export function TicketDetailControls({
       </div>
 
       {terminalTarget ? (
-        <form action={completeTicket} className="space-y-2 rounded-[12px] border border-mint-500/25 bg-mint-500/[0.06] p-3">
+        <form action={completeTicket} className="space-y-2 rounded-[var(--radius-card)] border border-mint-500/25 bg-mint-500/[0.06] p-3">
           <div className="flex items-center justify-between gap-2">
             <p className="flex items-center gap-1.5 text-xs font-bold text-mint-700"><CheckCircle2 className="h-3.5 w-3.5" /> Çözüm kaydı</p>
             <button type="button" onClick={() => setTerminalTarget(null)} className="focus-ring rounded-md p-1 text-text-faint hover:text-ink-950" aria-label="Çözüm formunu kapat"><X className="h-3.5 w-3.5" /></button>
           </div>
-          <label className="block text-[10px] font-semibold text-text-muted">
+          <label className="block text-xs font-semibold text-text-muted">
             Çözüm türü
-            <select name="resolution_code" defaultValue={terminalTarget === "closed" ? "closed_by_support" : "solved"} className="mt-1 w-full rounded-[8px] border border-line bg-surface px-2.5 py-2 text-xs outline-none focus:border-brand-400">
+            <select name="resolution_code" defaultValue={terminalTarget === "closed" ? "closed_by_support" : "solved"} className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-2 text-xs outline-none focus:border-brand-400">
               <option value="solved">Sorun çözüldü</option>
               <option value="guidance">Bilgilendirme yapıldı</option>
               <option value="configuration">Yapılandırma düzeltildi</option>
@@ -198,11 +198,11 @@ export function TicketDetailControls({
               <option value="closed_by_support">Destek tarafından kapatıldı</option>
             </select>
           </label>
-          <label className="block text-[10px] font-semibold text-text-muted">
+          <label className="block text-xs font-semibold text-text-muted">
             Çözüm özeti
-            <textarea name="resolution_summary" required minLength={3} maxLength={2000} rows={3} placeholder="Uygulanan çözümü kısa ve ölçülebilir şekilde yazın…" className="mt-1 w-full resize-y rounded-[8px] border border-line bg-surface px-2.5 py-2 text-xs leading-relaxed outline-none focus:border-brand-400" />
+            <textarea name="resolution_summary" required minLength={3} maxLength={2000} rows={3} placeholder="Uygulanan çözümü kısa ve ölçülebilir şekilde yazın…" className="mt-1 w-full resize-y rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-2 text-xs leading-relaxed outline-none focus:border-brand-400" />
           </label>
-          <button type="submit" disabled={statusPending} className="focus-ring press w-full rounded-[8px] bg-mint-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-60">
+          <button type="submit" disabled={statusPending} className="focus-ring press w-full rounded-[var(--radius-control)] bg-mint-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-60">
             {statusPending ? "Kaydediliyor…" : terminalTarget === "resolved" ? "Çözüldü olarak kaydet" : "Kapat ve kaydet"}
           </button>
         </form>
@@ -210,7 +210,7 @@ export function TicketDetailControls({
 
       <div className="grid grid-cols-2 gap-2.5">
         <div>
-          <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.06em] text-text-faint">Öncelik</label>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Öncelik</label>
           <Select value={priority} onValueChange={(next) => onTicketFieldChange("priority", next)}>
             <SelectTrigger aria-label="Öncelik güncelle" disabled={fieldPending} className="text-xs font-semibold">
               <span className="truncate">{PRIORITY_LABEL[priority] ?? priority}</span>
@@ -224,7 +224,7 @@ export function TicketDetailControls({
           </Select>
         </div>
         <div>
-          <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.06em] text-text-faint">Kategori</label>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Kategori</label>
           <Select value={category} onValueChange={(next) => onTicketFieldChange("category", next)}>
             <SelectTrigger aria-label="Kategori güncelle" disabled={fieldPending} className="text-xs font-semibold"><span className="truncate">{categoryOptions.find((option) => option.value === category)?.label ?? category}</span></SelectTrigger>
             <SelectContent>
@@ -235,17 +235,17 @@ export function TicketDetailControls({
       </div>
 
       <div>
-        <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.06em] text-text-faint">Atanan personel</label>
+        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Atanan personel</label>
         <Select value={assignValue} onValueChange={onAssignChange}>
           <SelectTrigger aria-label="Personel ata" disabled={assignPending} className={cn("font-semibold", assignPending && "opacity-70")}>
             <span className="flex min-w-0 items-center gap-2">
-              {assignPending ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-text-faint" /> : assignedId ? <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-cyan-500/15 text-[9px] font-bold text-cyan-700">{initials(staffNameOf.get(assignedId) ?? "?")}</span> : <UserRound className="h-4 w-4 shrink-0 text-text-faint" aria-hidden />}
+              {assignPending ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-text-faint" /> : assignedId ? <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-cyan-500/15 text-xs font-bold text-cyan-700">{initials(staffNameOf.get(assignedId) ?? "?")}</span> : <UserRound className="h-4 w-4 shrink-0 text-text-faint" aria-hidden />}
               <span className="truncate">{assignedId ? (staffNameOf.get(assignedId) ?? "Personel") : "Atanmadı"}</span>
             </span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={UNASSIGNED}><span className="flex items-center gap-2 text-text-muted"><UserRound className="h-3.5 w-3.5" /> Atanmadı</span></SelectItem>
-            {staff.map((person) => <SelectItem key={person.id} value={person.id}><span className="flex items-center gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand-600/10 text-[9px] font-bold text-brand-700">{initials(person.full_name)}</span>{person.full_name}</span></SelectItem>)}
+            {staff.map((person) => <SelectItem key={person.id} value={person.id}><span className="flex items-center gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand-600/10 text-xs font-bold text-brand-700">{initials(person.full_name)}</span>{person.full_name}</span></SelectItem>)}
           </SelectContent>
         </Select>
       </div>

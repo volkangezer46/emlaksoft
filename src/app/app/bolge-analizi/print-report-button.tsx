@@ -15,7 +15,7 @@ export function PrintReportButton() {
     <button
       type="button"
       onClick={() => window.print()}
-      className="focus-ring press no-print inline-flex items-center gap-1.5 rounded-[9px] bg-ink-950 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-ink-700"
+      className="focus-ring press no-print inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-ink-700"
     >
       <Printer className="h-3.5 w-3.5" /> Cep raporu yazdır
     </button>

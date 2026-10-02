@@ -28,7 +28,7 @@ export function AuthShell({
           </Link>
 
           <div className="max-w-md">
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-cyan-300">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-cyan-300">
               <Sparkles className="h-3.5 w-3.5" /> Türkiye&apos;nin emlak işletim sistemi
             </span>
             <h2 className="mt-4 font-display text-3xl font-extrabold leading-tight xl:text-4xl">{panelTitle}</h2>
@@ -42,7 +42,7 @@ export function AuthShell({
                 { icon: ShieldCheck, text: "KVKK kayıtları ve İYS/EİDS hazırlık akışları" },
               ].map((f) => (
                 <li key={f.text} className="flex items-center gap-3 text-sm text-white/80">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] border border-white/10 bg-white/6 text-cyan-300">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] border border-white/10 bg-white/6 text-cyan-300">
                     <f.icon className="h-4 w-4" />
                   </span>
                   {f.text}
@@ -51,7 +51,7 @@ export function AuthShell({
             </ul>
           </div>
 
-          <figure className="max-w-md rounded-[18px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur">
+          <figure className="max-w-md rounded-[var(--radius-panel)] border border-white/10 bg-white/[0.05] p-5 backdrop-blur">
             <blockquote className="text-sm leading-relaxed text-white/80">
               &quot;Portal kapanışlarından kaçan komisyonu ilk ay gördük. Artık hangi ilanın nerede kapandığı ve
               kimin araması gerektiği net.&quot;
@@ -60,7 +60,7 @@ export function AuthShell({
               <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-600 text-xs font-bold text-white">SD</span>
               <div>
                 <p className="text-sm font-bold text-white">Serkan D.</p>
-                <p className="text-[11px] text-white/50">Ofis sahibi · İzmir</p>
+                <p className="text-xs text-white/50">Ofis sahibi · İzmir</p>
               </div>
             </figcaption>
           </figure>

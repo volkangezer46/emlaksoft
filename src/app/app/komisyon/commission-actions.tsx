@@ -80,7 +80,7 @@ export function CommissionActions({
             type="button"
             onClick={markPaid}
             disabled={busy !== null}
-            className="inline-flex items-center gap-1 rounded-[9px] bg-mint-500/15 px-2.5 py-1.5 text-[11px] font-bold text-mint-700 transition hover:bg-mint-500/25 disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-mint-500/15 px-2.5 py-1.5 text-xs font-bold text-mint-700 transition hover:bg-mint-500/25 disabled:opacity-50"
           >
             {busy === "paid" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
             Tahsil et
@@ -91,7 +91,7 @@ export function CommissionActions({
               <button
                 type="button"
                 disabled={busy !== null}
-                className="inline-flex items-center gap-1 rounded-[9px] border border-line px-2.5 py-1.5 text-[11px] font-bold text-text-muted transition hover:border-amber-400 hover:text-amber-600 disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-bold text-text-muted transition hover:border-amber-400 hover:text-amber-600 disabled:opacity-50"
               >
                 {busy === "revert" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Undo2 className="h-3.5 w-3.5" />}
                 Tahsilatı geri al
@@ -108,14 +108,14 @@ export function CommissionActions({
           type="button"
           onClick={makeLink}
           disabled={busy !== null}
-          className="inline-flex items-center gap-1 rounded-[9px] border border-line px-2.5 py-1.5 text-[11px] font-bold text-brand-600 transition hover:border-brand-300 disabled:opacity-50"
+          className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-bold text-brand-600 transition hover:border-brand-300 disabled:opacity-50"
         >
           {busy === "link" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
           Ödeme linki
         </button>
       </div>
       {linkUrl ? (
-        <a href={linkUrl} target="_blank" rel="noreferrer" className="max-w-[220px] truncate text-[11px] font-semibold text-brand-600 hover:underline">
+        <a href={linkUrl} target="_blank" rel="noreferrer" className="max-w-[220px] truncate text-xs font-semibold text-brand-600 hover:underline">
           {linkUrl}
         </a>
       ) : null}

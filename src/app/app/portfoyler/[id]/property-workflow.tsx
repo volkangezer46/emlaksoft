@@ -74,7 +74,7 @@ export function PropertyWorkflow({
   }
 
   return (
-    <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+    <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <p className="flex items-center gap-2 text-xs font-semibold text-amber-600">
         <Handshake className="h-4 w-4" /> İş akışı
       </p>
@@ -105,7 +105,7 @@ export function PropertyWorkflow({
           <input
             value={dealValue}
             onChange={(e) => setDealValue(e.target.value)}
-            className="mt-1.5 w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm font-semibold outline-none focus:border-brand-400"
+            className="mt-1.5 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm font-semibold outline-none focus:border-brand-400"
             inputMode="decimal"
           />
         </label>
@@ -122,7 +122,7 @@ export function PropertyWorkflow({
         </label>
       </div>
 
-      <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-[12px] border border-mint-500/25 bg-mint-500/5 px-3 py-3">
+      <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-[var(--radius-card)] border border-mint-500/25 bg-mint-500/5 px-3 py-3">
         <input
           type="checkbox"
           checked={hasAuthority}
@@ -144,7 +144,7 @@ export function PropertyWorkflow({
           type="button"
           onClick={createDeal}
           disabled={busy !== null}
-          className="btn-shine inline-flex items-center gap-1.5 rounded-[10px] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+          className="btn-shine inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
         >
           {busy === "deal" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Handshake className="h-4 w-4" />}
           Anlaşma + komisyon oluştur
@@ -153,7 +153,7 @@ export function PropertyWorkflow({
           type="button"
           onClick={share}
           disabled={busy !== null}
-          className="inline-flex items-center gap-1.5 rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-brand-600 hover:border-brand-300 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-semibold text-brand-600 hover:border-brand-300 disabled:opacity-50"
         >
           {busy === "share" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
           Paylaşım linki
@@ -161,7 +161,7 @@ export function PropertyWorkflow({
       </div>
 
       {shareUrl ? (
-        <p className="mt-3 flex items-start gap-2 rounded-[12px] border border-brand-300/40 bg-brand-600/5 px-3 py-2 text-xs text-brand-700">
+        <p className="mt-3 flex items-start gap-2 rounded-[var(--radius-card)] border border-brand-300/40 bg-brand-600/5 px-3 py-2 text-xs text-brand-700">
           <Link2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <a href={shareUrl} target="_blank" rel="noreferrer" className="break-all font-semibold hover:underline">
             {shareUrl}

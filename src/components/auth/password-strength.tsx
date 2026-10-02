@@ -30,7 +30,7 @@ export function PasswordStrengthMeter({ password }: { password: string }) {
       <div className="h-1.5 overflow-hidden rounded-full bg-line">
         <div className={`h-full rounded-full transition-all ${strength.cls} ${strength.w}`} />
       </div>
-      <p className="mt-1 text-[11px] font-semibold text-text-muted">Şifre gücü: {strength.label}</p>
+      <p className="mt-1 text-xs font-semibold text-text-muted">Şifre gücü: {strength.label}</p>
     </div>
   );
 }

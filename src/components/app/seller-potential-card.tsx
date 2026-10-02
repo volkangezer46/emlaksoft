@@ -14,12 +14,12 @@ const TIER = {
 export function SellerPotentialCard({ prediction }: { prediction: SellerPrediction }) {
   const t = TIER[prediction.tier];
   return (
-    <div className="rounded-[16px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+    <div className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
           <TrendingUp className="h-4 w-4" /> Satış potansiyeli
         </p>
-        <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${t.cls}`}>
+        <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-bold ${t.cls}`}>
           {prediction.label}
         </span>
       </div>
@@ -30,7 +30,7 @@ export function SellerPotentialCard({ prediction }: { prediction: SellerPredicti
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-canvas">
             <div className={`h-full rounded-full ${t.bar}`} style={{ width: `${prediction.score}%` }} />
           </div>
-          <p className="mt-1 text-[10px] text-text-faint">/100 listeleme olasılığı</p>
+          <p className="mt-1 text-xs text-text-faint">/100 listeleme olasılığı</p>
         </div>
       </div>
 

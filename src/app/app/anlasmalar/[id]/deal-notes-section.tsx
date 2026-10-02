@@ -64,12 +64,12 @@ export function DealNotesSection({
           </span>
         ) : null}
       </h2>
-      <p className="mt-1 text-[11px] text-text-faint">
+      <p className="mt-1 text-xs text-text-faint">
         Ekip içi not akışı — teklif dönüşümü gibi sistem izleri de buraya düşer.
       </p>
 
       {notes.length === 0 ? (
-        <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
+        <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
           Henüz not yok. İlk notu siz yazın.
         </p>
       ) : (
@@ -82,9 +82,9 @@ export function DealNotesSection({
             return (
               <li
                 key={n.id}
-                className="group/not flex items-start gap-3 rounded-[12px] border border-line bg-canvas px-4 py-3"
+                className="group/not flex items-start gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3"
               >
-                <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[image:var(--grad-brand)] text-[9px] font-bold text-white">
+                <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[image:var(--grad-brand)] text-xs font-bold text-white">
                   {initials(yazar)}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -105,7 +105,7 @@ export function DealNotesSection({
                       <button
                         type="button"
                         aria-label="Notu sil"
-                        className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 shrink-0 place-items-center rounded-[8px] text-text-faint opacity-0 transition hover:bg-danger-500/10 hover:text-danger-600 focus-visible:opacity-100 group-hover/not:opacity-100"
+                        className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-faint opacity-0 transition hover:bg-danger-500/10 hover:text-danger-600 focus-visible:opacity-100 group-hover/not:opacity-100"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -135,13 +135,13 @@ export function DealNotesSection({
                   e.currentTarget.form?.requestSubmit();
                 }
               }}
-              className="mt-1 w-full resize-none rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+              className="mt-1 w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
             />
           </label>
           <button
             type="submit"
             disabled={pending}
-            className="btn-shine focus-ring press inline-flex h-[38px] shrink-0 items-center gap-1.5 rounded-[10px] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+            className="btn-shine focus-ring press inline-flex h-[38px] shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
           >
             <Send className="h-4 w-4" /> {pending ? "Ekleniyor…" : "Ekle"}
           </button>

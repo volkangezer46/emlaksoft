@@ -60,7 +60,7 @@ export function FavorilerClient({ slug }: { slug: string }) {
   // Boş durum — hiç favori yok
   if (favorites.length === 0) {
     return (
-      <div className="rounded-[20px] border border-dashed border-line bg-surface px-5 py-20 text-center">
+      <div className="rounded-[var(--radius-panel)] border border-dashed border-line bg-surface px-5 py-20 text-center">
         <Heart className="mx-auto h-8 w-8 text-text-faint" />
         <p className="mt-3 text-sm font-semibold text-ink-950">Henüz favori ilanınız yok</p>
         <p className="mt-1 text-xs text-text-muted">
@@ -78,7 +78,7 @@ export function FavorilerClient({ slug }: { slug: string }) {
 
   if (error) {
     return (
-      <div className="rounded-[20px] border border-dashed border-line bg-surface px-5 py-16 text-center">
+      <div className="rounded-[var(--radius-panel)] border border-dashed border-line bg-surface px-5 py-16 text-center">
         <p className="text-sm font-semibold text-ink-950">Favoriler yüklenemedi</p>
         <p className="mt-1 text-xs text-text-muted">Bağlantınızı kontrol edip sayfayı yenileyin.</p>
         <Link
@@ -93,7 +93,7 @@ export function FavorilerClient({ slug }: { slug: string }) {
 
   if (items === null) {
     return (
-      <div className="grid place-items-center rounded-[20px] border border-line bg-surface px-5 py-20">
+      <div className="grid place-items-center rounded-[var(--radius-panel)] border border-line bg-surface px-5 py-20">
         <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
         <p className="mt-3 text-xs text-text-muted">Favorileriniz yükleniyor…</p>
       </div>
@@ -107,13 +107,13 @@ export function FavorilerClient({ slug }: { slug: string }) {
   return (
     <>
       {unpublished > 0 ? (
-        <p className="mb-5 rounded-[14px] border border-amber-300/50 bg-amber-400/12 px-4 py-3 text-xs font-medium text-amber-700">
+        <p className="mb-5 rounded-[var(--radius-card)] border border-amber-300/50 bg-amber-400/12 px-4 py-3 text-xs font-medium text-amber-700">
           {unpublished} favori ilan artık yayında değil — satılmış ya da yayından kaldırılmış olabilir.
         </p>
       ) : null}
 
       {visible.length === 0 ? (
-        <div className="rounded-[20px] border border-dashed border-line bg-surface px-5 py-20 text-center">
+        <div className="rounded-[var(--radius-panel)] border border-dashed border-line bg-surface px-5 py-20 text-center">
           <Heart className="mx-auto h-8 w-8 text-text-faint" />
           <p className="mt-3 text-sm font-semibold text-ink-950">Favorilerinizden hiçbiri şu anda yayında değil</p>
           <p className="mt-1 text-xs text-text-muted">Vitrine dönüp güncel ilanlara göz atabilirsiniz.</p>
@@ -132,7 +132,7 @@ export function FavorilerClient({ slug }: { slug: string }) {
               <div key={p.id} className="relative">
                 <Link
                   href={`/vitrin/${slug}/${p.id}`}
-                  className="lift group block overflow-hidden rounded-[18px] border border-line bg-surface transition hover:border-brand-300"
+                  className="lift group block overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface transition hover:border-brand-300"
                 >
                   <div className="relative aspect-[4/3] overflow-hidden bg-ink-950/5">
                     {p.coverId ? (
@@ -150,7 +150,7 @@ export function FavorilerClient({ slug }: { slug: string }) {
                       </div>
                     )}
                     {p.transactionType ? (
-                      <span className="absolute left-3 top-3 rounded-full bg-ink-950/80 px-2.5 py-1 text-[11px] font-bold uppercase text-white">
+                      <span className="absolute left-3 top-3 rounded-full bg-ink-950/80 px-2.5 py-1 text-xs font-bold uppercase text-white">
                         {p.transactionType}
                       </span>
                     ) : null}

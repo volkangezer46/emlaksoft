@@ -160,11 +160,11 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
         aria-haspopup="listbox"
         aria-controls="admin-command-results"
         aria-label="Platform genelinde ara"
-        className="focus-ring group flex h-10 w-full items-center gap-3 rounded-[12px] border border-hairline bg-canvas/80 px-4 text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300/70 hover:bg-surface hover:text-text-muted hover:shadow-[var(--elev-2)]"
+        className="focus-ring group flex h-10 w-full items-center gap-3 rounded-[var(--radius-card)] border border-hairline bg-canvas/80 px-4 text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300/70 hover:bg-surface hover:text-text-muted hover:shadow-[var(--elev-2)]"
       >
         <Search className="h-4 w-4 shrink-0 transition group-hover:text-brand-500" />
         <span className="hidden flex-1 truncate text-left text-[13px] sm:block">Ara… ofis, üye, destek talebi</span>
-        <kbd className="ml-auto hidden shrink-0 items-center gap-1 rounded-[7px] border border-hairline bg-surface px-2 py-1 text-[11px] font-semibold text-text-faint lg:inline-flex">
+        <kbd className="ml-auto hidden shrink-0 items-center gap-1 rounded-[7px] border border-hairline bg-surface px-2 py-1 text-xs font-semibold text-text-faint lg:inline-flex">
           Ctrl <span className="font-bold">K</span>
         </kbd>
       </button>
@@ -179,7 +179,7 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
             onClick={close}
             className="fixed inset-0 z-40 cursor-default"
           />
-          <div className="popover-in absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-[16px] border border-hairline bg-surface shadow-[var(--inner-top),var(--elev-5)]">
+          <div className="popover-in absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-[var(--radius-card)] border border-hairline bg-surface shadow-[var(--inner-top),var(--elev-5)]">
             <div className="hairline-b flex items-center gap-3 px-4">
               <Search className="h-4 w-4 shrink-0 text-text-faint" />
               <input
@@ -204,7 +204,7 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
 
             <div id="admin-command-results" role="listbox" aria-label="Arama sonuçları" className="max-h-[min(60vh,28rem)] overflow-y-auto p-2">
               {filteredNav.length > 0 ? (
-                <p className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">Sayfalar</p>
+                <p className="px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Sayfalar</p>
               ) : null}
               {flat.map((item, i) => {
                 const Icon = item.kind === "nav" ? item.icon : typeIcon[item.type];
@@ -213,7 +213,7 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
                 return (
                   <div key={`${item.kind}-${item.href}-${i}`}>
                     {isFirstHit ? (
-                      <p className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">Kayıtlar</p>
+                      <p className="px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Kayıtlar</p>
                     ) : null}
                     <button
                       id={`admin-command-option-${i}`}
@@ -222,12 +222,12 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
                       type="button"
                       onMouseEnter={() => setActive(i)}
                       onClick={() => go(item.href)}
-                      className={`flex w-full items-center gap-3 rounded-[11px] px-3 py-2.5 text-left transition ${
+                      className={`flex w-full items-center gap-3 rounded-[var(--radius-control)] px-3 py-2.5 text-left transition ${
                         isActive ? "bg-brand-600/8" : "hover:bg-canvas"
                       }`}
                     >
                       <span
-                        className={`grid h-8 w-8 shrink-0 place-items-center rounded-[9px] ${
+                        className={`grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] ${
                           isActive ? "bg-brand-600/12 text-brand-600" : "bg-canvas text-text-muted"
                         }`}
                       >
@@ -238,7 +238,7 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
                           {item.kind === "nav" ? item.label : item.title}
                         </span>
                         {item.kind === "hit" ? (
-                          <span className="block truncate text-[11px] text-text-faint">
+                          <span className="block truncate text-xs text-text-faint">
                             {typeLabel[item.type]} · {item.subtitle}
                           </span>
                         ) : null}
@@ -254,7 +254,7 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
               ) : null}
             </div>
 
-            <div className="hairline-t surface-sunken flex items-center justify-between px-4 py-2 text-[11px] text-text-faint">
+            <div className="hairline-t surface-sunken flex items-center justify-between px-4 py-2 text-xs text-text-faint">
               <span className="flex items-center gap-2">
                 <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5">↑↓</kbd> gezin
                 <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5">↵</kbd> aç

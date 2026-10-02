@@ -91,7 +91,7 @@ export async function BillingHome({ staffName }: { staffName: string }) {
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-64 w-64 rounded-full bg-mint-500/20 blur-[90px]" />
         <div className="relative">
@@ -104,10 +104,10 @@ export async function BillingHome({ staffName }: { staffName: string }) {
           </p>
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {kpis.map((k) => (
-              <Link key={k.label} href={k.href} className="focus-ring group relative block rounded-[14px] border border-white/12 bg-white/8 p-3 backdrop-blur transition hover:border-white/25 hover:bg-white/12">
+              <Link key={k.label} href={k.href} className="focus-ring group relative block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 backdrop-blur transition hover:border-white/25 hover:bg-white/12">
                 <k.icon className={`h-4 w-4 ${k.tone}`} />
                 <p className="mt-2 font-display text-lg font-extrabold tabular-nums text-white"><CountUp value={k.value} money={k.money} /></p>
-                <p className="text-[11px] text-white/70">{k.label}</p>
+                <p className="text-xs text-white/70">{k.label}</p>
                 <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:opacity-100" />
               </Link>
             ))}
@@ -117,14 +117,14 @@ export async function BillingHome({ staffName }: { staffName: string }) {
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
         {/* Plan bazlı gelir */}
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
             <TrendingUp className="h-4 w-4" /> Plan bazlı aylık gelir
           </p>
           <h2 className="mt-1 font-display font-bold text-ink-950">Gelir dağılımı</h2>
           <div className="mt-5 space-y-3">
             {planRevenue.map((p, i) => (
-              <Link key={p.key} href={`/admin/tenants?plan=${p.key}`} className="focus-ring group block rounded-[8px]">
+              <Link key={p.key} href={`/admin/tenants?plan=${p.key}`} className="focus-ring group block rounded-[var(--radius-control)]">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-ink-950 transition group-hover:text-brand-600">{p.label}</span>
                   <span className="tabular-nums text-text-muted">{money(p.value)}</span>
@@ -139,23 +139,23 @@ export async function BillingHome({ staffName }: { staffName: string }) {
             ))}
           </div>
           <div className="mt-5 grid grid-cols-3 gap-2 border-t border-line pt-4 text-center">
-            <Link href="/admin/billing?durum=trialing" className="focus-ring group rounded-[10px] py-1 transition hover:bg-canvas">
+            <Link href="/admin/billing?durum=trialing" className="focus-ring group rounded-[var(--radius-control)] py-1 transition hover:bg-canvas">
               <p className="font-display text-lg font-extrabold text-ink-950">{trialing}</p>
-              <p className="text-[11px] text-text-muted transition group-hover:text-brand-600">Deneme</p>
+              <p className="text-xs text-text-muted transition group-hover:text-brand-600">Deneme</p>
             </Link>
-            <Link href="/admin/billing?durum=past_due" className="focus-ring group rounded-[10px] py-1 transition hover:bg-canvas">
+            <Link href="/admin/billing?durum=past_due" className="focus-ring group rounded-[var(--radius-control)] py-1 transition hover:bg-canvas">
               <p className="font-display text-lg font-extrabold text-danger-500">{pastDue}</p>
-              <p className="text-[11px] text-text-muted transition group-hover:text-brand-600">Gecikmiş abonelik</p>
+              <p className="text-xs text-text-muted transition group-hover:text-brand-600">Gecikmiş abonelik</p>
             </Link>
-            <Link href="/admin/billing?durum=open" className="focus-ring group rounded-[10px] py-1 transition hover:bg-canvas">
+            <Link href="/admin/billing?durum=open" className="focus-ring group rounded-[var(--radius-control)] py-1 transition hover:bg-canvas">
               <p className="font-display text-lg font-extrabold text-amber-600">{money(openTotal)}</p>
-              <p className="text-[11px] text-text-muted transition group-hover:text-brand-600">Açık bakiye</p>
+              <p className="text-xs text-text-muted transition group-hover:text-brand-600">Açık bakiye</p>
             </Link>
           </div>
         </section>
 
         {/* Son faturalar */}
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold text-amber-600">
@@ -175,24 +175,24 @@ export async function BillingHome({ staffName }: { staffName: string }) {
                 <>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink-950 transition group-hover:text-brand-600">{nameOf(i.tenant as Rel)}</p>
-                    <p className="text-[11px] text-text-faint">
+                    <p className="text-xs text-text-faint">
                       {i.invoice_no ?? "—"} · {new Date(i.created_at).toLocaleDateString("tr-TR")}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <span className="tabular-nums text-sm font-semibold text-ink-950">{money(Number(i.total_try || 0))}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${isOverdue ? "bg-danger-500/10 text-danger-500" : invStatusColor[i.status] ?? "bg-ink-950/5 text-text-muted"}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${isOverdue ? "bg-danger-500/10 text-danger-500" : invStatusColor[i.status] ?? "bg-ink-950/5 text-text-muted"}`}>
                       {isOverdue ? "Gecikmiş" : invStatusLabel[i.status] ?? i.status}
                     </span>
                   </div>
                 </>
               );
               return tenantId ? (
-                <Link key={i.id} href={`/admin/tenants/${tenantId}`} className="focus-ring group flex items-center justify-between rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5 transition hover:border-brand-300">
+                <Link key={i.id} href={`/admin/tenants/${tenantId}`} className="focus-ring group flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5 transition hover:border-brand-300">
                   {inner}
                 </Link>
               ) : (
-                <div key={i.id} className="flex items-center justify-between rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5">
+                <div key={i.id} className="flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5">
                   {inner}
                 </div>
               );
@@ -207,8 +207,8 @@ export async function BillingHome({ staffName }: { staffName: string }) {
           { href: "/admin/billing", title: "Abonelik & fatura", desc: `${activeCount} aktif abonelik · ${money(mrr)} aylık gelir`, icon: CreditCard, tone: "bg-amber-400/15 text-amber-600" },
           { href: "/admin/tenants", title: "Ofis defteri", desc: "Ofislerin plan ve durum bilgisi", icon: Wallet, tone: "bg-brand-600/10 text-brand-600" },
         ].map((card) => (
-          <Link key={card.title} href={card.href} className="lift group relative overflow-hidden rounded-[16px] border border-line bg-surface p-4 transition hover:border-brand-300">
-            <span className={`grid h-10 w-10 place-items-center rounded-[12px] ${card.tone}`}>
+          <Link key={card.title} href={card.href} className="lift group relative overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface p-4 transition hover:border-brand-300">
+            <span className={`grid h-10 w-10 place-items-center rounded-[var(--radius-card)] ${card.tone}`}>
               <card.icon className="h-5 w-5" />
             </span>
             <p className="mt-3 font-display font-bold text-ink-950">{card.title}</p>

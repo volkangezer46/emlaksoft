@@ -77,7 +77,7 @@ export function DealCostsSection({
       <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
         <FolderOpen className="h-4 w-4 text-brand-600" /> İşlem dosyası
       </h2>
-      <p className="mt-1 text-[11px] text-text-faint">
+      <p className="mt-1 text-xs text-text-faint">
         Kapora ve kapanış masrafları — tapu harcı, ekspertiz, dışarıya ödenen komisyon vb.
       </p>
 
@@ -88,8 +88,8 @@ export function DealCostsSection({
           ["Masraf toplamı", money(masraf)],
           ["Net (kapora − masraf)", money(net)],
         ].map(([k, v]) => (
-          <div key={k} className="rounded-[12px] border border-line bg-canvas px-4 py-2.5">
-            <p className="text-[11px] text-text-faint">{k}</p>
+          <div key={k} className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
+            <p className="text-xs text-text-faint">{k}</p>
             <p className={`numeric text-sm font-bold ${k.startsWith("Net") && net < 0 ? "text-danger-600" : "text-ink-950"}`}>{v}</p>
           </div>
         ))}
@@ -97,7 +97,7 @@ export function DealCostsSection({
 
       {/* Kalem listesi */}
       {costs.length === 0 ? (
-        <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
+        <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
           Henüz kalem eklenmemiş.
         </p>
       ) : (
@@ -107,10 +107,10 @@ export function DealCostsSection({
             return (
               <li
                 key={c.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-line bg-canvas px-4 py-2.5"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5"
               >
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${meta.badge}`}>
+                  <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${meta.badge}`}>
                     {meta.label}
                   </span>
                   {c.label ? (
@@ -125,7 +125,7 @@ export function DealCostsSection({
                       disabled={togglePending}
                       onClick={() => togglePaid(c.id)}
                       title={c.paid ? "Ödenmedi olarak işaretle" : "Ödendi olarak işaretle"}
-                      className={`focus-ring press inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset transition disabled:opacity-60 ${
+                      className={`focus-ring press inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset transition disabled:opacity-60 ${
                         c.paid
                           ? "bg-mint-500/10 text-mint-700 ring-mint-600/20"
                           : "bg-zinc-100 text-zinc-600 ring-zinc-500/10 hover:bg-zinc-200"
@@ -136,7 +136,7 @@ export function DealCostsSection({
                     </button>
                   ) : (
                     <span
-                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${
                         c.paid
                           ? "bg-mint-500/10 text-mint-700 ring-mint-600/20"
                           : "bg-zinc-100 text-zinc-600 ring-zinc-500/10"
@@ -156,7 +156,7 @@ export function DealCostsSection({
                         <button
                           type="button"
                           aria-label="Kalemi sil"
-                          className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600"
+                          className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -180,7 +180,7 @@ export function DealCostsSection({
               name="kind"
               required
               defaultValue="kapora"
-              className="mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+              className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
             >
               {(Object.keys(KIND_META) as DealCostKind[]).map((k) => (
                 <option key={k} value={k}>{KIND_META[k].label}</option>
@@ -193,7 +193,7 @@ export function DealCostsSection({
               name="label"
               type="text"
               placeholder="Örn. tapu randevusu harcı (opsiyonel)"
-              className="mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+              className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
             />
           </label>
           <label className="text-xs font-semibold text-text-muted">
@@ -205,14 +205,14 @@ export function DealCostsSection({
               step="100"
               required
               placeholder="Tutar"
-              className="mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+              className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
             />
           </label>
           <div className="flex items-end">
             <button
               type="submit"
               disabled={pending}
-              className="btn-shine focus-ring press inline-flex h-[38px] items-center gap-1.5 rounded-[10px] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+              className="btn-shine focus-ring press inline-flex h-[38px] items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
             >
               <Plus className="h-4 w-4" /> {pending ? "Ekleniyor…" : "Ekle"}
             </button>

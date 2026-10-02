@@ -70,7 +70,7 @@ export function GalleryLightbox({
           unoptimized
           className="object-cover"
         />
-        <span className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-ink-950/70 px-2.5 py-1 text-[11px] font-bold text-white">
+        <span className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-ink-950/70 px-2.5 py-1 text-xs font-bold text-white">
           <Expand className="h-3.5 w-3.5" /> {index + 1}/{count}
         </span>
       </button>
@@ -84,7 +84,7 @@ export function GalleryLightbox({
               onClick={() => setIndex(i)}
               aria-label={`Fotoğraf ${i + 1}'i göster`}
               aria-current={i === index}
-              className={`relative aspect-square w-full overflow-hidden rounded-[8px] transition ${
+              className={`relative aspect-square w-full overflow-hidden rounded-[var(--radius-control)] transition ${
                 i === index ? "ring-2 ring-brand-500" : "opacity-75 hover:opacity-100"
               }`}
             >
@@ -105,7 +105,7 @@ export function GalleryLightbox({
                 setIndex(MAX_THUMBS);
                 setOpen(true);
               }}
-              className="relative grid aspect-square w-full place-items-center overflow-hidden rounded-[8px] bg-ink-950/80 text-xs font-extrabold text-white transition hover:bg-ink-950/70"
+              className="relative grid aspect-square w-full place-items-center overflow-hidden rounded-[var(--radius-control)] bg-ink-950/80 text-xs font-extrabold text-white transition hover:bg-ink-950/70"
               aria-label={`${count - MAX_THUMBS} fotoğraf daha — galeriyi aç`}
             >
               +{count - MAX_THUMBS}

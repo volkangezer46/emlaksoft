@@ -149,14 +149,14 @@ export function KeyboardShortcuts() {
             ].map((k) => (
               <div
                 key={k.tuslar}
-                className="flex items-center justify-between gap-4 rounded-[10px] px-3 py-2 odd:bg-canvas"
+                className="flex items-center justify-between gap-4 rounded-[var(--radius-control)] px-3 py-2 odd:bg-canvas"
               >
                 <dt className="text-sm text-ink-950">{k.etiket}</dt>
                 <dd className="flex shrink-0 gap-1">
                   {k.tuslar.split(" ").map((t, i) => (
                     <kbd
                       key={`${k.tuslar}-${i}`}
-                      className="numeric min-w-[22px] rounded-[6px] border border-line bg-surface px-1.5 py-0.5 text-center text-[11px] font-semibold text-text-muted shadow-[var(--shadow-xs)]"
+                      className="numeric min-w-[22px] rounded-[6px] border border-line bg-surface px-1.5 py-0.5 text-center text-xs font-semibold text-text-muted shadow-[var(--shadow-xs)]"
                     >
                       {t}
                     </kbd>
@@ -166,7 +166,7 @@ export function KeyboardShortcuts() {
             ))}
           </dl>
 
-          <p className="mt-4 text-[11px] leading-relaxed text-text-faint">
+          <p className="mt-4 text-xs leading-relaxed text-text-faint">
             <strong>g</strong> önekli iki tuşluk dizi bilinçli: tek harfli kısayol, bir nota ya da
             arama kutusuna yazarken odak kaybolduğunda sayfayı aniden değiştirip yazılanı
             kaybettirebilir.
@@ -176,7 +176,7 @@ export function KeyboardShortcuts() {
             <DialogClose asChild>
               <button
                 type="button"
-                className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas"
+                className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas"
               >
                 <X className="h-4 w-4" /> Kapat
               </button>

@@ -184,7 +184,7 @@ export default async function TeamPage() {
   return (
     <div className="space-y-6">
       {/* premium header */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-brand-600/30 blur-[90px]" />
         <div className="relative grid gap-6 lg:grid-cols-[1.25fr_1fr] lg:items-center">
@@ -196,11 +196,11 @@ export default async function TeamPage() {
                 <p className="mt-1 max-w-lg text-sm text-white/60">Danışmanları davet edin, rol ve şube atayın; herkes yalnızca yetkili olduğu müşteri ve portföyleri görür.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Link href="/app/ayarlar/roller" className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                <Link href="/app/ayarlar/roller" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <Fingerprint className="h-4 w-4" /> İzin matrisi
                 </Link>
-                <Link href="/app/ekip/izinler" className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"><CalendarRange className="h-4 w-4" /> İzin takvimi</Link>
-                <Link href="/app/ekip/kartvizitim" className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"><IdCard className="h-4 w-4" /> Kartvizitim</Link>
+                <Link href="/app/ekip/izinler" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"><CalendarRange className="h-4 w-4" /> İzin takvimi</Link>
+                <Link href="/app/ekip/kartvizitim" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"><IdCard className="h-4 w-4" /> Kartvizitim</Link>
                 {canManage ? <AddMemberDialog branches={branches.map((b) => ({ id: b.id, name: b.name }))} /> : null}
               </div>
             </div>
@@ -209,20 +209,20 @@ export default async function TeamPage() {
                 <Link
                   key={k.label}
                   href={k.href}
-                  className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur hover:border-white/30"
+                  className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur hover:border-white/30"
                 >
                   <span className="flex items-start justify-between">
                     <k.icon className="h-4 w-4 text-mint-400" />
                     <ArrowUpRight className="hover-action h-4 w-4 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
                   </span>
                   <p className="mt-2 font-display text-xl font-extrabold text-white">{k.value}</p>
-                  <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+                  <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
                 </Link>
               ))}
             </div>
           </div>
 
-          <div className="flex items-center gap-5 rounded-[16px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
+          <div className="flex items-center gap-5 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="relative grid h-28 w-28 place-items-center">
               <div
                 className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-25 blur-md"
@@ -244,14 +244,14 @@ export default async function TeamPage() {
               </svg>
               <div className="absolute text-center">
                 <p className="font-display text-xl font-extrabold text-white">%{Math.round(activeRate * 100)}</p>
-                <p className="text-[10px] text-white/45">aktif</p>
+                <p className="text-xs text-white/45">aktif</p>
               </div>
             </div>
             <div className="min-w-0 flex-1 space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/45">Rol karışımı</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-white/45">Rol karışımı</p>
               {roleMix.slice(0, 4).map((r, i) => (
                 <div key={r.key}>
-                  <div className="mb-0.5 flex justify-between text-[11px] text-white/60">
+                  <div className="mb-0.5 flex justify-between text-xs text-white/60">
                     <span>{r.label}</span>
                     <span className="font-bold text-white">{r.count}</span>
                   </div>
@@ -273,18 +273,18 @@ export default async function TeamPage() {
       </section>
 
       {!canManage ? (
-        <div className="flex items-center gap-3 rounded-[14px] border border-amber-400/30 bg-amber-400/8 px-4 py-3 text-sm text-ink-950">
+        <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/8 px-4 py-3 text-sm text-ink-950">
           <ShieldCheck className="h-5 w-5 text-amber-500" /> Ekibi yalnızca ofis sahibi ve yöneticiler düzenleyebilir. Görüntüleme modundasınız.
         </div>
       ) : null}
 
       {loadRows.length > 0 ? (
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><UserRound className="h-4 w-4" /> İş yükü</p>
           <h2 className="mt-1 font-display font-bold text-ink-950">Müşteri dağılımı</h2>
           <div className="mt-4 space-y-3">
             {loadRows.map((r, i) => (
-              <Link key={r.id} href={`/app/ekip/${r.id}`} className="focus-ring group block rounded-[10px] p-1 -m-1">
+              <Link key={r.id} href={`/app/ekip/${r.id}`} className="focus-ring group block rounded-[var(--radius-control)] p-1 -m-1">
                 <div className="mb-1 flex justify-between text-xs">
                   <span className="flex items-center gap-1 font-semibold text-ink-950 group-hover:text-brand-600">
                     {r.name}
@@ -305,7 +305,7 @@ export default async function TeamPage() {
       ) : null}
 
       {/* team list */}
-      <section id="uyeler" className="scroll-mt-24 overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+      <section id="uyeler" className="scroll-mt-24 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950"><Users className="h-4 w-4 text-brand-600" /> Ekip üyeleri</h2>
@@ -321,7 +321,7 @@ export default async function TeamPage() {
             return (
               <article key={m.id} className={`grid gap-4 px-5 py-4 transition hover:bg-brand-600/[0.02] lg:grid-cols-[1.4fr_1fr_0.8fr_auto] lg:items-center ${!m.is_active ? "opacity-60" : ""}`}>
                 <div className="flex min-w-0 items-center gap-3">
-                  <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-[13px] bg-[image:var(--grad-brand)] text-xs font-bold text-white">
+                  <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] bg-[image:var(--grad-brand)] text-xs font-bold text-white">
                     {initials(m.full_name)}
                     {isOwner ? <span className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full border-2 border-white bg-amber-400 text-ink-950"><Crown className="h-2.5 w-2.5" /></span> : null}
                   </span>
@@ -335,35 +335,35 @@ export default async function TeamPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${meta.cls}`}>{meta.label}</span>
-                  {!m.is_active ? <span className="rounded-full bg-ink-950/8 px-2 py-0.5 text-[11px] font-semibold text-text-muted">Pasif</span> : null}
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${meta.cls}`}>{meta.label}</span>
+                  {!m.is_active ? <span className="rounded-full bg-ink-950/8 px-2 py-0.5 text-xs font-semibold text-text-muted">Pasif</span> : null}
                   {m.is_public && m.public_slug ? (
                     <a
                       href={`/danisman/${m.public_slug}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2 py-0.5 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/20"
+                      className="inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold text-brand-600 transition hover:bg-brand-600/20"
                     >
                       <IdCard className="h-3 w-3" /> Kartvizit
                     </a>
                   ) : null}
                   {isOnLeave(todayLeaves, m.id, todayKey) ? (
-                    <Link href="/app/ekip/izinler" className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-600 transition hover:bg-amber-400/25">
+                    <Link href="/app/ekip/izinler" className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600 transition hover:bg-amber-400/25">
                       <PalmtreeIcon className="h-3 w-3" /> İzinde
                     </Link>
                   ) : null}
                   {loginDataAvailable ? (
                     lastLoginByUser.has(m.id) ? (
-                      <span className="text-[11px] text-text-faint">Son giriş: {relativeTimeTR(lastLoginByUser.get(m.id)!)}</span>
+                      <span className="text-xs text-text-faint">Son giriş: {relativeTimeTR(lastLoginByUser.get(m.id)!)}</span>
                     ) : (
                       <>
-                        <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-600">Hiç giriş yapmadı</span>
+                        <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600">Hiç giriş yapmadı</span>
                         {canManage && !isOwner ? (
                           <form action={resendInvite}>
                             <input type="hidden" name="id" value={m.id} />
                             <button
                               type="submit"
-                              className="rounded-[9px] border border-line px-2.5 py-1 text-[11px] font-semibold text-brand-600 transition hover:border-brand-300"
+                              className="rounded-[var(--radius-control)] border border-line px-2.5 py-1 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
                             >
                               Daveti yinele
                             </button>
@@ -387,27 +387,27 @@ export default async function TeamPage() {
                     <>
                       <form action={setMemberRole} className="flex flex-wrap items-center gap-1.5">
                         <input type="hidden" name="id" value={m.id} />
-                        <select name="role" defaultValue={m.role} className="rounded-[9px] border border-line bg-canvas px-2 py-1.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
+                        <select name="role" defaultValue={m.role} className="rounded-[var(--radius-control)] border border-line bg-canvas px-2 py-1.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
                           {assignableRoles.map((r) => <option key={r} value={r}>{roleMeta[r].label}</option>)}
                         </select>
                         {branches.length > 0 ? (
-                          <select name="branch_id" defaultValue={m.branch_id ?? ""} className="rounded-[9px] border border-line bg-canvas px-2 py-1.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
+                          <select name="branch_id" defaultValue={m.branch_id ?? ""} className="rounded-[var(--radius-control)] border border-line bg-canvas px-2 py-1.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
                             <option value="">Şubesiz</option>
                             {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                           </select>
                         ) : null}
-                        <button type="submit" className="rounded-[9px] border border-line px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300">Uygula</button>
+                        <button type="submit" className="rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300">Uygula</button>
                       </form>
                       <form action={setMemberActive}>
                         <input type="hidden" name="id" value={m.id} />
                         <input type="hidden" name="is_active" value={(!m.is_active).toString()} />
-                        <button type="submit" className={`rounded-[9px] border px-2.5 py-1.5 text-xs font-semibold transition ${m.is_active ? "border-line text-text-muted hover:border-danger-500/40 hover:text-danger-500" : "border-mint-500/30 text-mint-600 hover:bg-mint-500/8"}`}>
+                        <button type="submit" className={`rounded-[var(--radius-control)] border px-2.5 py-1.5 text-xs font-semibold transition ${m.is_active ? "border-line text-text-muted hover:border-danger-500/40 hover:text-danger-500" : "border-mint-500/30 text-mint-600 hover:bg-mint-500/8"}`}>
                           {m.is_active ? "Pasifleştir" : "Aktifleştir"}
                         </button>
                       </form>
                     </>
                   ) : (
-                    <span className="text-[11px] text-text-faint">{isOwner ? "Ofis sahibi" : "—"}</span>
+                    <span className="text-xs text-text-faint">{isOwner ? "Ofis sahibi" : "—"}</span>
                   )}
                 </div>
               </article>
@@ -417,13 +417,13 @@ export default async function TeamPage() {
       </section>
 
       {/* branches */}
-      <section id="subeler" className="scroll-mt-24 rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <section id="subeler" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950"><Building2 className="h-4 w-4 text-brand-600" /> Şubeler</h2>
           {canManage ? <AddBranchDialog provinces={provinces} /> : null}
         </div>
         {branches.length === 0 ? (
-          <p className="mt-4 rounded-[12px] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">Henüz şube tanımlanmadı. Tek ofis olarak da çalışabilirsiniz.</p>
+          <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">Henüz şube tanımlanmadı. Tek ofis olarak da çalışabilirsiniz.</p>
         ) : (
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {branches.map((b) => (

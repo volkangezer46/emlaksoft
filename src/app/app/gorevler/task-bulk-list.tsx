@@ -82,7 +82,7 @@ export function TaskBulkList({ items }: { items: Item[] }) {
     <div className="space-y-2">
       {hasSelectable ? (
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex cursor-pointer items-center gap-2 rounded-[10px] border border-line bg-surface px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300">
+          <label className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300">
             <input
               type="checkbox"
               checked={allSelected}
@@ -99,7 +99,7 @@ export function TaskBulkList({ items }: { items: Item[] }) {
                 type="button"
                 onClick={submit}
                 disabled={pending}
-                className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] bg-mint-500/10 px-3.5 py-2 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/20 disabled:opacity-60"
+                className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-mint-500/10 px-3.5 py-2 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/20 disabled:opacity-60"
               >
                 <CheckCheck className="h-4 w-4" />
                 Seçilenleri tamamla
@@ -107,13 +107,13 @@ export function TaskBulkList({ items }: { items: Item[] }) {
               <button
                 type="button"
                 onClick={() => setSelected(new Set())}
-                className="focus-ring press inline-flex items-center gap-1 rounded-[10px] border border-line bg-surface px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300"
+                className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300"
               >
                 <X className="h-3.5 w-3.5" /> Vazgeç
               </button>
             </>
           ) : (
-            <span className="text-[11px] text-text-faint">Toplu tamamlamak için görevleri işaretleyin.</span>
+            <span className="text-xs text-text-faint">Toplu tamamlamak için görevleri işaretleyin.</span>
           )}
         </div>
       ) : null}

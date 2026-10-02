@@ -165,7 +165,7 @@ export default async function ForeignSalePage() {
         <ArrowLeft className="h-4 w-4" /> Portföy merkezine dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-mint-500/20 blur-[80px]" />
         <div className="relative">
@@ -183,7 +183,7 @@ export default async function ForeignSalePage() {
       </section>
 
       {/* Yasal uyarı — mevzuat kartlarının hepsini kapsar */}
-      <div className="flex items-start gap-3 rounded-[16px] border border-amber-400/40 bg-amber-400/[0.07] px-4 py-3">
+      <div className="flex items-start gap-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/[0.07] px-4 py-3">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
         <p className="text-xs leading-relaxed text-text-muted">
           <span className="font-bold text-ink-950">Bilgi amaçlıdır, hukuki tavsiye değildir.</span>{" "}
@@ -238,21 +238,21 @@ export default async function ForeignSalePage() {
           {FOREIGN_SALE_GUIDE.map((card) => (
             <article
               key={card.title}
-              className="lift flex flex-col rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]"
+              className="lift flex flex-col rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]"
             >
               <div className="flex items-start justify-between gap-2">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-brand-600/10 text-brand-600">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
                   <ShieldCheck className="h-4 w-4" />
                 </span>
                 {card.figure ? (
-                  <span className="rounded-full bg-ink-950 px-2.5 py-1 text-[11px] font-bold text-white">
+                  <span className="rounded-full bg-ink-950 px-2.5 py-1 text-xs font-bold text-white">
                     {card.figure}
                   </span>
                 ) : null}
               </div>
               <h3 className="mt-3 font-display text-sm font-extrabold text-ink-950">{card.title}</h3>
               <p className="mt-2 flex-1 text-xs leading-relaxed text-text-muted">{card.body}</p>
-              <p className="mt-3 border-t border-line pt-2 text-[11px] leading-relaxed text-text-faint">
+              <p className="mt-3 border-t border-line pt-2 text-xs leading-relaxed text-text-faint">
                 <span className="font-bold text-amber-600">Doğrulanmalı:</span> {card.verify}
               </p>
             </article>
@@ -261,7 +261,7 @@ export default async function ForeignSalePage() {
       </section>
 
       {/* Evrak kontrol listesi + anlaşmaya uygula */}
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
           <div>
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -277,12 +277,12 @@ export default async function ForeignSalePage() {
         <div className="grid gap-x-6 gap-y-1 px-5 py-4 md:grid-cols-2">
           {FOREIGN_SALE_CHECKLIST.map((item, i) => (
             <div key={item.label} className="flex items-start gap-2.5 border-b border-line/60 py-2 last:border-0">
-              <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-canvas text-[10px] font-bold text-text-faint">
+              <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-canvas text-xs font-bold text-text-faint">
                 {i + 1}
               </span>
               <span className="flex-1 text-sm text-ink-950">{item.label}</span>
               <span
-                className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
                   item.required ? "bg-danger-500/10 text-danger-600" : "bg-canvas text-text-faint"
                 }`}
               >
@@ -304,7 +304,7 @@ export default async function ForeignSalePage() {
       {/* Yabancı müşteriler */}
       <section
         id="yabanci-musteriler"
-        className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]"
+        className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]"
       >
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
           <div>

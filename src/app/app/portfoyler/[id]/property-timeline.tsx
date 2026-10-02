@@ -79,7 +79,7 @@ export function PropertyTimeline({ events, simdi }: { events: TimelineEvent[]; s
       <div className="mt-4 space-y-5">
         {gruplar.map((g) => (
           <div key={g.gun}>
-            <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-faint">
+            <p className="text-xs font-bold uppercase tracking-[0.1em] text-text-faint">
               {new Intl.DateTimeFormat("tr-TR", { dateStyle: "full" }).format(new Date(g.gun))}
             </p>
 
@@ -98,7 +98,7 @@ export function PropertyTimeline({ events, simdi }: { events: TimelineEvent[]; s
                     </span>
                     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
                       <p className="text-sm font-semibold text-ink-950">{o.title}</p>
-                      <time className="numeric text-[11px] text-text-faint" dateTime={o.at}>
+                      <time className="numeric text-xs text-text-faint" dateTime={o.at}>
                         {tarih(o.at)}
                       </time>
                     </div>

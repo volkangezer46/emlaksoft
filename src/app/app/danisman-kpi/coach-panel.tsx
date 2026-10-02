@@ -49,7 +49,7 @@ export function CoachPanel({ actions, adSoyad }: { actions: CoachActionWithLink[
             {adSoyad ? `${adSoyad} · bu hafta` : "Bu hafta"}
           </h2>
         </div>
-        <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] text-text-muted">
+        <span className="rounded-full bg-canvas px-2.5 py-1 text-xs text-text-muted">
           en fazla 4 madde
         </span>
       </div>
@@ -59,7 +59,7 @@ export function CoachPanel({ actions, adSoyad }: { actions: CoachActionWithLink[
           const s = STIL[a.kind];
           const Ikon = s.icon;
           return (
-            <li key={a.title} className={`flex gap-3 rounded-[14px] border px-4 py-3 ${s.cls}`}>
+            <li key={a.title} className={`flex gap-3 rounded-[var(--radius-card)] border px-4 py-3 ${s.cls}`}>
               <span className="mt-0.5 shrink-0">
                 <Ikon className="h-4 w-4" />
               </span>
@@ -81,7 +81,7 @@ export function CoachPanel({ actions, adSoyad }: { actions: CoachActionWithLink[
         })}
       </ul>
 
-      <p className="mt-3 text-[11px] leading-relaxed text-text-faint">
+      <p className="mt-3 text-xs leading-relaxed text-text-faint">
         Öneriler kural tabanlıdır; eşikler emlak operasyonunda yaygın kabul gören oranlardan seçildi,
         geçmiş veriden öğrenilmedi. Kendi bildiğiniz bağlam her zaman önce gelir.
       </p>

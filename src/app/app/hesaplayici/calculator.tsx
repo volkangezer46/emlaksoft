@@ -59,7 +59,7 @@ function parseNumber(raw: string): number {
 }
 
 const fieldCls =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 outline-none transition focus:border-brand-400";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 outline-none transition focus:border-brand-400";
 const labelCls = "mb-1.5 block text-sm text-text-muted";
 
 /** Binlik ayraçlı para alanı — panelde ₺ girdileri hep bu biçimde. */
@@ -245,7 +245,7 @@ export function PurchaseCalculator({
     <div className="grid gap-5 lg:grid-cols-[1.35fr_1fr]">
       {/* ------------------------------- SOL: girdi + döküm ------------------ */}
       <div className="space-y-5">
-        <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <Calculator className="h-4 w-4 text-brand-600" /> Hesap girdileri
           </h2>
@@ -331,7 +331,7 @@ export function PurchaseCalculator({
                   }}
                   className={`${fieldCls} numeric text-right tabular-nums`}
                 />
-                <p className="mt-1 text-[11px] text-text-faint">
+                <p className="mt-1 text-xs text-text-faint">
                   Yıllık nominal ≈ %{loan.annualRatePct} · bankanızın güncel oranını girin
                 </p>
               </div>
@@ -355,7 +355,7 @@ export function PurchaseCalculator({
               </div>
               <div>
                 <span className={labelCls}>Tapu harcı paylaşımı</span>
-                <div className="grid grid-cols-2 gap-1 rounded-[10px] border border-line bg-canvas p-1">
+                <div className="grid grid-cols-2 gap-1 rounded-[var(--radius-control)] border border-line bg-canvas p-1">
                   {(
                     [
                       { key: "half" as const, label: "Yarı yarıya (%2)" },
@@ -366,7 +366,7 @@ export function PurchaseCalculator({
                       key={opt.key}
                       type="button"
                       onClick={() => setDeedFeeShare(opt.key)}
-                      className={`focus-ring press rounded-[8px] px-2 py-2 text-xs font-bold transition ${
+                      className={`focus-ring press rounded-[var(--radius-control)] px-2 py-2 text-xs font-bold transition ${
                         deedFeeShare === opt.key
                           ? "bg-brand-600 text-white"
                           : "text-text-muted hover:text-ink-950"
@@ -383,7 +383,7 @@ export function PurchaseCalculator({
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <span className={labelCls}>Taşınmaz cinsi</span>
-                <div className="grid grid-cols-2 gap-1 rounded-[10px] border border-line bg-canvas p-1">
+                <div className="grid grid-cols-2 gap-1 rounded-[var(--radius-control)] border border-line bg-canvas p-1">
                   {(
                     [
                       { key: "residential" as const, label: "Konut" },
@@ -394,7 +394,7 @@ export function PurchaseCalculator({
                       key={opt.key}
                       type="button"
                       onClick={() => setPropertyKind(opt.key)}
-                      className={`focus-ring press rounded-[8px] px-2 py-2 text-xs font-bold transition ${
+                      className={`focus-ring press rounded-[var(--radius-control)] px-2 py-2 text-xs font-bold transition ${
                         propertyKind === opt.key ? "bg-brand-600 text-white" : "text-text-muted hover:text-ink-950"
                       }`}
                     >
@@ -405,7 +405,7 @@ export function PurchaseCalculator({
               </div>
               <div>
                 <span className={labelCls}>Yapı durumu</span>
-                <label className="flex h-[42px] cursor-pointer items-center gap-2.5 rounded-[10px] border border-line bg-canvas px-3 text-sm">
+                <label className="flex h-[42px] cursor-pointer items-center gap-2.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3 text-sm">
                   <input
                     type="checkbox"
                     checked={newBuild}
@@ -414,21 +414,21 @@ export function PurchaseCalculator({
                   />
                   <span className="font-medium text-ink-950">Yeni bina (müteahhitten ilk el)</span>
                 </label>
-                <p className="mt-1 text-[11px] text-text-faint">İşaretliyse fiyata KDV eklenir; ikinci elde KDV yok.</p>
+                <p className="mt-1 text-xs text-text-faint">İşaretliyse fiyata KDV eklenir; ikinci elde KDV yok.</p>
               </div>
             </div>
           </div>
         </section>
 
         {costs.exceedsLoanToValue ? (
-          <p className="flex items-start gap-2 rounded-[12px] border border-amber-400/30 bg-amber-400/8 px-3 py-2.5 text-xs text-amber-700">
+          <p className="flex items-start gap-2 rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/8 px-3 py-2.5 text-xs text-amber-700">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             Kredi tutarı konut değerinin %{costs.loanToValuePct}&apos;ine denk geliyor. Konut kredisinde kredi/değer
             oranı yasal olarak en çok %{MAX_LOAN_TO_VALUE_PCT} olabilir — peşinatı artırmanız gerekebilir.
           </p>
         ) : null}
 
-        <Tabs defaultValue={initial.tab} className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <Tabs defaultValue={initial.tab} className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <TabsList>
             <TabsTrigger value="maliyet">
               <Receipt /> Alım maliyeti
@@ -441,14 +441,14 @@ export function PurchaseCalculator({
           {/* ------------------------- Alım maliyeti ------------------------- */}
           <TabsContent value="maliyet" className="mt-4">
             {costs.lines.length === 0 ? (
-              <p className="rounded-[12px] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
+              <p className="rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
                 Satış bedelini girin — masraf dökümü burada oluşur.
               </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[520px] text-sm">
                   <thead>
-                    <tr className="border-b border-line text-left text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
+                    <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
                       <th className="py-2.5 pr-3">Kalem</th>
                       <th className="py-2.5 text-right">Tutar</th>
                     </tr>
@@ -458,7 +458,7 @@ export function PurchaseCalculator({
                       <tr key={l.key}>
                         <td className="py-3 pr-3">
                           <p className="font-semibold text-ink-950">{l.label}</p>
-                          <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">{l.note}</p>
+                          <p className="mt-0.5 text-xs leading-relaxed text-text-muted">{l.note}</p>
                         </td>
                         <td className="numeric whitespace-nowrap py-3 text-right align-top font-bold tabular-nums text-ink-950">
                           {formatTry(l.amount)}
@@ -468,7 +468,7 @@ export function PurchaseCalculator({
                     <tr className="bg-canvas/60">
                       <td className="py-3 pr-3 font-display font-extrabold text-ink-950">
                         Masraf toplamı
-                        <span className="ml-2 text-[11px] font-semibold text-text-muted">
+                        <span className="ml-2 text-xs font-semibold text-text-muted">
                           fiyatın ~%{costs.costsPctOfPrice}&apos;i
                         </span>
                       </td>
@@ -481,7 +481,7 @@ export function PurchaseCalculator({
                 </table>
               </div>
             )}
-            <ul className="mt-4 space-y-1 text-[11px] leading-relaxed text-text-faint">
+            <ul className="mt-4 space-y-1 text-xs leading-relaxed text-text-faint">
               {costs.notes.map((n) => (
                 <li key={n}>• {n}</li>
               ))}
@@ -491,7 +491,7 @@ export function PurchaseCalculator({
           {/* --------------------------- Kredi ------------------------------ */}
           <TabsContent value="kredi" className="mt-4">
             {loan.monthlyPayment <= 0 ? (
-              <p className="rounded-[12px] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
+              <p className="rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
                 Peşinat satış bedelinin tamamını karşılıyor — kredi kullanılmıyor. Peşinatı düşürürseniz taksit planı
                 burada oluşur.
               </p>
@@ -503,8 +503,8 @@ export function PurchaseCalculator({
                     { label: "Aylık taksit", value: formatTry(loan.monthlyPayment) },
                     { label: "Toplam geri ödeme", value: formatTry(loan.totalPayment) },
                   ].map((k) => (
-                    <div key={k.label} className="rounded-[14px] border border-line bg-canvas/60 p-3">
-                      <p className="text-[11px] text-text-muted">{k.label}</p>
+                    <div key={k.label} className="rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3">
+                      <p className="text-xs text-text-muted">{k.label}</p>
                       <p className="numeric mt-1 font-display text-lg font-extrabold tabular-nums text-ink-950">
                         {k.value}
                       </p>
@@ -513,13 +513,13 @@ export function PurchaseCalculator({
                 </div>
 
                 <h3 className="mt-5 text-sm font-bold text-ink-950">İlk 12 taksitin kırılımı</h3>
-                <p className="mt-0.5 text-[11px] text-text-muted">
+                <p className="mt-0.5 text-xs text-text-muted">
                   Başlangıçta taksidin büyük kısmı faize gider; anapara payı vade ilerledikçe artar.
                 </p>
                 <div className="mt-3 overflow-x-auto">
                   <table className="w-full min-w-[520px] text-sm">
                     <thead>
-                      <tr className="border-b border-line text-left text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
+                      <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
                         <th className="py-2.5 pr-3">Taksit</th>
                         <th className="py-2.5 pr-3 text-right">Anapara</th>
                         <th className="py-2.5 pr-3 text-right">Faiz</th>
@@ -544,7 +544,7 @@ export function PurchaseCalculator({
                     </tbody>
                   </table>
                 </div>
-                <p className="mt-3 text-[11px] leading-relaxed text-text-faint">{loan.note}</p>
+                <p className="mt-3 text-xs leading-relaxed text-text-faint">{loan.note}</p>
               </>
             )}
           </TabsContent>
@@ -553,21 +553,21 @@ export function PurchaseCalculator({
 
       {/* ------------------------------ SAĞ: özet --------------------------- */}
       <div className="lg:sticky lg:top-6 lg:self-start">
-        <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <PiggyBank className="h-4 w-4 text-mint-600" /> Özet
           </h2>
 
           <div className="mt-4 space-y-3">
             {summary.map((s) => (
-              <div key={s.label} className={`rounded-[14px] border p-4 ${toneCls[s.tone]}`}>
-                <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.08em]">
+              <div key={s.label} className={`rounded-[var(--radius-card)] border p-4 ${toneCls[s.tone]}`}>
+                <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em]">
                   <s.icon className="h-3.5 w-3.5" /> {s.label}
                 </p>
                 <p className="numeric mt-1.5 font-display text-2xl font-extrabold tabular-nums text-ink-950">
                   {s.value}
                 </p>
-                <p className="mt-0.5 text-[11px] text-text-muted">{s.hint}</p>
+                <p className="mt-0.5 text-xs text-text-muted">{s.hint}</p>
               </div>
             ))}
           </div>
@@ -575,16 +575,16 @@ export function PurchaseCalculator({
           <button
             type="button"
             onClick={copyShareLink}
-            className="btn-shine focus-ring press mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[11px] bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-600/90"
+            className="btn-shine focus-ring press mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-600/90"
           >
             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             {copied ? "Link kopyalandı" : "Müşteriye gönder (link kopyala)"}
           </button>
-          <p className="mt-2 text-center text-[11px] text-text-faint">
+          <p className="mt-2 text-center text-xs text-text-faint">
             Link bu hesabın tüm parametrelerini taşır — müşteri açtığında aynı sonucu görür.
           </p>
 
-          <p className="mt-4 flex items-start gap-2 rounded-[12px] border border-amber-400/30 bg-amber-400/8 px-3 py-2.5 text-[11px] leading-relaxed text-amber-700">
+          <p className="mt-4 flex items-start gap-2 rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/8 px-3 py-2.5 text-xs leading-relaxed text-amber-700">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {APPROX_DISCLAIMER}
           </p>

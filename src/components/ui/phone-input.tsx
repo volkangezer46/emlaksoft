@@ -52,7 +52,7 @@ export function PhoneInput(props: PhoneInputProps) {
 
   const inputClassName =
     className ??
-    "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400";
+    "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400";
 
   return (
     <input

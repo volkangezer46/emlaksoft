@@ -49,7 +49,7 @@ export function LogoUploadForm({
   return (
     <div className="flex items-center gap-5">
       {/* Önizleme */}
-      <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-line bg-canvas">
+      <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas">
         {preview ? (
           <Image
             src={preview}
@@ -78,7 +78,7 @@ export function LogoUploadForm({
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={pending}
-            className="inline-flex items-center gap-1.5 rounded-[9px] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:bg-surface disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:bg-surface disabled:opacity-50"
           >
             <Upload className="h-3.5 w-3.5" />
             {preview ? "Değiştir" : "Yükle"}
@@ -89,7 +89,7 @@ export function LogoUploadForm({
               type="button"
               onClick={handleDelete}
               disabled={pending}
-              className="inline-flex items-center gap-1.5 rounded-[9px] border border-line px-3 py-2 text-xs font-semibold text-danger-500 transition hover:border-danger-500/30 hover:bg-danger-500/5 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-danger-500 transition hover:border-danger-500/30 hover:bg-danger-500/5 disabled:opacity-50"
             >
               <Trash2 className="h-3.5 w-3.5" /> Sil
             </button>

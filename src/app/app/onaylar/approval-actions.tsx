@@ -20,7 +20,7 @@ import {
 const init: ApprovalResult = {};
 
 const fieldCls =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
 /**
  * Onay / ret kararı.
@@ -50,7 +50,7 @@ export function DecisionDialog({
       <DialogTrigger asChild>
         <button
           type="button"
-          className={`focus-ring press inline-flex items-center gap-1.5 rounded-[9px] px-3 py-1.5 text-xs font-semibold transition ${
+          className={`focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold transition ${
             red
               ? "border border-danger-500/30 bg-danger-500/8 text-danger-600 hover:bg-danger-500/15"
               : "bg-mint-500/12 text-mint-700 hover:bg-mint-500/20"
@@ -90,7 +90,7 @@ export function DecisionDialog({
           </div>
 
           {state?.error ? (
-            <p className="rounded-[10px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
+            <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
               {state.error}
             </p>
           ) : null}
@@ -99,7 +99,7 @@ export function DecisionDialog({
             <DialogClose asChild>
               <button
                 type="button"
-                className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+                className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:bg-canvas"
               >
                 Vazgeç
               </button>
@@ -107,7 +107,7 @@ export function DecisionDialog({
             <button
               type="submit"
               disabled={isPending}
-              className={`focus-ring press inline-flex items-center gap-2 rounded-[10px] px-5 py-2.5 text-sm font-semibold text-white transition disabled:opacity-50 ${
+              className={`focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] px-5 py-2.5 text-sm font-semibold text-white transition disabled:opacity-50 ${
                 red ? "bg-danger-500 hover:bg-danger-600" : "bg-mint-600 hover:bg-mint-700"
               }`}
             >
@@ -141,13 +141,13 @@ export function CancelApprovalButton({ requestId, requestTitle }: { requestId: s
         trigger={
           <button
             type="button"
-            className="focus-ring press inline-flex items-center gap-1.5 rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-danger-500/40 hover:text-danger-600"
+            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-danger-500/40 hover:text-danger-600"
           >
             <Undo2 className="h-3.5 w-3.5" /> İptal et
           </button>
         }
       />
-      {error ? <span className="text-[11px] font-semibold text-danger-600">{error}</span> : null}
+      {error ? <span className="text-xs font-semibold text-danger-600">{error}</span> : null}
     </>
   );
 }
@@ -166,18 +166,18 @@ export function ApprovalCommentForm({ requestId }: { requestId: string }) {
         required
         maxLength={2000}
         placeholder="Not ekle…"
-        className="min-w-0 flex-1 rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+        className="min-w-0 flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
       />
       <button
         type="submit"
         disabled={isPending}
-        className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
+        className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
       >
         {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
         Gönder
       </button>
       {state?.error ? (
-        <p className="w-full text-[11px] font-semibold text-danger-600" role="alert">{state.error}</p>
+        <p className="w-full text-xs font-semibold text-danger-600" role="alert">{state.error}</p>
       ) : null}
     </form>
   );

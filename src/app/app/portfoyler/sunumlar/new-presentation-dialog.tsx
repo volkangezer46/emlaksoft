@@ -173,8 +173,8 @@ export function NewPresentationDialog({
         {createdUrl ? (
           <>
             <DialogBody>
-              <div className="rounded-[16px] border border-mint-500/30 bg-mint-500/5 p-5 text-center">
-                <span className="mx-auto grid h-11 w-11 place-items-center rounded-[13px] bg-mint-500/15 text-mint-600">
+              <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/5 p-5 text-center">
+                <span className="mx-auto grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-mint-500/15 text-mint-600">
                   <Check className="h-5 w-5" />
                 </span>
                 <p className="mt-3 font-display text-base font-bold text-ink-950">Sunum hazır</p>
@@ -182,7 +182,7 @@ export function NewPresentationDialog({
                   Linki kopyalayıp WhatsApp&apos;tan gönderin — müşteri telefonda sunum gibi gezer,
                   yazdırınca A4 dosya olur.
                 </p>
-                <p className="numeric mt-3 select-all break-all rounded-[10px] border border-line bg-canvas px-3 py-2 text-xs text-ink-950">
+                <p className="numeric mt-3 select-all break-all rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs text-ink-950">
                   {createdUrl}
                 </p>
                 <div className="mt-3 flex justify-center gap-2">
@@ -194,7 +194,7 @@ export function NewPresentationDialog({
                     href={createdUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-hairline-strong bg-surface px-3 text-xs font-semibold text-ink-950 hover:bg-canvas"
+                    className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-3 text-xs font-semibold text-ink-950 hover:bg-canvas"
                   >
                     <ExternalLink className="h-3.5 w-3.5" /> Önizle
                   </a>
@@ -223,7 +223,7 @@ export function NewPresentationDialog({
                     required
                     maxLength={120}
                     placeholder="Örn. Kadıköy 3+1 seçkisi"
-                    className="mt-1 w-full rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+                    className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
                   />
                 </label>
                 {/*
@@ -253,7 +253,7 @@ export function NewPresentationDialog({
                       onBlur={() => setTimeout(() => setCustomerFocused(false), 150)}
                       maxLength={120}
                       placeholder="Örn. Ayşe Yılmaz"
-                      className={`mt-1 w-full rounded-[11px] border bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface ${
+                      className={`mt-1 w-full rounded-[var(--radius-control)] border bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface ${
                         pickedCustomer ? "border-mint-500/50 pr-9" : "border-line"
                       }`}
                     />
@@ -269,17 +269,17 @@ export function NewPresentationDialog({
                         }}
                         title="Müşteri bağını kaldır"
                         aria-label="Müşteri bağını kaldır"
-                        className="focus-ring absolute right-2 top-[30px] grid h-7 w-7 place-items-center rounded-[8px] text-text-faint transition hover:bg-canvas hover:text-ink-950"
+                        className="focus-ring absolute right-2 top-[30px] grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950"
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
-                      <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-mint-600">
+                      <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-mint-600">
                         <Check className="h-3 w-3" /> Müşteri kartına bağlanacak
                       </p>
                     </>
                   ) : null}
                   {showSuggestions ? (
-                    <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-[12px] border border-line bg-surface shadow-[var(--shadow-lg)]">
+                    <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-lg)]">
                       {customerMatches.map((c) => (
                         <li key={c.id}>
                           <button
@@ -297,7 +297,7 @@ export function NewPresentationDialog({
                               {c.name}
                             </span>
                             {c.phone ? (
-                              <span className="numeric shrink-0 text-[11px] text-text-faint">{c.phone}</span>
+                              <span className="numeric shrink-0 text-xs text-text-faint">{c.phone}</span>
                             ) : null}
                           </button>
                         </li>
@@ -313,7 +313,7 @@ export function NewPresentationDialog({
                   rows={2}
                   maxLength={500}
                   placeholder="Örn. Görüşmemizde konuştuğumuz kriterlere uyan portföyleri sizin için derledim."
-                  className="mt-1 w-full resize-none rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+                  className="mt-1 w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
                 />
               </label>
 
@@ -333,10 +333,10 @@ export function NewPresentationDialog({
                     onChange={(e) => setQuery(e.target.value)}
                     aria-label="Portföy ara"
                     placeholder="Kod, başlık veya ilçe ara…"
-                    className="w-full rounded-[11px] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+                    className="w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
                   />
                 </div>
-                <div className="mt-2 max-h-56 space-y-1 overflow-y-auto rounded-[12px] border border-line bg-canvas p-1.5">
+                <div className="mt-2 max-h-56 space-y-1 overflow-y-auto rounded-[var(--radius-card)] border border-line bg-canvas p-1.5">
                   {properties.length === 0 ? (
                     <p className="px-3 py-6 text-center text-sm text-text-muted">
                       Yayında portföy yok — sunuma eklemek için önce bir portföyü yayına alın.
@@ -350,7 +350,7 @@ export function NewPresentationDialog({
                       return (
                         <label
                           key={p.id}
-                          className={`flex cursor-pointer items-center gap-3 rounded-[10px] px-3 py-2 transition ${
+                          className={`flex cursor-pointer items-center gap-3 rounded-[var(--radius-control)] px-3 py-2 transition ${
                             checked ? "bg-brand-600/8 ring-1 ring-brand-300/60" : "hover:bg-surface"
                           } ${full ? "cursor-not-allowed opacity-45" : ""}`}
                         >
@@ -365,7 +365,7 @@ export function NewPresentationDialog({
                             <span className="block truncate text-sm font-semibold text-ink-950">
                               {p.title ?? p.code}
                             </span>
-                            <span className="block text-[11px] text-text-muted">
+                            <span className="block text-xs text-text-muted">
                               {p.code}
                               {p.district ? ` · ${p.district}` : ""} · {money(p.price, p.tx)}
                             </span>

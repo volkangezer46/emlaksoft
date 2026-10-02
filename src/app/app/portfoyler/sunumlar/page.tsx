@@ -163,7 +163,7 @@ export default async function PresentationsPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="relative flex flex-wrap items-start justify-between gap-5">
           <div>
@@ -182,13 +182,13 @@ export default async function PresentationsPage({
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="rounded-[14px] border border-white/10 bg-white/5 px-4 py-2.5 text-center backdrop-blur">
+            <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-2.5 text-center backdrop-blur">
               <p className="font-display text-xl font-extrabold text-white">{presentations.length}</p>
-              <p className="text-[11px] text-white/50">Sunum</p>
+              <p className="text-xs text-white/50">Sunum</p>
             </div>
-            <div className="rounded-[14px] border border-white/10 bg-white/5 px-4 py-2.5 text-center backdrop-blur">
+            <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-2.5 text-center backdrop-blur">
               <p className="font-display text-xl font-extrabold text-mint-400">{totalViews}</p>
-              <p className="text-[11px] text-white/50">Görüntülenme</p>
+              <p className="text-xs text-white/50">Görüntülenme</p>
             </div>
             <NewPresentationDialog
               properties={liveProperties}
@@ -201,8 +201,8 @@ export default async function PresentationsPage({
       </section>
 
       {presentations.length === 0 ? (
-        <div className="grid place-items-center rounded-[20px] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
-          <span className="grid h-16 w-16 place-items-center rounded-[18px] bg-brand-600/10 text-brand-600">
+        <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
+          <span className="grid h-16 w-16 place-items-center rounded-[var(--radius-panel)] bg-brand-600/10 text-brand-600">
             <MonitorPlay className="h-8 w-8" />
           </span>
           <h2 className="mt-5 font-display text-xl font-bold text-ink-950">İlk sunumunuzu hazırlayın</h2>

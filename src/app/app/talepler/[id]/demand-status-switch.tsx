@@ -53,7 +53,7 @@ export function DemandStatusSwitch({
               disabled={pending || active}
               onClick={() => apply(s.value)}
               aria-pressed={active}
-              className={`focus-ring press rounded-full px-3 py-1.5 text-[11px] font-bold transition disabled:cursor-default ${
+              className={`focus-ring press rounded-full px-3 py-1.5 text-xs font-bold transition disabled:cursor-default ${
                 active
                   ? s.activeCls
                   : "border border-line bg-surface text-text-muted hover:border-brand-400 hover:text-brand-600 disabled:opacity-50"

@@ -97,20 +97,20 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
         <ArrowLeft className="h-4 w-4" /> Ekip
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/30 blur-[70px]" />
         <div className="relative flex flex-wrap items-center justify-between gap-5">
           <div className="flex items-center gap-4">
-            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-[20px] bg-[image:var(--grad-brand)] font-display text-xl font-extrabold text-white shadow-[var(--shadow-glow-brand)]">
+            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-[var(--radius-panel)] bg-[image:var(--grad-brand)] font-display text-xl font-extrabold text-white shadow-[var(--shadow-glow-brand)]">
               {initials(member.full_name)}
             </span>
             <div>
               <h1 className="font-display text-2xl font-extrabold text-white md:text-3xl">{member.full_name}</h1>
               <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/70">
-                <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold">{ROLE_LABELS[member.role] ?? member.role}</span>
+                <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-semibold">{ROLE_LABELS[member.role] ?? member.role}</span>
                 {branch ? <span>{branch}</span> : null}
-                {!member.is_active ? <span className="rounded-full bg-danger-500/20 px-2 py-0.5 text-[11px] font-bold text-danger-400">Pasif</span> : null}
+                {!member.is_active ? <span className="rounded-full bg-danger-500/20 px-2 py-0.5 text-xs font-bold text-danger-400">Pasif</span> : null}
               </p>
               {member.phone ? (
                 <a href={`tel:${member.phone}`} className="mt-2 inline-flex items-center gap-1.5 text-sm text-white/70 hover:text-mint-300">
@@ -121,9 +121,9 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
           </div>
           <Link
             href="/app/komisyon"
-            className="focus-ring press lift group block rounded-[16px] border border-white/12 bg-white/8 px-5 py-4 text-center hover:border-white/30"
+            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/12 bg-white/8 px-5 py-4 text-center hover:border-white/30"
           >
-            <p className="flex items-center justify-center gap-1.5 text-[11px] text-white/60"><Wallet className="h-3.5 w-3.5" /> Bu ay komisyon</p>
+            <p className="flex items-center justify-center gap-1.5 text-xs text-white/60"><Wallet className="h-3.5 w-3.5" /> Bu ay komisyon</p>
             <p className="mt-1 flex items-center justify-center gap-1 font-display text-2xl font-extrabold text-mint-300">
               {money(myCommission)}
               <ArrowUpRight className="hover-action h-4 w-4 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
@@ -137,7 +137,7 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
           <Link
             key={s.label}
             href={s.href}
-            className="focus-ring press lift group block rounded-[16px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] hover:border-brand-300"
+            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] hover:border-brand-300"
           >
             <span className="flex items-start justify-between">
               <s.icon className={`h-4 w-4 ${s.tone}`} />
@@ -151,7 +151,7 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
 
       {/* İş yükü devri — ayrılan/pasife alınan danışmanın müşteri + portföyünü aktar (C.5) */}
       {canHandoff ? (
-        <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <ArrowLeftRight className="h-4 w-4 text-brand-600" /> İş yükünü devret
           </h2>
@@ -171,7 +171,7 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Müşteriler */}
-        <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950"><Users className="h-4 w-4 text-brand-600" /> Müşteriler <span className="ml-auto text-xs text-text-muted">{customerCount ?? 0}</span></h2>
           {cust.length === 0 ? (
             <p className="py-8 text-center text-sm text-text-muted">Atanmış müşteri yok.</p>
@@ -180,7 +180,7 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
               <ul className="space-y-1.5">
                 {cust.map((c) => (
                   <li key={c.id}>
-                    <Link href={`/app/musteriler/${c.id}`} className="group flex items-center justify-between rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm transition hover:border-brand-400 hover:bg-brand-600/[0.03]">
+                    <Link href={`/app/musteriler/${c.id}`} className="group flex items-center justify-between rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm transition hover:border-brand-400 hover:bg-brand-600/[0.03]">
                       <span className="font-medium text-ink-950 group-hover:text-brand-600">{c.full_name}</span>
                       <span className="flex items-center gap-2 text-xs text-text-muted">
                         {c.phone ? formatTurkishPhone(c.phone) : "—"} <ArrowUpRight className="hover-action h-3.5 w-3.5 opacity-0 transition group-hover:opacity-100" />
@@ -191,7 +191,7 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
               </ul>
               <Link
                 href={`/app/musteriler?assigned=${id}`}
-                className="focus-ring mt-3 inline-flex items-center gap-1 rounded-[8px] text-xs font-semibold text-brand-600 hover:underline"
+                className="focus-ring mt-3 inline-flex items-center gap-1 rounded-[var(--radius-control)] text-xs font-semibold text-brand-600 hover:underline"
               >
                 Tümünü gör ({customerCount ?? 0}) <ArrowUpRight className="h-3.5 w-3.5" />
               </Link>
@@ -200,7 +200,7 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
         </section>
 
         {/* Portföyler */}
-        <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950"><Building2 className="h-4 w-4 text-mint-600" /> Portföyler <span className="ml-auto text-xs text-text-muted">{propertyCount ?? 0}</span></h2>
           {props.length === 0 ? (
             <p className="py-8 text-center text-sm text-text-muted">Atanmış portföy yok.</p>
@@ -209,7 +209,7 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
               <ul className="space-y-1.5">
                 {props.map((p) => (
                   <li key={p.id}>
-                    <Link href={`/app/portfoyler/${p.id}`} className="group flex items-center justify-between rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm transition hover:border-brand-400 hover:bg-brand-600/[0.03]">
+                    <Link href={`/app/portfoyler/${p.id}`} className="group flex items-center justify-between rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm transition hover:border-brand-400 hover:bg-brand-600/[0.03]">
                       <span className="min-w-0 truncate font-medium text-ink-950 group-hover:text-brand-600">{p.title ?? p.property_code}</span>
                       <span className="flex shrink-0 items-center gap-2 text-xs text-text-muted">
                         {p.list_price ? money(Number(p.list_price)) : "—"} <ArrowUpRight className="hover-action h-3.5 w-3.5 opacity-0 transition group-hover:opacity-100" />
@@ -220,7 +220,7 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
               </ul>
               <Link
                 href="/app/portfoyler"
-                className="focus-ring mt-3 inline-flex items-center gap-1 rounded-[8px] text-xs font-semibold text-brand-600 hover:underline"
+                className="focus-ring mt-3 inline-flex items-center gap-1 rounded-[var(--radius-control)] text-xs font-semibold text-brand-600 hover:underline"
               >
                 Tümünü gör ({propertyCount ?? 0}) <ArrowUpRight className="h-3.5 w-3.5" />
               </Link>

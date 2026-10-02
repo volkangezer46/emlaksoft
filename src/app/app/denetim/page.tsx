@@ -240,12 +240,12 @@ export default async function AuditPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -left-10 bottom-0 h-48 w-48 rounded-full bg-danger-500/20 blur-[80px]" />
         <div className="relative grid gap-6 lg:grid-cols-[1.2fr_1fr] lg:items-center">
           <div>
-            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-danger-300">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-danger-300">
               <Shield className="h-3.5 w-3.5" /> KVKK / denetim izi
             </p>
             <h1 className="mt-2 font-display text-3xl font-extrabold">Denetim kayıtları</h1>
@@ -273,19 +273,19 @@ export default async function AuditPage({
                 <a
                   key={k.label}
                   href={k.href}
-                  className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 transition hover:border-white/30"
+                  className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 transition hover:border-white/30"
                 >
                   <span className="flex items-start justify-between">
                     <k.icon className={`h-4 w-4 ${k.tone}`} />
                     <ArrowUpRight className="h-4 w-4 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
                   </span>
                   <p className="numeric mt-1 font-display text-xl font-extrabold">{k.value}</p>
-                  <p className="text-[11px] text-white/45">{k.label}</p>
+                  <p className="text-xs text-white/45">{k.label}</p>
                 </a>
               ))}
             </div>
           </div>
-          <div className="rounded-[16px] border border-white/10 bg-white/[0.04] p-4">
+          <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4">
             <p className="text-xs font-semibold text-white/70">Aktivite · son 24 saat (2s dilim)</p>
             <div className="mt-4 flex h-28 items-end gap-1.5">
               {buckets.map((b, i) => (
@@ -300,7 +300,7 @@ export default async function AuditPage({
         </div>
       </section>
 
-      <section id="akis" className="scroll-mt-24 overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+      <section id="akis" className="scroll-mt-24 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
           <div>
             <h2 className="font-display font-bold text-ink-950">Olay akışı</h2>
@@ -318,7 +318,7 @@ export default async function AuditPage({
             type="date"
             defaultValue={fromF}
             aria-label="Başlangıç tarihi"
-            className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+            className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
           />
           <span className="text-text-faint">—</span>
           <input
@@ -326,13 +326,13 @@ export default async function AuditPage({
             type="date"
             defaultValue={toF}
             aria-label="Bitiş tarihi"
-            className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+            className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
           />
           <select
             name="aktor"
             defaultValue={aktorF}
             aria-label="Aktör filtresi"
-            className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+            className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
           >
             <option value="">Tüm aktörler</option>
             {actorOptions.map((a) => (
@@ -343,13 +343,13 @@ export default async function AuditPage({
             name="risk"
             defaultValue={riskF}
             aria-label="Risk filtresi"
-            className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+            className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
           >
             <option value="">Tüm riskler</option>
             <option value="yuksek">Yüksek risk</option>
             <option value="orta">Orta risk</option>
           </select>
-          <button type="submit" className="focus-ring press rounded-[9px] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700">
+          <button type="submit" className="focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700">
             Filtrele
           </button>
           {hasFilter ? (
@@ -382,7 +382,7 @@ export default async function AuditPage({
           <div>
             {dayGroups.map((g) => (
               <div key={g.day}>
-                <p className="border-y border-line bg-canvas/60 px-5 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
+                <p className="border-y border-line bg-canvas/60 px-5 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
                   {g.day}
                 </p>
                 <div className="divide-y divide-line">
@@ -408,7 +408,7 @@ export default async function AuditPage({
                         <Link
                           href={`/app/denetim?risk=${risk}`}
                           title="Bu risk seviyesine göre filtrele"
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition hover:ring-1 hover:ring-brand-300 ${riskChip[risk].cls}`}
+                          className={`rounded-full px-2 py-0.5 text-xs font-bold transition hover:ring-1 hover:ring-brand-300 ${riskChip[risk].cls}`}
                         >
                           {riskChip[risk].label}
                         </Link>
@@ -417,16 +417,16 @@ export default async function AuditPage({
                     {entityRoute && r.entity_id ? (
                       <Link
                         href={`${entityRoute}/${r.entity_id}`}
-                        className="focus-ring group mt-0.5 inline-flex items-center gap-1 text-[11px] text-text-muted transition hover:text-brand-600"
+                        className="focus-ring group mt-0.5 inline-flex items-center gap-1 text-xs text-text-muted transition hover:text-brand-600"
                       >
                         {entityLine}
                         <ArrowUpRight className="hover-action h-3 w-3 opacity-0 transition group-hover:opacity-100" />
                       </Link>
                     ) : (
-                      <p className="mt-0.5 text-[11px] text-text-muted">{entityLine}</p>
+                      <p className="mt-0.5 text-xs text-text-muted">{entityLine}</p>
                     )}
                   </div>
-                  <p className="truncate text-[11px] text-text-muted" title={diffPreview(r.old_value, r.new_value)}>
+                  <p className="truncate text-xs text-text-muted" title={diffPreview(r.old_value, r.new_value)}>
                     {diffPreview(r.old_value, r.new_value)}
                   </p>
                   {actorName && r.actor_id ? (
@@ -455,21 +455,21 @@ export default async function AuditPage({
         {totalPages > 1 ? (
           <nav aria-label="Sayfalama" className="flex items-center justify-between gap-3 border-t border-line px-5 py-3">
             {page > 1 ? (
-              <Link href={pageHref(page - 1)} className="focus-ring press rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+              <Link href={pageHref(page - 1)} className="focus-ring press rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
                 ← Önceki
               </Link>
             ) : (
-              <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">← Önceki</span>
+              <span className="rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">← Önceki</span>
             )}
             <span className="text-xs tabular-nums text-text-muted">
               Sayfa {page} / {totalPages} · toplam {total.toLocaleString("tr-TR")} kayıt
             </span>
             {page < totalPages ? (
-              <Link href={pageHref(page + 1)} className="focus-ring press rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+              <Link href={pageHref(page + 1)} className="focus-ring press rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
                 Sonraki →
               </Link>
             ) : (
-              <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">Sonraki →</span>
+              <span className="rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">Sonraki →</span>
             )}
           </nav>
         ) : null}

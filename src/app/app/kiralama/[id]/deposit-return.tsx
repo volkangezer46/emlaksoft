@@ -35,7 +35,7 @@ export function DepositReturnControl({
       : null;
     return (
       <span className="inline-flex items-center gap-1.5">
-        <span className="inline-flex items-center gap-1 rounded-full bg-mint-500/20 px-2 py-0.5 text-[11px] font-bold text-mint-300">
+        <span className="inline-flex items-center gap-1 rounded-full bg-mint-500/20 px-2 py-0.5 text-xs font-bold text-mint-300">
           <CheckCircle2 className="h-3 w-3" /> İade edildi{dateLabel ? ` · ${dateLabel}` : ""}
         </span>
         <button
@@ -43,7 +43,7 @@ export function DepositReturnControl({
           disabled={pending}
           onClick={() => set(false)}
           title="İadeyi geri al"
-          className="focus-ring grid h-6 w-6 place-items-center rounded-[8px] text-white/50 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+          className="focus-ring grid h-6 w-6 place-items-center rounded-[var(--radius-control)] text-white/50 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
         >
           {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
         </button>
@@ -56,7 +56,7 @@ export function DepositReturnControl({
       type="button"
       disabled={pending}
       onClick={() => set(true)}
-      className="focus-ring press inline-flex items-center gap-1.5 rounded-[9px] border border-mint-400/30 bg-mint-500/12 px-2.5 py-1 text-[11px] font-bold text-mint-300 transition hover:border-mint-400/50 hover:bg-mint-500/20 disabled:opacity-60"
+      className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-mint-400/30 bg-mint-500/12 px-2.5 py-1 text-xs font-bold text-mint-300 transition hover:border-mint-400/50 hover:bg-mint-500/20 disabled:opacity-60"
     >
       {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
       Depozito iade edildi

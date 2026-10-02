@@ -4,12 +4,12 @@ export default function Loading() {
       <div className="h-12 w-72 rounded bg-white/10" />
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-40 rounded-[20px] bg-white/10" />
+          <div key={i} className="h-40 rounded-[var(--radius-panel)] bg-white/10" />
         ))}
       </div>
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <div className="h-72 rounded-[20px] bg-white/10" />
-        <div className="h-72 rounded-[20px] bg-white/10" />
+        <div className="h-72 rounded-[var(--radius-panel)] bg-white/10" />
+        <div className="h-72 rounded-[var(--radius-panel)] bg-white/10" />
       </div>
     </div>
   );

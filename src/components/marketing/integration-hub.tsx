@@ -63,7 +63,7 @@ export function IntegrationHub() {
 
       {/* center node */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-        <div className="pulse-ring grid h-20 w-20 place-items-center rounded-[22px] bg-[image:var(--grad-brand)] shadow-[var(--shadow-glow-brand)]">
+        <div className="pulse-ring grid h-20 w-20 place-items-center rounded-[var(--radius-panel)] bg-[image:var(--grad-brand)] shadow-[var(--shadow-glow-brand)]">
           <span className="font-display text-3xl font-extrabold text-white">E</span>
         </div>
       </div>
@@ -78,10 +78,10 @@ export function IntegrationHub() {
             style={{ left: `${p.x}%`, top: `${p.y}%` }}
           >
             <div className="lift flex flex-col items-center gap-1.5">
-              <span className="grid h-12 w-12 place-items-center rounded-[14px] border border-white/12 bg-white/8 backdrop-blur">
+              <span className="grid h-12 w-12 place-items-center rounded-[var(--radius-card)] border border-white/12 bg-white/8 backdrop-blur">
                 <node.icon className={`h-5 w-5 ${node.tone}`} />
               </span>
-              <span className="rounded-full bg-ink-950/60 px-2 py-0.5 text-[10px] font-semibold text-white/70 backdrop-blur">{node.name}</span>
+              <span className="rounded-full bg-ink-950/60 px-2 py-0.5 text-xs font-semibold text-white/70 backdrop-blur">{node.name}</span>
             </div>
           </div>
         );

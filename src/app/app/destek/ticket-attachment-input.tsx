@@ -136,8 +136,8 @@ export function TicketAttachmentInput({
     <div className="space-y-2">
       <label
         htmlFor={id}
-        className={`focus-ring press inline-flex cursor-pointer items-center gap-2 rounded-[10px] border border-line bg-surface font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 ${
-          compact ? "px-2.5 py-1.5 text-[11px]" : "px-3 py-2 text-xs"
+        className={`focus-ring press inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 ${
+          compact ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-xs"
         } ${disabled ? "pointer-events-none opacity-50" : ""}`}
       >
         <Paperclip className="h-3.5 w-3.5" aria-hidden /> Dosya ekle
@@ -174,14 +174,14 @@ export function TicketAttachmentInput({
       {names.length ? (
         <div className="flex flex-wrap gap-1.5" aria-live="polite">
           {names.map((name) => (
-            <span key={name} className="inline-flex max-w-56 items-center gap-1 rounded-full bg-mint-500/10 px-2 py-1 text-[10px] font-semibold text-mint-700">
+            <span key={name} className="inline-flex max-w-56 items-center gap-1 rounded-full bg-mint-500/10 px-2 py-1 text-xs font-semibold text-mint-700">
               <FileCheck2 className="h-3 w-3 shrink-0" aria-hidden />
               <span className="truncate">{name}</span>
             </span>
           ))}
         </div>
       ) : (
-        <p className="flex items-center gap-1.5 text-[10px] text-text-faint">
+        <p className="flex items-center gap-1.5 text-xs text-text-faint">
           <ShieldCheck className="h-3 w-3 text-mint-600" aria-hidden /> PDF, JPEG, PNG, WebP, TXT veya CSV · en fazla 10 MB · 5 dosya
         </p>
       )}

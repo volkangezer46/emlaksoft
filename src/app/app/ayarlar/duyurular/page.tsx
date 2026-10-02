@@ -62,7 +62,7 @@ export default async function AnnouncementsSettingsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/35 blur-[80px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -76,11 +76,11 @@ export default async function AnnouncementsSettingsPage() {
               dashboard&apos;unda görünür; kim okudu buradan takip edilir.
             </p>
           </div>
-          <div className="flex items-center gap-3 rounded-[14px] border border-white/12 bg-white/[0.05] px-5 py-3">
+          <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-5 py-3">
             <Users2 className="h-5 w-5 text-mint-300" />
             <div>
               <p className="font-display text-xl font-extrabold text-mint-300">{activeCount}</p>
-              <p className="text-[11px] text-white/55">yayında duyuru</p>
+              <p className="text-xs text-white/55">yayında duyuru</p>
             </div>
           </div>
         </div>

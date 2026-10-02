@@ -91,9 +91,9 @@ export default async function SecuritySettingsPage() {
       </div>
 
       {/* 2FA */}
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-4 md:p-6">
+      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center gap-3 border-b border-line pb-4">
-          <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-mint-500/12 text-mint-600">
+          <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-mint-500/12 text-mint-600">
             <ShieldCheck className="h-5 w-5" />
           </span>
           <div>
@@ -113,9 +113,9 @@ export default async function SecuritySettingsPage() {
       </section>
 
       {/* Son girişler */}
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-4 md:p-6">
+      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center gap-3 border-b border-line pb-4">
-          <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-brand-600/10 text-brand-600">
+          <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
             <History className="h-5 w-5" />
           </span>
           <div>
@@ -132,7 +132,7 @@ export default async function SecuritySettingsPage() {
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[560px] text-sm">
               <thead>
-                <tr className="border-b border-line text-left text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
+                <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
                   <th className="py-2.5 pr-4">Tarih</th>
                   <th className="py-2.5 pr-4">IP adresi</th>
                   <th className="py-2.5 pr-4">Cihaz</th>

@@ -64,7 +64,7 @@ export function SubscriptionPanel({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-2 rounded-[10px] border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
+          className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
         >
           <CreditCard className="h-4 w-4" /> Abonelik değiştir
         </button>
@@ -89,7 +89,7 @@ export function SubscriptionPanel({
                 name="plan"
                 value={plan}
                 onChange={(event) => setPlan(event.target.value)}
-                className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
               >
                 {plans.map((option) => (
                   <option key={option.id} value={option.id}>
@@ -112,7 +112,7 @@ export function SubscriptionPanel({
                 id="sub-status"
                 name="status"
                 defaultValue={currentStatus}
-                className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
               >
                 {STATUS_OPTIONS.map((status) => (
                   <option key={status.value} value={status.value}>
@@ -133,7 +133,7 @@ export function SubscriptionPanel({
             <DialogClose asChild>
               <button
                 type="button"
-                className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-medium text-ink-950 hover:bg-canvas"
+                className="rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-medium text-ink-950 hover:bg-canvas"
               >
                 Vazgeç
               </button>
@@ -141,7 +141,7 @@ export function SubscriptionPanel({
             <button
               type="submit"
               disabled={pending}
-              className="rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+              className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
             >
               {pending ? "Kaydediliyor…" : "Kaydet"}
             </button>

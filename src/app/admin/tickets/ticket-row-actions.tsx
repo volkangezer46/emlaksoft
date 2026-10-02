@@ -153,7 +153,7 @@ export function TicketRowActions({
       </Select>
 
       {statusError || assignError ? (
-        <p role="alert" aria-live="polite" className="basis-full text-right text-[10px] font-semibold text-danger-600">
+        <p role="alert" aria-live="polite" className="basis-full text-right text-xs font-semibold text-danger-600">
           {statusError ?? assignError}
         </p>
       ) : null}

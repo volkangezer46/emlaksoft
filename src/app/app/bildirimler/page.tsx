@@ -41,7 +41,7 @@ const kindLabel: Record<string, string> = {
 const PAGE_SIZE = 50;
 
 const chipCls = (active: boolean) =>
-  `focus-ring press inline-flex min-h-[36px] items-center gap-1.5 rounded-[9px] px-3 py-1.5 text-xs font-semibold transition ${
+  `focus-ring press inline-flex min-h-[36px] items-center gap-1.5 rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold transition ${
     active ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
   }`;
 
@@ -153,7 +153,7 @@ export default async function BildirimlerPage({
   return (
     <div className="space-y-5">
       {/* Koyu hero — KPI şeridi filtre kısayoludur */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/30 blur-[80px]" />
         <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-amber-400/12 blur-[70px]" />
@@ -174,7 +174,7 @@ export default async function BildirimlerPage({
               <form action={markAllNotificationsReadForm}>
                 <button
                   type="submit"
-                  className="focus-ring press inline-flex min-h-[40px] items-center gap-2 rounded-[10px] border border-white/20 bg-white/5 px-3.5 py-2 text-xs font-semibold text-white/85 transition hover:border-white/40 hover:text-white"
+                  className="focus-ring press inline-flex min-h-[40px] items-center gap-2 rounded-[var(--radius-control)] border border-white/20 bg-white/5 px-3.5 py-2 text-xs font-semibold text-white/85 transition hover:border-white/40 hover:text-white"
                 >
                   <CheckCheck className="h-3.5 w-3.5" /> Tümünü okundu işaretle
                 </button>
@@ -189,12 +189,12 @@ export default async function BildirimlerPage({
                 <Link
                   key={k.label}
                   href={k.href}
-                  className={`focus-ring press group relative block rounded-[14px] border bg-white/5 p-3.5 transition hover:border-white/30 ${
+                  className={`focus-ring press group relative block rounded-[var(--radius-card)] border bg-white/5 p-3.5 transition hover:border-white/30 ${
                     k.active && filtersActive ? "border-white/40" : "border-white/10"
                   }`}
                 >
                   <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/50 opacity-0 transition group-hover:opacity-100" />
-                  <span className="flex items-center gap-1.5 text-[11px] text-white/50">
+                  <span className="flex items-center gap-1.5 text-xs text-white/50">
                     <Icon className="h-3.5 w-3.5" /> {k.label}
                   </span>
                   <p className={`numeric mt-1.5 font-display text-xl font-extrabold tabular-nums ${k.accent}`}>{k.value}</p>
@@ -204,7 +204,7 @@ export default async function BildirimlerPage({
           </div>
 
           {topKind && kindCounts[topKind] > 0 ? (
-            <p className="mt-4 text-[11px] text-white/50">
+            <p className="mt-4 text-xs text-white/50">
               En yoğun tür:{" "}
               <Link
                 href={buildHref({ tur: topKind, sayfa: 1 })}
@@ -244,7 +244,7 @@ export default async function BildirimlerPage({
         ))}
       </nav>
 
-      <section className="overflow-hidden rounded-[18px] border border-line bg-surface">
+      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex items-center gap-2 border-b border-line px-5 py-3.5">
           <Bell className="h-4 w-4 text-brand-600" />
           <p className="text-sm font-semibold text-ink-950">Gelen kutusu</p>
@@ -254,7 +254,7 @@ export default async function BildirimlerPage({
         {rows.length === 0 ? (
           <div className="relative overflow-hidden px-4 py-16 text-center">
             <div className="pointer-events-none absolute left-1/2 top-4 h-32 w-32 -translate-x-1/2 rounded-full bg-brand-600/15 blur-[60px]" />
-            <span className="relative mx-auto grid h-14 w-14 place-items-center rounded-[16px] bg-brand-600/10 text-brand-600">
+            <span className="relative mx-auto grid h-14 w-14 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
               <Inbox className="h-7 w-7" />
             </span>
             <p className="relative mt-3 text-sm font-semibold text-ink-950">
@@ -310,7 +310,7 @@ export default async function BildirimlerPage({
                     <Link
                       href={buildHref({ tur: tur === n.kind ? null : n.kind })}
                       title={`"${kindLabel[n.kind] ?? n.kind}" türünü filtrele`}
-                      className="relative z-10 shrink-0 rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-text-faint transition hover:bg-brand-600/10 hover:text-brand-600"
+                      className="relative z-10 shrink-0 rounded-full bg-canvas px-1.5 py-0.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint transition hover:bg-brand-600/10 hover:text-brand-600"
                     >
                       {kindLabel[n.kind] ?? n.kind}
                     </Link>
@@ -325,13 +325,13 @@ export default async function BildirimlerPage({
                       type="submit"
                       title="Okundu işaretle"
                       aria-label={`${n.title} bildirimini okundu işaretle`}
-                      className="focus-ring press grid h-10 w-10 place-items-center rounded-[8px] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                      className="focus-ring press grid h-10 w-10 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
                     >
                       <CheckCheck className="h-3.5 w-3.5" />
                     </button>
                   </form>
                 ) : null}
-                <span className="shrink-0 text-[11px] text-text-faint">{relativeTimeTR(n.created_at)}</span>
+                <span className="shrink-0 text-xs text-text-faint">{relativeTimeTR(n.created_at)}</span>
               </div>
             ))}
           </div>
@@ -340,19 +340,19 @@ export default async function BildirimlerPage({
         {totalPages > 1 ? (
           <nav aria-label="Sayfalama" className="flex items-center justify-between gap-3 border-t border-line px-5 py-3">
             {page > 1 ? (
-              <Link href={buildHref({ sayfa: page - 1 })} className="focus-ring press inline-flex min-h-[40px] items-center rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+              <Link href={buildHref({ sayfa: page - 1 })} className="focus-ring press inline-flex min-h-[40px] items-center rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
                 ← Önceki
               </Link>
             ) : (
-              <span className="inline-flex min-h-[40px] items-center rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">← Önceki</span>
+              <span className="inline-flex min-h-[40px] items-center rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">← Önceki</span>
             )}
             <span className="text-xs tabular-nums text-text-muted">Sayfa {page} / {totalPages}</span>
             {page < totalPages ? (
-              <Link href={buildHref({ sayfa: page + 1 })} className="focus-ring press inline-flex min-h-[40px] items-center rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+              <Link href={buildHref({ sayfa: page + 1 })} className="focus-ring press inline-flex min-h-[40px] items-center rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
                 Sonraki →
               </Link>
             ) : (
-              <span className="inline-flex min-h-[40px] items-center rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">Sonraki →</span>
+              <span className="inline-flex min-h-[40px] items-center rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">Sonraki →</span>
             )}
           </nav>
         ) : null}

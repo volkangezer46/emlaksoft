@@ -31,8 +31,8 @@ function AnnouncementRow({ ann, read }: { ann: AnnRow; read: boolean }) {
   const meta = LEVEL_META[ann.level] ?? LEVEL_META.info;
   const LevelIcon = meta.icon;
   return (
-    <li className={`flex items-start gap-3 rounded-[13px] border ${meta.border} ${meta.bg} px-3.5 py-3 ${read ? "opacity-55" : ""}`}>
-      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[9px] ${meta.iconTone}`}>
+    <li className={`flex items-start gap-3 rounded-[var(--radius-card)] border ${meta.border} ${meta.bg} px-3.5 py-3 ${read ? "opacity-55" : ""}`}>
+      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] ${meta.iconTone}`}>
         <LevelIcon className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
@@ -43,7 +43,7 @@ function AnnouncementRow({ ann, read }: { ann: AnnRow; read: boolean }) {
         <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-text-muted">{ann.body}</p>
       </div>
       {read ? (
-        <span className="mt-1 inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-mint-600">
+        <span className="mt-1 inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-mint-600">
           <CheckCircle2 className="h-3.5 w-3.5" /> Okundu
         </span>
       ) : (
@@ -90,10 +90,10 @@ export async function AnnouncementsBanner() {
   const rest = ordered.slice(2);
 
   return (
-    <section className="surface-card rounded-[18px] p-5">
+    <section className="surface-card rounded-[var(--radius-panel)] p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-          <span className="grid h-8 w-8 place-items-center rounded-[9px] bg-brand-600/10 text-brand-600">
+          <span className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
             <Megaphone className="h-4 w-4" />
           </span>
           Ofis duyuruları
@@ -111,7 +111,7 @@ export async function AnnouncementsBanner() {
 
       {rest.length > 0 ? (
         <details className="group mt-2">
-          <summary className="focus-ring inline-flex cursor-pointer list-none items-center gap-1 rounded-[9px] px-2 py-1.5 text-xs font-semibold text-brand-600 transition hover:text-brand-700 [&::-webkit-details-marker]:hidden">
+          <summary className="focus-ring inline-flex cursor-pointer list-none items-center gap-1 rounded-[var(--radius-control)] px-2 py-1.5 text-xs font-semibold text-brand-600 transition hover:text-brand-700 [&::-webkit-details-marker]:hidden">
             <span className="group-open:hidden">Tümünü göster ({announcements.length})</span>
             <span className="hidden group-open:inline">Daralt</span>
           </summary>

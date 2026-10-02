@@ -78,7 +78,7 @@ export default async function ProjelerPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-500/25 blur-[70px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -93,8 +93,8 @@ export default async function ProjelerPage({
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {allUnits.length > 0 ? (
-              <div className="rounded-[14px] border border-white/12 bg-white/8 px-4 py-3">
-                <p className="text-[11px] text-white/60">Genel eritme oranı</p>
+              <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/8 px-4 py-3">
+                <p className="text-xs text-white/60">Genel eritme oranı</p>
                 <div className="mt-1 flex items-center gap-2">
                   <span className="numeric font-display text-xl font-extrabold text-white">%{genelPct}</span>
                   <span className="h-2 w-24 overflow-hidden rounded-full bg-white/15">
@@ -106,7 +106,7 @@ export default async function ProjelerPage({
             <ExportCsvButton
               label="Dışa aktar"
               action={exportProjectsCsv.bind(null, { durum: durum ?? "" })}
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
+              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
             />
             {canCreate ? <NewProjectDialog /> : null}
           </div>
@@ -131,11 +131,11 @@ export default async function ProjelerPage({
 
       {/* Teslim radarı — 120 gün penceresi; geciken teslim kırmızı işaretlenir */}
       {teslimRadar.length > 0 ? (
-        <section className="rounded-[18px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 text-sm font-bold text-ink-950">
               <Timer className="h-4 w-4 text-amber-600" /> Teslim radarı
-              <span className="numeric rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+              <span className="numeric rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-semibold text-amber-700">
                 {teslimRadar.length}
               </span>
             </h2>
@@ -146,7 +146,7 @@ export default async function ProjelerPage({
               <Link
                 key={p.id}
                 href={`/app/projeler/${p.id}`}
-                className="focus-ring press lift group flex items-center justify-between gap-3 rounded-[14px] border border-line bg-canvas p-4 hover:border-brand-300"
+                className="focus-ring press lift group flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas p-4 hover:border-brand-300"
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold text-ink-950">{p.name}</p>
@@ -243,14 +243,14 @@ export default async function ProjelerPage({
             const soldPct  = total > 0 ? (sold / total) * 100 : 0;
             const heldPct  = total > 0 ? (held / total) * 100 : 0;
             return (
-              <div key={p.id} className="lift group relative rounded-[20px] border border-line bg-surface p-5 transition hover:border-brand-300">
+              <div key={p.id} className="lift group relative rounded-[var(--radius-panel)] border border-line bg-surface p-5 transition hover:border-brand-300">
                 <Link
                   href={`/app/projeler/${p.id}`}
-                  className="focus-ring absolute inset-0 rounded-[20px]"
+                  className="focus-ring absolute inset-0 rounded-[var(--radius-panel)]"
                   aria-label={`${p.name} proje detayını aç`}
                 />
                 <div className="flex items-start justify-between gap-2">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-brand-600/10 text-brand-600">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
                     <Building2 className="h-5 w-5" />
                   </span>
                   <span className="flex items-center gap-2">
@@ -280,7 +280,7 @@ export default async function ProjelerPage({
 
                 {/* Stok kompozisyonu — satılan / rezerve / boş tek bakışta */}
                 <div className="mt-4">
-                  <div className="flex items-center justify-between text-[11px] font-semibold">
+                  <div className="flex items-center justify-between text-xs font-semibold">
                     <span className="text-text-muted">
                       {total > 0 ? `${sold}/${total} satıldı` : "Henüz daire yok"}
                     </span>
@@ -291,7 +291,7 @@ export default async function ProjelerPage({
                     <div className="h-full bg-amber-400 transition-all" style={{ width: `${heldPct}%` }} />
                   </div>
                   {total > 0 ? (
-                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-text-muted">
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-muted">
                       <span className="inline-flex items-center gap-1">
                         <span className="h-2 w-2 rounded-full bg-mint-500" /> {sold} satış
                       </span>
@@ -313,7 +313,7 @@ export default async function ProjelerPage({
                   >
                     Stok ızgarası →
                   </Link>
-                  <span className="text-[11px] text-text-faint">{total} daire</span>
+                  <span className="text-xs text-text-faint">{total} daire</span>
                 </div>
               </div>
             );

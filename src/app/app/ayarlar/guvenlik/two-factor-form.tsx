@@ -31,7 +31,7 @@ export function TwoFactorForm({
         disabled={!canToggle || pending}
         role="switch"
         aria-checked={enabled}
-        className="flex w-full items-center gap-3 rounded-[12px] border border-line bg-canvas/50 px-3 py-3 text-left transition hover:border-brand-300 disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-3 text-left transition hover:border-brand-300 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <span
           className={`relative h-6 w-11 shrink-0 rounded-full transition ${enabled ? "bg-mint-500" : "bg-ink-950/15"}`}
@@ -44,7 +44,7 @@ export function TwoFactorForm({
           <span className="block text-sm font-semibold text-ink-950">
             SMS ile iki adımlı doğrulama {enabled ? "açık" : "kapalı"}
           </span>
-          <span className="block text-[11px] text-text-muted">
+          <span className="block text-xs text-text-muted">
             {phone
               ? `Girişte ${phone} numarasına 6 haneli kod gönderilir.`
               : "Profilinizde kayıtlı telefon numarası yok."}
@@ -54,11 +54,11 @@ export function TwoFactorForm({
       </button>
 
       {!phone ? (
-        <p className="rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3.5 py-2.5 text-xs font-medium text-amber-700">
+        <p className="rounded-[var(--radius-control)] border border-amber-400/30 bg-amber-400/10 px-3.5 py-2.5 text-xs font-medium text-amber-700">
           İki adımlı doğrulamayı açmak için önce profilinize bir cep telefonu numarası ekleyin.
         </p>
       ) : !smsConfigured ? (
-        <p className="flex items-start gap-2 rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3.5 py-2.5 text-xs font-medium text-amber-700">
+        <p className="flex items-start gap-2 rounded-[var(--radius-control)] border border-amber-400/30 bg-amber-400/10 px-3.5 py-2.5 text-xs font-medium text-amber-700">
           <MessageSquareText className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           SMS servisi (Netgsm) yapılandırılmadığı için iki adımlı doğrulama açılamıyor. Ayarlar →
           Entegrasyonlar bölümünden ofis Netgsm hesabınızı bağlayın.
@@ -66,11 +66,11 @@ export function TwoFactorForm({
       ) : null}
 
       {state.error ? (
-        <p className="rounded-[10px] border border-danger-500/25 bg-danger-500/8 px-3.5 py-2.5 text-xs font-medium text-danger-600" role="alert">
+        <p className="rounded-[var(--radius-control)] border border-danger-500/25 bg-danger-500/8 px-3.5 py-2.5 text-xs font-medium text-danger-600" role="alert">
           {state.error}
         </p>
       ) : state.ok ? (
-        <p className="rounded-[10px] border border-mint-500/25 bg-mint-500/8 px-3.5 py-2.5 text-xs font-medium text-mint-600" role="status">
+        <p className="rounded-[var(--radius-control)] border border-mint-500/25 bg-mint-500/8 px-3.5 py-2.5 text-xs font-medium text-mint-600" role="status">
           Ayar kaydedildi.
         </p>
       ) : null}

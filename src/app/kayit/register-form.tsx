@@ -89,7 +89,7 @@ export function RegisterForm({
   }
 
   const inputCls =
-    "w-full rounded-[12px] border border-line bg-surface py-3 pl-10 pr-3.5 text-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10";
+    "w-full rounded-[var(--radius-card)] border border-line bg-surface py-3 pl-10 pr-3.5 text-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10";
 
   return (
     <AuthShell
@@ -136,7 +136,7 @@ export function RegisterForm({
                   </span>
                 )}
                 <div className="min-w-0">
-                  <p className={`text-[11px] font-bold ${active || done ? "text-ink-950" : "text-text-faint"}`}>{s.label}</p>
+                  <p className={`text-xs font-bold ${active || done ? "text-ink-950" : "text-text-faint"}`}>{s.label}</p>
                   <div className={`mt-1 h-1 rounded-full ${done ? "bg-mint-500" : active ? "bg-brand-600" : "bg-line"}`} />
                 </div>
               </li>
@@ -165,9 +165,9 @@ export function RegisterForm({
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="phone">Telefon <span className="font-normal text-text-faint">(opsiyonel)</span></label>
-              <PhoneInput id="phone" name="phone" className="w-full rounded-[12px] border border-line bg-surface px-3.5 py-3 text-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10" />
+              <PhoneInput id="phone" name="phone" className="w-full rounded-[var(--radius-card)] border border-line bg-surface px-3.5 py-3 text-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10" />
             </div>
-            <button type="button" onClick={next} className="btn-shine group flex w-full items-center justify-center gap-2 rounded-[12px] bg-[image:var(--grad-brand)] px-4 py-3 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:brightness-[1.06]">
+            <button type="button" onClick={next} className="btn-shine group flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-brand)] px-4 py-3 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:brightness-[1.06]">
               Devam et <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
             </button>
           </div>
@@ -196,20 +196,20 @@ export function RegisterForm({
                       onChange={() => setTeamSize(o.value as RegistrationTeamSize)}
                       className="peer sr-only"
                     />
-                    <span className="block rounded-[12px] border border-line bg-surface px-3.5 py-3 transition peer-checked:border-brand-600 peer-checked:bg-brand-600/[0.05] peer-checked:ring-2 peer-checked:ring-brand-600/25 hover:border-brand-300">
+                    <span className="block rounded-[var(--radius-card)] border border-line bg-surface px-3.5 py-3 transition peer-checked:border-brand-600 peer-checked:bg-brand-600/[0.05] peer-checked:ring-2 peer-checked:ring-brand-600/25 hover:border-brand-300">
                       <span className="block text-sm font-bold text-ink-950">{o.title}</span>
-                      <span className="block text-[11px] text-text-muted">{o.desc}</span>
+                      <span className="block text-xs text-text-muted">{o.desc}</span>
                     </span>
                   </label>
                 ))}
               </div>
-              <p className="mt-2 text-[11px] text-text-faint">Ekip büyüklüğünüze göre en uygun planla başlatırız; sonradan değiştirilebilir.</p>
+              <p className="mt-2 text-xs text-text-faint">Ekip büyüklüğünüze göre en uygun planla başlatırız; sonradan değiştirilebilir.</p>
             </fieldset>
             <div className="flex gap-2.5">
-              <button type="button" onClick={() => setStep(1)} className="flex items-center justify-center gap-1.5 rounded-[12px] border border-line px-4 py-3 text-sm font-semibold text-text-muted transition hover:bg-surface">
+              <button type="button" onClick={() => setStep(1)} className="flex items-center justify-center gap-1.5 rounded-[var(--radius-card)] border border-line px-4 py-3 text-sm font-semibold text-text-muted transition hover:bg-surface">
                 <ArrowLeft className="h-4 w-4" /> Geri
               </button>
-              <button type="button" onClick={next} className="btn-shine group flex flex-1 items-center justify-center gap-2 rounded-[12px] bg-[image:var(--grad-brand)] px-4 py-3 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:brightness-[1.06]">
+              <button type="button" onClick={next} className="btn-shine group flex flex-1 items-center justify-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-brand)] px-4 py-3 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:brightness-[1.06]">
                 Devam et <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </button>
             </div>
@@ -231,12 +231,12 @@ export function RegisterForm({
                   placeholder="En az 8 karakter"
                   value={pw}
                   onChange={(e) => setPw(e.target.value)}
-                  className="w-full rounded-[12px] border border-line bg-surface py-3 pl-10 pr-11 text-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10"
+                  className="w-full rounded-[var(--radius-card)] border border-line bg-surface py-3 pl-10 pr-11 text-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-[8px] text-text-faint transition hover:bg-canvas hover:text-ink-800"
+                  className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-800"
                   aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -245,7 +245,7 @@ export function RegisterForm({
               <PasswordStrengthMeter password={pw} />
             </div>
 
-            <label className="flex cursor-pointer items-start gap-2.5 rounded-[12px] border border-line bg-surface px-3.5 py-3 text-[12px] leading-relaxed text-text-muted transition hover:border-brand-300">
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-surface px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-brand-300">
               <input
                 type="checkbox"
                 name="legal_consent"
@@ -260,7 +260,7 @@ export function RegisterForm({
             </label>
 
             {state.error ? (
-              <div className="rounded-[10px] border border-danger-500/25 bg-danger-500/8 px-3.5 py-2.5" role="alert">
+              <div className="rounded-[var(--radius-control)] border border-danger-500/25 bg-danger-500/8 px-3.5 py-2.5" role="alert">
                 <p className="text-sm font-medium text-danger-600">{state.error}</p>
                 {errorTargetStep ? (
                   <>
@@ -270,7 +270,7 @@ export function RegisterForm({
                     <button
                       type="button"
                       onClick={() => setStep(errorTargetStep)}
-                      className="mt-2 inline-flex items-center gap-1.5 rounded-[8px] border border-danger-500/30 bg-surface px-3 py-1.5 text-xs font-semibold text-danger-600 transition hover:bg-danger-500/10"
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-danger-500/30 bg-surface px-3 py-1.5 text-xs font-semibold text-danger-600 transition hover:bg-danger-500/10"
                     >
                       <ArrowLeft className="h-3.5 w-3.5" /> {errorTargetStep}. adıma dön
                     </button>
@@ -280,13 +280,13 @@ export function RegisterForm({
             ) : null}
 
             <div className="flex gap-2.5">
-              <button type="button" onClick={() => setStep(2)} className="flex items-center justify-center gap-1.5 rounded-[12px] border border-line px-4 py-3 text-sm font-semibold text-text-muted transition hover:bg-surface">
+              <button type="button" onClick={() => setStep(2)} className="flex items-center justify-center gap-1.5 rounded-[var(--radius-card)] border border-line px-4 py-3 text-sm font-semibold text-text-muted transition hover:bg-surface">
                 <ArrowLeft className="h-4 w-4" /> Geri
               </button>
               <button
                 type="submit"
                 disabled={pending}
-                className="btn-shine group flex flex-1 items-center justify-center gap-2 rounded-[12px] bg-[image:var(--grad-brand)] px-4 py-3 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:brightness-[1.06] disabled:opacity-60"
+                className="btn-shine group flex flex-1 items-center justify-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-brand)] px-4 py-3 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:brightness-[1.06] disabled:opacity-60"
               >
                 {pending ? (
                   <>
@@ -299,7 +299,7 @@ export function RegisterForm({
                 )}
               </button>
             </div>
-            <p className="text-center text-[11px] text-text-faint">Kredi kartı gerekmez · 14 gün ücretsiz · Taahhütsüz</p>
+            <p className="text-center text-xs text-text-faint">Kredi kartı gerekmez · 14 gün ücretsiz · Taahhütsüz</p>
           </div>
         </form>
 

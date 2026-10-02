@@ -126,12 +126,12 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
 
   return (
     <article
-      className={`group relative flex items-start gap-3 rounded-[16px] border bg-surface px-4 py-3.5 transition ${
+      className={`group relative flex items-start gap-3 rounded-[var(--radius-card)] border bg-surface px-4 py-3.5 transition ${
         done ? "border-line opacity-70" : highPr ? "border-danger-500/25" : "border-line"
       }`}
     >
       {href ? (
-        <Link href={href} className="absolute inset-0 rounded-[16px]" aria-label={`${task.title} kaydını aç`} />
+        <Link href={href} className="absolute inset-0 rounded-[var(--radius-card)]" aria-label={`${task.title} kaydını aç`} />
       ) : canEdit && !done ? (
         // Müşterisiz/portföysüz görevde gidilecek kayıt yok — kartın kendisi
         // düzenleme diyaloğunu açar (overlay tetikleyicili ikinci diyalog örneği).
@@ -141,7 +141,7 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
         />
       ) : null}
       <span
-        className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-[11px] transition ${
+        className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] transition ${
           done ? "bg-mint-500/10 text-mint-600" : "bg-brand-600/10 text-brand-600"
         }`}
       >
@@ -151,21 +151,21 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className={`text-sm font-semibold transition ${done ? "text-text-muted line-through" : "text-ink-950"}`}>{task.title}</p>
-          <span className="rounded-full bg-ink-950/6 px-2 py-0.5 text-[11px] font-bold text-text-muted">{meta.label}</span>
+          <span className="rounded-full bg-ink-950/6 px-2 py-0.5 text-xs font-bold text-text-muted">{meta.label}</span>
           {task.recurrence && RECURRENCE_LABELS[task.recurrence] ? (
-            <span className="flex items-center gap-1 rounded-full bg-cyan-500/10 px-2 py-0.5 text-[11px] font-bold text-cyan-600">
+            <span className="flex items-center gap-1 rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs font-bold text-cyan-600">
               <Repeat className="h-3 w-3" /> {RECURRENCE_LABELS[task.recurrence]}
             </span>
           ) : null}
           {highPr && !done ? (
-            <span className="rounded-full bg-danger-500/10 px-2 py-0.5 text-[11px] font-bold text-danger-500">Yüksek</span>
+            <span className="rounded-full bg-danger-500/10 px-2 py-0.5 text-xs font-bold text-danger-500">Yüksek</span>
           ) : null}
           {task.priority === "low" && !done ? (
-            <span className="rounded-full bg-ink-950/6 px-2 py-0.5 text-[11px] font-bold text-text-faint">Düşük</span>
+            <span className="rounded-full bg-ink-950/6 px-2 py-0.5 text-xs font-bold text-text-faint">Düşük</span>
           ) : null}
         </div>
         {task.notes ? <p className="mt-0.5 line-clamp-1 text-xs text-text-muted">{task.notes}</p> : null}
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
           <span className={`flex items-center gap-1 ${due.cls}`}>
             <Clock className="h-3 w-3" /> {due.text}
           </span>
@@ -209,7 +209,7 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
                 onClick={() => setStatus("open")}
                 disabled={pending}
                 aria-label="Görevi yeniden aç"
-                className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line text-text-muted transition hover:border-brand-300 disabled:opacity-50"
+                className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 disabled:opacity-50"
               >
                 {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
               </button>
@@ -219,7 +219,7 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
               type="button"
               onClick={() => setStatus("done")}
               disabled={pending}
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[9px] bg-mint-500/10 px-3 py-2 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/20 disabled:opacity-60"
+              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-mint-500/10 px-3 py-2 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/20 disabled:opacity-60"
             >
               <CheckCircle2 className="h-4 w-4" /> Tamamla
             </button>
@@ -232,7 +232,7 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
             confirmLabel="Sil"
             onConfirm={removeTask}
             trigger={
-              <button type="button" aria-label="Görevi sil" className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line text-danger-500 transition hover:border-danger-500/40">
+              <button type="button" aria-label="Görevi sil" className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-danger-500 transition hover:border-danger-500/40">
                 <Trash2 className="h-4 w-4" />
               </button>
             }

@@ -258,12 +258,12 @@ export default async function ValuationPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-cyan-400/20 blur-[80px]" />
         <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-cyan-400">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-cyan-400">
               <Gauge className="h-3.5 w-3.5" /> Çok kaynaklı değerleme
             </p>
             <h1 className="mt-2 font-display text-3xl font-extrabold">Değerleme motoru</h1>
@@ -282,11 +282,11 @@ export default async function ValuationPage({
             <a
               key={k.label}
               href={k.href}
-              className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-white/30"
+              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-white/30"
             >
               <k.icon className="h-4 w-4 text-cyan-400" />
               <p className="numeric mt-2 font-display text-xl font-extrabold text-white">{k.value}</p>
-              <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+              <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
             </a>
           ))}
         </div>
@@ -294,12 +294,12 @@ export default async function ValuationPage({
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
         <ValuationForm properties={properties ?? []} provinces={provinces ?? []} defaultPropertyId={preselectedPropertyId} />
-        <section id="gecmis" className="scroll-mt-24 rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section id="gecmis" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <Sparkles className="h-4 w-4 text-amber-500" /> Son değerlemeler
           </h2>
           {rows.length === 0 ? (
-            <p className="mt-6 rounded-[12px] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
+            <p className="mt-6 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
               Henüz değerleme yok. Soldan oluşturun.
             </p>
           ) : (
@@ -309,16 +309,16 @@ export default async function ValuationPage({
                 const priceSources = sources.filter((s) => s.weight > 0);
                 const investmentScoreSource = sources.find((s) => s.name === "Tapusor yatırım puanı");
                 return (
-                  <article key={v.id} className="group relative rounded-[14px] border border-line bg-canvas/60 p-4 transition hover:border-brand-300">
+                  <article key={v.id} className="group relative rounded-[var(--radius-card)] border border-line bg-canvas/60 p-4 transition hover:border-brand-300">
                     {/* Kartın tamamı rapora gider; alttaki ikincil linkler z-10 ile üstte kalır */}
                     <Link
                       href={`/app/degerleme/${v.id}`}
-                      className="absolute inset-0 rounded-[14px]"
+                      className="absolute inset-0 rounded-[var(--radius-card)]"
                       aria-label={`${v.title ?? "Değerleme"} raporunu aç`}
                     />
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-display font-bold text-ink-950 group-hover:text-brand-600">{v.title}</p>
-                      <span className="text-[11px] font-bold text-mint-600">
+                      <span className="text-xs font-bold text-mint-600">
                         %{Math.round(Number(v.confidence || 0) * 100)} güven
                       </span>
                     </div>
@@ -334,7 +334,7 @@ export default async function ValuationPage({
                         {priceSources.map((s) => (
                           <span
                             key={s.name}
-                            className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                            className={`rounded-full px-2 py-0.5 text-xs font-bold ${
                               s.name.includes("Endeksa")
                                 ? "bg-cyan-500/10 text-cyan-700"
                                 : s.name.includes("Tapusor")
@@ -348,7 +348,7 @@ export default async function ValuationPage({
                       </div>
                     ) : null}
                     {investmentScoreSource ? (
-                      <p className="mt-2 text-[11px] font-semibold text-brand-600">
+                      <p className="mt-2 text-xs font-semibold text-brand-600">
                         Tapusor yatırım puanı: {investmentScoreSource.value}/100
                       </p>
                     ) : null}
@@ -358,7 +358,7 @@ export default async function ValuationPage({
                     <div className="hairline-t mt-3 flex flex-wrap items-center gap-3 pt-2.5">
                       <Link
                         href={`/app/degerleme/${v.id}`}
-                        className="focus-ring relative z-10 inline-flex items-center gap-1 rounded-[8px] text-xs font-bold text-brand-600 hover:underline"
+                        className="focus-ring relative z-10 inline-flex items-center gap-1 rounded-[var(--radius-control)] text-xs font-bold text-brand-600 hover:underline"
                       >
                         <FileText className="h-3.5 w-3.5" /> Raporu aç
                       </Link>
@@ -382,7 +382,7 @@ export default async function ValuationPage({
       {/* ------------------------------------------------------------------ */}
       {/* D4 — Kira çarpanı / getiri analizi                                  */}
       {/* ------------------------------------------------------------------ */}
-      <section id="getiri" className="scroll-mt-24 rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <section id="getiri" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
@@ -395,10 +395,10 @@ export default async function ValuationPage({
             </p>
           </div>
           {officeYield != null && officeAmort != null ? (
-            <div className="flex items-center gap-3 rounded-[14px] border border-mint-500/25 bg-mint-500/8 px-4 py-3">
+            <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-mint-500/25 bg-mint-500/8 px-4 py-3">
               <TrendingUp className="h-5 w-5 text-mint-600" />
               <div>
-                <p className="text-[11px] text-text-muted">Ofis geneli</p>
+                <p className="text-xs text-text-muted">Ofis geneli</p>
                 <p className="numeric text-sm font-bold text-ink-950">
                   %{nf1.format(officeYield)} brüt · {nf1.format(officeAmort)} yıl amortisman
                 </p>
@@ -421,7 +421,7 @@ export default async function ValuationPage({
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
               <thead>
-                <tr className="border-b border-line text-left text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
+                <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
                   <th className="py-2.5 pr-3">İlçe</th>
                   <th className="py-2.5 pr-3 text-right">Satılık medyan ₺/m²</th>
                   <th className="py-2.5 pr-3 text-right">Kira medyan ₺/m²/ay</th>
@@ -458,7 +458,7 @@ export default async function ValuationPage({
                           <span className="text-text-faint">—</span>
                         ) : (
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                            className={`rounded-full px-2 py-0.5 text-xs font-bold ${
                               diff >= 0 ? "bg-mint-500/10 text-mint-600" : "bg-amber-400/15 text-amber-600"
                             }`}
                           >
@@ -475,7 +475,7 @@ export default async function ValuationPage({
           </div>
         )}
         {yieldRows.some((r) => r.sampleSale < 3 || r.sampleRent < 3) ? (
-          <p className="mt-3 rounded-[12px] border border-amber-400/30 bg-amber-400/8 px-3 py-2 text-xs text-amber-700">
+          <p className="mt-3 rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/8 px-3 py-2 text-xs text-amber-700">
             Bazı ilçelerde örneklem küçük (3 portföyün altı) — medyan tek bir kayıttan etkilenebilir, sonucu yön
             göstergesi olarak okuyun.
           </p>
@@ -485,7 +485,7 @@ export default async function ValuationPage({
       {/* ------------------------------------------------------------------ */}
       {/* D5 — Satış süresi tahmini                                           */}
       {/* ------------------------------------------------------------------ */}
-      <section id="sure" className="scroll-mt-24 rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <section id="sure" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
@@ -500,11 +500,11 @@ export default async function ValuationPage({
           {officeMedianDays != null ? (
             <Link
               href="/app/anlasmalar"
-              className="focus-ring press flex items-center gap-3 rounded-[14px] border border-brand-600/20 bg-brand-600/6 px-4 py-3 transition hover:border-brand-400"
+              className="focus-ring press flex items-center gap-3 rounded-[var(--radius-card)] border border-brand-600/20 bg-brand-600/6 px-4 py-3 transition hover:border-brand-400"
             >
               <Timer className="h-5 w-5 text-brand-600" />
               <div>
-                <p className="text-[11px] text-text-muted">Ofis medyanı · {wonSamples.length} kapanış</p>
+                <p className="text-xs text-text-muted">Ofis medyanı · {wonSamples.length} kapanış</p>
                 <p className="numeric text-sm font-bold text-ink-950">{nf0.format(officeMedianDays)} gün</p>
               </div>
             </Link>
@@ -523,7 +523,7 @@ export default async function ValuationPage({
         ) : (
           <>
             {lowSampleOverall ? (
-              <p className="mt-4 rounded-[12px] border border-amber-400/30 bg-amber-400/8 px-3 py-2 text-xs text-amber-700">
+              <p className="mt-4 rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/8 px-3 py-2 text-xs text-amber-700">
                 Toplam {wonSamples.length} kapanış var — örneklem küçük olduğu için tahminler düşük güvenlidir. Kapanış
                 sayısı arttıkça tahmin keskinleşir.
               </p>
@@ -535,23 +535,23 @@ export default async function ValuationPage({
                   <Link
                     key={r.key}
                     href="/app/anlasmalar"
-                    className="focus-ring press lift group block rounded-[14px] border border-line bg-canvas/60 p-4 transition hover:border-brand-300"
+                    className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-canvas/60 p-4 transition hover:border-brand-300"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-ink-950 group-hover:text-brand-600">
                           {r.districtName}
                         </p>
-                        <p className="text-[11px] text-text-muted">{r.propertyType}</p>
+                        <p className="text-xs text-text-muted">{r.propertyType}</p>
                       </div>
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${conf.cls}`}>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${conf.cls}`}>
                         {conf.label}
                       </span>
                     </div>
                     <p className="numeric mt-3 font-display text-2xl font-extrabold text-ink-950">
                       {nf0.format(r.medianDays)} gün
                     </p>
-                    <p className="text-[11px] text-text-muted">medyan · {r.n} kapanış</p>
+                    <p className="text-xs text-text-muted">medyan · {r.n} kapanış</p>
                   </Link>
                 );
               })}

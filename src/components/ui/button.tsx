@@ -23,12 +23,12 @@ const VARIANTS = {
 } as const;
 
 /** Boy ölçeği. `xs` v2'de eklendi: tablo satırı içi aksiyonlar 32px'de bile iri
- *  duruyordu ve her ekran kendi `h-7 text-[11px]` reçetesini yazıyordu. */
+ *  duruyordu ve her ekran kendi `h-7 text-xs` reçetesini yazıyordu. */
 const SIZES = {
-  xs: "h-7 gap-1 rounded-[8px] px-2.5 text-[11px]",
-  sm: "h-8 gap-1.5 rounded-[8px] px-3 text-xs",
-  md: "h-10 gap-2 rounded-[10px] px-4 text-sm",
-  lg: "h-11 gap-2 rounded-[10px] px-5 text-sm",
+  xs: "h-7 gap-1 rounded-[var(--radius-control)] px-2.5 text-xs",
+  sm: "h-8 gap-1.5 rounded-[var(--radius-control)] px-3 text-xs",
+  md: "h-10 gap-2 rounded-[var(--radius-control)] px-4 text-sm",
+  lg: "h-11 gap-2 rounded-[var(--radius-control)] px-5 text-sm",
 } as const;
 
 /** İkon boyu boy ölçeğiyle birlikte büyür — elle `h-4 w-4` yazmaya gerek yok. */

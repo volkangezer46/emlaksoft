@@ -147,10 +147,10 @@ export function StatCard({
 }) {
   if (loading) {
     return (
-      <div role="status" aria-busy="true" className="rounded-[18px] border border-line bg-surface p-5">
+      <div role="status" aria-busy="true" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
         <span className="sr-only">{label} yükleniyor</span>
         <div className="flex items-start justify-between">
-          <Skeleton className="h-10 w-10 rounded-[12px]" />
+          <Skeleton className="h-10 w-10 rounded-[var(--radius-card)]" />
           <Skeleton className="h-6 w-14 rounded-full" />
         </div>
         <Skeleton className="mt-4 h-3 w-24" />
@@ -174,7 +174,7 @@ export function StatCard({
   const inner = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <span className={`kpi-chip-shine grid h-10 w-10 place-items-center rounded-[12px] ${TONE_CHIP[tone]}`}>
+        <span className={`kpi-chip-shine grid h-10 w-10 place-items-center rounded-[var(--radius-card)] ${TONE_CHIP[tone]}`}>
           <Icon aria-hidden="true" className="h-5 w-5" />
         </span>
         <span className="flex items-center gap-2">
@@ -194,7 +194,7 @@ export function StatCard({
       <p className="mt-4 text-sm text-text-muted">{label}</p>
       <p className="numeric mt-1 font-display text-2xl font-extrabold text-ink-950">{value}</p>
       {normalized?.label ? (
-        <p className="mt-1 text-[11px] text-text-faint">{normalized.label}</p>
+        <p className="mt-1 text-xs text-text-faint">{normalized.label}</p>
       ) : null}
       {sparkline && sparkline.length > 1 ? (
         <MiniSparkline
@@ -210,7 +210,7 @@ export function StatCard({
 
   // kpi-glow: hover'da kartın altında ton renkli yumuşak parıltı (dashboard'da
   // kanıtlanmış sınıf). Taban sınıf + ton değişkeni birlikte verilmeli.
-  const shell = `kpi-glow ${TONE_GLOW[tone]} rounded-[18px] border border-line bg-surface p-5${animate ? " anim-rise" : ""}`;
+  const shell = `kpi-glow ${TONE_GLOW[tone]} rounded-[var(--radius-panel)] border border-line bg-surface p-5${animate ? " anim-rise" : ""}`;
 
   if (href) {
     return (
@@ -234,7 +234,7 @@ export function InfoCard({
   className?: string;
 }) {
   return (
-    <div className={`rounded-[16px] border border-line bg-surface p-4 ${className ?? ""}`}>
+    <div className={`rounded-[var(--radius-card)] border border-line bg-surface p-4 ${className ?? ""}`}>
       <dl className="space-y-3">
         {items.map((item, idx) => (
           <div key={idx} className="flex items-center justify-between text-sm">

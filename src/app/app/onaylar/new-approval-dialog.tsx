@@ -16,7 +16,7 @@ import { APPROVAL_KINDS, APPROVAL_KIND_META, type ApprovalKind } from "@/lib/app
 const init: ApprovalResult = {};
 
 const fieldCls =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
 /**
  * Yeni onay talebi.
@@ -43,7 +43,7 @@ export function NewApprovalDialog({ entityOptions }: { entityOptions: ComboboxOp
       <DialogTrigger asChild>
         <button
           type="button"
-          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[11px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
         >
           <Plus className="h-4 w-4" /> Yeni onay talebi
         </button>
@@ -135,7 +135,7 @@ export function NewApprovalDialog({ entityOptions }: { entityOptions: ComboboxOp
           </div>
 
           {state?.error ? (
-            <p className="rounded-[10px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
+            <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
               {state.error}
             </p>
           ) : null}
@@ -144,7 +144,7 @@ export function NewApprovalDialog({ entityOptions }: { entityOptions: ComboboxOp
             <DialogClose asChild>
               <button
                 type="button"
-                className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:border-hairline-strong hover:bg-canvas"
+                className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:border-hairline-strong hover:bg-canvas"
               >
                 İptal
               </button>
@@ -152,7 +152,7 @@ export function NewApprovalDialog({ entityOptions }: { entityOptions: ComboboxOp
             <button
               type="submit"
               disabled={isPending}
-              className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+              className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
             >
               {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
               {isPending ? "Gönderiliyor…" : "Onaya gönder"}

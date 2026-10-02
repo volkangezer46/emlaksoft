@@ -136,7 +136,7 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
   return (
     <div className="space-y-3">
       {/* --- Toplu işlem çubuğu --- */}
-      <div className="flex flex-wrap items-center gap-3 rounded-[14px] border border-line bg-surface px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2.5">
         <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-text-muted">
           <input
             type="checkbox"
@@ -189,7 +189,7 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
       </div>
 
       {/* --- Liste --- */}
-      <ul className="divide-y divide-line overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+      <ul className="divide-y divide-line overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         {rows.map((row) => {
           const Icon = KIND_ICON[row.kind];
           const isSelected = selected.has(row.key);
@@ -209,25 +209,25 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
                   aria-label={`${row.name} seç`}
                   className="h-4 w-4 rounded border-line accent-[var(--brand-600)]"
                 />
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-canvas text-text-muted">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-canvas text-text-muted">
                   <Icon className="h-5 w-5" />
                 </span>
               </div>
 
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${SOURCE_CHIP[row.source]}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${SOURCE_CHIP[row.source]}`}>
                     {SOURCE_LABEL[row.source]}
                   </span>
-                  <span className="rounded-full bg-canvas px-2 py-0.5 text-[10px] font-semibold text-text-muted">
+                  <span className="rounded-full bg-canvas px-2 py-0.5 text-xs font-semibold text-text-muted">
                     {CATEGORY_LABEL[row.category]}
                   </span>
-                  <span className="text-[10px] font-medium text-text-faint">{KIND_LABEL[row.kind]}</span>
+                  <span className="text-xs font-medium text-text-faint">{KIND_LABEL[row.kind]}</span>
                 </div>
                 <p className="mt-1 truncate text-sm font-semibold text-ink-950" title={row.name}>
                   {row.name}
                 </p>
-                <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-text-muted">
+                <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-text-muted">
                   {row.relatedHref && row.relatedLabel ? (
                     <Link href={row.relatedHref} className="font-semibold text-brand-600 hover:underline">
                       {row.relatedLabel}
@@ -257,7 +257,7 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
                     onClick={() => setLightboxKey(row.key)}
                     aria-label={`${row.name} önizle`}
                     title="Önizle"
-                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[8px] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
                   >
                     <Eye className="h-4 w-4" />
                   </button>
@@ -268,7 +268,7 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
                     rel="noopener noreferrer"
                     aria-label={`${row.name} yeni sekmede aç`}
                     title={row.source === "sozlesme" ? "Sözleşmeyi aç" : "Yeni sekmede aç"}
-                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[8px] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
                   >
                     {row.source === "sozlesme" || row.source === "evrak" ? (
                       <Link2 className="h-4 w-4" />
@@ -284,7 +284,7 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
                     download={row.name}
                     aria-label={`${row.name} indir`}
                     title="İndir"
-                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[8px] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
                   >
                     <Download className="h-4 w-4" />
                   </a>
@@ -297,7 +297,7 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
                         type="button"
                         aria-label={`${row.name} ${row.source === "sozlesme" ? "iptal et" : "kaldır"}`}
                         title={row.source === "sozlesme" ? "Sözleşmeyi iptal et" : "Kaldır"}
-                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[8px] border border-line text-text-muted transition hover:border-danger-500/50 hover:text-danger-500"
+                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/50 hover:text-danger-500"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

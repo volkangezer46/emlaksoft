@@ -233,7 +233,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
   return (
     <div className="space-y-6">
       {/* ── Hero: talep künyesi ─────────────────────────────────────────── */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-brand-600/25 blur-[80px]" />
         <div className="relative">
@@ -246,15 +246,15 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
           <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-cyan-400">
+                <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.14em] text-cyan-400">
                   <Target className="h-3.5 w-3.5" /> {demand.transaction_type}
                   {demand.property_type ? ` · ${demand.property_type}` : ""}
                 </span>
-                <span className="rounded-full bg-mint-500/15 px-2.5 py-0.5 text-[11px] font-bold text-mint-400">
+                <span className="rounded-full bg-mint-500/15 px-2.5 py-0.5 text-xs font-bold text-mint-400">
                   {statusLabel[demand.status] ?? demand.status}
                 </span>
                 {demand.urgency ? (
-                  <span className="rounded-full bg-amber-400/15 px-2.5 py-0.5 text-[11px] font-bold text-amber-300">
+                  <span className="rounded-full bg-amber-400/15 px-2.5 py-0.5 text-xs font-bold text-amber-300">
                     {urgencyLabel[demand.urgency] ?? demand.urgency}
                   </span>
                 ) : null}
@@ -262,7 +262,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
                   <Link
                     href="/app/ag"
                     title={`Ağ talep havuzunda ${networkRow.status === "active" ? "paylaşımda" : "duraklatıldı"} · komisyon paylaşımı %${Number(networkRow.commission_share_pct)}`}
-                    className="inline-flex items-center gap-1 rounded-full bg-cyan-400/15 px-2.5 py-0.5 text-[11px] font-bold text-cyan-300 transition hover:bg-cyan-400/25"
+                    className="inline-flex items-center gap-1 rounded-full bg-cyan-400/15 px-2.5 py-0.5 text-xs font-bold text-cyan-300 transition hover:bg-cyan-400/25"
                   >
                     <Share2 className="h-3 w-3" />
                     {networkRow.status === "active" ? "Ağda paylaşımda" : "Ağ paylaşımı duraklatıldı"}
@@ -289,7 +289,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {canEdit && customer ? (
-                <div className="rounded-[10px] border border-white/15 bg-white/10 px-3 py-2 backdrop-blur transition hover:border-white/30 [&_button]:text-white [&_button]:hover:no-underline">
+                <div className="rounded-[var(--radius-control)] border border-white/15 bg-white/10 px-3 py-2 backdrop-blur transition hover:border-white/30 [&_button]:text-white [&_button]:hover:no-underline">
                   <EditDemandDialog
                     demand={{
                       id: demand.id,
@@ -312,7 +312,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
               ) : null}
               <Link
                 href={`/app/eslestirme?demand=${demand.id}`}
-                className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
               >
                 <Crosshair className="h-4 w-4" /> Eşleştirmede aç
               </Link>
@@ -323,7 +323,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
 
       <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
         {/* ── Bu talebin eşleşmeleri ──────────────────────────────────────── */}
-        <section className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+        <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2 border-b border-line px-5 py-4">
             <div>
               <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -354,7 +354,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
               <p className="mt-1 max-w-md text-sm text-text-muted">
                 Kriterlere uyan yayında portföy eklendiğinde burada skorlanır.
               </p>
-              <Link href="/app/portfoyler" className="mt-4 rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white">
+              <Link href="/app/portfoyler" className="mt-4 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white">
                 Portföylere git
               </Link>
             </div>
@@ -366,7 +366,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
                   <article key={m.property.id} className="flex items-center gap-4 px-5 py-4 transition hover:bg-brand-600/[0.02]">
                     <Link
                       href={`/app/portfoyler/${m.property.id}`}
-                      className="relative grid h-16 w-20 shrink-0 place-items-center overflow-hidden rounded-[12px] bg-[image:var(--grad-brand-soft)]"
+                      className="relative grid h-16 w-20 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-card)] bg-[image:var(--grad-brand-soft)]"
                       aria-label={`${m.property.title ?? m.property.property_code} portföyünü aç`}
                     >
                       {coverId ? (
@@ -396,13 +396,13 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
                       </p>
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         {m.reasons.filter((r) => r.ok).slice(0, 4).map((r) => (
-                          <span key={r.label} className="rounded-full bg-mint-500/10 px-2 py-0.5 text-[10px] font-semibold text-mint-600">
+                          <span key={r.label} className="rounded-full bg-mint-500/10 px-2 py-0.5 text-xs font-semibold text-mint-600">
                             {r.label}
                           </span>
                         ))}
                         {m.likedByCustomer ? (
                           <span
-                            className="rounded-full bg-mint-500/12 px-2 py-0.5 text-[10px] font-bold text-mint-600"
+                            className="rounded-full bg-mint-500/12 px-2 py-0.5 text-xs font-bold text-mint-600"
                             title="Müşteri portalında bu portföyü beğendi — skora +10 eklendi"
                           >
                             💚 Müşteri beğendi
@@ -414,7 +414,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
                       <div className="flex items-center gap-2">
                         <span className="font-display text-2xl font-extrabold text-ink-950">{m.score}</span>
-                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${tierCls(m.tier)}`}>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${tierCls(m.tier)}`}>
                           {tierLabel(m.tier)}
                         </span>
                       </div>
@@ -434,7 +434,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
 
         <div className="space-y-4">
           {/* ── Müşteri kartı ─────────────────────────────────────────────── */}
-          <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <Users className="h-4 w-4 text-brand-600" /> Müşteri
             </h2>
@@ -442,7 +442,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
               <>
                 <Link
                   href={`/app/musteriler/${customer.id}`}
-                  className="group mt-3 flex items-center justify-between gap-2 rounded-[14px] border border-line bg-canvas/60 px-4 py-3 transition hover:border-brand-300"
+                  className="group mt-3 flex items-center justify-between gap-2 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-4 py-3 transition hover:border-brand-300"
                 >
                   <div className="min-w-0">
                     <p className="truncate font-display text-base font-bold text-ink-950 group-hover:text-brand-600">
@@ -451,7 +451,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
                     {customer.phone ? (
                       <p className="mt-0.5 text-xs text-text-muted">{formatTurkishPhone(customer.phone)}</p>
                     ) : null}
-                    {agentName ? <p className="mt-0.5 text-[11px] text-text-faint">Danışman: {agentName}</p> : null}
+                    {agentName ? <p className="mt-0.5 text-xs text-text-faint">Danışman: {agentName}</p> : null}
                   </div>
                   <ArrowUpRight className="hover-action h-4 w-4 shrink-0 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                 </Link>
@@ -459,7 +459,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <a
                       href={phoneHref ?? "#"}
-                      className="focus-ring press inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-line bg-surface px-3 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600"
+                      className="focus-ring press inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600"
                     >
                       <PhoneCall className="h-3.5 w-3.5" /> Ara
                     </a>
@@ -468,7 +468,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
                       target="_blank"
                       rel="noreferrer"
                       aria-label={`${customer.full_name} ile WhatsApp görüşmesi`}
-                      className="focus-ring press inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-line bg-surface px-3 py-2 text-xs font-semibold text-ink-950 transition hover:border-mint-500 hover:text-mint-600"
+                      className="focus-ring press inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-ink-950 transition hover:border-mint-500 hover:text-mint-600"
                     >
                       <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
                     </a>
@@ -476,14 +476,14 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
                 ) : null}
               </>
             ) : (
-              <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
+              <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
                 Talebin bağlı olduğu müşteri bulunamadı.
               </p>
             )}
           </section>
 
           {/* ── Durum ─────────────────────────────────────────────────────── */}
-          <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <Target className="h-4 w-4 text-brand-600" /> Durum
             </h2>

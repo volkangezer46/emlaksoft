@@ -74,7 +74,7 @@ export type TemplateCard = {
 const init: PlaybookResult = {};
 
 const fieldClass =
-  "focus-ring w-full rounded-[11px] border border-line bg-canvas px-3 py-2 text-sm text-ink-950 placeholder:text-text-faint";
+  "focus-ring w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm text-ink-950 placeholder:text-text-faint";
 
 function emptyStep(): StepDraft {
   return { title: "", kind: "followup", priority: "normal", offset_days: 0, assign_to: "owner", assignee_id: null, note: null };
@@ -179,7 +179,7 @@ export function PlaybooksManager({
     <div className="space-y-6">
       {/* Hazır şablonlar */}
       {canEdit ? (
-        <section className="rounded-[20px] border border-dashed border-brand-300/40 bg-brand-600/[0.02] p-5">
+        <section className="rounded-[var(--radius-panel)] border border-dashed border-brand-300/40 bg-brand-600/[0.02] p-5">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <Sparkles className="h-4 w-4 text-brand-600" /> Hazır şablondan başla
@@ -187,17 +187,17 @@ export function PlaybooksManager({
             <button
               type="button"
               onClick={openNew}
-              className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white"
+              className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white"
             >
               <Plus className="h-4 w-4" /> Sıfırdan iş akışı
             </button>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {templates.map((t) => (
-              <div key={t.key} className="flex flex-col rounded-[13px] border border-line bg-surface p-3.5">
+              <div key={t.key} className="flex flex-col rounded-[var(--radius-card)] border border-line bg-surface p-3.5">
                 <p className="text-sm font-bold text-ink-950">{t.name}</p>
-                <p className="mt-1 flex-1 text-[11px] leading-relaxed text-text-muted">{t.description}</p>
-                <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                <p className="mt-1 flex-1 text-xs leading-relaxed text-text-muted">{t.description}</p>
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs">
                   <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 font-semibold text-amber-700">
                     <Bolt className="h-3 w-3" /> {t.triggerLabel}
                   </span>
@@ -212,7 +212,7 @@ export function PlaybooksManager({
                   type="button"
                   onClick={() => applyTemplate(t.key)}
                   disabled={rowPending}
-                  className="focus-ring press mt-3 inline-flex items-center justify-center gap-1.5 rounded-[9px] border border-brand-300 px-3 py-1.5 text-xs font-bold text-brand-600 transition hover:bg-brand-600 hover:text-white disabled:opacity-60"
+                  className="focus-ring press mt-3 inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-brand-300 px-3 py-1.5 text-xs font-bold text-brand-600 transition hover:bg-brand-600 hover:text-white disabled:opacity-60"
                 >
                   <Plus className="h-3.5 w-3.5" /> Kopyala (pasif açılır)
                 </button>
@@ -224,10 +224,10 @@ export function PlaybooksManager({
 
       {/* Editör */}
       {canEdit && formOpen ? (
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-4 md:p-6">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
           <div className="flex items-center justify-between gap-3 border-b border-line pb-4">
             <div className="flex items-center gap-3">
-              <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-brand-600/10 text-brand-600">
+              <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
                 {editing ? <Pencil className="h-5 w-5" /> : <Workflow className="h-5 w-5" />}
               </span>
               <div>
@@ -242,7 +242,7 @@ export function PlaybooksManager({
             <button
               type="button"
               onClick={() => { setFormOpen(false); setEditing(null); }}
-              className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+              className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
             >
               <X className="h-3.5 w-3.5" /> Vazgeç
             </button>
@@ -294,11 +294,11 @@ export function PlaybooksManager({
             </div>
 
             {/* Basit eşitlik filtresi */}
-            <div className="rounded-[13px] border border-line bg-canvas p-3.5">
+            <div className="rounded-[var(--radius-card)] border border-line bg-canvas p-3.5">
               <p className="flex items-center gap-1.5 text-xs font-bold text-text-muted">
                 <Filter className="h-3.5 w-3.5 text-brand-600" /> Koşul (opsiyonel)
               </p>
-              <p className="mt-1 text-[11px] text-text-faint">
+              <p className="mt-1 text-xs text-text-faint">
                 Yalnız belirli kayıtlarda çalışsın: alan adı ve değeri girin. Boş bırakılırsa akış olayın her
                 örneğinde çalışır. Örnek: <code>transaction_type</code> = <code>Satılık</code>.
               </p>
@@ -327,7 +327,7 @@ export function PlaybooksManager({
                 {filterHints.flatMap((h) => h.samples).map((v) => <option key={v} value={v} />)}
               </datalist>
               {filterHints.length === 0 ? (
-                <p className="mt-2 text-[11px] text-text-faint">Bu olay için filtrelenebilir alan yok.</p>
+                <p className="mt-2 text-xs text-text-faint">Bu olay için filtrelenebilir alan yok.</p>
               ) : null}
             </div>
 
@@ -338,7 +338,7 @@ export function PlaybooksManager({
                 <button
                   type="button"
                   onClick={() => setSteps((prev) => [...prev, emptyStep()])}
-                  className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
+                  className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
                 >
                   <Plus className="h-3.5 w-3.5" /> Adım ekle
                 </button>
@@ -346,9 +346,9 @@ export function PlaybooksManager({
 
               <ul className="mt-2.5 space-y-2.5">
                 {steps.map((s, i) => (
-                  <li key={i} className="rounded-[13px] border border-line bg-canvas p-3">
+                  <li key={i} className="rounded-[var(--radius-card)] border border-line bg-canvas p-3">
                     <div className="flex items-start gap-2">
-                      <span className="mt-2 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-600/10 text-[11px] font-bold text-brand-600">
+                      <span className="mt-2 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-600/10 text-xs font-bold text-brand-600">
                         {i + 1}
                       </span>
                       <div className="min-w-0 flex-1 space-y-2">
@@ -391,7 +391,7 @@ export function PlaybooksManager({
                               className={fieldClass}
                               aria-label={`${i + 1}. adım kaç gün sonra`}
                             />
-                            <span className="shrink-0 text-[11px] font-semibold text-text-faint">gün sonra</span>
+                            <span className="shrink-0 text-xs font-semibold text-text-faint">gün sonra</span>
                           </div>
                           <select
                             value={s.assign_to}
@@ -434,7 +434,7 @@ export function PlaybooksManager({
                           onClick={() => moveStep(i, -1)}
                           disabled={i === 0}
                           title="Yukarı taşı"
-                          className="focus-ring press grid h-7 w-7 place-items-center rounded-[8px] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-30"
+                          className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-30"
                         >
                           <ArrowUp className="h-3.5 w-3.5" />
                         </button>
@@ -443,7 +443,7 @@ export function PlaybooksManager({
                           onClick={() => moveStep(i, 1)}
                           disabled={i === steps.length - 1}
                           title="Aşağı taşı"
-                          className="focus-ring press grid h-7 w-7 place-items-center rounded-[8px] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-30"
+                          className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-30"
                         >
                           <ArrowDown className="h-3.5 w-3.5" />
                         </button>
@@ -452,7 +452,7 @@ export function PlaybooksManager({
                           onClick={() => setSteps((prev) => (prev.length > 1 ? prev.filter((_, k) => k !== i) : prev))}
                           disabled={steps.length === 1}
                           title="Adımı sil"
-                          className="focus-ring press grid h-7 w-7 place-items-center rounded-[8px] border border-line text-text-muted transition hover:border-danger-500/40 hover:text-danger-500 disabled:opacity-30"
+                          className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/40 hover:text-danger-500 disabled:opacity-30"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -463,7 +463,7 @@ export function PlaybooksManager({
               </ul>
             </div>
 
-            <label className="flex cursor-pointer items-center gap-2.5 rounded-[11px] border border-line bg-canvas px-3.5 py-2.5">
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5">
               <input
                 type="checkbox"
                 name="is_active"
@@ -475,7 +475,7 @@ export function PlaybooksManager({
             </label>
 
             {errorMsg ? (
-              <p className="rounded-[10px] border border-danger-500/25 bg-danger-500/8 px-3 py-2 text-xs font-semibold text-danger-500">
+              <p className="rounded-[var(--radius-control)] border border-danger-500/25 bg-danger-500/8 px-3 py-2 text-xs font-semibold text-danger-500">
                 {errorMsg}
               </p>
             ) : null}
@@ -483,7 +483,7 @@ export function PlaybooksManager({
             <button
               type="submit"
               disabled={pending}
-              className="focus-ring press inline-flex w-full items-center justify-center gap-2 rounded-[11px] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60 sm:w-auto"
+              className="focus-ring press inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60 sm:w-auto"
             >
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
               {editing ? "Değişiklikleri kaydet" : "İş akışını oluştur"}
@@ -493,7 +493,7 @@ export function PlaybooksManager({
       ) : null}
 
       {/* Liste */}
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3.5">
           <h2 className="flex items-center gap-2 text-sm font-bold text-ink-950">
             <Workflow className="h-4 w-4 text-brand-600" /> Kayıtlı iş akışları
@@ -520,7 +520,7 @@ export function PlaybooksManager({
                     <p className="flex items-center gap-2 font-semibold text-ink-950">
                       <span className="truncate">{p.name}</span>
                       <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
                           p.is_active ? "bg-mint-50 text-mint-700" : "bg-zinc-100 text-zinc-500"
                         }`}
                       >
@@ -530,7 +530,7 @@ export function PlaybooksManager({
                     {p.description ? (
                       <p className="mt-0.5 line-clamp-1 text-xs text-text-muted">{p.description}</p>
                     ) : null}
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 font-semibold text-amber-700">
                         <Bolt className="h-3 w-3" /> {p.triggerLabel}
                       </span>
@@ -559,7 +559,7 @@ export function PlaybooksManager({
                         type="button"
                         onClick={() => toggleActive(p)}
                         disabled={rowPending}
-                        className={`focus-ring press rounded-[9px] border px-2.5 py-1.5 text-xs font-bold transition disabled:opacity-50 ${
+                        className={`focus-ring press rounded-[var(--radius-control)] border px-2.5 py-1.5 text-xs font-bold transition disabled:opacity-50 ${
                           p.is_active
                             ? "border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
                             : "border-mint-500/40 text-mint-700 hover:bg-mint-500/10"
@@ -571,7 +571,7 @@ export function PlaybooksManager({
                         type="button"
                         onClick={() => openEdit(p)}
                         title="Düzenle"
-                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
@@ -580,7 +580,7 @@ export function PlaybooksManager({
                           <button
                             type="button"
                             title="Sil"
-                            className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line text-text-muted transition hover:border-danger-500/40 hover:text-danger-500"
+                            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/40 hover:text-danger-500"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -599,20 +599,20 @@ export function PlaybooksManager({
                 {p.steps.length > 0 ? (
                   <ol className="mt-3 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
                     {p.steps.map((s, i) => (
-                      <li key={i} className="flex items-center gap-2 rounded-[10px] border border-line bg-canvas px-2.5 py-1.5">
-                        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand-600/10 text-[10px] font-bold text-brand-600">
+                      <li key={i} className="flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5">
+                        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand-600/10 text-xs font-bold text-brand-600">
                           {i + 1}
                         </span>
                         <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ink-950">{s.title}</span>
-                        <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${PRIORITY_BADGE[s.priority] ?? PRIORITY_BADGE.normal}`}>
+                        <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-xs font-bold ${PRIORITY_BADGE[s.priority] ?? PRIORITY_BADGE.normal}`}>
                           {PLAYBOOK_KIND_LABELS[s.kind] ?? s.kind}
                         </span>
-                        <span className="shrink-0 text-[10px] font-semibold text-text-faint">{offsetLabel(s.offset_days)}</span>
+                        <span className="shrink-0 text-xs font-semibold text-text-faint">{offsetLabel(s.offset_days)}</span>
                       </li>
                     ))}
                   </ol>
                 ) : (
-                  <p className="mt-3 rounded-[10px] border border-dashed border-line px-3 py-2 text-xs text-text-faint">
+                  <p className="mt-3 rounded-[var(--radius-control)] border border-dashed border-line px-3 py-2 text-xs text-text-faint">
                     Adım yok — bu akış yayına alınamaz.
                   </p>
                 )}

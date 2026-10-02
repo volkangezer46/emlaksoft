@@ -121,7 +121,7 @@ export function PropertyKeysSection({
   const lost = keys.filter((k) => k.status === "kayip").length;
 
   return (
-    <section id="anahtarlar" className="scroll-mt-24 rounded-[20px] border border-line bg-surface p-5">
+    <section id="anahtarlar" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
@@ -131,7 +131,7 @@ export function PropertyKeysSection({
         </div>
         <div className="flex items-center gap-2">
           {keys.length > 0 ? (
-            <p className="text-[11px] text-text-muted">
+            <p className="text-xs text-text-muted">
               {keys.length} anahtar
               {outside > 0 ? ` · ${outside} dışarıda` : ""}
               {overdue > 0 ? ` · ${overdue} gecikmiş` : ""}
@@ -143,7 +143,7 @@ export function PropertyKeysSection({
               type="button"
               onClick={() => setAdding((v) => !v)}
               aria-expanded={adding}
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border border-line px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
+              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
             >
               <Plus className="h-3.5 w-3.5" /> Anahtar ekle
             </button>
@@ -156,7 +156,7 @@ export function PropertyKeysSection({
         <form
           ref={addFormRef}
           action={addAction}
-          className="mt-4 flex flex-wrap items-end gap-2 rounded-[14px] border border-dashed border-line-strong bg-canvas/60 p-3"
+          className="mt-4 flex flex-wrap items-end gap-2 rounded-[var(--radius-card)] border border-dashed border-line-strong bg-canvas/60 p-3"
         >
           <input type="hidden" name="property_id" value={propertyId} />
           <label className="min-w-[160px] flex-1 text-xs font-semibold text-text-muted">
@@ -166,7 +166,7 @@ export function PropertyKeysSection({
               required
               maxLength={80}
               placeholder="Örn. Ana kapı"
-              className="mt-1 w-full rounded-[10px] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
+              className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
             />
           </label>
           <label className="min-w-[120px] text-xs font-semibold text-text-muted">
@@ -175,7 +175,7 @@ export function PropertyKeysSection({
               name="key_code"
               maxLength={40}
               placeholder="Etiket / numara"
-              className="mt-1 w-full rounded-[10px] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
+              className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
             />
           </label>
           <label className="min-w-[160px] flex-1 text-xs font-semibold text-text-muted">
@@ -184,13 +184,13 @@ export function PropertyKeysSection({
               name="note"
               maxLength={500}
               placeholder="Opsiyonel"
-              className="mt-1 w-full rounded-[10px] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
+              className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
             />
           </label>
           <button
             type="submit"
             disabled={addPending}
-            className="btn-shine focus-ring press inline-flex h-[38px] items-center gap-1.5 rounded-[10px] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+            className="btn-shine focus-ring press inline-flex h-[38px] items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
           >
             <Plus className="h-4 w-4" /> {addPending ? "Ekleniyor…" : "Ekle"}
           </button>
@@ -203,8 +203,8 @@ export function PropertyKeysSection({
       ) : null}
 
       {keys.length === 0 ? (
-        <div className="mt-4 rounded-[14px] border border-dashed border-line-strong px-4 py-10 text-center">
-          <span className="mx-auto grid h-12 w-12 place-items-center rounded-[14px] bg-brand-600/10 text-brand-600">
+        <div className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center">
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
             <KeyRound className="h-6 w-6" />
           </span>
           <p className="mt-3 text-sm font-semibold text-ink-950">Bu portföyün anahtar kaydı yok</p>
@@ -227,7 +227,7 @@ export function PropertyKeysSection({
             return (
               <li
                 key={key.id}
-                className={`rounded-[14px] border bg-canvas px-4 py-3 transition ${
+                className={`rounded-[var(--radius-card)] border bg-canvas px-4 py-3 transition ${
                   overdueDays > 0 ? "border-danger-500/35 bg-danger-500/[0.03]" : "border-line"
                 }`}
               >
@@ -237,15 +237,15 @@ export function PropertyKeysSection({
                       <KeyRound className="h-4 w-4 shrink-0 text-text-faint" />
                       {key.label}
                       {key.key_code ? (
-                        <span className="rounded-md bg-ink-950/5 px-1.5 py-0.5 text-[10px] font-bold text-text-muted">
+                        <span className="rounded-md bg-ink-950/5 px-1.5 py-0.5 text-xs font-bold text-text-muted">
                           #{key.key_code}
                         </span>
                       ) : null}
-                      <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${keyStatusTone(key.status)}`}>
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${keyStatusTone(key.status)}`}>
                         {keyStatusLabel(key.status)}
                       </span>
                       {overdueDays > 0 ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-danger-500/10 px-2 py-0.5 text-[11px] font-bold text-danger-600">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-danger-500/10 px-2 py-0.5 text-xs font-bold text-danger-600">
                           <AlertTriangle className="h-3 w-3" /> {overdueDays} gün gecikmiş
                         </span>
                       ) : null}
@@ -279,7 +279,7 @@ export function PropertyKeysSection({
                             setHolderType("staff");
                           }}
                           aria-expanded={checkoutFor === key.id}
-                          className="focus-ring press inline-flex items-center gap-1.5 rounded-[9px] border border-line px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
+                          className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
                         >
                           <LogOut className="h-3.5 w-3.5" /> Çıkış ver
                         </button>
@@ -289,7 +289,7 @@ export function PropertyKeysSection({
                           <input type="hidden" name="key_id" value={key.id} />
                           <button
                             type="submit"
-                            className="focus-ring press inline-flex items-center gap-1.5 rounded-[9px] bg-mint-500/12 px-2.5 py-1.5 text-xs font-semibold text-mint-700 transition hover:bg-mint-500/20"
+                            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-mint-500/12 px-2.5 py-1.5 text-xs font-semibold text-mint-700 transition hover:bg-mint-500/20"
                           >
                             <Undo2 className="h-3.5 w-3.5" /> İade al
                           </button>
@@ -306,7 +306,7 @@ export function PropertyKeysSection({
                             <button
                               type="button"
                               aria-label={`${key.label} anahtarını kayıp bildir`}
-                              className="focus-ring press grid h-7 w-7 place-items-center rounded-[8px] text-text-faint transition hover:bg-amber-400/15 hover:text-amber-600"
+                              className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-amber-400/15 hover:text-amber-600"
                               title="Kayıp bildir"
                             >
                               <AlertTriangle className="h-3.5 w-3.5" />
@@ -325,7 +325,7 @@ export function PropertyKeysSection({
                             <button
                               type="button"
                               aria-label={`${key.label} anahtarını sil`}
-                              className="focus-ring press grid h-7 w-7 place-items-center rounded-[8px] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600"
+                              className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -341,7 +341,7 @@ export function PropertyKeysSection({
                   <form action={outAction} className="hairline-t mt-3 grid gap-2 pt-3 sm:grid-cols-2">
                     <input type="hidden" name="key_id" value={key.id} />
                     <input type="hidden" name="holder_type" value={holderType} />
-                    <div className="sm:col-span-2 flex items-center gap-1.5 rounded-[10px] border border-line bg-surface p-1 text-xs font-semibold">
+                    <div className="sm:col-span-2 flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface p-1 text-xs font-semibold">
                       {(
                         [
                           ["staff", "Danışman"],
@@ -353,7 +353,7 @@ export function PropertyKeysSection({
                           type="button"
                           onClick={() => setHolderType(value)}
                           aria-pressed={holderType === value}
-                          className={`focus-ring flex-1 rounded-[8px] px-3 py-1.5 transition ${
+                          className={`focus-ring flex-1 rounded-[var(--radius-control)] px-3 py-1.5 transition ${
                             holderType === value ? "bg-ink-950 text-white" : "text-text-muted hover:text-ink-950"
                           }`}
                         >
@@ -369,7 +369,7 @@ export function PropertyKeysSection({
                           name="holder_staff_id"
                           required
                           defaultValue=""
-                          className="mt-1 w-full rounded-[10px] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
+                          className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
                         >
                           <option value="" disabled>
                             Seçin…
@@ -390,7 +390,7 @@ export function PropertyKeysSection({
                             required
                             maxLength={120}
                             placeholder="Örn. Ayşe Yılmaz"
-                            className="mt-1 w-full rounded-[10px] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
+                            className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
                           />
                         </label>
                         <label className="text-xs font-semibold text-text-muted">
@@ -400,7 +400,7 @@ export function PropertyKeysSection({
                             maxLength={30}
                             inputMode="tel"
                             placeholder="0555 000 00 00"
-                            className="mt-1 w-full rounded-[10px] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
+                            className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
                           />
                         </label>
                       </>
@@ -412,7 +412,7 @@ export function PropertyKeysSection({
                         type="date"
                         name="due_at"
                         defaultValue={defaultDueDate}
-                        className="mt-1 w-full rounded-[10px] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
+                        className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
                       />
                     </label>
                     <label className="text-xs font-semibold text-text-muted sm:col-span-2">
@@ -421,21 +421,21 @@ export function PropertyKeysSection({
                         name="note"
                         maxLength={500}
                         placeholder="Opsiyonel — örn. yer gösterimi için"
-                        className="mt-1 w-full rounded-[10px] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
+                        className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
                       />
                     </label>
                     <div className="flex items-center gap-2 sm:col-span-2">
                       <button
                         type="submit"
                         disabled={outPending}
-                        className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+                        className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
                       >
                         <LogOut className="h-3.5 w-3.5" /> {outPending ? "Kaydediliyor…" : "Çıkışı kaydet"}
                       </button>
                       <button
                         type="button"
                         onClick={() => setCheckoutFor(null)}
-                        className="rounded-[10px] px-3 py-2 text-xs font-semibold text-text-muted hover:bg-canvas"
+                        className="rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold text-text-muted hover:bg-canvas"
                       >
                         Vazgeç
                       </button>
@@ -451,7 +451,7 @@ export function PropertyKeysSection({
                 {/* Hareket geçmişi — son 5, genişletilebilir */}
                 {history.length > 0 ? (
                   <details className="group mt-2">
-                    <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-semibold text-text-faint transition hover:text-brand-600 [&::-webkit-details-marker]:hidden">
+                    <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-text-faint transition hover:text-brand-600 [&::-webkit-details-marker]:hidden">
                       <History className="h-3.5 w-3.5" />
                       Hareket geçmişi ({history.length})
                       <span className="text-text-faint group-open:hidden">▾</span>
@@ -459,7 +459,7 @@ export function PropertyKeysSection({
                     </summary>
                     <ol className="mt-2 space-y-1.5 border-l border-line pl-3">
                       {recent.map((e) => (
-                        <li key={e.id} className="text-[11px] text-text-muted">
+                        <li key={e.id} className="text-xs text-text-muted">
                           <span className="font-semibold text-ink-950">
                             {EVENT_LABEL[e.action] ?? e.action}
                           </span>
@@ -472,12 +472,12 @@ export function PropertyKeysSection({
                     {/* 5'ten fazlası ikinci bir katmanda — liste uzayıp kartı boğmasın */}
                     {history.length > 5 ? (
                       <details className="mt-1.5 pl-3">
-                        <summary className="cursor-pointer list-none text-[11px] font-semibold text-brand-600 [&::-webkit-details-marker]:hidden">
+                        <summary className="cursor-pointer list-none text-xs font-semibold text-brand-600 [&::-webkit-details-marker]:hidden">
                           Daha eski {history.length - 5} hareket
                         </summary>
                         <ol className="mt-1.5 space-y-1.5 border-l border-line pl-3">
                           {history.slice(5).map((e) => (
-                            <li key={e.id} className="text-[11px] text-text-muted">
+                            <li key={e.id} className="text-xs text-text-muted">
                               <span className="font-semibold text-ink-950">
                                 {EVENT_LABEL[e.action] ?? e.action}
                               </span>

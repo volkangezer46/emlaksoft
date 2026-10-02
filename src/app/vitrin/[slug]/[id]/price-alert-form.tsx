@@ -7,7 +7,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { createVitrinPriceAlert } from "@/app/actions/vitrin-alerts";
 
 const inputCls =
-  "w-full rounded-[12px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400";
+  "w-full rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400";
 
 /**
  * İlan detayı "Fiyat düşünce haber ver" mini formu — ad + telefon + KVKK.
@@ -53,7 +53,7 @@ export function PriceAlertForm({ slug, propertyId }: { slug: string; propertyId:
 
   if (status === "done") {
     return (
-      <div className="mt-5 rounded-[18px] border border-mint-500/30 bg-mint-500/8 px-5 py-8 text-center" role="status" aria-live="polite">
+      <div className="mt-5 rounded-[var(--radius-panel)] border border-mint-500/30 bg-mint-500/8 px-5 py-8 text-center" role="status" aria-live="polite">
         <CheckCircle2 className="mx-auto h-8 w-8 text-mint-600" />
         <p className="mt-2 font-display text-base font-extrabold text-ink-950">Fiyat alarmı kuruldu</p>
         <p className="mt-1 text-xs text-text-muted">
@@ -64,9 +64,9 @@ export function PriceAlertForm({ slug, propertyId }: { slug: string; propertyId:
   }
 
   return (
-    <div className="mt-5 rounded-[18px] border border-line bg-surface p-5">
+    <div className="mt-5 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <div className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-brand-600/10 text-brand-600">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
           <TrendingDown className="h-5 w-5" />
         </span>
         <div>
@@ -99,7 +99,7 @@ export function PriceAlertForm({ slug, propertyId }: { slug: string; propertyId:
           </div>
         </div>
 
-        <label id="price-alert-consent" htmlFor="price-alert-kvkk" className="flex cursor-pointer items-start gap-2.5 rounded-[12px] border border-line bg-canvas px-3.5 py-3 text-[12px] leading-relaxed text-text-muted transition hover:border-brand-300">
+        <label id="price-alert-consent" htmlFor="price-alert-kvkk" className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-brand-300">
           <input
             id="price-alert-kvkk"
             type="checkbox"
@@ -122,7 +122,7 @@ export function PriceAlertForm({ slug, propertyId }: { slug: string; propertyId:
         <button
           type="submit"
           disabled={status === "loading" || !kvkkAccepted}
-          className="btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-600/90 disabled:opacity-60"
+          className="btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-600/90 disabled:opacity-60"
         >
           {status === "loading" ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellRing className="h-4 w-4" />}
           Alarmı kur

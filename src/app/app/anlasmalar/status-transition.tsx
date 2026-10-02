@@ -85,7 +85,7 @@ export function StatusTransitionBar({
         <button
           type="button"
           disabled={pending}
-          className="focus-ring inline-flex items-center gap-1 rounded-[8px] border border-line bg-surface px-2.5 py-1.5 text-[11px] font-bold text-ink-950 hover:border-brand-300 disabled:opacity-60"
+          className="focus-ring inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs font-bold text-ink-950 hover:border-brand-300 disabled:opacity-60"
         >
           {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Workflow className="h-3.5 w-3.5 text-brand-600" />}
           Geçiş

@@ -54,7 +54,7 @@ export function ShareButton({ valuationId, title }: { valuationId: string; title
         type="button"
         onClick={share}
         disabled={busy}
-        className="focus-ring press inline-flex items-center gap-2 rounded-[10px] border border-line bg-surface px-4 py-2.5 text-sm font-bold text-brand-600 transition hover:border-brand-300 disabled:opacity-50"
+        className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-4 py-2.5 text-sm font-bold text-brand-600 transition hover:border-brand-300 disabled:opacity-50"
       >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
         {shareUrl ? "Linki kopyala" : "Paylaşım linki oluştur"}
@@ -64,13 +64,13 @@ export function ShareButton({ valuationId, title }: { valuationId: string; title
           href={whatsappHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="focus-ring press inline-flex items-center gap-2 rounded-[10px] border border-mint-500/30 bg-mint-500/10 px-4 py-2.5 text-sm font-bold text-mint-700 transition hover:bg-mint-500/20"
+          className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-mint-500/30 bg-mint-500/10 px-4 py-2.5 text-sm font-bold text-mint-700 transition hover:bg-mint-500/20"
         >
           <MessageCircle className="h-4 w-4" /> WhatsApp ile gönder
         </a>
       ) : null}
       {shareUrl ? (
-        <span className="flex min-w-0 items-center gap-1.5 rounded-[10px] border border-brand-300/40 bg-brand-600/5 px-3 py-2 text-xs text-brand-700">
+        <span className="flex min-w-0 items-center gap-1.5 rounded-[var(--radius-control)] border border-brand-300/40 bg-brand-600/5 px-3 py-2 text-xs text-brand-700">
           <Link2 className="h-3.5 w-3.5 shrink-0" />
           <a href={shareUrl} target="_blank" rel="noreferrer" className="truncate font-semibold hover:underline">
             {shareUrl}

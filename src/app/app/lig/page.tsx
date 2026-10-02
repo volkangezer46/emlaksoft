@@ -84,7 +84,7 @@ function RankTrend({ current, previous }: { current: number; previous: number | 
     return (
       <span
         title="Geçen ay ligde mühürlü kaydı yok — ilk kez sıralandı"
-        className="inline-flex items-center rounded-full bg-brand-600/10 px-1.5 py-0.5 text-[9px] font-bold text-brand-700"
+        className="inline-flex items-center rounded-full bg-brand-600/10 px-1.5 py-0.5 text-xs font-bold text-brand-700"
       >
         yeni
       </span>
@@ -102,7 +102,7 @@ function RankTrend({ current, previous }: { current: number; previous: number | 
   return (
     <span
       title={`Geçen aya göre ${Math.abs(delta)} sıra ${up ? "yükseldi" : "geriledi"}`}
-      className={`inline-flex items-center gap-0.5 text-[10px] font-bold tabular-nums ${up ? "text-mint-600" : "text-danger-500"}`}
+      className={`inline-flex items-center gap-0.5 text-xs font-bold tabular-nums ${up ? "text-mint-600" : "text-danger-500"}`}
     >
       {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
       {Math.abs(delta)}
@@ -240,7 +240,7 @@ export default async function LigPage({
     return (
       <div className="tv-zoom space-y-5">
         <TvAutoRefresh intervalMs={30_000} />
-        <div className="theme-dark flex flex-wrap items-center justify-between gap-3 rounded-[16px] bg-[image:var(--grad-ink)] px-6 py-4">
+        <div className="theme-dark flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] px-6 py-4">
           <div className="flex items-center gap-3">
             <span className="status-pulse h-3 w-3 rounded-full bg-mint-400" />
             <p className="font-display text-2xl font-extrabold text-white">
@@ -254,7 +254,7 @@ export default async function LigPage({
             <TvClock />
             <Link
               href={`/app/lig?donem=${period}${keepScope}`}
-              className="focus-ring press rounded-[9px] border border-white/15 bg-white/5 px-3 py-1.5 text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
+              className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3 py-1.5 text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
             >
               Çık
             </Link>
@@ -323,7 +323,7 @@ export default async function LigPage({
   return (
     <div className="space-y-6">
       {/* Hero: dönem seçici + kapsam + TV modu girişi */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -338,7 +338,7 @@ export default async function LigPage({
             <div className="mt-3 flex flex-wrap items-center gap-1">
               <Link
                 href={prevHref}
-                className="focus-ring grid h-8 w-8 place-items-center rounded-[8px] border border-white/15 text-white/70 transition hover:bg-white/10 hover:text-white"
+                className="focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-white/15 text-white/70 transition hover:bg-white/10 hover:text-white"
                 aria-label="Önceki dönem"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -349,14 +349,14 @@ export default async function LigPage({
               {nextHref ? (
                 <Link
                   href={nextHref}
-                  className="focus-ring grid h-8 w-8 place-items-center rounded-[8px] border border-white/15 text-white/70 transition hover:bg-white/10 hover:text-white"
+                  className="focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-white/15 text-white/70 transition hover:bg-white/10 hover:text-white"
                   aria-label="Sonraki dönem"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Link>
               ) : (
                 <span
-                  className="grid h-8 w-8 cursor-not-allowed place-items-center rounded-[8px] border border-white/8 text-white/25"
+                  className="grid h-8 w-8 cursor-not-allowed place-items-center rounded-[var(--radius-control)] border border-white/8 text-white/25"
                   aria-hidden="true"
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -365,7 +365,7 @@ export default async function LigPage({
               {!isCurrent ? (
                 <Link
                   href={`/app/lig${branchId ? `?kapsam=${branchId}` : ""}`}
-                  className="focus-ring ml-1 rounded-[8px] border border-white/15 px-2.5 py-1.5 text-[11px] font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
+                  className="focus-ring ml-1 rounded-[var(--radius-control)] border border-white/15 px-2.5 py-1.5 text-xs font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
                 >
                   Bu ay
                 </Link>
@@ -377,7 +377,7 @@ export default async function LigPage({
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 <Link
                   href={`/app/lig?donem=${period}`}
-                  className={`focus-ring rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                  className={`focus-ring rounded-full px-3 py-1 text-xs font-semibold transition ${
                     branchId === null ? "bg-white text-ink-950" : "border border-white/15 text-white/70 hover:bg-white/10"
                   }`}
                 >
@@ -387,7 +387,7 @@ export default async function LigPage({
                   <Link
                     key={String(b.id)}
                     href={`/app/lig?donem=${period}&kapsam=${b.id}`}
-                    className={`focus-ring rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                    className={`focus-ring rounded-full px-3 py-1 text-xs font-semibold transition ${
                       branchId === String(b.id) ? "bg-white text-ink-950" : "border border-white/15 text-white/70 hover:bg-white/10"
                     }`}
                   >
@@ -401,7 +401,7 @@ export default async function LigPage({
           <div className="flex items-center gap-3">
             <Link
               href="/app/danisman-kpi"
-              className="focus-ring press rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-xs font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
+              className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-xs font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
             >
               Danışman KPI karnesi
             </Link>
@@ -409,7 +409,7 @@ export default async function LigPage({
               href={`/app/lig?donem=${period}${keepScope}&tv=1`}
               title="TV modu — ofis ekranı görünümü"
               aria-label="TV modunu aç"
-              className="focus-ring press grid h-9 w-9 place-items-center rounded-[10px] border border-white/15 bg-white/5 text-white/75 transition hover:bg-white/10 hover:text-white"
+              className="focus-ring press grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-white/15 bg-white/5 text-white/75 transition hover:bg-white/10 hover:text-white"
             >
               <Tv className="h-4 w-4" />
             </Link>
@@ -432,7 +432,7 @@ export default async function LigPage({
         <>
           {/* ── PODYUM: ilk üç ─────────────────────────────────────────── */}
           {podium.length > 0 ? (
-            <section className="dashboard-panel relative overflow-hidden rounded-[22px] border border-line bg-surface p-6">
+            <section className="dashboard-panel relative overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface p-6">
               <div className="pointer-events-none absolute -left-10 -top-16 h-48 w-48 rounded-full bg-amber-400/15 blur-[70px]" />
               <div className="relative">
                 <p className="flex items-center gap-2 text-xs font-semibold text-amber-600">
@@ -448,7 +448,7 @@ export default async function LigPage({
                       <Link
                         key={r.staffId}
                         href={`/app/ekip/${r.staffId}`}
-                        className={`focus-ring press lift group flex flex-col rounded-[18px] border-2 bg-canvas/40 p-4 text-center transition hover:border-brand-300 ${s.tone} ${s.order}`}
+                        className={`focus-ring press lift group flex flex-col rounded-[var(--radius-panel)] border-2 bg-canvas/40 p-4 text-center transition hover:border-brand-300 ${s.tone} ${s.order}`}
                         aria-label={`${r.rank}. sıra: ${r.agent!.fullName} — ${r.total} puan`}
                       >
                         <span className={`mx-auto grid h-14 w-14 place-items-center rounded-full font-display text-base font-extrabold ${s.ring}`}>
@@ -458,11 +458,11 @@ export default async function LigPage({
                           <span aria-hidden="true">{s.medal}</span> {r.agent!.fullName}
                         </p>
                         <p className="numeric font-display text-2xl font-extrabold text-brand-600">{r.total}</p>
-                        <p className="text-[11px] text-text-muted">
+                        <p className="text-xs text-text-muted">
                           puan · {r.badges.length} rozet
                           {r.streak > 0 ? ` · 🔥 ${r.streak} gün` : ""}
                         </p>
-                        <div className={`mt-3 w-full rounded-t-[10px] ${s.bar}`} aria-hidden="true" />
+                        <div className={`mt-3 w-full rounded-t-[var(--radius-control)] ${s.bar}`} aria-hidden="true" />
                       </Link>
                     );
                   })}
@@ -516,12 +516,12 @@ export default async function LigPage({
                         <p className="font-semibold text-ink-950 group-hover:text-brand-600">
                           {r.agent!.fullName}
                           {ben ? (
-                            <span className="ml-1.5 rounded-full bg-brand-600/12 px-1.5 py-0.5 text-[10px] font-bold text-brand-700">
+                            <span className="ml-1.5 rounded-full bg-brand-600/12 px-1.5 py-0.5 text-xs font-bold text-brand-700">
                               sen
                             </span>
                           ) : null}
                         </p>
-                        <p className="text-[11px] capitalize text-text-faint">{r.agent!.role}</p>
+                        <p className="text-xs capitalize text-text-faint">{r.agent!.role}</p>
                       </TD>
                       <TD align="right">
                         <span className="numeric font-display text-base font-extrabold text-brand-600">{r.total}</span>
@@ -557,7 +557,7 @@ export default async function LigPage({
                       </TD>
                       <TD>
                         {r.badges.length === 0 ? (
-                          <span className="text-[11px] text-text-faint">—</span>
+                          <span className="text-xs text-text-faint">—</span>
                         ) : (
                           <span className="flex flex-wrap items-center gap-1">
                             {r.badges.slice(0, 6).map((b) => {
@@ -574,7 +574,7 @@ export default async function LigPage({
                               );
                             })}
                             {r.badges.length > 6 ? (
-                              <span className="text-[11px] font-semibold text-text-muted">+{r.badges.length - 6}</span>
+                              <span className="text-xs font-semibold text-text-muted">+{r.badges.length - 6}</span>
                             ) : null}
                           </span>
                         )}
@@ -607,7 +607,7 @@ export default async function LigPage({
         </div>
 
         {!myStats ? (
-          <p className="rounded-[14px] border border-line bg-canvas px-4 py-3 text-xs text-text-muted">
+          <p className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-xs text-text-muted">
             Rozet galerisi kişiseldir — bu dönemde ligde yarışan bir danışman kaydınız bulunmuyor.
             Aşağıdaki kartlar yine de hangi rozetin nasıl kazanıldığını gösterir.
           </p>
@@ -621,11 +621,11 @@ export default async function LigPage({
             return (
               <div
                 key={b.code}
-                className={`surface-card rounded-[16px] p-4 transition ${kazanildi ? "" : "opacity-55"}`}
+                className={`surface-card rounded-[var(--radius-card)] p-4 transition ${kazanildi ? "" : "opacity-55"}`}
               >
                 <div className="flex items-start gap-3">
                   <span
-                    className={`grid h-11 w-11 shrink-0 place-items-center rounded-[13px] ${
+                    className={`grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] ${
                       kazanildi ? "bg-amber-400/18 text-amber-700" : "bg-ink-950/6 text-text-faint"
                     }`}
                     aria-hidden="true"
@@ -635,14 +635,14 @@ export default async function LigPage({
                   <div className="min-w-0">
                     <p className="flex items-center gap-1.5 font-display text-sm font-bold text-ink-950">
                       {b.name}
-                      <span className="rounded-full bg-ink-950/5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-text-faint">
+                      <span className="rounded-full bg-ink-950/5 px-1.5 py-0.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
                         {b.scope === "monthly" ? "aylık" : "kalıcı"}
                       </span>
                     </p>
                     {kazanildi ? (
                       <>
                         <p className="mt-0.5 text-xs text-text-muted">{b.description}</p>
-                        <p className="mt-1 text-[11px] font-semibold text-mint-700">
+                        <p className="mt-1 text-xs font-semibold text-mint-700">
                           {earnedAt ? `Kazanıldı · ${dateLabel(earnedAt)}` : "Kazanıldı · bu dönem"}
                         </p>
                       </>
@@ -674,13 +674,13 @@ function ScoreRulesCard() {
     { key: "leak_sla_response", hint: "Kayıp-kaçak SLA içinde yanıt" },
   ];
   return (
-    <section className="surface-card rounded-[18px] p-5">
+    <section className="surface-card rounded-[var(--radius-panel)] p-5">
       <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
         <Target className="h-4 w-4" /> Nasıl puan kazanılır
       </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((it) => (
-          <div key={it.key} className="flex items-center justify-between gap-3 rounded-[12px] bg-canvas px-3 py-2.5">
+          <div key={it.key} className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] bg-canvas px-3 py-2.5">
             <span className="text-xs text-text-muted">{it.hint}</span>
             <span className="numeric shrink-0 font-display text-sm font-extrabold text-ink-950">
               +{SCORE_RULES[it.key]}
@@ -688,7 +688,7 @@ function ScoreRulesCard() {
           </div>
         ))}
       </div>
-      <p className="mt-3 text-[11px] text-text-faint">
+      <p className="mt-3 text-xs text-text-faint">
         Puanlar dönem başında sıfırlanır; rozetler kalıcıdır. Kırılım hücrelerine tıklayarak
         ilgili kayıtlara gidebilirsiniz. Rozet kataloğu: {BADGE_BY_CODE.size} rozet.
       </p>

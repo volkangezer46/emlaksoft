@@ -50,7 +50,7 @@ export function MatchedPropertiesWidget({ demands, properties, weights }: Props)
   if (top.length === 0) return null;
 
   return (
-    <section className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+    <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
       <div className="flex items-center justify-between border-b border-line px-5 py-4">
         <div>
           <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
@@ -81,7 +81,7 @@ export function MatchedPropertiesWidget({ demands, properties, weights }: Props)
               href={`/app/portfoyler/${pair.property.id}`}
               className="flex items-center gap-4 px-5 py-3.5 transition hover:bg-brand-600/[0.02]"
             >
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-brand-600/10 text-brand-600">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
                 <Building2 className="h-5 w-5" />
               </span>
 
@@ -102,7 +102,7 @@ export function MatchedPropertiesWidget({ demands, properties, weights }: Props)
                 <span className="font-display text-xl font-extrabold text-ink-950">
                   {pair.score}
                 </span>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${tierCls(pair.tier)}`}>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${tierCls(pair.tier)}`}>
                   {tierLabel(pair.tier)}
                 </span>
                 <Crosshair className="h-4 w-4 text-text-faint" />

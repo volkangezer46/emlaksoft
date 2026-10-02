@@ -170,14 +170,14 @@ export default async function AdminReportsPage({
       </AdminPageHeader>
 
       {/* Tarih aralığı — metrikler seçili aralıktaki kayıtlardan hesaplanır */}
-      <form action="/admin/raporlar" className="flex flex-wrap items-end gap-3 rounded-[16px] border border-line bg-surface p-3">
+      <form action="/admin/raporlar" className="flex flex-wrap items-end gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3">
         <label className="text-xs font-semibold text-text-muted">
           Başlangıç
           <input
             type="date"
             name="from"
             defaultValue={from}
-            className="mt-1 block rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
+            className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
           />
         </label>
         <label className="text-xs font-semibold text-text-muted">
@@ -186,30 +186,30 @@ export default async function AdminReportsPage({
             type="date"
             name="to"
             defaultValue={to}
-            className="mt-1 block rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
+            className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
           />
         </label>
-        <button type="submit" className="focus-ring press rounded-[9px] bg-ink-950 px-3 py-2 text-xs font-semibold text-white">
+        <button type="submit" className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-3 py-2 text-xs font-semibold text-white">
           Uygula
         </button>
         {dateFiltered ? (
           <Link
             href="/admin/raporlar"
-            className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
+            className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
           >
             Tarih: {from ?? "…"} → {to ?? "…"} · temizle
           </Link>
         ) : (
-          <p className="ml-auto text-[11px] text-text-faint">Aralık seçilmezse tüm veri raporlanır.</p>
+          <p className="ml-auto text-xs text-text-faint">Aralık seçilmezse tüm veri raporlanır.</p>
         )}
       </form>
 
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
         <div className="flex items-center justify-between">
           <p className="flex items-center gap-2 text-sm font-semibold text-ink-950"><LineChart className="h-4 w-4 text-brand-600" /> Aktif abonelik kohortu · 12 ay</p>
           <span className="rounded-full bg-mint-500/10 px-2.5 py-1 text-xs font-bold text-mint-600">{moneyTRY(trendFallback[11] ?? 0)}</span>
         </div>
-        <p className="mt-1 text-[11px] text-text-faint">Bugün aktif aboneliklerin başlangıç tarihine göre kümülatif MRR görünümü.</p>
+        <p className="mt-1 text-xs text-text-faint">Bugün aktif aboneliklerin başlangıç tarihine göre kümülatif MRR görünümü.</p>
         <svg viewBox={`0 0 ${W} ${H}`} className="mt-4 w-full overflow-visible" style={{ height: H }} preserveAspectRatio="none">
           <defs>
             <linearGradient id="repTrend" x1="0" y1="0" x2="0" y2="1">
@@ -226,18 +226,18 @@ export default async function AdminReportsPage({
             </circle>
           ))}
         </svg>
-        <div className="mt-1 flex justify-between text-[10px] text-text-faint">
+        <div className="mt-1 flex justify-between text-xs text-text-faint">
           {months.map((m, i) => <span key={i}>{m.label}</span>)}
         </div>
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* plan revenue */}
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-sm font-semibold text-ink-950"><Building2 className="h-4 w-4 text-amber-600" /> Plan geliri</p>
           <div className="mt-4 space-y-3">
             {planRevenue.map((p, i) => (
-              <Link key={p.key} href={`/admin/tenants?plan=${p.key}`} className="focus-ring group block rounded-[8px]">
+              <Link key={p.key} href={`/admin/tenants?plan=${p.key}`} className="focus-ring group block rounded-[var(--radius-control)]">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-ink-950 transition group-hover:text-brand-600">{p.label} <span className="text-text-faint">· {p.count} ofis</span></span>
                   <span className="tabular-nums text-text-muted">{moneyTRY(p.revenue)}</span>
@@ -251,7 +251,7 @@ export default async function AdminReportsPage({
         </section>
 
         {/* status distribution */}
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-sm font-semibold text-ink-950"><PieChart className="h-4 w-4 text-brand-600" /> Durum dağılımı</p>
           <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-ink-950/5">
             {statuses.map((s) => s.count > 0 ? (
@@ -260,7 +260,7 @@ export default async function AdminReportsPage({
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2">
             {statuses.map((s) => (
-              <Link key={s.key} href={`/admin/tenants?durum=${s.key}`} className="focus-ring group flex items-center justify-between rounded-[10px] border border-line bg-canvas/50 px-3 py-2 text-xs transition hover:border-brand-300">
+              <Link key={s.key} href={`/admin/tenants?durum=${s.key}`} className="focus-ring group flex items-center justify-between rounded-[var(--radius-control)] border border-line bg-canvas/50 px-3 py-2 text-xs transition hover:border-brand-300">
                 <span className="flex items-center gap-2 transition group-hover:text-brand-600"><span className={`h-2 w-2 rounded-full ${statusColor[s.key]}`} /> {s.label}</span>
                 <span className="font-bold tabular-nums text-ink-950">{s.count}</span>
               </Link>
@@ -277,19 +277,19 @@ export default async function AdminReportsPage({
       </div>
 
       {/* top tenants */}
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
         <p className="flex items-center gap-2 text-sm font-semibold text-ink-950"><TrendingUp className="h-4 w-4 text-mint-600" /> En değerli ofisler · ilk 6</p>
         <div className="mt-4 space-y-2">
           {topTenants.length === 0 ? (
             <p className="py-6 text-center text-sm text-text-muted">Aktif ofis yok.</p>
           ) : topTenants.map((t, i) => (
-            <Link key={t.id} href={`/admin/tenants/${t.id}`} className="focus-ring group flex items-center gap-3 rounded-[12px] border border-line bg-canvas/50 px-3 py-2.5 transition hover:border-brand-300">
+            <Link key={t.id} href={`/admin/tenants/${t.id}`} className="focus-ring group flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-2.5 transition hover:border-brand-300">
               <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-600/10 text-xs font-bold text-brand-600">{i + 1}</span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-ink-950 transition group-hover:text-brand-600">{t.name}</p>
-                <p className="text-[11px] text-text-faint">{catalogPlanLabel(t.plan)}</p>
+                <p className="text-xs text-text-faint">{catalogPlanLabel(t.plan)}</p>
               </div>
-              <span className="shrink-0 font-display text-sm font-extrabold tabular-nums text-ink-950">{moneyTRY(t.value)}<span className="text-[11px] font-normal text-text-faint">/ay</span></span>
+              <span className="shrink-0 font-display text-sm font-extrabold tabular-nums text-ink-950">{moneyTRY(t.value)}<span className="text-xs font-normal text-text-faint">/ay</span></span>
               <ArrowUpRight className="hover-action h-4 w-4 shrink-0 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
             </Link>
           ))}
@@ -297,18 +297,18 @@ export default async function AdminReportsPage({
       </section>
 
       {/* Modül benimseme — tüm ofislerde son 30 gün kullanım yaygınlığı */}
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="flex items-center gap-2 text-sm font-semibold text-ink-950">
             <LayoutGrid className="h-4 w-4 text-brand-600" /> Modül benimseme · son 30 gün
           </p>
-          <span className="text-[11px] text-text-faint">
+          <span className="text-xs text-text-faint">
             {Number(aggregate.all_tenant_count)} ofis üzerinden · en az 1 işlem yapan ofis oranı
           </span>
         </div>
         <div className="mt-4 space-y-3">
           {adoption.map((a, i) => (
-            <Link key={a.mod} href="/admin/aktivite" className="focus-ring group block rounded-[8px]">
+            <Link key={a.mod} href="/admin/aktivite" className="focus-ring group block rounded-[var(--radius-control)]">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-ink-950 transition group-hover:text-brand-600">
                   {a.mod} <span className="text-text-faint">· {a.offices} ofis</span>
@@ -324,7 +324,7 @@ export default async function AdminReportsPage({
                 />
               </div>
               {lowestMods.has(a.mod) ? (
-                <p className="mt-1 text-[11px] font-semibold text-amber-700">
+                <p className="mt-1 text-xs font-semibold text-amber-700">
                   {a.mod} %{a.pct} — tanıtım fırsatı: ofislere bu modülü anlatan bir duyuru/eğitim planlayın.
                 </p>
               ) : null}

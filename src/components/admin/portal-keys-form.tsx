@@ -44,12 +44,12 @@ function PortalKeyCard({
   }
 
   return (
-    <section className="rounded-[20px] border border-line bg-surface p-5">
+    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <div className="flex items-center justify-between">
         <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
           <RadioTower className="h-4 w-4" /> {label}
         </p>
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
           configured ? "bg-mint-500/12 text-mint-600" : "bg-zinc-100 text-zinc-500"
         }`}>
           {configured ? "Bağlı" : "Tanımsız"}
@@ -57,7 +57,7 @@ function PortalKeyCard({
       </div>
 
       {configured && maskedKey && (
-        <div className="mt-3 flex items-center gap-2 rounded-[10px] border border-line bg-canvas/60 px-3 py-2">
+        <div className="mt-3 flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3 py-2">
           <code className="flex-1 text-xs text-text-muted">{show ? maskedKey : maskedKey}</code>
           <button type="button" onClick={() => setShow((s) => !s)} className="text-text-faint hover:text-ink-950" aria-label="Göster/gizle">
             {show ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -72,14 +72,14 @@ function PortalKeyCard({
             type="password"
             autoComplete="off"
             placeholder="API anahtarı"
-            className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm text-ink-950 outline-none focus:border-brand-300"
+            className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm text-ink-950 outline-none focus:border-brand-300"
           />
           <input
             name="agency_id"
             type="text"
             autoComplete="off"
             placeholder="Acente ID (opsiyonel)"
-            className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm text-ink-950 outline-none focus:border-brand-300"
+            className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm text-ink-950 outline-none focus:border-brand-300"
           />
           <input
             name="base_url"
@@ -87,19 +87,19 @@ function PortalKeyCard({
             autoComplete="off"
             placeholder="Sözleşmedeki API base URL (zorunlu)"
             required
-            className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm text-ink-950 outline-none focus:border-brand-300"
+            className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm text-ink-950 outline-none focus:border-brand-300"
           />
           {result?.error && (
-            <p className="rounded-[8px] bg-red-50 px-3 py-1.5 text-xs text-red-600">{result.error}</p>
+            <p className="rounded-[var(--radius-control)] bg-red-50 px-3 py-1.5 text-xs text-red-600">{result.error}</p>
           )}
           {result?.ok && (
-            <p className="rounded-[8px] bg-mint-500/10 px-3 py-1.5 text-xs text-mint-700">Kaydedildi ✓</p>
+            <p className="rounded-[var(--radius-control)] bg-mint-500/10 px-3 py-1.5 text-xs text-mint-700">Kaydedildi ✓</p>
           )}
           <div className="flex gap-2">
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[10px] bg-brand-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
             >
               <Save className="h-3.5 w-3.5" /> {saving ? "Kaydediliyor…" : "Kaydet"}
             </button>
@@ -108,7 +108,7 @@ function PortalKeyCard({
                 type="button"
                 onClick={handleClear}
                 disabled={clearing}
-                className="inline-flex items-center gap-1 rounded-[10px] border border-line px-3 py-2 text-xs font-semibold text-danger-500 transition hover:bg-red-50 disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-danger-500 transition hover:bg-red-50 disabled:opacity-50"
               >
                 <Trash2 className="h-3.5 w-3.5" /> Sil
               </button>

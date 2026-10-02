@@ -70,7 +70,7 @@ export async function SupportHome({ staffName }: { staffName: string }) {
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-64 w-64 rounded-full bg-brand-500/25 blur-[90px]" />
         <div className="relative">
@@ -83,10 +83,10 @@ export async function SupportHome({ staffName }: { staffName: string }) {
           </p>
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {kpis.map((k) => (
-              <Link key={k.label} href={k.href} className="focus-ring group relative block rounded-[14px] border border-white/12 bg-white/8 p-3 backdrop-blur transition hover:border-white/25 hover:bg-white/12">
+              <Link key={k.label} href={k.href} className="focus-ring group relative block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 backdrop-blur transition hover:border-white/25 hover:bg-white/12">
                 <k.icon className={`h-4 w-4 ${k.tone}`} />
                 <p className="mt-2 font-display text-xl font-extrabold text-white"><CountUp value={k.value} /></p>
-                <p className="text-[11px] text-white/70">{k.label}</p>
+                <p className="text-xs text-white/70">{k.label}</p>
                 <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:opacity-100" />
               </Link>
             ))}
@@ -96,14 +96,14 @@ export async function SupportHome({ staffName }: { staffName: string }) {
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.3fr]">
         {/* Öncelik dağılımı */}
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
             <Siren className="h-4 w-4" /> Açık kuyruk önceliği
           </p>
           <h2 className="mt-1 font-display font-bold text-ink-950">Öncelik dağılımı</h2>
           <div className="mt-5 space-y-3">
             {priorities.map((p, i) => (
-              <Link key={p.key} href={`/admin/tickets?oncelik=${p.key}`} className="focus-ring group block rounded-[8px]">
+              <Link key={p.key} href={`/admin/tickets?oncelik=${p.key}`} className="focus-ring group block rounded-[var(--radius-control)]">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-ink-950 transition group-hover:text-brand-600">{p.label}</span>
                   <span className="tabular-nums text-text-muted">{p.count}</span>
@@ -127,7 +127,7 @@ export async function SupportHome({ staffName }: { staffName: string }) {
         </section>
 
         {/* Açık talepler */}
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
@@ -144,15 +144,15 @@ export async function SupportHome({ staffName }: { staffName: string }) {
               <Link
                 key={t.id}
                 href={`/admin/tickets/${t.id}`}
-                className="flex items-center justify-between gap-3 rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5 transition hover:border-brand-300"
+                className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5 transition hover:border-brand-300"
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink-950">{t.subject}</p>
-                  <p className="text-[11px] text-text-faint">
+                  <p className="text-xs text-text-faint">
                     {nameOf(t.tenant as Rel)} · {statusLabel[t.status] ?? t.status} · {new Date(t.created_at).toLocaleDateString("tr-TR")}
                   </p>
                 </div>
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${priorityChip[t.priority] ?? "bg-ink-950/5 text-text-muted"}`}>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${priorityChip[t.priority] ?? "bg-ink-950/5 text-text-muted"}`}>
                   {priorityLabel[t.priority] ?? t.priority}
                 </span>
               </Link>
@@ -167,8 +167,8 @@ export async function SupportHome({ staffName }: { staffName: string }) {
           { href: "/admin/tickets", title: "Destek kuyruğu", desc: `${openRows.length} açık talep`, icon: LifeBuoy, tone: "bg-mint-500/12 text-mint-600" },
           { href: "/admin/members", title: "Kullanıcılar", desc: "Tüm ofis kullanıcıları", icon: Users, tone: "bg-brand-600/10 text-brand-600" },
         ].map((card) => (
-          <Link key={card.title} href={card.href} className="lift group relative overflow-hidden rounded-[16px] border border-line bg-surface p-4 transition hover:border-brand-300">
-            <span className={`grid h-10 w-10 place-items-center rounded-[12px] ${card.tone}`}>
+          <Link key={card.title} href={card.href} className="lift group relative overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface p-4 transition hover:border-brand-300">
+            <span className={`grid h-10 w-10 place-items-center rounded-[var(--radius-card)] ${card.tone}`}>
               <card.icon className="h-5 w-5" />
             </span>
             <p className="mt-3 font-display font-bold text-ink-950">{card.title}</p>

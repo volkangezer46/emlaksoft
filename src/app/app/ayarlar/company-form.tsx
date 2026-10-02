@@ -20,7 +20,7 @@ type Tenant = {
 };
 
 const fieldClass =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
 export function CompanyForm({ tenant }: { tenant: Tenant }) {
   const [pending, setPending] = useState(false);
@@ -44,9 +44,9 @@ export function CompanyForm({ tenant }: { tenant: Tenant }) {
   }
 
   return (
-    <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-4 md:p-6">
+    <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
       <div className="flex items-center gap-3">
-        <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-brand-600/10 text-brand-600"><Building2 className="h-5 w-5" /></span>
+        <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600"><Building2 className="h-5 w-5" /></span>
         <div>
           <h2 className="font-display font-bold text-ink-950">Firma bilgileri</h2>
           <p className="text-xs text-text-muted">Ofis kimliği, vergi ve yetki belgesi bilgileri.</p>
@@ -102,7 +102,7 @@ export function CompanyForm({ tenant }: { tenant: Tenant }) {
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-color">Marka rengi</label>
           <div className="flex items-center gap-2">
-            <input id="tenant-color" name="brand_color" type="color" defaultValue={tenant.brand_color || "#2563eb"} className="h-11 w-14 cursor-pointer rounded-[10px] border border-line bg-canvas p-1" />
+            <input id="tenant-color" name="brand_color" type="color" defaultValue={tenant.brand_color || "#2563eb"} className="h-11 w-14 cursor-pointer rounded-[var(--radius-control)] border border-line bg-canvas p-1" />
             <span className="text-xs text-text-muted">Panel ve vitrin vurgusunda kullanılır.</span>
           </div>
         </div>
@@ -111,7 +111,7 @@ export function CompanyForm({ tenant }: { tenant: Tenant }) {
 
         <div className="sm:col-span-2 flex items-center justify-end gap-3 border-t border-line pt-4">
           {saved ? <span className="flex items-center gap-1.5 text-sm font-semibold text-mint-600"><Check className="h-4 w-4" /> Kaydedildi</span> : null}
-          <button type="submit" disabled={pending} className="btn-shine inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+          <button type="submit" disabled={pending} className="btn-shine inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
             <Save className="h-4 w-4" /> {pending ? "Kaydediliyor…" : "Değişiklikleri kaydet"}
           </button>
         </div>

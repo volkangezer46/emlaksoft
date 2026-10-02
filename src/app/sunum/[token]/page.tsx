@@ -182,11 +182,11 @@ export default async function PublicPresentationPage({
                   <img
                     src={tenant.logo_url}
                     alt={`${officeName} logosu`}
-                    className="h-11 w-11 shrink-0 rounded-[10px] bg-white object-contain p-1"
+                    className="h-11 w-11 shrink-0 rounded-[var(--radius-control)] bg-white object-contain p-1"
                   />
                 ) : (
                   <span
-                    className="grid h-11 w-11 shrink-0 place-items-center rounded-[10px] font-display text-lg font-extrabold text-white"
+                    className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-control)] font-display text-lg font-extrabold text-white"
                     style={{ backgroundColor: brand }}
                   >
                     {officeName[0]}
@@ -194,7 +194,7 @@ export default async function PublicPresentationPage({
                 )}
                 <div>
                   <p className="font-display text-base font-extrabold leading-tight">{officeName}</p>
-                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/50">Portföy sunumu</p>
+                  <p className="text-xs uppercase tracking-[0.14em] text-white/50">Portföy sunumu</p>
                 </div>
               </div>
 
@@ -208,7 +208,7 @@ export default async function PublicPresentationPage({
                 </p>
               ) : null}
               {pres.note ? (
-                <p className="mt-4 max-w-xl whitespace-pre-line rounded-[14px] border border-white/10 bg-white/5 px-4 py-3 text-sm leading-relaxed text-white/75">
+                <p className="mt-4 max-w-xl whitespace-pre-line rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-3 text-sm leading-relaxed text-white/75">
                   {pres.note}
                 </p>
               ) : null}
@@ -282,11 +282,11 @@ export default async function PublicPresentationPage({
                     <Building2 className="h-14 w-14" />
                   </div>
                 )}
-                <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[11px] font-bold text-ink-950 shadow-[var(--shadow-xs)] backdrop-blur">
+                <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink-950 shadow-[var(--shadow-xs)] backdrop-blur">
                   {index + 1} / {properties.length}
                 </span>
                 <span
-                  className="absolute right-4 top-4 rounded-full px-3 py-1 text-[11px] font-bold uppercase text-white shadow-[var(--shadow-xs)]"
+                  className="absolute right-4 top-4 rounded-full px-3 py-1 text-xs font-bold uppercase text-white shadow-[var(--shadow-xs)]"
                   style={{ backgroundColor: brand }}
                 >
                   {property.transaction_type as string}
@@ -296,7 +296,7 @@ export default async function PublicPresentationPage({
               <div className="p-6 sm:p-8">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: brand }}>
+                    <p className="text-xs font-bold uppercase tracking-[0.08em]" style={{ color: brand }}>
                       {property.property_type as string} · {property.property_code as string}
                     </p>
                     <h2 className="mt-1 font-display text-xl font-extrabold text-ink-950 sm:text-2xl">
@@ -334,7 +334,7 @@ export default async function PublicPresentationPage({
                 {gallery.length > 0 ? (
                   <div className="print-avoid-break mt-5 grid grid-cols-3 gap-2">
                     {gallery.map((media) => (
-                      <div key={media.id} className="relative aspect-[4/3] overflow-hidden rounded-[10px] border border-line bg-canvas">
+                      <div key={media.id} className="relative aspect-[4/3] overflow-hidden rounded-[var(--radius-control)] border border-line bg-canvas">
                         <Image
                           src={media.src}
                           alt="Portföy fotoğrafı"
@@ -355,7 +355,7 @@ export default async function PublicPresentationPage({
         {/* ============ İLETİŞİM CTA ============ */}
         <article className="print-sheet surface-card overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-lg)] print:break-before-page">
           <div className="px-6 py-8 text-center sm:px-10">
-            <span className="mx-auto grid h-12 w-12 place-items-center rounded-[14px]" style={{ backgroundColor: `${brand}1a` }}>
+            <span className="mx-auto grid h-12 w-12 place-items-center rounded-[var(--radius-card)]" style={{ backgroundColor: `${brand}1a` }}>
               <Phone className="h-6 w-6" style={{ color: brand }} />
             </span>
             <h2 className="mt-4 font-display text-xl font-extrabold text-ink-950">Beğendiğiniz portföy oldu mu?</h2>
@@ -373,7 +373,7 @@ export default async function PublicPresentationPage({
                 {telHref ? (
                   <a
                     href={telHref}
-                    className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[12px] px-5 py-3 text-sm font-bold text-white"
+                    className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-card)] px-5 py-3 text-sm font-bold text-white"
                     style={{ backgroundColor: brand }}
                   >
                     <Phone className="h-4 w-4" /> Hemen ara
@@ -384,7 +384,7 @@ export default async function PublicPresentationPage({
                     href={waHref}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="focus-ring press inline-flex items-center gap-2 rounded-[12px] border border-mint-500/40 bg-mint-500/10 px-5 py-3 text-sm font-bold text-mint-600 transition hover:bg-mint-500/20"
+                    className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-card)] border border-mint-500/40 bg-mint-500/10 px-5 py-3 text-sm font-bold text-mint-600 transition hover:bg-mint-500/20"
                   >
                     <MessageCircle className="h-4 w-4" /> WhatsApp&apos;tan yaz
                   </a>
@@ -394,7 +394,7 @@ export default async function PublicPresentationPage({
           </div>
         </article>
 
-        <p className="no-print text-center text-[11px] text-text-faint">
+        <p className="no-print text-center text-xs text-text-faint">
           Bu sayfa size özel bir sunum linkidir ·{" "}
           <Link href="/" className="font-semibold underline-offset-2 transition hover:text-text-muted hover:underline">
             Powered by EmlakSoft

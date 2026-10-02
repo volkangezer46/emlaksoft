@@ -38,7 +38,7 @@ import { PropertyKeysSection } from "./property-keys-section";
 // ---------------------------------------------------------------------------
 
 function Skeleton({ className }: { className: string }) {
-  return <div className={`animate-pulse rounded-[20px] bg-ink-950/[0.06] ${className}`} aria-hidden />;
+  return <div className={`animate-pulse rounded-[var(--radius-panel)] bg-ink-950/[0.06] ${className}`} aria-hidden />;
 }
 
 export const MediaSkeleton = () => <Skeleton className="h-64" />;
@@ -182,7 +182,7 @@ export async function InvestmentSection({
   const oneDecimal = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 });
 
   return (
-    <section className="rounded-[20px] border border-line bg-surface p-5">
+    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
@@ -197,48 +197,48 @@ export async function InvestmentSection({
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         {grossYieldPct != null ? (
           <div
-            className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5"
+            className="rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5"
             title={
               isRentListing
                 ? "Yıllık kira (liste fiyatı × 12) ÷ tahmini değer (bölge satılık medyan ₺/m² × m²). m² veya fiyat yoksa bölge kira çarpanı kullanılır."
                 : "Tahmini yıllık kira (bölge kiralık medyan ₺/m² × m² × 12) ÷ liste fiyatı. m² veya fiyat yoksa bölge kira çarpanı kullanılır."
             }
           >
-            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-text-faint">
               <Percent className="h-3.5 w-3.5 text-mint-600" /> Tahmini yıllık getiri
             </p>
             <p className="mt-1 font-display text-2xl font-extrabold text-ink-950">~%{oneDecimal.format(grossYieldPct)}</p>
-            <p className="text-[11px] text-text-muted">brüt kira getirisi</p>
+            <p className="text-xs text-text-muted">brüt kira getirisi</p>
           </div>
         ) : null}
         {amortYears != null ? (
           <div
-            className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5"
+            className="rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5"
             title="Amortisman = satılık değerin kaç yıllık kira geliriyle karşılandığı (bölge kira çarpanı esaslı)."
           >
-            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-text-faint">
               <Landmark className="h-3.5 w-3.5 text-brand-600" /> Amortisman
             </p>
             <p className="mt-1 font-display text-2xl font-extrabold text-ink-950">{oneDecimal.format(amortYears)} yıl</p>
-            <p className="text-[11px] text-text-muted">kira ile geri dönüş süresi</p>
+            <p className="text-xs text-text-muted">kira ile geri dönüş süresi</p>
           </div>
         ) : null}
         {daysRange ? (
           <div
-            className="rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5"
+            className="rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5"
             title={`Bölgedeki ${isRentListing ? "kiralık" : "satılık"} portföylerin ortalama listede kalma süresi (${Math.round(baseDays ?? 0)} gün), fiyat sağlığına göre ±%25 düzeltilir: yeşil fiyat hızlandırır, kırmızı yavaşlatır.`}
           >
-            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-text-faint">
               <Timer className="h-3.5 w-3.5 text-amber-600" /> Tahmini {isRentListing ? "kiralama" : "satış"} süresi
             </p>
             <p className="mt-1 font-display text-2xl font-extrabold text-ink-950">
               ~{daysRange[0]}–{daysRange[1]} gün
             </p>
-            <p className="text-[11px] text-text-muted">bölge ortalaması + fiyat sağlığı</p>
+            <p className="text-xs text-text-muted">bölge ortalaması + fiyat sağlığı</p>
           </div>
         ) : null}
       </div>
-      <p className="mt-3 text-[11px] leading-relaxed text-text-muted">
+      <p className="mt-3 text-xs leading-relaxed text-text-muted">
         Tahminler yalnızca ofisinizin kendi bölge verisinden (ilçe medyanları) üretilir; dış piyasa endeksi değildir.
       </p>
     </section>
@@ -305,7 +305,7 @@ export async function ClosuresSection({ portalIds }: { portalIds: string[] }) {
   if (closures.length === 0) return null;
 
   return (
-    <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+    <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
       <div className="flex items-center justify-between border-b border-line px-5 py-4">
         <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
           <Siren className="h-4 w-4 text-danger-500" /> Kapanış / kayıp kayıtları

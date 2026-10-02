@@ -200,7 +200,7 @@ export default async function KayipSatisPage() {
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-14 h-52 w-52 rounded-full bg-red-500/25 blur-[90px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -220,39 +220,39 @@ export default async function KayipSatisPage() {
           <div className="flex gap-3">
             <Link
               href="#kritik"
-              className="focus-ring press lift block rounded-[14px] border border-white/12 bg-white/8 p-3 text-center hover:border-white/30"
+              className="focus-ring press lift block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 text-center hover:border-white/30"
             >
               <p className="font-display text-2xl font-extrabold text-red-400">{critical.length}</p>
-              <p className="text-[11px] text-white/70">Kritik</p>
+              <p className="text-xs text-white/70">Kritik</p>
             </Link>
             <Link
               href="#uyari"
-              className="focus-ring press lift block rounded-[14px] border border-white/12 bg-white/8 p-3 text-center hover:border-white/30"
+              className="focus-ring press lift block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 text-center hover:border-white/30"
             >
               <p className="font-display text-2xl font-extrabold text-amber-400">{warning.length}</p>
-              <p className="text-[11px] text-white/70">Uyarı</p>
+              <p className="text-xs text-white/70">Uyarı</p>
             </Link>
             <Link
               href="#kritik"
-              className="focus-ring press lift block rounded-[14px] border border-white/12 bg-white/8 p-3 text-center hover:border-white/30"
+              className="focus-ring press lift block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 text-center hover:border-white/30"
             >
               <p className="font-display text-lg font-extrabold text-white">{money(estLost)}</p>
-              <p className="text-[11px] text-white/70">Tahmini kayıp</p>
+              <p className="text-xs text-white/70">Tahmini kayıp</p>
             </Link>
             {/* Kaybedilen ciro: son 12 ayın lost anlaşmalarının gerçek toplamı */}
             <Link
               href="#radar"
-              className="focus-ring press lift block rounded-[14px] border border-danger-500/30 bg-danger-500/15 p-3 text-center hover:border-danger-400/60"
+              className="focus-ring press lift block rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/15 p-3 text-center hover:border-danger-400/60"
             >
               <p className="font-display text-lg font-extrabold text-danger-300">{money(lostRevenue)}</p>
-              <p className="text-[11px] text-white/70">Kaybedilen ciro · 12 ay</p>
+              <p className="text-xs text-white/70">Kaybedilen ciro · 12 ay</p>
             </Link>
           </div>
         </div>
       </section>
 
       {hiddenCount > 0 ? (
-        <p className="rounded-[12px] border border-line bg-surface px-4 py-2.5 text-xs text-text-muted">
+        <p className="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2.5 text-xs text-text-muted">
           {hiddenCount} müşteri &quot;arandı&quot; veya ertelendiği için gizlendi.
         </p>
       ) : null}
@@ -323,11 +323,11 @@ export default async function KayipSatisPage() {
           <>
             <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
               {/* Kaybedilen ciro paneli */}
-              <div className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+              <div className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
                 <p className="flex items-center gap-2 text-xs font-semibold text-danger-500">
                   <BadgeDollarSign className="h-4 w-4" /> Kaybedilen ciro · 12 ay
                 </p>
-                <Link href="/app/anlasmalar" className="focus-ring group mt-2 block rounded-[10px]">
+                <Link href="/app/anlasmalar" className="focus-ring group mt-2 block rounded-[var(--radius-control)]">
                   <p className="numeric flex items-center gap-1 font-display text-3xl font-extrabold text-danger-500">
                     −{money(lostRevenue)}
                     <ArrowUpRight className="h-4 w-4 text-text-faint opacity-0 transition group-hover:text-danger-500 group-hover:opacity-100" />
@@ -350,21 +350,21 @@ export default async function KayipSatisPage() {
                       <div className="mt-2 h-2 overflow-hidden rounded-full bg-danger-500/15">
                         <div className="bar-live h-full rounded-full bg-mint-500" style={{ width: `${winRate}%` }} />
                       </div>
-                      <p className="text-[11px] text-text-faint">Kazanma oranı %{winRate}</p>
+                      <p className="text-xs text-text-faint">Kazanma oranı %{winRate}</p>
                     </>
                   ) : null}
                 </div>
               </div>
 
               {/* Kayıp nedenleri dağılımı */}
-              <div className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+              <div className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
                 <p className="flex items-center gap-2 text-xs font-semibold text-amber-600">
                   <PieChart className="h-4 w-4" /> Kayıp nedenleri dağılımı
                 </p>
                 <h3 className="mt-1 font-display font-bold text-ink-950">Neden kaybediyoruz?</h3>
                 <div className="mt-5 space-y-3">
                   {reasonBars.map((r, i) => (
-                    <Link key={r.label} href="/app/anlasmalar" className="focus-ring group -m-1 block rounded-[10px] p-1">
+                    <Link key={r.label} href="/app/anlasmalar" className="focus-ring group -m-1 block rounded-[var(--radius-control)] p-1">
                       <div className="mb-1 flex justify-between gap-3 text-xs">
                         <span className="flex min-w-0 items-center gap-1 font-semibold text-ink-950">
                           <span className="truncate">{r.label}</span>
@@ -397,8 +397,8 @@ export default async function KayipSatisPage() {
                     mint: "bg-mint-500/12 text-mint-600",
                   }[ins.tone];
                   return (
-                    <article key={ins.title} className="lift flex gap-3 rounded-[18px] border border-line bg-surface p-5">
-                      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[12px] ${toneCls}`}>
+                    <article key={ins.title} className="lift flex gap-3 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+                      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] ${toneCls}`}>
                         <ins.icon className="h-5 w-5" />
                       </span>
                       <div className="min-w-0">
@@ -413,7 +413,7 @@ export default async function KayipSatisPage() {
                 })}
               </div>
             ) : (
-              <p className="flex items-start gap-2 rounded-[14px] border border-line bg-canvas px-4 py-3 text-xs text-text-muted">
+              <p className="flex items-start gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-xs text-text-muted">
                 <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
                 Desen çıkarmak için henüz yeterli kapanış verisi yok — anlaşmaları kapatırken kayıp nedeni girmek radarın isabetini artırır.
               </p>
@@ -436,7 +436,7 @@ function RiskCard({ risk }: { risk: Awaited<ReturnType<typeof detectLostSaleRisk
   const isCritical = risk.urgency === "critical";
 
   return (
-    <div className={`flex flex-wrap items-center gap-3 rounded-[16px] border px-4 py-3 transition hover:bg-canvas/60 ${
+    <div className={`flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border px-4 py-3 transition hover:bg-canvas/60 ${
       isCritical ? "border-red-200 bg-red-50/50" : "border-amber-200 bg-amber-50/40"
     }`}>
       {/* Avatar */}
@@ -459,7 +459,7 @@ function RiskCard({ risk }: { risk: Awaited<ReturnType<typeof detectLostSaleRisk
           {risk.reasonLabel}
         </p>
         {risk.phone && (
-          <p className="mt-0.5 text-[11px] text-text-faint">{formatTurkishPhone(risk.phone)}</p>
+          <p className="mt-0.5 text-xs text-text-faint">{formatTurkishPhone(risk.phone)}</p>
         )}
       </div>
 
@@ -469,7 +469,7 @@ function RiskCard({ risk }: { risk: Awaited<ReturnType<typeof detectLostSaleRisk
           <>
             <a
               href={toTelHref(risk.phone) ?? "#"}
-              className="grid h-8 w-8 place-items-center rounded-[8px] border border-line bg-surface text-brand-600 transition hover:bg-brand-600/5"
+              className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-brand-600 transition hover:bg-brand-600/5"
               title="Ara"
               aria-label="Ara"
             >
@@ -479,7 +479,7 @@ function RiskCard({ risk }: { risk: Awaited<ReturnType<typeof detectLostSaleRisk
               href={toWhatsAppLink(risk.phone) ?? "#"}
               target="_blank"
               rel="noreferrer"
-              className="grid h-8 w-8 place-items-center rounded-[8px] border border-line bg-surface text-mint-600 transition hover:bg-mint-50"
+              className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-mint-600 transition hover:bg-mint-50"
               title="WhatsApp"
               aria-label="WhatsApp"
             >
@@ -497,7 +497,7 @@ function RiskCard({ risk }: { risk: Awaited<ReturnType<typeof detectLostSaleRisk
             <>
               <input type="hidden" name="phone" value={risk.phone} />
               <label
-                className="flex cursor-pointer items-center gap-1 text-[11px] text-text-muted"
+                className="flex cursor-pointer items-center gap-1 text-xs text-text-muted"
                 title="İşaretliyse görüşme, çağrı geçmişine ve müşteri zaman tüneline de yazılır"
               >
                 <input
@@ -513,7 +513,7 @@ function RiskCard({ risk }: { risk: Awaited<ReturnType<typeof detectLostSaleRisk
           ) : null}
           <button
             type="submit"
-            className="focus-ring press inline-flex items-center gap-1 rounded-[8px] border border-line bg-surface px-2.5 py-1.5 text-[11px] font-semibold text-mint-600 transition hover:bg-mint-500/10"
+            className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/10"
             title="Arandı olarak işaretle (30 gün listeden düşer)"
           >
             <PhoneCall className="h-3.5 w-3.5" /> Arandı ✓
@@ -525,7 +525,7 @@ function RiskCard({ risk }: { risk: Awaited<ReturnType<typeof detectLostSaleRisk
           <input type="hidden" name="reason" value="snoozed" />
           <button
             type="submit"
-            className="focus-ring press inline-flex items-center gap-1 rounded-[8px] border border-line bg-surface px-2.5 py-1.5 text-[11px] font-semibold text-amber-600 transition hover:bg-amber-50"
+            className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-amber-600 transition hover:bg-amber-50"
             title="1 hafta sonra tekrar hatırlat"
           >
             <AlarmClock className="h-3.5 w-3.5" /> 1 hafta ertele
@@ -534,14 +534,14 @@ function RiskCard({ risk }: { risk: Awaited<ReturnType<typeof detectLostSaleRisk
         {/* Takip görevini görevler ekranında aç */}
         <Link
           href="/app/gorevler"
-          className="focus-ring press inline-flex items-center gap-1 rounded-[8px] border border-line bg-surface px-2.5 py-1.5 text-[11px] font-semibold text-text-muted transition hover:bg-canvas hover:text-ink-950"
+          className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:bg-canvas hover:text-ink-950"
           title="Takip görevi oluştur"
         >
           <ClipboardPlus className="h-3.5 w-3.5" /> Görev oluştur
         </Link>
         <Link
           href={`/app/musteriler/${risk.id}`}
-          className="inline-flex items-center gap-1 rounded-[8px] border border-line bg-surface px-2.5 py-1.5 text-[11px] font-semibold text-brand-600 transition hover:bg-brand-600/5"
+          className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-600/5"
         >
           Kart
         </Link>

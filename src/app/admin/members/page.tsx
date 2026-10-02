@@ -123,7 +123,7 @@ export default async function AdminMembersPage({
         {m.phone ? (
           <a
             href={`tel:${m.phone}`}
-            className="focus-ring press inline-flex items-center gap-1 rounded-[8px] border border-hairline bg-surface px-2.5 py-1.5 text-xs font-semibold text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas"
+            className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 text-xs font-semibold text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas"
           >
             <Phone className="h-3 w-3" /> Ara
           </a>
@@ -131,14 +131,14 @@ export default async function AdminMembersPage({
         {m.tenant_id ? (
           <Link
             href={`/admin/tenants/${m.tenant_id}`}
-            className="focus-ring press inline-flex items-center gap-1.5 rounded-[8px] border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-[var(--elev-1)] transition hover:bg-brand-600/5"
+            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-[var(--elev-1)] transition hover:bg-brand-600/5"
           >
             Ofis
           </Link>
         ) : null}
         <Link
           href={`/admin/members/${m.id}`}
-          className="focus-ring press relative z-10 inline-flex items-center gap-1.5 rounded-[8px] border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-[var(--elev-1)] transition hover:bg-brand-600/5"
+          className="focus-ring press relative z-10 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-[var(--elev-1)] transition hover:bg-brand-600/5"
         >
           Detay
         </Link>
@@ -202,7 +202,7 @@ export default async function AdminMembersPage({
         </AdminStatGrid>
       </AdminPageHeader>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-[16px] border border-line bg-surface p-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3">
         <AdminSearchForm
           action="/admin/members"
           defaultValue={query}
@@ -224,7 +224,7 @@ export default async function AdminMembersPage({
             Ofis: {filterTenant.name} <X className="h-3 w-3" />
           </AdminFilterChip>
         ) : null}
-        <p className="ml-auto text-[11px] text-text-faint">
+        <p className="ml-auto text-xs text-text-faint">
           Arama sunucuda çalışır ve tüm sayfaları tarar; tablodaki arama yalnız açık sayfayı süzer.
         </p>
       </div>

@@ -29,10 +29,10 @@ import { useToast } from "@/components/app/toast-provider";
  */
 
 const ROW_BTN =
-  "focus-ring press hover-action relative z-10 grid h-8 w-8 place-items-center rounded-[9px] text-text-faint opacity-0 transition group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40";
+  "focus-ring press hover-action relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-faint opacity-0 transition group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40";
 
 const fieldClass =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
 /** ISO anı datetime-local girdisinin beklediği yerel "YYYY-MM-DDTHH:mm" biçimine çevirir. */
 function toLocalInput(iso: string): string {
@@ -155,7 +155,7 @@ export function RowQuickActions({
                 onChange={(e) => setDue(e.target.value)}
                 className={fieldClass}
               />
-              <p className="mt-1 text-[11px] text-text-faint">Varsayılan: yarın 09:00</p>
+              <p className="mt-1 text-xs text-text-faint">Varsayılan: yarın 09:00</p>
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="quick-task-notes">
@@ -180,7 +180,7 @@ export function RowQuickActions({
               <DialogClose asChild>
                 <button
                   type="button"
-                  className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+                  className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
                 >
                   Vazgeç
                 </button>
@@ -188,7 +188,7 @@ export function RowQuickActions({
               <button
                 type="submit"
                 disabled={taskPending}
-                className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+                className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
               >
                 <Check className="h-4 w-4" /> {taskPending ? "Oluşturuluyor…" : "Görevi oluştur"}
               </button>

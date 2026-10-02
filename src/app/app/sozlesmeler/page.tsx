@@ -74,9 +74,9 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const PAGE_SIZE = 50;
 
 const PAGER_BTN =
-  "focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+  "focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
 const PAGER_BTN_DISABLED =
-  "inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
+  "inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
 function fmtDate(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -232,7 +232,7 @@ export default async function SozlesmelerPage({
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-14 h-52 w-52 rounded-full bg-brand-500/25 blur-[90px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -258,7 +258,7 @@ export default async function SozlesmelerPage({
               <Link
                 key={k.label}
                 href={k.href}
-                className={`focus-ring press lift group block rounded-[14px] border p-3 transition hover:border-brand-300 ${
+                className={`focus-ring press lift group block rounded-[var(--radius-card)] border p-3 transition hover:border-brand-300 ${
                   k.active ? "border-white/35 bg-white/15" : "border-white/12 bg-white/8"
                 }`}
               >
@@ -266,14 +266,14 @@ export default async function SozlesmelerPage({
                   <span className="font-display text-2xl font-extrabold text-white">{k.value}</span>
                   <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                 </span>
-                <p className="text-[11px] text-white/70">{k.label}</p>
+                <p className="text-xs text-white/70">{k.label}</p>
               </Link>
             ))}
           </div>
         </div>
         {signRate != null ? (
           <div className="relative mt-5 max-w-md">
-            <div className="flex items-center justify-between text-[11px] text-white/60">
+            <div className="flex items-center justify-between text-xs text-white/60">
               <span className="flex items-center gap-1.5"><PenLine className="h-3.5 w-3.5 text-mint-400" /> İmza oranı (gönderilen + imzalanan)</span>
               <span className="numeric font-bold text-white">%{signRate}</span>
             </div>
@@ -288,9 +288,9 @@ export default async function SozlesmelerPage({
       {expiring.length > 0 ? (
         <Link
           href={href({ durum: null, yenileme: true })}
-          className="focus-ring press flex flex-wrap items-center gap-3 rounded-[16px] border border-amber-400/40 bg-amber-400/10 px-4 py-3 transition hover:border-amber-400/70"
+          className="focus-ring press flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 transition hover:border-amber-400/70"
         >
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-amber-400/20 text-amber-600">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-amber-400/20 text-amber-600">
             <AlarmClock className="h-4 w-4" />
           </span>
           <span className="min-w-0 flex-1 text-sm text-text-muted">
@@ -326,7 +326,7 @@ export default async function SozlesmelerPage({
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href={href({ durum: null })}
-              className={`rounded-[10px] border px-3.5 py-2 text-xs font-semibold transition ${
+              className={`rounded-[var(--radius-control)] border px-3.5 py-2 text-xs font-semibold transition ${
                 durum === null
                   ? "border-brand-400/50 bg-brand-600/10 text-brand-600"
                   : "border-line bg-surface text-ink-950 hover:border-brand-300"
@@ -338,7 +338,7 @@ export default async function SozlesmelerPage({
               <Link
                 key={value}
                 href={href({ durum: value })}
-                className={`rounded-[10px] border px-3.5 py-2 text-xs font-semibold transition ${
+                className={`rounded-[var(--radius-control)] border px-3.5 py-2 text-xs font-semibold transition ${
                   durum === value
                     ? "border-brand-400/50 bg-brand-600/10 text-brand-600"
                     : "border-line bg-surface text-ink-950 hover:border-brand-300"
@@ -349,7 +349,7 @@ export default async function SozlesmelerPage({
             ))}
             <Link
               href={href({ yenileme: !yenileme })}
-              className={`flex items-center gap-1.5 rounded-[10px] border px-3.5 py-2 text-xs font-semibold transition ${
+              className={`flex items-center gap-1.5 rounded-[var(--radius-control)] border px-3.5 py-2 text-xs font-semibold transition ${
                 yenileme
                   ? "border-amber-400/60 bg-amber-400/10 text-amber-600"
                   : "border-line bg-surface text-text-muted hover:border-amber-400/50 hover:text-amber-600"
@@ -357,7 +357,7 @@ export default async function SozlesmelerPage({
             >
               <AlarmClock className="h-3.5 w-3.5" /> Süresi yaklaşan
             </Link>
-            <span className="numeric ml-auto text-[11px] font-medium tracking-wide text-text-faint">
+            <span className="numeric ml-auto text-xs font-medium tracking-wide text-text-faint">
               {totalFiltered.toLocaleString("tr-TR")} kayıt
             </span>
           </div>
@@ -367,7 +367,7 @@ export default async function SozlesmelerPage({
             <span className="flex items-center gap-1.5 text-xs font-semibold text-text-muted"><CalendarRange className="h-3.5 w-3.5" /> Tarih:</span>
             <Link
               href={href({ from: null, to: null })}
-              className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+              className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                 !from && !to
                   ? "border-brand-400/50 bg-brand-600/10 text-brand-600"
                   : "border-line bg-surface text-text-muted hover:border-brand-300 hover:text-brand-600"
@@ -382,7 +382,7 @@ export default async function SozlesmelerPage({
                   key={p.label}
                   href={href({ from: p.from, to: p.to })}
                   aria-current={active ? "page" : undefined}
-                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                     active
                       ? "border-brand-400/50 bg-brand-600/10 text-brand-600"
                       : "border-line bg-surface text-text-muted hover:border-brand-300 hover:text-brand-600"
@@ -395,7 +395,7 @@ export default async function SozlesmelerPage({
           </div>
 
           {contracts.length === 0 ? (
-            <div className="grid place-items-center rounded-[18px] border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
+            <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
               <FileSignature className="h-8 w-8 text-text-faint" />
               <h2 className="mt-3 font-display text-lg font-bold text-ink-950">
                 {durum ? `“${STATUS_LABELS[durum]}” durumunda sözleşme yok` : "Bu filtrelerle eşleşen sözleşme yok"}
@@ -433,12 +433,12 @@ export default async function SozlesmelerPage({
                           {c.property_id ? (
                             <Link
                               href={`/app/portfoyler/${c.property_id}`}
-                              className="focus-ring relative z-10 mt-0.5 block w-fit rounded-[6px] text-[11px] font-normal text-text-faint transition hover:text-brand-600 hover:underline"
+                              className="focus-ring relative z-10 mt-0.5 block w-fit rounded-[6px] text-xs font-normal text-text-faint transition hover:text-brand-600 hover:underline"
                             >
                               {c.property_label}
                             </Link>
                           ) : c.property_label ? (
-                            <span className="mt-0.5 block text-[11px] font-normal text-text-faint">{c.property_label}</span>
+                            <span className="mt-0.5 block text-xs font-normal text-text-faint">{c.property_label}</span>
                           ) : null}
                         </TD>
                         <TD>
@@ -523,7 +523,7 @@ export default async function SozlesmelerPage({
       )}
 
       {/* Bilgi kutusu */}
-      <section className="rounded-[16px] border border-dashed border-line-strong bg-surface px-5 py-4 text-sm text-text-muted">
+      <section className="rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface px-5 py-4 text-sm text-text-muted">
         <p className="font-semibold text-ink-950">E-imza nasıl çalışır?</p>
         <p className="mt-1">
           Sözleşme taslağı oluşturun → imzalayan kişileri ekleyin → sistem benzersiz bir imza linki oluşturur →

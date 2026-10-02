@@ -14,7 +14,7 @@ import {
 const init: OfferResult = {};
 
 const fieldCls =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
 type PropertyOption = { id: string; property_code: string; title: string | null; list_price: number | null };
 type CustomerOption = { id: string; full_name: string };
@@ -61,7 +61,7 @@ export function NewOfferDialog({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[11px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
         >
           <Plus className="h-4 w-4" /> Yeni teklif
         </button>
@@ -137,7 +137,7 @@ export function NewOfferDialog({
                   placeholder="ör. 3500000"
                 />
                 {selectedPrice && (
-                  <p className="mt-1 text-[11px] text-text-faint">
+                  <p className="mt-1 text-xs text-text-faint">
                     Liste fiyatı: {new Intl.NumberFormat("tr-TR").format(selectedPrice)} ₺
                   </p>
                 )}
@@ -170,7 +170,7 @@ export function NewOfferDialog({
               </div>
 
               {state?.error && (
-                <p className="rounded-[10px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
+                <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
                   {state.error}
                 </p>
               )}
@@ -179,7 +179,7 @@ export function NewOfferDialog({
                 <DialogClose asChild>
                   <button
                     type="button"
-                    className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:border-hairline-strong hover:bg-canvas"
+                    className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:border-hairline-strong hover:bg-canvas"
                   >
                     İptal
                   </button>
@@ -187,7 +187,7 @@ export function NewOfferDialog({
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+                  className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
                 >
                   {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Tag className="h-4 w-4" />}
                   {isPending ? "Kaydediliyor…" : "Teklif oluştur"}

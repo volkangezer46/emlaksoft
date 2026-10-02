@@ -18,7 +18,7 @@ export function CancelContractButton({ id }: { id: string }) {
       trigger={
         <button
           type="button"
-          className="focus-ring press inline-flex items-center gap-1.5 rounded-[9px] border border-danger-500/30 px-3 py-1.5 text-xs font-semibold text-danger-600 transition hover:bg-danger-500/8"
+          className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-danger-500/30 px-3 py-1.5 text-xs font-semibold text-danger-600 transition hover:bg-danger-500/8"
         >
           <Ban className="h-3.5 w-3.5" /> İptal et
         </button>

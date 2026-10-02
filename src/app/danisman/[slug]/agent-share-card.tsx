@@ -59,7 +59,7 @@ export function AgentShareCard({
         <DialogTrigger asChild>
           <button
             type="button"
-            className="focus-ring press flex flex-1 flex-col items-center gap-1 rounded-[12px] px-1 py-2 text-[10px] font-bold text-text-muted transition hover:text-brand-600"
+            className="focus-ring press flex flex-1 flex-col items-center gap-1 rounded-[var(--radius-card)] px-1 py-2 text-xs font-bold text-text-muted transition hover:text-brand-600"
           >
             <Share2 className="h-4 w-4" />
             Paylaş
@@ -95,7 +95,7 @@ export function AgentShareCard({
           icon={<QrCode />}
         />
         <DialogBody className="pt-5">
-          <div className="rounded-[16px] border border-line bg-white p-3">
+          <div className="rounded-[var(--radius-card)] border border-line bg-white p-3">
             {qrSrc ? (
               // The external service receives only this already-public profile URL.
               // eslint-disable-next-line @next/next/no-img-element
@@ -107,17 +107,17 @@ export function AgentShareCard({
                 className="mx-auto h-[240px] w-[240px]"
               />
             ) : (
-              <div className="h-[240px] w-full animate-pulse rounded-[12px] bg-canvas" />
+              <div className="h-[240px] w-full animate-pulse rounded-[var(--radius-card)] bg-canvas" />
             )}
           </div>
-          <code className="mt-3 block truncate rounded-[10px] border border-line bg-canvas px-3 py-2 text-[11px] text-ink-950">
+          <code className="mt-3 block truncate rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs text-ink-950">
             {url}
           </code>
           <button
             type="button"
             onClick={onShare}
             disabled={!url}
-            className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-[12px] bg-brand-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-brand-600/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-card)] bg-brand-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-brand-600/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {copied ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
             {copied ? "Kopyalandı" : "Linki paylaş"}

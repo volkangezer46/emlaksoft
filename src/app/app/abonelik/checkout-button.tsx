@@ -42,8 +42,8 @@ export function CheckoutButton({
         onClick={onClick}
         className={
           variant === "primary"
-            ? "btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[11px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
-            : "inline-flex w-full items-center justify-center gap-2 rounded-[11px] border border-line px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:border-brand-400 disabled:opacity-60"
+            ? "btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+            : "inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:border-brand-400 disabled:opacity-60"
         }
       >
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

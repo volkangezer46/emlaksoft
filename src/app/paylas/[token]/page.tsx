@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 // alınır, galeri alanı yüklenene dek en-boy oranını koruyan iskelet görünür.
 const GalleryLightbox = dynamicImport(
   () => import("@/components/public/gallery-lightbox").then((m) => m.GalleryLightbox),
-  { loading: () => <div className="aspect-[16/10] w-full animate-pulse rounded-[16px] bg-white/10" /> },
+  { loading: () => <div className="aspect-[16/10] w-full animate-pulse rounded-[var(--radius-card)] bg-white/10" /> },
 );
 
 function money(n: number | null) {
@@ -140,7 +140,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
     return (
       <div className="grid min-h-screen place-items-center bg-canvas px-4">
         <div className="text-center">
-          <div className="mx-auto grid h-14 w-14 place-items-center rounded-[16px] bg-danger-500/10">
+          <div className="mx-auto grid h-14 w-14 place-items-center rounded-[var(--radius-card)] bg-danger-500/10">
             <ShieldCheck className="h-7 w-7 text-danger-500" />
           </div>
           <p className="mt-4 text-sm text-text-muted">Bu paylaşım linkinin süresi dolmuş.</p>
@@ -255,20 +255,20 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
 
       <div className="mx-auto max-w-2xl">
         <div className="mb-5 flex items-center justify-center gap-2 text-xs font-semibold text-white/50">
-          <span className="grid h-6 w-6 place-items-center rounded-[8px] bg-white/10 text-[11px] font-bold text-white">
+          <span className="grid h-6 w-6 place-items-center rounded-[var(--radius-control)] bg-white/10 text-xs font-bold text-white">
             {office ? office[0] : "E"}
           </span>
           {office || "EmlakSoft"} tarafından paylaşıldı
         </div>
 
-        <div className="overflow-hidden rounded-[24px] border border-white/15 bg-white/[0.06] shadow-[0_30px_80px_-40px_rgba(0,0,0,0.7)] backdrop-blur-xl">
+        <div className="overflow-hidden rounded-[var(--radius-hero)] border border-white/15 bg-white/[0.06] shadow-[0_30px_80px_-40px_rgba(0,0,0,0.7)] backdrop-blur-xl">
           <div className="relative border-b border-white/10 bg-white/[0.03] px-6 py-6">
             <div className="flex items-center justify-between gap-3">
-              <span className="rounded-full border border-mint-400/25 bg-mint-500/12 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-mint-400">
+              <span className="rounded-full border border-mint-400/25 bg-mint-500/12 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-mint-400">
                 {property.transaction_type}
               </span>
               <span className="flex items-center gap-2">
-                <span className="hidden items-center gap-1.5 text-[11px] font-semibold text-white/40 sm:flex">
+                <span className="hidden items-center gap-1.5 text-xs font-semibold text-white/40 sm:flex">
                   <ShieldCheck className="h-3.5 w-3.5 text-mint-400" /> Doğrulanmış portföy
                 </span>
                 {/* Web Share: link o anki paylaşım adresi (window.location) */}
@@ -310,7 +310,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
                 alt={property.title || property.property_code || "Portföy"}
                 priority
                 sizes="(max-width: 640px) 100vw, 600px"
-                mainClassName="relative aspect-[16/10] w-full overflow-hidden rounded-[16px]"
+                mainClassName="relative aspect-[16/10] w-full overflow-hidden rounded-[var(--radius-card)]"
                 thumbsClassName="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6"
               />
               {tours.length > 0 ? (
@@ -338,7 +338,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
             <p className="mt-1 text-xs font-medium text-white/40">{property.property_type}</p>
 
             {specs.length > 0 && (
-              <div className="mt-5 grid grid-cols-3 divide-x divide-white/10 rounded-[14px] border border-white/10 bg-white/[0.04] py-3 text-center">
+              <div className="mt-5 grid grid-cols-3 divide-x divide-white/10 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] py-3 text-center">
                 {specs.map((s) => (
                   <span key={s.label} className="flex items-center justify-center gap-1.5 text-sm font-medium text-white/75">
                     <s.icon className="h-4 w-4 text-cyan-400" /> {s.label}
@@ -348,22 +348,22 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
             )}
 
             {description ? (
-              <div className="mt-5 rounded-[14px] border border-white/10 bg-white/[0.04] p-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-white/40">İlan açıklaması</p>
+              <div className="mt-5 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.08em] text-white/40">İlan açıklaması</p>
                 <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-white/75">{description}</p>
               </div>
             ) : null}
 
             <div className="mt-5 flex flex-wrap gap-2">
               {["Yetki doğrulandı", "Güncel fiyat", "Aktif ilan"].map((t) => (
-                <span key={t} className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/60">
+                <span key={t} className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-white/60">
                   <Check className="h-3 w-3 text-mint-400" /> {t}
                 </span>
               ))}
             </div>
 
             {agent?.full_name && (
-              <div className="mt-6 flex items-center gap-3 rounded-[14px] border border-white/10 bg-white/[0.04] p-4">
+              <div className="mt-6 flex items-center gap-3 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4">
                 <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[image:var(--grad-brand)] text-sm font-bold text-white">
                   {initials(agent.full_name)}
                 </span>
@@ -379,12 +379,12 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
               {agentTelHref ? (
                 <a
                   href={agentTelHref}
-                  className="btn-shine inline-flex items-center justify-center gap-2 rounded-[12px] bg-white px-4 py-3.5 text-sm font-bold text-ink-950 transition hover:bg-white/90"
+                  className="btn-shine inline-flex items-center justify-center gap-2 rounded-[var(--radius-card)] bg-white px-4 py-3.5 text-sm font-bold text-ink-950 transition hover:bg-white/90"
                 >
                   <Phone className="h-4 w-4" /> Ara
                 </a>
               ) : (
-                <span className="inline-flex items-center justify-center gap-2 rounded-[12px] border border-white/15 px-4 py-3.5 text-sm font-semibold text-white/40">
+                <span className="inline-flex items-center justify-center gap-2 rounded-[var(--radius-card)] border border-white/15 px-4 py-3.5 text-sm font-semibold text-white/40">
                   <Phone className="h-4 w-4" /> Telefon yok
                 </span>
               )}
@@ -393,7 +393,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
                   href={agentWhatsAppLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-[12px] border border-mint-400/30 bg-mint-500/10 px-4 py-3.5 text-sm font-bold text-mint-300 transition hover:bg-mint-500/20"
+                  className="inline-flex items-center justify-center gap-2 rounded-[var(--radius-card)] border border-mint-400/30 bg-mint-500/10 px-4 py-3.5 text-sm font-bold text-mint-300 transition hover:bg-mint-500/20"
                 >
                   <MessageCircle className="h-4 w-4" /> WhatsApp
                 </a>
@@ -409,13 +409,13 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
               )}
             />
 
-            <p className="mt-6 text-center text-[11px] text-white/35">
+            <p className="mt-6 text-center text-xs text-white/35">
               Bu sayfa salt okunur bir paylaşım linkidir · teklif ve randevu için ofisle iletişime geçin
             </p>
           </div>
         </div>
 
-        <p className="mt-6 text-center text-[11px] text-white/30">
+        <p className="mt-6 text-center text-xs text-white/30">
           <Link href="/" className="font-semibold underline-offset-2 transition hover:text-white/70 hover:underline">
             Powered by EmlakSoft
           </Link>{" "}

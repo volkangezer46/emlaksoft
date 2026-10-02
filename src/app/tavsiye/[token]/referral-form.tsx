@@ -7,7 +7,7 @@ import { submitReferralByToken } from "@/app/actions/referral-public";
 import { formatTurkishPhone, sanitizeTurkishPhoneInput, toTelHref, TR_MOBILE_PLACEHOLDER } from "@/lib/phone";
 
 const inputCls =
-  "w-full rounded-[12px] border border-line bg-canvas px-3.5 py-3 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400";
+  "w-full rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-3 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400";
 
 /**
  * Tavsiye formu + teşekkür ekranı.
@@ -48,7 +48,7 @@ export function ReferralForm({
 
   if (done) {
     return (
-      <div className="mt-5 rounded-[14px] border border-mint-500/30 bg-mint-500/8 px-4 py-8 text-center">
+      <div className="mt-5 rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/8 px-4 py-8 text-center">
         <span className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-mint-500/15 text-mint-600">
           <CheckCircle2 className="h-6 w-6" />
         </span>
@@ -63,7 +63,7 @@ export function ReferralForm({
         {telHref ? (
           <a
             href={telHref}
-            className="focus-ring press mt-4 inline-flex items-center gap-2 rounded-[11px] border border-hairline-strong bg-surface px-4 py-2.5 text-sm font-bold text-ink-950 transition hover:bg-canvas"
+            className="focus-ring press mt-4 inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-4 py-2.5 text-sm font-bold text-ink-950 transition hover:bg-canvas"
           >
             <Phone className="h-4 w-4 text-brand-600" />
             {formatTurkishPhone(officePhone)}
@@ -132,7 +132,7 @@ export function ReferralForm({
         />
       </div>
 
-      <label className="flex cursor-pointer items-start gap-2.5 rounded-[12px] border border-line bg-canvas/60 px-3.5 py-3 text-[12px] leading-relaxed text-text-muted transition hover:border-brand-300">
+      <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-brand-300">
         <input
           type="checkbox"
           name="kvkk"
@@ -157,7 +157,7 @@ export function ReferralForm({
 
       {error ? (
         <p
-          className="rounded-[10px] border border-danger-500/25 bg-danger-500/5 px-3 py-2 text-center text-xs font-semibold text-danger-500"
+          className="rounded-[var(--radius-control)] border border-danger-500/25 bg-danger-500/5 px-3 py-2 text-center text-xs font-semibold text-danger-500"
           role="alert"
         >
           {error}
@@ -167,7 +167,7 @@ export function ReferralForm({
       <button
         type="submit"
         disabled={pending || !kvkk}
-        className="btn-shine focus-ring press inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-brand-600 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
+        className="btn-shine focus-ring press inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-brand-600 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
       >
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         Tavsiyemi ilet

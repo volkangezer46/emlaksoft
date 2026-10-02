@@ -268,17 +268,17 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
           {officeSlug ? (
             <Link
               href={`/vitrin/${officeSlug}`}
-              className="focus-ring flex w-fit items-center gap-2.5 rounded-[14px] transition hover:opacity-90"
+              className="focus-ring flex w-fit items-center gap-2.5 rounded-[var(--radius-card)] transition hover:opacity-90"
             >
               <span
-                className="grid h-9 w-9 place-items-center rounded-[11px] text-sm font-extrabold text-white"
+                className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] text-sm font-extrabold text-white"
                 style={{ background: brand }}
               >
                 {office[0]}
               </span>
               <span>
                 <span className="block text-sm font-bold">{office}</span>
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-mint-400">
+                <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-mint-400">
                   Portföy vitrinine git
                 </span>
               </span>
@@ -286,7 +286,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
           ) : (
             <span className="flex w-fit items-center gap-2.5">
               <span
-                className="grid h-9 w-9 place-items-center rounded-[11px] text-sm font-extrabold text-white"
+                className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] text-sm font-extrabold text-white"
                 style={{ background: brand }}
               >
                 {office[0]}
@@ -299,7 +299,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
             {/* Portre veya monogram */}
             <div className="relative shrink-0">
               <span
-                className="absolute -inset-1 rounded-[28px] opacity-60 blur-lg"
+                className="absolute -inset-1 rounded-[var(--radius-hero)] opacity-60 blur-lg"
                 style={{ background: brand }}
                 aria-hidden
               />
@@ -310,11 +310,11 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
                   width={144}
                   height={144}
                   priority
-                  className="relative h-32 w-32 rounded-[26px] border border-white/20 object-cover sm:h-36 sm:w-36"
+                  className="relative h-32 w-32 rounded-[var(--radius-hero)] border border-white/20 object-cover sm:h-36 sm:w-36"
                 />
               ) : (
                 <span
-                  className="relative grid h-32 w-32 place-items-center rounded-[26px] border border-white/20 font-display text-4xl font-extrabold text-white sm:h-36 sm:w-36"
+                  className="relative grid h-32 w-32 place-items-center rounded-[var(--radius-hero)] border border-white/20 font-display text-4xl font-extrabold text-white sm:h-36 sm:w-36"
                   style={{ background: `linear-gradient(140deg, ${brand}, rgba(255,255,255,0.08))` }}
                 >
                   {agentInitials(agent.full_name)}
@@ -381,10 +381,10 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
       <main id="main-content" className="mx-auto max-w-5xl space-y-10 px-4 py-10">
         {/* -------------------------------------------------------- Memnuniyet */}
         {avgScore != null ? (
-          <section className="rounded-[22px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] sm:p-6">
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] sm:p-6">
             <div className="flex flex-wrap items-center gap-5">
               <div className="flex items-center gap-3">
-                <span className="grid h-12 w-12 place-items-center rounded-[15px] bg-amber-400/15 text-amber-500">
+                <span className="grid h-12 w-12 place-items-center rounded-[var(--radius-card)] bg-amber-400/15 text-amber-500">
                   <Star className="h-6 w-6" />
                 </span>
                 <div>
@@ -406,7 +406,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
             {testimonials.length > 0 ? (
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
                 {testimonials.map((t, i) => (
-                  <figure key={i} className="rounded-[16px] border border-line bg-canvas p-4">
+                  <figure key={i} className="rounded-[var(--radius-card)] border border-line bg-canvas p-4">
                     <Quote className="h-4 w-4 text-brand-600" />
                     <blockquote className="mt-2 text-sm leading-relaxed text-ink-950">{t.comment}</blockquote>
                     <figcaption className="mt-3 text-xs font-semibold text-text-muted">{t.who}</figcaption>
@@ -463,7 +463,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
                           <Building2 className="h-10 w-10" />
                         </div>
                       )}
-                      <span className="absolute left-3 top-3 rounded-full bg-ink-950/80 px-2.5 py-1 text-[11px] font-bold uppercase text-white">
+                      <span className="absolute left-3 top-3 rounded-full bg-ink-950/80 px-2.5 py-1 text-xs font-bold uppercase text-white">
                         {p.transaction_type}
                       </span>
                     </div>
@@ -494,14 +494,14 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
                   <Link
                     key={p.id}
                     href={href}
-                    className="lift group overflow-hidden rounded-[18px] border border-line bg-surface transition hover:border-brand-300"
+                    className="lift group overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface transition hover:border-brand-300"
                   >
                     {card}
                   </Link>
                 ) : (
                   <article
                     key={p.id}
-                    className="group overflow-hidden rounded-[18px] border border-line bg-surface"
+                    className="group overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface"
                   >
                     {card}
                   </article>
@@ -512,7 +512,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
         ) : null}
 
         {/* -------------------------------------------------------- İletişim CTA */}
-        <section className="theme-dark overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white sm:p-8">
+        <section className="theme-dark overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white sm:p-8">
           <h2 className="font-display text-xl font-extrabold">Aradığınızı bulamadınız mı?</h2>
           <p className="mt-2 max-w-lg text-sm text-white/60">
             {agent.full_name.split(" ")[0]} size uygun portföyleri bulup yerinde inceleme planlasın.
@@ -543,7 +543,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
             <a
               key={a.key}
               href={a.href}
-              className={`focus-ring press flex flex-1 flex-col items-center gap-1 rounded-[12px] px-1 py-2 text-[10px] font-bold transition ${
+              className={`focus-ring press flex flex-1 flex-col items-center gap-1 rounded-[var(--radius-card)] px-1 py-2 text-xs font-bold transition ${
                 a.primary ? "bg-brand-600 text-white" : "text-text-muted hover:text-brand-600"
               }`}
             >
@@ -555,7 +555,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
         </div>
       </div>
 
-      <footer className="border-t border-line py-6 text-center text-[11px] text-text-faint">
+      <footer className="border-t border-line py-6 text-center text-xs text-text-faint">
         <Link href="/" className="font-semibold underline-offset-2 transition hover:text-brand-600 hover:underline">
           Powered by EmlakSoft
         </Link>{" "}

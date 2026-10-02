@@ -174,12 +174,12 @@ export default async function DealsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-mint-500/20 blur-[90px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-mint-400">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-mint-400">
               <Handshake className="h-3.5 w-3.5" /> Anlaşma hattı
             </p>
             <h1 className="mt-2 font-display text-3xl font-extrabold md:text-4xl">Anlaşma tahtası</h1>
@@ -191,7 +191,7 @@ export default async function DealsPage() {
             <ExportCsvButton
               label="Dışa aktar"
               action={exportDealsCsv}
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
+              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
             />
             {canCreate ? <NewDealDialog properties={properties ?? []} customers={customers ?? []} /> : null}
           </div>
@@ -209,22 +209,22 @@ export default async function DealsPage() {
             <Link
               key={k.label}
               href={k.href}
-              className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-4 backdrop-blur transition hover:border-brand-300"
+              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-4 backdrop-blur transition hover:border-brand-300"
             >
               <div className="flex items-start justify-between">
                 <k.icon className={`h-4 w-4 ${k.tone}`} />
                 <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
               </div>
               <p className="mt-2 truncate font-display text-xl font-extrabold">{k.value}</p>
-              <p className="text-[11px] text-white/45">{k.label}</p>
+              <p className="text-xs text-white/45">{k.label}</p>
             </Link>
           ))}
         </div>
       </section>
 
       {deals.length === 0 ? (
-        <div className="grid place-items-center rounded-[20px] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
-          <span className="grid h-14 w-14 place-items-center rounded-[16px] bg-mint-500/12 text-mint-600">
+        <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
+          <span className="grid h-14 w-14 place-items-center rounded-[var(--radius-card)] bg-mint-500/12 text-mint-600">
             <Handshake className="h-7 w-7" />
           </span>
           <h2 className="mt-4 font-display text-lg font-bold text-ink-950">Satış hattı boş</h2>
@@ -233,7 +233,7 @@ export default async function DealsPage() {
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             {canCreate ? <NewDealDialog properties={properties ?? []} customers={customers ?? []} /> : null}
-            <Link href="/app/portfoyler" className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-brand-600">
+            <Link href="/app/portfoyler" className="rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-semibold text-brand-600">
               Portföye git
             </Link>
           </div>
@@ -242,12 +242,12 @@ export default async function DealsPage() {
         <>
           {/* Satış hunisi — mevcut dağılım + aşamalar arası oran; satırlar sütuna iner */}
           <section id="huni" className="scroll-mt-24 grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-            <div className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+            <div className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">
                   Satış hunisi
                 </h2>
-                <span className="text-[11px] text-text-faint">Aşamadaki kart sayısına göre</span>
+                <span className="text-xs text-text-faint">Aşamadaki kart sayısına göre</span>
               </div>
               <div className="mt-4 space-y-3">
                 {funnel.map((f, i) => {
@@ -257,7 +257,7 @@ export default async function DealsPage() {
                     <div key={f.key}>
                       <Link
                         href={`#sutun-${f.key}`}
-                        className="focus-ring group block rounded-[12px] px-1 py-0.5 transition hover:bg-canvas"
+                        className="focus-ring group block rounded-[var(--radius-card)] px-1 py-0.5 transition hover:bg-canvas"
                       >
                         <div className="flex items-center justify-between gap-3 text-xs">
                           <span className={`font-bold ${f.text}`}>{f.label}</span>
@@ -274,7 +274,7 @@ export default async function DealsPage() {
                         </div>
                       </Link>
                       {conv != null && f.key !== "won" ? (
-                        <p className="mt-0.5 pl-1 text-[10px] text-text-faint">↓ sonraki aşamaya oran %{conv}</p>
+                        <p className="mt-0.5 pl-1 text-xs text-text-faint">↓ sonraki aşamaya oran %{conv}</p>
                       ) : null}
                     </div>
                   );
@@ -283,7 +283,7 @@ export default async function DealsPage() {
               {lost.length > 0 ? (
                 <Link
                   href="#sutun-lost"
-                  className="focus-ring mt-4 flex items-center justify-between rounded-[12px] border border-danger-500/15 bg-danger-500/5 px-3 py-2 text-xs transition hover:border-danger-500/30"
+                  className="focus-ring mt-4 flex items-center justify-between rounded-[var(--radius-card)] border border-danger-500/15 bg-danger-500/5 px-3 py-2 text-xs transition hover:border-danger-500/30"
                 >
                   <span className="font-semibold text-danger-500">Kaybedilen</span>
                   <span className="numeric text-text-muted">
@@ -295,14 +295,14 @@ export default async function DealsPage() {
 
             {/* Aşama bazlı toplam değer şeridi + hat sağlığı */}
             <div className="flex flex-col gap-4">
-              <div className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+              <div className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
                 <h2 className="font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">
                   Aşama bazlı değer
                 </h2>
                 {pipelineValue + wonValue > 0 ? (
                   <>
                     {/* Yığılmış şerit — 2px yüzey boşluklu segmentler, her biri sütuna iner */}
-                    <div className="mt-4 flex h-4 gap-0.5 overflow-hidden rounded-[8px]">
+                    <div className="mt-4 flex h-4 gap-0.5 overflow-hidden rounded-[var(--radius-control)]">
                       {funnel
                         .filter((f) => f.value > 0)
                         .map((f) => (
@@ -336,7 +336,7 @@ export default async function DealsPage() {
               {staleOpen > 0 ? (
                 <Link
                   href="#tahta"
-                  className="focus-ring press flex items-start gap-3 rounded-[16px] border border-amber-400/40 bg-amber-400/10 p-4 transition hover:border-amber-400/70"
+                  className="focus-ring press flex items-start gap-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 p-4 transition hover:border-amber-400/70"
                 >
                   <AlarmClock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                   <span className="text-xs text-text-muted">
@@ -349,13 +349,13 @@ export default async function DealsPage() {
           </section>
 
           {wonTrendTotal > 0 ? (
-            <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <div className="flex flex-wrap items-end justify-between gap-2">
                 <div>
                   <h2 className="font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">
                     Aylık kazanılan ciro
                   </h2>
-                  <p className="mt-0.5 text-[11px] text-text-faint">Son 6 ay · kapanan anlaşma değeri</p>
+                  <p className="mt-0.5 text-xs text-text-faint">Son 6 ay · kapanan anlaşma değeri</p>
                 </div>
                 <p className="numeric font-display text-xl font-extrabold text-mint-600 tabular-nums">{money(wonTrendTotal)}</p>
               </div>

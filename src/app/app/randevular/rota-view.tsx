@@ -135,7 +135,7 @@ export function RotaView({
             <select
               value={selectedAdvisorId}
               onChange={(e) => onAdvisorChange(e.target.value)}
-              className="focus-ring rounded-[10px] border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-ink-950"
+              className="focus-ring rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-ink-950"
               aria-label="Danışman seç"
             >
               {advisors.map((a) => (
@@ -147,7 +147,7 @@ export function RotaView({
           </label>
         ) : null}
         {stops.length > 0 ? (
-          <span className="ml-auto flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1.5 text-[11px] font-bold text-brand-600">
+          <span className="ml-auto flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1.5 text-xs font-bold text-brand-600">
             <Route className="h-3.5 w-3.5" />
             {stops.length} durak
             {totalKm > 0 ? ` · ~${totalKm < 1 ? "<1" : Math.round(totalKm)} km kuş uçuşu` : ""}
@@ -167,7 +167,7 @@ export function RotaView({
       ) : (
         <div className="grid gap-4 xl:grid-cols-[1fr_1.1fr]">
           {/* Durak listesi — saat sırası */}
-          <section className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+          <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
             <div className="flex items-center justify-between border-b border-line px-5 py-4">
               <div>
                 <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
@@ -175,7 +175,7 @@ export function RotaView({
                 </p>
                 <h2 className="mt-1 font-display font-bold text-ink-950">{gunLabel}</h2>
               </div>
-              <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">
+              <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
                 {stops.length} durak
               </span>
             </div>
@@ -184,7 +184,7 @@ export function RotaView({
                 <li key={s.id}>
                   {/* Bacak bilgisi — önceki koordinatlı duraktan geçiş */}
                   {i > 0 ? (
-                    <div className="flex items-center gap-2 py-1.5 pl-3.5 text-[11px] text-text-faint">
+                    <div className="flex items-center gap-2 py-1.5 pl-3.5 text-xs text-text-faint">
                       <ArrowDown className="h-3.5 w-3.5 shrink-0" />
                       {s.leg ? (
                         <>
@@ -204,8 +204,8 @@ export function RotaView({
                     </div>
                   ) : null}
 
-                  <article className="group relative flex gap-3 rounded-[14px] border border-line bg-canvas p-3.5 transition hover:border-brand-300">
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-600 text-[12px] font-extrabold text-white">
+                  <article className="group relative flex gap-3 rounded-[var(--radius-card)] border border-line bg-canvas p-3.5 transition hover:border-brand-300">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-600 text-xs font-extrabold text-white">
                       {s.order}
                     </span>
                     <div className="min-w-0 flex-1">
@@ -223,7 +223,7 @@ export function RotaView({
                         ) : (
                           <span className="truncate text-sm font-semibold text-ink-950">{s.customerName}</span>
                         )}
-                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${s.typeToneCls}`}>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${s.typeToneCls}`}>
                           {s.typeLabel}
                         </span>
                       </div>
@@ -237,7 +237,7 @@ export function RotaView({
                       ) : s.propertyName ? (
                         <p className="mt-1 truncate text-xs text-text-muted">{s.propertyName}</p>
                       ) : null}
-                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-text-faint">
+                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-faint">
                         {s.location ? (
                           <span className="flex items-center gap-1">
                             <MapPin className="h-3 w-3" /> {s.location}
@@ -260,7 +260,7 @@ export function RotaView({
                         href={s.directionsHref}
                         target="_blank"
                         rel="noreferrer"
-                        className="focus-ring press inline-flex h-fit shrink-0 items-center gap-1 rounded-[9px] border border-line bg-surface px-2.5 py-1.5 text-[11px] font-semibold text-brand-600 transition hover:border-brand-300"
+                        className="focus-ring press inline-flex h-fit shrink-0 items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
                       >
                         <Navigation className="h-3 w-3" /> Yol tarifi
                         <ExternalLink className="h-2.5 w-2.5" />
@@ -277,16 +277,16 @@ export function RotaView({
             <div className="space-y-2">
               <RotaMap markers={markers} />
               {markers.length < stops.length ? (
-                <p className="flex items-center gap-1.5 text-[11px] text-text-faint">
+                <p className="flex items-center gap-1.5 text-xs text-text-faint">
                   <MapPinOff className="h-3.5 w-3.5" />
                   {stops.length - markers.length} durak haritada gösterilemiyor — bağlı portföyde koordinat yok.
                 </p>
               ) : null}
             </div>
           ) : (
-            <div className="grid place-items-center rounded-[20px] border border-dashed border-line-strong bg-surface p-4 text-center md:p-8">
+            <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface p-4 text-center md:p-8">
               <div>
-                <span className="mx-auto grid h-14 w-14 place-items-center rounded-[16px] bg-amber-400/15 text-amber-600">
+                <span className="mx-auto grid h-14 w-14 place-items-center rounded-[var(--radius-card)] bg-amber-400/15 text-amber-600">
                   <MapPinOff className="h-7 w-7" />
                 </span>
                 <h3 className="mt-3 font-display font-bold text-ink-950">Harita gösterilemiyor</h3>

@@ -130,7 +130,7 @@ function TicketCreateForm({
             clearable={false}
             aria-label="Talebin açılacağı ofis"
           />
-          <p className="mt-1.5 text-[11px] text-text-faint">Talep ofis adına açılır ve tüm hareketler denetim kaydına işlenir.</p>
+          <p className="mt-1.5 text-xs text-text-faint">Talep ofis adına açılır ve tüm hareketler denetim kaydına işlenir.</p>
         </div>
 
         <div>
@@ -146,7 +146,7 @@ function TicketCreateForm({
             maxLength={TICKET_LIMITS.subjectMax}
             autoComplete="off"
             placeholder="Örn. Portal ilanı gönderim hatası"
-            className="focus-ring w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 outline-none transition placeholder:text-text-faint focus:border-brand-400 focus:bg-surface"
+            className="focus-ring w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 outline-none transition placeholder:text-text-faint focus:border-brand-400 focus:bg-surface"
           />
         </div>
 
@@ -159,13 +159,13 @@ function TicketCreateForm({
               value={category}
               onChange={(event) => setCategory(event.target.value)}
               disabled={categoryPending}
-              className="focus-ring w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 outline-none transition focus:border-brand-400 focus:bg-surface"
+              className="focus-ring w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 outline-none transition focus:border-brand-400 focus:bg-surface"
             >
               {categoryOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
-            {categoryPending ? <p className="mt-1 text-[11px] text-text-faint">Ofis kategorileri yükleniyor…</p> : null}
+            {categoryPending ? <p className="mt-1 text-xs text-text-faint">Ofis kategorileri yükleniyor…</p> : null}
           </div>
           <div>
             <label htmlFor="admin-ticket-priority" className="mb-1.5 block text-xs font-bold text-ink-950">Öncelik</label>
@@ -173,7 +173,7 @@ function TicketCreateForm({
               id="admin-ticket-priority"
               name="priority"
               defaultValue="normal"
-              className="focus-ring w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 outline-none transition focus:border-brand-400 focus:bg-surface"
+              className="focus-ring w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 outline-none transition focus:border-brand-400 focus:bg-surface"
             >
               {[...TICKET_PRIORITY_KEYS].reverse().map((priority) => (
                 <option key={priority} value={priority}>{TICKET_PRIORITY_LABEL[priority]}</option>
@@ -194,18 +194,18 @@ function TicketCreateForm({
             maxLength={TICKET_LIMITS.bodyMax}
             rows={6}
             placeholder="Sorunu, beklenen sonucu ve bilinen ayrıntıları yazın…"
-            className="focus-ring w-full resize-y rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm leading-relaxed text-ink-950 outline-none transition placeholder:text-text-faint focus:border-brand-400 focus:bg-surface"
+            className="focus-ring w-full resize-y rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm leading-relaxed text-ink-950 outline-none transition placeholder:text-text-faint focus:border-brand-400 focus:bg-surface"
           />
         </div>
 
         {categoryError ? (
-          <p role="alert" className="rounded-[10px] border border-amber-400/25 bg-amber-400/[0.08] px-3 py-2.5 text-sm font-semibold text-amber-800">
+          <p role="alert" className="rounded-[var(--radius-control)] border border-amber-400/25 bg-amber-400/[0.08] px-3 py-2.5 text-sm font-semibold text-amber-800">
             {categoryError}
           </p>
         ) : null}
 
         {state.error ? (
-          <p role="alert" className="rounded-[10px] border border-danger-500/20 bg-danger-500/[0.06] px-3 py-2.5 text-sm font-semibold text-danger-700">
+          <p role="alert" className="rounded-[var(--radius-control)] border border-danger-500/20 bg-danger-500/[0.06] px-3 py-2.5 text-sm font-semibold text-danger-700">
             {state.error}
           </p>
         ) : null}

@@ -46,7 +46,7 @@ function CopyButton({ url }: { url: string }) {
       }}
       title="Linki kopyala"
       aria-label="Portal linkini kopyala"
-      className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+      className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
     >
       {copied ? <Check className="h-3.5 w-3.5 text-mint-600" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
@@ -76,14 +76,14 @@ function RevokeButton({ row }: { row: SharedPortalRow }) {
           type="button"
           onClick={revoke}
           disabled={pending}
-          className="rounded-[7px] bg-danger-500 px-2 py-1 text-[11px] font-bold text-white transition hover:bg-danger-600 disabled:opacity-60"
+          className="rounded-[7px] bg-danger-500 px-2 py-1 text-xs font-bold text-white transition hover:bg-danger-600 disabled:opacity-60"
         >
           {pending ? "İptal ediliyor…" : "İptal et"}
         </button>
         <button
           type="button"
           onClick={() => setConfirming(false)}
-          className="rounded-[7px] px-1.5 py-1 text-[11px] font-semibold text-text-muted hover:text-ink-950"
+          className="rounded-[7px] px-1.5 py-1 text-xs font-semibold text-text-muted hover:text-ink-950"
         >
           Vazgeç
         </button>
@@ -97,7 +97,7 @@ function RevokeButton({ row }: { row: SharedPortalRow }) {
       onClick={() => setConfirming(true)}
       title="Linki iptal et"
       aria-label={`${row.subject} portal linkini iptal et`}
-      className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line bg-surface text-text-faint transition hover:border-danger-500/40 hover:text-danger-500"
+      className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-faint transition hover:border-danger-500/40 hover:text-danger-500"
     >
       <XCircle className="h-3.5 w-3.5" />
     </button>
@@ -134,8 +134,8 @@ export function SharedPortals({ rows }: { rows: SharedPortalRow[] }) {
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-[18px] border border-dashed border-line-strong bg-surface px-6 py-10 text-center">
-          <span className="mx-auto grid h-12 w-12 place-items-center rounded-[14px] bg-brand-600/10 text-brand-600">
+        <div className="rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-10 text-center">
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
             <Share2 className="h-6 w-6" />
           </span>
           <p className="mt-4 font-display font-bold text-ink-950">Henüz portal linki paylaşılmadı</p>
@@ -146,13 +146,13 @@ export function SharedPortals({ rows }: { rows: SharedPortalRow[] }) {
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Link
               href="/app/musteriler"
-              className="focus-ring press rounded-[10px] border border-line px-4 py-2 text-sm font-semibold text-ink-950 transition hover:border-brand-300"
+              className="focus-ring press rounded-[var(--radius-control)] border border-line px-4 py-2 text-sm font-semibold text-ink-950 transition hover:border-brand-300"
             >
               Müşteriler
             </Link>
             <Link
               href="/app/portfoyler"
-              className="focus-ring press rounded-[10px] border border-line px-4 py-2 text-sm font-semibold text-ink-950 transition hover:border-brand-300"
+              className="focus-ring press rounded-[var(--radius-control)] border border-line px-4 py-2 text-sm font-semibold text-ink-950 transition hover:border-brand-300"
             >
               Portföyler
             </Link>
@@ -184,7 +184,7 @@ export function SharedPortals({ rows }: { rows: SharedPortalRow[] }) {
                       {row.kind === "customer" ? "Müşteri portalı" : "Malik portalı"}
                     </span>
                     {row.context ? (
-                      <span className="mt-0.5 block truncate text-[11px] font-medium text-text-muted">
+                      <span className="mt-0.5 block truncate text-xs font-medium text-text-muted">
                         {row.context}
                       </span>
                     ) : null}
@@ -210,11 +210,11 @@ export function SharedPortals({ rows }: { rows: SharedPortalRow[] }) {
                   </TD>
                   <TD>
                     {row.expired ? (
-                      <span className="rounded-full bg-ink-950/8 px-2.5 py-1 text-[11px] font-semibold text-text-muted">
+                      <span className="rounded-full bg-ink-950/8 px-2.5 py-1 text-xs font-semibold text-text-muted">
                         Süresi doldu / iptal
                       </span>
                     ) : (
-                      <span className="rounded-full bg-mint-500/10 px-2.5 py-1 text-[11px] font-semibold text-mint-600">
+                      <span className="rounded-full bg-mint-500/10 px-2.5 py-1 text-xs font-semibold text-mint-600">
                         {tarih(row.expiresAt)}&apos;e kadar
                       </span>
                     )}
@@ -231,7 +231,7 @@ export function SharedPortals({ rows }: { rows: SharedPortalRow[] }) {
                             rel="noopener noreferrer"
                             title="Portalı yeni sekmede aç"
                             aria-label="Portalı yeni sekmede aç"
-                            className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
                           >
                             <ExternalLink className="h-3.5 w-3.5" />
                           </a>

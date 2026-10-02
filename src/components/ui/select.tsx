@@ -37,7 +37,7 @@ export function SelectTrigger({
     <SelectPrimitive.Trigger
       {...props}
       className={cn(
-        "flex w-full items-center justify-between gap-2 rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-left text-sm text-ink-950 outline-none transition",
+        "flex w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-left text-sm text-ink-950 outline-none transition",
         "focus:border-brand-400 focus:bg-surface data-[state=open]:border-brand-400 data-[state=open]:bg-surface",
         "disabled:cursor-not-allowed disabled:opacity-60",
         "data-[placeholder]:text-text-faint",
@@ -64,7 +64,7 @@ export function SelectContent({
         {...props}
         position={position}
         className={cn(
-          "popover-in z-[60] max-h-[var(--radix-select-content-available-height)] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-[12px] border border-line bg-surface shadow-[var(--shadow-card)]",
+          "popover-in z-[60] max-h-[var(--radix-select-content-available-height)] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-card)]",
           position === "popper" && "translate-y-1",
           className,
         )}
@@ -90,7 +90,7 @@ export function SelectItem({
     <SelectPrimitive.Item
       {...props}
       className={cn(
-        "relative flex cursor-pointer select-none items-center gap-2 rounded-[8px] py-2 pl-3 pr-8 text-sm text-ink-950 outline-none transition",
+        "relative flex cursor-pointer select-none items-center gap-2 rounded-[var(--radius-control)] py-2 pl-3 pr-8 text-sm text-ink-950 outline-none transition",
         "data-[highlighted]:bg-brand-600/[0.07] data-[highlighted]:text-brand-700",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className,
@@ -111,7 +111,7 @@ export function SelectLabel({
   return (
     <SelectPrimitive.Label
       {...props}
-      className={cn("px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-faint", className)}
+      className={cn("px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-text-faint", className)}
     />
   );
 }

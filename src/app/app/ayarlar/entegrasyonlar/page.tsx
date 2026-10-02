@@ -24,7 +24,7 @@ export default async function EntegrasyonlarPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlar
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-cyan-500/25 blur-[70px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -36,9 +36,9 @@ export default async function EntegrasyonlarPage() {
               yerel kimlik ve güvenlik sözleşmesi tamamlandığında gösterilir; sağlayıcı sağlığı işlem anında ayrıca doğrulanır.
             </p>
           </div>
-          <div className="rounded-[16px] border border-white/12 bg-white/8 px-5 py-4 text-center">
+          <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/8 px-5 py-4 text-center">
             <p className="font-display text-3xl font-extrabold">{configured}/{integrations.length}</p>
-            <p className="text-[11px] text-white/60">yapılandırılmış bağlantı</p>
+            <p className="text-xs text-white/60">yapılandırılmış bağlantı</p>
           </div>
         </div>
       </section>
@@ -50,7 +50,7 @@ export default async function EntegrasyonlarPage() {
         return (
           <section key={cat.key}>
             <div className="flex items-center gap-2.5">
-              <span className="grid h-9 w-9 place-items-center rounded-[11px] bg-brand-600/10 text-brand-600"><Icon className="h-4.5 w-4.5" /></span>
+              <span className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600"><Icon className="h-4.5 w-4.5" /></span>
               <div>
                 <h2 className="font-display text-base font-bold text-ink-950">{cat.label}</h2>
                 <p className="text-xs text-text-muted">{cat.sub}</p>
@@ -62,16 +62,16 @@ export default async function EntegrasyonlarPage() {
                 const configured = it.status === "configured";
                 const planned = it.status === "planned";
                 return (
-                  <div key={it.key} className="rounded-[16px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+                  <div key={it.key} className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <h3 className="text-sm font-bold text-ink-950">{it.name}</h3>
                         {it.turkish ? (
-                          <span className="rounded-full bg-mint-500/12 px-2 py-0.5 text-[10px] font-bold text-mint-600 ring-1 ring-inset ring-mint-500/25">TR</span>
+                          <span className="rounded-full bg-mint-500/12 px-2 py-0.5 text-xs font-bold text-mint-600 ring-1 ring-inset ring-mint-500/25">TR</span>
                         ) : null}
                       </div>
                       <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset ${
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${
                           configured
                             ? "bg-mint-500/12 text-mint-600 ring-mint-500/25"
                             : planned
@@ -103,7 +103,7 @@ export default async function EntegrasyonlarPage() {
         );
       })}
 
-      <p className="rounded-[14px] border border-line bg-canvas/60 px-4 py-3 text-xs text-text-muted">
+      <p className="rounded-[var(--radius-card)] border border-line bg-canvas/60 px-4 py-3 text-xs text-text-muted">
         Kurulum gerekli durumundaki bağlantılar için kimlik bilgileri ve sağlayıcı doğrulaması tamamlanmalıdır. “Planlandı”
         durumundaki servisler, adaptör ve uçtan uca kabul testleri bitmeden canlı özellik olarak değerlendirilmez.
       </p>

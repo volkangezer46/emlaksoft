@@ -31,7 +31,7 @@ export function CampaignActions({
             <button
               type="button"
               title="Gönderim kuyruğuna al"
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[8px] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700"
+              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700"
             >
               <Send className="h-3.5 w-3.5" /> Kuyruğa al
             </button>
@@ -46,7 +46,7 @@ export function CampaignActions({
         />
       )}
       {campaign.status === "sending" && (
-        <span className="inline-flex items-center gap-1.5 rounded-[8px] bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
+        <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Gönderiliyor
         </span>
       )}
@@ -56,7 +56,7 @@ export function CampaignActions({
             <button
               type="button"
               title="Sil"
-              className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[8px] text-text-muted transition hover:bg-red-50 hover:text-red-600"
+              className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-red-50 hover:text-red-600"
               aria-label="Kampanyayı sil"
             >
               <Trash2 className="h-3.5 w-3.5" />

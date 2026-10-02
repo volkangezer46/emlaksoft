@@ -56,7 +56,7 @@ function ScoreBadge({ score }: { score: number }) {
         ? "bg-amber-500/12 text-amber-600"
         : "bg-mint-500/12 text-mint-600";
   return (
-    <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[10px] text-sm font-extrabold tabular-nums ${cls}`}>
+    <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-sm font-extrabold tabular-nums ${cls}`}>
       {score}
     </span>
   );
@@ -132,10 +132,10 @@ export default async function SatisfactionReportPage() {
   return (
     <div className="space-y-6">
       {/* Hero — rapor merkezi deseni (koyu bant + KPI kartları) */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="relative">
-          <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-cyan-400">
+          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-cyan-400">
             <Smile className="h-3.5 w-3.5" /> Rapor merkezi · Memnuniyet
           </p>
           <h1 className="mt-2 font-display text-3xl font-extrabold">Müşteri memnuniyeti (NPS)</h1>
@@ -181,22 +181,22 @@ export default async function SatisfactionReportPage() {
             <a
               key={k.label}
               href={k.href}
-              className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-4 hover:border-white/30"
+              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-4 hover:border-white/30"
             >
               <span className="flex items-start justify-between">
                 <k.icon className={`h-4 w-4 ${k.tone}`} />
                 <ArrowUpRight className="hover-action h-4 w-4 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
               </span>
               <p className={`mt-2 font-display text-xl font-extrabold ${k.label === "NPS skoru" ? k.tone : ""}`}>{k.value}</p>
-              <p className="text-[11px] text-white/45">{k.label}</p>
-              <p className="mt-0.5 text-[11px] text-white/35">{k.sub}</p>
+              <p className="text-xs text-white/45">{k.label}</p>
+              <p className="mt-0.5 text-xs text-white/35">{k.sub}</p>
             </a>
           ))}
         </div>
       </section>
 
       {/* Anket oluştur — kapanan ve anketi olmayan anlaşmalar */}
-      <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center gap-2">
           <Send className="h-4 w-4 text-brand-600" />
           <h2 className="font-display font-bold text-ink-950">Anket oluştur</h2>
@@ -246,7 +246,7 @@ export default async function SatisfactionReportPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Danışman bazlı NPS */}
-        <section id="danisman" className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section id="danisman" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-brand-600" />
             <h2 className="font-display font-bold text-ink-950">Danışman bazlı</h2>
@@ -259,7 +259,7 @@ export default async function SatisfactionReportPage() {
             <div className="mt-4 overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-line text-left text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted">
+                  <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-muted">
                     <th className="py-2 pr-3">Danışman</th>
                     <th className="py-2 pr-3 text-right">Yanıt</th>
                     <th className="py-2 pr-3 text-right">NPS</th>
@@ -302,7 +302,7 @@ export default async function SatisfactionReportPage() {
         </section>
 
         {/* Bekleyen anketler — link kopyala */}
-        <section id="bekleyen" className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section id="bekleyen" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center gap-2">
             <Hourglass className="h-4 w-4 text-amber-500" />
             <h2 className="font-display font-bold text-ink-950">Bekleyen anketler</h2>
@@ -340,7 +340,7 @@ export default async function SatisfactionReportPage() {
       </div>
 
       {/* Son yorumlar */}
-      <section id="yorumlar" className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <section id="yorumlar" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex items-center gap-2">
           <MessageSquareQuote className="h-4 w-4 text-brand-600" />
           <h2 className="font-display font-bold text-ink-950">Son yorumlar</h2>
@@ -355,7 +355,7 @@ export default async function SatisfactionReportPage() {
             {comments.map((s) => {
               const cust = rel(s.customer as Rel);
               return (
-                <li key={String(s.id)} className="rounded-[14px] border border-line bg-canvas/60 p-4">
+                <li key={String(s.id)} className="rounded-[var(--radius-card)] border border-line bg-canvas/60 p-4">
                   <div className="flex items-center gap-3">
                     <ScoreBadge score={Number(s.score)} />
                     <div className="min-w-0">
@@ -365,7 +365,7 @@ export default async function SatisfactionReportPage() {
                       >
                         {cust?.full_name ?? "Müşteri"}
                       </Link>
-                      <p className="text-[11px] text-text-muted">
+                      <p className="text-xs text-text-muted">
                         {s.answered_at ? fmtDate(String(s.answered_at)) : ""}
                         {s.agent_id ? ` · ${agentName.get(String(s.agent_id)) ?? "Danışman"}` : ""}
                       </p>

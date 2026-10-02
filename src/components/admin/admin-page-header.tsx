@@ -54,7 +54,7 @@ export function AdminPageHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+    <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
       <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
       {glow === "none" ? null : (
         <div className={`pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full blur-[90px] ${GLOW_CLS[glow]}`} />
@@ -62,7 +62,7 @@ export function AdminPageHeader({
       <div className="relative">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            <p className={`flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] ${EYEBROW_TONE[glow]}`}>
+            <p className={`flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] ${EYEBROW_TONE[glow]}`}>
               {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
               {eyebrow}
             </p>

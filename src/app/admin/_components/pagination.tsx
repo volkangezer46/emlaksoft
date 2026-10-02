@@ -37,7 +37,7 @@ export function Pagination({ page, total, pageSize = PAGE_SIZE, hrefFor }: Props
   const nextDisabled = page >= totalPages;
 
   const btnCls = (disabled: boolean) =>
-    `inline-flex items-center gap-1 rounded-[9px] border px-3 py-1.5 text-xs font-semibold transition ${
+    `inline-flex items-center gap-1 rounded-[var(--radius-control)] border px-3 py-1.5 text-xs font-semibold transition ${
       disabled
         ? "pointer-events-none border-line text-text-faint opacity-50"
         : "focus-ring press border-line text-ink-950 hover:border-brand-400 hover:text-brand-600"
@@ -46,7 +46,7 @@ export function Pagination({ page, total, pageSize = PAGE_SIZE, hrefFor }: Props
   return (
     <nav
       aria-label="Sayfalama"
-      className="flex items-center justify-between gap-3 rounded-[14px] border border-line bg-surface px-4 py-2.5"
+      className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2.5"
     >
       <Link
         href={hrefFor(page - 1)}

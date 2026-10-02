@@ -55,7 +55,7 @@ export default async function AuditDossierPage() {
       <article className="print-sheet surface-card rounded-[var(--radius-panel)] p-6 sm:p-8">
         <header className="hairline-b flex flex-wrap items-start justify-between gap-4 pb-5">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-600">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-600">
               {d.ofis?.name ?? "Emlak ofisi"}
             </p>
             <h1 className="mt-1 font-display text-2xl font-extrabold tracking-[-0.02em] text-ink-950">
@@ -95,7 +95,7 @@ export default async function AuditDossierPage() {
           </h2>
 
           {d.eksikler.length === 0 ? (
-            <p className="mt-2 rounded-[12px] border border-mint-500/30 bg-mint-500/[0.06] px-4 py-3 text-sm text-mint-600">
+            <p className="mt-2 rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/[0.06] px-4 py-3 text-sm text-mint-600">
               Yetki belgeleri, komisyon oranları, İYS rızaları ve sözleşme durumları üzerinde yapılan
               otomatik kontrollerde bir eksik bulunamadı. Bu, denetimin sorunsuz geçeceği anlamına
               gelmez — yalnızca sistemde tespit edilebilen eksik yok demektir.
@@ -105,7 +105,7 @@ export default async function AuditDossierPage() {
               {d.eksikler.map((e) => (
                 <li
                   key={e.baslik}
-                  className="print-avoid-break rounded-[12px] border border-danger-500/25 bg-danger-500/[0.04] px-4 py-3"
+                  className="print-avoid-break rounded-[var(--radius-card)] border border-danger-500/25 bg-danger-500/[0.04] px-4 py-3"
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                     <p className="text-sm font-semibold text-ink-950">{e.baslik}</p>
@@ -130,8 +130,8 @@ export default async function AuditDossierPage() {
               ["Süresi geçmiş", String(d.yetki.suresiGecmis)],
               ["15 gün içinde dolan", String(d.yetki.yakinda)],
             ].map(([k, v]) => (
-              <div key={k} className="rounded-[12px] border border-line bg-canvas px-4 py-2.5">
-                <dt className="text-[11px] text-text-faint">{k}</dt>
+              <div key={k} className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
+                <dt className="text-xs text-text-faint">{k}</dt>
                 <dd className="numeric text-sm font-bold text-ink-950">{v}</dd>
               </div>
             ))}
@@ -148,8 +148,8 @@ export default async function AuditDossierPage() {
               ["Taslak", String(d.sozlesme.taslak)],
               ["İptal", String(d.sozlesme.iptal)],
             ].map(([k, v]) => (
-              <div key={k} className="rounded-[12px] border border-line bg-canvas px-4 py-2.5">
-                <dt className="text-[11px] text-text-faint">{k}</dt>
+              <div key={k} className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
+                <dt className="text-xs text-text-faint">{k}</dt>
                 <dd className="numeric text-sm font-bold text-ink-950">{v}</dd>
               </div>
             ))}
@@ -165,8 +165,8 @@ export default async function AuditDossierPage() {
               ["Brüt toplam", money(d.hizmetBedeli.brutToplam)],
               ["KDV toplam", money(d.hizmetBedeli.kdvToplam)],
             ].map(([k, v]) => (
-              <div key={k} className="rounded-[12px] border border-line bg-canvas px-4 py-2.5">
-                <dt className="text-[11px] text-text-faint">{k}</dt>
+              <div key={k} className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
+                <dt className="text-xs text-text-faint">{k}</dt>
                 <dd className="numeric text-sm font-bold text-ink-950">{v}</dd>
               </div>
             ))}
@@ -183,8 +183,8 @@ export default async function AuditDossierPage() {
               ["Rızası olmayan müşteri", String(d.iys.rizasizMusteri)],
               ["İşlenmiş silme talebi", String(d.kvkk.silmeTalebi)],
             ].map(([k, v]) => (
-              <div key={k} className="rounded-[12px] border border-line bg-canvas px-4 py-2.5">
-                <dt className="text-[11px] text-text-faint">{k}</dt>
+              <div key={k} className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
+                <dt className="text-xs text-text-faint">{k}</dt>
                 <dd className="numeric text-sm font-bold text-ink-950">{v}</dd>
               </div>
             ))}
@@ -200,8 +200,8 @@ export default async function AuditDossierPage() {
               ["İlk kayıt", tarih(d.denetimIzi.ilk)],
               ["Son kayıt", tarih(d.denetimIzi.son)],
             ].map(([k, v]) => (
-              <div key={k} className="rounded-[12px] border border-line bg-canvas px-4 py-2.5">
-                <dt className="text-[11px] text-text-faint">{k}</dt>
+              <div key={k} className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
+                <dt className="text-xs text-text-faint">{k}</dt>
                 <dd className="numeric text-sm font-bold text-ink-950">{v}</dd>
               </div>
             ))}
@@ -209,7 +209,7 @@ export default async function AuditDossierPage() {
         </section>
 
         <footer className="hairline-t mt-8 pt-5">
-          <p className="flex items-start gap-2 text-[11px] leading-relaxed text-text-muted">
+          <p className="flex items-start gap-2 text-xs leading-relaxed text-text-muted">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600" />
             <span>
               Bu dosya sistemdeki kayıtlardan <strong>otomatik</strong> üretilmiştir ve bir özettir;
@@ -221,13 +221,13 @@ export default async function AuditDossierPage() {
           </p>
 
           <div className="print-only mt-10 grid grid-cols-2 gap-12">
-            <div className="hairline-t pt-1.5 text-[11px] text-text-muted">Hazırlayan · ad, soyad, tarih</div>
-            <div className="hairline-t pt-1.5 text-[11px] text-text-muted">Teslim alan · ad, soyad, tarih</div>
+            <div className="hairline-t pt-1.5 text-xs text-text-muted">Hazırlayan · ad, soyad, tarih</div>
+            <div className="hairline-t pt-1.5 text-xs text-text-muted">Teslim alan · ad, soyad, tarih</div>
           </div>
         </footer>
       </article>
 
-      <p className="no-print flex items-start gap-2 rounded-[14px] border border-line bg-canvas px-4 py-3 text-xs leading-relaxed text-text-muted">
+      <p className="no-print flex items-start gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-xs leading-relaxed text-text-muted">
         <FileCheck2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
         <span>
           <strong>Yazdır / PDF</strong> düğmesi tek dosyalık, seçilebilir metinli bir çıktı üretir.

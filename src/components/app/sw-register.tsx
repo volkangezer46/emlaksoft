@@ -67,12 +67,12 @@ export function ServiceWorkerRegister() {
 
   return (
     <div role="status" className="fixed inset-x-0 bottom-4 z-[90] flex justify-center px-4">
-      <div className="flex items-center gap-3 rounded-[14px] border border-line bg-surface px-4 py-2.5 shadow-[0_16px_40px_-16px_rgba(7,26,56,0.35)]">
+      <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2.5 shadow-[0_16px_40px_-16px_rgba(7,26,56,0.35)]">
         <p className="text-sm font-medium text-ink-950">Yeni sürüm hazır</p>
         <button
           type="button"
           onClick={() => waiting.postMessage({ type: "SKIP_WAITING" })}
-          className="inline-flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-600/90"
+          className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-600/90"
         >
           <RefreshCw className="h-3.5 w-3.5" /> Yenile
         </button>

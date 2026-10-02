@@ -172,9 +172,9 @@ export function ProductTour() {
           className="grid place-items-center bg-transparent p-4"
         >
         <div
-          className="popover-in w-full max-w-sm rounded-[18px] border border-line bg-surface p-5 shadow-[var(--elev-5)]"
+          className="popover-in w-full max-w-sm rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--elev-5)]"
         >
-          <span className="grid h-10 w-10 place-items-center rounded-[12px] bg-brand-600/10 text-brand-600">
+          <span className="grid h-10 w-10 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
             <Sparkles className="h-5 w-5" />
           </span>
           <DialogTitle asChild>
@@ -185,7 +185,7 @@ export function ProductTour() {
               Tur tamamlandı — panel artık canlı ofis verinizle çalışıyor.
             </p>
           </DialogDescription>
-          <p className="mt-3 rounded-[10px] bg-canvas px-3 py-2 text-xs text-text-muted">
+          <p className="mt-3 rounded-[var(--radius-control)] bg-canvas px-3 py-2 text-xs text-text-muted">
             İstediğinde{" "}
             <kbd className="rounded-[5px] border border-line bg-surface px-1.5 py-0.5 font-semibold text-ink-950">?</kbd>{" "}
             klavye kısayollarını,{" "}
@@ -195,7 +195,7 @@ export function ProductTour() {
           <button
             type="button"
             onClick={close}
-            className="focus-ring press mt-4 w-full rounded-[11px] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700"
+            className="focus-ring press mt-4 w-full rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700"
           >
             Panele başla
           </button>
@@ -256,7 +256,7 @@ export function ProductTour() {
       >
       {/* Spotlight deliği — dev box-shadow geri kalanı karartır */}
       <div
-        className="absolute rounded-[18px] transition-[top,left,width,height] duration-300 ease-out"
+        className="absolute rounded-[var(--radius-panel)] transition-[top,left,width,height] duration-300 ease-out"
         style={{
           top: hole.top,
           left: hole.left,
@@ -267,18 +267,18 @@ export function ProductTour() {
       />
       {/* Balon kart */}
       <div
-        className="popover-in absolute rounded-[16px] border border-line bg-surface p-4 shadow-[var(--elev-5)] transition-[top,left] duration-300 ease-out"
+        className="popover-in absolute rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--elev-5)] transition-[top,left] duration-300 ease-out"
         style={{ top: cardTop, left: cardLeft, width: CARD_W, maxWidth: "calc(100vw - 32px)" }}
       >
         <div className="flex items-start justify-between gap-3">
-          <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-[11px] font-bold tabular-nums text-brand-600">
+          <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold tabular-nums text-brand-600">
             Adım {index + 1} / {activeSteps.length}
           </span>
           <button
             type="button"
             onClick={close}
             aria-label="Turu kapat"
-            className="focus-ring -mr-1 -mt-1 grid h-7 w-7 place-items-center rounded-[8px] text-text-faint transition hover:bg-canvas hover:text-ink-950"
+            className="focus-ring -mr-1 -mt-1 grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950"
           >
             <X className="h-4 w-4" />
           </button>
@@ -293,7 +293,7 @@ export function ProductTour() {
           <button
             type="button"
             onClick={close}
-            className="focus-ring rounded-[9px] px-2 py-1.5 text-xs font-semibold text-text-faint transition hover:text-ink-950"
+            className="focus-ring rounded-[var(--radius-control)] px-2 py-1.5 text-xs font-semibold text-text-faint transition hover:text-ink-950"
           >
             Geç
           </button>
@@ -302,14 +302,14 @@ export function ProductTour() {
               type="button"
               onClick={prev}
               disabled={index === 0}
-              className="focus-ring press inline-flex items-center gap-1 rounded-[10px] border border-line bg-canvas px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 disabled:cursor-not-allowed disabled:opacity-40"
+              className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ArrowLeft className="h-3.5 w-3.5" /> Geri
             </button>
             <button
               type="button"
               onClick={next}
-              className="focus-ring press inline-flex items-center gap-1 rounded-[10px] bg-brand-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-700"
+              className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-700"
             >
               {index + 1 >= activeSteps.length ? "Bitir" : "İleri"} <ArrowRight className="h-3.5 w-3.5" />
             </button>

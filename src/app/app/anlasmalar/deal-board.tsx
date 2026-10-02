@@ -187,7 +187,7 @@ export function DealBoard({
           <section
             key={col.key}
             id={`sutun-${col.key}`}
-            className={`min-w-[260px] flex-1 scroll-mt-24 rounded-[18px] border backdrop-blur transition-colors duration-150 ${
+            className={`min-w-[260px] flex-1 scroll-mt-24 rounded-[var(--radius-panel)] border backdrop-blur transition-colors duration-150 ${
               isDropTarget ? "border-dashed border-brand-400/80 bg-brand-600/10" : col.ring
             }`}
             style={{ animationDelay: `${colIdx * 60}ms` }}
@@ -228,16 +228,16 @@ export function DealBoard({
           >
             <header className="flex items-center justify-between border-b border-line/60 px-3.5 py-3">
               <div>
-                <p className={`text-[11px] font-extrabold uppercase tracking-[0.12em] ${col.tone}`}>{col.label}</p>
-                <p className="mt-0.5 text-[11px] text-text-muted">{rows.length} · {money(sum)}</p>
+                <p className={`text-xs font-extrabold uppercase tracking-[0.12em] ${col.tone}`}>{col.label}</p>
+                <p className="mt-0.5 text-xs text-text-muted">{rows.length} · {money(sum)}</p>
               </div>
-              <span className="grid h-7 w-7 place-items-center rounded-[8px] bg-surface text-xs font-bold text-ink-950 shadow-[var(--shadow-xs)]">
+              <span className="grid h-7 w-7 place-items-center rounded-[var(--radius-control)] bg-surface text-xs font-bold text-ink-950 shadow-[var(--shadow-xs)]">
                 {rows.length}
               </span>
             </header>
             <div className="space-y-2.5 p-2.5">
               {rows.length === 0 ? (
-                <div className="rounded-[12px] border border-dashed border-line-strong px-3 py-8 text-center text-[11px] text-text-faint">
+                <div className="rounded-[var(--radius-card)] border border-dashed border-line-strong px-3 py-8 text-center text-xs text-text-faint">
                   Boş sütun
                 </div>
               ) : (
@@ -262,7 +262,7 @@ export function DealBoard({
                         setDragging(null);
                         setDragOverCol(null);
                       }}
-                      className={`lift group relative cursor-grab rounded-[14px] border bg-surface p-3 shadow-[var(--shadow-xs)] transition focus:outline-none focus:ring-2 focus:ring-brand-400/40 active:cursor-grabbing ${
+                      className={`lift group relative cursor-grab rounded-[var(--radius-card)] border bg-surface p-3 shadow-[var(--shadow-xs)] transition focus:outline-none focus:ring-2 focus:ring-brand-400/40 active:cursor-grabbing ${
                         isDragging
                           ? "border-brand-300 opacity-40 [transform:rotate(1.5deg)_scale(0.98)]"
                           : justDropped
@@ -278,7 +278,7 @@ export function DealBoard({
                       <Link
                         href={`/app/anlasmalar/${d.id}`}
                         draggable={false}
-                        className="focus-ring absolute inset-0 rounded-[14px]"
+                        className="focus-ring absolute inset-0 rounded-[var(--radius-card)]"
                         aria-label={`${d.property_title ?? d.property_code ?? "Anlaşma"} detayını aç`}
                       />
                       <div className="flex items-start justify-between gap-2">
@@ -286,7 +286,7 @@ export function DealBoard({
                           <p className="truncate text-sm font-semibold text-ink-950">
                             {d.property_title ?? d.property_code ?? "Anlaşma"}
                           </p>
-                          <p className="mt-0.5 truncate text-[11px] text-text-muted">
+                          <p className="mt-0.5 truncate text-xs text-text-muted">
                             {d.customer_name ?? "Müşteri atanmadı"} · {d.deal_type === "rent" ? "Kiralama" : "Satış"}
                           </p>
                         </div>
@@ -296,7 +296,7 @@ export function DealBoard({
                           {d.checklist_total > 0 ? (
                             <span
                               title={`${d.checklist_done}/${d.checklist_total} zorunlu evrak tamam`}
-                              className={`numeric inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                              className={`numeric inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-bold ${
                                 d.checklist_done === d.checklist_total
                                   ? "bg-mint-500/12 text-mint-700"
                                   : "bg-canvas text-text-muted"
@@ -309,7 +309,7 @@ export function DealBoard({
                           {d.note_count > 0 ? (
                             <span
                               title={`${d.note_count} not`}
-                              className="numeric inline-flex items-center gap-0.5 rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-bold text-text-muted"
+                              className="numeric inline-flex items-center gap-0.5 rounded-full bg-canvas px-1.5 py-0.5 text-xs font-bold text-text-muted"
                             >
                               <MessageSquare className="h-3 w-3" /> {d.note_count}
                             </span>
@@ -340,17 +340,17 @@ export function DealBoard({
                             className="focus-ring group/danisman relative z-10 flex min-w-0 items-center gap-1.5 rounded-[6px]"
                             title="Danışman profilini aç"
                           >
-                            <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[image:var(--grad-brand)] text-[8px] font-bold text-white">
+                            <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[image:var(--grad-brand)] text-xs font-bold text-white">
                               {initials(memberById.get(d.assigned_to) ?? "?")}
                             </span>
-                            <span className="truncate text-[11px] font-semibold text-text-muted transition group-hover/danisman:text-brand-600">
+                            <span className="truncate text-xs font-semibold text-text-muted transition group-hover/danisman:text-brand-600">
                               {memberById.get(d.assigned_to) ?? "Danışman"}
                             </span>
                           </Link>
                         ) : (
-                          <span className="text-[11px] text-text-faint">Danışman atanmadı</span>
+                          <span className="text-xs text-text-faint">Danışman atanmadı</span>
                         )}
-                        <span className="shrink-0 text-[11px] text-text-faint">{updatedAgo(d.updated_at)}</span>
+                        <span className="shrink-0 text-xs text-text-faint">{updatedAgo(d.updated_at)}</span>
                       </div>
                       <div className="relative z-10 mt-3 flex flex-wrap items-center gap-1.5">
                         <StatusTransitionBar
@@ -369,7 +369,7 @@ export function DealBoard({
                               editReturnFocusRef.current = event.currentTarget;
                               setEditing(d);
                             }}
-                            className="inline-flex items-center gap-1 rounded-[7px] border border-line px-2 py-1 text-[11px] font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
+                            className="inline-flex items-center gap-1 rounded-[7px] border border-line px-2 py-1 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
                           >
                             <Pencil className="h-3 w-3" /> Düzenle
                           </button>
@@ -378,7 +378,7 @@ export function DealBoard({
                           <Link
                             href={`/app/portfoyler/${d.property_id}`}
                             draggable={false}
-                            className="rounded-[7px] border border-line px-2 py-1 text-[11px] font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
+                            className="rounded-[7px] border border-line px-2 py-1 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
                           >
                             Portföy
                           </Link>
@@ -387,7 +387,7 @@ export function DealBoard({
                           <Link
                             href={`/app/musteriler/${d.customer_id}`}
                             draggable={false}
-                            className="rounded-[7px] border border-line px-2 py-1 text-[11px] font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
+                            className="rounded-[7px] border border-line px-2 py-1 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
                           >
                             Müşteri
                           </Link>
@@ -397,7 +397,7 @@ export function DealBoard({
                             type="button"
                             disabled={busy}
                             onClick={() => move(d.id, next.key)}
-                            className="ml-auto inline-flex items-center gap-1 rounded-[7px] bg-ink-950 px-2 py-1 text-[11px] font-bold text-white disabled:opacity-50"
+                            className="ml-auto inline-flex items-center gap-1 rounded-[7px] bg-ink-950 px-2 py-1 text-xs font-bold text-white disabled:opacity-50"
                           >
                             {next.label} <ArrowRight className="h-3 w-3" />
                           </button>
@@ -407,7 +407,7 @@ export function DealBoard({
                             type="button"
                             disabled={busy}
                             onClick={() => move(d.id, "won")}
-                            className="inline-flex items-center gap-1 rounded-[7px] bg-mint-500/15 px-2 py-1 text-[11px] font-bold text-mint-700 disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded-[7px] bg-mint-500/15 px-2 py-1 text-xs font-bold text-mint-700 disabled:opacity-50"
                           >
                             <Sparkles className="h-3 w-3" /> Kazan
                           </button>
@@ -421,7 +421,7 @@ export function DealBoard({
                               lossReturnFocusRef.current = event.currentTarget;
                               setLossFor(d);
                             }}
-                            className="rounded-[7px] px-2 py-1 text-[11px] font-semibold text-danger-500 hover:bg-danger-500/10 disabled:opacity-50"
+                            className="rounded-[7px] px-2 py-1 text-xs font-semibold text-danger-500 hover:bg-danger-500/10 disabled:opacity-50"
                           >
                             Kayıp
                           </button>
@@ -441,7 +441,7 @@ export function DealBoard({
           <DialogContent
             size="sm"
             overlayClassName="bg-ink-950/40 backdrop-blur-sm"
-            className="rounded-[20px] border-line shadow-[var(--shadow-lg)]"
+            className="rounded-[var(--radius-panel)] border-line shadow-[var(--shadow-lg)]"
             onCloseAutoFocus={(event) => {
               event.preventDefault();
               const target = editReturnFocusRef.current;
@@ -453,7 +453,7 @@ export function DealBoard({
             <div className="flex items-center justify-between border-b border-line px-6 py-4">
               <DialogTitle className="font-display text-lg font-bold text-ink-950">Anlaşmayı düzenle</DialogTitle>
               <DialogClose asChild>
-                <button type="button" className="grid h-8 w-8 place-items-center rounded-[8px] text-text-muted hover:bg-canvas" aria-label="Kapat">
+                <button type="button" className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-canvas" aria-label="Kapat">
                   <X className="h-5 w-5" />
                 </button>
               </DialogClose>
@@ -463,16 +463,16 @@ export function DealBoard({
               <DialogDescription className="text-sm text-text-muted">{editing.property_title ?? editing.property_code ?? "Anlaşma"} · {editing.customer_name ?? "Müşteri atanmadı"}</DialogDescription>
               <div>
                 <label htmlFor={`deal-${editing.id}-value`} className="mb-1 block text-xs font-semibold text-text-muted">Anlaşma değeri (₺)</label>
-                <input id={`deal-${editing.id}-value`} name="deal_value" defaultValue={editing.deal_value ?? ""} inputMode="numeric" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" />
+                <input id={`deal-${editing.id}-value`} name="deal_value" defaultValue={editing.deal_value ?? ""} inputMode="numeric" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label htmlFor={`deal-${editing.id}-probability`} className="mb-1 block text-xs font-semibold text-text-muted">Olasılık (%)</label>
-                  <input id={`deal-${editing.id}-probability`} name="probability" type="number" min={0} max={100} defaultValue={editing.probability ?? ""} className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" />
+                  <input id={`deal-${editing.id}-probability`} name="probability" type="number" min={0} max={100} defaultValue={editing.probability ?? ""} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" />
                 </div>
                 <div>
                   <label htmlFor={`deal-${editing.id}-type`} className="mb-1 block text-xs font-semibold text-text-muted">Tür</label>
-                  <select id={`deal-${editing.id}-type`} name="deal_type" defaultValue={editing.deal_type} className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
+                  <select id={`deal-${editing.id}-type`} name="deal_type" defaultValue={editing.deal_type} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
                     <option value="sale">Satış</option>
                     <option value="rent">Kiralama</option>
                   </select>
@@ -480,7 +480,7 @@ export function DealBoard({
               </div>
               <div>
                 <label htmlFor={`deal-${editing.id}-assignee`} className="mb-1 block text-xs font-semibold text-text-muted">Sorumlu danışman</label>
-                <select id={`deal-${editing.id}-assignee`} name="assigned_to" defaultValue={editing.assigned_to ?? ""} className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
+                <select id={`deal-${editing.id}-assignee`} name="assigned_to" defaultValue={editing.assigned_to ?? ""} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
                   <option value="">Değiştirme</option>
                   {members.map((m) => (
                     <option key={m.id} value={m.id}>{m.full_name}</option>
@@ -489,9 +489,9 @@ export function DealBoard({
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <DialogClose asChild>
-                  <button type="button" className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted hover:bg-canvas">Vazgeç</button>
+                  <button type="button" className="rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted hover:bg-canvas">Vazgeç</button>
                 </DialogClose>
-                <button type="submit" disabled={pending} className="rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60">
+                <button type="submit" disabled={pending} className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60">
                   {pending ? "Kaydediliyor…" : "Kaydet"}
                 </button>
               </div>
@@ -518,7 +518,7 @@ export function DealBoard({
           <DialogContent
             size="sm"
             overlayClassName="bg-ink-950/40 backdrop-blur-sm"
-            className="max-w-sm rounded-[20px] border-line shadow-[var(--shadow-lg)]"
+            className="max-w-sm rounded-[var(--radius-panel)] border-line shadow-[var(--shadow-lg)]"
             onCloseAutoFocus={(event) => {
               event.preventDefault();
               const target = lossReturnFocusRef.current;
@@ -530,7 +530,7 @@ export function DealBoard({
             <div className="flex items-center justify-between border-b border-line px-6 py-4">
               <DialogTitle className="font-display text-lg font-bold text-ink-950">Kayıp nedeni</DialogTitle>
               <DialogClose asChild>
-                <button type="button" className="grid h-8 w-8 place-items-center rounded-[8px] text-text-muted hover:bg-canvas" aria-label="Kapat">
+                <button type="button" className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-canvas" aria-label="Kapat">
                   <X className="h-5 w-5" />
                 </button>
               </DialogClose>
@@ -539,7 +539,7 @@ export function DealBoard({
               <DialogDescription className="text-sm text-text-muted">{lossFor.property_title ?? lossFor.property_code ?? "Anlaşma"} neden kaybedildi?</DialogDescription>
               <div className="flex flex-wrap gap-1.5">
                 {["Fiyat yüksek", "Rakip kapattı", "Müşteri vazgeçti", "İletişim koptu", "Finansman"].map((r) => (
-                  <button key={r} type="button" aria-pressed={lossReason === r} onClick={() => setLossReason(r)} className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${lossReason === r ? "bg-danger-500 text-white" : "border border-line text-text-muted hover:border-danger-500/40"}`}>
+                  <button key={r} type="button" aria-pressed={lossReason === r} onClick={() => setLossReason(r)} className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${lossReason === r ? "bg-danger-500 text-white" : "border border-line text-text-muted hover:border-danger-500/40"}`}>
                     {r}
                   </button>
                 ))}
@@ -550,17 +550,17 @@ export function DealBoard({
                 onChange={(e) => setLossReason(e.target.value)}
                 rows={2}
                 placeholder="Neden…"
-                className="w-full resize-none rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-danger-400"
+                className="w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-danger-400"
               />
               <div className="flex justify-end gap-2">
                 <DialogClose asChild>
-                  <button type="button" className="rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted hover:bg-canvas">Vazgeç</button>
+                  <button type="button" className="rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted hover:bg-canvas">Vazgeç</button>
                 </DialogClose>
                 <button
                   type="button"
                   disabled={pending}
                   onClick={() => { const d = lossFor; setLossFor(null); if (d) move(d.id, "lost", lossReason); }}
-                  className="rounded-[10px] bg-danger-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-danger-600 disabled:opacity-60"
+                  className="rounded-[var(--radius-control)] bg-danger-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-danger-600 disabled:opacity-60"
                 >
                   Kayıp olarak işaretle
                 </button>

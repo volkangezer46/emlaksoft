@@ -102,7 +102,7 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
         <ArrowLeft className="h-4 w-4" /> Açık ev listesine dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/30 blur-[80px]" />
         <div className="relative">
@@ -142,10 +142,10 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
                 icon: DoorOpen,
               },
             ].map((k) => (
-              <div key={k.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur">
+              <div key={k.label} className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur">
                 <k.icon className="h-4 w-4 text-mint-400" />
                 <p className="numeric mt-2 font-display text-lg font-extrabold text-white">{k.value}</p>
-                <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+                <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
               </div>
             ))}
           </div>
@@ -176,7 +176,7 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
           className="lift-hover focus-ring group surface-card flex items-start justify-between gap-3 rounded-[var(--radius-panel)] p-5 transition hover:border-brand-300"
         >
           <div className="min-w-0">
-            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-brand-600">
               <Building2 className="h-3.5 w-3.5" /> {property.property_code}
             </p>
             <p className="mt-1 truncate font-semibold text-ink-950">{property.title ?? "Başlıksız"}</p>
@@ -187,7 +187,7 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
               {money(property.list_price)}
             </p>
           </div>
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-canvas text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-canvas text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
             <ArrowUpRight className="h-4 w-4" />
           </span>
         </Link>
@@ -219,7 +219,7 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
         </div>
 
         {visitors.length === 0 ? (
-          <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
+          <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
             Henüz ziyaretçi kaydı yok. Açık ev günü kapıda topladığınız isimleri buradan girin — her biri
             takip edilebilir bir aday olur.
           </p>

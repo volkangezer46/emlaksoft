@@ -54,7 +54,7 @@ export default async function ProjeDetayPage({ params }: { params: Promise<{ id:
         <ArrowLeft className="h-4 w-4" /> Projeler
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>

@@ -50,9 +50,9 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const PAGE_SIZE = 50;
 
 const PAGER_BTN =
-  "focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+  "focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
 const PAGER_BTN_DISABLED =
-  "inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
+  "inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
 function fmtDate(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -259,7 +259,7 @@ export default async function TekliflerPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -279,7 +279,7 @@ export default async function TekliflerPage({
               <Link
                 key={k.label}
                 href={k.href}
-                className={`focus-ring press lift group block rounded-[14px] border p-3 text-center transition hover:border-brand-300 ${
+                className={`focus-ring press lift group block rounded-[var(--radius-card)] border p-3 text-center transition hover:border-brand-300 ${
                   k.active ? "border-white/35 bg-white/15" : "border-white/12 bg-white/8"
                 }`}
               >
@@ -287,13 +287,13 @@ export default async function TekliflerPage({
                   <span className="font-display text-2xl font-extrabold text-white">{k.value}</span>
                   <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                 </span>
-                <p className="text-left text-[11px] text-white/70">{k.label}</p>
+                <p className="text-left text-xs text-white/70">{k.label}</p>
               </Link>
             ))}
             <ExportCsvButton
               action={exportOffersCsv}
               label="Dışa aktar"
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
+              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
             />
             {canCreate ? (
               <NewOfferDialog
@@ -325,7 +325,7 @@ export default async function TekliflerPage({
           </section>
 
           {/* Durum akışı — teklif yolculuğu; her adım o durumun filtresine gider */}
-          <section className="rounded-[20px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="mr-2 font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">
                 Durum akışı
@@ -335,13 +335,13 @@ export default async function TekliflerPage({
                   {i > 0 ? <ArrowRight className="h-3.5 w-3.5 text-text-faint" aria-hidden /> : null}
                   <Link
                     href={href({ durum: f.key })}
-                    className={`focus-ring press flex min-h-[40px] items-center gap-1.5 rounded-[11px] border px-3 py-2 text-xs font-semibold transition hover:border-brand-300 ${
+                    className={`focus-ring press flex min-h-[40px] items-center gap-1.5 rounded-[var(--radius-control)] border px-3 py-2 text-xs font-semibold transition hover:border-brand-300 ${
                       durum === f.key ? "border-brand-400/50 bg-brand-600/10 text-brand-600" : "border-line bg-surface text-ink-950"
                     }`}
                   >
                     <f.icon className="h-3.5 w-3.5 text-text-muted" />
                     {STATUS_LABELS[f.key]}
-                    <span className="numeric rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-extrabold text-ink-950">
+                    <span className="numeric rounded-full bg-canvas px-1.5 py-0.5 text-xs font-extrabold text-ink-950">
                       {countOf(f.key)}
                     </span>
                   </Link>
@@ -352,14 +352,14 @@ export default async function TekliflerPage({
                 <Link
                   key={k}
                   href={href({ durum: k })}
-                  className={`focus-ring press flex min-h-[40px] items-center gap-1.5 rounded-[11px] border px-3 py-2 text-xs font-semibold transition ${
+                  className={`focus-ring press flex min-h-[40px] items-center gap-1.5 rounded-[var(--radius-control)] border px-3 py-2 text-xs font-semibold transition ${
                     durum === k
                       ? "border-danger-500/40 bg-danger-500/10 text-danger-500"
                       : "border-line bg-surface text-text-muted hover:border-danger-500/30 hover:text-danger-500"
                   }`}
                 >
                   {STATUS_LABELS[k]}
-                  <span className="numeric rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-extrabold text-ink-950">{countOf(k)}</span>
+                  <span className="numeric rounded-full bg-canvas px-1.5 py-0.5 text-xs font-extrabold text-ink-950">{countOf(k)}</span>
                 </Link>
               ))}
             </div>
@@ -394,7 +394,7 @@ export default async function TekliflerPage({
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href={href({ durum: null })}
-              className={`rounded-[10px] border px-3.5 py-2 text-xs font-semibold transition ${
+              className={`rounded-[var(--radius-control)] border px-3.5 py-2 text-xs font-semibold transition ${
                 durum === null
                   ? "border-brand-400/50 bg-brand-600/10 text-brand-600"
                   : "border-line bg-surface text-ink-950 hover:border-brand-300"
@@ -406,7 +406,7 @@ export default async function TekliflerPage({
               <Link
                 key={value}
                 href={href({ durum: value })}
-                className={`rounded-[10px] border px-3.5 py-2 text-xs font-semibold transition ${
+                className={`rounded-[var(--radius-control)] border px-3.5 py-2 text-xs font-semibold transition ${
                   durum === value
                     ? "border-brand-400/50 bg-brand-600/10 text-brand-600"
                     : "border-line bg-surface text-ink-950 hover:border-brand-300"
@@ -415,7 +415,7 @@ export default async function TekliflerPage({
                 {label}
               </Link>
             ))}
-            <span className="numeric ml-auto text-[11px] font-medium tracking-wide text-text-faint">
+            <span className="numeric ml-auto text-xs font-medium tracking-wide text-text-faint">
               {totalFiltered.toLocaleString("tr-TR")} kayıt
             </span>
           </div>
@@ -425,7 +425,7 @@ export default async function TekliflerPage({
             <span className="flex items-center gap-1.5 text-xs font-semibold text-text-muted"><CalendarRange className="h-3.5 w-3.5" /> Tarih:</span>
             <Link
               href={href({ from: null, to: null })}
-              className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+              className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                 !from && !to
                   ? "border-brand-400/50 bg-brand-600/10 text-brand-600"
                   : "border-line bg-surface text-text-muted hover:border-brand-300 hover:text-brand-600"
@@ -440,7 +440,7 @@ export default async function TekliflerPage({
                   key={p.label}
                   href={href({ from: p.from, to: p.to })}
                   aria-current={active ? "page" : undefined}
-                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                     active
                       ? "border-brand-400/50 bg-brand-600/10 text-brand-600"
                       : "border-line bg-surface text-text-muted hover:border-brand-300 hover:text-brand-600"
@@ -453,7 +453,7 @@ export default async function TekliflerPage({
           </div>
 
           {offers.length === 0 ? (
-            <div className="grid place-items-center rounded-[18px] border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
+            <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
               <Tag className="h-8 w-8 text-text-faint" />
               <h2 className="mt-3 font-display text-lg font-bold text-ink-950">
                 {durum ? `“${STATUS_LABELS[durum]}” durumunda teklif yok` : "Bu filtrelerle eşleşen teklif yok"}

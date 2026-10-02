@@ -8,7 +8,7 @@ import { createVitrinSavedSearch } from "@/app/actions/vitrin";
 import { listPublicDistricts, type PublicGeoOption } from "@/app/actions/public-valuation";
 
 const inputCls =
-  "w-full rounded-[12px] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400";
+  "w-full rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400";
 
 /**
  * Vitrin "Aramamı kaydet" kutusu: ziyaretçi kriter + telefon + KVKK onayı
@@ -81,7 +81,7 @@ export function SavedSearchBox({
 
   if (status === "done") {
     return (
-      <section className="mt-10 rounded-[20px] border border-mint-500/30 bg-mint-500/8 px-5 py-10 text-center" role="status" aria-live="polite">
+      <section className="mt-10 rounded-[var(--radius-panel)] border border-mint-500/30 bg-mint-500/8 px-5 py-10 text-center" role="status" aria-live="polite">
         <CheckCircle2 className="mx-auto h-10 w-10 text-mint-600" />
         <p className="mt-3 font-display text-lg font-extrabold text-ink-950">Aramanız kaydedildi</p>
         <p className="mt-1 text-sm text-text-muted">
@@ -92,9 +92,9 @@ export function SavedSearchBox({
   }
 
   return (
-    <section className="mt-10 rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] sm:p-6">
+    <section className="mt-10 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] sm:p-6">
       <div className="flex items-start gap-3">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px] bg-brand-600/10 text-brand-600">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
           <BellRing className="h-5 w-5" />
         </span>
         <div>
@@ -172,7 +172,7 @@ export function SavedSearchBox({
           </select>
         </div>
 
-        <label id="saved-search-consent" htmlFor="saved-search-kvkk" className="flex cursor-pointer items-start gap-2.5 rounded-[12px] border border-line bg-canvas px-3.5 py-3 text-[12px] leading-relaxed text-text-muted transition hover:border-brand-300">
+        <label id="saved-search-consent" htmlFor="saved-search-kvkk" className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-brand-300">
           <input
             id="saved-search-kvkk"
             type="checkbox"
@@ -195,7 +195,7 @@ export function SavedSearchBox({
         <button
           type="submit"
           disabled={status === "loading" || !kvkkAccepted}
-          className="btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-600/90 disabled:opacity-60 sm:w-auto"
+          className="btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-600/90 disabled:opacity-60 sm:w-auto"
         >
           {status === "loading" ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellRing className="h-4 w-4" />}
           Aramamı kaydet

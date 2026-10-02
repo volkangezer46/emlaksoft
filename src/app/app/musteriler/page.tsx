@@ -197,9 +197,9 @@ function formatDate(iso: string) {
 }
 
 const PAGER_BTN =
-  "focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+  "focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
 const PAGER_BTN_DISABLED =
-  "inline-flex items-center gap-1 rounded-[9px] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
+  "inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
 export default async function CustomersPage({
   searchParams,
@@ -558,7 +558,7 @@ export default async function CustomersPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/35 blur-[70px]" />
         <div className="relative flex flex-wrap items-start justify-between gap-5">
@@ -589,21 +589,21 @@ export default async function CustomersPage({
               <Link
                 key={item.label}
                 href={item.href}
-                className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
+                className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
               >
                 <div className="flex items-start justify-between">
                   <item.icon className="h-4 w-4 text-mint-400" />
                   <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                 </div>
                 <p className="mt-2 font-display text-xl font-extrabold text-white">{item.value}</p>
-                <p className="text-[11px] text-white/45 sm:text-xs">{item.label}</p>
+                <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
               </Link>
             ))}
           </div>
-          <div className="rounded-[16px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
+          <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="flex items-center justify-between">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-white/75"><TrendingUp className="h-3.5 w-3.5 text-cyan-400" /> Yeni müşteri · son 8 hafta</p>
-              <span className="rounded-full bg-brand-500/20 px-2 py-0.5 text-[11px] font-bold text-cyan-300">{buckets[7]} bu hafta</span>
+              <span className="rounded-full bg-brand-500/20 px-2 py-0.5 text-xs font-bold text-cyan-300">{buckets[7]} bu hafta</span>
             </div>
             <svg viewBox="0 0 200 60" className="mt-3 h-20 w-full overflow-visible" preserveAspectRatio="none">
               <defs>
@@ -632,7 +632,7 @@ export default async function CustomersPage({
 
       {/* Yaklaşan doğum günü / yıldönümü hatırlatma */}
       {occasions.length > 0 ? (
-        <section className="overflow-hidden rounded-[16px] border border-amber-300/60 bg-gradient-to-r from-amber-50 to-rose-50/60 p-4 shadow-[var(--shadow-xs)] dark:border-amber-400/25 dark:from-amber-500/[0.08] dark:to-rose-500/[0.06]">
+        <section className="overflow-hidden rounded-[var(--radius-card)] border border-amber-300/60 bg-gradient-to-r from-amber-50 to-rose-50/60 p-4 shadow-[var(--shadow-xs)] dark:border-amber-400/25 dark:from-amber-500/[0.08] dark:to-rose-500/[0.06]">
           <div className="flex items-center gap-2">
             <span className="grid h-8 w-8 place-items-center rounded-full bg-amber-400/20 text-amber-600 dark:text-amber-400">
               <Gift className="h-4 w-4" />
@@ -656,7 +656,7 @@ export default async function CustomersPage({
                     <Gift className="h-3.5 w-3.5 text-amber-500" />
                   )}
                   <span>{o.name}</span>
-                  <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold ${o.days === 0 ? "bg-rose-500 text-white" : "bg-amber-400/20 text-amber-700 dark:text-amber-300"}`}>
+                  <span className={`rounded-full px-1.5 py-0.5 text-xs font-bold ${o.days === 0 ? "bg-rose-500 text-white" : "bg-amber-400/20 text-amber-700 dark:text-amber-300"}`}>
                     {o.kind === "birthday" ? "🎂" : "🎉"} {occasionLabel(o.days)}
                   </span>
                 </Link>
@@ -671,7 +671,7 @@ export default async function CustomersPage({
 
       {/* Filtre toolbar — form GET olduğu için sayfa 1'e döner; sıralama gizli
           alanlarla korunur */}
-      <form className="rounded-[16px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] space-y-3" action="/app/musteriler">
+      <form className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] space-y-3" action="/app/musteriler">
         {siralaF ? <input type="hidden" name="sirala" value={siralaF} /> : null}
         {yonF ? <input type="hidden" name="yon" value={yonF} /> : null}
         {segmentF ? <input type="hidden" name="segment" value={segmentF} /> : null}
@@ -684,7 +684,7 @@ export default async function CustomersPage({
               defaultValue={q}
               aria-label="Müşteri ara"
               placeholder="Ad, telefon, e-posta ara…"
-              className="w-full rounded-[11px] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+              className="w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
             />
           </div>
           {/* Müşteri tipi */}
@@ -692,7 +692,7 @@ export default async function CustomersPage({
             name="type"
             defaultValue={typeF}
             aria-label="Müşteri tipi filtresi"
-            className="rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+            className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
           >
             <option value="">Tüm tipler</option>
             {customerTypes.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -702,7 +702,7 @@ export default async function CustomersPage({
             name="source"
             defaultValue={sourceF}
             aria-label="Kaynak filtresi"
-            className="rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+            className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
           >
             <option value="">Tüm kaynaklar</option>
             {sourceEntries.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -713,7 +713,7 @@ export default async function CustomersPage({
               name="etiket"
               defaultValue={etiketF}
               aria-label="Etiket filtresi"
-              className="rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+              className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
             >
               <option value="">Tüm etiketler</option>
               {etiketF && !tenantTags.includes(etiketF) ? (
@@ -728,7 +728,7 @@ export default async function CustomersPage({
               name="assigned"
               defaultValue={assignedF}
               aria-label="Danışman filtresi"
-              className="rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+              className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
             >
               <option value="">Tüm danışmanlar</option>
               {advisorList.map((a) => <option key={a.id} value={a.id}>{a.full_name}</option>)}
@@ -743,17 +743,17 @@ export default async function CustomersPage({
               name="from"
               type="date"
               defaultValue={fromF}
-              className="min-w-0 max-w-[150px] flex-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 sm:flex-none"
+              className="min-w-0 max-w-[150px] flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 sm:flex-none"
             />
             <span>—</span>
             <input
               name="to"
               type="date"
               defaultValue={toF}
-              className="min-w-0 max-w-[150px] flex-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 sm:flex-none"
+              className="min-w-0 max-w-[150px] flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 sm:flex-none"
             />
           </div>
-          <button type="submit" className="rounded-[10px] bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700">
+          <button type="submit" className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700">
             Filtrele
           </button>
           {(activeFilters > 0 || q || sortF || siralaF) && (
@@ -765,7 +765,7 @@ export default async function CustomersPage({
             type="submit"
             name="sort"
             value={sortF === "hot" ? "" : "hot"}
-            className={`inline-flex items-center gap-1 rounded-[10px] px-3 py-2 text-xs font-semibold transition ${sortF === "hot" ? "bg-danger-500/15 text-danger-500 ring-1 ring-danger-500/25" : "border border-line text-text-muted hover:border-danger-500/50 hover:text-danger-500"}`}
+            className={`inline-flex items-center gap-1 rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold transition ${sortF === "hot" ? "bg-danger-500/15 text-danger-500 ring-1 ring-danger-500/25" : "border border-line text-text-muted hover:border-danger-500/50 hover:text-danger-500"}`}
             title="Bu sayfadaki kayıtları lead skoruna göre sırala"
           >
             🔥 Sıcak önce{hotCount > 0 ? ` · ${hotCount}` : ""}
@@ -825,7 +825,7 @@ export default async function CustomersPage({
               yoktu. */}
           <Link
             href="/app/musteriler/cift-kayit"
-            className="focus-ring press inline-flex items-center gap-1.5 rounded-[10px] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-amber-400 hover:text-amber-600"
+            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-amber-400 hover:text-amber-600"
           >
             <Copy className="h-3.5 w-3.5" /> Çift kayıt kontrolü
           </Link>
@@ -928,7 +928,7 @@ export default async function CustomersPage({
                             {c.full_name}
                             {lead && !c.blacklist ? (
                               <span
-                                className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ring-1 ring-inset ${leadTierCls(lead.tier)}`}
+                                className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-bold ring-1 ring-inset ${leadTierCls(lead.tier)}`}
                                 title={`Lead skoru: ${lead.score}`}
                               >
                                 {lead.tier === "hot" ? "🔥" : lead.tier === "warm" ? "🌤️" : "❄️"} {lead.score}
@@ -938,7 +938,7 @@ export default async function CustomersPage({
                                 uykudaysa temassız gün sayısı da başlıkta */}
                             {heat ? (
                               <span
-                                className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ring-1 ring-inset ${HEAT_SEGMENTS[heat.segment].badgeCls}`}
+                                className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-bold ring-1 ring-inset ${HEAT_SEGMENTS[heat.segment].badgeCls}`}
                                 title={heatTitle(heat)}
                               >
                                 {HEAT_SEGMENTS[heat.segment].emoji} {HEAT_SEGMENTS[heat.segment].label}
@@ -949,9 +949,9 @@ export default async function CustomersPage({
                             ) : null}
                           </p>
                           {c.blacklist ? (
-                            <p className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-danger-500"><span className="h-1.5 w-1.5 rounded-full bg-danger-500" /> Kara liste</p>
+                            <p className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-danger-500"><span className="h-1.5 w-1.5 rounded-full bg-danger-500" /> Kara liste</p>
                           ) : (
-                            <p className="mt-0.5 flex items-center gap-1 text-[11px] text-text-faint"><Clock3 className="h-3 w-3" /> {relativeAdded(c.created_at)}</p>
+                            <p className="mt-0.5 flex items-center gap-1 text-xs text-text-faint"><Clock3 className="h-3 w-3" /> {relativeAdded(c.created_at)}</p>
                           )}
                         </div>
                       </Link>
@@ -968,12 +968,12 @@ export default async function CustomersPage({
                       {c.tags && c.tags.length > 0 ? (
                         <span className="mt-1 flex flex-wrap items-center gap-1">
                           {c.tags.slice(0, 2).map((t) => (
-                            <span key={t} className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-700">
+                            <span key={t} className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs font-semibold text-cyan-700">
                               {t}
                             </span>
                           ))}
                           {c.tags.length > 2 ? (
-                            <span className="text-[10px] font-semibold text-text-faint" title={c.tags.slice(2).join(", ")}>
+                            <span className="text-xs font-semibold text-text-faint" title={c.tags.slice(2).join(", ")}>
                               +{c.tags.length - 2}
                             </span>
                           ) : null}
@@ -1033,7 +1033,7 @@ export default async function CustomersPage({
                           />
                         ) : null}
                         {canDelete ? <CustomerRowDelete customerId={c.id} name={c.full_name} /> : null}
-                        <span className="grid h-8 w-8 place-items-center rounded-[9px] text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
+                        <span className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
                           <ArrowUpRight className="h-4 w-4" />
                         </span>
                       </div>

@@ -141,7 +141,7 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
       width="lg"
     >
       {setting.note ? (
-        <p className="mb-4 rounded-[12px] border border-line bg-canvas/60 px-4 py-3 text-xs leading-relaxed text-text-muted">
+        <p className="mb-4 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-4 py-3 text-xs leading-relaxed text-text-muted">
           {setting.note}
         </p>
       ) : null}

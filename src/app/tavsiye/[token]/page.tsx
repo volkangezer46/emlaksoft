@@ -101,7 +101,7 @@ export default async function ReferralPage({
     >
       {active ? (
         <>
-          <ul className="space-y-2 text-[12px] leading-relaxed text-text-muted">
+          <ul className="space-y-2 text-xs leading-relaxed text-text-muted">
             {[
               "Aynı gün içinde arar, ne aradığını dinleriz.",
               "Baskı yok — uygun portföy yoksa açıkça söyleriz.",
@@ -109,7 +109,7 @@ export default async function ReferralPage({
             ].map((t) => (
               <li
                 key={t}
-                className="flex items-start gap-2 rounded-[12px] border border-line bg-canvas/60 px-3.5 py-2.5"
+                className="flex items-start gap-2 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3.5 py-2.5"
               >
                 <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mint-600" aria-hidden="true" />
                 <span>{t}</span>
@@ -119,7 +119,7 @@ export default async function ReferralPage({
 
           {reward ? (
             <p
-              className="mt-3 flex items-start gap-2 rounded-[12px] border px-3.5 py-2.5 text-[12px] font-semibold leading-relaxed"
+              className="mt-3 flex items-start gap-2 rounded-[var(--radius-card)] border px-3.5 py-2.5 text-xs font-semibold leading-relaxed"
               style={{
                 borderColor: "var(--pb-edge)",
                 backgroundColor: "var(--pb-veil)",

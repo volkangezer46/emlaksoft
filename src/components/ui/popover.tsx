@@ -28,7 +28,7 @@ export function PopoverContent({
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
         className={cn(
-          "popover-in z-[60] overflow-hidden rounded-[16px] border border-line bg-surface shadow-[var(--shadow-lg)] outline-none",
+          "popover-in z-[60] overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-lg)] outline-none",
           className,
         )}
       />

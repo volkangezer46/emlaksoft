@@ -46,7 +46,7 @@ export function FavEmptyNotice({ slug, ids }: { slug: string; ids: string[] }) {
   if (ids.some((id) => favorites.includes(id))) return null;
 
   return (
-    <div className="mb-6 rounded-[20px] border border-dashed border-line bg-surface px-5 py-14 text-center">
+    <div className="mb-6 rounded-[var(--radius-panel)] border border-dashed border-line bg-surface px-5 py-14 text-center">
       <Heart className="mx-auto h-8 w-8 text-text-faint" />
       <p className="mt-3 text-sm font-semibold text-ink-950">
         {favorites.length === 0 ? "Henüz favori ilanınız yok" : "Bu sayfada favori ilanınız görünmüyor"}

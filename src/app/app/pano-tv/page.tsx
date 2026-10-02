@@ -67,7 +67,7 @@ export default async function PanoTvPage() {
       <div className="relative">
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5">
           <div className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-white/10 text-cyan-300">
+            <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-white/10 text-cyan-300">
               <Tv className="h-6 w-6" />
             </span>
             <div>
@@ -81,7 +81,7 @@ export default async function PanoTvPage() {
         {/* Dev KPI'lar */}
         <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {stats.map((s) => (
-            <div key={s.label} className="rounded-[20px] border border-white/10 bg-white/[0.06] p-6">
+            <div key={s.label} className="rounded-[var(--radius-panel)] border border-white/10 bg-white/[0.06] p-6">
               <s.icon className={`h-6 w-6 ${s.tone}`} />
               <p className="mt-4 font-display text-4xl font-extrabold leading-none tracking-tight md:text-5xl">{s.value}</p>
               <p className="mt-2 text-sm font-semibold text-white/80">{s.label}</p>
@@ -92,7 +92,7 @@ export default async function PanoTvPage() {
 
         <div className="mt-6 grid gap-4 lg:grid-cols-[1.1fr_1fr]">
           {/* Lig */}
-          <section className="rounded-[20px] border border-white/10 bg-white/[0.05] p-6">
+          <section className="rounded-[var(--radius-panel)] border border-white/10 bg-white/[0.05] p-6">
             <h2 className="flex items-center gap-2 text-sm font-bold text-white/80">
               <Trophy className="h-5 w-5 text-amber-300" /> Danışman Ligi · son 30 gün
             </h2>
@@ -103,7 +103,7 @@ export default async function PanoTvPage() {
                 {lig.map((a, i) => (
                   <li key={a.name} className="flex items-center gap-3">
                     <span
-                      className={`grid h-9 w-9 shrink-0 place-items-center rounded-[11px] font-display text-lg font-extrabold ${
+                      className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] font-display text-lg font-extrabold ${
                         i === 0 ? "bg-amber-400 text-ink-950" : i === 1 ? "bg-white/25" : i === 2 ? "bg-amber-700/50" : "bg-white/10"
                       }`}
                     >
@@ -117,7 +117,7 @@ export default async function PanoTvPage() {
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="font-display text-lg font-extrabold tabular-nums text-mint-300">{compact(a.value)}</p>
-                      <p className="text-[11px] text-white/50">{a.count} anlaşma</p>
+                      <p className="text-xs text-white/50">{a.count} anlaşma</p>
                     </div>
                   </li>
                 ))}
@@ -126,7 +126,7 @@ export default async function PanoTvPage() {
           </section>
 
           {/* Yeni portföy akışı */}
-          <section className="rounded-[20px] border border-white/10 bg-white/[0.05] p-6">
+          <section className="rounded-[var(--radius-panel)] border border-white/10 bg-white/[0.05] p-6">
             <h2 className="flex items-center gap-2 text-sm font-bold text-white/80">
               <Building2 className="h-5 w-5 text-cyan-300" /> Yeni Portföy Akışı
             </h2>
@@ -135,13 +135,13 @@ export default async function PanoTvPage() {
             ) : (
               <ul className="mt-5 space-y-2.5">
                 {props.map((p) => (
-                  <li key={p.property_code} className="flex items-center gap-3 rounded-[13px] border border-white/8 bg-white/[0.04] px-4 py-3">
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-white/10 text-cyan-300">
+                  <li key={p.property_code} className="flex items-center gap-3 rounded-[var(--radius-card)] border border-white/8 bg-white/[0.04] px-4 py-3">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-white/10 text-cyan-300">
                       <Building2 className="h-4 w-4" />
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold">{p.title}</p>
-                      <p className="text-[11px] text-white/50">{p.property_code}</p>
+                      <p className="text-xs text-white/50">{p.property_code}</p>
                     </div>
                     <p className="shrink-0 font-display text-base font-bold tabular-nums text-white/90">
                       {p.list_price != null ? money(Number(p.list_price)) : "—"}

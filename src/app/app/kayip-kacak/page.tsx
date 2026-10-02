@@ -254,7 +254,7 @@ export default async function LeakShieldPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-danger-500/25 blur-[90px]" />
         <div className="relative grid gap-6 lg:grid-cols-[1.2fr_1fr] lg:items-center">
@@ -281,24 +281,24 @@ export default async function LeakShieldPage({
                 <Link
                   key={k.label}
                   href={k.href}
-                  className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 hover:border-white/30"
+                  className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 hover:border-white/30"
                 >
                   <p className={`flex items-center gap-1 font-display text-lg font-extrabold ${k.tone}`}>
                     {k.value}
                     <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
                   </p>
-                  <p className="text-[11px] text-white/45">{k.label}</p>
+                  <p className="text-xs text-white/45">{k.label}</p>
                 </Link>
               ))}
             </div>
           </div>
 
-          <div className="rounded-[16px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
+          <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="flex items-center justify-between">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-white/75">
                 <TrendingDown className="h-3.5 w-3.5 text-danger-400" /> Kayıp trend · 8 hafta
               </p>
-              <span className="rounded-full bg-danger-500/15 px-2 py-0.5 text-[11px] font-bold text-danger-300">
+              <span className="rounded-full bg-danger-500/15 px-2 py-0.5 text-xs font-bold text-danger-300">
                 {moneyTry(buckets[7] ?? 0)}
               </span>
             </div>
@@ -318,7 +318,7 @@ export default async function LeakShieldPage({
 
       {/* ── Teyit SLA durumu şeridi ─────────────────────────────────────────── */}
       {slaTotal > 0 ? (
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
@@ -327,7 +327,7 @@ export default async function LeakShieldPage({
               <h2 className="mt-1 font-display font-bold text-ink-950">
                 {slaTotal} canlı ilan
                 {slaHealth !== null ? (
-                  <span className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                  <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-bold ${
                     slaHealth >= 85 ? "bg-mint-500/12 text-mint-600" : slaHealth >= 60 ? "bg-amber-400/15 text-amber-600" : "bg-danger-500/10 text-danger-500"
                   }`}>
                     %{slaHealth} SLA içinde
@@ -335,7 +335,7 @@ export default async function LeakShieldPage({
                 ) : null}
               </h2>
             </div>
-            <p className="text-[11px] text-text-faint">SLA: her ilan en geç 7 günde bir teyit edilir</p>
+            <p className="text-xs text-text-faint">SLA: her ilan en geç 7 günde bir teyit edilir</p>
           </div>
 
           {/* Oransal şerit — segmentler tıklanabilir chips ile eşleşir */}
@@ -354,7 +354,7 @@ export default async function LeakShieldPage({
               <Link
                 key={s.label}
                 href={s.href}
-                className="focus-ring press lift group flex min-h-[44px] items-center justify-between gap-2 rounded-[12px] border border-line bg-canvas/50 px-3.5 py-2.5 hover:border-brand-300"
+                className="focus-ring press lift group flex min-h-[44px] items-center justify-between gap-2 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3.5 py-2.5 hover:border-brand-300"
               >
                 <span className="flex items-center gap-2 text-xs font-semibold text-text-muted">
                   <span className={`h-2 w-2 rounded-full ${s.dot}`} /> {s.label}
@@ -370,7 +370,7 @@ export default async function LeakShieldPage({
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-xs font-semibold text-danger-500">
             <Siren className="h-4 w-4" /> Kaçak oranı
           </p>
@@ -393,7 +393,7 @@ export default async function LeakShieldPage({
               </svg>
               <div className="absolute text-center">
                 <p className="font-display text-lg font-extrabold text-ink-950">%{Math.round(leakShare * 100)}</p>
-                <p className="text-[10px] text-text-faint">kaçak</p>
+                <p className="text-xs text-text-faint">kaçak</p>
               </div>
             </div>
             <div className="space-y-2 text-xs text-text-muted">
@@ -404,7 +404,7 @@ export default async function LeakShieldPage({
           </div>
         </section>
 
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-xs font-semibold text-amber-600">
             <ShieldAlert className="h-4 w-4" /> Neden dağılımı
           </p>
@@ -421,7 +421,7 @@ export default async function LeakShieldPage({
                     // Aktif nedene tekrar tıklamak filtreyi kaldırır
                     href={filterHref({ neden: active ? null : r.label })}
                     aria-current={active ? "page" : undefined}
-                    className={`focus-ring group block rounded-[10px] p-1 -m-1 ${active ? "bg-brand-600/5" : ""}`}
+                    className={`focus-ring group block rounded-[var(--radius-control)] p-1 -m-1 ${active ? "bg-brand-600/5" : ""}`}
                   >
                     <div className="mb-1 flex justify-between text-xs">
                       <span className="flex items-center gap-1 font-semibold text-ink-950">
@@ -445,7 +445,7 @@ export default async function LeakShieldPage({
       </div>
 
       {riskRanking.length > 0 ? (
-        <section className="rounded-[20px] border border-warn-500/30 bg-warn-500/5 p-5">
+        <section className="rounded-[var(--radius-panel)] border border-warn-500/30 bg-warn-500/5 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-warn-500" />
@@ -494,7 +494,7 @@ export default async function LeakShieldPage({
                       />
                     </div>
                   </div>
-                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold tabular-nums ${
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums ${
                     critical ? "bg-danger-500/10 text-danger-500" : "bg-warn-500/15 text-warn-600"
                   }`}>
                     {days >= 999 ? "Hiç teyit yok" : `${days} gün`}
@@ -510,14 +510,14 @@ export default async function LeakShieldPage({
                   <button
                     type="submit"
                     title="İlanı şimdi teyit et — gecikmiş listeden düşer"
-                    className="focus-ring press inline-flex min-h-[36px] items-center gap-1 rounded-[10px] border border-mint-500/25 bg-mint-500/10 px-2.5 text-[11px] font-bold text-mint-700 transition hover:border-mint-500/45 hover:bg-mint-500/15"
+                    className="focus-ring press inline-flex min-h-[36px] items-center gap-1 rounded-[var(--radius-control)] border border-mint-500/25 bg-mint-500/10 px-2.5 text-xs font-bold text-mint-700 transition hover:border-mint-500/45 hover:bg-mint-500/15"
                   >
                     <CheckCircle2 className="h-3.5 w-3.5" /> Teyit et
                   </button>
                 </form>
               ) : null;
               return (
-                <div key={r.id} className="group flex min-h-[44px] items-center gap-2 rounded-[14px] border border-line bg-surface px-3.5 py-2.5 transition hover:border-brand-300">
+                <div key={r.id} className="group flex min-h-[44px] items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-3.5 py-2.5 transition hover:border-brand-300">
                   {prop?.id ? (
                     <Link href={`/app/portfoyler/${prop.id}`} className="focus-ring press flex min-w-0 flex-1">
                       {inner}
@@ -533,7 +533,7 @@ export default async function LeakShieldPage({
         </section>
       ) : null}
 
-      <section id="kapanislar" className="overflow-hidden rounded-[20px] border border-line bg-surface">
+      <section id="kapanislar" className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
           <div>
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -546,7 +546,7 @@ export default async function LeakShieldPage({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {nedenF ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1 text-[11px] font-semibold text-brand-700">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1 text-xs font-semibold text-brand-700">
                 Neden: {nedenF}
                 <Link href={filterHref({ neden: null })} aria-label="Neden filtresini temizle" className="focus-ring rounded-full hover:text-brand-900">
                   ×
@@ -554,7 +554,7 @@ export default async function LeakShieldPage({
               </span>
             ) : null}
             {tipF ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1 text-[11px] font-semibold text-brand-700">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1 text-xs font-semibold text-brand-700">
                 {TIP_LABELS[tipF]}
                 <Link href={filterHref({ tip: null })} aria-label="Tip filtresini temizle" className="focus-ring rounded-full hover:text-brand-900">
                   ×
@@ -562,7 +562,7 @@ export default async function LeakShieldPage({
               </span>
             ) : null}
             {sevF ? (
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold ${SEV_META[sevF].badge}`}>
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${SEV_META[sevF].badge}`}>
                 {SEV_META[sevF].label} ciddiyet
                 <Link href={filterHref({ siddet: null })} aria-label="Ciddiyet filtresini temizle" className="focus-ring rounded-full hover:opacity-80">
                   ×
@@ -583,7 +583,7 @@ export default async function LeakShieldPage({
             type="date"
             defaultValue={fromF}
             aria-label="Başlangıç tarihi"
-            className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+            className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
           />
           <span className="text-text-faint">—</span>
           <input
@@ -591,9 +591,9 @@ export default async function LeakShieldPage({
             type="date"
             defaultValue={toF}
             aria-label="Bitiş tarihi"
-            className="rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+            className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
           />
-          <button type="submit" className="focus-ring press rounded-[9px] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700">
+          <button type="submit" className="focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700">
             Uygula
           </button>
           {rangeActive ? (
@@ -616,7 +616,7 @@ export default async function LeakShieldPage({
                 key={s}
                 href={filterHref({ siddet: active ? null : s })}
                 aria-current={active ? "page" : undefined}
-                className={`focus-ring press inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold transition ${
+                className={`focus-ring press inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition ${
                   active ? SEV_META[s].badge : "border border-line text-text-muted hover:border-brand-300"
                 }`}
               >
@@ -626,7 +626,7 @@ export default async function LeakShieldPage({
               </Link>
             );
           })}
-          <span className="text-[11px] text-text-faint">7+ gün sonuçsuz kapanışlarda otomatik atanır</span>
+          <span className="text-xs text-text-faint">7+ gün sonuçsuz kapanışlarda otomatik atanır</span>
         </div>
         {totalClosuresCount === 0 ? (
           <p className="px-5 py-12 text-center text-sm text-text-muted">
@@ -665,7 +665,7 @@ export default async function LeakShieldPage({
                       <Link
                         href={filterHref({ siddet: sevF === r.leak_severity ? null : r.leak_severity })}
                         title={`${SEV_META[r.leak_severity].label} ciddiyet — kayıp ciddiyetine göre süz`}
-                        className={`focus-ring press relative z-10 rounded-full px-2.5 py-1 text-[11px] font-bold transition hover:opacity-80 ${SEV_META[r.leak_severity].badge}`}
+                        className={`focus-ring press relative z-10 rounded-full px-2.5 py-1 text-xs font-bold transition hover:opacity-80 ${SEV_META[r.leak_severity].badge}`}
                       >
                         {SEV_META[r.leak_severity].label}
                       </Link>
@@ -674,7 +674,7 @@ export default async function LeakShieldPage({
                     {r.competitor_closed ? (
                       <Link
                         href={filterHref({ tip: tipF === "rakip" ? null : "rakip" })}
-                        className="focus-ring press relative z-10 rounded-full bg-danger-500/10 px-2.5 py-1 text-[11px] font-bold text-danger-500 hover:bg-danger-500/20"
+                        className="focus-ring press relative z-10 rounded-full bg-danger-500/10 px-2.5 py-1 text-xs font-bold text-danger-500 hover:bg-danger-500/20"
                       >
                         Rakip
                       </Link>
@@ -682,7 +682,7 @@ export default async function LeakShieldPage({
                     {r.closed_by_us ? (
                       <Link
                         href={filterHref({ tip: tipF === "bizim" ? null : "bizim" })}
-                        className="focus-ring press relative z-10 rounded-full bg-mint-500/12 px-2.5 py-1 text-[11px] font-bold text-mint-600 hover:bg-mint-500/25"
+                        className="focus-ring press relative z-10 rounded-full bg-mint-500/12 px-2.5 py-1 text-xs font-bold text-mint-600 hover:bg-mint-500/25"
                       >
                         Bizim
                       </Link>
@@ -690,7 +690,7 @@ export default async function LeakShieldPage({
                     {r.deal_happened ? (
                       <Link
                         href={filterHref({ tip: tipF === "islem" ? null : "islem" })}
-                        className="focus-ring press relative z-10 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 hover:bg-brand-600/20"
+                        className="focus-ring press relative z-10 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 hover:bg-brand-600/20"
                       >
                         İşlem var
                       </Link>
@@ -700,7 +700,7 @@ export default async function LeakShieldPage({
                     <p className={`font-display text-base font-extrabold ${lost > 0 ? "text-danger-500" : "text-mint-600"}`}>
                       {lost > 0 ? `−${moneyTry(lost)}` : "Kayıp yok"}
                     </p>
-                    <p className="text-[11px] text-text-faint">
+                    <p className="text-xs text-text-faint">
                       {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(r.created_at))}
                     </p>
                   </div>
@@ -712,19 +712,19 @@ export default async function LeakShieldPage({
         {totalPages > 1 ? (
           <nav aria-label="Sayfalama" className="flex items-center justify-between gap-3 border-t border-line px-5 py-3">
             {page > 1 ? (
-              <Link href={filterHref({ sayfa: page - 1 })} className="focus-ring press rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+              <Link href={filterHref({ sayfa: page - 1 })} className="focus-ring press rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
                 ← Önceki
               </Link>
             ) : (
-              <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">← Önceki</span>
+              <span className="rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">← Önceki</span>
             )}
             <span className="text-xs tabular-nums text-text-muted">Sayfa {page} / {totalPages}</span>
             {page < totalPages ? (
-              <Link href={filterHref({ sayfa: page + 1 })} className="focus-ring press rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+              <Link href={filterHref({ sayfa: page + 1 })} className="focus-ring press rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
                 Sonraki →
               </Link>
             ) : (
-              <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">Sonraki →</span>
+              <span className="rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">Sonraki →</span>
             )}
           </nav>
         ) : null}

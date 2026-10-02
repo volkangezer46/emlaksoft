@@ -69,7 +69,7 @@ export function AddLeaveDialog({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
+          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
         >
           <CalendarPlus className="h-4 w-4" /> İzin ekle
         </button>
@@ -95,7 +95,7 @@ export function AddLeaveDialog({
                 id="leave_staff"
                 name="staff_id"
                 defaultValue={selfId}
-                className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
               >
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -109,11 +109,11 @@ export function AddLeaveDialog({
                 <input type="hidden" name="staff_id" value={selfId} />
                 <p
                   id="leave_staff"
-                  className="rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm font-semibold text-ink-950"
+                  className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm font-semibold text-ink-950"
                 >
                   {selfName}
                 </p>
-                <p className="mt-1.5 text-[11px] text-text-faint">
+                <p className="mt-1.5 text-xs text-text-faint">
                   Başkası adına izin girmek için ekip düzenleme yetkisi gerekir.
                 </p>
               </>
@@ -137,7 +137,7 @@ export function AddLeaveDialog({
                   // kullanıcıyı hata mesajıyla karşılamadan burada düzeltilir.
                   if (e.target.value > end) setEnd(e.target.value);
                 }}
-                className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
               />
             </div>
             <div>
@@ -152,7 +152,7 @@ export function AddLeaveDialog({
                 min={start}
                 value={end}
                 onChange={(e) => setEnd(e.target.value)}
-                className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
               />
             </div>
           </div>
@@ -165,7 +165,7 @@ export function AddLeaveDialog({
               id="kind"
               name="kind"
               defaultValue="izin"
-              className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+              className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
             >
               {KIND_OPTIONS.map((k) => (
                 <option key={k.value} value={k.value}>
@@ -185,7 +185,7 @@ export function AddLeaveDialog({
               rows={2}
               maxLength={500}
               placeholder="Örn. Yıllık izin — acil durumda telefonla ulaşılabilir"
-              className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+              className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
             />
           </div>
 
@@ -199,7 +199,7 @@ export function AddLeaveDialog({
             <DialogClose asChild>
               <button
                 type="button"
-                className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas"
+                className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas"
               >
                 Vazgeç
               </button>
@@ -207,7 +207,7 @@ export function AddLeaveDialog({
             <button
               type="submit"
               disabled={pending}
-              className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+              className="btn-shine focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
             >
               {pending ? "Kaydediliyor…" : canManage ? "İzni kaydet" : "Talebi gönder"}
             </button>

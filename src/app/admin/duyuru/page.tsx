@@ -70,11 +70,11 @@ export default async function BroadcastPage() {
   return (
     <div className="space-y-6">
       {/* Başlık */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-amber-400/20 blur-[90px]" />
         <div className="relative">
-          <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-amber-300">
+          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-amber-300">
             <Megaphone className="h-3.5 w-3.5" /> Toplu duyuru
           </p>
           <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">
@@ -95,37 +95,37 @@ export default async function BroadcastPage() {
 
         {/* Bilgi paneli */}
         <aside className="space-y-4">
-          <section className="rounded-[18px] border border-line bg-surface p-5">
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
             <div className="flex items-center gap-2">
               <Bell className="h-4 w-4 text-brand-600" />
               <h3 className="font-display font-bold text-ink-950">Nasıl çalışır?</h3>
             </div>
             <ul className="mt-4 space-y-3 text-sm text-text-muted">
               <li className="flex gap-2">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-600/10 text-[10px] font-bold text-brand-600">1</span>
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-600/10 text-xs font-bold text-brand-600">1</span>
                 Duyuru, seçilen ofisin <strong className="text-ink-950">tüm kullanıcılarına</strong> görünür.
               </li>
               <li className="flex gap-2">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-600/10 text-[10px] font-bold text-brand-600">2</span>
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-600/10 text-xs font-bold text-brand-600">2</span>
                 Ofis paneli topbar zili anında güncellenir; kullanıcı sayfayı yenilediğinde görür.
               </li>
               <li className="flex gap-2">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-600/10 text-[10px] font-bold text-brand-600">3</span>
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-600/10 text-xs font-bold text-brand-600">3</span>
                 Bağlantı alanı doluysa bildirime tıklanınca ilgili sayfaya yönlendirir.
               </li>
               <li className="flex gap-2">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-600/10 text-[10px] font-bold text-brand-600">4</span>
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-600/10 text-xs font-bold text-brand-600">4</span>
                 Gönderim geri alınamaz; dikkatlice doldurun.
               </li>
             </ul>
           </section>
 
-          <section className="rounded-[18px] border border-line bg-surface p-5">
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
             <h3 className="font-display font-bold text-ink-950">Tür rehberi</h3>
             <div className="mt-3 space-y-2">
               {KIND_OPTIONS.map((k) => (
                 <div key={k.value} className="flex items-center gap-3">
-                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${k.cls}`}>{k.label}</span>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${k.cls}`}>{k.label}</span>
                   <span className="text-xs text-text-muted">
                     {k.value === "info" && "Yeni özellik, duyuru, genel bilgi"}
                     {k.value === "success" && "Başarılı güncelleme, plan yükseltme"}
@@ -138,14 +138,14 @@ export default async function BroadcastPage() {
             </div>
           </section>
 
-          <div className="rounded-[14px] border border-amber-400/30 bg-amber-400/8 px-4 py-3 text-xs text-amber-700">
+          <div className="rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/8 px-4 py-3 text-xs text-amber-700">
             <strong>Yetki:</strong> Yalnızca Süper admin ve Operasyon rolü duyuru gönderebilir.
           </div>
         </aside>
       </div>
 
       {/* Duyuru geçmişi — gönderim başına tek arşiv satırı */}
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <History className="h-4 w-4 text-brand-600" /> Son duyurular
@@ -167,7 +167,7 @@ export default async function BroadcastPage() {
                   className="grid gap-2 px-5 py-3 transition hover:bg-brand-600/[0.02] sm:grid-cols-[1.4fr_1fr_auto_auto] sm:items-center"
                 >
                   <div className="flex min-w-0 items-center gap-2">
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${kindOpt?.cls ?? "bg-canvas text-text-muted"}`}>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${kindOpt?.cls ?? "bg-canvas text-text-muted"}`}>
                       {kindOpt?.label ?? a.kind}
                     </span>
                     <p className="truncate text-sm font-semibold text-ink-950">{a.title}</p>
@@ -181,7 +181,7 @@ export default async function BroadcastPage() {
                       (audienceLabel[a.audience] ?? a.audience)
                     )}
                   </p>
-                  <span className="numeric w-fit rounded-full bg-mint-500/10 px-2.5 py-1 text-[11px] font-bold text-mint-600">
+                  <span className="numeric w-fit rounded-full bg-mint-500/10 px-2.5 py-1 text-xs font-bold text-mint-600">
                     {a.sent_count} ofis
                   </span>
                   <p className="text-xs text-text-faint">

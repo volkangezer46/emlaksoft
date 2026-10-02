@@ -112,7 +112,7 @@ export default async function OtomasyonlarPage({
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -130,7 +130,7 @@ export default async function OtomasyonlarPage({
                   trigger={
                     <button
                       type="button"
-                      className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white"
+                      className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white"
                     >
                       <Plus className="h-4 w-4" /> Yeni otomasyon
                     </button>
@@ -150,13 +150,13 @@ export default async function OtomasyonlarPage({
               <Link
                 key={k.label}
                 href={k.href}
-                className={`focus-ring press group relative block min-w-[92px] rounded-[14px] border p-3 text-center transition hover:border-white/30 ${
+                className={`focus-ring press group relative block min-w-[92px] rounded-[var(--radius-card)] border p-3 text-center transition hover:border-white/30 ${
                   k.danger ? "border-danger-500/40 bg-danger-500/15" : "border-white/12 bg-white/8"
                 }`}
               >
                 <ArrowUpRight className="hover-action absolute right-2 top-2 h-3.5 w-3.5 text-white/50 opacity-0 transition group-hover:opacity-100" />
                 <p className="numeric font-display text-2xl font-extrabold text-white">{k.value}</p>
-                <p className="text-[11px] text-white/70">{k.label}</p>
+                <p className="text-xs text-white/70">{k.label}</p>
               </Link>
             ))}
           </div>
@@ -164,10 +164,10 @@ export default async function OtomasyonlarPage({
       </section>
 
       {/* Hazır şablonlar */}
-      <section className="rounded-[20px] border border-dashed border-brand-300/40 bg-brand-600/[0.02] p-5">
+      <section className="rounded-[var(--radius-panel)] border border-dashed border-brand-300/40 bg-brand-600/[0.02] p-5">
         <h2 className="mb-3 flex flex-wrap items-center gap-2 font-display font-bold text-ink-950">
           <Zap className="h-4 w-4 text-brand-600" /> Hızlı başlangıç şablonları
-          <Link href="/app/ayarlar/is-akislari" className="focus-ring ml-auto rounded-[8px] text-xs font-semibold text-brand-600 hover:underline">
+          <Link href="/app/ayarlar/is-akislari" className="focus-ring ml-auto rounded-[var(--radius-control)] text-xs font-semibold text-brand-600 hover:underline">
             Çok adımlı görev paketi mi lazım? İş akışları →
           </Link>
         </h2>
@@ -188,24 +188,24 @@ export default async function OtomasyonlarPage({
             /* Kartın tamamı klavyeyle de açılabilir bir önizleme tetikleyicisi:
                summary etiketli buton gibi davranır, açılınca şablon açıklaması
                görünür. Uygula butonu preventDefault ile toggle'ı bastırır. */
-            <details key={t.key} className="group/tpl rounded-[12px] border border-line bg-surface">
+            <details key={t.key} className="group/tpl rounded-[var(--radius-card)] border border-line bg-surface">
               <summary
                 aria-label={`${t.name} şablon önizlemesi`}
                 className="flex cursor-pointer list-none items-center gap-3 px-3 py-3 [&::-webkit-details-marker]:hidden"
               >
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-brand-600/10 text-brand-600">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
                   <Zap className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-semibold text-ink-950">{t.name}</p>
-                  <p className="text-[11px] text-text-faint">
+                  <p className="text-xs text-text-faint">
                     {TRIGGER_LABELS[t.trigger]} → {ACTION_LABELS[t.action]}
                   </p>
                 </div>
                 <ApplyTemplateButton templateKey={t.key} />
                 <ChevronDown className="h-3.5 w-3.5 shrink-0 text-text-faint transition group-open/tpl:rotate-180" />
               </summary>
-              <p className="border-t border-line px-3 py-2.5 text-[11px] leading-relaxed text-text-muted">
+              <p className="border-t border-line px-3 py-2.5 text-xs leading-relaxed text-text-muted">
                 {t.description}
               </p>
             </details>
@@ -214,7 +214,7 @@ export default async function OtomasyonlarPage({
       </section>
 
       {/* Mevcut otomasyonlar */}
-      <section className="overflow-hidden rounded-[20px] border border-line bg-surface">
+      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3.5">
           <p className="flex items-center gap-2 text-sm font-semibold text-ink-950">
             <BarChart3 className="h-4 w-4 text-brand-600" /> Kayıtlı otomasyonlar
@@ -225,7 +225,7 @@ export default async function OtomasyonlarPage({
                 <Link
                   key={f.value}
                   href={f.value ? `/app/otomasyonlar?durum=${f.value}` : "/app/otomasyonlar"}
-                  className={`focus-ring rounded-[8px] px-2.5 py-1 text-[11px] font-semibold transition ${
+                  className={`focus-ring rounded-[var(--radius-control)] px-2.5 py-1 text-xs font-semibold transition ${
                     durum === f.value
                       ? "bg-ink-950 text-white"
                       : "border border-line text-text-muted hover:text-ink-950"
@@ -266,7 +266,7 @@ export default async function OtomasyonlarPage({
               return (
                 <div key={r.id} className="group relative flex items-center gap-3 px-5 py-3.5 transition hover:bg-brand-600/[0.03]">
                   <Link href={`/app/otomasyonlar/${r.id}`} className="absolute inset-0" aria-label={`${r.name} otomasyon detayı`} />
-                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[9px] ${
+                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] ${
                     r.status === "active" ? "bg-mint-500/12 text-mint-600" : "bg-zinc-100 text-zinc-400"
                   }`}>
                     {r.status === "active" ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
@@ -274,7 +274,7 @@ export default async function OtomasyonlarPage({
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold text-ink-950 group-hover:text-brand-600">{r.name}</p>
                     {/* Tetikleyici → koşul → aksiyon zinciri görselleştirmesi */}
-                    <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px]">
+                    <div className="mt-1 flex flex-wrap items-center gap-1 text-xs">
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 font-semibold text-amber-700">
                         <Bolt className="h-3 w-3" /> {TRIGGER_LABELS[r.trigger_type] ?? r.trigger_type}
                       </span>
@@ -302,12 +302,12 @@ export default async function OtomasyonlarPage({
                       {r.run_count} çalışma
                     </Link>
                     {r.last_run_at && (
-                      <p className="text-[11px] text-text-faint">
+                      <p className="text-xs text-text-faint">
                         Son: {new Date(r.last_run_at).toLocaleDateString("tr-TR")}
                       </p>
                     )}
                   </div>
-                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
                     r.status === "active" ? "bg-mint-50 text-mint-700" :
                     r.status === "draft"  ? "bg-zinc-100 text-zinc-500" :
                     "bg-zinc-50 text-zinc-400"
@@ -325,7 +325,7 @@ export default async function OtomasyonlarPage({
       </section>
 
       {/* Son çalışmalar — automation_logs son 7 gün özeti */}
-      <section id="son-calismalar" className="scroll-mt-6 overflow-hidden rounded-[20px] border border-line bg-surface">
+      <section id="son-calismalar" className="scroll-mt-6 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3.5">
           <h2 className="flex items-center gap-2 text-sm font-bold text-ink-950">
             <History className="h-4 w-4 text-brand-600" /> Son çalışmalar
@@ -354,7 +354,7 @@ export default async function OtomasyonlarPage({
                     className="absolute inset-0"
                     aria-label={`${nameById.get(log.automation_id) ?? "Otomasyon"} çalışma geçmişi`}
                   />
-                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${badge.className}`}>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${badge.className}`}>
                     {badge.label}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -362,7 +362,7 @@ export default async function OtomasyonlarPage({
                       {nameById.get(log.automation_id) ?? "Otomasyon kuralı"}
                     </p>
                     {log.result === "error" && log.error_msg ? (
-                      <p className="truncate text-[11px] text-danger-500">{log.error_msg}</p>
+                      <p className="truncate text-xs text-danger-500">{log.error_msg}</p>
                     ) : null}
                   </div>
                   <span className="shrink-0 text-xs text-text-faint">{relativeTime(log.created_at)}</span>

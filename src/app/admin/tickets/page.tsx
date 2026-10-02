@@ -166,20 +166,20 @@ function MetricCard({
     <>
       <span className={cn("absolute inset-x-0 top-0 h-px bg-gradient-to-r to-transparent", accentClass)} aria-hidden />
       <div className="flex items-start justify-between gap-3">
-        <span className={cn("grid h-10 w-10 place-items-center rounded-[12px]", toneClass)}>
+        <span className={cn("grid h-10 w-10 place-items-center rounded-[var(--radius-card)]", toneClass)}>
           <Icon className="h-5 w-5" aria-hidden />
         </span>
-        {href ? <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Görüntüle</span> : null}
+        {href ? <span className="text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Görüntüle</span> : null}
       </div>
       <p className="numeric mt-3 font-display text-2xl font-extrabold leading-none text-ink-950">
         {typeof value === "number" ? value.toLocaleString("tr-TR") : value}
       </p>
       <p className="mt-1 text-xs font-bold text-ink-950">{label}</p>
-      <p className="mt-1 truncate text-[11px] text-text-muted">{hint}</p>
+      <p className="mt-1 truncate text-xs text-text-muted">{hint}</p>
     </>
   );
 
-  const className = "surface-card group relative block min-h-[136px] overflow-hidden rounded-[16px] p-4 transition";
+  const className = "surface-card group relative block min-h-[136px] overflow-hidden rounded-[var(--radius-card)] p-4 transition";
   return href ? (
     <Link href={href} className={cn(className, "focus-ring press lift hover:border-brand-300")}>
       {content}
@@ -191,7 +191,7 @@ function MetricCard({
 
 function StatusCount({ count, active }: { count: number; active: boolean }) {
   return (
-    <span className={cn("numeric rounded-full px-1.5 py-0.5 text-[10px] font-extrabold", active ? "bg-white/18 text-white" : "bg-ink-950/[0.06] text-text-muted")}>
+    <span className={cn("numeric rounded-full px-1.5 py-0.5 text-xs font-extrabold", active ? "bg-white/18 text-white" : "bg-ink-950/[0.06] text-text-muted")}>
       {count}
     </span>
   );
@@ -510,15 +510,15 @@ export default async function AdminTicketsPage({
 
   return (
     <div className="space-y-4">
-      <header className="surface-card relative overflow-hidden rounded-[18px] p-5">
+      <header className="surface-card relative overflow-hidden rounded-[var(--radius-panel)] p-5">
         <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-amber-400/12 blur-[70px]" aria-hidden />
         <div className="relative flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex min-w-0 items-start gap-3.5">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[14px] bg-[linear-gradient(145deg,var(--amber-300),var(--amber-500))] text-ink-950 shadow-[var(--inner-top),var(--elev-2)]">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[var(--radius-card)] bg-[linear-gradient(145deg,var(--amber-300),var(--amber-500))] text-ink-950 shadow-[var(--inner-top),var(--elev-2)]">
               <LifeBuoy className="h-6 w-6" aria-hidden />
             </span>
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700">Müşteri operasyon merkezi</p>
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-amber-700">Müşteri operasyon merkezi</p>
               <h1 className="mt-1 font-display text-xl font-extrabold text-ink-950 sm:text-2xl">Destek talepleri</h1>
               <p className="mt-1 text-sm text-text-muted">
                 SLA, durum ve sorumlu atamalarını tek kuyruktan yönetin.
@@ -555,16 +555,16 @@ export default async function AdminTicketsPage({
       <section aria-label="Destek analitiği" className="grid gap-4 xl:grid-cols-3 2xl:grid-cols-[0.95fr_1.45fr_0.9fr]">
         <TicketStatusDonut segments={donutSegments} total={total} />
 
-        <section className="surface-card min-w-0 rounded-[18px] p-4 sm:p-5">
+        <section className="surface-card min-w-0 rounded-[var(--radius-panel)] p-4 sm:p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">Talep akışı</p>
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">Talep akışı</p>
               <h2 className="mt-1 font-display text-base font-extrabold text-ink-950">Son 14 gün · yeni talepler</h2>
               <p className="mt-0.5 text-xs text-text-muted">Günlük oluşturulan destek talebi</p>
             </div>
-            <span className="rounded-[10px] bg-brand-600/[0.07] px-2.5 py-1.5 text-right">
+            <span className="rounded-[var(--radius-control)] bg-brand-600/[0.07] px-2.5 py-1.5 text-right">
               <span className="numeric block font-display text-lg font-extrabold leading-none text-brand-700">{newLast14}</span>
-              <span className="text-[9px] font-bold uppercase tracking-[0.05em] text-text-faint">14 gün</span>
+              <span className="text-xs font-bold uppercase tracking-[0.05em] text-text-faint">14 gün</span>
             </span>
           </div>
           <div className="mt-4">
@@ -589,7 +589,7 @@ export default async function AdminTicketsPage({
         />
       </section>
 
-      <section className="surface-card overflow-hidden rounded-[18px]">
+      <section className="surface-card overflow-hidden rounded-[var(--radius-panel)]">
         <nav aria-label="Talep durumları" className="border-b border-hairline bg-canvas/65 px-2 py-2">
           <div className="flex max-w-full items-center gap-1 overflow-x-auto pb-0.5">
             <Link href={hrefFor({ durum: null })} aria-current={!filters.durum ? "page" : undefined} className={statusPillClass(!filters.durum)}>
@@ -655,7 +655,7 @@ export default async function AdminTicketsPage({
           {filters.tenant ? <input type="hidden" name="tenant" value={filters.tenant} /> : null}
           {filters.sla ? <input type="hidden" name="sla" value={filters.sla} /> : null}
           <div className="relative min-w-0 sm:col-span-2 xl:col-span-2 2xl:col-span-1">
-            <label htmlFor="ticket-search" className="mb-1 block text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Ara</label>
+            <label htmlFor="ticket-search" className="mb-1 block text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Ara</label>
             <Search className="pointer-events-none absolute bottom-2.5 left-3 h-4 w-4 text-text-faint" aria-hidden />
             <input
               id="ticket-search"
@@ -665,29 +665,29 @@ export default async function AdminTicketsPage({
               minLength={2}
               maxLength={80}
               placeholder="Talep no, konu veya ofis…"
-              className="focus-ring h-10 w-full rounded-[10px] border border-line bg-canvas pl-9 pr-3 text-sm text-ink-950 outline-none transition placeholder:text-text-faint focus:border-brand-400 focus:bg-surface"
+              className="focus-ring h-10 w-full rounded-[var(--radius-control)] border border-line bg-canvas pl-9 pr-3 text-sm text-ink-950 outline-none transition placeholder:text-text-faint focus:border-brand-400 focus:bg-surface"
             />
           </div>
 
           <div>
-            <label htmlFor="ticket-priority" className="mb-1 block text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Öncelik</label>
-            <select id="ticket-priority" name="oncelik" defaultValue={filters.oncelik ?? ""} className="focus-ring h-10 w-full rounded-[10px] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
+            <label htmlFor="ticket-priority" className="mb-1 block text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Öncelik</label>
+            <select id="ticket-priority" name="oncelik" defaultValue={filters.oncelik ?? ""} className="focus-ring h-10 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
               <option value="">Tüm öncelikler</option>
               {TICKET_PRIORITY_KEYS.map((priority) => <option key={priority} value={priority}>{TICKET_PRIORITY_LABEL[priority]}</option>)}
             </select>
           </div>
 
           <div>
-            <label htmlFor="ticket-category" className="mb-1 block text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Kategori</label>
-            <select id="ticket-category" name="kategori" defaultValue={filters.kategori ?? ""} className="focus-ring h-10 w-full rounded-[10px] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
+            <label htmlFor="ticket-category" className="mb-1 block text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Kategori</label>
+            <select id="ticket-category" name="kategori" defaultValue={filters.kategori ?? ""} className="focus-ring h-10 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
               <option value="">Tüm kategoriler</option>
               {categoryOptions.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
             </select>
           </div>
 
           <div>
-            <label htmlFor="ticket-assignee" className="mb-1 block text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Atanan</label>
-            <select id="ticket-assignee" name="atanan" defaultValue={filters.atanan ?? ""} className="focus-ring h-10 w-full rounded-[10px] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
+            <label htmlFor="ticket-assignee" className="mb-1 block text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Atanan</label>
+            <select id="ticket-assignee" name="atanan" defaultValue={filters.atanan ?? ""} className="focus-ring h-10 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
               <option value="">Tüm personel</option>
               <option value="atanmadi">Atanmamış</option>
               {staff.map((person) => <option key={person.id} value={person.id}>{person.full_name}</option>)}
@@ -699,8 +699,8 @@ export default async function AdminTicketsPage({
               <input type="hidden" name="sirala" value="queue" />
               <input type="hidden" name="yon" value="desc" />
               <div className="sm:col-span-2">
-                <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Sıralama</span>
-                <div className="flex h-10 items-center rounded-[10px] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950">
+                <span className="mb-1 block text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Sıralama</span>
+                <div className="flex h-10 items-center rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950">
                   SLA riskine göre otomatik sıralanır
                 </div>
               </div>
@@ -708,8 +708,8 @@ export default async function AdminTicketsPage({
           ) : (
             <>
               <div>
-                <label htmlFor="ticket-sort" className="mb-1 block text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Sıralama</label>
-                <select id="ticket-sort" name="sirala" defaultValue={filters.sirala ?? "queue"} className="focus-ring h-10 w-full rounded-[10px] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
+                <label htmlFor="ticket-sort" className="mb-1 block text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Sıralama</label>
+                <select id="ticket-sort" name="sirala" defaultValue={filters.sirala ?? "queue"} className="focus-ring h-10 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
                   <option value="queue">SLA öncelikli kuyruk</option>
                   <option value="created_at">Oluşturma</option>
                   <option value="updated_at">Son hareket</option>
@@ -719,8 +719,8 @@ export default async function AdminTicketsPage({
               </div>
 
               <div>
-                <label htmlFor="ticket-direction" className="mb-1 block text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Yön</label>
-                <select id="ticket-direction" name="yon" defaultValue={filters.yon ?? "desc"} className="focus-ring h-10 w-full rounded-[10px] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
+                <label htmlFor="ticket-direction" className="mb-1 block text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Yön</label>
+                <select id="ticket-direction" name="yon" defaultValue={filters.yon ?? "desc"} className="focus-ring h-10 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
                   <option value="desc">Azalan</option>
                   <option value="asc">Artan</option>
                 </select>
@@ -733,19 +733,19 @@ export default async function AdminTicketsPage({
 
         {(filtered || selectedTenant) ? (
           <div className="flex flex-wrap items-center gap-2 border-t border-hairline px-3 py-2.5">
-            <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">Aktif görünüm</span>
+            <span className="text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Aktif görünüm</span>
             {selectedTenant ? (
-              <Link href={hrefFor({ tenant: null })} className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/[0.08] px-2.5 py-1 text-[11px] font-bold text-brand-700">
+              <Link href={hrefFor({ tenant: null })} className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/[0.08] px-2.5 py-1 text-xs font-bold text-brand-700">
                 {selectedTenant.name} <X className="h-3 w-3" aria-hidden />
               </Link>
             ) : null}
             {filters.sla ? (
-              <Link href={hrefFor({ sla: null })} className="focus-ring inline-flex items-center gap-1 rounded-full bg-amber-400/12 px-2.5 py-1 text-[11px] font-bold text-amber-700">
+              <Link href={hrefFor({ sla: null })} className="focus-ring inline-flex items-center gap-1 rounded-full bg-amber-400/12 px-2.5 py-1 text-xs font-bold text-amber-700">
                 {SLA_FILTER_LABEL[filters.sla]} <X className="h-3 w-3" aria-hidden />
               </Link>
             ) : null}
             <span className="numeric text-xs font-semibold text-text-muted">{listTotal.toLocaleString("tr-TR")} sonuç</span>
-            <Link href="/admin/tickets" className="focus-ring ml-auto rounded-[8px] px-2 py-1 text-xs font-bold text-danger-600 transition hover:bg-danger-500/[0.06]">Filtreleri temizle</Link>
+            <Link href="/admin/tickets" className="focus-ring ml-auto rounded-[var(--radius-control)] px-2 py-1 text-xs font-bold text-danger-600 transition hover:bg-danger-500/[0.06]">Filtreleri temizle</Link>
           </div>
         ) : null}
       </section>

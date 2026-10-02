@@ -19,7 +19,7 @@ type CustomerOption = { id: string; full_name: string };
 const initial: DemandResult = {};
 
 const fieldClass =
-  "w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
 /**
  * Liste sayfasından yeni talep — müşteri-360'taki NewDemandDialog ile aynı form,
@@ -54,7 +54,7 @@ export function NewDemandListDialog({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-brand-700"
+          className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-brand-700"
         >
           <Plus className="h-3.5 w-3.5" /> Yeni talep
         </button>
@@ -122,14 +122,14 @@ export function NewDemandListDialog({
 
           <div className="hairline-t sm:col-span-2 flex justify-end gap-2 pt-4">
             <DialogClose asChild>
-              <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
+              <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
                 Vazgeç
               </button>
             </DialogClose>
             <button
               type="submit"
               disabled={pending}
-              className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+              className="btn-shine focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
             >
               {pending ? "Kaydediliyor…" : "Talebi kaydet"}
             </button>

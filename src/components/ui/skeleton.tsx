@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
  * anlamsız kutu okur.
  */
 export function Skeleton({ className }: { className?: string }) {
-  return <div aria-hidden="true" className={cn("skeleton rounded-[8px]", className)} />;
+  return <div aria-hidden="true" className={cn("skeleton rounded-[var(--radius-control)]", className)} />;
 }
 
 /**
@@ -71,9 +71,9 @@ export function SkeletonLine({ className }: { className?: string }) {
 /** KPI/StatCard ölçüsünde kart iskeleti — gerçek kartla aynı yükseklikte. */
 export function SkeletonStat({ className }: { className?: string }) {
   return (
-    <div className={cn("rounded-[18px] border border-line bg-surface p-5", className)}>
+    <div className={cn("rounded-[var(--radius-panel)] border border-line bg-surface p-5", className)}>
       <div className="flex items-start justify-between">
-        <Skeleton className="h-10 w-10 rounded-[12px]" />
+        <Skeleton className="h-10 w-10 rounded-[var(--radius-card)]" />
         <Skeleton className="h-5 w-14 rounded-full" />
       </div>
       <Skeleton className="mt-4 h-3 w-24" />
@@ -94,7 +94,7 @@ export function SkeletonTable({
   className?: string;
 }) {
   return (
-    <div className={cn("overflow-hidden rounded-[16px] border border-line bg-surface", className)}>
+    <div className={cn("overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface", className)}>
       <div
         className="grid gap-4 border-b border-line bg-canvas px-4 py-3"
         style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}

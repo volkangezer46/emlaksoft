@@ -41,7 +41,7 @@ function DeleteMacroButton({ id, title }: { id: string; title: string }) {
         formAction={action}
         hiddenFields={{ id }}
       />
-      {state.error ? <p className="mt-1 max-w-32 text-[10px] font-semibold text-danger-600" role="alert">{state.error}</p> : null}
+      {state.error ? <p className="mt-1 max-w-32 text-xs font-semibold text-danger-600" role="alert">{state.error}</p> : null}
     </div>
   );
 }
@@ -62,18 +62,18 @@ export function TicketMacroManager({ macros }: { macros: { id: string; title: st
   );
 
   return (
-    <details className="group rounded-[16px] border border-line bg-surface p-4">
+    <details className="group rounded-[var(--radius-card)] border border-line bg-surface p-4">
       <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-bold text-ink-950">
-        Hazır yanıtlar <span className="text-[10px] font-semibold text-text-faint">{macros.length} makro</span>
+        Hazır yanıtlar <span className="text-xs font-semibold text-text-faint">{macros.length} makro</span>
       </summary>
       <div className="mt-3 space-y-3">
         {macros.length ? (
           <ul className="space-y-1.5">
             {macros.map((macro) => (
-              <li key={macro.id} className="flex items-start gap-2 rounded-[10px] border border-line bg-canvas/55 px-2.5 py-2">
+              <li key={macro.id} className="flex items-start gap-2 rounded-[var(--radius-control)] border border-line bg-canvas/55 px-2.5 py-2">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-ink-950">{macro.title}</p>
-                  <p className="mt-0.5 line-clamp-2 text-[10px] text-text-muted">{macro.body}</p>
+                  <p className="mt-0.5 line-clamp-2 text-xs text-text-muted">{macro.body}</p>
                 </div>
                 <DeleteMacroButton id={macro.id} title={macro.title} />
               </li>
@@ -81,8 +81,8 @@ export function TicketMacroManager({ macros }: { macros: { id: string; title: st
           </ul>
         ) : <p className="text-xs text-text-faint">Henüz hazır yanıt yok.</p>}
         <form ref={formRef} action={action} className="space-y-2">
-          <input type="text" name="title" required maxLength={120} placeholder="Makro başlığı" className="w-full rounded-[8px] border border-line bg-canvas px-2.5 py-2 text-xs outline-none focus:border-brand-400" />
-          <textarea name="body" required minLength={3} maxLength={5000} rows={3} placeholder="Hazır yanıt metni…" className="w-full resize-y rounded-[8px] border border-line bg-canvas px-2.5 py-2 text-xs outline-none focus:border-brand-400" />
+          <input type="text" name="title" required maxLength={120} placeholder="Makro başlığı" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-2 text-xs outline-none focus:border-brand-400" />
+          <textarea name="body" required minLength={3} maxLength={5000} rows={3} placeholder="Hazır yanıt metni…" className="w-full resize-y rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-2 text-xs outline-none focus:border-brand-400" />
           <Button type="submit" size="sm" icon={Plus} loading={pending} className="w-full">Makro ekle</Button>
           {state.error ? <p className="text-xs font-semibold text-danger-600" role="alert">{state.error}</p> : null}
           {state.ok ? <p className="text-xs font-semibold text-mint-700" role="status">Hazır yanıt eklendi.</p> : null}

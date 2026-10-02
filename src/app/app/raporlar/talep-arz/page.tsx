@@ -30,7 +30,7 @@ import type { TalepArzMarker } from "./talep-arz-map";
 // Harita ağır bir client komponenti — dynamic import ile ayrı chunk
 // (portfoyler sayfasındaki MapView deseniyle aynı).
 const TalepArzMap = dynamic(() => import("./talep-arz-map").then((m) => m.TalepArzMap), {
-  loading: () => <div className="h-[460px] animate-pulse rounded-[16px] border border-line bg-ink-950/8" />,
+  loading: () => <div className="h-[460px] animate-pulse rounded-[var(--radius-card)] border border-line bg-ink-950/8" />,
 });
 
 function money(n: number) {
@@ -209,12 +209,12 @@ export default async function TalepArzPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-brand-600/25 blur-[80px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-cyan-400">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-cyan-400">
               <MapIcon className="h-3.5 w-3.5" /> Rapor merkezi
             </p>
             <h1 className="mt-2 font-display text-3xl font-extrabold">Talep-Arz Haritası</h1>
@@ -225,7 +225,7 @@ export default async function TalepArzPage({
           </div>
           <Link
             href="/app/raporlar"
-            className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white"
+            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white"
           >
             <BarChart3 className="h-4 w-4" /> Rapor merkezi
           </Link>
@@ -274,7 +274,7 @@ export default async function TalepArzPage({
             name="il"
             defaultValue={ilFilter ?? ""}
             aria-label="İl filtresi"
-            className="rounded-[10px] border border-line bg-surface px-3 py-2 text-xs font-semibold text-ink-950 outline-none transition focus:border-brand-400"
+            className="rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-ink-950 outline-none transition focus:border-brand-400"
           >
             <option value="">Tüm iller</option>
             {provinces.map((p) => (
@@ -285,7 +285,7 @@ export default async function TalepArzPage({
           </select>
           <button
             type="submit"
-            className="rounded-[10px] bg-ink-950 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-ink-950/85"
+            className="rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-ink-950/85"
           >
             Uygula
           </button>
@@ -347,7 +347,7 @@ export default async function TalepArzPage({
       ) : (
         <>
           {/* İlçe bazlı denge tablosu */}
-          <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
             <div className="flex flex-wrap items-center gap-2">
               <Scale className="h-4 w-4 text-brand-600" />
               <h2 className="font-display font-bold text-ink-950">İlçe bazlı talep-arz dengesi</h2>
@@ -358,7 +358,7 @@ export default async function TalepArzPage({
             <div className="mt-4 overflow-x-auto">
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
-                  <tr className="border-b border-line text-left text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted">
+                  <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-muted">
                     <th className="py-2 pr-3">İlçe</th>
                     <th className="py-2 pr-3 text-right">Açık talep</th>
                     <th className="py-2 pr-3 text-right">Yayında portföy</th>
@@ -385,12 +385,12 @@ export default async function TalepArzPage({
                       <tr key={r.key} className="border-b border-line/60 transition hover:bg-canvas">
                         <td className="py-2.5 pr-3">
                           <p className="font-semibold text-ink-950">{r.label}</p>
-                          <p className="text-[11px] text-text-muted">{r.provinceName}</p>
+                          <p className="text-xs text-text-muted">{r.provinceName}</p>
                         </td>
                         <td className="py-2.5 pr-3 text-right">
                           <Link
                             href={r.demandHref}
-                            className="focus-ring group inline-flex items-center gap-1 rounded-[8px] px-1.5 py-0.5 font-display font-extrabold tabular-nums text-brand-600 hover:bg-brand-600/10"
+                            className="focus-ring group inline-flex items-center gap-1 rounded-[var(--radius-control)] px-1.5 py-0.5 font-display font-extrabold tabular-nums text-brand-600 hover:bg-brand-600/10"
                             title="Açık talepler (talep merkezi)"
                           >
                             {r.demandCount}
@@ -400,7 +400,7 @@ export default async function TalepArzPage({
                         <td className="py-2.5 pr-3 text-right">
                           <Link
                             href={r.supplyHref}
-                            className="focus-ring group inline-flex items-center gap-1 rounded-[8px] px-1.5 py-0.5 font-display font-extrabold tabular-nums text-mint-600 hover:bg-mint-500/10"
+                            className="focus-ring group inline-flex items-center gap-1 rounded-[var(--radius-control)] px-1.5 py-0.5 font-display font-extrabold tabular-nums text-mint-600 hover:bg-mint-500/10"
                             title={`Yayındaki portföyler — ${r.districtName ?? r.provinceName}`}
                           >
                             {r.supplyCount}
@@ -417,7 +417,7 @@ export default async function TalepArzPage({
                           {r.medianPrice !== null ? money(r.medianPrice) : "—"}
                         </td>
                         <td className="py-2.5 text-right">
-                          <span className={`inline-block rounded-full px-2.5 py-1 text-[11px] font-bold ${badge.cls}`}>
+                          <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-bold ${badge.cls}`}>
                             {badge.label}
                           </span>
                         </td>
@@ -432,7 +432,7 @@ export default async function TalepArzPage({
           {/* İlçe çift bar grafiği — geo_districts'te koordinat olmadığından ilçe
               haritası yerine bar görünümü (il haritası aşağıda ayrıca var) */}
           {barRows.length > 0 ? (
-            <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <div className="flex flex-wrap items-center gap-2">
                 <BarChart3 className="h-4 w-4 text-brand-600" />
                 <h2 className="font-display font-bold text-ink-950">Talep vs arz · ilçe sıralaması</h2>
@@ -447,7 +447,7 @@ export default async function TalepArzPage({
               </div>
               <div className="mt-5 space-y-3">
                 {barRows.map((r, i) => (
-                  <Link key={r.key} href={r.supplyHref} className="focus-ring group block rounded-[10px] p-1 -m-1">
+                  <Link key={r.key} href={r.supplyHref} className="focus-ring group block rounded-[var(--radius-control)] p-1 -m-1">
                     <div className="mb-1 flex items-center justify-between text-xs">
                       <span className="flex items-center gap-1 font-semibold text-ink-950">
                         {r.label}

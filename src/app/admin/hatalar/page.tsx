@@ -118,7 +118,7 @@ export default async function ErrorLogsPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-danger-500/25 blur-[80px]" />
         <div className="relative">
@@ -149,19 +149,19 @@ export default async function ErrorLogsPage({
                   key={k.label}
                   href={k.href}
                   aria-current={k.active ? "page" : undefined}
-                  className={`focus-ring press group relative block rounded-[14px] border p-3 backdrop-blur transition ${
+                  className={`focus-ring press group relative block rounded-[var(--radius-card)] border p-3 backdrop-blur transition ${
                     k.active ? "border-danger-300/50 bg-white/12" : "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10"
                   }`}
                 >
                   <k.icon className="h-4 w-4 text-danger-300" />
                   <p className="numeric mt-2 font-display text-lg font-extrabold text-white">{k.value}</p>
-                  <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+                  <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
                 </Link>
               ) : (
-                <div key={k.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur">
+                <div key={k.label} className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur">
                   <k.icon className="h-4 w-4 text-danger-300" />
                   <p className="numeric mt-2 font-display text-lg font-extrabold text-white">{k.value}</p>
-                  <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+                  <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
                 </div>
               ),
             )}
@@ -169,7 +169,7 @@ export default async function ErrorLogsPage({
         </div>
       </section>
 
-      <nav aria-label="Durum filtresi" className="flex flex-wrap gap-2 rounded-[16px] border border-line bg-surface p-3">
+      <nav aria-label="Durum filtresi" className="flex flex-wrap gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-3">
         {[
           { v: "", l: "Açık" },
           { v: "cozulmus", l: "Çözülmüş" },
@@ -178,7 +178,7 @@ export default async function ErrorLogsPage({
             key={o.l}
             href={hrefWith({ durum: o.v || undefined, son: sonBirSaat ? "1saat" : undefined })}
             aria-current={(o.v === "cozulmus") === cozulmusGoster ? "page" : undefined}
-            className={`focus-ring press rounded-[9px] px-3 py-2 text-xs font-semibold transition ${
+            className={`focus-ring press rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold transition ${
               (o.v === "cozulmus") === cozulmusGoster
                 ? "bg-ink-950 text-white"
                 : "border border-line text-text-muted hover:text-ink-950"
@@ -190,7 +190,7 @@ export default async function ErrorLogsPage({
         <Link
           href={hrefWith({ durum: params.durum, son: sonBirSaat ? undefined : "1saat" })}
           aria-current={sonBirSaat ? "page" : undefined}
-          className={`focus-ring press ml-auto inline-flex items-center gap-1.5 rounded-[9px] px-3 py-2 text-xs font-semibold transition ${
+          className={`focus-ring press ml-auto inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold transition ${
             sonBirSaat ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
           }`}
         >
@@ -199,8 +199,8 @@ export default async function ErrorLogsPage({
       </nav>
 
       {rows.length === 0 ? (
-        <div className="grid place-items-center rounded-[20px] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
-          <span className="grid h-16 w-16 place-items-center rounded-[18px] bg-mint-500/12 text-mint-600">
+        <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
+          <span className="grid h-16 w-16 place-items-center rounded-[var(--radius-panel)] bg-mint-500/12 text-mint-600">
             <CheckCircle2 className="h-8 w-8" />
           </span>
           <h2 className="mt-5 font-display text-xl font-bold text-ink-950">
@@ -227,7 +227,7 @@ export default async function ErrorLogsPage({
                         {r.source === "server" ? "Sunucu" : "İstemci"}
                       </Badge>
                       {r.occurrences > 1 ? (
-                        <span className="numeric rounded-full bg-danger-500/10 px-2.5 py-0.5 text-[11px] font-bold text-danger-600">
+                        <span className="numeric rounded-full bg-danger-500/10 px-2.5 py-0.5 text-xs font-bold text-danger-600">
                           {r.occurrences}× tekrar
                         </span>
                       ) : null}
@@ -243,7 +243,7 @@ export default async function ErrorLogsPage({
                       )}
                     </p>
                     <p className="mt-2 break-words font-semibold text-ink-950">{r.message}</p>
-                    <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-text-faint">
+                    <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-faint">
                       {r.path ? <span className="numeric">{r.path}</span> : null}
                       <span>ilk: {ne_zaman(r.first_seen, simdi)}</span>
                       <span>son: {ne_zaman(r.last_seen, simdi)}</span>
@@ -262,17 +262,17 @@ export default async function ErrorLogsPage({
                 </div>
                 {r.digest || r.stack ? (
                   <details className="group mt-3">
-                    <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 text-[11px] font-semibold text-text-muted transition hover:text-ink-950 [&::-webkit-details-marker]:hidden">
+                    <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-text-muted transition hover:text-ink-950 [&::-webkit-details-marker]:hidden">
                       <ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" /> Teknik detay
                     </summary>
-                    <div className="mt-2 space-y-2 rounded-[10px] border border-line bg-canvas p-3">
+                    <div className="mt-2 space-y-2 rounded-[var(--radius-control)] border border-line bg-canvas p-3">
                       {r.digest ? (
-                        <p className="numeric break-all text-[11px] text-text-muted">
+                        <p className="numeric break-all text-xs text-text-muted">
                           digest: <span className="font-semibold text-ink-950">{r.digest}</span>
                         </p>
                       ) : null}
                       {r.stack ? (
-                        <pre className="numeric max-h-64 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-relaxed text-text-muted">
+                        <pre className="numeric max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs leading-relaxed text-text-muted">
                           {r.stack}
                         </pre>
                       ) : null}
@@ -292,7 +292,7 @@ export default async function ErrorLogsPage({
         </div>
       )}
 
-      <p className="flex items-start gap-2 rounded-[14px] border border-line bg-canvas px-4 py-3 text-xs leading-relaxed text-text-muted">
+      <p className="flex items-start gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-xs leading-relaxed text-text-muted">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
         <span>
           Next.js üretimde hata metnini gizler ve yerine <strong>digest</strong> verir; sunucu

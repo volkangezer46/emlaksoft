@@ -619,18 +619,18 @@ export default async function DocumentsPage({
   };
 
   const chipBase =
-    "focus-ring press rounded-[9px] px-3 py-1.5 text-xs font-semibold transition border";
+    "focus-ring press rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold transition border";
   const chipOn = "border-transparent bg-ink-950 text-white";
   const chipOff = "border-line text-text-muted hover:border-brand-300 hover:text-brand-600";
 
   return (
     <div className="space-y-6">
       {/* ---------------------------------------------------------------- */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full bg-brand-500/25 blur-[80px]" />
         <div className="relative">
-          <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-mint-400">
+          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-mint-400">
             <Archive className="h-3.5 w-3.5" /> Belge merkezi
           </p>
           <h1 className="mt-2 font-display text-3xl font-extrabold">Ofisin tüm dosyaları</h1>
@@ -675,7 +675,7 @@ export default async function DocumentsPage({
       {/* --- Depolama dökümü ---------------------------------------------- */}
       <section
         id="depolama"
-        className="scroll-mt-24 rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]"
+        className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]"
       >
         <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
           <HardDrive className="h-4 w-4 text-brand-600" /> Depolama kullanımı
@@ -685,34 +685,34 @@ export default async function DocumentsPage({
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <Link
                 href="/app/belgeler?kaynak=musteri"
-                className="focus-ring press lift block rounded-[14px] border border-line bg-canvas p-4 transition hover:border-brand-300"
+                className="focus-ring press lift block rounded-[var(--radius-card)] border border-line bg-canvas p-4 transition hover:border-brand-300"
               >
                 <p className="text-xs text-text-muted">Müşteri dosyaları</p>
                 <p className="numeric mt-1 font-display text-xl font-extrabold text-ink-950">
                   {formatBytes(Number(usage.customer_bytes))}
                 </p>
-                <p className="mt-0.5 text-[11px] text-text-faint">{Number(usage.customer_count)} dosya</p>
+                <p className="mt-0.5 text-xs text-text-faint">{Number(usage.customer_count)} dosya</p>
               </Link>
               <Link
                 href="/app/belgeler?kaynak=portfoy"
-                className="focus-ring press lift block rounded-[14px] border border-line bg-canvas p-4 transition hover:border-brand-300"
+                className="focus-ring press lift block rounded-[var(--radius-card)] border border-line bg-canvas p-4 transition hover:border-brand-300"
               >
                 <p className="text-xs text-text-muted">Portföy medyası</p>
                 <p className="numeric mt-1 font-display text-xl font-extrabold text-ink-950">
                   {formatBytes(Number(usage.media_bytes))}
                 </p>
-                <p className="mt-0.5 text-[11px] text-text-faint">{Number(usage.media_count)} dosya</p>
+                <p className="mt-0.5 text-xs text-text-faint">{Number(usage.media_count)} dosya</p>
               </Link>
-              <div className="rounded-[14px] border border-dashed border-line-strong bg-canvas p-4">
+              <div className="rounded-[var(--radius-card)] border border-dashed border-line-strong bg-canvas p-4">
                 <p className="text-xs text-text-muted">Ölçülemeyen</p>
                 <p className="mt-1 font-display text-sm font-bold text-ink-950">Sözleşme &amp; evrak bağlantısı</p>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-text-faint">
+                <p className="mt-0.5 text-xs leading-relaxed text-text-faint">
                   Sözleşme metni veritabanında tutulur; anlaşma evrağı harici bağlantıdır. İkisi de bizim
                   depolamamızda dosya olarak durmadığı için boyutları toplama girmez.
                 </p>
               </div>
             </div>
-            <p className="mt-3 text-[11px] leading-relaxed text-text-faint">
+            <p className="mt-3 text-xs leading-relaxed text-text-faint">
               Toplam {storedFileCount.toLocaleString("tr-TR")} dosya · boyutlar yükleme anında kaydedilen
               <code className="mx-1 rounded bg-canvas px-1">file_size</code> alanından toplanır (Supabase
               <code className="mx-1 rounded bg-canvas px-1">storage.objects</code> tablosu PostgREST&apos;e kapalı
@@ -730,7 +730,7 @@ export default async function DocumentsPage({
       </section>
 
       {/* --- Filtreler ----------------------------------------------------- */}
-      <section className="space-y-3 rounded-[16px] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+      <section className="space-y-3 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
         <form method="get" action="/app/belgeler" className="flex flex-wrap items-center gap-2">
           {kaynakF ? <input type="hidden" name="kaynak" value={kaynakF} /> : null}
           {turF ? <input type="hidden" name="tur" value={turF} /> : null}
@@ -741,7 +741,7 @@ export default async function DocumentsPage({
               defaultValue={q}
               aria-label="Belge ara"
               placeholder="Dosya adı, etiket veya ilişkili kayıt (müşteri/portföy) ara…"
-              className="w-full rounded-[11px] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+              className="w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
             />
           </div>
           <input
@@ -749,7 +749,7 @@ export default async function DocumentsPage({
             type="date"
             defaultValue={fromF}
             aria-label="Başlangıç tarihi"
-            className="rounded-[9px] border border-line bg-canvas px-2.5 py-2 text-sm outline-none focus:border-brand-400"
+            className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-2 text-sm outline-none focus:border-brand-400"
           />
           <span className="text-text-faint">—</span>
           <input
@@ -757,18 +757,18 @@ export default async function DocumentsPage({
             type="date"
             defaultValue={toF}
             aria-label="Bitiş tarihi"
-            className="rounded-[9px] border border-line bg-canvas px-2.5 py-2 text-sm outline-none focus:border-brand-400"
+            className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-2 text-sm outline-none focus:border-brand-400"
           />
           <button
             type="submit"
-            className="focus-ring press rounded-[9px] bg-brand-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-brand-700"
+            className="focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-brand-700"
           >
             Filtrele
           </button>
         </form>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">Kaynak</span>
+          <span className="text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Kaynak</span>
           <Link href={buildHref({ kaynak: "", sayfa: "1" })} className={`${chipBase} ${kaynakF ? chipOff : chipOn}`}>
             Tümü ({total.toLocaleString("tr-TR")})
           </Link>
@@ -785,7 +785,7 @@ export default async function DocumentsPage({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">Tür</span>
+          <span className="text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Tür</span>
           <Link href={buildHref({ tur: "", sayfa: "1" })} className={`${chipBase} ${turF ? chipOff : chipOn}`}>
             Tümü
           </Link>
@@ -845,7 +845,7 @@ export default async function DocumentsPage({
       ) : (
         <>
           {capReached ? (
-            <p className="flex items-center gap-2 rounded-[12px] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-xs text-amber-700">
+            <p className="flex items-center gap-2 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-xs text-amber-700">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               Birleşik sıralama {HARD_CAP.toLocaleString("tr-TR")} kayıt derinliğine kadar hesaplanır. Daha eskisine
               ulaşmak için tarih aralığı veya kaynak filtresi kullanın.
@@ -859,17 +859,17 @@ export default async function DocumentsPage({
       {totalPages > 1 ? (
         <nav
           aria-label="Sayfalama"
-          className="flex items-center justify-between gap-3 rounded-[16px] border border-line bg-surface px-5 py-3"
+          className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-5 py-3"
         >
           {page > 1 ? (
             <Link
               href={buildHref({ sayfa: String(page - 1) })}
-              className="focus-ring press rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+              className="focus-ring press rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
             >
               ← Önceki
             </Link>
           ) : (
-            <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">
+            <span className="rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">
               ← Önceki
             </span>
           )}
@@ -879,12 +879,12 @@ export default async function DocumentsPage({
           {page < totalPages ? (
             <Link
               href={buildHref({ sayfa: String(page + 1) })}
-              className="focus-ring press rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+              className="focus-ring press rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
             >
               Sonraki →
             </Link>
           ) : (
-            <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">
+            <span className="rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">
               Sonraki →
             </span>
           )}
@@ -897,7 +897,7 @@ export default async function DocumentsPage({
 
         <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
           {/* (a) eksik zorunlu evrak */}
-          <div className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+          <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
             <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
               <div>
                 <h3 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -907,7 +907,7 @@ export default async function DocumentsPage({
               </div>
               <Link
                 href="/app/anlasmalar"
-                className="focus-ring rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                className="focus-ring rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
               >
                 Anlaşmalar
               </Link>
@@ -928,19 +928,19 @@ export default async function DocumentsPage({
                         <span className="block truncate text-sm font-semibold text-ink-950 group-hover:text-brand-600">
                           {d.label}
                         </span>
-                        <span className="block truncate text-[11px] text-text-muted">
+                        <span className="block truncate text-xs text-text-muted">
                           {d.missing.join(" · ")}
                           {d.count > d.missing.length ? ` +${d.count - d.missing.length}` : ""}
                         </span>
                       </span>
-                      <span className="shrink-0 rounded-full bg-amber-400/15 px-2.5 py-1 text-[11px] font-bold text-amber-600">
+                      <span className="shrink-0 rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-600">
                         {d.count} eksik
                       </span>
                     </Link>
                   </li>
                 ))}
                 {missingDeals.length > 8 ? (
-                  <li className="px-5 py-2.5 text-[11px] text-text-faint">
+                  <li className="px-5 py-2.5 text-xs text-text-faint">
                     +{missingDeals.length - 8} anlaşma daha ·{" "}
                     <Link href="/app/anlasmalar" className="font-semibold text-brand-600 hover:underline">
                       hepsini gör
@@ -955,10 +955,10 @@ export default async function DocumentsPage({
           <div className="space-y-4">
             <Link
               href="/app/musteriler"
-              className="focus-ring press lift group block rounded-[18px] border border-line bg-surface p-5 transition hover:border-brand-300"
+              className="focus-ring press lift group block rounded-[var(--radius-panel)] border border-line bg-surface p-5 transition hover:border-brand-300"
             >
               <span className="flex items-start justify-between">
-                <span className="grid h-10 w-10 place-items-center rounded-[12px] bg-amber-400/12 text-amber-600">
+                <span className="grid h-10 w-10 place-items-center rounded-[var(--radius-card)] bg-amber-400/12 text-amber-600">
                   <UserX className="h-5 w-5" />
                 </span>
               </span>
@@ -966,7 +966,7 @@ export default async function DocumentsPage({
               <p className="numeric mt-1 font-display text-2xl font-extrabold text-ink-950">
                 {(health?.customers_without_files ?? 0).toLocaleString("tr-TR")}
               </p>
-              <p className="mt-1 text-[11px] leading-relaxed text-text-faint">
+              <p className="mt-1 text-xs leading-relaxed text-text-faint">
                 Hiç dosyası olmayan aktif müşteri. Müşteri listesinde “dosyasız” filtresi henüz yok — liste açılır,
                 müşteri kartından dosya eklenir.
               </p>
@@ -974,10 +974,10 @@ export default async function DocumentsPage({
 
             <Link
               href="/app/portfoyler?status=live"
-              className="focus-ring press lift group block rounded-[18px] border border-line bg-surface p-5 transition hover:border-brand-300"
+              className="focus-ring press lift group block rounded-[var(--radius-panel)] border border-line bg-surface p-5 transition hover:border-brand-300"
             >
               <span className="flex items-start justify-between">
-                <span className="grid h-10 w-10 place-items-center rounded-[12px] bg-danger-500/10 text-danger-500">
+                <span className="grid h-10 w-10 place-items-center rounded-[var(--radius-card)] bg-danger-500/10 text-danger-500">
                   <ImageOff className="h-5 w-5" />
                 </span>
               </span>
@@ -985,7 +985,7 @@ export default async function DocumentsPage({
               <p className="numeric mt-1 font-display text-2xl font-extrabold text-ink-950">
                 {(health?.live_properties_without_photos ?? 0).toLocaleString("tr-TR")}
               </p>
-              <p className="mt-1 text-[11px] leading-relaxed text-text-faint">
+              <p className="mt-1 text-xs leading-relaxed text-text-faint">
                 Yayında olup hiç görseli olmayan portföy — portal performansını en çok düşüren eksik.
               </p>
             </Link>

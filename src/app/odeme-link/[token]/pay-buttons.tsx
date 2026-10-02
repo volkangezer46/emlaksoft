@@ -6,7 +6,7 @@ import { markPaymentLinkPaid, startPaymentLinkCheckout } from "@/app/actions/pay
 
 type BuyerDefaults = { fullName: string; email: string; phone: string };
 
-const inputClass = "mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 outline-none transition focus:border-brand-400";
+const inputClass = "mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 outline-none transition focus:border-brand-400";
 
 export function PayButtons({
   token,
@@ -118,13 +118,13 @@ export function PayButtons({
               />
             </label>
           </div>
-          <p className="text-[11px] leading-relaxed text-text-faint">
+          <p className="text-xs leading-relaxed text-text-faint">
             Bu bilgiler yalnızca ödeme sağlayıcısının zorunlu alıcı doğrulaması için kullanılır.
           </p>
           <button
             type="submit"
             disabled={pending}
-            className="btn-shine w-full rounded-[11px] bg-brand-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+            className="btn-shine w-full rounded-[var(--radius-control)] bg-brand-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
           >
             {pending ? "Yönlendiriliyor…" : "iyzico ile güvenli öde"}
           </button>
@@ -134,7 +134,7 @@ export function PayButtons({
           type="button"
           disabled={pending}
           onClick={payDemo}
-          className="btn-shine w-full rounded-[11px] bg-brand-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+          className="btn-shine w-full rounded-[var(--radius-control)] bg-brand-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
         >
           {pending ? "İşleniyor…" : "Ödemeyi tamamla (demo)"}
         </button>

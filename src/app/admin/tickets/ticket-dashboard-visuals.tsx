@@ -33,9 +33,9 @@ export function TicketStatusDonut({
   const description = segments.map((segment) => `${segment.label}: ${segment.count}`).join(", ");
 
   return (
-    <section className="surface-card min-w-0 rounded-[18px] p-4 sm:p-5">
+    <section className="surface-card min-w-0 rounded-[var(--radius-panel)] p-4 sm:p-5">
       <div>
-        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand-600">Kuyruk yapısı</p>
+        <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">Kuyruk yapısı</p>
         <h2 className="mt-1 font-display text-base font-extrabold text-ink-950">Durum dağılımı</h2>
         <p className="mt-0.5 text-xs text-text-muted">Tüm destek taleplerinin güncel görünümü</p>
       </div>
@@ -80,7 +80,7 @@ export function TicketStatusDonut({
               <p className="numeric font-display text-2xl font-extrabold leading-none text-ink-950">
                 {total.toLocaleString("tr-TR")}
               </p>
-              <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-text-faint">Toplam</p>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Toplam</p>
             </div>
           </div>
         </div>
@@ -94,14 +94,14 @@ export function TicketStatusDonut({
                   href={segment.href}
                   aria-current={segment.active ? "page" : undefined}
                   className={cn(
-                    "focus-ring group flex items-center gap-2 rounded-[9px] px-2 py-1.5 text-xs transition",
+                    "focus-ring group flex items-center gap-2 rounded-[var(--radius-control)] px-2 py-1.5 text-xs transition",
                     segment.active ? "bg-brand-600/[0.07]" : "hover:bg-canvas",
                   )}
                 >
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: segment.color }} aria-hidden />
                   <span className={cn("min-w-0 flex-1 truncate", segment.active ? "font-bold text-ink-950" : "text-text-muted")}>{segment.label}</span>
                   <span className="numeric font-bold tabular-nums text-ink-950">{segment.count}</span>
-                  <span className="numeric w-8 text-right text-[10px] text-text-faint">%{percent}</span>
+                  <span className="numeric w-8 text-right text-xs text-text-faint">%{percent}</span>
                 </Link>
               </li>
             );
@@ -129,14 +129,14 @@ export function TicketResolutionGauge({
   const titleId = "ticket-resolution-gauge-title";
 
   return (
-    <section className="surface-card min-w-0 rounded-[18px] p-4 sm:p-5">
+    <section className="surface-card min-w-0 rounded-[var(--radius-panel)] p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-mint-600">Operasyon kalitesi</p>
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-mint-600">Operasyon kalitesi</p>
           <h2 className="mt-1 font-display text-base font-extrabold text-ink-950">Çözüm performansı</h2>
           <p className="mt-0.5 text-xs text-text-muted">Tüm zamanlar · gerçek kayıtlar</p>
         </div>
-        <Link href={href} aria-label="Çözülen talepleri listele" className="focus-ring rounded-[8px] p-1.5 text-text-faint transition hover:bg-canvas hover:text-mint-600">
+        <Link href={href} aria-label="Çözülen talepleri listele" className="focus-ring rounded-[var(--radius-control)] p-1.5 text-text-faint transition hover:bg-canvas hover:text-mint-600">
           <ArrowUpRight className="h-4 w-4" />
         </Link>
       </div>
@@ -165,12 +165,12 @@ export function TicketResolutionGauge({
         </svg>
         <div className="pointer-events-none absolute inset-x-0 bottom-1 text-center">
           <p className="numeric font-display text-3xl font-extrabold leading-none text-ink-950">%{safeRate}</p>
-          <p className="mt-1 text-[11px] font-semibold text-text-muted">{resolved}/{total} çözüldü</p>
+          <p className="mt-1 text-xs font-semibold text-text-muted">{resolved}/{total} çözüldü</p>
         </div>
       </div>
 
-      <div className="mt-2 rounded-[12px] border border-hairline bg-canvas/70 px-3 py-2.5 text-center">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-text-faint">Ortalama çözüm süresi</p>
+      <div className="mt-2 rounded-[var(--radius-card)] border border-hairline bg-canvas/70 px-3 py-2.5 text-center">
+        <p className="text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Ortalama çözüm süresi</p>
         <p className="mt-0.5 font-display text-base font-extrabold text-ink-950">{averageLabel}</p>
       </div>
     </section>

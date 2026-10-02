@@ -18,7 +18,7 @@ export function SlaBadge({ sla }: { sla: SlaState }) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${cls}`}
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${cls}`}
       title={`${phaseLabel} SLA hedefi`}
     >
       <Timer className="h-3 w-3" />

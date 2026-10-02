@@ -12,7 +12,7 @@ export function PrintButton() {
     <button
       type="button"
       onClick={() => window.print()}
-      className="btn-shine focus-ring press no-print inline-flex items-center gap-2 rounded-[10px] bg-ink-950 px-4 py-2.5 text-sm font-bold text-white shadow-[var(--elev-2)]"
+      className="btn-shine focus-ring press no-print inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-sm font-bold text-white shadow-[var(--elev-2)]"
     >
       <Printer className="h-4 w-4" /> Yazdır / PDF kaydet
     </button>

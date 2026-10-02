@@ -57,10 +57,10 @@ export default async function AdminGeoDistrictPage({
         <ArrowLeft className="h-3.5 w-3.5" /> {province.name} · ilçeler
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="relative">
-          <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-amber-300">
+          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-amber-300">
             <MapPinned className="h-3.5 w-3.5" /> {province.name}
           </p>
           <h1 className="mt-2 font-display text-3xl font-extrabold">{district.name} · mahalleler</h1>
@@ -70,7 +70,7 @@ export default async function AdminGeoDistrictPage({
         </div>
       </section>
 
-      <div className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+      <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <div className="flex items-center gap-3 border-b border-line px-5 py-3.5">
           <form className="relative flex-1 max-w-sm">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-faint" />
@@ -79,7 +79,7 @@ export default async function AdminGeoDistrictPage({
               name="q"
               defaultValue={query}
               placeholder="Mahalle ara…"
-              className="w-full rounded-[10px] border border-line bg-canvas px-8 py-2 text-sm outline-none focus:border-brand-400"
+              className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-8 py-2 text-sm outline-none focus:border-brand-400"
             />
           </form>
         </div>

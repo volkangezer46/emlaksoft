@@ -50,7 +50,7 @@ export function ConfirmListingButton({ listingId }: { listingId: string }) {
       <button
         type="button"
         disabled
-        className="inline-flex items-center gap-1.5 rounded-[9px] border border-mint-500/30 bg-mint-500/10 px-3 py-2 text-xs font-semibold text-mint-600"
+        className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-mint-500/30 bg-mint-500/10 px-3 py-2 text-xs font-semibold text-mint-600"
       >
         <CheckCircle2 className="h-3.5 w-3.5" /> Teyit edildi ✓
       </button>
@@ -62,7 +62,7 @@ export function ConfirmListingButton({ listingId }: { listingId: string }) {
       type="button"
       onClick={submitConfirm}
       disabled={pending}
-      className="focus-ring press inline-flex items-center gap-1.5 rounded-[9px] border border-mint-500/20 px-3 py-2 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/8 disabled:opacity-60"
+      className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-mint-500/20 px-3 py-2 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/8 disabled:opacity-60"
     >
       <RefreshCw className="h-3.5 w-3.5" /> Teyit
     </button>

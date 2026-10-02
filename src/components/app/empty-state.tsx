@@ -125,13 +125,13 @@ export function EmptyState({
   const t = TONE_CLS[tone];
 
   return (
-    <div className="anim-rise relative grid place-items-center overflow-hidden rounded-[20px] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
+    <div className="anim-rise relative grid place-items-center overflow-hidden rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
       <div className={`pointer-events-none absolute -top-10 h-40 w-40 rounded-full blur-[70px] ${t.glow}`} />
       <div className="relative">
         {illustration ? (
           <Illustration kind={illustration} tone={tone} />
         ) : (
-          <span className={`mx-auto grid h-16 w-16 place-items-center rounded-[18px] ${t.tile}`}>
+          <span className={`mx-auto grid h-16 w-16 place-items-center rounded-[var(--radius-panel)] ${t.tile}`}>
             <Icon className="h-8 w-8" />
           </span>
         )}
@@ -143,7 +143,7 @@ export function EmptyState({
               (action?.href ? (
                 <Link
                   href={action.href}
-                  className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[11px] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
                   {action.label}
                 </Link>
@@ -152,7 +152,7 @@ export function EmptyState({
               (secondary?.href ? (
                 <Link
                   href={secondary.href}
-                  className="focus-ring press inline-flex items-center gap-2 rounded-[11px] border border-hairline-strong bg-surface px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-canvas"
+                  className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-canvas"
                 >
                   {secondary.label}
                 </Link>

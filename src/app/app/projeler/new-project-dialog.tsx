@@ -83,7 +83,7 @@ export function NewProjectDialog() {
           </FormField>
 
           {error ? (
-            <p className="rounded-[8px] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
+            <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
               {error}
             </p>
           ) : null}

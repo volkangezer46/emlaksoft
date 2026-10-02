@@ -18,7 +18,7 @@ import {
  */
 
 const inputCls =
-  "w-full rounded-[12px] border border-white/12 bg-white/[0.04] px-3.5 py-3 text-sm text-white placeholder:text-white/35 outline-none transition focus:border-mint-400/50 focus:bg-white/[0.07]";
+  "w-full rounded-[var(--radius-card)] border border-white/12 bg-white/[0.04] px-3.5 py-3 text-sm text-white placeholder:text-white/35 outline-none transition focus:border-mint-400/50 focus:bg-white/[0.07]";
 
 const ROOM_OPTIONS = ["1+0", "1+1", "2+1", "3+1", "4+1", "5+1 ve üzeri"];
 const AGE_OPTIONS = ["0 (yeni)", "1-5", "6-10", "11-20", "21 ve üzeri"];
@@ -140,7 +140,7 @@ export function ValuationFunnel({
   // ---- 3. adım: teşekkür ----------------------------------------------------
   if (step === "done") {
     return (
-      <div className="rounded-[16px] border border-mint-400/25 bg-mint-500/10 px-4 py-10 text-center">
+      <div className="rounded-[var(--radius-card)] border border-mint-400/25 bg-mint-500/10 px-4 py-10 text-center">
         <CheckCircle2 className="mx-auto h-10 w-10 text-mint-400" />
         <p className="mt-3 text-base font-bold text-white">Talebiniz alındı</p>
         <p className="mt-1 text-sm text-white/60">
@@ -161,21 +161,21 @@ export function ValuationFunnel({
     return (
       <div className="space-y-5">
         {estimate.sufficient ? (
-          <div className="rounded-[16px] border border-mint-400/25 bg-mint-500/10 px-5 py-6 text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mint-400">
+          <div className="rounded-[var(--radius-card)] border border-mint-400/25 bg-mint-500/10 px-5 py-6 text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mint-400">
               Tahmini değer aralığı
             </p>
             <p className="mt-2 font-display text-2xl font-extrabold text-white sm:text-3xl">
               {money(estimate.low)} – {money(estimate.high)}
             </p>
             <p className="mt-2 text-xs text-white/50">{estimate.note}</p>
-            <p className="mt-3 rounded-[10px] border border-white/10 bg-white/5 px-3 py-2 text-[11px] leading-relaxed text-white/55">
+            <p className="mt-3 rounded-[var(--radius-control)] border border-white/10 bg-white/5 px-3 py-2 text-xs leading-relaxed text-white/55">
               Bu bir <strong className="text-white/80">ön tahmindir</strong>; resmi değerleme raporu yerine
               geçmez. Net değer, mülkün yerinde incelenmesiyle belirlenir.
             </p>
           </div>
         ) : (
-          <div className="rounded-[16px] border border-white/12 bg-white/[0.04] px-5 py-6 text-center">
+          <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/[0.04] px-5 py-6 text-center">
             <Home className="mx-auto h-8 w-8 text-white/40" />
             <p className="mt-3 text-base font-bold text-white">Bu bölge için yeterli veri yok</p>
             <p className="mt-1 text-sm text-white/60">
@@ -207,14 +207,14 @@ export function ValuationFunnel({
             <button
               type="submit"
               disabled={leadPending}
-              className="btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-white px-4 py-3.5 text-sm font-bold text-ink-950 transition hover:bg-white/90 disabled:opacity-60"
+              className="btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-white px-4 py-3.5 text-sm font-bold text-ink-950 transition hover:bg-white/90 disabled:opacity-60"
             >
               {leadPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Beni arayın
             </button>
           </form>
         ) : (
-          <p className="rounded-[12px] border border-white/10 bg-white/5 px-4 py-4 text-center text-sm text-white/60">
+          <p className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-4 text-center text-sm text-white/60">
             Talep formu şu anda kapalı — vitrindeki iletişim bilgilerinden ofise ulaşabilirsiniz.
           </p>
         )}
@@ -334,7 +334,7 @@ export function ValuationFunnel({
         </select>
       </div>
 
-      <label className="flex cursor-pointer items-start gap-2.5 rounded-[12px] border border-white/12 bg-white/[0.04] px-3.5 py-3 text-[12px] leading-relaxed text-white/60 transition hover:border-mint-400/40">
+      <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-white/12 bg-white/[0.04] px-3.5 py-3 text-xs leading-relaxed text-white/60 transition hover:border-mint-400/40">
         <input
           type="checkbox"
           required
@@ -355,12 +355,12 @@ export function ValuationFunnel({
       <button
         type="submit"
         disabled={pending || !kvkk}
-        className="btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-white px-4 py-3.5 text-sm font-bold text-ink-950 transition hover:bg-white/90 disabled:opacity-60"
+        className="btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-white px-4 py-3.5 text-sm font-bold text-ink-950 transition hover:bg-white/90 disabled:opacity-60"
       >
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         Değerimi hesapla
       </button>
-      <p className="text-center text-[11px] text-white/40">
+      <p className="text-center text-xs text-white/40">
         Sonuç bir ön tahmindir; resmi değerleme raporu yerine geçmez.
       </p>
     </form>

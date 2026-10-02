@@ -136,7 +136,7 @@ export function DuplicateGroupsClient({ groups }: { groups: DuplicateGroup[] }) 
   return (
     <div className="space-y-4">
       {gizliSayisi > 0 ? (
-        <div className="flex items-center justify-between gap-3 rounded-[14px] border border-line bg-canvas px-4 py-2.5">
+        <div className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
           <p className="text-xs text-text-muted">
             <span className="numeric font-semibold">{gizliSayisi}</span> grup &quot;mükerrer
             değil&quot; olarak işaretlendi (yalnızca bu cihazda gizli).
@@ -160,7 +160,7 @@ export function DuplicateGroupsClient({ groups }: { groups: DuplicateGroup[] }) 
       ) : null}
 
       {gosterilen.length === 0 ? (
-        <div className="grid place-items-center rounded-[20px] border border-dashed border-line-strong bg-surface px-6 py-10 text-center">
+        <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-10 text-center">
           <p className="text-sm text-text-muted">
             Tüm gruplar &quot;mükerrer değil&quot; olarak gizlendi.
           </p>
@@ -184,7 +184,7 @@ export function DuplicateGroupsClient({ groups }: { groups: DuplicateGroup[] }) 
                       {g.signal === "phone" ? formatTurkishPhone(g.key) : g.key}
                     </span>
                   </p>
-                  <p className="mt-1 text-[11px] text-text-faint">{meta.desc}</p>
+                  <p className="mt-1 text-xs text-text-faint">{meta.desc}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <span className="rounded-full bg-canvas px-2.5 py-1 text-xs font-semibold text-text-muted">
@@ -221,7 +221,7 @@ export function DuplicateGroupsClient({ groups }: { groups: DuplicateGroup[] }) 
                     <li key={k.customer_id}>
                       <Link
                         href={`/app/musteriler/${k.customer_id}`}
-                        className={`lift-hover focus-ring group flex h-full items-start justify-between gap-3 rounded-[14px] border p-4 transition ${
+                        className={`lift-hover focus-ring group flex h-full items-start justify-between gap-3 rounded-[var(--radius-card)] border p-4 transition ${
                           onerilen ? "border-mint-500/40 bg-mint-500/[0.05]" : "border-line bg-canvas"
                         }`}
                       >
@@ -235,7 +235,7 @@ export function DuplicateGroupsClient({ groups }: { groups: DuplicateGroup[] }) 
                           <p className="mt-0.5 truncate text-xs text-text-muted">
                             {k.email ?? "E-posta yok"}
                           </p>
-                          <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-text-faint">
+                          <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-faint">
                             <span>{tarih(k.created_at)} tarihinde eklendi</span>
                             <span className="numeric">{k.activity} kayıt hareketi</span>
                             {onerilen ? (
@@ -243,7 +243,7 @@ export function DuplicateGroupsClient({ groups }: { groups: DuplicateGroup[] }) 
                             ) : null}
                           </p>
                         </div>
-                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-surface text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
+                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-surface text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
                           <ArrowUpRight className="h-4 w-4" />
                         </span>
                       </Link>

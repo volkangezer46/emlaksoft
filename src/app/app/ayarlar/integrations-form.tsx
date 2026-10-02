@@ -92,23 +92,23 @@ export function IntegrationsForm({
 
   return (
     <div className="space-y-4">
-    <div className="rounded-[16px] border border-line bg-canvas p-4">
+    <div className="rounded-[var(--radius-card)] border border-line bg-canvas p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 place-items-center rounded-[11px] bg-mint-500/12 text-mint-600">
+          <span className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-mint-500/12 text-mint-600">
             <MessageSquareText className="h-4 w-4" />
           </span>
           <div>
             <h3 className="text-sm font-bold text-ink-950">Netgsm SMS</h3>
-            <p className="text-[11px] text-text-muted">Kampanya ve bildirim SMS&apos;leri bu hesap üzerinden gönderilir.</p>
+            <p className="text-xs text-text-muted">Kampanya ve bildirim SMS&apos;leri bu hesap üzerinden gönderilir.</p>
           </div>
         </div>
         {netgsm ? (
-          <span className="rounded-full bg-mint-500/12 px-2.5 py-1 text-[11px] font-bold text-mint-600">Ofis hesabı tanımlı</span>
+          <span className="rounded-full bg-mint-500/12 px-2.5 py-1 text-xs font-bold text-mint-600">Ofis hesabı tanımlı</span>
         ) : platformConfigured ? (
-          <span className="rounded-full bg-ink-950/8 px-2.5 py-1 text-[11px] font-bold text-text-muted">Platform varsayılanı</span>
+          <span className="rounded-full bg-ink-950/8 px-2.5 py-1 text-xs font-bold text-text-muted">Platform varsayılanı</span>
         ) : (
-          <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-[11px] font-bold text-amber-600">Yapılandırılmadı</span>
+          <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-600">Yapılandırılmadı</span>
         )}
       </div>
 
@@ -191,29 +191,29 @@ export function IntegrationsForm({
       </form>
     </div>
 
-    <div className="rounded-[16px] border border-line bg-canvas p-4">
+    <div className="rounded-[var(--radius-card)] border border-line bg-canvas p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 place-items-center rounded-[11px] bg-brand-600/10 text-brand-600">
+          <span className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
             <MessageCircle className="h-4 w-4" />
           </span>
           <div>
             <h3 className="text-sm font-bold text-ink-950">WhatsApp Cloud API</h3>
-            <p className="text-[11px] text-text-muted">
+            <p className="text-xs text-text-muted">
               Kampanyalar onaylı Meta şablonlarıyla bu ofise ait numaradan gönderilir.
             </p>
           </div>
         </div>
         {whatsapp?.hasAccessToken && whatsapp.status === "healthy" ? (
-          <span className="rounded-full bg-mint-500/12 px-2.5 py-1 text-[11px] font-bold text-mint-600">
+          <span className="rounded-full bg-mint-500/12 px-2.5 py-1 text-xs font-bold text-mint-600">
             Meta sahipliği doğrulandı · sağlıklı
           </span>
         ) : whatsapp?.hasAccessToken ? (
-          <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-[11px] font-bold text-amber-600">
+          <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-600">
             Yeniden doğrulama gerekli
           </span>
         ) : (
-          <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-[11px] font-bold text-amber-600">
+          <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-600">
             Yapılandırılmadı
           </span>
         )}
@@ -271,7 +271,7 @@ export function IntegrationsForm({
             name="graph_api_version"
             required
             defaultValue={whatsapp?.graphVersion || WHATSAPP_GRAPH_VERSIONS.at(-1)}
-            className="h-10 w-full rounded-[10px] border border-line bg-surface px-3 text-sm text-ink-950 outline-none focus:border-brand-300"
+            className="h-10 w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm text-ink-950 outline-none focus:border-brand-300"
           >
             {WHATSAPP_GRAPH_VERSIONS.map((version) => (
               <option key={version} value={version}>{version}</option>

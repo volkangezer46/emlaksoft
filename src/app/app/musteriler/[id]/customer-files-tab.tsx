@@ -101,7 +101,7 @@ export function CustomerFilesTab({ customerId, files }: { customerId: string; fi
           <h3 className="font-display text-lg font-bold text-ink-950">Dosyalar</h3>
           <p className="text-xs text-text-muted">Kimlik, sözleşme, fotoğraf ve belgeler</p>
         </div>
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700">
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700">
           {uploading ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -125,8 +125,8 @@ export function CustomerFilesTab({ customerId, files }: { customerId: string; fi
       </div>
 
       {files.length === 0 ? (
-        <div className="grid place-items-center rounded-[16px] border border-line bg-canvas px-6 py-12 text-center">
-          <span className="grid h-14 w-14 place-items-center rounded-[14px] bg-brand-600/10 text-brand-600">
+        <div className="grid place-items-center rounded-[var(--radius-card)] border border-line bg-canvas px-6 py-12 text-center">
+          <span className="grid h-14 w-14 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
             <FileText className="h-7 w-7" />
           </span>
           <h4 className="mt-3 font-display text-base font-bold text-ink-950">Henüz dosya yok</h4>
@@ -140,10 +140,10 @@ export function CustomerFilesTab({ customerId, files }: { customerId: string; fi
             return (
               <div
                 key={f.id}
-                className="relative overflow-hidden rounded-[14px] border border-line bg-surface p-4 transition hover:border-brand-300"
+                className="relative overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface p-4 transition hover:border-brand-300"
               >
                 <div className="flex items-start gap-3">
-                  <span className="grid h-10 w-10 place-items-center rounded-[10px] bg-brand-600/10 text-brand-600">
+                  <span className="grid h-10 w-10 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
                     <Icon className="h-5 w-5" />
                   </span>
                   <div className="min-w-0 flex-1">
@@ -151,7 +151,7 @@ export function CustomerFilesTab({ customerId, files }: { customerId: string; fi
                       {f.file_name}
                     </p>
                     {f.label ? <p className="mt-0.5 text-xs text-text-muted">{f.label}</p> : null}
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-text-faint">
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-faint">
                       <span>{formatBytes(f.file_size)}</span>
                       <span>·</span>
                       <span>{uploaderName(f.uploader)}</span>
@@ -165,7 +165,7 @@ export function CustomerFilesTab({ customerId, files }: { customerId: string; fi
                     href={`/api/customer-files/${f.id}/download`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 rounded-[8px] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink-950 hover:border-brand-300"
+                    className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink-950 hover:border-brand-300"
                   >
                     <Download className="h-3.5 w-3.5" />
                     İndir
@@ -174,7 +174,7 @@ export function CustomerFilesTab({ customerId, files }: { customerId: string; fi
                     type="button"
                     disabled={deleting === f.id}
                     onClick={() => handleDelete(f.id)}
-                    className="inline-flex items-center gap-1 rounded-[8px] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-danger-600 hover:border-danger-300 disabled:opacity-50"
+                    className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-danger-600 hover:border-danger-300 disabled:opacity-50"
                   >
                     {deleting === f.id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />

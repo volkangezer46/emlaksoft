@@ -28,7 +28,7 @@ export function FavNavBadge({ slug, variant = "light" }: { slug: string; variant
       <Heart className={`h-3.5 w-3.5 ${count > 0 ? "fill-danger-500 text-danger-500" : ""}`} />
       Favorilerim
       {count > 0 ? (
-        <span className="grid h-4 min-w-4 place-items-center rounded-full bg-danger-500 px-1 text-[10px] font-extrabold leading-none text-white">
+        <span className="grid h-4 min-w-4 place-items-center rounded-full bg-danger-500 px-1 text-xs font-extrabold leading-none text-white">
           {count > 99 ? "99+" : count}
         </span>
       ) : null}

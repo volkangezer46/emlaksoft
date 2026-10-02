@@ -28,7 +28,7 @@ export function SaveMatchButton({ demandId, propertyId }: { demandId: string; pr
           }
         });
       }}
-      className="inline-flex items-center gap-1 rounded-[8px] bg-ink-950 px-2.5 py-1.5 text-[11px] font-bold text-white disabled:opacity-50"
+      className="inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-ink-950 px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
     >
       {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookmarkPlus className="h-3.5 w-3.5" />}
       Kaydet & bildir

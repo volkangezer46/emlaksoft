@@ -87,13 +87,13 @@ export function TaskEditDialog({
           <button
             type="button"
             aria-label={`${task.title} görevini düzenle`}
-            className="focus-ring absolute inset-0 cursor-pointer rounded-[16px]"
+            className="focus-ring absolute inset-0 cursor-pointer rounded-[var(--radius-card)]"
           />
         ) : (
           <button
             type="button"
             aria-label="Görevi düzenle"
-            className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-hairline text-text-muted transition hover:border-brand-300"
+            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline text-text-muted transition hover:border-brand-300"
           >
             <Pencil className="h-4 w-4" />
           </button>
@@ -109,13 +109,13 @@ export function TaskEditDialog({
                   required
                   defaultValue={task.title}
                   placeholder="Görev başlığı"
-                  className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                  className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                 />
                 <div className="grid grid-cols-2 gap-3">
                   <select
                     name="kind"
                     defaultValue={task.kind}
-                    className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                    className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                   >
                     {KINDS.map((k) => (
                       <option key={k.value} value={k.value}>
@@ -126,7 +126,7 @@ export function TaskEditDialog({
                   <select
                     name="priority"
                     defaultValue={task.priority}
-                    className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                    className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                   >
                     {PRIORITIES.map((p) => (
                       <option key={p.value} value={p.value}>
@@ -142,7 +142,7 @@ export function TaskEditDialog({
                     type="datetime-local"
                     value={due}
                     onChange={(e) => setDue(e.target.value)}
-                    className="mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                    className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                   />
                 </label>
                 <label className="text-xs font-semibold text-text-muted">
@@ -151,7 +151,7 @@ export function TaskEditDialog({
                     name="recurrence"
                     defaultValue={task.recurrence ?? ""}
                     disabled={!due}
-                    className="mt-1 w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {RECURRENCES.map((r) => (
                       <option key={r.value} value={r.value}>
@@ -166,7 +166,7 @@ export function TaskEditDialog({
                   rows={2}
                   defaultValue={task.notes ?? ""}
                   placeholder="Not (opsiyonel)"
-                  className="rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
+                  className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
                 />
                 {/* Palet disi red-600 -> danger-600, role="alert" eklendi */}
                 {state.error && (
@@ -176,7 +176,7 @@ export function TaskEditDialog({
                   <DialogClose asChild>
                     <button
                       type="button"
-                      className="focus-ring press rounded-[10px] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+                      className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
                     >
                       Vazgeç
                     </button>
@@ -184,7 +184,7 @@ export function TaskEditDialog({
                   <button
                     type="submit"
                     disabled={pending}
-                    className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+                    className="btn-shine focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
                   >
                     {pending ? "Kaydediliyor…" : "Kaydet"}
                   </button>

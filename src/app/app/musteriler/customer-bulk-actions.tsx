@@ -195,7 +195,7 @@ export function CustomerBulkBar({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-[14px] border border-brand-300/40 bg-brand-600/[0.04] px-4 py-2.5">
+    <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-brand-300/40 bg-brand-600/[0.04] px-4 py-2.5">
       <span className="text-sm font-semibold text-brand-700">
         {selected.size} müşteri seçildi
       </span>
@@ -230,7 +230,7 @@ export function CustomerBulkBar({
                 id="bulk-assign-advisor"
                 value={advisor}
                 onChange={(e) => setAdvisor(e.target.value)}
-                className="w-full rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
               >
                 <option value="">Atamayı kaldır (danışmansız)</option>
                 {advisors.map((a) => (
@@ -292,7 +292,7 @@ export function CustomerBulkBar({
                 }}
                 maxLength={30}
                 placeholder="Örn: VIP, Yatırımcı, Takipte…"
-                className="w-full rounded-[11px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
               />
               {/* Tenant'ın mevcut etiketleri öneri olarak düşer; yeni etiket de yazılabilir */}
               <datalist id="bulk-tag-options">

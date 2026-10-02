@@ -14,7 +14,7 @@ export function DemoForm() {
 
   if (state.ok) {
     return (
-      <div className="rounded-[16px] border border-mint-500/30 bg-mint-500/10 px-6 py-10 text-center">
+      <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/10 px-6 py-10 text-center">
         <Check className="mx-auto h-8 w-8 text-mint-600" />
         <p className="mt-3 font-display text-lg font-bold text-ink-950">Talebiniz alındı</p>
         <p className="mt-1 text-sm text-text-muted">Ekibimiz en kısa sürede sizi arayacak.</p>
@@ -23,14 +23,14 @@ export function DemoForm() {
             Takip numaranız: <span className="font-mono">{state.referenceCode}</span>
           </p>
         ) : null}
-        <div className="mt-6 rounded-[12px] border border-line bg-surface px-4 py-4 text-left">
+        <div className="mt-6 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-4 text-left">
           <p className="text-sm font-bold text-ink-950">Beklerken kendiniz deneyin</p>
           <p className="mt-0.5 text-xs text-text-muted">
             14 gün ücretsiz, kredi kartsız · ofisinizi hemen kurup gezinmeye başlayın.
           </p>
           <Link
             href="/kayit"
-            className="btn-shine mt-3 inline-flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700"
+            className="btn-shine mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700"
           >
             Ücretsiz hesap oluştur <ArrowRight className="h-3.5 w-3.5" />
           </Link>
@@ -74,7 +74,7 @@ export function DemoForm() {
           required
           maxLength={120}
           autoComplete="name"
-          className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+          className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
           placeholder="Örn. Volkan Gezer"
         />
       </div>
@@ -94,7 +94,7 @@ export function DemoForm() {
           type="email"
           maxLength={254}
           autoComplete="email"
-          className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+          className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
           placeholder="ornek@ofis.com"
         />
       </div>
@@ -107,11 +107,11 @@ export function DemoForm() {
           name="company"
           maxLength={160}
           autoComplete="organization"
-          className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+          className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
           placeholder="Örn. Gezertaşar Emlak"
         />
       </div>
-      <label className="flex cursor-pointer items-start gap-2.5 rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-[12px] leading-relaxed text-text-muted transition hover:border-brand-300">
+      <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-xs leading-relaxed text-text-muted transition hover:border-brand-300">
         <input
           type="checkbox"
           name="consent"
@@ -139,7 +139,7 @@ export function DemoForm() {
       <button
         type="submit"
         disabled={pending}
-        className="btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+        className="btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
       >
         <Sparkles className="h-4 w-4" />
         {pending ? "Gönderiliyor…" : "Demo planla"}

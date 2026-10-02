@@ -5,7 +5,7 @@ import type { LucideIcon } from "lucide-react";
 /**
  * Platform panelinin liste iskeleti.
  *
- * NEDEN VAR: `/admin` altındaki her liste kendi `overflow-hidden rounded-[20px]
+ * NEDEN VAR: `/admin` altındaki her liste kendi `overflow-hidden rounded-[var(--radius-panel)]
  * border border-line bg-surface` kabuğunu, kendi başlık şeridini ve kendi boş
  * durum metnini elde kuruyordu. Sonuç: kimi listede yatay kaydırma kabı vardı
  * kimisinde yoktu (mobilde tablo taşıyordu), boş durumlar kimi yerde tek
@@ -35,7 +35,7 @@ export function AdminPanel({
   bodyClassName?: string;
 }) {
   return (
-    <section className={`dashboard-panel overflow-hidden rounded-[20px] border border-line bg-surface ${className}`}>
+    <section className={`dashboard-panel overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface ${className}`}>
       {title ? (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3.5">
           <div className="min-w-0">
@@ -101,7 +101,7 @@ export function AdminSortHeader({
       aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
       title={active ? "Sıralama yönünü çevir" : `"${label}" sütununa göre sırala`}
       className={[
-        "focus-ring inline-flex items-center gap-1 rounded-[6px] px-1 py-0.5 text-[10px] font-bold uppercase tracking-wide transition",
+        "focus-ring inline-flex items-center gap-1 rounded-[6px] px-1 py-0.5 text-xs font-bold uppercase tracking-wide transition",
         active ? "text-brand-600" : "text-text-faint hover:text-ink-950",
         align === "right" ? "justify-end" : align === "center" ? "justify-center" : "",
         className,
@@ -142,7 +142,7 @@ export function AdminEmpty({
 }) {
   return (
     <div className="grid place-items-center px-6 py-14 text-center">
-      <span className="grid h-14 w-14 place-items-center rounded-[16px] bg-canvas text-text-faint">
+      <span className="grid h-14 w-14 place-items-center rounded-[var(--radius-card)] bg-canvas text-text-faint">
         <Icon className="h-6 w-6" />
       </span>
       <p className="mt-4 font-display text-base font-bold text-ink-950">{title}</p>
@@ -157,7 +157,7 @@ export function AdminFilterChip({ href, children }: { href: string; children: Re
   return (
     <Link
       href={href}
-      className="focus-ring press inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
+      className="focus-ring press inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
     >
       {children}
     </Link>
@@ -190,7 +190,7 @@ export function AdminSearchForm({
         defaultValue={defaultValue}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="focus-ring w-full rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm outline-none transition focus:border-brand-400"
+        className="focus-ring w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none transition focus:border-brand-400"
       />
     </form>
   );

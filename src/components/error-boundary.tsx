@@ -38,7 +38,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
           <div className="w-full max-w-md text-center">
-            <div className="mx-auto grid h-16 w-16 place-items-center rounded-[16px] bg-danger-500/10">
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-[var(--radius-card)] bg-danger-500/10">
               <AlertTriangle className="h-8 w-8 text-danger-500" />
             </div>
             <h1 className="mt-4 font-display text-2xl font-extrabold text-ink-950">
@@ -48,7 +48,7 @@ export class ErrorBoundary extends Component<Props, State> {
               Beklenmeyen bir hata oluştu. Lütfen sayfayı yenileyin.
             </p>
             {process.env.NODE_ENV === "development" && this.state.error ? (
-              <pre className="mt-4 rounded-[12px] border border-danger-300 bg-danger-50 p-3 text-left text-xs text-danger-700">
+              <pre className="mt-4 rounded-[var(--radius-card)] border border-danger-300 bg-danger-50 p-3 text-left text-xs text-danger-700">
                 {this.state.error.message}
                 {"\n"}
                 {this.state.error.stack?.slice(0, 300)}
@@ -57,7 +57,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="mt-6 rounded-[11px] bg-brand-600 px-6 py-3 text-sm font-semibold text-white hover:bg-brand-700"
+              className="mt-6 rounded-[var(--radius-control)] bg-brand-600 px-6 py-3 text-sm font-semibold text-white hover:bg-brand-700"
             >
               Sayfayı yenile
             </button>

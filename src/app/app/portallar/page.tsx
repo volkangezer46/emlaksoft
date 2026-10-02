@@ -195,7 +195,7 @@ export default async function PortalsPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-cyan-400/20 blur-[80px]" />
         <div className="relative flex flex-wrap items-center justify-between gap-5">
@@ -211,7 +211,7 @@ export default async function PortalsPage({
             <ExportCsvButton
               action={exportPortalListingsCsv}
               label="Dışa aktar"
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[11px] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
+              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
             />
             <NewPortalDialog properties={propertyOptions} />
           </div>
@@ -225,25 +225,25 @@ export default async function PortalsPage({
             <Link
               key={item.label}
               href={portalHref(item.durum, portal, undefined, propertyF)}
-              className={`focus-ring press group relative block rounded-[14px] border bg-white/5 p-3 backdrop-blur transition hover:border-white/30 ${
+              className={`focus-ring press group relative block rounded-[var(--radius-card)] border bg-white/5 p-3 backdrop-blur transition hover:border-white/30 ${
                 durum === item.durum ? "border-white/40" : "border-white/10"
               }`}
             >
               <ArrowUpRight className="hover-action absolute right-2 top-2 h-3.5 w-3.5 text-white/50 opacity-0 transition group-hover:opacity-100" />
               <item.icon className={`h-4 w-4 ${item.tone}`} />
               <p className="mt-2 font-display text-xl font-extrabold text-white">{item.value}</p>
-              <p className="text-[11px] text-white/45 sm:text-xs">{item.label}</p>
+              <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
             </Link>
           ))}
         </div>
       </section>
 
       {expiring.length > 0 ? (
-        <section className="overflow-hidden rounded-[20px] border border-amber-400/30 bg-amber-400/[0.06] shadow-[var(--shadow-xs)]">
+        <section className="overflow-hidden rounded-[var(--radius-panel)] border border-amber-400/30 bg-amber-400/[0.06] shadow-[var(--shadow-xs)]">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-400/20 px-5 py-3.5">
             <p className="flex items-center gap-2 text-sm font-bold text-ink-950">
               <FileCheck2 className="h-4 w-4 text-amber-600" /> Yetki süresi dolmak üzere
-              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-700">{expiring.length}</span>
+              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-bold text-amber-700">{expiring.length}</span>
             </p>
             <span className="text-xs text-text-muted">15 gün içinde dolan yetkiler — süre bitince ilan rakibe açılır</span>
           </div>
@@ -266,7 +266,7 @@ export default async function PortalsPage({
                       {a.authorization_end ? ` · bitiş ${new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(a.authorization_end))}` : ""}
                     </p>
                   </div>
-                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${overdue ? "bg-danger-500/12 text-danger-500" : a.daysLeft !== null && a.daysLeft <= 7 ? "bg-amber-500/15 text-amber-700" : "bg-ink-950/6 text-text-muted"}`}>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${overdue ? "bg-danger-500/12 text-danger-500" : a.daysLeft !== null && a.daysLeft <= 7 ? "bg-amber-500/15 text-amber-700" : "bg-ink-950/6 text-text-muted"}`}>
                     {a.daysLeft === null ? "—" : overdue ? "Süresi doldu" : a.daysLeft === 0 ? "Bugün doluyor" : `${a.daysLeft} gün kaldı`}
                   </span>
                 </Link>
@@ -277,7 +277,7 @@ export default async function PortalsPage({
       ) : null}
 
       {totalCount > 0 ? (
-        <section className="grid items-center gap-5 rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] md:grid-cols-[auto_1fr]">
+        <section className="grid items-center gap-5 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] md:grid-cols-[auto_1fr]">
           <div className="flex items-center gap-4 md:border-r md:border-line md:pr-6">
             <div className="relative grid h-24 w-24 place-items-center">
               <div className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-25 blur-md" style={{ background: "conic-gradient(from 0deg, var(--mint-500), var(--brand-500), var(--mint-500))" }} />
@@ -304,7 +304,7 @@ export default async function PortalsPage({
               <p className="mt-0.5 text-xs text-text-muted">{onTime}/{live} ilan zamanında teyitli</p>
               <Link
                 href={portalHref("teyit", portal, undefined, propertyF)}
-                className="focus-ring mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600 hover:underline"
+                className="focus-ring mt-1 inline-flex items-center gap-1 text-xs font-semibold text-amber-600 hover:underline"
               >
                 {overdue} ilan 7+ gündür teyit bekliyor <ArrowUpRight className="h-3 w-3" />
               </Link>
@@ -320,18 +320,18 @@ export default async function PortalsPage({
                   key={p.name}
                   href={portalHref(durum, portal === p.name ? "" : p.name, undefined, propertyF)}
                   aria-label={`${p.name} ilanlarını listele`}
-                  className={`focus-ring group flex h-full flex-1 flex-col items-center gap-1.5 rounded-[8px] px-1 pt-1 transition hover:bg-brand-600/[0.04] ${
+                  className={`focus-ring group flex h-full flex-1 flex-col items-center gap-1.5 rounded-[var(--radius-control)] px-1 pt-1 transition hover:bg-brand-600/[0.04] ${
                     portal === p.name ? "bg-brand-600/[0.06]" : ""
                   }`}
                 >
-                  <span className="text-[11px] font-bold tabular-nums text-ink-950">{p.count}</span>
+                  <span className="text-xs font-bold tabular-nums text-ink-950">{p.count}</span>
                   <div className="flex h-full w-full items-end justify-center">
                     <div
                       className="bar-live w-7 rounded-t-[5px] bg-[image:var(--grad-brand)] shadow-[0_0_12px_-2px_rgba(20,99,255,0.5)]"
                       style={{ height: `${(p.count / maxCount) * 100}%`, animationDelay: `${i * 0.1}s` }}
                     />
                   </div>
-                  <span className={`max-w-[72px] truncate text-[10px] transition group-hover:text-brand-600 ${portal === p.name ? "font-bold text-brand-600" : "text-text-muted"}`}>
+                  <span className={`max-w-[72px] truncate text-xs transition group-hover:text-brand-600 ${portal === p.name ? "font-bold text-brand-600" : "text-text-muted"}`}>
                     {p.name}
                   </span>
                 </Link>
@@ -342,7 +342,7 @@ export default async function PortalsPage({
       ) : null}
 
       {propertyOptions.length === 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-[16px] border border-amber-400/30 bg-amber-400/8 px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/8 px-5 py-4">
           <div className="flex items-center gap-3"><AlertTriangle className="h-5 w-5 text-amber-500" /><div><p className="text-sm font-semibold text-ink-950">Önce bir portföy oluşturun</p><p className="text-xs text-text-muted">Portal ilanı bağlamak için aktif bir portföy gerekir.</p></div></div>
           <Link href="/app/portfoyler" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600">Portföylere git <ArrowUpRight className="h-4 w-4" /></Link>
         </div>
@@ -361,7 +361,7 @@ export default async function PortalsPage({
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+        <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
             <div>
               <h2 className="font-display font-bold text-ink-950">Bağlı portal ilanları</h2>
@@ -375,7 +375,7 @@ export default async function PortalsPage({
                 <Link
                   key={f.value}
                   href={portalHref(f.value, portal, undefined, propertyF)}
-                  className={`focus-ring rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
+                  className={`focus-ring rounded-full px-2.5 py-1 text-xs font-bold transition ${
                     durum === f.value
                       ? "bg-ink-950 text-white"
                       : "border border-line text-text-muted hover:text-ink-950"
@@ -387,7 +387,7 @@ export default async function PortalsPage({
               {portal ? (
                 <Link
                   href={portalHref(durum, "", undefined, propertyF)}
-                  className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/20"
+                  className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/20"
                   aria-label={`${portal} portal filtresini kaldır`}
                 >
                   {portal} <X className="h-3 w-3" />
@@ -396,7 +396,7 @@ export default async function PortalsPage({
               {propertyF ? (
                 <Link
                   href={portalHref(durum, portal)}
-                  className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/20"
+                  className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/20"
                   aria-label="Portföy filtresini kaldır"
                 >
                   {propertyChip ? propertyChip.property_code : "Portföy"} <X className="h-3 w-3" />
@@ -434,7 +434,7 @@ export default async function PortalsPage({
                     <span aria-hidden className="h-4 w-4 shrink-0" />
                   )}
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-[12px] ${isLive ? "bg-brand-600/10 text-brand-600" : "bg-ink-950/5 text-text-faint"}`}><RadioTower className="h-5 w-5" /></span>
+                    <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] ${isLive ? "bg-brand-600/10 text-brand-600" : "bg-ink-950/5 text-text-faint"}`}><RadioTower className="h-5 w-5" /></span>
                     <div className="min-w-0">
                       {property ? (
                         <Link href={`/app/portfoyler/${property.id}`} className="focus-ring group/prop block">
@@ -453,16 +453,16 @@ export default async function PortalsPage({
                     </div>
                   </div>
                   <div>
-                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${isLive ? "bg-mint-500/10 text-mint-600" : "bg-ink-950/5 text-text-muted"}`}>
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${isLive ? "bg-mint-500/10 text-mint-600" : "bg-ink-950/5 text-text-muted"}`}>
                       {isLive ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Siren className="h-3.5 w-3.5" />}{isLive ? "Yayında" : "Kapandı"}
                     </span>
-                    {!isLive && row.removal_reason ? <p className="mt-1 text-[11px] text-text-faint">{row.removal_reason}</p> : null}
+                    {!isLive && row.removal_reason ? <p className="mt-1 text-xs text-text-faint">{row.removal_reason}</p> : null}
                   </div>
                   <div className={`text-xs ${isOverdue ? "text-amber-500" : "text-text-muted"}`}>
                     <p className="flex items-center gap-1.5">{isOverdue ? <AlertTriangle className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5 text-mint-600" />}{relativeConfirm(row.last_confirmed_at)}</p>
                   </div>
                   <div className="flex items-center justify-end gap-2">
-                    {row.portal_url ? <a href={row.portal_url} target="_blank" rel="noreferrer" className="grid h-9 w-9 place-items-center rounded-[9px] border border-line text-text-faint transition hover:border-brand-300 hover:text-brand-600" aria-label="İlanı aç"><ExternalLink className="h-4 w-4" /></a> : null}
+                    {row.portal_url ? <a href={row.portal_url} target="_blank" rel="noreferrer" className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-faint transition hover:border-brand-300 hover:text-brand-600" aria-label="İlanı aç"><ExternalLink className="h-4 w-4" /></a> : null}
                     {isLive ? (
                       <>
                         <ConfirmListingButton listingId={row.id} />
@@ -479,19 +479,19 @@ export default async function PortalsPage({
           {totalPages > 1 ? (
             <nav aria-label="Sayfalama" className="flex items-center justify-between gap-3 border-t border-line px-5 py-3">
               {page > 1 ? (
-                <Link href={portalHref(durum, portal, page - 1, propertyF)} className="focus-ring press rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+                <Link href={portalHref(durum, portal, page - 1, propertyF)} className="focus-ring press rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
                   ← Önceki
                 </Link>
               ) : (
-                <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">← Önceki</span>
+                <span className="rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">← Önceki</span>
               )}
               <span className="text-xs tabular-nums text-text-muted">Sayfa {Math.min(page, totalPages)} / {totalPages}</span>
               {page < totalPages ? (
-                <Link href={portalHref(durum, portal, page + 1, propertyF)} className="focus-ring press rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+                <Link href={portalHref(durum, portal, page + 1, propertyF)} className="focus-ring press rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
                   Sonraki →
                 </Link>
               ) : (
-                <span className="rounded-[9px] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">Sonraki →</span>
+                <span className="rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-faint opacity-50">Sonraki →</span>
               )}
             </nav>
           ) : null}

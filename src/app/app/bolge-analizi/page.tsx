@@ -261,7 +261,7 @@ export default async function RegionAnalysisPage({
 
   return (
     <div className="space-y-6">
-      <section className="no-print theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="no-print theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-12 -top-20 h-60 w-60 rounded-full bg-mint-500/25 blur-[80px]" />
         <div className="relative">
@@ -284,20 +284,20 @@ export default async function RegionAnalysisPage({
                 <Link
                   key={item.label}
                   href={item.href}
-                  className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur hover:border-white/30"
+                  className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur hover:border-white/30"
                 >
                   <span className="flex items-start justify-between">
                     <item.icon className="h-4 w-4 text-mint-400" />
                     <ArrowUpRight className="hover-action h-4 w-4 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
                   </span>
                   <p className="mt-2 font-display text-xl font-extrabold text-white">{item.value}</p>
-                  <p className="text-[11px] text-white/45 sm:text-xs">{item.label}</p>
+                  <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
                 </Link>
               ) : (
-                <div key={item.label} className="rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur">
+                <div key={item.label} className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur">
                   <item.icon className="h-4 w-4 text-mint-400" />
                   <p className="mt-2 font-display text-xl font-extrabold text-white">{item.value}</p>
-                  <p className="text-[11px] text-white/45 sm:text-xs">{item.label}</p>
+                  <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
                 </div>
               ),
             )}
@@ -311,7 +311,7 @@ export default async function RegionAnalysisPage({
           okunacagi belirsiz kalirdi. */}
       <nav
         aria-label="Bölge analizi filtreleri"
-        className="no-print flex flex-wrap items-center gap-2 rounded-[16px] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]"
+        className="no-print flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]"
       >
         <span className="mr-1 text-xs font-semibold text-text-faint">İşlem</span>
         {TX_FILTERS.map((f) => (
@@ -319,7 +319,7 @@ export default async function RegionAnalysisPage({
             key={f.value || "all"}
             href={`/app/bolge-analizi?tx=${encodeURIComponent(f.value)}&months=${months}`}
             aria-current={tx === f.value ? "page" : undefined}
-            className={`focus-ring press rounded-[9px] px-3 py-2 text-xs font-semibold transition ${
+            className={`focus-ring press rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold transition ${
               tx === f.value ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
             }`}
           >
@@ -332,7 +332,7 @@ export default async function RegionAnalysisPage({
             key={p.value}
             href={`/app/bolge-analizi?tx=${encodeURIComponent(tx)}&months=${p.value}`}
             aria-current={String(months) === p.value ? "page" : undefined}
-            className={`focus-ring press rounded-[9px] px-3 py-2 text-xs font-semibold transition ${
+            className={`focus-ring press rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold transition ${
               String(months) === p.value ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
             }`}
           >
@@ -342,12 +342,12 @@ export default async function RegionAnalysisPage({
       </nav>
 
       {error ? (
-        <p className="rounded-[14px] border border-danger-500/30 bg-danger-500/5 px-4 py-3 text-sm text-danger-600" role="alert">
+        <p className="rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 px-4 py-3 text-sm text-danger-600" role="alert">
           Bölge verisi okunamadı. Lütfen sayfayı yenileyin.
         </p>
       ) : rows.length === 0 ? (
-        <div className="grid place-items-center rounded-[20px] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
-          <span className="grid h-16 w-16 place-items-center rounded-[18px] bg-brand-600/10 text-brand-600">
+        <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
+          <span className="grid h-16 w-16 place-items-center rounded-[var(--radius-panel)] bg-brand-600/10 text-brand-600">
             <MapPinned className="h-8 w-8" />
           </span>
           <h2 className="mt-5 font-display text-xl font-bold text-ink-950">Henüz ilçe verisi yok</h2>
@@ -357,7 +357,7 @@ export default async function RegionAnalysisPage({
           </p>
           <Link
             href="/app/portfoyler"
-            className="focus-ring press mt-5 rounded-[10px] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white"
+            className="focus-ring press mt-5 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white"
           >
             Portföylere git
           </Link>
@@ -374,7 +374,7 @@ export default async function RegionAnalysisPage({
               <header className="print-only hairline-b pb-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-600">{officeName}</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-600">{officeName}</p>
                     <h1 className="mt-1 font-display text-2xl font-extrabold tracking-[-0.02em] text-ink-950">
                       Bölge cep raporu — {selected.district_name}
                     </h1>
@@ -412,8 +412,8 @@ export default async function RegionAnalysisPage({
                     ],
                     [`Kapanan işlem (${months} ay)`, `${selected.closed_count} · ${money(selected.closed_value)}`],
                   ].map(([k, v]) => (
-                    <div key={k} className="rounded-[12px] border border-line px-3 py-2">
-                      <dt className="text-[10px] font-semibold uppercase tracking-wide text-text-faint">{k}</dt>
+                    <div key={k} className="rounded-[var(--radius-card)] border border-line px-3 py-2">
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-text-faint">{k}</dt>
                       <dd className="numeric mt-0.5 text-sm font-bold text-ink-950">{v}</dd>
                     </div>
                   ))}
@@ -428,7 +428,7 @@ export default async function RegionAnalysisPage({
                     <PrintReportButton />
                     <Link
                       href={`/app/bolge-analizi?tx=${encodeURIComponent(tx)}&months=${months}`}
-                      className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line px-2.5 py-1.5 text-xs font-semibold text-text-muted hover:text-ink-950"
+                      className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-text-muted hover:text-ink-950"
                       aria-label="Trend grafiğini kapat"
                     >
                       <X className="h-3.5 w-3.5" /> Kapat
@@ -445,7 +445,7 @@ export default async function RegionAnalysisPage({
                     series={[{ key: "sqm", label: "Medyan m² (₺)" }]}
                   />
                 ) : (
-                  <div className="grid h-full place-items-center rounded-[14px] border border-dashed border-line-strong bg-canvas/60 px-4 text-center">
+                  <div className="grid h-full place-items-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-canvas/60 px-4 text-center">
                     <p className="text-sm text-text-muted">
                       Bu ilçe için henüz yeterli tarihçe yok — <strong>snapshot birikiyor</strong>.
                       Aylık bölge fotoğrafı alındıkça trend çizgisi burada oluşacak.
@@ -499,13 +499,13 @@ export default async function RegionAnalysisPage({
               {/* ---- CEP RAPORU ALT BLOĞU (yalnız çıktıda) ---- */}
               <footer className="print-only">
                 <h2 className="text-sm font-bold text-ink-950">Yöntem</h2>
-                <p className="mt-1 text-[11px] leading-relaxed text-text-muted">
+                <p className="mt-1 text-xs leading-relaxed text-text-muted">
                   Rakamlar yalnızca {officeName} portföy ve anlaşma verisinden üretilmiştir; dış piyasa
                   endeksi değildir. Medyan m² fiyatı, m² bilgisi girilmiş kayıtların ortancasıdır — uç
                   fiyatlar sonucu bozmaz. Kira çarpanı, satılık medyan ₺/m² değerinin yıllık kira medyanına
                   bölümüdür (amortisman yılı). Trend çizgisi aylık bölge fotoğraflarından (snapshot) gelir.
                 </p>
-                <p className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed text-text-muted">
+                <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-text-muted">
                   <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600" />
                   <span>
                     Bu rapor bilgilendirme amaçlı bir <strong>piyasa özeti</strong>dir; SPK lisanslı
@@ -515,15 +515,15 @@ export default async function RegionAnalysisPage({
                   </span>
                 </p>
                 <div className="mt-10 grid grid-cols-2 gap-12">
-                  <div className="hairline-t pt-1.5 text-[11px] text-text-muted">Hazırlayan · {officeName}</div>
-                  <div className="hairline-t pt-1.5 text-[11px] text-text-muted">Teslim alan · ad, soyad, tarih</div>
+                  <div className="hairline-t pt-1.5 text-xs text-text-muted">Hazırlayan · {officeName}</div>
+                  <div className="hairline-t pt-1.5 text-xs text-text-muted">Teslim alan · ad, soyad, tarih</div>
                 </div>
               </footer>
             </section>
           ) : null}
 
           {insightCards.length > 0 ? (
-            <section className="no-print rounded-[20px] border border-line bg-surface p-5">
+            <section className="no-print rounded-[var(--radius-panel)] border border-line bg-surface p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
@@ -532,7 +532,7 @@ export default async function RegionAnalysisPage({
                   <h2 className="mt-1 font-display font-bold text-ink-950">Bölge içgörü kartları</h2>
                 </div>
                 {withTrend.length > 0 ? (
-                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
                     <span className="flex items-center gap-1 rounded-full bg-mint-500/10 px-2.5 py-1 text-mint-600">
                       <TrendingUp className="h-3.5 w-3.5" /> {risingCount} ilçe yükselişte
                     </span>
@@ -552,15 +552,15 @@ export default async function RegionAnalysisPage({
                   <Link
                     key={c.key}
                     href={c.href}
-                    className="focus-ring press lift group block rounded-[14px] border border-line bg-canvas/60 p-4 transition hover:border-brand-300"
+                    className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-canvas/60 p-4 transition hover:border-brand-300"
                   >
-                    <p className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.08em] text-text-faint">
+                    <p className="flex items-center justify-between text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
                       <span>{c.badge}</span>
                       <ArrowUpRight className="h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                     </p>
                     <p className="mt-1 truncate text-sm font-semibold text-ink-950 group-hover:text-brand-600">{c.district}</p>
                     <p className="numeric mt-2 font-display text-2xl font-extrabold text-ink-950">{c.value}</p>
-                    <p className="text-[11px] text-text-muted">{c.note}</p>
+                    <p className="text-xs text-text-muted">{c.note}</p>
                   </Link>
                 ))}
               </div>
@@ -568,21 +568,21 @@ export default async function RegionAnalysisPage({
           ) : null}
 
           {investorTop.length > 0 ? (
-            <section className="no-print rounded-[20px] border border-line bg-surface p-5">
+            <section className="no-print rounded-[var(--radius-panel)] border border-line bg-surface p-5">
               <p className="flex items-center gap-2 text-xs font-semibold text-amber-700">
                 <Trophy className="h-4 w-4" /> Yatırımcı özeti
               </p>
               <h2 className="mt-1 font-display font-bold text-ink-950">En hızlı geri dönen ilçeler</h2>
               <p
-                className="mt-0.5 text-[11px] text-text-muted"
+                className="mt-0.5 text-xs text-text-muted"
                 title="Kira çarpanı = satılık medyan ₺/m² ÷ (kiralık medyan aylık ₺/m² × 12). Düşük değer, kira geliriyle daha hızlı amortisman demektir."
               >
                 Kira çarpanına göre — satılık fiyatın kaç yıllık kirayla karşılandığı
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 {investorTop.map((r, i) => (
-                  <div key={r.id} className="rounded-[14px] border border-line bg-canvas/60 p-4">
-                    <p className="flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
+                  <div key={r.id} className="rounded-[var(--radius-card)] border border-line bg-canvas/60 p-4">
+                    <p className="flex items-center justify-between text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
                       <span>#{i + 1}</span>
                       <LineChart className="h-3.5 w-3.5 text-amber-500" />
                     </p>
@@ -590,7 +590,7 @@ export default async function RegionAnalysisPage({
                     <p className="mt-2 font-display text-2xl font-extrabold text-ink-950">
                       {new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(r.multiplier)} yıl
                     </p>
-                    <p className="text-[11px] text-text-muted">
+                    <p className="text-xs text-text-muted">
                       amortisman · ~%{new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(100 / r.multiplier)} brüt getiri
                     </p>
                   </div>
@@ -643,7 +643,7 @@ export default async function RegionAnalysisPage({
           />
           </div>
 
-          <p className="no-print flex items-start gap-2 rounded-[14px] border border-line bg-canvas px-4 py-3 text-xs leading-relaxed text-text-muted">
+          <p className="no-print flex items-start gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-xs leading-relaxed text-text-muted">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
             <span>
               Rakamlar <strong>yalnızca kendi ofis verinizden</strong> üretilir; dış piyasa endeksi değildir.

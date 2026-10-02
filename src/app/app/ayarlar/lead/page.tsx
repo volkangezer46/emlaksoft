@@ -37,7 +37,7 @@ export default async function LeadCaptureSettingsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-mint-500/30 blur-[80px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -53,13 +53,13 @@ export default async function LeadCaptureSettingsPage() {
           </div>
           <Link
             href="/app/musteriler"
-            className="focus-ring press lift group relative block rounded-[14px] border border-white/12 bg-white/[0.05] px-5 py-3 text-center transition hover:border-mint-400/40"
+            className="focus-ring press lift group relative block rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-5 py-3 text-center transition hover:border-mint-400/40"
           >
             <ArrowUpRight className="hover-action absolute right-2 top-2 h-4 w-4 text-white/40 opacity-0 transition group-hover:text-mint-300 group-hover:opacity-100" />
             <p className="flex items-center justify-center gap-1.5 font-display text-2xl font-extrabold text-mint-300">
               <Zap className="h-5 w-5" /> {leadCount ?? 0}
             </p>
-            <p className="text-[11px] text-white/50">otomatik atanan aday · müşterilere git</p>
+            <p className="text-xs text-white/50">otomatik atanan aday · müşterilere git</p>
           </Link>
         </div>
       </section>

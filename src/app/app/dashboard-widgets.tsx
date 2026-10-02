@@ -94,12 +94,12 @@ export function WidgetEditToggle({ className = "" }: { className?: string }) {
       type="button"
       onClick={() => setEdit(!edit)}
       title="Panelleri gizle / göster"
-      className={`focus-ring press inline-flex h-9 items-center gap-1.5 rounded-[10px] border px-3 text-xs font-semibold transition ${className}`}
+      className={`focus-ring press inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] border px-3 text-xs font-semibold transition ${className}`}
     >
       <Settings2 className="h-3.5 w-3.5" />
       {edit ? "Bitti" : "Düzenle"}
       {!edit && hidden.length > 0 ? (
-        <span className="rounded-full bg-white/15 px-1.5 text-[11px] tabular-nums">{hidden.length}</span>
+        <span className="rounded-full bg-white/15 px-1.5 text-xs tabular-nums">{hidden.length}</span>
       ) : null}
     </button>
   );
@@ -126,7 +126,7 @@ export function Widget({
   return (
     <div
       className={`relative ${className} ${
-        edit ? "rounded-[20px] outline-2 outline-dashed outline-brand-300/70 outline-offset-2" : ""
+        edit ? "rounded-[var(--radius-panel)] outline-2 outline-dashed outline-brand-300/70 outline-offset-2" : ""
       } ${isHidden ? "opacity-45 grayscale" : ""}`}
     >
       {edit ? (
@@ -135,7 +135,7 @@ export function Widget({
           onClick={() => toggle(id)}
           title={isHidden ? "Paneli göster" : "Paneli gizle"}
           aria-label={isHidden ? "Paneli göster" : "Paneli gizle"}
-          className="focus-ring press absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-[9px] border border-line bg-surface text-text-muted shadow-elev-2 transition hover:border-brand-300 hover:text-brand-600"
+          className="focus-ring press absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted shadow-elev-2 transition hover:border-brand-300 hover:text-brand-600"
         >
           {isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>

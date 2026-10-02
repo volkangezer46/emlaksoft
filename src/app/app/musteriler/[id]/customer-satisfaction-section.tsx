@@ -61,7 +61,7 @@ export function CustomerSatisfactionSection({
   if (surveys.length === 0 && presentations.length === 0) return null;
 
   return (
-    <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
           <HeartHandshake className="h-4 w-4 text-mint-600" /> Memnuniyet &amp; Paylaşımlar
@@ -80,7 +80,7 @@ export function CustomerSatisfactionSection({
             const tone = answered ? npsTone(s.score as number) : null;
             const url = `${appUrl}/anket/${s.public_token}`;
             return (
-              <div key={s.id} className="rounded-[14px] border border-line bg-canvas/60 p-4">
+              <div key={s.id} className="rounded-[var(--radius-card)] border border-line bg-canvas/60 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="flex items-center gap-2">
                     {answered && tone ? (
@@ -89,19 +89,19 @@ export function CustomerSatisfactionSection({
                           {s.score}
                         </span>
                         <span
-                          className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 ring-inset ${tone.cls}`}
+                          className={`rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${tone.cls}`}
                         >
                           {tone.label}
                         </span>
                       </>
                     ) : (
-                      <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-[11px] font-bold text-brand-600">
+                      <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-xs font-bold text-brand-600">
                         Yanıt bekliyor
                       </span>
                     )}
                   </span>
                   <span className="flex items-center gap-2">
-                    <span className="text-[11px] text-text-faint">
+                    <span className="text-xs text-text-faint">
                       {answered ? `Yanıt: ${tarih(s.answered_at)}` : `Gönderim: ${tarih(s.sent_at)}`}
                     </span>
                     {/* Yanıtlanmamış anketin linki hâlâ işe yarar — danışman tekrar iletir */}
@@ -122,7 +122,7 @@ export function CustomerSatisfactionSection({
 
       {presentations.length > 0 ? (
         <div className="mt-4">
-          <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-text-faint">
+          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
             <Presentation className="h-3.5 w-3.5" /> Gönderilen sunumlar
           </p>
           <ul className="mt-2 space-y-2">
@@ -131,7 +131,7 @@ export function CustomerSatisfactionSection({
               return (
                 <li
                   key={p.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-line bg-canvas/50 px-3 py-2.5"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-2.5"
                 >
                   <span className="min-w-0">
                     <a
@@ -142,7 +142,7 @@ export function CustomerSatisfactionSection({
                     >
                       {p.title}
                     </a>
-                    <span className="text-[11px] text-text-muted">
+                    <span className="text-xs text-text-muted">
                       {p.property_count} portföy · {tarih(p.created_at)}
                     </span>
                   </span>
@@ -160,7 +160,7 @@ export function CustomerSatisfactionSection({
                       rel="noopener noreferrer"
                       title="Sunumu yeni sekmede aç"
                       aria-label="Sunumu yeni sekmede aç"
-                      className="focus-ring press grid h-8 w-8 place-items-center rounded-[8px] border border-hairline-strong bg-surface text-text-muted transition hover:bg-canvas hover:text-ink-950"
+                      className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline-strong bg-surface text-text-muted transition hover:bg-canvas hover:text-ink-950"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
                     </a>

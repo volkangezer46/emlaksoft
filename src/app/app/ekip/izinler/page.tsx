@@ -219,7 +219,7 @@ export default async function LeavesPage({
   return (
     <div className="space-y-6">
       {/* premium header */}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-mint-500/25 blur-[90px]" />
         <div className="relative">
@@ -237,7 +237,7 @@ export default async function LeavesPage({
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href="/app/ekip"
-                className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
               >
                 <ArrowLeft className="h-4 w-4" /> Ekip
               </Link>
@@ -256,26 +256,26 @@ export default async function LeavesPage({
               <Link
                 key={k.label}
                 href={k.href}
-                className="focus-ring press lift group block rounded-[14px] border border-white/10 bg-white/5 p-3 backdrop-blur hover:border-white/30"
+                className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur hover:border-white/30"
               >
                 <span className="flex items-start justify-between">
                   <k.icon className="h-4 w-4 text-mint-400" />
                   <ArrowUpRight className="hover-action h-4 w-4 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
                 </span>
                 <p className="mt-2 font-display text-xl font-extrabold text-white">{k.value}</p>
-                <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+                <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
               </Link>
             ))}
           </div>
 
           {todayOnLeave.length > 0 ? (
-            <div className="relative mt-4 flex flex-wrap items-center gap-2 rounded-[14px] border border-white/10 bg-white/[0.04] px-4 py-3">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/45">Bugün izinde</span>
+            <div className="relative mt-4 flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] px-4 py-3">
+              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-white/45">Bugün izinde</span>
               {todayOnLeave.map((m) => (
                 <Link
                   key={m.id}
                   href={`/app/ekip/${m.id}`}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-2.5 py-1 text-[11px] font-bold text-amber-300 transition hover:bg-amber-400/25"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-300 transition hover:bg-amber-400/25"
                 >
                   <PalmtreeIcon className="h-3 w-3" /> {m.full_name}
                 </Link>
@@ -287,7 +287,7 @@ export default async function LeavesPage({
 
       <div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
         {/* ---- Ay ızgarası ---- */}
-        <section className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+        <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
             <div>
               <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -301,14 +301,14 @@ export default async function LeavesPage({
               <Link
                 href={monthHref({ ay: shiftMonth(monthKey, -1) })}
                 aria-label="Önceki ay"
-                className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Link>
               {monthKey !== currentMonth ? (
                 <Link
                   href={monthHref({ ay: currentMonth })}
-                  className="focus-ring press rounded-[9px] border border-line px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
+                  className="focus-ring press rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
                 >
                   Bu ay
                 </Link>
@@ -316,7 +316,7 @@ export default async function LeavesPage({
               <Link
                 href={monthHref({ ay: shiftMonth(monthKey, 1) })}
                 aria-label="Sonraki ay"
-                className="focus-ring press grid h-8 w-8 place-items-center rounded-[9px] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
               >
                 <ChevronRight className="h-4 w-4" />
               </Link>
@@ -326,7 +326,7 @@ export default async function LeavesPage({
           <div className="p-4">
             <div className="grid grid-cols-7 gap-1.5">
               {WEEKDAY_SHORT.map((w) => (
-                <div key={w} className="pb-1 text-center text-[11px] font-semibold uppercase tracking-[0.06em] text-text-faint">
+                <div key={w} className="pb-1 text-center text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">
                   {w}
                 </div>
               ))}
@@ -336,7 +336,7 @@ export default async function LeavesPage({
               {cells.map((c) => (
                 <div
                   key={c.dateKey}
-                  className={`min-h-[74px] rounded-[11px] border p-1.5 transition ${
+                  className={`min-h-[74px] rounded-[var(--radius-control)] border p-1.5 transition ${
                     c.isToday
                       ? "border-brand-400 bg-brand-600/[0.04]"
                       : c.isWeekend
@@ -345,7 +345,7 @@ export default async function LeavesPage({
                   }`}
                 >
                   <p
-                    className={`text-[11px] font-bold tabular-nums ${
+                    className={`text-xs font-bold tabular-nums ${
                       c.isToday ? "text-brand-600" : c.isWeekend ? "text-text-faint" : "text-text-muted"
                     }`}
                   >
@@ -359,14 +359,14 @@ export default async function LeavesPage({
                         <span
                           key={l.id}
                           title={`${nameById.get(l.staff_id) ?? "Personel"} — ${LEAVE_KIND_LABELS[kind]}${pending ? " (onay bekliyor)" : ""}`}
-                          className={`block truncate rounded-[6px] px-1.5 py-0.5 text-[10px] font-bold ${LEAVE_KIND_TONES[kind]} ${pending ? "opacity-55 ring-1 ring-inset ring-current" : ""}`}
+                          className={`block truncate rounded-[6px] px-1.5 py-0.5 text-xs font-bold ${LEAVE_KIND_TONES[kind]} ${pending ? "opacity-55 ring-1 ring-inset ring-current" : ""}`}
                         >
                           {nameById.get(l.staff_id) ?? "Personel"}
                         </span>
                       );
                     })}
                     {c.onLeave.length > 3 ? (
-                      <span className="block px-1.5 text-[10px] font-semibold text-text-faint">
+                      <span className="block px-1.5 text-xs font-semibold text-text-faint">
                         +{c.onLeave.length - 3} kişi
                       </span>
                     ) : null}
@@ -376,7 +376,7 @@ export default async function LeavesPage({
             </div>
 
             {/* Renk anahtarı — rozetin ne anlattığı ızgaraya bakınca anlaşılsın */}
-            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3 text-[11px] text-text-muted">
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3 text-xs text-text-muted">
               <span className="font-semibold">Tür:</span>
               {(Object.keys(LEAVE_KIND_LABELS) as (keyof typeof LEAVE_KIND_LABELS)[]).map((k) => (
                 <span key={k} className={`rounded-full px-2 py-0.5 font-bold ${LEAVE_KIND_TONES[k]}`}>
@@ -389,7 +389,7 @@ export default async function LeavesPage({
         </section>
 
         {/* ---- Liste ---- */}
-        <section className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+        <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-4">
             <div>
               <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -400,7 +400,7 @@ export default async function LeavesPage({
             </div>
             <Link
               href={monthHref({ gecmis: gecmis ? "" : "1" })}
-              className="focus-ring press rounded-[9px] border border-line px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
+              className="focus-ring press rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
             >
               {gecmis ? "Yaklaşanlar" : "Geçmiş"}
             </Link>
@@ -433,7 +433,7 @@ export default async function LeavesPage({
                 return (
                   <article key={l.id} className="px-5 py-4 transition hover:bg-brand-600/[0.02]">
                     <div className="flex items-start gap-3">
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-[image:var(--grad-brand)] text-[11px] font-bold text-white">
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] text-xs font-bold text-white">
                         {initials(name)}
                       </span>
                       <div className="min-w-0 flex-1">
@@ -444,11 +444,11 @@ export default async function LeavesPage({
                           >
                             {name}
                           </Link>
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${LEAVE_KIND_TONES[kind]}`}>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${LEAVE_KIND_TONES[kind]}`}>
                             {LEAVE_KIND_LABELS[kind]}
                           </span>
                           {status !== "onayli" ? (
-                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${LEAVE_STATUS_TONES[status]}`}>
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${LEAVE_STATUS_TONES[status]}`}>
                               {LEAVE_STATUS_LABELS[status]}
                             </span>
                           ) : null}
@@ -461,7 +461,7 @@ export default async function LeavesPage({
                         {conflicts > 0 ? (
                           <Link
                             href={`/app/randevular?gorunum=gun&tarih=${l.starts_on}`}
-                            className="focus-ring group mt-2 flex items-center gap-2 rounded-[10px] border border-amber-400/30 bg-amber-400/8 px-3 py-2 text-[11px] font-semibold text-amber-600 transition hover:border-amber-400/60"
+                            className="focus-ring group mt-2 flex items-center gap-2 rounded-[var(--radius-control)] border border-amber-400/30 bg-amber-400/8 px-3 py-2 text-xs font-semibold text-amber-600 transition hover:border-amber-400/60"
                           >
                             <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                             Bu aralıkta {conflicts} randevusu var — devretmeyi unutmayın.
@@ -475,7 +475,7 @@ export default async function LeavesPage({
                               <input type="hidden" name="id" value={l.id} />
                               <button
                                 type="submit"
-                                className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-mint-600 transition hover:border-mint-500/40"
+                                className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-mint-600 transition hover:border-mint-500/40"
                               >
                                 <CheckCircle2 className="h-3 w-3" /> Onayla
                               </button>
@@ -486,7 +486,7 @@ export default async function LeavesPage({
                               <input type="hidden" name="id" value={l.id} />
                               <button
                                 type="submit"
-                                className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-danger-500 transition hover:border-danger-500/40"
+                                className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-danger-500 transition hover:border-danger-500/40"
                               >
                                 <XCircle className="h-3 w-3" /> Reddet
                               </button>
@@ -498,7 +498,7 @@ export default async function LeavesPage({
                                 <button
                                   type="button"
                                   title="Sil"
-                                  className="focus-ring press inline-flex items-center gap-1 rounded-[9px] border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-semibold text-text-muted transition hover:border-danger-500/40 hover:text-danger-500"
+                                  className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-danger-500/40 hover:text-danger-500"
                                 >
                                   <Trash2 className="h-3 w-3" /> Sil
                                 </button>

@@ -50,17 +50,17 @@ export default async function VitrinFavorilerPage({ params }: { params: Promise<
         <div className="relative mx-auto max-w-6xl px-4 py-8">
           <Link
             href={`/vitrin/${slug}`}
-            className="focus-ring flex w-fit items-center gap-3 rounded-[14px] transition hover:opacity-90"
+            className="focus-ring flex w-fit items-center gap-3 rounded-[var(--radius-card)] transition hover:opacity-90"
           >
             <span
-              className="grid h-11 w-11 place-items-center rounded-[13px] text-base font-extrabold text-white"
+              className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] text-base font-extrabold text-white"
               style={{ background: tenant.brand_color || "var(--grad-brand)" }}
             >
               {tenant.name ? tenant.name[0] : "E"}
             </span>
             <span>
               <span className="block font-display text-lg font-extrabold">{tenant.name}</span>
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-mint-400">
+              <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-mint-400">
                 Portföy vitrini
               </span>
             </span>
@@ -84,7 +84,7 @@ export default async function VitrinFavorilerPage({ params }: { params: Promise<
         <FavorilerClient slug={slug} />
       </main>
 
-      <footer className="border-t border-line py-6 text-center text-[11px] text-text-faint">
+      <footer className="border-t border-line py-6 text-center text-xs text-text-faint">
         <Link href="/" className="font-semibold underline-offset-2 transition hover:text-brand-600 hover:underline">
           Powered by EmlakSoft
         </Link>{" "}

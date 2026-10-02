@@ -41,7 +41,7 @@ export function OfferStatusActions({ offerId, status }: { offerId: string; statu
           type="button"
           disabled={pending}
           onClick={() => run("accepted")}
-          className="inline-flex items-center gap-1.5 rounded-[10px] bg-mint-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-mint-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
         >
           <CheckCircle2 className="h-4 w-4" /> Kabul et
         </button>
@@ -49,7 +49,7 @@ export function OfferStatusActions({ offerId, status }: { offerId: string; statu
           type="button"
           disabled={pending}
           onClick={() => run("rejected")}
-          className="inline-flex items-center gap-1.5 rounded-[10px] bg-danger-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-danger-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
         >
           <XCircle className="h-4 w-4" /> Reddet
         </button>
@@ -57,7 +57,7 @@ export function OfferStatusActions({ offerId, status }: { offerId: string; statu
           type="button"
           disabled={pending}
           onClick={() => setCounterMode((v) => !v)}
-          className="inline-flex items-center gap-1.5 rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-canvas disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-canvas disabled:opacity-60"
         >
           <Repeat className="h-4 w-4" /> Karşı teklif
         </button>
@@ -65,14 +65,14 @@ export function OfferStatusActions({ offerId, status }: { offerId: string; statu
           type="button"
           disabled={pending}
           onClick={() => run("withdrawn")}
-          className="inline-flex items-center gap-1.5 rounded-[10px] border border-line px-4 py-2.5 text-sm font-medium text-text-muted transition hover:bg-canvas disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-medium text-text-muted transition hover:bg-canvas disabled:opacity-60"
         >
           <Undo2 className="h-4 w-4" /> Geri çek
         </button>
       </div>
 
       {counterMode ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-line bg-canvas p-3">
+        <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas p-3">
           <input
             type="number"
             min="0"
@@ -80,13 +80,13 @@ export function OfferStatusActions({ offerId, status }: { offerId: string; statu
             value={counter}
             onChange={(e) => setCounter(e.target.value)}
             placeholder="Karşı teklif tutarı (₺)"
-            className="min-w-[180px] flex-1 rounded-[10px] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400"
+            className="min-w-[180px] flex-1 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400"
           />
           <button
             type="button"
             disabled={pending || !counter}
             onClick={() => run("countered", Number(counter))}
-            className="rounded-[10px] bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
             Karşı teklif gönder
           </button>

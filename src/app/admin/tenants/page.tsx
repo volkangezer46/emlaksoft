@@ -132,7 +132,7 @@ export default async function AdminTenantsPage({
   return (
     <div className="space-y-6">
       {auditFailed ? (
-        <div role="alert" className="flex items-start justify-between gap-4 rounded-[14px] border border-danger-500/25 bg-danger-500/8 px-4 py-3 text-sm text-danger-600">
+        <div role="alert" className="flex items-start justify-between gap-4 rounded-[var(--radius-card)] border border-danger-500/25 bg-danger-500/8 px-4 py-3 text-sm text-danger-600">
           <div className="flex items-start gap-2.5">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
@@ -140,12 +140,12 @@ export default async function AdminTenantsPage({
               <p className="mt-0.5 text-xs text-danger-600/85">Güvenlik ekibi hata kayıtlarını kontrol etmelidir; yeni impersonation başlatmadan önce olay kaydını doğrulayın.</p>
             </div>
           </div>
-          <Link href="/admin/tenants" aria-label="Uyarıyı kapat" className="focus-ring grid h-7 w-7 shrink-0 place-items-center rounded-[8px] hover:bg-danger-500/10">
+          <Link href="/admin/tenants" aria-label="Uyarıyı kapat" className="focus-ring grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-control)] hover:bg-danger-500/10">
             <X className="h-4 w-4" />
           </Link>
         </div>
       ) : null}
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-amber-400/20 blur-[90px]" />
         <div className="relative grid gap-6 lg:grid-cols-[1.2fr_1fr] lg:items-center">
@@ -170,23 +170,23 @@ export default async function AdminTenantsPage({
                     href={buildHref({ q: query, durum, plan: active ? undefined : p.key })}
                     aria-current={active ? "page" : undefined}
                     title={active ? "Paket filtresini kaldır" : `Yalnızca ${p.label} paketini göster`}
-                    className={`focus-ring press flex h-full flex-1 flex-col items-center justify-end gap-1 rounded-[10px] pb-1 transition ${
+                    className={`focus-ring press flex h-full flex-1 flex-col items-center justify-end gap-1 rounded-[var(--radius-control)] pb-1 transition ${
                       active ? "bg-white/12" : "hover:bg-white/6"
                     }`}
                   >
-                    <span className="text-[10px] font-bold text-white/80">{p.count}</span>
+                    <span className="text-xs font-bold text-white/80">{p.count}</span>
                     <div
                       className="bar-live w-full max-w-[26px] rounded-t-[5px] bg-gradient-to-t from-amber-500 to-amber-300"
                       style={{ height: `${Math.max((p.count / maxPlan) * 70, 8)}%`, animationDelay: `${i * 0.08}s` }}
                     />
-                    <span className={`text-[10px] ${active ? "font-bold text-amber-300" : "text-white/65"}`}>{p.label}</span>
+                    <span className={`text-xs ${active ? "font-bold text-amber-300" : "text-white/65"}`}>{p.label}</span>
                   </Link>
                 );
               })}
             </div>
           </div>
 
-          <div className="flex items-center gap-5 rounded-[16px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
+          <div className="flex items-center gap-5 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="relative grid h-28 w-28 place-items-center">
               <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
                 <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
@@ -208,7 +208,7 @@ export default async function AdminTenantsPage({
               </svg>
               <div className="absolute text-center">
                 <p className="font-display text-xl font-extrabold text-white">%{Math.round(activeRate * 100)}</p>
-                <p className="text-[10px] text-white/70">aktif</p>
+                <p className="text-xs text-white/70">aktif</p>
               </div>
             </div>
             <div className="space-y-1 text-xs">
@@ -235,7 +235,7 @@ export default async function AdminTenantsPage({
         </div>
       </section>
 
-      <div className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-xs)]">
+      <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-3">
           <form className="relative w-full max-w-xs">
             {durum ? <input type="hidden" name="durum" value={durum} /> : null}
@@ -246,13 +246,13 @@ export default async function AdminTenantsPage({
               name="q"
               defaultValue={query}
               placeholder="Ofis adı ara…"
-              className="w-full rounded-[10px] border border-line bg-canvas px-8 py-2 text-sm outline-none focus:border-brand-400"
+              className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-8 py-2 text-sm outline-none focus:border-brand-400"
             />
           </form>
           {query ? (
             <Link
               href={buildHref({ durum, plan })}
-              className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
+              className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
             >
               Arama: {query} <X className="h-3 w-3" />
             </Link>
@@ -260,7 +260,7 @@ export default async function AdminTenantsPage({
           {durum ? (
             <Link
               href={buildHref({ q: query, plan })}
-              className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
+              className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
             >
               Durum: {statusLabel[durum]} <X className="h-3 w-3" />
             </Link>
@@ -268,7 +268,7 @@ export default async function AdminTenantsPage({
           {plan ? (
             <Link
               href={buildHref({ q: query, durum })}
-              className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600 transition hover:bg-brand-600/15"
+              className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
             >
               Paket: {planLabel(plan)} <X className="h-3 w-3" />
             </Link>
@@ -286,7 +286,7 @@ export default async function AdminTenantsPage({
               style={{ animationDelay: `${i * 0.03}s` }}
             >
               <div className="flex items-start gap-3">
-                <span className="relative mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-[image:var(--grad-ink)] text-amber-300">
+                <span className="relative mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] text-amber-300">
                   <Building2 className="h-4 w-4" />
                   {t.status === "active" ? <span className="status-pulse absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-mint-500" /> : null}
                 </span>
@@ -306,7 +306,7 @@ export default async function AdminTenantsPage({
                     · {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(t.created_at))}
                   </p>
                   {t.trial_ends_at ? (
-                    <p className="mt-1 flex items-center gap-1 text-[11px] text-amber-600">
+                    <p className="mt-1 flex items-center gap-1 text-xs text-amber-600">
                       <Activity className="h-3 w-3" />
                       Deneme bitiş: {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(t.trial_ends_at))}
                     </p>
@@ -315,17 +315,17 @@ export default async function AdminTenantsPage({
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusCls[t.status] ?? statusCls.trial}`}>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusCls[t.status] ?? statusCls.trial}`}>
                   {statusLabel[t.status] ?? t.status}
                 </span>
-                <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-600">
+                <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
                   {planLabel(t.plan)}
                 </span>
                 {(() => {
                   const h = healthOf(t.id);
                   return (
                     <span
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${h.cls}`}
+                      className={`rounded-full px-2.5 py-1 text-xs font-bold ${h.cls}`}
                       title={`Son 14 günde ${h.n} işlem (audit log)`}
                     >
                       {h.label}
@@ -346,7 +346,7 @@ export default async function AdminTenantsPage({
                 {canImpersonate ? (
                   <form action={startImpersonation}>
                     <input type="hidden" name="tenant_id" value={t.id} />
-                    <button type="submit" className="rounded-[9px] border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-xs font-bold text-amber-700 transition hover:bg-amber-400/20">
+                    <button type="submit" className="rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-xs font-bold text-amber-700 transition hover:bg-amber-400/20">
                       Ofise gir
                     </button>
                   </form>

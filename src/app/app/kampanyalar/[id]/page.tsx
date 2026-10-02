@@ -145,7 +145,7 @@ export default async function CampaignDetailPage({
         <ArrowLeft className="h-4 w-4" /> Kampanyalara dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/30 blur-[80px]" />
         <div className="relative">
@@ -174,14 +174,14 @@ export default async function CampaignDetailPage({
               <Link
                 key={k.label}
                 href={durumHref(k.durum)}
-                className={`focus-ring press group relative block rounded-[14px] border bg-white/5 p-3 backdrop-blur transition hover:border-white/30 ${
+                className={`focus-ring press group relative block rounded-[var(--radius-card)] border bg-white/5 p-3 backdrop-blur transition hover:border-white/30 ${
                   durum === k.durum && k.durum !== "" ? "border-white/40" : "border-white/10"
                 }`}
               >
                 <ArrowUpRight className="hover-action absolute right-2 top-2 h-3.5 w-3.5 text-white/50 opacity-0 transition group-hover:opacity-100" />
                 <k.icon className="h-4 w-4 text-mint-400" />
                 <p className="numeric mt-2 font-display text-lg font-extrabold text-white">{k.value}</p>
-                <p className="text-[11px] text-white/45 sm:text-xs">{k.label}</p>
+                <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
               </Link>
             ))}
           </div>
@@ -203,7 +203,7 @@ export default async function CampaignDetailPage({
       {/* Gönderilen mesajın kendisi — hangi metnin gittiği kaydın parçası */}
       <section className="surface-card rounded-[var(--radius-panel)] p-5">
         <h2 className="font-display font-bold text-ink-950">Gönderilen mesaj</h2>
-        <p className="mt-2 whitespace-pre-line rounded-[12px] border border-line bg-canvas px-4 py-3 text-sm leading-relaxed text-ink-950">
+        <p className="mt-2 whitespace-pre-line rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-sm leading-relaxed text-ink-950">
           {campaign.message}
         </p>
       </section>
@@ -221,7 +221,7 @@ export default async function CampaignDetailPage({
                 <li key={mesaj}>
                   <Link
                     href={durumHref("failed")}
-                    className="focus-ring group flex flex-wrap items-start justify-between gap-3 rounded-[12px] border border-danger-500/20 bg-surface px-4 py-2.5 transition hover:border-danger-500/40"
+                    className="focus-ring group flex flex-wrap items-start justify-between gap-3 rounded-[var(--radius-card)] border border-danger-500/20 bg-surface px-4 py-2.5 transition hover:border-danger-500/40"
                   >
                     <span className="min-w-0 text-sm text-ink-950">{mesaj}</span>
                     <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-danger-500/10 px-2.5 py-0.5 text-xs font-bold text-danger-600">
@@ -253,7 +253,7 @@ export default async function CampaignDetailPage({
               <Link
                 key={f.value}
                 href={durumHref(f.value)}
-                className={`focus-ring rounded-[9px] px-2.5 py-1.5 text-xs font-semibold transition ${
+                className={`focus-ring rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs font-semibold transition ${
                   durum === f.value ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
                 }`}
               >
@@ -264,11 +264,11 @@ export default async function CampaignDetailPage({
         ) : null}
 
         {recipients.length === 0 ? (
-          <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
+          <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
             Bu kampanyaya alıcı eklenmemiş.
           </p>
         ) : visibleRecipients.length === 0 ? (
-          <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
+          <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
             Bu durumda alıcı yok.{" "}
             <Link href={basePath} className="font-semibold text-brand-600 hover:underline">
               Filtreyi temizle
@@ -327,7 +327,7 @@ export default async function CampaignDetailPage({
               </Table>
             </TableFrame>
             {recipients.length >= 500 ? (
-              <p className="mt-2 text-[11px] text-text-faint">
+              <p className="mt-2 text-xs text-text-faint">
                 İlk 500 alıcı gösteriliyor. Daha fazlası varsa listede yer almıyor.
               </p>
             ) : null}

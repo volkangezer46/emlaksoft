@@ -202,7 +202,7 @@ export default async function CustomerPortalPage({
 
       <main id="main-content" className="mx-auto max-w-3xl space-y-6 p-4 py-6">
         {/* Karşılama + danışman iletişimi */}
-        <section className="theme-dark relative overflow-hidden rounded-[20px] bg-[image:var(--grad-ink)] p-5 text-white shadow-[var(--shadow-lg)]">
+        <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white shadow-[var(--shadow-lg)]">
           <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
           <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-brand-600/25 blur-[90px]" />
           <div className="relative">
@@ -219,7 +219,7 @@ export default async function CustomerPortalPage({
                 {advisorTel && (
                   <a
                     href={advisorTel}
-                    className="btn-shine inline-flex items-center justify-center gap-2 rounded-[12px] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 transition hover:bg-white/90"
+                    className="btn-shine inline-flex items-center justify-center gap-2 rounded-[var(--radius-card)] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 transition hover:bg-white/90"
                   >
                     <Phone className="h-4 w-4" /> Danışmanı Ara
                   </a>
@@ -229,7 +229,7 @@ export default async function CustomerPortalPage({
                     href={advisorWhatsApp}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-2 rounded-[12px] border border-mint-400/30 bg-mint-500/10 px-4 py-2.5 text-sm font-bold text-mint-300 transition hover:bg-mint-500/20"
+                    className="inline-flex items-center justify-center gap-2 rounded-[var(--radius-card)] border border-mint-400/30 bg-mint-500/10 px-4 py-2.5 text-sm font-bold text-mint-300 transition hover:bg-mint-500/20"
                   >
                     <MessageCircle className="h-4 w-4" /> WhatsApp
                   </a>
@@ -306,7 +306,7 @@ export default async function CustomerPortalPage({
                           )}
                         </div>
                         {m.score && (
-                          <span className="shrink-0 rounded-full bg-mint-500/12 px-2 py-0.5 text-[11px] font-bold text-mint-700">
+                          <span className="shrink-0 rounded-full bg-mint-500/12 px-2 py-0.5 text-xs font-bold text-mint-700">
                             %{m.score} eşleşme
                           </span>
                         )}
@@ -315,7 +315,7 @@ export default async function CustomerPortalPage({
                         <p className="mt-2 text-sm font-bold text-ink-950">{money(m.property.price)}</p>
                       )}
                       {href && (
-                        <p className="mt-1.5 text-[11px] font-semibold text-brand-600">İlan detayını görüntüle →</p>
+                        <p className="mt-1.5 text-xs font-semibold text-brand-600">İlan detayını görüntüle →</p>
                       )}
                     </div>
                   </>
@@ -325,7 +325,7 @@ export default async function CustomerPortalPage({
                 return (
                   <div
                     key={m.id}
-                    className={`overflow-hidden rounded-[14px] border border-line bg-surface shadow-[var(--shadow-xs)] transition ${
+                    className={`overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-xs)] transition ${
                       verdict === "disliked"
                         ? "opacity-60 saturate-50"
                         : "hover:border-brand-300 hover:shadow-[var(--shadow-sm)]"
@@ -354,7 +354,7 @@ export default async function CustomerPortalPage({
           <PortalSection id="arayislar" icon={Search} title="Arayışlarım">
             <div className="space-y-2">
               {demands.map((d) => (
-                <div key={d.id} className="flex items-center justify-between rounded-[14px] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
+                <div key={d.id} className="flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
                   <div>
                     <p className="text-sm font-semibold text-ink-950">
                       {DEMAND_TYPE_LABELS[d.type] ?? d.type}
@@ -366,7 +366,7 @@ export default async function CustomerPortalPage({
                       </p>
                     )}
                   </div>
-                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
                     d.status === "active"
                       ? "bg-mint-500/12 text-mint-700"
                       : "bg-canvas text-text-muted"
@@ -384,9 +384,9 @@ export default async function CustomerPortalPage({
           <PortalSection id="randevular" icon={CalendarDays} title="Yaklaşan Randevularım">
             <div className="space-y-2">
               {appointments.map((a) => (
-                <div key={a.id} className="rounded-[14px] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
+                <div key={a.id} className="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
                   <div className="flex items-center gap-3">
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-brand-600/10 text-brand-600">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
                       <CalendarDays className="h-4 w-4" />
                     </span>
                     <div className="flex-1 min-w-0">
@@ -398,7 +398,7 @@ export default async function CustomerPortalPage({
                         </p>
                       )}
                     </div>
-                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
                       a.status === "confirmed" ? "bg-mint-500/12 text-mint-700" : "bg-amber-400/15 text-amber-700"
                     }`}>
                       {a.status === "confirmed" ? "Onaylandı" : "Teyit Bekliyor"}

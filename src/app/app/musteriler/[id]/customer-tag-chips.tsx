@@ -66,7 +66,7 @@ export function CustomerTagChips({
         {tags.map((tag) => (
           <span
             key={tag}
-            className="inline-flex items-center gap-1 rounded-full bg-cyan-500/15 py-0.5 pl-2.5 pr-1.5 text-[11px] font-semibold text-cyan-300 ring-1 ring-inset ring-cyan-400/25"
+            className="inline-flex items-center gap-1 rounded-full bg-cyan-500/15 py-0.5 pl-2.5 pr-1.5 text-xs font-semibold text-cyan-300 ring-1 ring-inset ring-cyan-400/25"
           >
             <Tag className="h-3 w-3" />
             {tag}
@@ -91,7 +91,7 @@ export function CustomerTagChips({
               setOpen(true);
               setError(null);
             }}
-            className="inline-flex items-center gap-1 rounded-full border border-dashed border-white/25 px-2.5 py-0.5 text-[11px] font-semibold text-white/60 transition hover:border-cyan-400/60 hover:text-cyan-300"
+            className="inline-flex items-center gap-1 rounded-full border border-dashed border-white/25 px-2.5 py-0.5 text-xs font-semibold text-white/60 transition hover:border-cyan-400/60 hover:text-cyan-300"
           >
             <Plus className="h-3 w-3" /> Etiket ekle
           </button>
@@ -121,7 +121,7 @@ export function CustomerTagChips({
               disabled={pending}
               placeholder="Etiket yaz, Enter'a bas…"
               aria-label="Yeni etiket"
-              className="w-44 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[12px] text-white placeholder:text-white/40 outline-none transition focus:border-cyan-400/60 disabled:opacity-60"
+              className="w-44 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-white placeholder:text-white/40 outline-none transition focus:border-cyan-400/60 disabled:opacity-60"
             />
             <button
               type="button"
@@ -136,14 +136,14 @@ export function CustomerTagChips({
               <X className="h-3 w-3" />
             </button>
             {matches.length > 0 ? (
-              <ul className="absolute left-0 top-full z-20 mt-1.5 max-h-52 w-52 overflow-auto rounded-[12px] border border-line bg-surface p-1 shadow-[var(--elev-2)]">
+              <ul className="absolute left-0 top-full z-20 mt-1.5 max-h-52 w-52 overflow-auto rounded-[var(--radius-card)] border border-line bg-surface p-1 shadow-[var(--elev-2)]">
                 {matches.map((s) => (
                   <li key={s}>
                     <button
                       type="button"
                       onClick={() => submit(s)}
                       disabled={pending}
-                      className="flex w-full items-center gap-1.5 rounded-[8px] px-2.5 py-1.5 text-left text-xs font-medium text-ink-950 transition hover:bg-brand-600/10 hover:text-brand-700 disabled:opacity-50"
+                      className="flex w-full items-center gap-1.5 rounded-[var(--radius-control)] px-2.5 py-1.5 text-left text-xs font-medium text-ink-950 transition hover:bg-brand-600/10 hover:text-brand-700 disabled:opacity-50"
                     >
                       <Tag className="h-3 w-3 text-text-faint" />
                       {s}
@@ -160,7 +160,7 @@ export function CustomerTagChips({
         ) : null}
       </div>
       {error ? (
-        <p className="mt-1 text-[11px] font-semibold text-danger-400" role="alert">
+        <p className="mt-1 text-xs font-semibold text-danger-400" role="alert">
           {error}
         </p>
       ) : null}

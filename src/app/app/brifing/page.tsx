@@ -59,7 +59,7 @@ export default async function BrifingPage() {
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[22px] bg-[image:var(--grad-ink)] p-6 text-white">
+      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-amber-400/20 blur-[70px]" />
         <div className="relative">
@@ -82,14 +82,14 @@ export default async function BrifingPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Randevular */}
-        <section className="rounded-[20px] border border-line bg-surface p-5">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <h2 className="flex items-center gap-2 text-sm font-bold text-ink-950"><CalendarClock className="h-4.5 w-4.5 text-brand-600" /> Yaklaşan randevular <span className="text-text-faint">· 48s</span></h2>
           {apptRows.length === 0 ? (
-            <p className="mt-4 rounded-[12px] border border-dashed border-line bg-canvas/60 px-3 py-5 text-center text-sm text-text-muted">Yaklaşan randevu yok.</p>
+            <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line bg-canvas/60 px-3 py-5 text-center text-sm text-text-muted">Yaklaşan randevu yok.</p>
           ) : (
             <ul className="mt-3 space-y-2">
               {apptRows.map((a) => (
-                <li key={a.id} className="rounded-[12px] border border-line bg-canvas/50 px-3 py-2.5">
+                <li key={a.id} className="rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-2.5">
                   <p className="text-sm font-semibold text-ink-950">{relName(a.customer) || "—"}</p>
                   <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-text-muted">
                     <span className="font-medium text-brand-600">{APPT_TR[a.appointment_type ?? "other"] ?? "Görüşme"}</span>
@@ -104,14 +104,14 @@ export default async function BrifingPage() {
         </section>
 
         {/* Görevler */}
-        <section className="rounded-[20px] border border-line bg-surface p-5">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <h2 className="flex items-center gap-2 text-sm font-bold text-ink-950"><ListChecks className="h-4.5 w-4.5 text-mint-600" /> Bugün & geciken görevler</h2>
           {taskRows.length === 0 ? (
-            <p className="mt-4 rounded-[12px] border border-dashed border-line bg-canvas/60 px-3 py-5 text-center text-sm text-text-muted">Bekleyen görev yok 👏</p>
+            <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line bg-canvas/60 px-3 py-5 text-center text-sm text-text-muted">Bekleyen görev yok 👏</p>
           ) : (
             <ul className="mt-3 space-y-2">
               {taskRows.map((t) => (
-                <li key={t.id} className="flex items-start gap-2 rounded-[12px] border border-line bg-canvas/50 px-3 py-2.5">
+                <li key={t.id} className="flex items-start gap-2 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-2.5">
                   <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${t.priority === "high" ? "bg-danger-500" : t.priority === "normal" ? "bg-amber-400" : "bg-slate-400"}`} />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink-950">{t.title}</p>
@@ -125,15 +125,15 @@ export default async function BrifingPage() {
         </section>
 
         {/* Yetki bitişleri */}
-        <section className="rounded-[20px] border border-line bg-surface p-5">
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <h2 className="flex items-center gap-2 text-sm font-bold text-ink-950"><ShieldAlert className="h-4.5 w-4.5 text-amber-500" /> Yetkisi dolan portföyler <span className="text-text-faint">· 14 gün</span></h2>
           {expRows.length === 0 ? (
-            <p className="mt-4 rounded-[12px] border border-dashed border-line bg-canvas/60 px-3 py-5 text-center text-sm text-text-muted">Yakında dolan yetki yok.</p>
+            <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line bg-canvas/60 px-3 py-5 text-center text-sm text-text-muted">Yakında dolan yetki yok.</p>
           ) : (
             <ul className="mt-3 space-y-2">
               {expRows.map((p) => (
                 <li key={p.id}>
-                  <Link href={`/app/portfoyler/${p.id}`} className="group flex items-center gap-2 rounded-[12px] border border-line bg-canvas/50 px-3 py-2.5 transition hover:border-brand-300">
+                  <Link href={`/app/portfoyler/${p.id}`} className="group flex items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-2.5 transition hover:border-brand-300">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-ink-950 group-hover:text-brand-600">{p.title}</p>
                       <p className="text-xs text-text-muted">{p.property_code} · yetki biter: {fmtDate(p.authorization_end)}</p>
@@ -150,16 +150,16 @@ export default async function BrifingPage() {
       {/* Sıcak müşteri köprüsü */}
       <Link
         href="/app/akilli-listeler"
-        className="focus-ring group flex items-center justify-between gap-4 rounded-[18px] border border-brand-600/20 bg-brand-600/5 p-5 transition hover:border-brand-600/40"
+        className="focus-ring group flex items-center justify-between gap-4 rounded-[var(--radius-panel)] border border-brand-600/20 bg-brand-600/5 p-5 transition hover:border-brand-600/40"
       >
         <div className="flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-brand-600/10 text-brand-600"><Flame className="h-5 w-5" /></span>
+          <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600"><Flame className="h-5 w-5" /></span>
           <div>
             <p className="text-sm font-bold text-ink-950">Aranacak sıcak müşteriler seni bekliyor</p>
             <p className="text-xs text-text-muted">Akıllı Listeler churn riski, sıcak-randevusuz ve satıcı adaylarını önceliklendirdi.</p>
           </div>
         </div>
-        <span className="inline-flex items-center gap-1 rounded-[10px] bg-brand-600 px-3 py-2 text-xs font-bold text-white transition group-hover:bg-brand-700">Akıllı Listeler <ArrowUpRight className="h-3.5 w-3.5" /></span>
+        <span className="inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-brand-600 px-3 py-2 text-xs font-bold text-white transition group-hover:bg-brand-700">Akıllı Listeler <ArrowUpRight className="h-3.5 w-3.5" /></span>
       </Link>
     </div>
   );

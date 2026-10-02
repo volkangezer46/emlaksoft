@@ -171,7 +171,7 @@ export default async function AdminHomePage() {
             <Link
               key={i}
               href={a.href}
-              className={`group flex items-center gap-3 rounded-[14px] border px-4 py-3 text-sm transition ${
+              className={`group flex items-center gap-3 rounded-[var(--radius-card)] border px-4 py-3 text-sm transition ${
                 a.tone === "danger"
                   ? "border-danger-500/25 bg-danger-500/[0.06] text-danger-600 hover:bg-danger-500/10"
                   : a.tone === "amber"
@@ -190,12 +190,12 @@ export default async function AdminHomePage() {
       {/* KPI cards with sparklines */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((k) => (
-          <Link key={k.label} href={k.href} className="dashboard-panel focus-ring press lift group relative block overflow-hidden rounded-[18px] border border-line bg-surface p-4 transition hover:border-brand-300">
+          <Link key={k.label} href={k.href} className="dashboard-panel focus-ring press lift group relative block overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface p-4 transition hover:border-brand-300">
             <div className="flex items-start justify-between">
-              <span className={`grid h-9 w-9 place-items-center rounded-[11px] bg-canvas ${k.tone}`}>
+              <span className={`grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-canvas ${k.tone}`}>
                 <k.icon className="h-4.5 w-4.5" />
               </span>
-              <span className="flex items-center gap-1 text-[11px] font-semibold text-text-faint">
+              <span className="flex items-center gap-1 text-xs font-semibold text-text-faint">
                 8 hafta
                 <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
               </span>
@@ -207,14 +207,14 @@ export default async function AdminHomePage() {
             <div className="mt-2 h-9">
               <Sparkline data={k.series} stroke={k.stroke} fill={k.fill} height={36} />
             </div>
-            <p className="mt-1 text-[11px] font-medium text-text-faint">{k.sub}</p>
+            <p className="mt-1 text-xs font-medium text-text-faint">{k.sub}</p>
           </Link>
         ))}
       </div>
 
       {/* finance card + funnel */}
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <section className="theme-dark relative overflow-hidden rounded-[20px] bg-[image:var(--grad-ink)] p-6 text-white">
+        <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
           <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
           <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-mint-500/20 blur-[90px]" />
           <div className="relative grid gap-6 md:grid-cols-[1.1fr_1fr] md:items-center">
@@ -222,7 +222,7 @@ export default async function AdminHomePage() {
               <p className="flex items-center gap-2 text-xs font-semibold text-mint-400">
                 <Zap className="h-3.5 w-3.5" /> Gelir motoru
               </p>
-              <Link href="/admin/billing" className="focus-ring group mt-2 block w-fit rounded-[10px]">
+              <Link href="/admin/billing" className="focus-ring group mt-2 block w-fit rounded-[var(--radius-control)]">
                 <p className="font-display text-4xl font-extrabold tabular-nums text-white">
                   <CountUp value={displayMrr} money />
                 </p>
@@ -232,14 +232,14 @@ export default async function AdminHomePage() {
                 </p>
               </Link>
               <div className="mt-5 grid grid-cols-2 gap-3">
-                <Link href="/admin/billing" className="focus-ring group relative block rounded-[12px] border border-white/12 bg-white/8 p-3 transition hover:border-white/25 hover:bg-white/12">
+                <Link href="/admin/billing" className="focus-ring group relative block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 transition hover:border-white/25 hover:bg-white/12">
                   <p className="font-display text-lg font-extrabold text-white">{moneyTRY(arr)}</p>
-                  <p className="text-[11px] text-white/70">Yıllık yinelenen gelir</p>
+                  <p className="text-xs text-white/70">Yıllık yinelenen gelir</p>
                   <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:opacity-100" />
                 </Link>
-                <Link href="/admin/members" className="focus-ring group relative block rounded-[12px] border border-white/12 bg-white/8 p-3 transition hover:border-white/25 hover:bg-white/12">
+                <Link href="/admin/members" className="focus-ring group relative block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 transition hover:border-white/25 hover:bg-white/12">
                   <p className="font-display text-lg font-extrabold text-white">{Number(summary.member_count)}</p>
-                  <p className="text-[11px] text-white/70">Toplam kullanıcı</p>
+                  <p className="text-xs text-white/70">Toplam kullanıcı</p>
                   <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:opacity-100" />
                 </Link>
               </div>
@@ -260,7 +260,7 @@ export default async function AdminHomePage() {
                 </svg>
                 <div className="absolute text-center">
                   <p className="font-display text-xl font-extrabold text-white">%{Math.round(healthRate * 100)}</p>
-                  <p className="text-[10px] text-white/70">sağlık</p>
+                  <p className="text-xs text-white/70">sağlık</p>
                 </div>
               </div>
               <div className="space-y-2 text-xs text-white/85">
@@ -273,14 +273,14 @@ export default async function AdminHomePage() {
         </section>
 
         {/* funnel */}
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
             <TrendingUp className="h-4 w-4" /> Kazanım hunisi
           </p>
           <h2 className="mt-1 font-display font-bold text-ink-950">Kayıt → Aktif dönüşüm</h2>
           <div className="mt-5 space-y-3">
             {funnel.map((f, i) => (
-              <Link key={f.label} href={f.href} className="focus-ring group block rounded-[8px]">
+              <Link key={f.label} href={f.href} className="focus-ring group block rounded-[var(--radius-control)]">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-ink-950 transition group-hover:text-brand-600">{f.label}</span>
                   <span className="tabular-nums text-text-muted">{f.value}</span>
@@ -291,9 +291,9 @@ export default async function AdminHomePage() {
               </Link>
             ))}
           </div>
-          <Link href="/admin/tenants?durum=active" className="focus-ring group mt-5 block rounded-[12px] border border-line bg-canvas/60 p-3 text-center transition hover:border-brand-300">
+          <Link href="/admin/tenants?durum=active" className="focus-ring group mt-5 block rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3 text-center transition hover:border-brand-300">
             <p className="font-display text-2xl font-extrabold text-mint-600">%{conversion}</p>
-            <p className="text-[11px] text-text-muted">Aktif abonelik dönüşüm oranı</p>
+            <p className="text-xs text-text-muted">Aktif abonelik dönüşüm oranı</p>
           </Link>
         </section>
       </div>
@@ -303,12 +303,12 @@ export default async function AdminHomePage() {
         <p className="mb-2 text-xs font-bold uppercase tracking-wider text-text-faint">Hızlı erişim</p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           {quickActions.map((card) => (
-            <Link key={card.title} href={card.href} className="lift group relative overflow-hidden rounded-[16px] border border-line bg-surface p-4 transition hover:border-brand-300">
-              <span className={`grid h-10 w-10 place-items-center rounded-[12px] ${card.tone}`}>
+            <Link key={card.title} href={card.href} className="lift group relative overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface p-4 transition hover:border-brand-300">
+              <span className={`grid h-10 w-10 place-items-center rounded-[var(--radius-card)] ${card.tone}`}>
                 <card.icon className="h-5 w-5" />
               </span>
               <p className="mt-3 text-sm font-display font-bold text-ink-950">{card.title}</p>
-              <p className="mt-0.5 text-[11px] text-text-muted">{card.desc}</p>
+              <p className="mt-0.5 text-xs text-text-muted">{card.desc}</p>
               <ArrowUpRight className="absolute right-3 top-3 h-4 w-4 text-text-faint transition group-hover:text-brand-600" />
             </Link>
           ))}
@@ -317,12 +317,12 @@ export default async function AdminHomePage() {
 
       {/* growth + plan mix + recent */}
       <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr_1fr]">
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <div className="flex items-center justify-between">
             <p className="flex items-center gap-1.5 text-xs font-semibold text-brand-600">
               <Activity className="h-3.5 w-3.5" /> Ofis büyümesi · 8 hafta
             </p>
-            <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-[11px] font-bold text-brand-600">+{buckets[7]} bu hafta</span>
+            <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold text-brand-600">+{buckets[7]} bu hafta</span>
           </div>
           <svg viewBox="0 0 280 80" className="mt-4 h-28 w-full overflow-visible" preserveAspectRatio="none">
             <defs>
@@ -336,28 +336,28 @@ export default async function AdminHomePage() {
             <circle cx={growthLast.x} cy={growthLast.y} r="3.5" fill="var(--brand-500)" opacity="0.3" className="glow-halo" />
             <circle cx={growthLast.x} cy={growthLast.y} r="3" fill="#fff" stroke="var(--brand-500)" strokeWidth="1.5" />
           </svg>
-          <div className="mt-1 flex justify-between text-[10px] text-text-faint">
+          <div className="mt-1 flex justify-between text-xs text-text-faint">
             {["−7h", "−6h", "−5h", "−4h", "−3h", "−2h", "−1h", "bu"].map((l) => <span key={l}>{l}</span>)}
           </div>
         </section>
 
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-xs font-semibold text-amber-600"><Building2 className="h-4 w-4" /> Paket dağılımı</p>
           <h2 className="mt-1 font-display font-bold text-ink-950">Plan karışımı</h2>
           <div className="mt-5 flex h-28 items-end gap-3">
             {planCounts.map((p, i) => (
-              <Link key={p.key} href={`/admin/tenants?plan=${p.key}`} className="focus-ring group flex flex-1 flex-col items-center gap-1.5 rounded-[8px]">
-                <span className="text-[11px] font-bold tabular-nums text-ink-950">{p.count}</span>
+              <Link key={p.key} href={`/admin/tenants?plan=${p.key}`} className="focus-ring group flex flex-1 flex-col items-center gap-1.5 rounded-[var(--radius-control)]">
+                <span className="text-xs font-bold tabular-nums text-ink-950">{p.count}</span>
                 <div className="flex h-full w-full items-end justify-center">
                   <div className="bar-live w-full max-w-[28px] rounded-t-[5px] bg-[image:var(--grad-brand)] shadow-[0_0_12px_-2px_rgba(20,99,255,0.45)] transition group-hover:brightness-110" style={{ height: `${Math.max((p.count / maxPlan) * 100, 8)}%`, animationDelay: `${i * 0.1}s` }} />
                 </div>
-                <span className="text-[10px] text-text-muted transition group-hover:text-brand-600">{p.label}</span>
+                <span className="text-xs text-text-muted transition group-hover:text-brand-600">{p.label}</span>
               </Link>
             ))}
           </div>
         </section>
 
-        <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold text-mint-600"><Users className="h-4 w-4" /> Canlı kayıtlar</p>
@@ -367,10 +367,10 @@ export default async function AdminHomePage() {
           </div>
           <div className="mt-4 space-y-2.5">
             {list.slice(0, 5).map((t) => (
-              <Link key={t.id} href={`/admin/tenants/${t.id}`} className="focus-ring group flex items-center justify-between gap-2 rounded-[12px] border border-line bg-canvas/60 px-3 py-2.5 transition hover:border-brand-300">
+              <Link key={t.id} href={`/admin/tenants/${t.id}`} className="focus-ring group flex items-center justify-between gap-2 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5 transition hover:border-brand-300">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink-950 transition group-hover:text-brand-600">{t.name}</p>
-                  <p className="text-[11px] text-text-faint">{catalogPlanLabel(t.plan)} · {statusLabel[t.status] ?? t.status}</p>
+                  <p className="text-xs text-text-faint">{catalogPlanLabel(t.plan)} · {statusLabel[t.status] ?? t.status}</p>
                 </div>
                 <span className="flex shrink-0 items-center gap-1.5">
                   <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
@@ -384,7 +384,7 @@ export default async function AdminHomePage() {
       </div>
 
       {/* activity feed */}
-      <section className="dashboard-panel rounded-[20px] border border-line bg-surface p-5">
+      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
         <div className="flex items-center justify-between">
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Activity className="h-4 w-4" /> Son hareketler</p>
@@ -399,15 +399,15 @@ export default async function AdminHomePage() {
             auditRows.map((a, i) => {
               const tenantName = Array.isArray(a.tenant) ? a.tenant[0]?.name : (a.tenant as { name?: string } | null)?.name;
               return (
-                <Link key={i} href={a.tenant_id ? `/admin/tenants/${a.tenant_id}` : "/admin/aktivite"} className="focus-ring group flex items-center gap-3 rounded-[10px] px-2 py-2 transition hover:bg-canvas">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-brand-600/8 text-brand-600">
+                <Link key={i} href={a.tenant_id ? `/admin/tenants/${a.tenant_id}` : "/admin/aktivite"} className="focus-ring group flex items-center gap-3 rounded-[var(--radius-control)] px-2 py-2 transition hover:bg-canvas">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/8 text-brand-600">
                     <Activity className="h-3.5 w-3.5" />
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-ink-950 transition group-hover:text-brand-600">{auditActionLabel(a.action)}</p>
-                    <p className="truncate text-[11px] text-text-faint">{tenantName ?? "Platform"} · {a.entity_type ?? "sistem"}</p>
+                    <p className="truncate text-xs text-text-faint">{tenantName ?? "Platform"} · {a.entity_type ?? "sistem"}</p>
                   </div>
-                  <span className="shrink-0 text-[11px] text-text-faint">{relativeTimeTR(a.created_at)}</span>
+                  <span className="shrink-0 text-xs text-text-faint">{relativeTimeTR(a.created_at)}</span>
                 </Link>
               );
             })

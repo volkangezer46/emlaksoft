@@ -36,7 +36,7 @@ export default async function ContractEditPage({ params }: { params: Promise<{ i
         <ArrowLeft className="h-4 w-4" /> Sözleşme detayı
       </Link>
 
-      <section className="rounded-[20px] border border-line bg-surface p-6 shadow-[var(--shadow-xs)]">
+      <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-6 shadow-[var(--shadow-xs)]">
         <h1 className="flex items-center gap-2 font-display text-xl font-extrabold text-ink-950">
           <FileSignature className="h-5 w-5 text-brand-600" /> Sözleşmeyi düzenle
         </h1>

@@ -2,12 +2,12 @@ import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter, Manrope } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/app/sw-register";
 import { getBaseUrl } from "@/lib/base-url";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 const manrope = Manrope({
   variable: "--font-manrope",
-  subsets: ["latin"],
-  weight: ["600", "700", "800"],
+  subsets: ["latin", "latin-ext"],
   display: "swap",
   preload: true,
   fallback: ["system-ui", "sans-serif"],
@@ -15,8 +15,7 @@ const manrope = Manrope({
 
 const inter = Inter({
   variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  subsets: ["latin", "latin-ext"],
   display: "swap",
   preload: true,
   fallback: ["system-ui", "sans-serif"],
@@ -101,9 +100,13 @@ export default function RootLayout({
   return (
     <html
       lang="tr"
+      suppressHydrationWarning
       data-scroll-behavior="smooth"
       className={`${manrope.variable} ${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col font-[family-name:var(--font-inter)]">
         <a href="#main-content" className="skip-link">İçeriğe atla</a>
         <ServiceWorkerRegister />

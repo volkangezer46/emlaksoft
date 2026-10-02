@@ -103,7 +103,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               key={t.id}
               onMouseEnter={() => pause(t.id)}
               onMouseLeave={() => resume(t.id)}
-              className={`${t.leaving ? "toast-out" : "toast-in"} surface-card pointer-events-auto relative flex items-start gap-3 overflow-hidden rounded-[12px] py-3 pl-4 pr-2 shadow-[var(--inner-top),var(--elev-4)]`}
+              className={`${t.leaving ? "toast-out" : "toast-in"} surface-card pointer-events-auto relative flex items-start gap-3 overflow-hidden rounded-[var(--radius-card)] py-3 pl-4 pr-2 shadow-[var(--inner-top),var(--elev-4)]`}
             >
               <span className={`absolute inset-y-0 left-0 w-[3px] ${s.bar}`} />
               <span className="mt-0.5 shrink-0">{s.icon}</span>
@@ -112,7 +112,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 type="button"
                 onClick={() => remove(t.id)}
                 aria-label="Kapat"
-                className="focus-ring grid h-7 w-7 shrink-0 place-items-center rounded-[8px] text-text-faint transition hover:bg-canvas hover:text-ink-950"
+                className="focus-ring grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950"
               >
                 <X className="h-4 w-4" />
               </button>

@@ -92,7 +92,7 @@ export function NewTicketDialog({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[10px] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
+          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
         >
           <LifeBuoy className="h-4 w-4" aria-hidden /> Yeni talep
         </button>
@@ -114,20 +114,20 @@ export function NewTicketDialog({
               required
               minLength={3}
               maxLength={200}
-              className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+              className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
               placeholder="Örn. Portal ilanım yayına gitmiyor"
             />
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-sm text-text-muted" htmlFor="category">Kategori</label>
-              <select id="category" name="category" defaultValue="general" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
+              <select id="category" name="category" defaultValue="general" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
                 {categoryOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </div>
             <div>
               <label className="mb-1.5 block text-sm text-text-muted" htmlFor="priority">Öncelik</label>
-              <select id="priority" name="priority" defaultValue="normal" className="w-full rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
+              <select id="priority" name="priority" defaultValue="normal" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
                 <option value="low">Düşük</option>
                 <option value="normal">Normal</option>
                 <option value="high">Yüksek</option>
@@ -144,26 +144,26 @@ export function NewTicketDialog({
               minLength={3}
               maxLength={20_000}
               rows={6}
-              className="w-full resize-y rounded-[10px] border border-line bg-canvas px-3 py-2.5 text-sm leading-relaxed outline-none transition focus:border-brand-400 focus:bg-surface"
+              className="w-full resize-y rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm leading-relaxed outline-none transition focus:border-brand-400 focus:bg-surface"
               placeholder="Ne oldu, ne olmasını bekliyordunuz ve hangi adımları denediniz?"
             />
           </div>
           <TicketAttachmentInput key={attachmentKey} id="new-ticket-files" disabled={pending} />
-          <p className="flex items-center gap-1.5 text-[11px] text-text-faint">
+          <p className="flex items-center gap-1.5 text-xs text-text-faint">
             <ShieldCheck className="h-3.5 w-3.5 text-mint-600" aria-hidden /> Dosyalar private depoda içerik ve bütünlük denetiminden geçirilir.
           </p>
           {state.error ? <p className="text-sm font-medium text-danger-600" role="alert">{state.error}</p> : null}
           {state.warning ? (
-            <div className="rounded-[10px] border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-800" role="status">
+            <div className="rounded-[var(--radius-control)] border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-800" role="status">
               <p>{state.warning}</p>
               {state.ticketId ? <Link href={`/app/destek/${state.ticketId}`} className="mt-1 inline-block font-semibold underline">Oluşturulan talebe git</Link> : null}
             </div>
           ) : null}
           <div className="flex justify-end gap-2">
             <DialogClose asChild>
-              <button type="button" className="focus-ring press rounded-[10px] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">Vazgeç</button>
+              <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">Vazgeç</button>
             </DialogClose>
-            <button type="submit" disabled={pending || !requestId} className="btn-shine focus-ring press rounded-[10px] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+            <button type="submit" disabled={pending || !requestId} className="btn-shine focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
               {pending ? "Gönderiliyor…" : "Talep oluştur"}
             </button>
           </div>

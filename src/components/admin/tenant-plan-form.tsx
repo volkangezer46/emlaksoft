@@ -6,9 +6,9 @@ import { updateTenantPlanStatus } from "@/app/actions/platform";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const selectCls =
-  "rounded-[9px] border border-line bg-canvas px-2 py-1.5 text-xs font-semibold outline-none focus:border-brand-400";
+  "rounded-[var(--radius-control)] border border-line bg-canvas px-2 py-1.5 text-xs font-semibold outline-none focus:border-brand-400";
 const submitCls =
-  "rounded-[9px] bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-ink-800";
+  "rounded-[var(--radius-control)] bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-ink-800";
 
 /** Erişimi kesen durum geçişleri — onaysız kaydedilemez. */
 const DESTRUCTIVE_STATUS: Record<string, { title: string; description: string; confirmLabel: string }> = {

@@ -100,26 +100,26 @@ export function AppointmentWeekView({
   const hours = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i);
 
   return (
-    <section className="rounded-[20px] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-display font-bold text-ink-950">{rangeLabel}</h2>
         <div className="flex items-center gap-1">
           <Link
             href={prevHref}
-            className="grid h-8 w-8 place-items-center rounded-[8px] border border-line text-text-muted transition hover:bg-canvas"
+            className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-canvas"
             aria-label={mode === "hafta" ? "Önceki hafta" : "Önceki gün"}
           >
             <ChevronLeft className="h-4 w-4" />
           </Link>
           <Link
             href={todayHref}
-            className="rounded-[8px] border border-line px-2.5 py-1 text-[11px] font-semibold text-text-muted transition hover:bg-canvas"
+            className="rounded-[var(--radius-control)] border border-line px-2.5 py-1 text-xs font-semibold text-text-muted transition hover:bg-canvas"
           >
             Bugün
           </Link>
           <Link
             href={nextHref}
-            className="grid h-8 w-8 place-items-center rounded-[8px] border border-line text-text-muted transition hover:bg-canvas"
+            className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-canvas"
             aria-label={mode === "hafta" ? "Sonraki hafta" : "Sonraki gün"}
           >
             <ChevronRight className="h-4 w-4" />
@@ -137,7 +137,7 @@ export function AppointmentWeekView({
               const isToday = sameDay(d, today);
               return (
                 <div key={i} className="border-b border-line px-2 pb-2 text-center">
-                  <p className={`text-[11px] font-bold uppercase ${isToday ? "text-brand-600" : "text-text-faint"}`}>
+                  <p className={`text-xs font-bold uppercase ${isToday ? "text-brand-600" : "text-text-faint"}`}>
                     {d.toLocaleDateString("tr-TR", { weekday: "short" })}
                   </p>
                   <p className={`font-display text-lg font-extrabold ${isToday ? "text-brand-600" : "text-ink-950"}`}>
@@ -155,7 +155,7 @@ export function AppointmentWeekView({
               {hours.map((h) => (
                 <span
                   key={h}
-                  className="absolute right-2 -translate-y-1/2 text-[10px] tabular-nums text-text-faint"
+                  className="absolute right-2 -translate-y-1/2 text-xs tabular-nums text-text-faint"
                   style={{ top: (h - HOUR_START) * HOUR_PX }}
                 >
                   {String(h).padStart(2, "0")}:00
@@ -188,20 +188,20 @@ export function AppointmentWeekView({
                         key={a.id}
                         href={`#randevu-${a.id}`}
                         title={`${timeLabel(start)} · ${TYPE_LABEL[a.appointment_type] ?? a.appointment_type}${a.customerName ? ` · ${a.customerName}` : ""}`}
-                        className={`focus-ring absolute inset-x-1 overflow-hidden rounded-[8px] ${color} px-1.5 py-1 text-white transition hover:brightness-110 ${cancelled ? "opacity-50" : ""}`}
+                        className={`focus-ring absolute inset-x-1 overflow-hidden rounded-[var(--radius-control)] ${color} px-1.5 py-1 text-white transition hover:brightness-110 ${cancelled ? "opacity-50" : ""}`}
                         style={{ top, height }}
                       >
-                        <p className="truncate text-[10px] font-bold leading-tight">
+                        <p className="truncate text-xs font-bold leading-tight">
                           {timeLabel(start)}
                           {mode === "gun" ? ` · ${TYPE_LABEL[a.appointment_type] ?? a.appointment_type}` : ""}
                         </p>
                         {height >= 32 ? (
-                          <p className="truncate text-[10px] leading-tight opacity-90">
+                          <p className="truncate text-xs leading-tight opacity-90">
                             {a.customerName ?? TYPE_LABEL[a.appointment_type] ?? ""}
                           </p>
                         ) : null}
                         {mode === "gun" && height >= 48 ? (
-                          <p className="truncate text-[10px] leading-tight opacity-75">
+                          <p className="truncate text-xs leading-tight opacity-75">
                             {a.propertyName ?? a.location ?? ""}
                           </p>
                         ) : null}
@@ -218,7 +218,7 @@ export function AppointmentWeekView({
       {/* Lejant */}
       <div className="mt-3 flex flex-wrap items-center gap-3">
         {Object.entries(TYPE_LABEL).map(([key, label]) => (
-          <span key={key} className="flex items-center gap-1.5 text-[11px] text-text-muted">
+          <span key={key} className="flex items-center gap-1.5 text-xs text-text-muted">
             <span className={`h-2.5 w-2.5 rounded-full ${TYPE_COLOR[key]}`} /> {label}
           </span>
         ))}

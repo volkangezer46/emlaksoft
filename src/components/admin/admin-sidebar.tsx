@@ -116,12 +116,12 @@ export function AdminSidebar({
     <aside className="flex h-full w-full flex-col bg-[linear-gradient(180deg,#0a1224_0%,#050b16_55%,#07101f_100%)]">
       <div className="relative flex h-14 items-center gap-3 overflow-hidden border-b border-white/8 px-5">
         <div className="pointer-events-none absolute -right-6 -top-8 h-24 w-24 rounded-full bg-amber-400/15 blur-2xl" />
-        <span className="relative grid h-10 w-10 place-items-center rounded-[12px] bg-amber-400 shadow-[0_0_24px_-4px_rgba(251,191,36,0.65)]">
+        <span className="relative grid h-10 w-10 place-items-center rounded-[var(--radius-card)] bg-amber-400 shadow-[0_0_24px_-4px_rgba(251,191,36,0.65)]">
           <Shield className="h-5 w-5 text-ink-950" />
         </span>
         <div className="relative">
           <p className="font-display text-sm font-extrabold text-white">EmlakSoft</p>
-          <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-400">
+          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.12em] text-amber-400">
             <span className="status-pulse h-1.5 w-1.5 rounded-full bg-amber-400" /> {roleLabel}
           </p>
         </div>
@@ -131,7 +131,7 @@ export function AdminSidebar({
         {sections.map((section) => (
           <div key={section.title ?? "root"}>
             {section.title ? (
-              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/70">{section.title}</p>
+              <p className="mb-1.5 px-3 text-xs font-semibold uppercase tracking-[0.12em] text-white/70">{section.title}</p>
             ) : null}
             <nav className="space-y-1">
               {section.items.map((item) => {
@@ -146,7 +146,7 @@ export function AdminSidebar({
                     onClick={() => setOpen(false)}
                     onMouseEnter={() => router.prefetch(item.href)}
                     onFocus={() => router.prefetch(item.href)}
-                    className={`group relative flex items-center gap-3 overflow-hidden rounded-[12px] px-3 py-2.5 text-sm transition ${
+                    className={`group relative flex items-center gap-3 overflow-hidden rounded-[var(--radius-card)] px-3 py-2.5 text-sm transition ${
                       active
                         ? "bg-white/12 font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
                         : "text-white/85 hover:bg-white/8 hover:text-white"
@@ -154,7 +154,7 @@ export function AdminSidebar({
                   >
                     {active ? <span className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-amber-400" /> : null}
                     <span
-                      className={`grid h-8 w-8 place-items-center rounded-[10px] transition ${
+                      className={`grid h-8 w-8 place-items-center rounded-[var(--radius-control)] transition ${
                         active ? "bg-amber-400/20 text-amber-300" : "bg-white/8 text-white/70 group-hover:text-white"
                       }`}
                     >
@@ -162,13 +162,13 @@ export function AdminSidebar({
                     </span>
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate">{item.label}</span>
-                      <span className={`text-[11px] font-normal ${active ? "text-white/75" : "text-white/65"}`}>
+                      <span className={`text-xs font-normal ${active ? "text-white/75" : "text-white/65"}`}>
                         {item.hint}
                       </span>
                     </span>
                     {badge && badge > 0 ? (
                       <span
-                        className={`shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-bold ${
+                        className={`shrink-0 rounded-full px-1.5 py-0.5 text-xs font-bold ${
                           item.badgeKey === "risk"
                             ? "bg-danger-500/20 text-danger-400"
                             : item.badgeKey === "sales"
@@ -188,14 +188,14 @@ export function AdminSidebar({
       </div>
 
       <div className="border-t border-white/8 p-4">
-        <div className="rounded-[14px] border border-white/8 bg-white/[0.04] p-3">
+        <div className="rounded-[var(--radius-card)] border border-white/8 bg-white/[0.04] p-3">
           <p className="truncate text-xs font-semibold text-white">{staffName}</p>
-          <p className="mt-0.5 text-[11px] uppercase tracking-[0.08em] text-amber-400/80">{roleLabel}</p>
-          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-mint-400/80">
+          <p className="mt-0.5 text-xs uppercase tracking-[0.08em] text-amber-400/80">{roleLabel}</p>
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-mint-400/80">
             <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-400" /> Operasyon oturumu açık
           </div>
         </div>
-        <Link href="/app" onClick={() => setOpen(false)} className="mt-3 block text-[11px] font-semibold text-white/70 transition hover:text-white">
+        <Link href="/app" onClick={() => setOpen(false)} className="mt-3 block text-xs font-semibold text-white/70 transition hover:text-white">
           ← Ofis paneline dön
         </Link>
       </div>
@@ -209,7 +209,7 @@ export function AdminSidebar({
         <button
           type="button"
           aria-label="Admin menüsünü aç"
-          className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-10 w-10 place-items-center rounded-[11px] bg-amber-400 text-ink-950 shadow-[0_0_24px_-6px_rgba(251,191,36,0.7)] md:hidden"
+          className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-10 w-10 place-items-center rounded-[var(--radius-control)] bg-amber-400 text-ink-950 shadow-[0_0_24px_-6px_rgba(251,191,36,0.7)] md:hidden"
         >
           <Menu className="h-5 w-5" />
         </button>
@@ -222,7 +222,7 @@ export function AdminSidebar({
       <DialogDrawerContent id="admin-mobile-navigation" aria-describedby={undefined}>
         <DialogTitleHidden>Admin menüsü</DialogTitleHidden>
         <DialogClose asChild>
-          <button type="button" className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-[10px] bg-white/8 text-white/80" aria-label="Kapat"><X className="h-5 w-5" /></button>
+          <button type="button" className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-white/8 text-white/80" aria-label="Kapat"><X className="h-5 w-5" /></button>
         </DialogClose>
         {content}
       </DialogDrawerContent>
@@ -241,7 +241,7 @@ export function AdminSidebar({
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
                 onClick={() => setOpen(false)}
-                className={`flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold transition ${active ? "text-amber-300" : "text-white/55 hover:text-white"}`}
+                className={`flex flex-col items-center gap-1 py-2.5 text-xs font-semibold transition ${active ? "text-amber-300" : "text-white/55 hover:text-white"}`}
               >
                 <span className={`grid h-7 w-11 place-items-center rounded-full transition ${active ? "bg-amber-400/15" : ""}`}>
                   <tab.icon className="h-[18px] w-[18px]" />
@@ -251,7 +251,7 @@ export function AdminSidebar({
             );
           })}
           <DialogTrigger asChild>
-            <button type="button" className="flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold text-white/65 transition hover:text-white">
+            <button type="button" className="flex flex-col items-center gap-1 py-2.5 text-xs font-semibold text-white/65 transition hover:text-white">
               <span className="grid h-7 w-11 place-items-center rounded-full"><Menu className="h-[18px] w-[18px]" /></span>
               Menü
             </button>

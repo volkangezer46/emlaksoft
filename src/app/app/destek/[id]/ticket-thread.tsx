@@ -135,7 +135,7 @@ export function TicketThread({
           <article
             key={message.id}
             className={cn(
-              "relative overflow-hidden rounded-[16px] border p-4 sm:p-5",
+              "relative overflow-hidden rounded-[var(--radius-card)] border p-4 sm:p-5",
               internal
                 ? "border-amber-400/35 bg-[linear-gradient(135deg,rgba(245,158,11,.08),rgba(255,255,255,.92))]"
                 : isStaff
@@ -150,7 +150,7 @@ export function TicketThread({
             <div className="flex items-center gap-2.5">
               <span
                 className={cn(
-                  "grid h-9 w-9 shrink-0 place-items-center rounded-[11px]",
+                  "grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)]",
                   internal
                     ? "bg-amber-400/15 text-amber-700"
                     : isStaff
@@ -164,11 +164,11 @@ export function TicketThread({
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-ink-950">{name}</p>
-                <p className="text-[11px] text-text-faint">{dt(message.created_at)}</p>
+                <p className="text-xs text-text-faint">{dt(message.created_at)}</p>
               </div>
               <span
                 className={cn(
-                  "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.06em]",
+                  "rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-[0.06em]",
                   internal
                     ? "bg-amber-400/15 text-amber-700"
                     : isStaff
@@ -191,8 +191,8 @@ export function TicketThread({
       })}
 
       {items.length === 0 ? (
-        <div className="grid place-items-center rounded-[16px] border border-dashed border-line px-4 py-10 text-center">
-          <span className="grid h-10 w-10 place-items-center rounded-[12px] bg-brand-600/10 text-brand-700">
+        <div className="grid place-items-center rounded-[var(--radius-card)] border border-dashed border-line px-4 py-10 text-center">
+          <span className="grid h-10 w-10 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-700">
             <LifeBuoy className="h-5 w-5" aria-hidden />
           </span>
           <p className="mt-2 text-sm font-semibold text-ink-950">Konuşma henüz başlamadı</p>

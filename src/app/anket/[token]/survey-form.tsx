@@ -66,7 +66,7 @@ export function SurveyForm({
   if (done) {
     if (done.alreadyAnswered) {
       return (
-        <div className="rounded-[14px] border border-mint-500/30 bg-mint-500/8 px-4 py-8 text-center">
+        <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/8 px-4 py-8 text-center">
           <span className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-mint-500/15 text-mint-600">
             <CheckCircle2 className="h-6 w-6" />
           </span>
@@ -81,7 +81,7 @@ export function SurveyForm({
     // telefonu; kötüleyen → telafi arama izni tonu; pasif → sade teşekkür.
     if (done.score >= 9) {
       return (
-        <div className="rounded-[14px] border border-mint-500/30 bg-mint-500/8 px-4 py-8 text-center">
+        <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/8 px-4 py-8 text-center">
           <span className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-mint-500/15 text-mint-600">
             <PartyPopper className="h-6 w-6" />
           </span>
@@ -93,7 +93,7 @@ export function SurveyForm({
           {officePhone ? (
             <a
               href={`tel:${officePhone.replace(/\s/g, "")}`}
-              className="focus-ring press mt-4 inline-flex items-center gap-2 rounded-[12px] bg-mint-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-mint-700"
+              className="focus-ring press mt-4 inline-flex items-center gap-2 rounded-[var(--radius-card)] bg-mint-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-mint-700"
             >
               <Phone className="h-4 w-4" /> {officePhone}
             </a>
@@ -103,7 +103,7 @@ export function SurveyForm({
     }
     if (done.score <= 6) {
       return (
-        <div className="rounded-[14px] border border-amber-500/30 bg-amber-500/8 px-4 py-8 text-center">
+        <div className="rounded-[var(--radius-card)] border border-amber-500/30 bg-amber-500/8 px-4 py-8 text-center">
           <span className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-amber-500/15 text-amber-600">
             <HeartHandshake className="h-6 w-6" />
           </span>
@@ -116,7 +116,7 @@ export function SurveyForm({
       );
     }
     return (
-      <div className="rounded-[14px] border border-mint-500/30 bg-mint-500/8 px-4 py-8 text-center">
+      <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/8 px-4 py-8 text-center">
         <span className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-mint-500/15 text-mint-600">
           <CheckCircle2 className="h-6 w-6" />
         </span>
@@ -155,13 +155,13 @@ export function SurveyForm({
                 setScore(n);
                 setError(null);
               }}
-              className={`focus-ring press grid h-11 min-w-11 place-items-center rounded-[12px] border text-sm font-extrabold tabular-nums transition ${toneClasses(n, score === n)}`}
+              className={`focus-ring press grid h-11 min-w-11 place-items-center rounded-[var(--radius-card)] border text-sm font-extrabold tabular-nums transition ${toneClasses(n, score === n)}`}
             >
               {n}
             </button>
           ))}
         </div>
-        <div className="mt-2 flex items-center justify-between px-0.5 text-[11px] text-text-faint">
+        <div className="mt-2 flex items-center justify-between px-0.5 text-xs text-text-faint">
           <span>Hiç memnun kalmadım</span>
           <span>Çok memnun kaldım</span>
         </div>
@@ -178,13 +178,13 @@ export function SurveyForm({
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder="Deneyiminizi birkaç cümleyle anlatabilirsiniz…"
-          className="w-full resize-none rounded-[12px] border border-line bg-canvas px-3.5 py-3 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400"
+          className="w-full resize-none rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-3 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400"
         />
       </div>
 
       {error ? (
         <p
-          className="rounded-[10px] border border-danger-500/25 bg-danger-500/5 px-3 py-2 text-center text-xs font-semibold text-danger-500"
+          className="rounded-[var(--radius-control)] border border-danger-500/25 bg-danger-500/5 px-3 py-2 text-center text-xs font-semibold text-danger-500"
           role="alert"
         >
           {error}
@@ -195,13 +195,13 @@ export function SurveyForm({
         type="button"
         onClick={submit}
         disabled={pending || score === null}
-        className="btn-shine focus-ring press inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-brand-600 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
+        className="btn-shine focus-ring press inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-brand-600 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
       >
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         Gönder
       </button>
 
-      <p className="text-center text-[11px] leading-relaxed text-text-faint">
+      <p className="text-center text-xs leading-relaxed text-text-faint">
         Yanıtınız yalnızca hizmet kalitesini değerlendirmek amacıyla işlenir.{" "}
         <Link
           href="/kvkk-aydinlatma"

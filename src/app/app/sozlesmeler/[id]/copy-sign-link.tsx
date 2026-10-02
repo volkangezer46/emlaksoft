@@ -32,7 +32,7 @@ export function CopySignLink({ token }: { token: string }) {
       onClick={copy}
       title="İmza linkini kopyala"
       aria-label="İmza linkini kopyala"
-      className="focus-ring press grid h-7 w-7 shrink-0 place-items-center rounded-[8px] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+      className="focus-ring press grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
     >
       {copied ? <Check className="h-3.5 w-3.5 text-mint-600" /> : <Link2 className="h-3.5 w-3.5" />}
     </button>

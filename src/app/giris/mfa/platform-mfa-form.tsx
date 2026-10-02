@@ -114,9 +114,9 @@ export function PlatformMfaForm({
         </p>
 
         {!factorId ? (
-          <div className="mt-8 rounded-[16px] border border-line bg-surface p-5">
+          <div className="mt-8 rounded-[var(--radius-card)] border border-line bg-surface p-5">
             <div className="flex items-start gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-brand-600/10 text-brand-600">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
                 <QrCode className="h-5 w-5" />
               </span>
               <div>
@@ -128,7 +128,7 @@ export function PlatformMfaForm({
               type="button"
               disabled={busy}
               onClick={beginEnrollment}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-[12px] bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-brand-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
               Güvenlik anahtarı oluştur
@@ -137,17 +137,17 @@ export function PlatformMfaForm({
         ) : null}
 
         {enrollment ? (
-          <div className="mt-6 rounded-[16px] border border-line bg-white p-5 text-center shadow-[var(--elev-2)]">
+          <div className="mt-6 rounded-[var(--radius-card)] border border-line bg-white p-5 text-center shadow-[var(--elev-2)]">
             <Image
               src={enrollment.qrCode}
               alt="Authenticator uygulaması için MFA QR kodu"
               width={220}
               height={220}
               unoptimized
-              className="mx-auto rounded-[12px]"
+              className="mx-auto rounded-[var(--radius-card)]"
             />
             <p className="mt-3 text-xs text-text-muted">QR okunmazsa bu anahtarı elle girin:</p>
-            <code className="mt-1 block break-all rounded-[8px] bg-canvas px-3 py-2 text-xs font-bold text-ink-900">
+            <code className="mt-1 block break-all rounded-[var(--radius-control)] bg-canvas px-3 py-2 text-xs font-bold text-ink-900">
               {enrollment.secret}
             </code>
           </div>
@@ -176,14 +176,14 @@ export function PlatformMfaForm({
                 maxLength={6}
                 required
                 autoFocus={Boolean(existingFactorId)}
-                className="w-full rounded-[12px] border border-line bg-surface px-3.5 py-3 text-center font-display text-2xl font-extrabold tracking-[0.4em] outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10"
+                className="w-full rounded-[var(--radius-card)] border border-line bg-surface px-3.5 py-3 text-center font-display text-2xl font-extrabold tracking-[0.4em] outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10"
                 placeholder="••••••"
               />
             </div>
             <button
               type="submit"
               disabled={busy || code.length !== 6}
-              className="btn-shine group flex w-full items-center justify-center gap-2 rounded-[12px] bg-[image:var(--grad-brand)] px-4 py-3 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:brightness-[1.06] disabled:opacity-60"
+              className="btn-shine group flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-brand)] px-4 py-3 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:brightness-[1.06] disabled:opacity-60"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Doğrula ve platformu aç <ArrowRight className="h-4 w-4" />
@@ -192,7 +192,7 @@ export function PlatformMfaForm({
         ) : null}
 
         {error ? (
-          <p role="alert" className="mt-4 rounded-[10px] border border-danger-500/25 bg-danger-500/8 px-3.5 py-2.5 text-sm font-medium text-danger-600">
+          <p role="alert" className="mt-4 rounded-[var(--radius-control)] border border-danger-500/25 bg-danger-500/8 px-3.5 py-2.5 text-sm font-medium text-danger-600">
             {error}
           </p>
         ) : null}

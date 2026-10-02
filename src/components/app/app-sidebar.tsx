@@ -151,12 +151,12 @@ export function AppSidebar({
         onClick={() => setOpen(false)}
         onMouseEnter={() => router.prefetch(item.href)}
         onFocus={() => router.prefetch(item.href)}
-        className={`group relative flex items-center gap-3 overflow-hidden rounded-[11px] px-3 py-2.5 text-sm transition ${
+        className={`group relative flex items-center gap-3 overflow-hidden rounded-[var(--radius-control)] px-3 py-2.5 text-sm transition ${
           active ? "bg-white/10 font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]" : "text-white/80 hover:bg-white/6 hover:text-white"
         }`}
       >
         {active ? <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-mint-400" /> : null}
-        <span className={`grid h-8 w-8 place-items-center rounded-[9px] transition ${active ? "bg-brand-600 text-white" : "bg-white/5 text-white/55 group-hover:bg-white/10 group-hover:text-cyan-400"}`}>
+        <span className={`grid h-8 w-8 place-items-center rounded-[var(--radius-control)] transition ${active ? "bg-brand-600 text-white" : "bg-white/5 text-white/55 group-hover:bg-white/10 group-hover:text-cyan-400"}`}>
           <item.icon className="h-4 w-4" />
         </span>
         <span className="flex-1">{item.label}</span>
@@ -168,10 +168,10 @@ export function AppSidebar({
   const content = (
     <>
       <div className="flex h-17 items-center gap-3 border-b border-white/8 px-5">
-        <span className="grid h-10 w-10 place-items-center rounded-[12px] bg-[image:var(--grad-brand)] font-display text-base font-extrabold text-white shadow-[0_12px_28px_-12px_rgba(34,211,238,.75)]">E</span>
+        <span className="grid h-10 w-10 place-items-center rounded-[var(--radius-card)] bg-[image:var(--grad-brand)] font-display text-base font-extrabold text-white shadow-[0_12px_28px_-12px_rgba(34,211,238,.75)]">E</span>
         <div>
           <p className="font-display text-base font-extrabold text-white">EmlakSoft</p>
-          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-400">Command OS</p>
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-cyan-400">Command OS</p>
         </div>
       </div>
 
@@ -179,23 +179,23 @@ export function AppSidebar({
         {showHome ? <div className="space-y-1">{renderItem(anaEkran)}{renderItem(brifing)}{renderItem(aiAsistan)}</div> : null}
         {groups.map((group) => (
           <div key={group.title} className="mt-5 first:mt-0">
-            <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/70">{group.title}</p>
+            <p className="px-3 text-xs font-semibold uppercase tracking-[0.12em] text-white/70">{group.title}</p>
             <div className="mt-2 space-y-1">{group.items.map(renderItem)}</div>
           </div>
         ))}
       </nav>
 
       <div className="p-3">
-        <div className="relative overflow-hidden rounded-[15px] border border-white/10 bg-white/5 p-4">
+        <div className="relative overflow-hidden rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-4">
           <div className="pointer-events-none absolute -right-7 -top-8 h-24 w-24 rounded-full bg-brand-600/25 blur-2xl" />
           <div className="relative flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-amber-400" />
-            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-amber-400">{trial ? "Deneme alanı" : "Aktif ofis"}</span>
+            <span className="text-xs font-bold uppercase tracking-[0.08em] text-amber-400">{trial ? "Deneme alanı" : "Aktif ofis"}</span>
           </div>
           <p className="relative mt-2 truncate text-sm font-bold text-white">{officeName}</p>
           <div className="relative mt-3 flex items-center justify-between">
-            <span className="rounded-full bg-mint-400/12 px-2 py-1 text-[11px] font-semibold text-mint-400">{plan}</span>
-            <span className="text-[11px] text-white/65">
+            <span className="rounded-full bg-mint-400/12 px-2 py-1 text-xs font-semibold text-mint-400">{plan}</span>
+            <span className="text-xs text-white/65">
               {officeScore != null ? `Skor ${officeScore}` : "Skor —"}
             </span>
           </div>
@@ -221,7 +221,7 @@ export function AppSidebar({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button type="button" className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-10 w-10 place-items-center rounded-[11px] bg-ink-950 text-white shadow-[var(--shadow-card)] lg:hidden" aria-label="Panel menüsünü aç">
+        <button type="button" className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-10 w-10 place-items-center rounded-[var(--radius-control)] bg-ink-950 text-white shadow-[var(--shadow-card)] lg:hidden" aria-label="Panel menüsünü aç">
           <Menu className="h-5 w-5" />
         </button>
       </DialogTrigger>
@@ -232,7 +232,7 @@ export function AppSidebar({
         <DialogTitleHidden>Panel menüsü</DialogTitleHidden>
         <aside className="flex h-full flex-col bg-[linear-gradient(180deg,#071a38_0%,#041127_100%)]">
           <DialogClose asChild>
-            <button type="button" className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-[10px] bg-white/8 text-white/80" aria-label="Kapat"><X className="h-5 w-5" /></button>
+            <button type="button" className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-white/8 text-white/80" aria-label="Kapat"><X className="h-5 w-5" /></button>
           </DialogClose>
           {content}
         </aside>
@@ -250,7 +250,7 @@ export function AppSidebar({
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
                 onClick={() => setOpen(false)}
-                className={`flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold transition ${
+                className={`flex flex-col items-center gap-1 py-2.5 text-xs font-semibold transition ${
                   active ? "text-brand-600" : "text-text-faint hover:text-ink-950"
                 }`}
               >
@@ -262,7 +262,7 @@ export function AppSidebar({
             );
           })}
           <DialogTrigger asChild>
-            <button type="button" className="flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold text-text-faint transition hover:text-ink-950">
+            <button type="button" className="flex flex-col items-center gap-1 py-2.5 text-xs font-semibold text-text-faint transition hover:text-ink-950">
               <span className="grid h-7 w-11 place-items-center rounded-full">
                 <Menu className="h-[18px] w-[18px]" />
               </span>

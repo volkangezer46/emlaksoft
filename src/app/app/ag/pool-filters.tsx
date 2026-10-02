@@ -44,7 +44,7 @@ export function PoolFilters({
   };
 
   const inputClass =
-    "focus-ring h-10 w-full rounded-[10px] border border-hairline-strong bg-surface px-3 text-sm text-ink-950 placeholder:text-text-faint";
+    "focus-ring h-10 w-full rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-3 text-sm text-ink-950 placeholder:text-text-faint";
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
