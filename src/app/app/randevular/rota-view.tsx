@@ -84,7 +84,7 @@ export function RotaView({
   selectedAdvisorId: string;
   /** danisman dışındaki korunacak paramların query string'i. */
   advisorBaseQuery: string;
-  /** Boş durum CTA'sı — sayfadaki NewAppointmentDialog buraya geçilir. */
+  /** Boş durum CTA'sı — sayfadaki "Yeni randevu" bağlantısı buraya geçilir. */
   newAppointmentSlot?: React.ReactNode;
 }) {
   const router = useRouter();

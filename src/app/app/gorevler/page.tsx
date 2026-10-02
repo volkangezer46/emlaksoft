@@ -1,15 +1,17 @@
 import Link from "next/link";
-import { AlarmClock, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Repeat, Sunrise } from "lucide-react";
+import { redirect } from "next/navigation";
+import { AlarmClock, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Plus, Repeat, Sunrise } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DAY_MS, daysFromNowIso, now } from "@/lib/clock";
-import { NewTaskDialog } from "./new-task-dialog";
+import { QuickTask } from "./quick-task";
 import { TaskCard, type TaskRow } from "./task-card";
 import { TaskBulkList } from "./task-bulk-list";
 import { EmptyState } from "@/components/app/empty-state";
 import { ICONS } from "@/lib/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
+import { ButtonLink } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +62,7 @@ export default async function TasksPage({
   const canDelete = (ctx.perms.tasks ?? []).includes("delete");
   const canCreate = (ctx.perms.tasks ?? []).includes("create");
   const params = (await searchParams) ?? {};
+  if (params.yeni === "1") redirect("/app/gorevler/yeni");
   const filter = FILTERS.some((f) => f.key === params.filter) ? params.filter! : "open";
   const mine = params.mine === "1";
   const tur = KIND_FILTERS.some((k) => k.key === params.tur) ? params.tur! : "";
@@ -136,16 +139,8 @@ export default async function TasksPage({
   }
   query = query.range(offset, offset + PAGE_SIZE - 1);
 
-  const [{ data: tasksData, count: taskTotal }, { data: members }, { data: customers }, counts] = await Promise.all([
+  const [{ data: tasksData, count: taskTotal }, counts] = await Promise.all([
     query,
-    supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
-    supabase
-      .from("customers")
-      .select("id, full_name")
-      .eq("tenant_id", ctx.tenantId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(100),
     (async () => {
       const nowIso = new Date(now()).toISOString();
       const head = () => supabase.from("tasks").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId);
@@ -231,8 +226,9 @@ export default async function TasksPage({
       <PageHeader
         title="Görevler"
         description="Arama, ziyaret, evrak ve takip görevlerini planlayın; ekibe atayın, gecikmeleri anında görün."
-        actions={canCreate ? <NewTaskDialog key={params.yeni === "1" ? "new-task" : "task-dialog"} members={members ?? []} customers={customers ?? []} defaultOpen={params.yeni === "1"} /> : null}
+        actions={canCreate ? <ButtonLink href="/app/gorevler/yeni" icon={Plus}>Yeni görev</ButtonLink> : null}
       />
+      {canCreate ? <QuickTask /> : null}
 
       {/* Kompakt, tıklanabilir sayaçlar — mevcut ?filter= parametresiyle ilgili listeye iner; sıfırlar sönük. */}
       <Card className="flex flex-wrap items-center gap-x-2 gap-y-1 p-2">

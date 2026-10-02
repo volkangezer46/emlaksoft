@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
-import { Activity, AlertTriangle, CalendarClock, Hourglass, KeyRound, Wallet, Wrench, X } from "lucide-react";
+import { Activity, AlertTriangle, CalendarClock, Hourglass, KeyRound, Plus, Wallet, Wrench, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { computeLegalIncrease } from "@/lib/tufe";
@@ -9,7 +10,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { ApplyIncreaseDialog } from "./apply-increase-dialog";
-import { NewRentalDialog } from "./new-rental-dialog";
+import { ButtonLink } from "@/components/ui/button";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportRentalsCsv } from "@/app/actions/export";
 
@@ -77,23 +78,21 @@ export default async function KiralamaPage({
 }) {
   const { perms } = await requireModulePage("rentals", "/app/kiralama");
   const params = (await searchParams) ?? {};
-  /*
-   * Kazanılan KİRA anlaşmasının köprüsü: kazanma sihirbazı
-   * /app/kiralama?portfoy=&musteri=&tutar= ile gelir. Bunlar liste filtresi
-   * değil, "yeni kira kaydı" diyaloğunun ön dolgusudur — diyalog açık gelir.
-   */
-  const prefillPropertyId = (params.portfoy ?? "").trim() || null;
-  const prefillCustomerId = (params.musteri ?? "").trim() || null;
-  const prefillRentParsed = Number(params.tutar ?? "");
-  const prefillRent =
-    Number.isFinite(prefillRentParsed) && prefillRentParsed > 0 ? Math.round(prefillRentParsed) : null;
+  // Kazanılan KİRA anlaşmasının köprüsü (?portfoy=&musteri=&tutar=) artık tam sayfa forma gider.
+  if (params.portfoy || params.musteri || params.tutar) {
+    const q = new URLSearchParams();
+    if (params.portfoy) q.set("portfoy", params.portfoy);
+    if (params.musteri) q.set("musteri", params.musteri);
+    if (params.tutar) q.set("tutar", params.tutar);
+    redirect(`/app/kiralama/yeni?${q.toString()}`);
+  }
   const durumF = DURUM_FILTERS.includes(params.durum as DurumFilter) ? (params.durum as DurumFilter) : "";
   const arizaF = params.ariza === "acik";
   const evreF = EVRELER.includes(params.evre as Evre) ? (params.evre as Evre) : "";
   const canCreate = perms.rentals?.includes("create") ?? false;
 
   const supabase = await createClient();
-  const [{ data: rentalData }, { data: chargeData }, { data: maintData }, { data: propData }, { data: custData }] =
+  const [{ data: rentalData }, { data: chargeData }, { data: maintData }] =
     await Promise.all([
       supabase
         .from("rentals")
@@ -108,53 +107,11 @@ export default async function KiralamaPage({
         .order("period", { ascending: false })
         .limit(1000),
       supabase.from("maintenance_requests").select("id, rental_id, status").limit(1000),
-      supabase
-        .from("properties")
-        .select("id, property_code, title")
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(100),
-      supabase
-        .from("customers")
-        .select("id, full_name, phone")
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(100),
     ]);
 
   const rentals = rentalData ?? [];
   const charges = chargeData ?? [];
   const maints = maintData ?? [];
-
-  /*
-   * Seçici havuzları "son eklenen 100" kısayolu. Ön dolgu havuz dışında
-   * kalırsa sessizce düşerdi — eksik kayıtlar tek sorguyla listeye eklenir.
-   */
-  const dialogProperties = [...(propData ?? [])];
-  const dialogCustomers = [...(custData ?? [])];
-  if (prefillPropertyId && !dialogProperties.some((p) => p.id === prefillPropertyId)) {
-    const { data: extra } = await supabase
-      .from("properties")
-      .select("id, property_code, title")
-      .eq("id", prefillPropertyId)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (extra) dialogProperties.unshift(extra);
-  }
-  if (prefillCustomerId && !dialogCustomers.some((c) => c.id === prefillCustomerId)) {
-    const { data: extra } = await supabase
-      .from("customers")
-      .select("id, full_name, phone")
-      .eq("id", prefillCustomerId)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (extra) dialogCustomers.unshift(extra);
-  }
-  const validPrefillProperty =
-    prefillPropertyId && dialogProperties.some((p) => p.id === prefillPropertyId) ? prefillPropertyId : null;
-  const validPrefillCustomer =
-    prefillCustomerId && dialogCustomers.some((c) => c.id === prefillCustomerId) ? prefillCustomerId : null;
-  const autoOpenRentalDialog = canCreate && Boolean(validPrefillProperty || validPrefillCustomer);
 
   const today = daysAgoIso(0).slice(0, 10);
   const curMonth = today.slice(0, 7);
@@ -247,15 +204,7 @@ export default async function KiralamaPage({
               action={exportRentalsCsv.bind(null, { durum: durumF, ariza: arizaF ? "acik" : "", evre: evreF })}
               className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
             />
-            {canCreate ? <NewRentalDialog
-                /* Kazanılan kira anlaşması köprüsü: ?portfoy=&musteri=&tutar= */
-                properties={dialogProperties}
-                customers={dialogCustomers}
-                defaultPropertyId={validPrefillProperty}
-                defaultCustomerId={validPrefillCustomer}
-                defaultMonthlyRent={prefillRent}
-                autoOpen={autoOpenRentalDialog}
-              /> : null}
+            {canCreate ? <ButtonLink href="/app/kiralama/yeni" icon={Plus}>Yeni kira kaydı</ButtonLink> : null}
           </div></div>
 } />
 
@@ -435,17 +384,8 @@ export default async function KiralamaPage({
               ? { href: "/app/kiralama", label: "Filtreyi temizle" }
               : canCreate
                 ? {
-                    node: (
-                      /* autoOpen YOK: üstteki örnek zaten ön dolgulu açılıyor,
-                         ikisi birden açılırsa iki modal üst üste gelir. */
-                      <NewRentalDialog
-                        properties={dialogProperties}
-                        customers={dialogCustomers}
-                        defaultPropertyId={validPrefillProperty}
-                        defaultCustomerId={validPrefillCustomer}
-                        defaultMonthlyRent={prefillRent}
-                      />
-                    ),
+                    href: "/app/kiralama/yeni",
+                    label: "Yeni kira kaydı",
                   }
                 : undefined
           }
