@@ -403,7 +403,10 @@ export async function ocrPropertyMediaDocument(mediaId: string): Promise<DocOcrA
   }
 
   const imageBase64 = Buffer.from(await blob.arrayBuffer()).toString("base64");
-  const result = await extractPropertyDocFields({ imageBase64, mimeType: media.file_type });
+  const result = await extractPropertyDocFields(
+    { imageBase64, mimeType: media.file_type },
+    { tenantId: gate.tenantId, actorId: gate.userId },
+  );
   if (!result.ok) return { error: result.error };
 
   await logActivity({

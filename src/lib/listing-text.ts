@@ -13,6 +13,8 @@ export type ListingTextInput = {
   features?: Record<string, unknown> | null;
 };
 
+// DİKKAT: bu sınırlar TAHMİNDİR, portalların resmî kurallarından doğrulanmadı. Uyarı metni bunu belirtir;
+// doğrulanınca burası güncellenmelidir.
 export const PORTAL_LIMITS = {
   Sahibinden: { title: 60, description: 10000 },
   Hepsiemlak: { title: 70, description: 5000 },
@@ -87,10 +89,10 @@ export function generateListingText(p: ListingTextInput): ListingText {
   if (!title) warnings.push("Başlık üretilemedi: tür, oda veya konum bilgisi eksik.");
   for (const [portal, lim] of Object.entries(PORTAL_LIMITS)) {
     if (title.length > lim.title) {
-      warnings.push(`${portal} başlık sınırı ${lim.title} karakter; bu başlık ${title.length} karakter, kısaltın.`);
+      warnings.push(`${portal} başlık sınırı ${lim.title} karakter; bu başlık ${title.length} karakter, kısaltın (sınır tahmindir, portal kurallarından doğrulayın).`);
     }
     if (description.length > lim.description) {
-      warnings.push(`${portal} açıklama sınırı ${lim.description} karakter; bu metin ${description.length}.`);
+      warnings.push(`${portal} açıklama sınırı ${lim.description} karakter; bu metin ${description.length} (sınır tahmindir, portal kurallarından doğrulayın).`);
     }
   }
   return { title, description, warnings };

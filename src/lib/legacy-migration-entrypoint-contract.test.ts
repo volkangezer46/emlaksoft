@@ -5,7 +5,7 @@ const legacy = readFileSync("scripts/apply-migrations.js", "utf8");
 const applyOne = readFileSync("scripts/apply-one.ts", "utf8");
 const apply008 = readFileSync("scripts/apply-migration-008.ts", "utf8");
 const oldBundle = readFileSync("supabase/apply_premium_plus.sql", "utf8");
-const oldSprint = readFileSync("docs/SPRINT_FINAL.md", "utf8");
+const oldSprint = readFileSync("docs/arsiv/SPRINT_FINAL.md", "utf8");
 const smoke = readFileSync("scripts/smoke-test.js", "utf8");
 
 describe("legacy migration entrypoint", () => {

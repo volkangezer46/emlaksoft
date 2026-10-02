@@ -50,6 +50,8 @@ const eslintConfig = defineConfig([
     // Yerel çalışma/denetim artıkları (ör. bozuk node_modules kopyaları) — depoda değil,
     // taranırsa yüz binlerce sahte bulgu üretir.
     ".tmp/**",
+    // Claude Code çalışma ağaçları (izole git worktree kopyaları) — projenin parçası değil.
+    ".claude/**",
     "test-results/**",
   ]),
 ]);

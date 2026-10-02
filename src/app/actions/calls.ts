@@ -99,7 +99,7 @@ export async function summarizeCallNotes(callId: string): Promise<CallSummaryRes
     durationSec: call.duration_sec,
     customerName: customer?.full_name ?? null,
     startedAt: call.started_at,
-  });
+  }, { tenantId: gate.tenantId, actorId: gate.userId });
 
   if (!result) return { error: "AI özeti şu an üretilemedi." };
   return { summary: result.summary, nextStep: result.nextStep };

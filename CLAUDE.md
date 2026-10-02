@@ -6,7 +6,7 @@ Türk emlak ofisleri için multi-tenant SaaS (Next.js 16 App Router + Supabase +
 Müşteri/talep/portföy/randevu/anlaşma/komisyon omurgası + kayıp-kaçak kalkanı, değerleme
 (emsal motoru), otomasyonlar, sözleşmeyle doğrulanan cron envanteri (bkz. `vercel.json`), AI asistan,
 vitrin ve token'lı public portallar.
-Tamamı Türkçe; deploy bilinçli olarak en sona bırakıldı (`docs/DEPLOY_CHECKLIST.md`).
+Tamamı Türkçe. Canlıda (Vercel `main` → production); deploy sırası ve zorunlu ortam değişkenleri `docs/DEPLOY.md`.
 
 ## Komutlar
 
@@ -50,10 +50,18 @@ Oturumlu E2E yalnız izole test DB'de, açık `E2E_MUTATION_ALLOWED=true` ve ben
   sunucu sorgusuna yansır, UI kontrolleri URL'i günceller (sunucu filtre + gerçek sayfalama).
 - **Zaman:** bileşenlerde `Date.now()` / `new Date()` doğrudan YASAK — `src/lib/clock.ts`
   yardımcıları (`now()`, `daysAgoIso()`, `isPast()` ...) kullanılır (React Compiler saflık kuralı).
-- **UI:** tamamen Türkçe ("lead" değil "talep/başvuru"); **dark mode YOK** — eklenmeyecek;
+- **UI:** tamamen Türkçe ("lead" değil "talep/başvuru"); **koyu tema yalnız /app ve /admin'de** (`html[data-theme="dark"]`, `src/app/theme-dark.css`, tercih: sistem/açık/koyu; public vitrin ve portallar her zaman açık kalır);
   ultra premium standart (animasyon, anlamlı boş durum).
-- **Cron:** 13 route `src/app/api/cron/*` + `vercel.json`; hepsi `CRON_SECRET` Bearer doğrular
+- **Menü ve paketler:** /app menüsü 9 iş başlığıdır, tek kaynak `src/lib/nav-config.ts` (sayfa yolları değişmez,
+  yeni sayfa buraya eklenir). Paket kilidi sayfa bazlıdır: `src/lib/billing/page-gates.ts` +
+  `requireModulePage(mod, href)`; yeni/değişen paket kuralı orada ve `src/lib/billing/plans.ts`'te yapılır.
+  Yeni tasarım bileşenleri `src/components/ui` (PageHeader, Card, StatRow, FilterBar...), kılavuz `docs/DESIGN_SYSTEM.md`.
+- **AI:** OpenAI çağrıları yalnız `src/lib/ai/openai-client.ts` üzerinden gider ve kişisel veri (telefon, TC, e-posta,
+  IBAN, kart) `src/lib/ai/redact.ts` ile maskelenir; doğrudan `api.openai.com` çağrısı yazma (sözleşme testi bunu yakalar).
+- **service_role:** `createAdminClient` kullanımı `src/lib/admin-client-allowlist.ts` kabul listesindedir; yeni kullanım
+  testi kırar (`npx tsx scripts/audit-admin-client.ts --write` ile envanter ve kabul listesi yenilenir). Envanter: `docs/security/`.
+- **Cron:** 27 route `src/app/api/cron/*` + `vercel.json` (sayı `npm run check:cron` ile doğrulanır); hepsi `CRON_SECRET` Bearer doğrular
   ve `recordHeartbeat` yazar.
 
-Ayrıntı: `docs/MIMARI.md` · plan: `docs/MASTER_PLAN.md` · kalanlar: `docs/OZELLIK_MASTER_LISTESI.md`.
-Devir/oturum geçmişi (yeni makinede buradan başla): `docs/DEVIR_NOTU.md`. CANLI: https://emlaksoft.vercel.app
+Ayrıntı: `docs/MIMARI.md` · yol haritası: `docs/ROADMAP.md` · güncel durum: `docs/DURUM.md` · deploy: `docs/DEPLOY.md`.
+Eski devir/sprint belgeleri: `docs/arsiv/`. CANLI: https://emlaksoft.vercel.app
