@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
@@ -89,6 +90,7 @@ export async function createPipelineDeal(formData: FormData): Promise<DealResult
   revalidatePath("/app/anlasmalar");
   revalidatePath("/app/komisyon");
   revalidatePath("/app");
+  revalidateTenantData(gate.tenantId);
   return { ok: true, dealId: deal.id };
 }
 
@@ -241,6 +243,7 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
   revalidatePath("/app/portfoyler");
   if (propertyId) revalidatePath(`/app/portfoyler/${propertyId}`);
   revalidatePath("/app");
+  revalidateTenantData(gate.tenantId);
   return { ok: true, dealId: id };
 }
 
@@ -314,6 +317,7 @@ export async function updateDeal(formData: FormData): Promise<DealResult> {
 
   revalidatePath("/app/anlasmalar");
   revalidatePath("/app/komisyon");
+  revalidateTenantData(gate.tenantId);
   return { ok: true, dealId: id };
 }
 

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateTenantData } from "@/lib/revalidate";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -312,6 +313,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   revalidatePath("/app/portfoyler");
   revalidatePath(`/app/portfoyler/${data.id}`);
   revalidatePath("/app");
+  revalidateTenantData(gate.tenantId);
   return { ok: true, matchedDemands };
 }
 
@@ -464,6 +466,7 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
   revalidatePath("/app/portfoyler");
   revalidatePath(`/app/portfoyler/${id}`);
   revalidatePath("/app");
+  revalidateTenantData(gate.tenantId);
   revalidateVitrinPaths(); // live ilanın başlık/fiyat/özellik değişikliği vitrine yansısın
   return { ok: true };
 }
@@ -493,6 +496,7 @@ export async function setPropertyStatus(formData: FormData): Promise<void> {
   revalidatePath("/app/portfoyler");
   revalidatePath(`/app/portfoyler/${id}`);
   revalidatePath("/app");
+  revalidateTenantData(gate.tenantId);
   revalidateVitrinPaths(); // yayına alma/çıkarma vitrin listesini anında değiştirir
 }
 
@@ -522,6 +526,7 @@ export async function deleteProperty(formData: FormData): Promise<void> {
   });
   revalidatePath("/app/portfoyler");
   revalidatePath("/app");
+  revalidateTenantData(gate.tenantId);
   revalidateVitrinPaths(); // silinen (arşivlenen) live ilan vitrinden düşsün
   if (redirectTo) redirect(redirectTo);
 }
@@ -554,4 +559,5 @@ export async function reassignProperty(formData: FormData): Promise<void> {
   });
   revalidatePath("/app/portfoyler");
   revalidatePath(`/app/portfoyler/${id}`);
+  revalidateTenantData(gate.tenantId);
 }

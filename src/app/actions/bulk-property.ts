@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateTenantData } from "@/lib/revalidate";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 
@@ -47,5 +48,6 @@ export async function bulkUpdatePropertyStatus(
   if (result?.outcome !== "applied" && result?.outcome !== "replay") return { error: "Güncelleme başarısız." };
 
   revalidatePath("/app/portfoyler");
+  revalidateTenantData(gate.tenantId);
   return { ok: true, updatedCount: Number(result.updated_count ?? 0) };
 }

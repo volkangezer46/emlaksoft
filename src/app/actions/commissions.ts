@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
@@ -56,6 +57,7 @@ export async function updateCommissionSplits(
   }
 
   revalidatePath("/app/komisyon");
+  revalidateTenantData(gate.tenantId);
   return { ok: true };
 }
 
@@ -102,6 +104,7 @@ export async function markCommissionsPaidBulk(
   }
 
   revalidatePath("/app/komisyon");
+  revalidateTenantData(gate.tenantId);
   return { ok: true, updated: updatedIds.length };
 }
 
@@ -169,5 +172,6 @@ export async function revertCommissionPayment(commissionId: string): Promise<Com
   revalidatePath("/app/komisyon");
   revalidatePath("/app/raporlar");
   revalidatePath("/app");
+  revalidateTenantData(gate.tenantId);
   return { ok: true };
 }

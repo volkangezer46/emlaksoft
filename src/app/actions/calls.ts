@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
@@ -63,6 +64,7 @@ export async function createCall(formData: FormData): Promise<CallResult> {
   revalidatePath("/app/arama");
   if (customerId) revalidatePath(`/app/musteriler/${customerId}`);
   revalidatePath("/app");
+  revalidateTenantData(gate.tenantId);
   return { ok: true };
 }
 

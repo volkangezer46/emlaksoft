@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateTenantData } from "@/lib/revalidate";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -118,6 +119,7 @@ export async function createCustomer(
   });
 
   revalidatePath("/app/musteriler");
+  revalidateTenantData(gate.tenantId);
   return { ok: true, id: data.id };
 }
 
@@ -185,6 +187,7 @@ export async function updateCustomer(
 
   revalidatePath("/app/musteriler");
   revalidatePath(`/app/musteriler/${id}`);
+  revalidateTenantData(gate.tenantId);
   return { ok: true, id };
 }
 
@@ -212,6 +215,7 @@ export async function deleteCustomer(formData: FormData): Promise<void> {
     entityId: id,
   });
   revalidatePath("/app/musteriler");
+  revalidateTenantData(gate.tenantId);
   if (redirectTo) redirect(redirectTo);
 }
 
@@ -270,6 +274,7 @@ export async function bulkAssignCustomers(
 
   revalidatePath("/app/musteriler");
   for (const id of validIds) revalidatePath(`/app/musteriler/${id}`);
+  revalidateTenantData(gate.tenantId);
   return { ok: true, updatedCount: validIds.length };
 }
 
@@ -303,6 +308,7 @@ export async function bulkDeleteCustomers(ids: string[]): Promise<BulkCustomerRe
   });
 
   revalidatePath("/app/musteriler");
+  revalidateTenantData(gate.tenantId);
   return { ok: true, updatedCount: validIds.length };
 }
 
@@ -382,6 +388,7 @@ export async function bulkReheatCustomers(ids: string[]): Promise<BulkCustomerRe
 
   revalidatePath("/app/musteriler");
   revalidatePath("/app/gorevler");
+  revalidateTenantData(gate.tenantId);
   return { ok: true, updatedCount: fresh.length };
 }
 
@@ -835,6 +842,7 @@ export async function mergeCustomers(
   revalidatePath("/app/musteriler");
   revalidatePath("/app/musteriler/cift-kayit");
   revalidatePath(`/app/musteriler/${primaryId}`);
+  revalidateTenantData(gate.tenantId);
   return {
     ok: true,
     primaryId,
@@ -871,6 +879,7 @@ export async function reassignCustomer(formData: FormData): Promise<void> {
   });
   revalidatePath("/app/musteriler");
   revalidatePath(`/app/musteriler/${id}`);
+  revalidateTenantData(gate.tenantId);
 }
 
 /**

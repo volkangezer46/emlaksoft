@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
@@ -11,11 +12,12 @@ import { isDemandStatus } from "@/lib/workflow-state";
 
 export type DemandResult = { error?: string; ok?: boolean; id?: string };
 
-function revalidateDemandPaths(customerId: string) {
+function revalidateDemandPaths(tenantId: string, customerId: string) {
   revalidatePath("/app/talepler");
   revalidatePath("/app/eslestirme");
   revalidatePath(`/app/musteriler/${customerId}`);
   revalidatePath("/app/musteriler");
+  revalidateTenantData(tenantId);
 }
 
 export async function createDemand(
@@ -123,7 +125,7 @@ export async function createDemand(
     },
   });
 
-  revalidateDemandPaths(customerId);
+  revalidateDemandPaths(gate.tenantId, customerId);
   return { ok: true, id: data.id };
 }
 
@@ -197,7 +199,7 @@ export async function updateDemand(
     newValue: { transaction_type: transactionType, status: status || undefined },
   });
 
-  revalidateDemandPaths(updated.customer_id);
+  revalidateDemandPaths(gate.tenantId, updated.customer_id);
   return { ok: true, id };
 }
 
@@ -224,6 +226,6 @@ export async function setDemandStatus(formData: FormData): Promise<DemandResult>
   }
   if (!updated) return { error: "Talep bulunamadı veya başka bir ofise ait." };
 
-  revalidateDemandPaths(updated.customer_id);
+  revalidateDemandPaths(gate.tenantId, updated.customer_id);
   return { ok: true, id };
 }
