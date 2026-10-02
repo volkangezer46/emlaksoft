@@ -7,6 +7,7 @@ import {
   KeyRound,
   MessageSquare,
   Percent,
+  Plus,
   Receipt,
   ShieldCheck,
   Timer,
@@ -34,7 +35,7 @@ import {
   waitingLabel,
   type ApprovalStatus,
 } from "@/lib/approvals";
-import { NewApprovalDialog } from "./new-approval-dialog";
+import { ButtonLink } from "@/components/ui/button";
 import { ApprovalCommentForm, CancelApprovalButton, DecisionDialog } from "./approval-actions";
 
 const PAGE_SIZE = 20;
@@ -260,7 +261,7 @@ export default async function OnaylarPage({
               Talep, karar ve gerekçe kayıt altında.
             </p>
           </div>
-          <NewApprovalDialog entityOptions={entityOptions} />
+          <ButtonLink href="/app/onaylar/yeni" icon={Plus}>Yeni onay talebi</ButtonLink>
         </div>
       </section>
 

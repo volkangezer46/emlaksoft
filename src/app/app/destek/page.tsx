@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   ArrowUpRight,
   CheckCircle2,
@@ -18,7 +19,7 @@ import { safeLike } from "@/lib/pgrst";
 import { DAY_MS, daysAgoIso, msSince } from "@/lib/clock";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
-import { NewTicketDialog } from "./new-ticket-dialog";
+import { ButtonLink } from "@/components/ui/button";
 import type { CSSProperties } from "react";
 
 import { PageHeader } from "@/components/ui/page-header";
@@ -88,10 +89,11 @@ const statusKeys = ["open", "in_progress", "waiting", "resolved", "closed"] as c
 export default async function SupportPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; kategori?: string; ara?: string; sayfa?: string }>;
+  searchParams?: Promise<{ durum?: string; kategori?: string; ara?: string; sayfa?: string; yeni?: string }>;
 }) {
   const gate = await requireModulePage("support");
   const sp = (await searchParams) ?? {};
+  if (sp.yeni) redirect("/app/destek/yeni");
   const requestedStatus = sp.durum ?? "";
   const durum = requestedStatus === "acik" || statusKeys.includes(requestedStatus as (typeof statusKeys)[number])
     ? requestedStatus
@@ -267,7 +269,7 @@ export default async function SupportPage({
   return (
     <div className="space-y-6">
       <PageHeader title="Talepleriniz" eyebrow="Destek merkezi" description="EmlakSoft ekibine fatura, kurulum ve teknik taleplerinizi iletin." actions={
-<NewTicketDialog categoryOptions={categoryOptions} />
+<ButtonLink href="/app/destek/yeni" icon={LifeBuoy}>Yeni talep</ButtonLink>
 } />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
@@ -489,7 +491,7 @@ export default async function SupportPage({
               ilk destek talebinizi oluşturun; ekibimiz en geç 1 iş günü içinde döner.
             </p>
             <div className="relative mt-5">
-              <NewTicketDialog categoryOptions={categoryOptions} />
+              <ButtonLink href="/app/destek/yeni" variant="secondary" icon={LifeBuoy}>Yeni talep</ButtonLink>
             </div>
           </div>
         ) : pageRows.length === 0 ? (

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   ArrowUpRight,
   BadgeCheck,
@@ -8,6 +9,7 @@ import {
   Grid3x3,
   Layers,
   MapPin,
+  Plus,
   Timer,
   X,
 } from "lucide-react";
@@ -17,7 +19,7 @@ import { msUntil, DAY_MS } from "@/lib/clock";
 import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/app/empty-state";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
-import { NewProjectDialog } from "./new-project-dialog";
+import { ButtonLink } from "@/components/ui/button";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportProjectsCsv } from "@/app/actions/export";
 
@@ -48,11 +50,12 @@ function deliveryLabel(iso: string) {
 export default async function ProjelerPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string }>;
+  searchParams?: Promise<{ durum?: string; yeni?: string }>;
 }) {
   const { perms } = await requireModulePage("projects", "/app/projeler");
   const canCreate = (perms.projects ?? []).includes("create");
   const params = (await searchParams) ?? {};
+  if (params.yeni) redirect("/app/projeler/yeni");
   const durum = Object.keys(FILTER_LABELS).includes(params.durum ?? "") ? params.durum : undefined;
 
   const projects = await listProjects();
@@ -108,7 +111,7 @@ export default async function ProjelerPage({
               action={exportProjectsCsv.bind(null, { durum: durum ?? "" })}
               className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
             />
-            {canCreate ? <NewProjectDialog /> : null}
+            {canCreate ? <ButtonLink href="/app/projeler/yeni" icon={Plus}>Yeni proje</ButtonLink> : null}
           </div>
         </div>
       </section>
@@ -227,7 +230,7 @@ export default async function ProjelerPage({
           }
           action={
             projects.length === 0 && canCreate
-              ? { node: <NewProjectDialog /> }
+              ? { label: "Yeni proje", href: "/app/projeler/yeni" }
               : projects.length > 0
                 ? { href: "/app/projeler", label: "Filtreyi temizle" }
                 : undefined

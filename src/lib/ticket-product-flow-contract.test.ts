@@ -9,7 +9,7 @@ function source(path: string) {
 describe("professional support product flow contract", () => {
   const tenantReply = source("src/app/app/destek/ticket-reply-form.tsx");
   const staffReply = source("src/app/admin/tickets/staff-reply-form.tsx");
-  const newTicket = source("src/app/app/destek/new-ticket-dialog.tsx");
+  const newTicket = source("src/app/app/destek/yeni/new-ticket-form.tsx");
   const tenantDetail = source("src/app/app/destek/[id]/page.tsx");
   const thread = source("src/app/app/destek/[id]/ticket-thread.tsx");
   const controls = source("src/app/admin/tickets/[id]/ticket-detail-controls.tsx");
