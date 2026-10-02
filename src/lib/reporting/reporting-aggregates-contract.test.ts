@@ -9,6 +9,7 @@ function source(path: string): string {
 const migration = source("supabase/migrations/20260802000340_reporting_aggregates.sql");
 const commission = source("src/app/app/komisyon/page.tsx");
 const tenantReports = source("src/app/app/raporlar/page.tsx");
+const reportsCache = source("src/lib/reporting/cache.ts");
 const adminHome = source("src/app/admin/page.tsx");
 const adminReports = source("src/app/admin/raporlar/page.tsx");
 
@@ -31,7 +32,10 @@ describe("exact reporting aggregate contract", () => {
 
   it("all four KPI pages consume aggregate RPCs and fail visibly on query errors", () => {
     expect(commission).toContain('rpc("tenant_commission_aggregates"');
-    expect(tenantReports).toContain('rpc("tenant_reporting_aggregates"');
+    // Tenant raporu RPC'yi kısa TTL cache yardımcısı üzerinden çağırır (admin client yok).
+    expect(reportsCache).toContain('rpc("tenant_reporting_aggregates"');
+    expect(reportsCache).not.toContain("createAdminClient");
+    expect(tenantReports).toContain("getTenantReportingAggregates");
     expect(adminHome).toContain('rpc("platform_reporting_aggregates"');
     expect(adminReports).toContain('rpc("platform_reporting_aggregates"');
     for (const page of [commission, tenantReports, adminHome, adminReports]) {

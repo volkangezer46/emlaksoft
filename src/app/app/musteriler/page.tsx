@@ -300,6 +300,36 @@ export default async function CustomersPage({
 
   const eightWeeksAgo = daysAgoIso(56);
 
+  type IntentRows = { data: { customer_id: string | null }[] | null };
+  const fetchIntentSignals = async (ids: string[]): Promise<[IntentRows, IntentRows]> =>
+    ids.length
+      ? Promise.all([
+          supabase.from("offers").select("customer_id").in("customer_id", ids),
+          supabase.from("deals").select("customer_id").in("customer_id", ids).not("stage", "in", "(won,lost)"),
+        ])
+      : [{ data: [] }, { data: [] }];
+  // Liste + havuz sorguları hemen başlar; ısı RPC'si ve niyet sinyalleri bunlara bağlıdır
+  // ama diğer (referans/KPI) sorguları BEKLEMEZ — eskiden hepsi bitince seri başlıyordu.
+  const listP = segmentF
+    ? Promise.resolve({ data: null, count: null })
+    : Promise.resolve(listQuery.range(offset, offset + PAGE_SIZE - 1));
+  const poolP = heatPoolQuery.limit(HEAT_POOL_LIMIT);
+  const heatP = (async (): Promise<{ data: HeatSignalRow[] | null }> => {
+    const [l, p] = await Promise.all([listP, poolP]);
+    const ids = [
+      ...new Set([
+        ...((p.data ?? []) as unknown as HeatPoolRow[]).map((r) => r.id),
+        ...((l.data ?? []) as unknown as CustomerRow[]).map((r) => r.id),
+      ]),
+    ];
+    if (!tenantId || ids.length === 0) return { data: [] };
+    const res = await supabase.rpc("customer_heat_signals", { p_tenant_id: tenantId, p_customer_ids: ids });
+    return { data: res.data as HeatSignalRow[] | null };
+  })();
+  const intentP: Promise<[IntentRows, IntentRows] | null> = segmentF
+    ? Promise.resolve(null)
+    : listP.then((l) => fetchIntentSignals(((l.data ?? []) as unknown as CustomerRow[]).map((c) => c.id)));
+
   const [
     { data: customers, count: customerTotal },
     { data: heatPool },
@@ -316,13 +346,13 @@ export default async function CustomersPage({
     typeDefs,
     sourceDefs,
     savedViews,
+    heatRes,
+    intentRes,
   ] = await Promise.all([
     // Segment filtresi aktifken sayfa dilimi havuzdan kesilir; normal range
-    // sorgusu boşa çalışmasın diye atlanır.
-    segmentF
-      ? Promise.resolve({ data: null, count: null })
-      : listQuery.range(offset, offset + PAGE_SIZE - 1),
-    heatPoolQuery.limit(HEAT_POOL_LIMIT),
+    // sorgusu boşa çalışmasın diye atlanır (listP yukarıda).
+    listP,
+    poolP,
     supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
@@ -361,6 +391,8 @@ export default async function CustomersPage({
     getDefinitionsOrDefault("customer_type"),
     getDefinitionsOrDefault("customer_source"),
     savedViewsPromise,
+    heatP,
+    intentP,
   ]);
 
   // DB-driven tanımlar (boşsa definition-defaults.ts yedeği getDefinitionsOrDefault içinde)
@@ -371,28 +403,11 @@ export default async function CustomersPage({
   // ---- Sıcaklık skorlama (tek toplu RPC — N+1 yok) ------------------------
   const poolRows = (heatPool ?? []) as unknown as HeatPoolRow[];
   const pageRowsRaw = (customers ?? []) as unknown as CustomerRow[];
-  // Havuz + görünen sayfa (500'ü aşan derin sayfalarda rozet kaybolmasın)
-  const heatIds = [...new Set([...poolRows.map((r) => r.id), ...pageRowsRaw.map((r) => r.id)])];
+  // Isı sinyalleri (heatP): havuz + görünen sayfa id'leri için, diğer sorgularla paralel.
   // Niyet sinyalleri (teklif/açık anlaşma) sayfa satırlarına bağlıdır, ısı RPC'sine
   // değil: segment filtresi yokken satırlar = pageRowsRaw → ısı RPC'siyle paralel başlar.
-  const fetchIntentSignals = (ids: string[]) =>
-    ids.length
-      ? Promise.all([
-          supabase.from("offers").select("customer_id").in("customer_id", ids),
-          supabase.from("deals").select("customer_id").in("customer_id", ids).not("stage", "in", "(won,lost)"),
-        ])
-      : Promise.resolve([
-          { data: [] as { customer_id: string | null }[] },
-          { data: [] as { customer_id: string | null }[] },
-        ]);
-  const intentPrefetch = segmentF ? null : fetchIntentSignals(pageRowsRaw.map((c) => c.id));
-  const { data: heatSignals } =
-    tenantId && heatIds.length > 0
-      ? await supabase.rpc("customer_heat_signals", {
-          p_tenant_id: tenantId,
-          p_customer_ids: heatIds,
-        })
-      : { data: [] as HeatSignalRow[] };
+  const intentPrefetch = intentRes;
+  const { data: heatSignals } = heatRes;
 
   const heatSignalMap = new Map<string, HeatSignalRow>();
   for (const s of (heatSignals ?? []) as HeatSignalRow[]) heatSignalMap.set(s.customer_id, s);
@@ -453,7 +468,7 @@ export default async function CustomersPage({
   // Davranışsal niyet sinyalleri — YALNIZ görünen satırlar için (≤50, customer_id
   // indeksli). Teklif = güçlü niyet, açık anlaşma = en yüksek niyet.
   const rowIds = rows.map((c) => c.id);
-  const [{ data: offerRows }, { data: openDealRows }] = await (intentPrefetch ?? fetchIntentSignals(rowIds));
+  const [{ data: offerRows }, { data: openDealRows }] = (intentPrefetch ?? (await fetchIntentSignals(rowIds)));
   const offerCount = new Map<string, number>();
   for (const o of (offerRows ?? []) as { customer_id: string | null }[]) {
     if (o.customer_id) offerCount.set(o.customer_id, (offerCount.get(o.customer_id) ?? 0) + 1);

@@ -20,6 +20,7 @@ import { computeOfficeScore, type OfficeScoreInputs } from "@/lib/office-score";
 import { now as clockNow } from "@/lib/clock";
 import { ICONS } from "@/lib/icons";
 import { requireReportingData } from "@/lib/reporting/result";
+import { getTenantReportingAggregates } from "@/lib/reporting/cache";
 
 type TenantReportingAggregate = {
   summary: {
@@ -99,12 +100,15 @@ function TrendBadge({ trend }: { trend: TrendInfo }) {
 }
 
 export default async function ReportsPage() {
-  await requireModulePage("reports", "/app/raporlar");
+  const { tenantId } = await requireModulePage("reports", "/app/raporlar");
   const supabase = await createClient();
-  const asOf = new Date(clockNow());
-  const aggregateResult = await supabase.rpc("tenant_reporting_aggregates", {
-    p_as_of: asOf.toISOString(),
-  });
+  // Tanımlar RPC ile paralel başlar (eskiden RPC'den SONRA seri bekleniyordu).
+  const sourceDefsPromise = getDefinitionsOrDefault("customer_source");
+  // Ağır toplulaştırma: kısa TTL tenant-tag cache (src/lib/reporting/cache.ts).
+  const [aggregateResult, sourceDefs] = await Promise.all([
+    getTenantReportingAggregates(supabase, tenantId, clockNow()),
+    sourceDefsPromise,
+  ]);
   const aggregate = requireReportingData(
     "tenant-reporting-aggregates",
     aggregateResult,
@@ -172,7 +176,7 @@ export default async function ReportsPage() {
 
   // Kaynak ROI — customers.source × kazanılan anlaşmalar (customer_id join)
   // Etiketler: tek sabit kaynak (eski/yeni değerler) üstüne ofisin tanımları
-  const SOURCE_LABELS: Record<string, string> = { ...defaultLabelMap("customer_source"), ...toLabelMap(await getDefinitionsOrDefault("customer_source")) };
+  const SOURCE_LABELS: Record<string, string> = { ...defaultLabelMap("customer_source"), ...toLabelMap(sourceDefs) };
   const sourceLabel = (s: string) => SOURCE_LABELS[s] ?? s;
   const allRoiRows = aggregate.roi.map((row) => ({
     source: row.source,

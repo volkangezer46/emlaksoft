@@ -93,7 +93,15 @@ export default async function KiralamaPage({
   const canCreate = perms.rentals?.includes("create") ?? false;
 
   const supabase = await createClient();
-  const [{ data: rentalData }, { data: chargeData }, { data: maintData }, { data: propData }, { data: custData }] =
+  const [
+    { data: rentalData },
+    { data: chargeData },
+    { data: maintData },
+    { data: propData },
+    { data: custData },
+    { data: prefillProp },
+    { data: prefillCust },
+  ] =
     await Promise.all([
       supabase
         .from("rentals")
@@ -120,6 +128,14 @@ export default async function KiralamaPage({
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(100),
+      // Ön dolgu kayıtları (havuz dışında kalabilir) ana turla PARALEL çekilir;
+      // eskiden havuz kontrolünden sonra seri 1-2 ek tur sürüyordu.
+      prefillPropertyId
+        ? supabase.from("properties").select("id, property_code, title").eq("id", prefillPropertyId).is("deleted_at", null).maybeSingle()
+        : Promise.resolve({ data: null }),
+      prefillCustomerId
+        ? supabase.from("customers").select("id, full_name, phone").eq("id", prefillCustomerId).is("deleted_at", null).maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
 
   const rentals = rentalData ?? [];
@@ -132,23 +148,11 @@ export default async function KiralamaPage({
    */
   const dialogProperties = [...(propData ?? [])];
   const dialogCustomers = [...(custData ?? [])];
-  if (prefillPropertyId && !dialogProperties.some((p) => p.id === prefillPropertyId)) {
-    const { data: extra } = await supabase
-      .from("properties")
-      .select("id, property_code, title")
-      .eq("id", prefillPropertyId)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (extra) dialogProperties.unshift(extra);
+  if (prefillPropertyId && prefillProp && !dialogProperties.some((p) => p.id === prefillPropertyId)) {
+    dialogProperties.unshift(prefillProp);
   }
-  if (prefillCustomerId && !dialogCustomers.some((c) => c.id === prefillCustomerId)) {
-    const { data: extra } = await supabase
-      .from("customers")
-      .select("id, full_name, phone")
-      .eq("id", prefillCustomerId)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (extra) dialogCustomers.unshift(extra);
+  if (prefillCustomerId && prefillCust && !dialogCustomers.some((c) => c.id === prefillCustomerId)) {
+    dialogCustomers.unshift(prefillCust);
   }
   const validPrefillProperty =
     prefillPropertyId && dialogProperties.some((p) => p.id === prefillPropertyId) ? prefillPropertyId : null;

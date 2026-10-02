@@ -222,6 +222,23 @@ export default async function AppointmentsPage({
         })()
       : null;
 
+  // Randevu listesi bir kez başlatılır; izin sorgusu liste biter bitmez DİĞER sorgularla
+  // paralel koşar (eskiden tüm Promise.all'dan sonra seri çalışıyordu).
+  const apptP = Promise.resolve(apptQuery.order("scheduled_at", { ascending: true }).limit(500));
+  const leavesP = apptP.then(async (res) => {
+    const list = (res.data ?? []) as unknown as AppointmentRow[];
+    if (list.length === 0) return [] as LeaveLike[];
+    const dayKeys = list.map((r) => new Date(Date.parse(r.scheduled_at) + TR_OFFSET_MIN * 60_000).toISOString().slice(0, 10));
+    const { data: leaves } = await supabase
+      .from("staff_leaves")
+      .select("staff_id, starts_on, ends_on, status")
+      .eq("status", "onayli")
+      .lte("starts_on", dayKeys.reduce((a, d) => (d > a ? d : a), dayKeys[0]!))
+      .gte("ends_on", dayKeys.reduce((a, d) => (d < a ? d : a), dayKeys[0]!))
+      .limit(500);
+    return (leaves ?? []) as LeaveLike[];
+  });
+
   const [
     { data: appts, count: apptTotal },
     { data: customers },
@@ -238,8 +255,9 @@ export default async function AppointmentsPage({
     { count: contractCount },
     { data: weekBarRows },
     { data: ownProfile },
+    leaveRows,
   ] = await Promise.all([
-    apptQuery.order("scheduled_at", { ascending: true }).limit(500),
+    apptP,
     // Bu iki sorgu SINIRSIZDI: sayfa her acildiginda ofisin TUM musteri ve
     // portfoy kayitlari cekiliyordu. Secici artik sunucu tarafinda arama
     // yaptigi icin buradaki liste yalnizca "son eklenenler" kisayolu —
@@ -274,6 +292,7 @@ export default async function AppointmentsPage({
       .limit(1000),
     // Takvim aboneliği (ICS) için kullanıcının gizli token'ı — diğerlerinden bağımsız.
     supabase.from("profiles").select("calendar_token").eq("id", gate.userId).maybeSingle(),
+    leavesP,
   ]);
 
   // Tür başına gerçek toplam (hero + "Randevu türleri" paneli + rozetler).
@@ -297,19 +316,6 @@ export default async function AppointmentsPage({
    * bu ipucu ELLE girilmiş / izin sonradan yazılmış randevuları yakalar.
    * Tek sorgu: listedeki randevuların kapsadığı gün aralığı.
    */
-  let leaveRows: LeaveLike[] = [];
-  if (rows.length > 0) {
-    const dayKeys = rows.map((r) => new Date(Date.parse(r.scheduled_at) + TR_OFFSET_MIN * 60_000).toISOString().slice(0, 10));
-    const { data: leaves } = await supabase
-      .from("staff_leaves")
-      .select("staff_id, starts_on, ends_on, status")
-      .eq("status", "onayli")
-      .lte("starts_on", dayKeys.reduce((a, d) => (d > a ? d : a), dayKeys[0]!))
-      .gte("ends_on", dayKeys.reduce((a, d) => (d < a ? d : a), dayKeys[0]!))
-      .limit(500);
-    leaveRows = (leaves ?? []) as LeaveLike[];
-  }
-
   const customerOptions = (customers ?? []).map((c) => ({ id: c.id, label: c.full_name }));
   if (filteredCustomer && !customerOptions.some((c) => c.id === filteredCustomer.id)) {
     customerOptions.unshift({ id: filteredCustomer.id, label: filteredCustomer.full_name });
