@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarClock, MapPin, Plus, StickyNote } from "lucide-react";
+import { Plus } from "lucide-react";
+import { TAB_ICONS as TI } from "@/lib/icons";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { FormField, FormInput, FormTextarea } from "@/components/ui/form-controls";
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
@@ -12,9 +13,9 @@ import { detailOrList } from "@/lib/form-logic";
 import { OPEN_HOUSE_DRAFT_FIELDS, OPEN_HOUSE_FORM_ID, OPEN_HOUSE_TABS } from "./open-house-tabs";
 
 const TAB_ICONS = {
-  zaman: CalendarClock,
-  yer: MapPin,
-  not: StickyNote,
+  zaman: TI.zaman,
+  yer: TI.konum,
+  not: TI.not,
 } as const;
 
 const FIELD_LABELS = { property_id: "Portföy", scheduled_at: "Tarih ve saat" };

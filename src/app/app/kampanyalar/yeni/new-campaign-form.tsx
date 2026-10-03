@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquareText, Plus, RefreshCw, Send, Sparkles } from "lucide-react";
+import { Plus, RefreshCw, Sparkles } from "lucide-react";
+import { TAB_ICONS as TI } from "@/lib/icons";
 import { FormField, FormInput, FormSelect, fieldClass } from "@/components/ui/form-controls";
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
 import { useToast } from "@/components/app/toast-provider";
@@ -22,7 +23,7 @@ const FILTERS = [
 ];
 
 const init: CampaignResult = {};
-const TAB_ICONS = { kanal: Send, icerik: MessageSquareText } as const;
+const TAB_ICONS = { kanal: TI.kanal, icerik: TI.mesaj } as const;
 const FIELD_LABELS = {
   title: "Kampanya başlığı",
   message: "Mesaj metni",

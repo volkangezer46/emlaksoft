@@ -22,12 +22,28 @@
  * düzeltme maliyeti (ve regresyon riski) en düşük oldu.
  */
 import {
+  AlignLeft,
   Award,
+  Banknote,
   BarChart3,
   Bell,
   Building2,
+  CalendarClock,
   CalendarDays,
+  CalendarHeart,
+  CalendarRange,
+  ClipboardCheck,
+  ClipboardList,
   Clock,
+  Files,
+  Info,
+  Landmark,
+  Link2,
+  MessageSquareText,
+  Paperclip,
+  Send,
+  SlidersHorizontal,
+  StickyNote,
   Coins,
   CreditCard,
   Crosshair,
@@ -183,6 +199,44 @@ export const ICONS = {
   destek: LifeBuoy,
   /** Ayarlar. TEK doğru: Settings (Settings2 DEĞİL). */
   ayar: Settings,
+} satisfies Record<string, LucideIcon>;
+
+/**
+ * FORM SEKMESİ İKONLARI — "Yeni X" sekmeli formlarının (MorphTabs) ortak sözlüğü.
+ * Aynı kavram her formda AYNI ikondur (konum = MapPin, not = StickyNote ...); bir formun
+ * sekmeleri birbirinden FARKLI ikon kullanır (sözleşme testi: form-tabs-contract.test.ts).
+ * Formlar `*-form.tsx` içinde tab id -> TAB_ICONS.<kavram> eşler; yeni sekme için önce buraya bak.
+ */
+export const TAB_ICONS = {
+  kisi: UserRound,
+  iletisim: Phone,
+  ozelGunler: CalendarHeart,
+  not: StickyNote,
+  konum: MapPin,
+  bolge: MapPinned,
+  temel: Building2,
+  fiyat: Banknote,
+  ozellikler: ListChecks,
+  ek: Paperclip,
+  aciklama: AlignLeft,
+  icerik: ScrollText,
+  taraflar: Users,
+  katilimci: UsersRound,
+  detay: Handshake,
+  kosullar: ClipboardList,
+  zaman: CalendarClock,
+  sure: CalendarRange,
+  gorev: ListChecks,
+  destek: LifeBuoy,
+  onay: ClipboardCheck,
+  kayit: Link2,
+  kanal: Send,
+  mesaj: MessageSquareText,
+  proje: Landmark,
+  sunumBilgi: Info,
+  portfoyler: Files,
+  sozlesme: FileSignature,
+  kriter: SlidersHorizontal,
 } satisfies Record<string, LucideIcon>;
 
 /**

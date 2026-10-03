@@ -17,6 +17,7 @@ import { RENTAL_DRAFT_FIELDS, RENTAL_TABS } from "@/app/app/kiralama/yeni/rental
 import { OPEN_HOUSE_DRAFT_FIELDS, OPEN_HOUSE_TABS } from "@/app/app/acik-ev/yeni/open-house-tabs";
 import { PRESENTATION_DRAFT_FIELDS, PRESENTATION_TABS } from "@/app/app/portfoyler/sunumlar/yeni/presentation-tabs";
 import { isSensitiveFieldName } from "./form-tabs";
+import { TAB_ICONS } from "./icons";
 
 /**
  * Sözleşme: sekmelerde tanımlı alan listelerinin birleşimi, form kaynağındaki
@@ -178,6 +179,29 @@ describe.each(FORMS)("sekme sözleşmesi: $name formu", ({ source, tabs, draft }
     for (const f of draft) {
       expect(declared, f).toContain(f);
       expect(isSensitiveFieldName(f), f).toBe(false);
+    }
+  });
+});
+
+describe("sekme ikonları (ortak sözlük)", () => {
+  it("her form ikonları src/lib/icons.ts TAB_ICONS sözlüğünden alır; formda çakışma yok; her sekmenin ikonu var", () => {
+    for (const form of FORMS) {
+      const src = read(form.source);
+      const block = /const TAB_ICONS = \{([\s\S]*?)\} as const;/.exec(src)?.[1] ?? "";
+      const used = [...block.matchAll(/TI\.([A-Za-z]+)/g)].map((m) => m[1]);
+      expect(used.length, `${form.name}: TAB_ICONS`).toBe(form.tabs.length);
+      expect(new Set(used).size, `${form.name}: aynı formda tekrar eden ikon`).toBe(used.length);
+      for (const key of used) expect(Object.keys(TAB_ICONS), `${form.name}: ${key}`).toContain(key);
+    }
+  });
+  it("sözlükte iki kavram aynı ikonu paylaşmaz (bilinçli eş anlamlılar hariç)", () => {
+    const allowedShared = new Set(["ozellikler|gorev"]);
+    const names = Object.keys(TAB_ICONS) as (keyof typeof TAB_ICONS)[];
+    for (let i = 0; i < names.length; i += 1) {
+      for (let j = i + 1; j < names.length; j += 1) {
+        if (TAB_ICONS[names[i]] !== TAB_ICONS[names[j]]) continue;
+        expect(allowedShared.has(`${names[i]}|${names[j]}`), `${names[i]} = ${names[j]}`).toBe(true);
+      }
     }
   });
 });

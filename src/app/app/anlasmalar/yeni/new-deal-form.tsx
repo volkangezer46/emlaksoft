@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Handshake, Save, TriangleAlert, Users } from "lucide-react";
+import { Save, TriangleAlert } from "lucide-react";
+import { TAB_ICONS as TI } from "@/lib/icons";
 import { createPipelineDeal } from "@/app/actions/deals";
 import { searchCustomers, searchProperties } from "@/app/actions/lookup";
 import { useCreateForm } from "@/components/app/use-create-form";
@@ -31,7 +32,7 @@ const STAGES = [
 
 const addLink = "mt-1 inline-block text-xs font-semibold text-brand-600 underline underline-offset-2";
 
-const TAB_ICONS = { taraflar: Users, detay: Handshake } as const;
+const TAB_ICONS = { taraflar: TI.taraflar, detay: TI.detay } as const;
 
 export function NewDealForm({ properties, customers, userId }: { properties: Prop[]; customers: Cust[]; userId: string }) {
   const [stage, setStage] = useState<string>("new");

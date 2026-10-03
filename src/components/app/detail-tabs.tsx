@@ -1,5 +1,5 @@
-import Link from "next/link";
 import type { ComponentType } from "react";
+import { MorphNav } from "@/components/ui/morph-tab-parts";
 import { ArrowUpRight, CalendarDays, MessageCircle, PhoneCall, Sparkles, StickyNote } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { MoreActions } from "@/components/app/more-actions";
@@ -49,44 +49,15 @@ export function DetailTabs({
   label?: string;
 }) {
   return (
-    <nav aria-label={label} className="-mx-1 overflow-x-auto px-1">
-      <ul className="flex min-w-max items-center gap-1 border-b border-line">
-        {tabs
-          .filter((t) => !t.hidden)
-          .map((t) => {
-            const isActive = t.id === active;
-            const Icon = t.icon;
-            return (
-              <li key={t.id}>
-                <Link
-                  href={`${basePath}?sekme=${t.id}`}
-                  scroll={false}
-                  aria-current={isActive ? "page" : undefined}
-                  className={cn(
-                    "focus-ring -mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm transition-colors",
-                    isActive
-                      ? "border-accent font-semibold text-text"
-                      : "border-transparent text-text-muted hover:border-line-strong hover:text-text",
-                  )}
-                >
-                  {Icon ? <Icon className="h-4 w-4" aria-hidden /> : null}
-                  {t.label}
-                  {t.count != null ? (
-                    <span
-                      className={cn(
-                        "rounded-full px-1.5 text-xs tabular-nums",
-                        isActive ? "bg-accent/10 text-text" : "bg-surface-2 text-text-faint",
-                      )}
-                    >
-                      {t.count}
-                    </span>
-                  ) : null}
-                </Link>
-              </li>
-            );
-          })}
-      </ul>
-    </nav>
+    <MorphNav
+      variant="underline"
+      label={label}
+      activeId={active}
+      scroll={false}
+      items={tabs
+        .filter((t) => !t.hidden)
+        .map((t) => ({ id: t.id, href: `${basePath}?sekme=${t.id}`, label: t.label, icon: t.icon, count: t.count }))}
+    />
   );
 }
 

@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown, FileText, Home, ListChecks, MapPin, Wallet } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
+import { TAB_ICONS as TI } from "@/lib/icons";
 import { createProperty } from "@/app/actions/properties";
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
 import { FormField, FormInput, FormSelect, fieldClass } from "@/components/ui/form-controls";
@@ -20,11 +21,11 @@ type Province = { id: string; name: string };
 type Branch = { id: string; name: string };
 
 const TAB_ICONS = {
-  temel: Home,
-  konum: MapPin,
-  fiyat: Wallet,
-  ozellikler: ListChecks,
-  ek: FileText,
+  temel: TI.temel,
+  konum: TI.konum,
+  fiyat: TI.fiyat,
+  ozellikler: TI.ozellikler,
+  ek: TI.ek,
 } as const;
 
 const FIELD_LABELS = {

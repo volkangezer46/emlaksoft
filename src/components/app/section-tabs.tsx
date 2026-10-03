@@ -1,13 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
-import { Lock } from "lucide-react";
+import type { ReactNode } from "react";
+import { MorphNav } from "@/components/ui/morph-tab-parts";
 import { resolveActiveNav, visibleSections } from "@/lib/nav-config";
 import { findActiveNavigationHref } from "@/lib/navigation";
 import type { AppModule } from "@/lib/permissions";
-import { cn } from "@/lib/utils";
 
 /**
  * Aktif iş başlığındaki kardeş sayfalar için sekme çubuğu (ör. Müşteriler →
@@ -20,10 +19,16 @@ import { cn } from "@/lib/utils";
 export function SectionTabs({
   accessibleModules,
   lockedHrefs = [],
+  counts,
+  actions,
 }: {
   accessibleModules: AppModule[];
   /** Pakete dahil olmayan sayfalar (kilit simgesi). */
   lockedHrefs?: string[];
+  /** Sekme href -> GERÇEK kayıt sayısı (mevcut sorgulardan). Verilmeyen sekmede sayaç gösterilmez. */
+  counts?: Record<string, number>;
+  /** Şeridin sağındaki isteğe bağlı eylem alanı (filtre/ayar düğmesi). */
+  actions?: ReactNode;
 }) {
   const pathname = usePathname();
   const sections = useMemo(() => visibleSections(accessibleModules), [accessibleModules]);
@@ -42,62 +47,38 @@ export function SectionTabs({
   return (
     <div className="mb-4">
       {current.items.length >= 2 ? (
-        <nav aria-label={`${current.title} sayfaları`} className="-mx-1 overflow-x-auto px-1 pb-1">
-          <ul className="flex min-w-max items-center gap-1 border-b border-line">
-            {current.items.map((item) => {
-              const active = item.href === activeHref;
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    className={cn(
-                      "focus-ring -mb-px inline-flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm transition-colors",
-                      active
-                        ? "border-accent font-semibold text-text"
-                        : "border-transparent text-text-muted hover:border-line-strong hover:text-text",
-                    )}
-                  >
-                    <item.icon className="h-3.5 w-3.5" aria-hidden />
-                    {item.label}
-                    {isLocked(item.href) ? (
-                      <Lock className="h-3 w-3 text-amber-600" aria-label="Paketinize dahil değil" />
-                    ) : null}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
+        <div className="flex items-start gap-2">
+          <MorphNav
+            variant="underline"
+            label={`${current.title} sayfaları`}
+            activeId={activeHref}
+            className="min-w-0 flex-1"
+            items={current.items.map((item) => ({
+              id: item.href,
+              href: item.href,
+              label: item.label,
+              icon: item.icon,
+              count: counts?.[item.href] ?? null,
+              locked: isLocked(item.href),
+            }))}
+          />
+          {actions ? <div className="flex shrink-0 items-center gap-2 pt-1">{actions}</div> : null}
+        </div>
       ) : null}
       {subTabs ? (
-        <nav aria-label={`${activeItem?.label} sekmeleri`} className="-mx-1 mt-3 overflow-x-auto px-1">
-          <ul className="inline-flex min-w-max items-center gap-1 rounded-[var(--radius-card)] border border-line bg-canvas p-1">
-            {subTabs.map((tab) => {
-              const active = tab.href === activeTabHref;
-              return (
-                <li key={tab.href}>
-                  <Link
-                    href={tab.href}
-                    aria-current={active ? "page" : undefined}
-                    className={cn(
-                      "focus-ring inline-flex items-center gap-2 rounded-[var(--radius-control)] px-3.5 py-1.5 text-sm font-semibold transition",
-                      active
-                        ? "bg-surface text-ink-950 shadow-[var(--shadow-xs)]"
-                        : "text-text-muted hover:text-ink-950",
-                    )}
-                  >
-                    <tab.icon className="h-3.5 w-3.5" aria-hidden />
-                    {tab.label}
-                    {isLocked(tab.href) ? (
-                      <Lock className="h-3 w-3 text-amber-600" aria-label="Paketinize dahil değil" />
-                    ) : null}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
+        <MorphNav
+          label={`${activeItem?.label} sekmeleri`}
+          activeId={activeTabHref}
+          className="mt-3"
+          items={subTabs.map((tab) => ({
+            id: tab.href,
+            href: tab.href,
+            label: tab.label,
+            icon: tab.icon,
+            count: counts?.[tab.href] ?? null,
+            locked: isLocked(tab.href),
+          }))}
+        />
       ) : null}
     </div>
   );

@@ -14,12 +14,18 @@ import { cn } from "@/lib/utils";
 export type MorphIcon = ComponentType<{ className?: string }>;
 
 /** Tek sekme düğmesinin ortak sınıfı: pill (modül içi şerit) veya rail (form rayı). */
-export function morphTabClass(kind: "pill" | "rail"): string {
+export type MorphTabKind = "pill" | "rail" | "underline";
+
+export function morphTabClass(kind: MorphTabKind): string {
   return cn(
     "mt-tab focus-ring relative flex min-h-11 shrink-0 items-center rounded-[var(--radius-control)] px-1 text-left text-sm font-medium text-text-muted transition-colors duration-150 hover:text-ink-950",
-    kind === "rail"
-      ? "hover:bg-canvas data-[active=true]:bg-brand-600/10 data-[active=true]:font-semibold data-[active=true]:text-brand-700"
-      : "hover:bg-surface/70 data-[active=true]:bg-surface data-[active=true]:font-semibold data-[active=true]:text-ink-950 data-[active=true]:shadow-[var(--shadow-xs)]",
+    kind === "rail" &&
+      "hover:bg-canvas data-[active=true]:bg-brand-600/10 data-[active=true]:font-semibold data-[active=true]:text-brand-700",
+    kind === "pill" &&
+      "hover:bg-surface/70 data-[active=true]:bg-surface data-[active=true]:font-semibold data-[active=true]:text-ink-950 data-[active=true]:shadow-[var(--shadow-xs)]",
+    // Alt çizgili şerit: aktif = ikon kapsülü + marka renkli alt çizgi (kapsül Face'te `capsule`).
+    kind === "underline" &&
+      "hover:bg-canvas data-[active=true]:font-semibold data-[active=true]:text-ink-950 after:pointer-events-none after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:origin-center after:scale-x-50 after:rounded-full after:bg-brand-600 after:opacity-0 after:transition-[opacity,transform] after:duration-200 data-[active=true]:after:scale-x-100 data-[active=true]:after:opacity-100 motion-reduce:after:transition-none",
   );
 }
 
@@ -34,16 +40,23 @@ export type MorphTabFaceProps = {
   count?: number | null;
   locked?: boolean;
   active: boolean;
+  /** Aktifken ikon marka renkli kapsül içinde (alt çizgili şerit). */
+  capsule?: boolean;
 };
 
 /** Sekmenin içi: ikon (+ rozet/halka) ve genişleyen etiket. Dış düğme/bağlantı çağırandadır. */
-export function MorphTabFace({ icon: Icon, label, description, progress, badge, count, locked, active }: MorphTabFaceProps) {
+export function MorphTabFace({ icon: Icon, label, description, progress, badge, count, locked, active, capsule }: MorphTabFaceProps) {
   const ring = progress != null;
   const style = ring ? ({ "--mt-p": ringPercent(progress) } as CSSProperties) : undefined;
   const hasCount = count != null;
   return (
     <>
-      <span className="mt-ico" data-ring={ring ? "1" : undefined} style={style} aria-hidden="true">
+      <span
+        className={cn("mt-ico transition-colors duration-150", capsule && active && "bg-brand-600/10")}
+        data-ring={ring ? "1" : undefined}
+        style={style}
+        aria-hidden="true"
+      >
         {Icon ? <Icon className={cn("h-4 w-4", active && "text-brand-600")} /> : null}
         {badge?.kind === "error" ? (
           <span className="numeric absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-danger-strong px-1 text-xs font-semibold leading-none text-white">
@@ -79,7 +92,7 @@ export function MorphTabFace({ icon: Icon, label, description, progress, badge, 
         <span
           className={cn(
             "mt-lw-count numeric mr-2 h-5 min-w-5 shrink-0 place-items-center rounded-full px-1.5 text-xs leading-none",
-            active ? "bg-brand-600/10 text-ink-950" : "bg-canvas text-text-faint",
+            active ? "bg-brand-600 font-semibold text-white" : "bg-canvas text-text-muted",
           )}
           aria-hidden="true"
         >
@@ -113,6 +126,7 @@ export function MorphNav({
   label,
   scroll,
   inactive = "auto",
+  variant = "pill",
   className,
   children,
 }: {
@@ -122,6 +136,8 @@ export function MorphNav({
   /** `?sekme=` gibi aynı sayfa içi gezinmede false (kaydırma sıfırlanmasın). */
   scroll?: boolean;
   inactive?: "icon" | "auto";
+  /** "pill": kapsül içinde segment (alt şerit); "underline": ikon kapsüllü + alt çizgili üst şerit. */
+  variant?: "pill" | "underline";
   className?: string;
   /** Şeridin sonuna eklenen içerik (ör. sağda eylem). */
   children?: ReactNode;
@@ -130,7 +146,10 @@ export function MorphNav({
     <nav aria-label={label} className={cn("mt-box", className)}>
       <ul
         data-idle={inactive}
-        className="mt-strip flex items-center gap-1 overflow-x-auto rounded-[var(--radius-card)] border border-line bg-canvas p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className={cn(
+          "mt-strip flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          variant === "pill" ? "rounded-[var(--radius-card)] border border-line bg-canvas p-1" : "border-b border-line px-1 pt-1.5",
+        )}
       >
         {items.map((item) => {
           const active = item.id === activeId;
@@ -145,9 +164,16 @@ export function MorphNav({
                 data-active={active}
                 data-density={density}
                 data-orient="horizontal"
-                className={morphTabClass("pill")}
+                className={morphTabClass(variant)}
               >
-                <MorphTabFace icon={item.icon} label={item.label} count={item.count} locked={item.locked} active={active} />
+                <MorphTabFace
+                  icon={item.icon}
+                  label={item.label}
+                  count={item.count}
+                  locked={item.locked}
+                  active={active}
+                  capsule={variant === "underline"}
+                />
               </Link>
             </li>
           );

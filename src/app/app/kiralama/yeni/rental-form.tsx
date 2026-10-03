@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { Banknote, CalendarRange, Check, Handshake } from "lucide-react";
+import { Check } from "lucide-react";
+import { TAB_ICONS as TI } from "@/lib/icons";
 import { createRental } from "@/app/actions/rentals";
 import { searchCustomers, searchProperties } from "@/app/actions/lookup";
 import { useCreateForm } from "@/components/app/use-create-form";
@@ -15,9 +16,9 @@ type Property = { id: string; property_code: string; title: string | null };
 type Customer = { id: string; full_name: string | null; phone: string | null };
 
 const TAB_ICONS = {
-  taraflar: Handshake,
-  bedel: Banknote,
-  sure: CalendarRange,
+  taraflar: TI.taraflar,
+  bedel: TI.fiyat,
+  sure: TI.sure,
 } as const;
 
 const FIELD_LABELS = {

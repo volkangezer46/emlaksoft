@@ -4,7 +4,8 @@ import { startTransition, useActionState, useEffect, useMemo, useRef, useState }
 import type { FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, LifeBuoy, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import { TAB_ICONS as TI } from "@/lib/icons";
 import { createSupportTicket, type TicketResult } from "@/app/actions/tickets";
 import { TicketAttachmentInput, uploadTicketFiles } from "../ticket-attachment-input";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
@@ -31,7 +32,7 @@ const PRIORITY_OPTIONS: { value: string; label: string }[] = [
   { value: "urgent", label: "Acil" },
 ];
 
-const TAB_ICONS = { talep: LifeBuoy, aciklama: FileText } as const;
+const TAB_ICONS = { talep: TI.destek, aciklama: TI.aciklama } as const;
 const FIELD_LABELS = { subject: "Konu", body: "Açıklama" };
 
 export function NewTicketForm({

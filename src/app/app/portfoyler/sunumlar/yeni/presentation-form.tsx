@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Check, Copy, ExternalLink, Files, Search, UserRound, X } from "lucide-react";
+import { Check, Copy, ExternalLink, Search, UserRound, X } from "lucide-react";
+import { TAB_ICONS as TI } from "@/lib/icons";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { FormActions, FormPage } from "@/components/ui/form-page";
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
@@ -31,7 +32,7 @@ const CUSTOMER_SUGGESTIONS = 6;
 
 const LIST_HREF = "/app/portfoyler/sunumlar";
 
-const TAB_ICONS = { bilgi: UserRound, portfoyler: Files } as const;
+const TAB_ICONS = { bilgi: TI.sunumBilgi, portfoyler: TI.portfoyler } as const;
 const TABS: FormTab[] = PRESENTATION_TABS.map((t) => ({
   id: t.id,
   label: t.label,
