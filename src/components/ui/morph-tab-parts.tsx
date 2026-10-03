@@ -147,7 +147,7 @@ export function MorphNav({
       <ul
         data-idle={inactive}
         className={cn(
-          "mt-strip flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          "mt-strip relative flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           variant === "pill" ? "rounded-[var(--radius-card)] border border-line bg-canvas p-1" : "border-b border-line px-1 pt-1.5",
         )}
       >
@@ -161,6 +161,7 @@ export function MorphNav({
                 scroll={scroll}
                 aria-current={active ? "page" : undefined}
                 title={density === "icon" ? item.label : undefined}
+                aria-label={density === "icon" ? item.label : undefined}
                 data-active={active}
                 data-density={density}
                 data-orient="horizontal"

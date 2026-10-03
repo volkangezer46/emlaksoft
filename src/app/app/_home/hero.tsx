@@ -29,11 +29,14 @@ async function HeroSummary({ ctx }: { ctx: HomeCtx }) {
   if (taskCount > 0) today.push(`${taskCount} görev`);
   const first = today.length > 0 ? `Bugün ${today.join(" ve ")} sizi bekliyor.` : "Bugün için planlanmış randevu ya da görev yok.";
   return (
-    <p>
+    <p className={SUMMARY_MIN}>
       {first} Son {ctx.period} günde {stats.customers} yeni müşteri ve {stats.demands} yeni talep kaydedildi.
     </p>
   );
 }
+
+/** Özet cümlesi mobilde ~3 satır: iskelet ile gerçek metin aynı asgari yüksekliği paylaşır (CLS). */
+const SUMMARY_MIN = "min-h-[4.5rem] sm:min-h-6";
 
 function GlassIskelet() {
   return (
@@ -118,7 +121,7 @@ export function AnaHero({
       title={greeting}
       highlight={hasName ? ctx.firstName : undefined}
       summary={
-        <Suspense fallback={<p>Bugünün özeti hazırlanıyor…</p>}>
+        <Suspense fallback={<p className={SUMMARY_MIN}>Bugünün özeti hazırlanıyor…</p>}>
           <HeroSummary ctx={ctx} />
         </Suspense>
       }

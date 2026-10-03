@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { RefObject } from "react";
-import { AlertCircle, Check, ChevronDown, CircleCheck, Loader2, Save, TriangleAlert } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, CircleCheck, Ellipsis, Loader2, Save, TriangleAlert } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { isDirty, serializeEntries } from "@/lib/form-dirty";
@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
  * yeşil "Hepsi tamam") + kısayol ipucu. Üst kenarda ilerleme çizgisi.
  * Sağ: İptal (kirliyse SATIR İÇİ onay, popup yok), "Taslak kaydet", "Kaydet ve yenisini ekle", Kaydet
  * (yüklemede spinner, başarıda ✓ animasyonu, hatada sallanma + hata bandına odak).
- * Mobil: iki satır (durum / düğmeler), 44px düğmeler, safe-area, alt gezinmenin üstünde yapışır;
+ * Mobil: tek satır (İptal / Daha fazla ikonu / Kaydet + "N eksik" rozeti; kirliyken üstte 16px durum satırı), 44px düğmeler, safe-area, alt gezinmenin üstünde yapışır;
  * ekran klavyesi açıkken akışa döner. Sunucu action'ı ve doğrulama DEĞİŞMEZ: yalnız kabuktur.
  */
 
@@ -277,12 +277,19 @@ export function FormActionBar({
           ) : null}
         </div>
       ) : (
-        <div className="flex flex-col gap-1.5 px-3 py-2 sm:flex-row sm:items-center sm:gap-3 sm:px-4 sm:py-3">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:flex-1" aria-live="polite" aria-atomic="true">
+        <div className="flex flex-col gap-1 px-2 py-1.5 sm:flex-row sm:items-center sm:gap-3 sm:px-4 sm:py-3">
+          {hasSecondary && moreOpen ? (
+            <div className="flex gap-2 sm:hidden max-sm:[&>*]:min-h-11 max-sm:[&>*]:flex-1">{secondaryButtons}</div>
+          ) : null}
+          <div
+            className={cn("flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:flex-1", !badge && "max-sm:hidden")}
+            aria-live="polite"
+            aria-atomic="true"
+          >
             {badge ? (
               <span
                 key={badge.text}
-                className={cn("fab-fade inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold max-sm:py-0.5", toneClass[badge.tone])}
+                className={cn("fab-fade inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold max-sm:px-2 max-sm:py-0 max-sm:leading-4", toneClass[badge.tone])}
               >
                 <badge.icon aria-hidden="true" className={cn("h-3.5 w-3.5", badge.spin && "animate-spin")} />
                 {badge.text}
@@ -294,13 +301,13 @@ export function FormActionBar({
                   type="button"
                   onClick={() => missing[0]?.onGo()}
                   title={`İlk eksik alan: ${missing[0]?.label ?? ""}`}
-                  className="focus-ring inline-flex min-h-8 items-center gap-1.5 rounded-full px-2 text-xs font-semibold text-warning-strong max-sm:min-h-6 underline-offset-2 hover:underline"
+                  className="focus-ring inline-flex min-h-8 items-center gap-1.5 rounded-full px-2 text-xs font-semibold text-warning-strong underline-offset-2 hover:underline max-sm:hidden"
                 >
                   <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-warning-strong" />
                   {missingCount} zorunlu alan eksik
                 </button>
               ) : allDone ? (
-                <span className="inline-flex items-center gap-1.5 px-1 text-xs font-semibold text-success-strong">
+                <span className="inline-flex items-center gap-1.5 px-1 text-xs font-semibold text-success-strong max-sm:hidden">
                   <Check aria-hidden="true" className="h-3.5 w-3.5" />
                   Hepsi tamam
                 </span>
@@ -329,7 +336,7 @@ export function FormActionBar({
             ) : null}
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2 max-sm:[&>*]:min-h-11 max-sm:[&>button]:flex-1 max-sm:[&>a]:flex-1">
+          <div className="flex flex-wrap items-center justify-end gap-2 max-sm:flex-nowrap max-sm:gap-1.5 max-sm:[&>*]:min-h-11 max-sm:[&>button]:flex-1 max-sm:[&>a]:flex-1">
             {onCancel || !cancelHref ? (
               <Button ref={cancelBtnRef} type="button" variant="secondary" size="lg" onClick={onCancelClick}>
                 {cancelLabel}
@@ -348,12 +355,17 @@ export function FormActionBar({
                 type="button"
                 variant="secondary"
                 size="lg"
-                className="sm:hidden"
+                className="w-11 px-0 sm:hidden max-sm:flex-none!"
+                aria-label="Daha fazla"
+                title="Daha fazla"
                 aria-expanded={moreOpen}
                 onClick={() => setMoreOpen((v) => !v)}
               >
-                Daha fazla
-                <ChevronDown aria-hidden="true" className={cn("h-4 w-4 transition-transform duration-150 motion-reduce:transition-none", moreOpen && "rotate-180")} />
+                {moreOpen ? (
+                  <ChevronDown aria-hidden="true" className="h-5 w-5" />
+                ) : (
+                  <Ellipsis aria-hidden="true" className="h-5 w-5" />
+                )}
               </Button>
             ) : null}
             <span className="contents max-sm:hidden">{secondaryButtons}</span>
@@ -369,12 +381,17 @@ export function FormActionBar({
               >
                 {success && !busy ? <Check aria-hidden="true" className="fab-pop h-4 w-4" /> : null}
                 {busy ? pendingLabel : success ? "Kaydedildi" : submitLabel}
+                {missingCount > 0 && !busy && !success ? (
+                  <span
+                    className="rounded-full bg-white/25 px-1.5 text-xs font-semibold leading-5 sm:hidden"
+                    aria-label={`${missingCount} zorunlu alan eksik`}
+                  >
+                    {missingCount} eksik
+                  </span>
+                ) : null}
               </Button>
             </span>
           </div>
-          {hasSecondary && moreOpen ? (
-            <div className="flex gap-2 sm:hidden max-sm:[&>*]:min-h-11 max-sm:[&>*]:flex-1">{secondaryButtons}</div>
-          ) : null}
         </div>
       )}
     </div>

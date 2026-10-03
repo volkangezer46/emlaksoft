@@ -146,6 +146,7 @@ export function MorphTabs({
             aria-controls={`${idPrefix}-panel-${t.id}`}
             tabIndex={active ? 0 : -1}
             title={density === "icon" ? t.label : undefined}
+            aria-label={density === "icon" ? t.label : undefined}
             data-active={active}
             data-density={density}
             data-orient={orientation}

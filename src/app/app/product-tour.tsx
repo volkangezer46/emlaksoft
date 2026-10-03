@@ -37,7 +37,7 @@ const CARD_W = 336; // balon kart genişliği (px)
 const CARD_H = 250; // yerleşim hesabı için tahmini kart yüksekliği (px)
 const GAP = 12; // delik ile kart arası boşluk (px)
 
-type TourStep = { selector: string; title: string; desc: string };
+type TourStep = { selector: string; title: string; desc: string; descMobile?: string };
 
 const STEPS: TourStep[] = [
   {
@@ -59,6 +59,7 @@ const STEPS: TourStep[] = [
     selector: '[data-tour="arama"]',
     title: "Arama kutusu",
     desc: "Müşteri adı, ilan numarası veya görev yazın; hepsi tek kutudan bulunur. Bilgisayarda Ctrl+K kısayolu da açar.",
+    descMobile: "Üstteki Arama simgesine dokunun; müşteri adı, ilan numarası veya görev yazın, hepsi tek kutudan bulunur.",
   },
   {
     selector: "aside",
@@ -298,7 +299,7 @@ export function ProductTour() {
           <h2 className="mt-2 font-display text-base font-bold text-ink-950">{step.title}</h2>
         </DialogTitle>
         <DialogDescription asChild>
-          <p className="mt-1 text-sm leading-relaxed text-text-muted">{step.desc}</p>
+          <p className="mt-1 text-sm leading-relaxed text-text-muted">{mobile && step.descMobile ? step.descMobile : step.desc}</p>
         </DialogDescription>
         <div className="mt-4 flex items-center justify-between gap-2">
           <button

@@ -93,7 +93,7 @@ export function KpiTile({
           </span>
         ) : null}
         <span className="min-w-0 flex-1">
-          <span className="pm-card-title line-clamp-2 break-words" title={label}>
+          <span className="pm-card-title line-clamp-2" title={label}>
             {label}
           </span>
           <span className={cn("pm-value mt-0.5 block", valueCls)} style={valueStyle}>
@@ -116,10 +116,10 @@ export function KpiTile({
               {ico}
             </span>
           ) : null}
-          <span className="pm-card-title line-clamp-2 break-words" title={label}>
+          <span className="pm-card-title line-clamp-2" title={label}>
             {label}
           </span>
-          {href ? <ChevronRight className="pm-card-arrow h-4 w-4" aria-hidden="true" /> : null}
+          {href ? <ChevronRight className="pm-card-arrow h-4 w-4 max-sm:hidden" aria-hidden="true" /> : null}
         </span>
         <span className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
           <span className={cn("pm-value", valueCls)} style={valueStyle}>

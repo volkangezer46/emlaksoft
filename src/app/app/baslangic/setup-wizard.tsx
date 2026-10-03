@@ -59,7 +59,7 @@ export function SetupWizard(props: SetupWizardProps) {
           </div>
           <Progress value={state.percent} label="Kurulum ilerlemesi" tone={state.complete ? "success" : "accent"} />
           <nav aria-label="Kurulum adımları">
-            <ol className="flex gap-1 overflow-x-auto pb-1">
+            <ol className="relative flex gap-1 overflow-x-auto pb-1">
               {[...state.steps.map((s) => ({ key: s.id as WizardStepKey, short: s.short, done: s.done })), { key: FINISH_STEP as WizardStepKey, short: "Bitiş", done: state.complete }].map(
                 (s, i) => {
                   const isCurrent = s.key === current;

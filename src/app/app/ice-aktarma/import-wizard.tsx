@@ -662,7 +662,7 @@ export function ImportWizard({
 
           <div>
             <h3 className="text-sm font-bold text-ink-950">İlk {PREVIEW_ROWS} satır (doğrulanmış haliyle)</h3>
-            <div className="mt-2 overflow-x-auto rounded-[var(--radius-card)] border border-line">
+            <div className="relative mt-2 overflow-x-auto rounded-[var(--radius-card)] border border-line">
               <table className="w-full min-w-[640px] text-left text-xs">
                 <thead className="bg-canvas text-text-muted">
                   <tr>
@@ -938,7 +938,7 @@ function ImportJournal({
           Henüz içe aktarma yapılmadı. Yaptığınız her aktarma burada listelenir ve yetkiliyseniz geri alınabilir.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-[var(--radius-card)] border border-line">
+        <div className="relative overflow-x-auto rounded-[var(--radius-card)] border border-line">
           <table className="w-full min-w-[640px] text-left text-xs">
             <thead className="bg-canvas text-text-muted">
               <tr>
