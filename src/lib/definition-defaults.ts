@@ -19,6 +19,8 @@ export const DEFINITION_CATEGORIES = [
   { key: "appointment_type", label: "Randevu tipi" },
   { key: "demand_urgency", label: "Talep aciliyeti" },
   { key: "ticket_category", label: "Destek kategorisi" },
+  { key: "loss_reason", label: "Kayıp nedeni" },
+  { key: "deal_stage_label", label: "Aşama adları" },
 ] as const;
 
 export type DefinitionCategory = (typeof DEFINITION_CATEGORIES)[number]["key"];
@@ -105,6 +107,24 @@ export const DEFAULT_DEFINITIONS: Record<DefinitionCategory, readonly DefaultDef
     { value: "compliance", label: "İYS / KVKK" },
     { value: "onboarding", label: "Kurulum" },
   ],
+  // Anlaşma kaybında seçilen neden (deals.loss_reason text; eski kayıtlarda serbest metin olabilir).
+  loss_reason: [
+    { value: "fiyat_yuksek", label: "Fiyat yüksek bulundu" },
+    { value: "baska_ofis", label: "Başka ofisle çalıştı" },
+    { value: "vazgecti", label: "Vazgeçti" },
+    { value: "finansman_yok", label: "Finansman bulamadı" },
+    { value: "mulk_satildi", label: "Mülk satıldı / kiralandı" },
+    { value: "ulasilamiyor", label: "Ulaşılamıyor" },
+    { value: "diger", label: "Diğer" },
+  ],
+  // Yalnız GÖRÜNEN aşama adı/rengi: value = DEAL_STAGES anahtarı (new/qualified/negotiation/won/lost).
+  deal_stage_label: [
+    { value: "new", label: "Yeni" },
+    { value: "qualified", label: "Nitelikli" },
+    { value: "negotiation", label: "Müzakere" },
+    { value: "won", label: "Kazanıldı" },
+    { value: "lost", label: "Kaybedildi" },
+  ],
 };
 
 /**
@@ -122,6 +142,8 @@ export const SYSTEM_DEFINITION_VALUES: Record<DefinitionCategory, readonly strin
   appointment_type: ["showing", "valuation", "office", "signing", "other"], // appointments CHECK + rapor sayaçları
   demand_urgency: ["low", "normal", "high", "urgent"], // talep skorlaması
   ticket_category: ["general"], // varsayılan destek kategorisi
+  loss_reason: ["diger"], // not zorunluluğu bu anahtara dallanır (loss-reason.ts)
+  deal_stage_label: ["won", "lost"], // kazanma/kayıp anlamı kodda sabit: silinemez (ad/renk değişebilir)
 };
 
 export function isSystemDefinitionValue(category: string, value: string): boolean {
