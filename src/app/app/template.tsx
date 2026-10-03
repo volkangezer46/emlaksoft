@@ -13,11 +13,15 @@
  */
 /// <reference types="react/canary" />
 import { ViewTransition } from "react";
+import { ViewTransitionGuard } from "@/components/app/view-transition-guard";
 
 export default function AppTemplate({ children }: { children: React.ReactNode }) {
   return (
     <ViewTransition default="page-fade">
-      <div className="page-in vt-page">{children}</div>
+      <div className="page-in vt-page">
+        <ViewTransitionGuard />
+        {children}
+      </div>
     </ViewTransition>
   );
 }

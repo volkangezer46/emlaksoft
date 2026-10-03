@@ -342,7 +342,7 @@ export function UnitsBoard({
                           isExpired(selected, now) ? "text-amber-600" : "text-ink-950"
                         }`}
                       >
-                        {new Date(selected.reserved_until).toLocaleDateString("tr-TR", {
+                        {new Date(selected.reserved_until).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul",
                           day: "2-digit",
                           month: "long",
                           hour: "2-digit",
@@ -355,7 +355,7 @@ export function UnitsBoard({
                     <>
                       <dt className="text-text-muted">Satış tarihi</dt>
                       <dd className="text-right font-semibold text-ink-950">
-                        {new Date(selected.sold_at).toLocaleDateString("tr-TR", {
+                        {new Date(selected.sold_at).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul",
                           day: "2-digit",
                           month: "long",
                           year: "numeric",

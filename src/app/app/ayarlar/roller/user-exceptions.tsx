@@ -34,7 +34,7 @@ function isActive(row: OverrideRow) {
 }
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
+  return new Date(iso).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul", day: "numeric", month: "long", year: "numeric" });
 }
 
 export function UserExceptions({

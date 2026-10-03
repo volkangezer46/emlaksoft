@@ -131,7 +131,7 @@ export function CustomerTasks({
                   <span className="rounded-full bg-ink-950/6 px-2 py-0.5 font-bold">{KIND_LABEL[t.kind] ?? "Görev"}</span>
                   {t.due_at ? (
                     <span className={`flex items-center gap-1 ${overdue ? "text-danger-500" : ""}`}>
-                      <Clock className="h-3 w-3" /> {new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(new Date(t.due_at))}
+                      <Clock className="h-3 w-3" /> {new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "short", timeStyle: "short" }).format(new Date(t.due_at))}
                       {overdue ? " · gecikti" : ""}
                     </span>
                   ) : null}

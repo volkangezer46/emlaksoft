@@ -155,8 +155,8 @@ export function PropertyAuthorizationPanel({
 
       {!editing ? (
         <div className="mt-3 space-y-1 text-sm text-text-muted">
-          {initial.authStart && <p>Başlangıç: <span className="font-semibold text-ink-950">{new Date(initial.authStart).toLocaleDateString("tr-TR")}</span></p>}
-          {initial.authEnd   && <p>Bitiş:     <span className="font-semibold text-ink-950">{new Date(initial.authEnd).toLocaleDateString("tr-TR")}</span></p>}
+          {initial.authStart && <p>Başlangıç: <span className="font-semibold text-ink-950">{new Date(initial.authStart).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" })}</span></p>}
+          {initial.authEnd   && <p>Bitiş:     <span className="font-semibold text-ink-950">{new Date(initial.authEnd).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" })}</span></p>}
           {initial.authType  && <p>Tür:       <span className="font-semibold text-ink-950">{initial.authType === "exclusive" ? "Tek Yetkili" : initial.authType === "open" ? "Açık Yetki" : "Sınırlı Yetki"}</span></p>}
           {initial.authNotes && <p className="mt-1 text-xs">{initial.authNotes}</p>}
           {!initial.authStart && !initial.authEnd && (

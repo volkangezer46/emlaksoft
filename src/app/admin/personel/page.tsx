@@ -226,7 +226,7 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => void }) 
         </Badge>
       </TD>
       <TD align="right" className="text-xs text-text-muted">
-        {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(member.created_at))}
+        {new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium" }).format(new Date(member.created_at))}
       </TD>
       <TD align="right">
         {member.is_active ? (

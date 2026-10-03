@@ -113,7 +113,7 @@ function getHiddenServerSnapshot(): string[] {
 }
 
 function tarih(iso: string) {
-  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(iso));
+  return new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium" }).format(new Date(iso));
 }
 
 export function DuplicateGroupsClient({ groups }: { groups: DuplicateGroup[] }) {

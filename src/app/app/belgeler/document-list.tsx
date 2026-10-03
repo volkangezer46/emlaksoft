@@ -48,7 +48,7 @@ const KIND_ICON = {
  */
 const DOWNLOAD_GAP_MS = 700;
 
-const dateFmt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" });
+const dateFmt = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium", timeStyle: "short" });
 
 export function DocumentList({ rows }: { rows: DocumentRow[] }) {
   const { push } = useToast();

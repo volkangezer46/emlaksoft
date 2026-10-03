@@ -72,7 +72,6 @@ const nextConfig: NextConfig = {
     // Buradaki her paket gerçekten kurulu olmalı — aksi halde satır ölü kalır.
     optimizePackageImports: [
       "lucide-react",
-      "date-fns",
       "recharts",
       "@radix-ui/react-dialog",
       "@radix-ui/react-dropdown-menu",

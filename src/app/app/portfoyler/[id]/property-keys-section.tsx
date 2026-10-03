@@ -46,8 +46,8 @@ import { PhoneInput } from "@/components/ui/phone-input";
 
 export type KeyWithHolder = PropertyKeyRow & { holder_staff_name: string | null };
 
-const dtf = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" });
-const dtfLong = new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" });
+const dtf = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium" });
+const dtfLong = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "short", timeStyle: "short" });
 
 function shortDate(value: string | null) {
   if (!value) return "—";
