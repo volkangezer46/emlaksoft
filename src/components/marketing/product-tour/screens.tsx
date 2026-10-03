@@ -70,7 +70,7 @@ export function CustomersScreen() {
   return (
     <AppShell w={W} h={H} sw={190} active={1} title="Müşteriler" sub="Müşteri, talep ve eşleşmeler aynı kartta" label="Müşteriler ekranı örneği: müşteri listesi ve seçili müşterinin talep ve eşleşme paneli" cta="+ Müşteri">
       <Card x={X0} y={84} w={450} h={456}>
-        <Chips x={16} y={16} items={["Tümü", "Alıcı", "Satıcı", "Kiracı"]} />
+        <Chips x={16} y={16} items={["Tümü", "Alıcılar", "Satıcılar", "Kiracılar"]} />
         {rows.map(([n, d, r, tone], i) => (
           <g key={n} transform={`translate(12 ${58 + i * 64})`}>
             <rect width="426" height="56" rx="12" fill={i === 1 ? "#eaf1ff" : "#fff"} stroke={i === 1 ? "#a9c1f5" : "transparent"} />
@@ -103,7 +103,7 @@ export function PortfolioScreen() {
   const grads = ["#dbe8ff", "#e9defd", "#d6f3ea", "#ffe9c9", "#ffdfe2", "#dfe9fb"];
   return (
     <AppShell w={W} h={H} sw={190} active={2} title="Portföy" sub="Portföyler, yayın teyidi ve anahtar takibi" label="Portföy ekranı örneği: durum etiketli portföy kartları" cta="+ Portföy">
-      <Chips x={X0} y={78} items={["Tümü", "Satılık", "Kiralık", "Teyit bekleyen"]} />
+      <Chips x={X0} y={78} items={["Tümü", "Satılıklar", "Kiralıklar", "Teyit bekleyen"]} />
       {items.map(([t, loc, st, tone], i) => {
         const x = X0 + (i % 3) * 258;
         const y = 120 + Math.floor(i / 3) * 214;
