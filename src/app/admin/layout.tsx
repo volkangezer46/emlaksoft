@@ -3,6 +3,8 @@ import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { requirePlatformStaff } from "@/lib/platform";
 import { PLATFORM_ROLE_LABELS, platformModulesFor } from "@/lib/platform-access";
 import { getAdminBadges } from "@/lib/admin-badges";
+import "@/app/console.css";
+import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { ThemeController } from "@/components/theme-controller";
 import { isPlatformMfaRequired } from "@/lib/platform-mfa";
 
@@ -18,9 +20,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="flex min-h-screen bg-canvas">
       <ThemeController />
+      <SidebarBoot />
       <AdminSidebar staffName={staff.full_name} role={staff.role} roleLabel={roleLabel} badges={badges} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <AdminTopbar roleLabel={roleLabel} modules={modules} />
+        <AdminTopbar roleLabel={roleLabel} staffName={staff.full_name} modules={modules} />
         {!isPlatformMfaRequired() ? (
           <p role="status" className="border-b border-amber-300/50 bg-amber-50 px-4 py-1.5 text-center text-xs font-semibold text-amber-800">
             Geliştirme modu: platform iki adımlı doğrulaması (TOTP) kapalı. Yayın öncesi PLATFORM_MFA_ENFORCEMENT=on yapın.
