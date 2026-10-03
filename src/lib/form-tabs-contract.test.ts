@@ -3,6 +3,10 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { CUSTOMER_DRAFT_FIELDS, CUSTOMER_TABS } from "@/app/app/musteriler/yeni/customer-tabs";
 import { PROPERTY_DRAFT_FIELDS, PROPERTY_TABS } from "@/app/app/portfoyler/yeni/property-tabs";
+import { APPROVAL_DRAFT_FIELDS, APPROVAL_TABS } from "@/app/app/onaylar/yeni/approval-tabs";
+import { CAMPAIGN_DRAFT_FIELDS, CAMPAIGN_TABS } from "@/app/app/kampanyalar/yeni/campaign-tabs";
+import { PROJECT_DRAFT_FIELDS, PROJECT_TABS } from "@/app/app/projeler/yeni/project-tabs";
+import { TICKET_DRAFT_FIELDS, TICKET_TABS } from "@/app/app/destek/yeni/ticket-tabs";
 import { isSensitiveFieldName } from "./form-tabs";
 
 /**
@@ -18,7 +22,7 @@ const read = (rel: string) => readFileSync(path.join(root, rel), "utf8");
 /** Kaynaktaki `name="x"` + özel bileşenlerin sabit alanları (GeoSelect, LatLngPicker). */
 function namesInSource(src: string): Set<string> {
   const names = new Set<string>();
-  for (const m of src.matchAll(/\bname="([a-z_]+)"/g)) names.add(m[1]);
+  for (const m of src.matchAll(/\bname="([A-Za-z_]+)"/g)) names.add(m[1]);
   if (/<GeoSelect\b/.test(src)) {
     names.add("province_id");
     names.add("district_id");
@@ -45,6 +49,30 @@ const FORMS = [
     source: "src/app/app/portfoyler/yeni/property-form.tsx",
     tabs: PROPERTY_TABS as readonly TabLike[],
     draft: PROPERTY_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "proje",
+    source: "src/app/app/projeler/yeni/new-project-form.tsx",
+    tabs: PROJECT_TABS as readonly TabLike[],
+    draft: PROJECT_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "kampanya",
+    source: "src/app/app/kampanyalar/yeni/new-campaign-form.tsx",
+    tabs: CAMPAIGN_TABS as readonly TabLike[],
+    draft: CAMPAIGN_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "onay",
+    source: "src/app/app/onaylar/yeni/new-approval-form.tsx",
+    tabs: APPROVAL_TABS as readonly TabLike[],
+    draft: APPROVAL_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "destek",
+    source: "src/app/app/destek/yeni/new-ticket-form.tsx",
+    tabs: TICKET_TABS as readonly TabLike[],
+    draft: TICKET_DRAFT_FIELDS as readonly string[],
   },
 ];
 
