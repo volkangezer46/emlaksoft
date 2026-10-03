@@ -10,6 +10,7 @@ import {
 } from "@/components/public/token-page";
 import { ConfirmButtons } from "./confirm-buttons";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { toWhatsAppLink } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -53,14 +54,14 @@ export default async function AppointmentConfirmPage({
   const { data: appt } = await admin
     .from("appointments")
     .select(
-      "id, appointment_type, scheduled_at, duration_min, status, customer_response, customer:customers!appointments_customer_id_fkey(full_name), tenant:tenants(name, status, logo_url, brand_color)",
+      "id, appointment_type, scheduled_at, duration_min, status, customer_response, customer:customers!appointments_customer_id_fkey(full_name), tenant:tenants(name, status, logo_url, brand_color, phone)",
     )
     .eq("confirm_token", token)
     .maybeSingle();
 
   if (!appt) notFound();
 
-  type TenantShape = { name?: string; status?: string; logo_url?: string | null; brand_color?: string | null };
+  type TenantShape = { name?: string; status?: string; logo_url?: string | null; brand_color?: string | null; phone?: string | null };
   const tenant = rel(appt.tenant as TenantShape | TenantShape[] | null);
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
   const office = tenant?.name ?? "Emlak ofisi";
@@ -115,6 +116,7 @@ export default async function AppointmentConfirmPage({
       ) : (
         <ConfirmButtons
           token={token}
+          whatsAppHref={toWhatsAppLink(tenant.phone, `Merhaba, ${tarih} ${saat} randevum için başka bir zaman önermek istiyorum.`)}
           initialResponse={appt.customer_response as "coming" | "cancelled" | null}
         />
       )}

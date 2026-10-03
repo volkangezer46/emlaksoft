@@ -14,6 +14,14 @@ import { getOwnerPortalData } from "@/app/actions/owner-portal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { OfferActions } from "./offer-actions";
+import {
+  PortalContactBar,
+  PortalEmpty,
+  PortalFooterNote,
+  PortalInvalidLink,
+  PortalSection,
+  PortalStickySpacer,
+} from "@/components/public/portal-kit";
 import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
 
 export const dynamic = "force-dynamic";
@@ -73,17 +81,10 @@ export default async function MalikPortaliPage({
 
   if (!data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
-        <div className="max-w-sm text-center">
-          <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-danger-500/10">
-            <Building2 className="h-8 w-8 text-danger-500" />
-          </div>
-          <h1 className="font-display text-lg font-bold text-ink-950">Bağlantı geçersiz veya süresi dolmuş</h1>
-          <p className="mt-2 text-sm text-text-muted">
-            Bu malik paneli bağlantısı artık geçerli değil. Danışmanınızla iletişime geçin.
-          </p>
-        </div>
-      </div>
+      <PortalInvalidLink
+        icon={Building2}
+        description="Bu malik paneli bağlantısı artık geçerli değil. Danışmanınızla iletişime geçin."
+      />
     );
   }
 
@@ -248,14 +249,9 @@ export default async function MalikPortaliPage({
         </section>
 
         {/* Yayın durumu */}
-        <section id="yayinlar" className="scroll-mt-4">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950">
-            <RadioTower className="h-4 w-4 text-brand-600" /> Portal Yayınları
-          </h3>
+        <PortalSection id="yayinlar" icon={RadioTower} title="Portal Yayınları" iconClassName="text-brand-600">
           {portalListings.length === 0 ? (
-            <div className="rounded-[var(--radius-card)] border border-dashed border-line bg-surface py-8 text-center">
-              <p className="text-sm text-text-muted">Henüz portal yayını bulunmuyor.</p>
-            </div>
+            <PortalEmpty icon={RadioTower} title="Henüz portal yayını bulunmuyor." />
           ) : (
             <div className="space-y-2">
               {portalListings.map((l) => (
@@ -287,17 +283,12 @@ export default async function MalikPortaliPage({
               ))}
             </div>
           )}
-        </section>
+        </PortalSection>
 
         {/* Teklifler */}
-        <section id="teklifler" className="scroll-mt-4">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950">
-            <Tag className="h-4 w-4 text-amber-600" /> Gelen Teklifler
-          </h3>
+        <PortalSection id="teklifler" icon={Tag} title="Gelen Teklifler" iconClassName="text-amber-600">
           {offers.length === 0 ? (
-            <div className="rounded-[var(--radius-card)] border border-dashed border-line bg-surface py-8 text-center">
-              <p className="text-sm text-text-muted">Henüz teklif gelmedi. Teklifler geldiğinde burada görünür.</p>
-            </div>
+            <PortalEmpty icon={Tag} title="Henüz teklif gelmedi. Teklifler geldiğinde burada görünür." />
           ) : (
             <div className="space-y-2">
               {offers.map((o) => (
@@ -331,14 +322,11 @@ export default async function MalikPortaliPage({
               ))}
             </div>
           )}
-        </section>
+        </PortalSection>
 
         {/* Fiyat geçmişi — kayıt varsa (yalnızca liste fiyatı serisi) */}
         {priceHistory.length > 0 && (
-          <section id="fiyat-gecmisi" className="scroll-mt-4">
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950">
-              <History className="h-4 w-4 text-mint-600" /> Fiyat Geçmişi
-            </h3>
+          <PortalSection id="fiyat-gecmisi" icon={History} title="Fiyat Geçmişi" iconClassName="text-mint-600">
             <div className="space-y-2">
               {priceHistory.map((h) => (
                 <div key={h.id} className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
@@ -370,18 +358,13 @@ export default async function MalikPortaliPage({
                 </div>
               ))}
             </div>
-          </section>
+          </PortalSection>
         )}
 
         {/* Randevular */}
-        <section id="randevular" className="scroll-mt-4">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950">
-            <CalendarDays className="h-4 w-4 text-brand-600" /> Randevular
-          </h3>
+        <PortalSection id="randevular" icon={CalendarDays} title="Randevular" iconClassName="text-brand-600">
           {appointments.length === 0 ? (
-            <div className="rounded-[var(--radius-card)] border border-dashed border-line bg-surface py-8 text-center">
-              <p className="text-sm text-text-muted">Planlanmış randevu bulunmuyor.</p>
-            </div>
+            <PortalEmpty icon={CalendarDays} title="Planlanmış randevu bulunmuyor." />
           ) : (
             <div className="space-y-2">
               {appointments.map((a) => (
@@ -402,21 +385,20 @@ export default async function MalikPortaliPage({
               ))}
             </div>
           )}
-        </section>
+        </PortalSection>
 
         {/* Açıklama */}
         {property.description && (
           <section className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
-            <h3 className="mb-2 text-sm font-bold text-ink-950">İlan Açıklaması</h3>
+            <h2 className="mb-2 text-sm font-bold text-ink-950">İlan Açıklaması</h2>
             <p className="text-sm leading-relaxed text-text-muted">{property.description}</p>
           </section>
         )}
 
-        <p className="text-center text-xs text-text-faint pb-4">
-          Bu sayfa {tenant.name} tarafından sizin için oluşturulmuştur.
-          <br />EmlakSoft ile güçlendirilmiştir.
-        </p>
+        <PortalFooterNote office={tenant.name} />
+        <PortalStickySpacer active={Boolean(contactTel || contactWhatsApp)} />
       </main>
+      <PortalContactBar telHref={contactTel} whatsAppHref={contactWhatsApp} callLabel={contactLabel} />
     </div>
   );
 }
