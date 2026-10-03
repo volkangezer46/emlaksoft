@@ -5,6 +5,8 @@ import {
   MessageCircle, Phone, PhoneCall, PieChart, Timer, TrendingDown, TrendingUp, Zap,
 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
+import { getLossReasonOptions } from "@/lib/definitions";
+import { lossReasonGroupLabel, lossReasonLabels } from "@/lib/loss-reason";
 import { createClient } from "@/lib/supabase/server";
 import { computeFragileDealType, detectLostSaleRisks, estimateLostRevenue } from "@/lib/lost-sale-detector";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
@@ -33,7 +35,7 @@ type DealRow = {
  * Migration yok: yalnız mevcut deals kolonları (loss_reason, deal_value,
  * created_at → updated_at döngü süresi) okunur. Yetersiz veri → içgörü üretmez.
  */
-function buildLossInsights(deals: DealRow[], now: number) {
+function buildLossInsights(deals: DealRow[], now: number, reasonLabels: Record<string, string>) {
   const lost = deals.filter((d) => d.stage === "lost");
   const won = deals.filter((d) => d.stage === "won");
   const insights: Array<{
@@ -49,7 +51,7 @@ function buildLossInsights(deals: DealRow[], now: number) {
   if (lost.length >= 3) {
     const byReason = new Map<string, number>();
     for (const d of lost) {
-      const r = (d.loss_reason ?? "").trim() || "Belirtilmemiş";
+      const r = lossReasonGroupLabel(d.loss_reason, reasonLabels);
       byReason.set(r, (byReason.get(r) ?? 0) + 1);
     }
     const [topReason, topCount] = [...byReason.entries()].sort((a, b) => b[1] - a[1])[0];
@@ -139,7 +141,7 @@ export default async function KayipSatisPage() {
   // Snooze/arandı filtresi: dismissed_until gelecekte olanlar ve son 30 günde
   // "called" işaretlenenler listeden düşer (bkz. lost_sale_dismissals).
   const supabase = await createClient();
-  const [{ data: dismissals }, { data: closedDeals }] = await Promise.all([
+  const [{ data: dismissals }, { data: closedDeals }, lossOptions] = await Promise.all([
     supabase
       .from("lost_sale_dismissals")
       .select("customer_id, dismissed_until, reason, created_at")
@@ -152,7 +154,9 @@ export default async function KayipSatisPage() {
       .in("stage", ["won", "lost"])
       .gte("updated_at", daysAgoIso(365))
       .limit(1000),
+    getLossReasonOptions(),
   ]);
+  const reasonLabels = lossReasonLabels(lossOptions);
 
   // Ofis geneli "kırılgan işlem türü" deseni — detectLostSaleRisks'e canlı
   // talep eşleştirmesi için geçirilir (bkz. lost-sale-detector.ts kural 4).
@@ -178,7 +182,7 @@ export default async function KayipSatisPage() {
 
   // ── Kaçan fırsat radarı: kapanan anlaşmalardan gerçek desenler ────────────
   const deals = (closedDeals ?? []) as DealRow[];
-  const { insights, lost, won } = buildLossInsights(deals, now);
+  const { insights, lost, won } = buildLossInsights(deals, now, reasonLabels);
   const lostRevenue = lost.reduce((s, d) => s + Number(d.deal_value || 0), 0);
   const closedTotal = lost.length + won.length;
   const winRate = closedTotal > 0 ? Math.round((won.length / closedTotal) * 100) : null;
@@ -186,7 +190,7 @@ export default async function KayipSatisPage() {
   // Neden dağılımı: adet + kaybedilen tutar birlikte
   const reasonAgg = new Map<string, { count: number; value: number }>();
   for (const d of lost) {
-    const r = (d.loss_reason ?? "").trim() || "Belirtilmemiş";
+    const r = lossReasonGroupLabel(d.loss_reason, reasonLabels);
     const rec = reasonAgg.get(r) ?? { count: 0, value: 0 };
     rec.count += 1;
     rec.value += Number(d.deal_value || 0);

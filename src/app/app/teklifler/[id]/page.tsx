@@ -18,6 +18,8 @@ import {
   User,
 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
+import { getStageLabels } from "@/lib/definitions";
+import { stageLabelMap } from "@/lib/deal-stage-labels";
 import { getOffer, listOfferRounds, type OfferRound } from "@/app/actions/offers";
 import { createClient } from "@/lib/supabase/server";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
@@ -36,14 +38,6 @@ const STATUS_LABELS: Record<string, string> = {
   withdrawn: "Geri çekildi",
 };
 
-/** Anlaşma aşama etiketleri — deal-board ile aynı. */
-const DEAL_STAGE_LABELS: Record<string, string> = {
-  new: "Yeni",
-  qualified: "Nitelikli",
-  negotiation: "Müzakere",
-  won: "Kazanıldı",
-  lost: "Kaybedildi",
-};
 
 const STATUS_STYLE: Record<string, string> = {
   accepted: "bg-mint-50 text-mint-700 ring-mint-600/20",
@@ -84,6 +78,7 @@ function one<T>(v: T | T[] | null): T | null {
 
 export default async function OfferDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { perms } = await requireModulePage("offers", "/app/teklifler");
+  const stageNames = stageLabelMap(await getStageLabels());
   const canEdit = (perms.offers ?? perms.commissions ?? []).includes("edit");
   const { id } = await params;
 
@@ -394,7 +389,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
                   Anlaşma detayını aç
                 </span>
                 <span className="flex shrink-0 items-center gap-1.5 text-xs text-text-muted">
-                  {DEAL_STAGE_LABELS[relatedDeal.stage] ?? relatedDeal.stage}
+                  {stageNames[relatedDeal.stage] ?? relatedDeal.stage}
                   <ArrowUpRight className="h-3.5 w-3.5" />
                 </span>
               </Link>

@@ -19,22 +19,25 @@ import {
 import { detailOrList } from "@/lib/form-logic";
 import { parseLooseNumber } from "@/lib/form-tabs";
 import { formatTry } from "@/lib/utils";
+import { defaultStageLabels, stageLabelMap } from "@/lib/deal-stage-labels";
 import { DEAL_DRAFT_FIELDS, DEAL_FORM_ID, DEAL_TABS } from "./deal-tabs";
 
 type Prop = { id: string; property_code: string; title: string | null; list_price: number | null; transaction_type: string };
 type Cust = { id: string; full_name: string };
 
+// Görünen aşama adları ofis tanımından (stageNames); anahtarlar sabit.
 const STAGES = [
-  { value: "new", label: "Yeni", help: "Ön görüşme aşaması; portföy, müşteri ve yetki belgesi şart değil." },
-  { value: "qualified", label: "Nitelikli", help: "Müşteri ciddi ve bütçesi uygun; hâlâ yetki belgesi şart değil." },
-  { value: "negotiation", label: "Müzakere", help: "Fiyat pazarlığı başladı; portföy, müşteri ve yazılı yetki belgesi zorunlu." },
+  { value: "new", help: "Ön görüşme aşaması; portföy, müşteri ve yetki belgesi şart değil." },
+  { value: "qualified", help: "Müşteri ciddi ve bütçesi uygun; hâlâ yetki belgesi şart değil." },
+  { value: "negotiation", help: "Fiyat pazarlığı başladı; portföy, müşteri ve yazılı yetki belgesi zorunlu." },
 ] as const;
 
 const addLink = "mt-1 inline-block text-xs font-semibold text-brand-600 underline underline-offset-2";
 
 const TAB_ICONS = { taraflar: TI.taraflar, detay: TI.detay } as const;
 
-export function NewDealForm({ properties, customers, userId }: { properties: Prop[]; customers: Cust[]; userId: string }) {
+export function NewDealForm({ properties, customers, userId, stageNames = stageLabelMap(defaultStageLabels()) }: { properties: Prop[]; customers: Cust[]; userId: string; stageNames?: Record<string, string> }) {
+  const nameOf = (v: string) => stageNames[v] ?? v;
   const [stage, setStage] = useState<string>("new");
   const [hasAuthority, setHasAuthority] = useState(false);
   const { onSubmit, pending, error } = useCreateForm((fd) => createPipelineDeal(fd), {
@@ -108,7 +111,7 @@ export function NewDealForm({ properties, customers, userId }: { properties: Pro
         <FormField label="Aşama" htmlFor="deal-stage" hint={stageMeta.help}>
           <FormSelect name="stage" value={stage} onChange={(e) => setStage(e.target.value)}>
             {STAGES.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
+              <option key={s.value} value={s.value}>{nameOf(s.value)}</option>
             ))}
           </FormSelect>
         </FormField>
@@ -126,7 +129,7 @@ export function NewDealForm({ properties, customers, userId }: { properties: Pro
           />
           <span>
             <span className="font-bold text-mint-700">Yazılı yetki / EİDS onaylı</span>
-            <span className="mt-0.5 block text-text-muted">Müzakere veya kazanılan aşaması için gerekli.</span>
+            <span className="mt-0.5 block text-text-muted">{nameOf("negotiation")} veya {nameOf("won")} aşaması için gerekli.</span>
           </span>
         </label>
       </>
@@ -162,7 +165,7 @@ export function NewDealForm({ properties, customers, userId }: { properties: Pro
           <SummaryRow label="Portföy" value={prop?.property_code ?? (hasProp ? "Seçildi" : "Seçilmedi")} muted={!hasProp} tab="taraflar" field="deal-property" />
           <SummaryRow label="Müşteri" value={cust?.full_name ?? (hasCust ? "Seçildi" : "Seçilmedi")} muted={!hasCust} tab="taraflar" field="deal-customer" />
           <SummaryRow label="Tür" value={values.deal_type === "rent" ? "Kiralama" : "Satış"} tab="detay" field="deal_type" />
-          <SummaryRow label="Aşama" value={stageMeta.label} tab="detay" field="stage" />
+          <SummaryRow label="Aşama" value={nameOf(stageMeta.value)} tab="detay" field="stage" />
           <SummaryRow label="Liste fiyatı" value={list ? formatTry(list) : "Portföy seçilince"} muted={!list} tab="taraflar" field="deal-property" />
           <SummaryRow
             label="Liste fiyatına oran"
@@ -175,7 +178,7 @@ export function NewDealForm({ properties, customers, userId }: { properties: Pro
         </SummaryGroup>
         {missing.length > 0 ? (
           <p role="status" className="rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-medium text-amber-800">
-            Müzakere aşaması için eksik: {missing.join(", ")}.
+            {nameOf("negotiation")} aşaması için eksik: {missing.join(", ")}.
           </p>
         ) : null}
       </>
@@ -205,8 +208,8 @@ export function NewDealForm({ properties, customers, userId }: { properties: Pro
             className="flex items-start gap-2 rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-medium text-amber-800"
           >
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden />
-            Müzakere aşamasına geçmek için yazılı yetki belgesi gerekir. Yetki onaylıysa Anlaşma detayı sekmesindeki kutuyu
-            işaretleyin; değilse aşamayı &quot;Yeni&quot; veya &quot;Nitelikli&quot; bırakın.
+            {nameOf("negotiation")} aşamasına geçmek için yazılı yetki belgesi gerekir. Yetki onaylıysa Anlaşma detayı sekmesindeki kutuyu
+            işaretleyin; değilse aşamayı &quot;{nameOf("new")}&quot; veya &quot;{nameOf("qualified")}&quot; bırakın.
           </p>
         ) : null
       }

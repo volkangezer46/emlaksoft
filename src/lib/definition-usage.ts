@@ -7,7 +7,7 @@ import type { DefinitionCategory } from "@/lib/definition-defaults";
  */
 export const DEFINITION_USAGE_REFS: Record<
   DefinitionCategory,
-  readonly { table: string; column: string; array?: boolean; softDelete?: boolean }[]
+  readonly { table: string; column: string; array?: boolean; softDelete?: boolean; prefixed?: boolean }[]
 > = {
   customer_type: [{ table: "customers", column: "customer_types", array: true, softDelete: true }],
   customer_source: [{ table: "customers", column: "source", softDelete: true }],
@@ -24,6 +24,10 @@ export const DEFINITION_USAGE_REFS: Record<
   appointment_type: [{ table: "appointments", column: "appointment_type" }],
   demand_urgency: [{ table: "demands", column: "urgency" }],
   ticket_category: [{ table: "support_tickets", column: "category" }],
+  // deals.loss_reason: "<value>" veya "<value> | not" saklanır (loss-reason.ts) → tam eşleşme + önek sayılır.
+  loss_reason: [{ table: "deals", column: "loss_reason", prefixed: true }],
+  // Yalnız görünen etiket: hiçbir kayıtta saklanmaz (aşama anahtarı deals.stage'de kalır).
+  deal_stage_label: [],
 };
 
 /**
@@ -47,6 +51,17 @@ export async function countDefinitionUsage(
     const { count, error } = await q;
     if (error) return null;
     total += count ?? 0;
+    if (ref.prefixed) {
+      // "<value> | not" biçimi: LIKE özel karakterleri kaçırılır.
+      const escaped = value.replace(/[\\%_]/g, (c) => `\\${c}`);
+      const { count: noted, error: notedError } = await supabase
+        .from(ref.table)
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .like(ref.column, `${escaped} | %`);
+      if (notedError) return null;
+      total += noted ?? 0;
+    }
   }
   return total;
 }

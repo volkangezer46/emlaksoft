@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/dialog";
 import { StatusTransitionBar, isAllowedTransition } from "./status-transition";
 import { WinCelebrationDialog } from "./win-celebration-dialog";
+import { LossReasonDialog, type LossReasonOption } from "./loss-reason-dialog";
+import { defaultStageLabels, type StageLabels } from "@/lib/deal-stage-labels";
 
 export type BoardDeal = {
   id: string;
@@ -42,12 +44,12 @@ export type BoardDeal = {
 
 type Member = { id: string; full_name: string };
 
-const STAGES: { key: DealStage; label: string; tone: string; ring: string }[] = [
-  { key: "new", label: "Yeni", tone: "text-cyan-600", ring: "border-cyan-400/30 bg-cyan-400/5" },
-  { key: "qualified", label: "Nitelikli", tone: "text-brand-600", ring: "border-brand-400/30 bg-brand-600/5" },
-  { key: "negotiation", label: "Müzakere", tone: "text-amber-600", ring: "border-amber-400/35 bg-amber-400/5" },
-  { key: "won", label: "Kazanıldı", tone: "text-mint-600", ring: "border-mint-500/35 bg-mint-500/5" },
-  { key: "lost", label: "Kaybedildi", tone: "text-danger-500", ring: "border-danger-500/25 bg-danger-500/5" },
+const STAGES: { key: DealStage; tone: string; ring: string }[] = [
+  { key: "new", tone: "text-cyan-600", ring: "border-cyan-400/30 bg-cyan-400/5" },
+  { key: "qualified", tone: "text-brand-600", ring: "border-brand-400/30 bg-brand-600/5" },
+  { key: "negotiation", tone: "text-amber-600", ring: "border-amber-400/35 bg-amber-400/5" },
+  { key: "won", tone: "text-mint-600", ring: "border-mint-500/35 bg-mint-500/5" },
+  { key: "lost", tone: "text-danger-500", ring: "border-danger-500/25 bg-danger-500/5" },
 ];
 
 function money(n: number | null) {
@@ -76,10 +78,16 @@ export function DealBoard({
   deals,
   canEdit = false,
   members = [],
+  lossReasons = [],
+  stageLabels = defaultStageLabels(),
 }: {
   deals: BoardDeal[];
   canEdit?: boolean;
   members?: Member[];
+  /** Ofisin `loss_reason` tanım listesi (kayıp diyaloğu). */
+  lossReasons?: LossReasonOption[];
+  /** Ofisin görünen aşama adı/rengi (aşama anahtarları sabit). */
+  stageLabels?: StageLabels;
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -87,7 +95,6 @@ export function DealBoard({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editing, setEditing] = useState<BoardDeal | null>(null);
   const [lossFor, setLossFor] = useState<BoardDeal | null>(null);
-  const [lossReason, setLossReason] = useState("");
   // Kazanma sihirbazı — yalnız won'a İLK geçişte açılır (move zaten sadece
   // won olmayan karttan tetiklenebilir); optimistic açılır, hatada kapanır.
   const [wonFor, setWonFor] = useState<BoardDeal | null>(null);
@@ -123,7 +130,7 @@ export function DealBoard({
 
   const memberById = useMemo(() => new Map(members.map((m) => [m.id, m.full_name])), [members]);
 
-  function move(dealId: string, stage: DealStage, reason?: string) {
+  function move(dealId: string, stage: DealStage, reason?: { value: string; note: string }) {
     if (busyId === dealId && pending) return; // çifte tıklama koruması
     setBusyId(dealId);
     // Won'a ilk geçiş: kutlama sihirbazı server onayı beklenmeden açılır
@@ -141,7 +148,10 @@ export function DealBoard({
       const fd = new FormData();
       fd.set("deal_id", dealId);
       fd.set("stage", stage);
-      if (stage === "lost") fd.set("loss_reason", reason?.trim() || "Neden belirtilmedi");
+      if (stage === "lost") {
+        fd.set("loss_reason", reason?.value ?? "");
+        fd.set("loss_note", reason?.note ?? "");
+      }
       try {
         const res = await updateDealStage(fd);
         if (res.error) {
@@ -218,7 +228,6 @@ export function DealBoard({
               if (col.key === "lost") {
                 // Kayıp akışı korunur: neden onaylanmadan optimistic taşıma YOK;
                 // diyalog iptal edilirse kart yerinde kalır.
-                setLossReason("");
                 lossReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
                 setLossFor(deal);
                 return;
@@ -228,7 +237,12 @@ export function DealBoard({
           >
             <header className="flex items-center justify-between border-b border-line/60 px-3.5 py-3">
               <div>
-                <p className={`text-xs font-extrabold uppercase tracking-[0.12em] ${col.tone}`}>{col.label}</p>
+                <p
+                  className={`text-xs font-extrabold uppercase tracking-[0.12em] ${col.tone}`}
+                  style={stageLabels[col.key].color ? { color: stageLabels[col.key].color ?? undefined } : undefined}
+                >
+                  {stageLabels[col.key].label}
+                </p>
                 <p className="mt-0.5 text-xs text-text-muted">{rows.length} · {money(sum)}</p>
               </div>
               <span className="grid h-7 w-7 place-items-center rounded-[var(--radius-control)] bg-surface text-xs font-bold text-ink-950 shadow-[var(--shadow-xs)]">
@@ -356,6 +370,11 @@ export function DealBoard({
                         <StatusTransitionBar
                           dealId={d.id}
                           stage={d.stage}
+                          stageLabels={stageLabels}
+                          onLossRequest={(trigger) => {
+                            lossReturnFocusRef.current = trigger;
+                            setLossFor(d);
+                          }}
                           onWonStart={() => {
                             winReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
                             setWonFor(d);
@@ -399,7 +418,7 @@ export function DealBoard({
                             onClick={() => move(d.id, next.key)}
                             className="ml-auto inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-ink-950 px-2 py-1 text-xs font-bold text-white disabled:opacity-50"
                           >
-                            {next.label} <ArrowRight className="h-3 w-3" />
+                            {stageLabels[next.key].label} <ArrowRight className="h-3 w-3" />
                           </button>
                         ) : null}
                         {col.key === "negotiation" ? (
@@ -417,7 +436,6 @@ export function DealBoard({
                             type="button"
                             disabled={busy}
                             onClick={(event) => {
-                              setLossReason("");
                               lossReturnFocusRef.current = event.currentTarget;
                               setLossFor(d);
                             }}
@@ -513,62 +531,21 @@ export function DealBoard({
         />
       ) : null}
 
-      <Dialog open={lossFor !== null} onOpenChange={(open) => { if (!open) setLossFor(null); }}>
-        {lossFor ? (
-          <DialogContent
-            size="sm"
-            overlayClassName="bg-ink-950/40 backdrop-blur-sm"
-            className="max-w-sm rounded-[var(--radius-panel)] border-line shadow-[var(--shadow-lg)]"
-            onCloseAutoFocus={(event) => {
-              event.preventDefault();
-              const target = lossReturnFocusRef.current;
-              lossReturnFocusRef.current = null;
-              if (target?.isConnected) target.focus();
-              else document.getElementById(`deal-card-${lossFor.id}`)?.focus();
-            }}
-          >
-            <div className="flex items-center justify-between border-b border-line px-6 py-4">
-              <DialogTitle className="font-display text-lg font-bold text-ink-950">Kayıp nedeni</DialogTitle>
-              <DialogClose asChild>
-                <button type="button" className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-canvas" aria-label="Kapat">
-                  <X className="h-5 w-5" />
-                </button>
-              </DialogClose>
-            </div>
-            <div className="space-y-4 p-6">
-              <DialogDescription className="text-sm text-text-muted">{lossFor.property_title ?? lossFor.property_code ?? "Anlaşma"} neden kaybedildi?</DialogDescription>
-              <div className="flex flex-wrap gap-1.5">
-                {["Fiyat yüksek", "Rakip kapattı", "Müşteri vazgeçti", "İletişim koptu", "Finansman"].map((r) => (
-                  <button key={r} type="button" aria-pressed={lossReason === r} onClick={() => setLossReason(r)} className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${lossReason === r ? "bg-danger-500 text-white" : "border border-line text-text-muted hover:border-danger-500/40"}`}>
-                    {r}
-                  </button>
-                ))}
-              </div>
-              <textarea
-                aria-label="Kayıp nedeni"
-                value={lossReason}
-                onChange={(e) => setLossReason(e.target.value)}
-                rows={2}
-                placeholder="Neden…"
-                className="w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-danger-400"
-              />
-              <div className="flex justify-end gap-2">
-                <DialogClose asChild>
-                  <button type="button" className="rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted hover:bg-canvas">Vazgeç</button>
-                </DialogClose>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => { const d = lossFor; setLossFor(null); if (d) move(d.id, "lost", lossReason); }}
-                  className="rounded-[var(--radius-control)] bg-danger-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-danger-600 disabled:opacity-60"
-                >
-                  Kayıp olarak işaretle
-                </button>
-              </div>
-            </div>
-          </DialogContent>
-        ) : null}
-      </Dialog>
+      <LossReasonDialog
+        open={lossFor !== null}
+        title={lossFor ? (lossFor.property_title ?? lossFor.property_code ?? "Anlaşma") : ""}
+        options={lossReasons}
+        pending={pending}
+        onCancel={() => setLossFor(null)}
+        onConfirm={(value, note) => { const d = lossFor; setLossFor(null); if (d) move(d.id, "lost", { value, note }); }}
+        onClosedFocus={(event) => {
+          event.preventDefault();
+          const target = lossReturnFocusRef.current;
+          lossReturnFocusRef.current = null;
+          if (target?.isConnected) target.focus();
+          else if (lossFor) document.getElementById(`deal-card-${lossFor.id}`)?.focus();
+        }}
+      />
     </div>
   );
 }

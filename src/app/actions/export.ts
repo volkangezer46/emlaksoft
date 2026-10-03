@@ -4,10 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import {
-  mapAppointment, mapAudit, mapCommission, mapContract, mapCustomer, mapDeal, mapDemand, mapDue, mapExpense,
+  mapAppointment, mapAudit, mapCommission, mapContract, mapCustomer, mapDealWith, mapDemand, mapDue, mapExpense,
   mapOffer, mapPortalListing, mapProject, mapProperty, mapReferral, relOne, toCsv,
 } from "@/lib/export-entities";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
+import { getStageLabels } from "@/lib/definitions";
+import { stageLabelMap } from "@/lib/deal-stage-labels";
 import { logActivity } from "@/lib/activity";
 
 export type ExportResult = {
@@ -339,7 +341,8 @@ export async function exportDealsCsv(): Promise<ExportResult> {
     console.error("exportDealsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
-  const rows = (data ?? []).map((r) => mapDeal(r));
+  const stageNames = stageLabelMap(await getStageLabels());
+  const rows = (data ?? []).map(mapDealWith(stageNames));
   return exportResult(gate, "anlasmalar", rows, `anlasmalar-${today10()}.csv`);
 }
 

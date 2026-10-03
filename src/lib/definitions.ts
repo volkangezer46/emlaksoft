@@ -3,6 +3,8 @@ import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { DEFAULT_DEFINITIONS, type DefinitionCategory } from "@/lib/definition-defaults";
+import { mergeLossReasonDefaults } from "@/lib/loss-reason";
+import { resolveStageLabels, type StageLabels } from "@/lib/deal-stage-labels";
 
 export type { DefinitionCategory };
 
@@ -100,4 +102,23 @@ export async function getDefinitionsOrDefault(category: DefinitionCategory): Pro
   }
   if (items.length > 0) return items;
   return DEFAULT_DEFINITIONS[category].map((d) => ({ value: d.value, label: d.label, color: null }));
+}
+
+/**
+ * Kayıp nedeni seçenekleri: ofis tanımı/varsayılan + sistem anahtarı 'diger' HER ZAMAN bulunur
+ * (global seed uygulanmamışken ofis kendi nedenini eklese bile "Diğer" kaybolmaz).
+ */
+export async function getLossReasonOptions(): Promise<DefinitionItem[]> {
+  return mergeLossReasonDefaults(await getDefinitionsOrDefault("loss_reason"));
+}
+
+/** Anlaşma aşaması görünen ad/renkleri (ofis tanımı + varsayılan; her zaman 5 aşama döner). */
+export async function getStageLabels(): Promise<StageLabels> {
+  let items: DefinitionItem[] = [];
+  try {
+    items = await getDefinitions("deal_stage_label");
+  } catch {
+    items = [];
+  }
+  return resolveStageLabels(items);
 }

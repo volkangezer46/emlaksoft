@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { getDefinitions } from "@/lib/definitions";
+import { getDefinitions, getStageLabels } from "@/lib/definitions";
+import { stageLabelMap } from "@/lib/deal-stage-labels";
 import { EditCustomerDialog } from "./edit-customer-dialog";
 import { CustomerTagChips } from "./customer-tag-chips";
 import { fetchTenantTags } from "../tenant-tags";
@@ -142,6 +143,7 @@ export default async function CustomerDetailPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { perms, userId } = await requireModulePage("customers");
+  const stageNames = stageLabelMap(await getStageLabels());
   const canEdit = (perms.customers ?? []).includes("edit");
   const canDelete = (perms.customers ?? []).includes("delete");
   const canTaskCreate = (perms.tasks ?? []).includes("create");
@@ -712,6 +714,7 @@ export default async function CustomerDetailPage({
             sourceDetail={customer.lead_source_detail}
             createdAt={customer.created_at}
             audit={audit}
+            stageNames={stageNames}
             deals={(dealsData ?? []).map((d) => ({
               id: d.id,
               stage: d.stage,

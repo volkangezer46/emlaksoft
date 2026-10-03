@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { defaultStageLabels, stageLabelMap } from "@/lib/deal-stage-labels";
 import {
   ArrowUpRight,
   CalendarDays,
@@ -159,6 +160,7 @@ export function Customer360Tabs({
   showTasks = true,
   ozetSlot,
   tasksSlot,
+  stageNames,
 }: {
   customerId: string;
   customerName: string;
@@ -188,14 +190,10 @@ export function Customer360Tabs({
   /** Özet sekmesinin akan bölümleri (portföy önerileri + memnuniyet) — yalnız aktifken çizilir. */
   ozetSlot?: ReactNode;
   tasksSlot?: ReactNode;
+  /** Ofisin görünen anlaşma aşaması adları (aşama anahtarı → ad); verilmezse varsayılan adlar. */
+  stageNames?: Record<string, string>;
 }) {
-  const stageLabel: Record<string, string> = {
-    new: "Yeni",
-    qualified: "Nitelikli",
-    negotiation: "Müzakere",
-    won: "Kazanıldı",
-    lost: "Kaybedildi",
-  };
+  const stageLabel: Record<string, string> = stageNames ?? stageLabelMap(defaultStageLabels());
   const channelLabel: Record<string, string> = {
     sms: "SMS",
     email: "E-posta",

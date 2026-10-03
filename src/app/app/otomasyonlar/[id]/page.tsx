@@ -6,6 +6,8 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { AutomationToggleButton } from "../automation-actions";
 import { AutomationWizard, type WizardInitial } from "../automation-wizard";
+import { getStageLabels } from "@/lib/definitions";
+import { stageLabelMap } from "@/lib/deal-stage-labels";
 import { TRIGGER_LABELS, ACTION_LABELS, STATUS_LABELS, TRIGGER_CONFIG_LABELS, CONDITION_OP_LABELS } from "../labels";
 
 function dateTime(iso: string | null) {
@@ -79,6 +81,7 @@ export default async function AutomationDetailPage({ params }: { params: Promise
   ]);
   const logs = (logData ?? []) as LogRow[];
   const staff = (staffData ?? []) as { id: string; full_name: string }[];
+  const stageNames = stageLabelMap(await getStageLabels());
 
   const actions = Array.isArray(rule.actions) ? rule.actions : [];
   const conditions = Array.isArray(rule.conditions) ? rule.conditions : [];
@@ -113,6 +116,7 @@ export default async function AutomationDetailPage({ params }: { params: Promise
             {canEdit ? (
               <AutomationWizard
                 staff={staff}
+                stageNames={stageNames}
                 initial={{
                   id: rule.id,
                   name: rule.name,

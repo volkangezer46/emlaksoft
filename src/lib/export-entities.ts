@@ -6,6 +6,7 @@
  */
 import { escapeCsvCell } from "@/lib/csv";
 import type { AppModule } from "@/lib/permissions";
+import { defaultStageLabels, stageLabelMap } from "@/lib/deal-stage-labels";
 
 /** supabase-js gömülü ilişkiyi obje ya da dizi tipler — tek kayda indirge. */
 export function relOne<T>(value: T | T[] | null | undefined): T | null {
@@ -56,7 +57,6 @@ const DEMAND_STATUS_TR: Record<string, string> = { new: "Yeni", active: "Aktif",
 const DEMAND_URGENCY_TR: Record<string, string> = { low: "Düşük", normal: "Normal", high: "Yüksek", urgent: "Acil" };
 const APPT_TYPE_TR: Record<string, string> = { showing: "Yer gösterme", office: "Ofis görüşmesi", valuation: "Değerleme", contract: "Sözleşme" };
 const APPT_STATUS_TR: Record<string, string> = { pending: "Teyit bekliyor", confirmed: "Onaylandı", signature: "İmza eksik", completed: "Tamamlandı", cancelled: "İptal" };
-const DEAL_STAGE_TR: Record<string, string> = { new: "Yeni", qualified: "Nitelikli", negotiation: "Müzakere", won: "Kazanıldı", lost: "Kaybedildi" };
 const PROJECT_STATUS_TR: Record<string, string> = { planning: "Planlama", selling: "Satışta", delivered: "Teslim edildi" };
 const REFERRAL_STATUS_TR: Record<string, string> = { yeni: "Yeni", iletisim: "İletişimde", musteri: "Müşteri oldu", kazanildi: "Kazanıldı", kayip: "Kayıp" };
 
@@ -141,10 +141,11 @@ export const mapAppointment = (a: RawRow) => ({
   konum: a.location ?? "",
   durum: APPT_STATUS_TR[a.status] ?? a.status,
 });
-export const mapDeal = (d: RawRow) => {
+/** Aşama sütunu: ofisin görünen aşama adları verilirse onlar, yoksa varsayılan adlar (aşama anahtarları sabittir). */
+export const mapDealWith = (stageNames: Record<string, string> = stageLabelMap(defaultStageLabels())) => (d: RawRow) => {
   const property = relOne(d.property);
   return {
-    asama: DEAL_STAGE_TR[d.stage] ?? d.stage,
+    asama: stageNames[d.stage] ?? d.stage,
     tur: d.deal_type ?? "",
     deger: d.deal_value ?? "",
     olasilik: d.probability ?? "",
@@ -154,6 +155,7 @@ export const mapDeal = (d: RawRow) => {
     guncelleme: d.updated_at,
   };
 };
+export const mapDeal = mapDealWith();
 export const mapProject = (p: RawRow) => {
   const units = (p.units ?? []) as { status: string }[];
   return {
