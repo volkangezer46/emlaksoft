@@ -12,6 +12,7 @@ import {
   Globe,
   Handshake,
   History,
+  KeyRound,
   Mail,
   MessageSquare,
   PhoneCall,
@@ -56,6 +57,7 @@ export const TIMELINE_ICONS: Record<string, IconC> = {
   shield: ShieldCheck,
   spark: Sparkles,
   history: History,
+  key: KeyRound,
 };
 
 /** Kategori anahtarına göre varsayılan ikon (icon verilmediyse). */
