@@ -15,6 +15,7 @@ import { fetchTenantMatchingWeights, scoreDemandProperty, type MatchDemand, type
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
 import { parseMoneyInput } from "@/lib/money-input";
+import { findPropertyDuplicates } from "@/lib/duplicate-finders";
 
 export type PropertyResult = { error?: string; ok?: boolean; matchedDemands?: number };
 
@@ -197,6 +198,33 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   }
   const priceValue = priceResult.value;
   const commissionValue = commissionResult.value;
+
+  // Giriş anı mükerrer kontrolü: aynı ada/parsel, adres ya da başlık+mahalle varsa kasıtlı onay (allow_duplicate=1) gerekir.
+  if (String(formData.get("allow_duplicate") ?? "") !== "1") {
+    const dups = await findPropertyDuplicates(
+      supabase,
+      {
+        tenantId: gate.tenantId,
+        probe: {
+          title,
+          address: addressLine,
+          block: parcelBlock,
+          lot: parcelLot,
+          propertyType,
+          transactionType,
+          districtId,
+          neighborhoodId,
+        },
+      },
+      { userId: gate.userId, officeWide: false },
+    );
+    if (dups.length > 0) {
+      return {
+        error:
+          "Benzer bir portföy zaten var. Formdaki uyarıyı inceleyin; yine de yeni kayıt açmak için \"Yine de yeni kayıt\" seçin.",
+      };
+    }
+  }
 
   const stamp = new Date().toISOString().slice(2, 7).replace("-", "");
   const suffix = crypto.randomUUID().slice(0, 6).toUpperCase();

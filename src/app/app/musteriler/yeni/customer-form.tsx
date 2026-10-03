@@ -16,6 +16,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { detailOrList } from "@/lib/form-logic";
 import { formatPhoneDisplay, parsePhone } from "@/lib/phone";
 import { EmailInput } from "@/components/ui/email-input";
+import { DuplicateHint } from "@/components/app/duplicate-hint";
 import { CUSTOMER_DRAFT_FIELDS, CUSTOMER_FORM_ID, CUSTOMER_TABS } from "./customer-tabs";
 
 type Province = { id: string; name: string };
@@ -255,7 +256,9 @@ export function CustomerForm({
       error={error}
       submitDisabled={Boolean(partialCustomerId)}
       notice={
-        partialCustomerId ? (
+        <>
+          <DuplicateHint kind="customer" />
+          {partialCustomerId ? (
           <div role="status" className="rounded-[var(--radius-control)] border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
             <p className="font-semibold">Müşteri kaydedildi, talep kaydedilemedi.</p>
             <p className="mt-1">Müşteriyi tekrar kaydetmeyin (mükerrer olur). Talebi müşteri üzerinden yeniden girin.</p>
@@ -271,7 +274,8 @@ export function CustomerForm({
               </Link>
             </div>
           </div>
-        ) : undefined
+          ) : null}
+        </>
       }
       onSubmit={onSubmit}
       tabs={tabs}

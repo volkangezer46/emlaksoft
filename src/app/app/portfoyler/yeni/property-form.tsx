@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Check, ChevronDown } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { createProperty } from "@/app/actions/properties";
+import { DuplicateHint } from "@/components/app/duplicate-hint";
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
 import { FormField, FormInput, FormSelect, fieldClass } from "@/components/ui/form-controls";
 import { LatLngPicker } from "@/components/app/lat-lng-picker";
@@ -254,6 +255,7 @@ export function PropertyForm({
       submitIcon={Check}
       pending={pending}
       error={error}
+      notice={<DuplicateHint kind="property" />}
       onSubmit={onSubmit}
       tabs={tabs}
       tabPanels={tabPanels}
