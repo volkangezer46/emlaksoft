@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, CreditCard, FileText, TrendingUp, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CreditCard, FileText, Sparkles, TrendingUp, Wallet } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { CountUp } from "@/components/admin/count-up";
-import { now } from "@/lib/clock";
+import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
+import { GlassKpi, HeroBanner, KpiCard } from "@/components/ui/premium";
+import { TR_OFFSET_MS, now, trParts } from "@/lib/clock";
+import { adminEyebrow, adminGreeting, firstNameOf } from "./shared";
 import { PLANS } from "@/lib/billing/plans";
 
 const invStatusLabel: Record<string, string> = {
@@ -59,8 +61,8 @@ export async function BillingHome({ staffName }: { staffName: string }) {
   const pastDue = subRows.filter((s) => s.status === "past_due").length;
 
   const nowMs = now();
-  const nowDate = new Date(nowMs);
-  const monthStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1).getTime();
+  const tp = trParts(nowMs);
+  const monthStart = Date.UTC(tp.year, tp.month, 1) - TR_OFFSET_MS;
   const collectedThisMonth = invRows
     .filter((i) => i.status === "paid" && i.paid_at && new Date(i.paid_at).getTime() >= monthStart)
     .reduce((sum, i) => sum + Number(i.total_try || 0), 0);
@@ -82,38 +84,44 @@ export async function BillingHome({ staffName }: { staffName: string }) {
   }));
   const maxPlan = Math.max(1, ...planRevenue.map((p) => p.value));
 
-  const kpis = [
-    { label: "Aylık yinelenen gelir", href: "/admin/billing", value: mrr, money: true, icon: TrendingUp, tone: "text-mint-400" },
-    { label: "Aktif abonelik", href: "/admin/billing?durum=active", value: activeCount, money: false, icon: CreditCard, tone: "text-amber-400" },
-    { label: "Bu ay tahsilat", href: "/admin/billing?durum=paid", value: collectedThisMonth, money: true, icon: Wallet, tone: "text-cyan-400" },
-    { label: "Gecikmiş fatura", href: "/admin/billing?durum=open", value: overdueTotal, money: true, icon: AlertTriangle, tone: "text-danger-400" },
+  const heroKpis = [
+    { label: "Aylık yinelenen gelir", href: "/admin/billing", value: money(mrr), sub: `Yıllık ${money(mrr * 12)}`, icon: TrendingUp },
+    { label: "Aktif abonelik", href: "/admin/billing?durum=active", value: String(activeCount), sub: `${trialing} deneme`, icon: CreditCard },
+    { label: "Bu ay tahsilat", href: "/admin/billing?durum=paid", value: money(collectedThisMonth), sub: "Ödenen faturalar", icon: Wallet },
+    {
+      label: "Gecikmiş fatura",
+      href: "/admin/billing?durum=open",
+      value: money(overdueTotal),
+      sub: overdue.length > 0 ? `${overdue.length} fatura` : "Gecikme yok",
+      subTone: overdue.length > 0 ? ("danger" as const) : undefined,
+      icon: AlertTriangle,
+    },
   ];
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-64 w-64 rounded-full bg-mint-500/20 blur-[90px]" />
-        <div className="relative">
-          <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-            <span className="status-pulse h-2 w-2 rounded-full bg-mint-400" /> EmlakSoft · Muhasebe
-          </span>
-          <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Finans kontrol paneli</h1>
-          <p className="mt-1 max-w-lg text-sm text-white/75">
-            Merhaba {staffName}. Abonelik geliri, tahsilat ve gecikmiş faturalar tek ekranda.
+      <HeroBanner
+        eyebrow={adminEyebrow(nowMs, "Finans")}
+        title={adminGreeting(nowMs)}
+        highlight={firstNameOf(staffName)}
+        summary={
+          <p>
+            {activeCount} aktif abonelik, {money(mrr)} aylık gelir. Bu ay {money(collectedThisMonth)} tahsil edildi
+            {overdue.length > 0 ? `, ${overdue.length} fatura gecikmiş.` : "; gecikmiş fatura yok."}
           </p>
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {kpis.map((k) => (
-              <Link key={k.label} href={k.href} className="focus-ring group relative block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 backdrop-blur transition hover:border-white/25 hover:bg-white/12">
-                <k.icon className={`h-4 w-4 ${k.tone}`} />
-                <p className="mt-2 font-display text-lg font-extrabold tabular-nums text-white"><CountUp value={k.value} money={k.money} /></p>
-                <p className="text-xs text-white/70">{k.label}</p>
-                <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:opacity-100" />
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+        }
+      >
+        {heroKpis.map((k) => (
+          <GlassKpi key={k.label} label={k.label} value={k.value} sub={k.sub} subTone={k.subTone} href={k.href} icon={k.icon} />
+        ))}
+      </HeroBanner>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard label="Deneme abonelik" value={trialing} href="/admin/billing?durum=trialing" icon={Sparkles} tone="brand" hint="Ödemeye dönüşmeyi bekleyen" />
+        <KpiCard label="Gecikmiş abonelik" value={pastDue} href="/admin/billing?durum=past_due" icon={AlertTriangle} tone={pastDue > 0 ? "danger" : "success"} attention={pastDue > 0} hint={pastDue > 0 ? "Tahsilat takibi gerekli" : "Gecikmiş abonelik yok"} />
+        <KpiCard label="Açık bakiye" value={money(openTotal)} href="/admin/billing?durum=open" icon={Wallet} tone="warn" hint="Ödenmemiş açık faturalar" />
+        <KpiCard label="Yıllık yinelenen gelir" value={money(mrr * 12)} href="/admin/billing" icon={TrendingUp} tone="gold" hint="Aylık gelirin 12 katı" />
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
         {/* Plan bazlı gelir */}
@@ -137,20 +145,6 @@ export async function BillingHome({ staffName }: { staffName: string }) {
                 </div>
               </Link>
             ))}
-          </div>
-          <div className="mt-5 grid grid-cols-3 gap-2 border-t border-line pt-4 text-center">
-            <Link href="/admin/billing?durum=trialing" className="focus-ring group rounded-[var(--radius-control)] py-1 transition hover:bg-canvas">
-              <p className="font-display text-lg font-extrabold text-ink-950">{trialing}</p>
-              <p className="text-xs text-text-muted transition group-hover:text-brand-600">Deneme</p>
-            </Link>
-            <Link href="/admin/billing?durum=past_due" className="focus-ring group rounded-[var(--radius-control)] py-1 transition hover:bg-canvas">
-              <p className="font-display text-lg font-extrabold text-danger-500">{pastDue}</p>
-              <p className="text-xs text-text-muted transition group-hover:text-brand-600">Gecikmiş abonelik</p>
-            </Link>
-            <Link href="/admin/billing?durum=open" className="focus-ring group rounded-[var(--radius-control)] py-1 transition hover:bg-canvas">
-              <p className="font-display text-lg font-extrabold text-amber-600">{money(openTotal)}</p>
-              <p className="text-xs text-text-muted transition group-hover:text-brand-600">Açık bakiye</p>
-            </Link>
           </div>
         </section>
 
@@ -197,7 +191,7 @@ export async function BillingHome({ staffName }: { staffName: string }) {
                 </div>
               );
             })}
-            {invRows.length === 0 ? <p className="py-6 text-center text-sm text-text-muted">Henüz fatura yok.</p> : null}
+            {invRows.length === 0 ? <EmptyStateV3 variant="compact" title="Henüz fatura yok" description="Kesilen faturalar burada listelenir." /> : null}
           </div>
         </section>
       </div>

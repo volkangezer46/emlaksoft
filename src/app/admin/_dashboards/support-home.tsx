@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { ArrowUpRight, Clock, Inbox, LifeBuoy, Siren, Users } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Clock, Inbox, LifeBuoy, Siren, Users } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { CountUp } from "@/components/admin/count-up";
-import { now } from "@/lib/clock";
+import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
+import { GlassKpi, HeroBanner, KpiCard } from "@/components/ui/premium";
+import { TR_OFFSET_MS, now, trParts } from "@/lib/clock";
+import { adminEyebrow, adminGreeting, firstNameOf } from "./shared";
 
 const statusLabel: Record<string, string> = {
   open: "Açık",
@@ -48,8 +50,8 @@ export async function SupportHome({ staffName }: { staffName: string }) {
   const waiting = rows.filter((t) => t.status === "waiting").length;
   const urgent = openRows.filter((t) => t.priority === "urgent").length;
 
-  const nowDate = new Date(now());
-  const monthStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1).getTime();
+  const tp = trParts(now());
+  const monthStart = Date.UTC(tp.year, tp.month, 1) - TR_OFFSET_MS;
   const resolvedThisMonth = rows.filter(
     (t) => ["resolved", "closed"].includes(t.status) && new Date(t.created_at).getTime() >= monthStart,
   ).length;
@@ -61,38 +63,47 @@ export async function SupportHome({ staffName }: { staffName: string }) {
   }));
   const maxPr = Math.max(1, ...priorities.map((p) => p.count));
 
+  const nowMs = now();
   const kpis = [
-    { label: "Açık talep", href: "/admin/tickets?durum=open", value: open, icon: Inbox, tone: "text-brand-400" },
-    { label: "İşleniyor", href: "/admin/tickets?durum=in_progress", value: inProgress, icon: Clock, tone: "text-cyan-400" },
-    { label: "Yanıt bekliyor", href: "/admin/tickets?durum=waiting", value: waiting, icon: LifeBuoy, tone: "text-amber-400" },
-    { label: "Acil", href: "/admin/tickets?oncelik=urgent", value: urgent, icon: Siren, tone: "text-danger-400" },
+    { label: "Açık talep", href: "/admin/tickets?durum=open", value: open, sub: "Yeni, ilk yanıt bekleyen", subTone: undefined, icon: Inbox },
+    { label: "İşleniyor", href: "/admin/tickets?durum=in_progress", value: inProgress, sub: "Ekipte çalışılan", subTone: undefined, icon: Clock },
+    { label: "Yanıt bekliyor", href: "/admin/tickets?durum=waiting", value: waiting, sub: "Müşteri yanıtı bekleniyor", subTone: undefined, icon: LifeBuoy },
+    { label: "Acil", href: "/admin/tickets?oncelik=urgent", value: urgent, sub: urgent > 0 ? "Hemen yanıt gerekli" : "Acil talep yok", subTone: urgent > 0 ? ("danger" as const) : undefined, icon: Siren },
   ];
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-64 w-64 rounded-full bg-brand-500/25 blur-[90px]" />
-        <div className="relative">
-          <span className="flex items-center gap-2 text-xs font-semibold text-brand-300">
-            <span className="status-pulse h-2 w-2 rounded-full bg-brand-400" /> EmlakSoft · Müşteri temsilcisi
-          </span>
-          <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Destek kontrol paneli</h1>
-          <p className="mt-1 max-w-lg text-sm text-white/75">
-            Merhaba {staffName}. Açık talepleri önceliklendirin ve müşterilere hızlı dönün.
+      <HeroBanner
+        eyebrow={adminEyebrow(nowMs, "Destek")}
+        title={adminGreeting(nowMs)}
+        highlight={firstNameOf(staffName)}
+        summary={
+          <p>
+            {openRows.length > 0
+              ? `${openRows.length} açık talep kuyrukta${urgent > 0 ? `, ${urgent} tanesi acil` : ""}.`
+              : "Kuyrukta açık talep yok."}{" "}
+            Bu ay {resolvedThisMonth} talep çözüldü.
           </p>
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {kpis.map((k) => (
-              <Link key={k.label} href={k.href} className="focus-ring group relative block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 backdrop-blur transition hover:border-white/25 hover:bg-white/12">
-                <k.icon className={`h-4 w-4 ${k.tone}`} />
-                <p className="mt-2 font-display text-xl font-extrabold text-white"><CountUp value={k.value} /></p>
-                <p className="text-xs text-white/70">{k.label}</p>
-                <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:opacity-100" />
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+        }
+      >
+        {kpis.map((k) => (
+          <GlassKpi
+            key={k.label}
+            label={k.label}
+            value={k.value}
+            sub={k.sub}
+            subTone={k.subTone}
+            href={k.href}
+            icon={k.icon}
+          />
+        ))}
+      </HeroBanner>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard label="Bu ay çözülen" value={resolvedThisMonth} href="/admin/tickets?durum=resolved" icon={CheckCircle2} tone="success" hint="Çözüldü veya kapatıldı" />
+        <KpiCard label="Açık kuyruk" value={openRows.length} href="/admin/tickets?durum=open" icon={LifeBuoy} tone="warn" hint="Açık, işleniyor ve yanıt bekleyen" />
+        <KpiCard label="Acil talep" value={urgent} href="/admin/tickets?oncelik=urgent" icon={Siren} tone={urgent > 0 ? "danger" : "success"} attention={urgent > 0} hint={urgent > 0 ? "Hemen yanıt bekliyor" : "Acil talep yok"} />
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.3fr]">
         {/* Öncelik dağılımı */}
@@ -157,7 +168,7 @@ export async function SupportHome({ staffName }: { staffName: string }) {
                 </span>
               </Link>
             ))}
-            {openRows.length === 0 ? <p className="py-6 text-center text-sm text-text-muted">Açık talep yok. 🎉</p> : null}
+            {openRows.length === 0 ? <EmptyStateV3 variant="compact" title="Açık talep yok" description="Kuyruk temiz; yeni talepler burada görünür." /> : null}
           </div>
         </section>
       </div>
