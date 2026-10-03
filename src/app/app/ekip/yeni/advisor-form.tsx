@@ -16,7 +16,7 @@ import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls"
 import { PageHeader } from "@/components/ui/page-header";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
-import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
+import { hasOfficeWideDataScope } from "@/lib/office-wide-scope";
 import type { AppModule } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { ADVISOR_DRAFT_FIELDS, ADVISOR_FORM_ID, ADVISOR_TABS, type InviteMode } from "./advisor-tabs";

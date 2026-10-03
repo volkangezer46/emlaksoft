@@ -5,10 +5,9 @@ import {
   type EffectivePermissions,
 } from "@/lib/permissions-effective";
 
-/** Roller için mevcut panel davranışı: bu üç rol tenant genelini, diğerleri kendi satırlarını görür. */
-export function hasOfficeWideDataScope(role: string | null | undefined): boolean {
-  return role === "owner" || role === "gm" || role === "branch_manager";
-}
+import { hasOfficeWideDataScope } from "@/lib/office-wide-scope";
+
+export { hasOfficeWideDataScope };
 
 export const SEARCH_KIND_MODULE = {
   customer: "customers",
