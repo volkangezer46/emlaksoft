@@ -6,7 +6,9 @@ import { ProductTour } from "./product-tour";
 import { DashboardWidgetProvider } from "./dashboard-widgets";
 import { buildHomeBounds, type HomeCtx } from "./_home/data";
 import { BlokIskelet, PanelIskelet } from "./_home/ortak";
-import { SayfaBasligi, TvUst, OrnekVeri, YetkiUyari } from "./_home/ust-bolum";
+import { TvUst, OrnekVeri, YetkiUyari } from "./_home/ust-bolum";
+import { AnaHero } from "./_home/hero";
+import { parsePeriod } from "@/components/ui/premium";
 import { BosOfisKapisi, KurulumSeridi } from "./_home/baslayalim";
 import { DuyuruSatiri } from "./_home/duyuru-satiri";
 import { BugunOzet } from "./_home/bugun-ozet";
@@ -31,9 +33,9 @@ import { HizliAksiyonlar, SonMusteriler } from "./_home/musteriler-hizli";
 export default async function AppHomePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ tv?: string }>;
+  searchParams?: Promise<{ tv?: string; donem?: string }>;
 }) {
-  const { tv = "" } = (await searchParams) ?? {};
+  const { tv = "", donem } = (await searchParams) ?? {};
   const tvMode = tv === "1";
 
   const { tenantId, perms } = await requireModulePage("dashboard");
@@ -46,6 +48,7 @@ export default async function AppHomePage({
     // Kiralama/proje şeridi yalnız modülü görebilene sorulur.
     canSeeRentals: (perms.rentals ?? []).includes("view"),
     canSeeProjects: (perms.projects ?? []).includes("view"),
+    period: parsePeriod(donem),
     fullName,
     firstName: fullName.split(" ")[0] || "hoş geldiniz",
     ...buildHomeBounds(),
@@ -63,7 +66,7 @@ export default async function AppHomePage({
           </Suspense>
         ) : (
           <>
-            <SayfaBasligi firstName={ctx.firstName} hasName={Boolean(fullName)} />
+            <AnaHero ctx={ctx} hasName={Boolean(fullName)} params={{}} />
             <Suspense fallback={null}>
               <OrnekVeri ctx={ctx} />
             </Suspense>
@@ -112,8 +115,8 @@ export default async function AppHomePage({
         <div data-tour="kpi">
           <Suspense
             fallback={
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {Array.from({ length: 6 }).map((_, i) => (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {Array.from({ length: 8 }).map((_, i) => (
                   <SkeletonCard key={i} />
                 ))}
               </div>

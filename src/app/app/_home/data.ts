@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { computeLeadScore } from "@/lib/lead-score";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { TR_OFFSET_MS, daysAgoIso, now, trParts } from "@/lib/clock";
+import type { Period } from "@/components/ui/premium";
 import { buildOnboarding } from "@/lib/onboarding-checklist";
 import {
   commissionSummaryFromAggregate,
@@ -28,6 +29,8 @@ export type HomeCtx = {
   canSeeProjects: boolean;
   fullName: string;
   firstName: string;
+  /** Dönem seçici (?donem=7|30|90): yalnız dönem-duyarlı hero özeti ve kartlar kullanır. */
+  period: Period;
   /** targets.period_start date kolonu "YYYY-AA-01" tutar */
   monthStartKey: string;
   monthStartIso: string;
@@ -82,6 +85,50 @@ export type LeadSignalRow = {
   calls: number;
   last_activity: string | null;
 };
+
+/* ------------------------------ Dönem (7/30/90) ----------------------------- */
+
+const PERIOD_SERIES_LIMIT = 500;
+
+/**
+ * Seçili dönemde (son N gün) yeni müşteri ve yeni talep sayısı + bir önceki aynı
+ * uzunlukta dönem (karşılaştırma). Sayılar `head count` (kırpılmaz). Seri için
+ * yalnız cari dönemin tarih kolonu çekilir; satır sınırına çarparsa seri
+ * `null` döner (kırpık seri çizilmez — uydurma yok).
+ */
+export const loadPeriodStats = cache(async (ctx: HomeCtx) => {
+  const supabase = await createClient();
+  const days = ctx.period;
+  const curStart = daysAgoIso(days);
+  const prevStart = daysAgoIso(days * 2);
+  const customers = () => supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null);
+  const demands = () => supabase.from("customer_demands").select("id", { count: "exact", head: true });
+  const results = await Promise.all([
+    customers().gte("created_at", curStart),
+    customers().gte("created_at", prevStart).lt("created_at", curStart),
+    demands().gte("created_at", curStart),
+    demands().gte("created_at", prevStart).lt("created_at", curStart),
+    supabase.from("customers").select("created_at").is("deleted_at", null)
+      .gte("created_at", curStart).order("created_at", { ascending: false }).limit(PERIOD_SERIES_LIMIT),
+    supabase.from("customer_demands").select("created_at")
+      .gte("created_at", curStart).order("created_at", { ascending: false }).limit(PERIOD_SERIES_LIMIT),
+  ]);
+  assertQueryBatchSucceeded(
+    results,
+    ["period-customers", "period-customers-prev", "period-demands", "period-demands-prev", "period-customer-dates", "period-demand-dates"],
+    "Ana panel",
+  );
+  const dates = (r: { data: { created_at: string | null }[] | null }) =>
+    (r.data ?? []).length >= PERIOD_SERIES_LIMIT ? null : (r.data ?? []).map((x) => x.created_at ?? "");
+  return {
+    customers: results[0].count ?? 0,
+    customersPrev: results[1].count ?? 0,
+    demands: results[2].count ?? 0,
+    demandsPrev: results[3].count ?? 0,
+    customerDates: dates(results[4] as never),
+    demandDates: dates(results[5] as never),
+  };
+});
 
 /* ------------------------------ Bugünün işleri ------------------------------ */
 

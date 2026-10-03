@@ -118,3 +118,39 @@ Metin tokenları: açıkta `--text-muted #5b6577` ≥4.9:1, `--text-faint #66708
 
 **Tercih DB'de (öneri, yazılmadı):** `profiles.ui_prefs jsonb` (`{theme, accent}`), girişte localStorage ile birleştirilir;
 cihazlar arası senkron için gerekir. Şimdilik yalnız tarayıcıda kalıcı.
+
+## Premium konsol
+
+Lacivert + altın "konsol" görünümü; `/app` ana ekranı ve (sonraki adımda) `/admin` genel bakışı bunlarla kurulur.
+Kod: `src/components/ui/premium/*` (içe aktarma: `@/components/ui/premium`), stiller: `src/app/premium.css`.
+Hepsi sunucu bileşeni (istemci JS yok), saf SVG, yeni bağımlılık yok, token renkli, koyu temada uyumlu.
+
+| Bileşen | Ne yapar | Önemli prop |
+|---|---|---|
+| `HeroBanner` | Lacivert gradient karşılama bandı + elle çizilmiş SVG gece şehri (`CityNight`) | `eyebrow`, `title`, `highlight` (altın ad), `summary` (ReactNode, Suspense ile akabilir), `actions`, `children` (GlassKpi ızgarası) |
+| `GlassKpi` | Hero içi cam (backdrop-blur) KPI: ikon, etiket, değer, alt satır, MiniBars | `href` ZORUNLU, `subTone` (`danger`/`warn`), `series` |
+| `KpiCard` | Beyaz kart: ikon rozeti, başlık, sağ ok, değer, `TrendPill`, önceki dönem metni, alt grafik | `href` ZORUNLU, `tone`, `trend`, `previousText`/`hint`, `series` + `chart` (`line`/`bars`) |
+| `Sparkline` / `MiniBars` | Saf SVG; `role="img"` + `aria-label` (özet otomatik) | `data` (en az 2 sonlu nokta, yoksa HİÇBİR ŞEY çizmez), `tone`, `unit`, `label` |
+| `TrendPill` | Yön oku + yüzde; iyi yeşil, kötü kırmızı, düz nötr, "yeni" altın; sr-only cümle | `trend` = `computeTrend(cari, önceki, invert?)` |
+| `PeriodToggle` | 7/30/90 gün segmenti, URL `?donem=` ile iki yönlü (bağlantı üretir, JS yok) | `current`, `basePath`, `params` |
+
+Kurallar:
+
+- **Uydurma çizim yok:** grafik yalnız gerçek geçmiş seriden çizilir; seri yoksa `series` verilmez ve kart grafiksiz kalır.
+  Önceki dönem 0 iken sahte yüzde yoktur (`computeTrend` "yeni" / "%0" döner).
+- **Sıfır çıkmaz metrik:** `KpiCard` ve `GlassKpi` için `href` zorunludur.
+- **Dönem seçici dürüstlüğü:** `PeriodToggle` yalnız seçimin veriyi gerçekten etkilediği ekranda gösterilir; sayfa
+  `parsePeriod(searchParams.donem)` ile okuyup sorguya uygular. Ana ekranda etkilenenler: hero özet cümlesi ve
+  "Yeni müşteri / Yeni talep" kartları (`loadPeriodStats`).
+- **Saf mantık** `premium-math.ts` içinde (sparkline yolu, çubuk geometrisi, trend, dönem, kovalama) ve birim testlidir.
+- **Hero ve yan menü iki temada da lacivert** kalır; metin sabit beyaz/altın (`--gold-300`). Kontrast
+  `design-tokens-contract.test.ts` "premium konsol paleti" bloğunda hesaplanır (hero, cam kutu, altın segment,
+  menü aktif öğe, ton rozetleri açık + koyu).
+- **Ton:** `brand | success | warn | danger | gold | neutral` → `.pm-t-*` sınıfları `--t` (çizgi/ikon), `--t-soft`
+  (zemin), `--t-text` (yazı) üretir. Yeni ton eklenirse AA testine de eklenir.
+- **Hareket:** yıldız/pencere ışıltısı ve kart kalkması yalnız `prefers-reduced-motion: no-preference` içindedir.
+- **Yan menü:** aktif öğe `.nav-gold-active` (altın degrade + ince kenar) + `.nav-gold-bar`; menü arama kutusu
+  `.nav-search` (yalnız izinli sayfalarda süzer). "Canlı" sistem kartı yalnız gerçek bir sağlık sinyali varsa eklenir
+  (şu an layout bu sinyali taşımadığı için eklenmedi).
+- **Tema:** "Gece Altın" vurgusu (`data-accent="gold"`): `--brand-600 #9a6700` (beyaz yazı 4.87:1), metin `#7a5200`
+  açıkta, `#f0c36a` koyuda; `ACCENTS` tablosu, `themes.css` ve boot script ile senkron.

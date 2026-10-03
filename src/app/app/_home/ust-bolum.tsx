@@ -1,54 +1,11 @@
 import Link from "next/link";
-import { AlertTriangle, Plus, Sparkles, Tv } from "lucide-react";
+import { AlertTriangle, Sparkles } from "lucide-react";
 import { clearSampleDataForm } from "@/app/actions/sample-data";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getCachedOfficeScore, getOfficeScoreCached } from "@/lib/office-score";
-import { DAY_MS, msUntil, now } from "@/lib/clock";
+import { DAY_MS, msUntil } from "@/lib/clock";
 import { TvAutoRefresh, TvClock } from "../tv-mode";
-import { WidgetEditToggle } from "../dashboard-widgets";
 import { loadExpiringAuthority, loadTenantRow, type HomeCtx } from "./data";
-import { greetingFor } from "./helpers";
-
-/**
- * Tek selamlama + tarih + birincil eylemler. Veri çekmez, anında render edilir.
- * Ofis skoru burada TEKRARLANMAZ — üst çubukta zaten var (yalnız TV modunda gösterilir).
- */
-export function SayfaBasligi({ firstName, hasName }: { firstName: string; hasName: boolean }) {
-  const at = new Date(now());
-  const hour = Number(
-    new Intl.DateTimeFormat("tr-TR", { hour: "numeric", hourCycle: "h23", timeZone: "Europe/Istanbul" }).format(at),
-  );
-  const greeting = greetingFor(Number.isFinite(hour) ? hour : 9);
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="min-w-0">
-        <h1 className="font-display text-2xl font-bold text-ink-950 md:text-3xl">
-          {hasName ? `${greeting}, ${firstName}` : greeting}
-        </h1>
-        <p className="mt-0.5 text-sm text-text-muted">
-          {new Intl.DateTimeFormat("tr-TR", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Istanbul" }).format(at)}
-        </p>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Link
-          href="/app/musteriler/yeni"
-          className="btn-shine focus-ring inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-        >
-          <Plus className="h-4 w-4" /> Müşteri
-        </Link>
-        <WidgetEditToggle className="border-line bg-surface text-text-muted hover:border-brand-300 hover:text-brand-600" />
-        <Link
-          href="/app?tv=1"
-          title="TV modu — büyük ekran görünümü"
-          aria-label="TV modunu aç"
-          className="focus-ring press grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
-        >
-          <Tv className="h-4 w-4" />
-        </Link>
-      </div>
-    </div>
-  );
-}
 
 /** TV modu: üst bilgi satırı (ofis adı + ofis skoru + canlı saat) + 60sn otomatik yenileme. */
 export async function TvUst({ ctx }: { ctx: HomeCtx }) {
