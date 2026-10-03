@@ -7,6 +7,7 @@ import {
   Activity,
   BarChart3,
   Building2,
+  ChevronDown,
   CreditCard,
   Handshake,
   LayoutDashboard,
@@ -27,6 +28,7 @@ import {
   type PlatformModule,
   type PlatformRole,
 } from "@/lib/platform-access";
+import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
 
 type Item = {
@@ -104,6 +106,9 @@ export function AdminSidebar({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // Akordeon: yalnız kullanıcının kapattığı gruplar saklanır (varsayılan hepsi açık);
+  // aktif sayfanın grubu her zaman açık kalır.
+  const [closed, setClosed] = useState<Record<string, boolean>>({});
   const allowed = platformModulesFor(role);
 
   const allSections = SECTIONS.map((s) => ({
@@ -127,21 +132,22 @@ export function AdminSidebar({
 
   const content = (
     <aside className="flex h-full w-full flex-col bg-[linear-gradient(180deg,#0a1224_0%,#050b16_55%,#07101f_100%)]">
-      <div className="relative flex h-14 items-center gap-3 overflow-hidden border-b border-white/8 px-5">
+      <div className="sb-head relative flex h-14 items-center gap-3 overflow-hidden border-b border-white/8 px-4">
         <div className="pointer-events-none absolute -right-6 -top-8 h-24 w-24 rounded-full bg-amber-400/15 blur-2xl" />
-        <span className="relative grid h-10 w-10 place-items-center rounded-[var(--radius-card)] bg-amber-400 shadow-[0_0_24px_-4px_rgba(251,191,36,0.65)]">
-          <Shield className="h-5 w-5 text-ink-950" />
+        <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-card)] bg-amber-400 shadow-[0_0_24px_-4px_rgba(251,191,36,0.65)]">
+          <Shield className="h-5 w-5 text-ink-950" aria-hidden />
         </span>
-        <div className="relative">
-          <p className="font-display text-sm font-extrabold text-white">EmlakSoft</p>
-          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.12em] text-amber-400">
-            <span className="status-pulse h-1.5 w-1.5 rounded-full bg-amber-400" /> {roleLabel}
+        <div className="sb-label relative min-w-0 flex-1">
+          <p className="font-display text-sm font-extrabold leading-5 text-white">EmlakSoft Platform</p>
+          <p className="flex items-center gap-1.5 truncate text-xs font-bold uppercase tracking-[0.12em] text-amber-400">
+            <span className="status-pulse h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" /> {roleLabel}
           </p>
         </div>
+        <SidebarCollapseButton className="relative" />
       </div>
 
-      <div className="px-3 pt-3">
-        <label className="nav-search">
+      <div className="sb-pad px-3 pt-3">
+        <label className="nav-search sb-label">
           <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
           <input
             type="search"
@@ -154,78 +160,94 @@ export function AdminSidebar({
         </label>
       </div>
 
-      <div className="mt-3 flex-1 space-y-4 overflow-y-auto px-3 pb-4">
+      <div className="sb-pad mt-3 flex-1 space-y-3 overflow-y-auto px-3 pb-4">
         {needle && sections.length === 0 ? (
           <p className="px-3 py-2 text-sm text-white/75">“{query.trim()}” için menü bulunamadı.</p>
         ) : null}
-        {sections.map((section) => (
-          <div key={section.title ?? "root"}>
-            {section.title ? (
-              <p className="mb-1.5 px-3 text-xs font-semibold uppercase tracking-[0.12em] text-white/70">{section.title}</p>
-            ) : null}
-            <nav className="space-y-1">
-              {section.items.map((item) => {
-                const active = item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
-                const badge = item.badgeKey ? badges?.[item.badgeKey] : undefined;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    prefetch
-                    onClick={() => setOpen(false)}
-                    onMouseEnter={() => router.prefetch(item.href)}
-                    onFocus={() => router.prefetch(item.href)}
-                    className={`group relative flex items-center gap-3 overflow-hidden rounded-[var(--radius-card)] px-3 py-2.5 text-sm transition ${
-                      active
-                        ? "nav-gold-active font-semibold"
-                        : "text-white/85 hover:bg-white/8 hover:text-white"
-                    }`}
-                  >
-                    {active ? <span className="nav-gold-bar absolute inset-y-2 left-0 w-[3px] rounded-r-full" /> : null}
-                    <span
-                      className={`grid h-8 w-8 place-items-center rounded-[var(--radius-control)] transition ${
-                        active ? "bg-[var(--gold-300)]/20 text-[var(--gold-300)]" : "bg-white/8 text-white/70 group-hover:text-white"
+        {sections.map((section) => {
+          const hasActive = section.items.some((i) => (i.href === "/admin" ? pathname === "/admin" : pathname.startsWith(i.href)));
+          const sectionKey = section.title ?? "root";
+          const collapsedGroup = Boolean(section.title) && !needle && !hasActive && closed[sectionKey] === true;
+          return (
+            <div key={sectionKey}>
+              {section.title ? (
+                <button
+                  type="button"
+                  onClick={() => setClosed((c) => ({ ...c, [sectionKey]: !(c[sectionKey] === true) }))}
+                  aria-expanded={!collapsedGroup}
+                  aria-controls={`adm-${sectionKey}`}
+                  className="sb-label sb-eyebrow focus-ring mb-1 flex w-full items-center justify-between rounded-[var(--radius-control)] px-3 py-1 text-white/70 transition-colors hover:text-white"
+                >
+                  {section.title}
+                  <ChevronDown className={`h-3 w-3 transition-transform ${collapsedGroup ? "-rotate-90" : ""}`} aria-hidden />
+                </button>
+              ) : null}
+              <nav id={`adm-${sectionKey}`} aria-label={section.title ?? "Genel"} hidden={collapsedGroup} className="space-y-0.5">
+                {section.items.map((item) => {
+                  const active = item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
+                  const badge = item.badgeKey ? badges?.[item.badgeKey] : undefined;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      title={item.label}
+                      prefetch
+                      onClick={() => setOpen(false)}
+                      onMouseEnter={() => router.prefetch(item.href)}
+                      onFocus={() => router.prefetch(item.href)}
+                      className={`sb-row group relative flex min-h-10 items-center gap-3 overflow-hidden rounded-[var(--radius-control)] px-3 py-1.5 text-sm transition-colors ${
+                        active ? "nav-gold-active font-semibold" : "text-white/85 hover:bg-white/8 hover:text-white"
                       }`}
                     >
-                      <item.icon className="h-4 w-4" />
-                    </span>
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate">{item.label}</span>
-                      <span className={`text-xs font-normal ${active ? "text-white/75" : "text-white/65"}`}>
-                        {item.hint}
-                      </span>
-                    </span>
-                    {badge && badge > 0 ? (
+                      {active ? <span className="nav-gold-bar absolute inset-y-2 left-0 w-[3px] rounded-r-full" /> : null}
                       <span
-                        className={`shrink-0 rounded-full px-1.5 py-0.5 text-xs font-bold ${
-                          item.badgeKey === "risk"
-                            ? "bg-danger-500/20 text-danger-400"
-                            : item.badgeKey === "sales"
-                              ? "bg-mint-500/20 text-mint-300"
-                              : "bg-amber-400/20 text-amber-300"
+                        className={`relative grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] transition-colors ${
+                          active ? "bg-[var(--gold-300)]/20 text-[var(--gold-300)]" : "bg-white/8 text-white/70 group-hover:text-white"
                         }`}
                       >
-                        {badge}
+                        <item.icon className="h-4 w-4" aria-hidden />
+                        {badge && badge > 0 ? <span className="sb-badge-dot absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-danger-400" aria-hidden /> : null}
                       </span>
-                    ) : null}
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-        ))}
+                      <span className="sb-label flex min-w-0 flex-1 flex-col">
+                        <span className="truncate leading-5">{item.label}</span>
+                        <span className={`truncate text-xs font-normal ${active ? "text-white/75" : "text-white/65"}`}>{item.hint}</span>
+                      </span>
+                      {badge && badge > 0 ? (
+                        <span
+                          aria-label={`${badge} bekleyen`}
+                          className={`sb-label num shrink-0 rounded-full px-1.5 py-0.5 text-xs ${
+                            item.badgeKey === "risk"
+                              ? "bg-danger-500/20 text-danger-400"
+                              : item.badgeKey === "sales"
+                                ? "bg-mint-500/20 text-mint-300"
+                                : "bg-amber-400/20 text-amber-300"
+                          }`}
+                        >
+                          {badge}
+                        </span>
+                      ) : null}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
+          );
+        })}
       </div>
 
-      <div className="border-t border-white/8 p-4">
-        <div className="rounded-[var(--radius-card)] border border-white/8 bg-white/[0.04] p-3">
+      <div className="sb-pad border-t border-white/8 p-4">
+        <div className="sb-when-collapsed mx-auto h-10 w-10 place-items-center rounded-[var(--radius-control)] bg-white/8 font-display text-sm font-extrabold text-amber-300" role="img" aria-label={`${staffName}, ${roleLabel}`} title={`${staffName} · ${roleLabel}`}>
+          {staffName.trim().charAt(0).toLocaleUpperCase("tr-TR") || "P"}
+        </div>
+        <div className="sb-label rounded-[var(--radius-card)] border border-white/8 bg-white/[0.04] p-3">
           <p className="truncate text-xs font-semibold text-white">{staffName}</p>
           <p className="mt-0.5 text-xs uppercase tracking-[0.08em] text-amber-400/80">{roleLabel}</p>
           <div className="mt-2 flex items-center gap-1.5 text-xs text-mint-400/80">
             <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-400" /> Operasyon oturumu açık
           </div>
         </div>
-        <Link href="/app" onClick={() => setOpen(false)} className="mt-3 block text-xs font-semibold text-white/70 transition hover:text-white">
+        <Link href="/app" onClick={() => setOpen(false)} title="Ofis paneline dön" className="sb-label mt-3 block text-xs font-semibold text-white/70 transition-colors hover:text-white">
           ← Ofis paneline dön
         </Link>
       </div>
@@ -246,7 +268,7 @@ export function AdminSidebar({
       </DialogTrigger>
 
       {/* Masaüstü sabit sidebar */}
-      <div className="hidden w-[264px] shrink-0 border-r border-white/6 md:block">{content}</div>
+      <div className="shell-aside sticky top-0 hidden h-screen shrink-0 overflow-hidden border-r border-white/6 md:block">{content}</div>
 
       {/* Mobil çekmece — focus trap, Escape, scroll lock ve focus restore Radix'ten gelir. */}
       <DialogDrawerContent id="admin-mobile-navigation" aria-describedby={undefined}>

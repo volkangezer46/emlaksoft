@@ -3,7 +3,9 @@ import { ArrowUpRight, CheckCircle2, Clock, Inbox, LifeBuoy, Siren, Users } from
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import { GlassKpi, HeroBanner, KpiCard } from "@/components/ui/premium";
-import { TR_OFFSET_MS, now, trParts } from "@/lib/clock";
+import { Bento, Bx } from "@/components/ui/console/bento";
+import { Ring } from "@/components/ui/console/ring";
+import { DAY_MS, TR_OFFSET_MS, msSince, now, trParts } from "@/lib/clock";
 import { adminEyebrow, adminGreeting, firstNameOf } from "./shared";
 
 const statusLabel: Record<string, string> = {
@@ -56,6 +58,9 @@ export async function SupportHome({ staffName }: { staffName: string }) {
     (t) => ["resolved", "closed"].includes(t.status) && new Date(t.created_at).getTime() >= monthStart,
   ).length;
 
+  const waitingQueue = [...openRows].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const resolvedTotal = rows.filter((t) => ["resolved", "closed"].includes(t.status)).length;
+
   const priorities = ["urgent", "high", "normal", "low"].map((p) => ({
     key: p,
     label: priorityLabel[p],
@@ -98,6 +103,58 @@ export async function SupportHome({ staffName }: { staffName: string }) {
           />
         ))}
       </HeroBanner>
+
+      <Bento>
+        <Bx className="md:col-span-6 xl:col-span-7" eyebrow="Bekleme kuyruğu" icon={Clock} title="En uzun bekleyen açık talepler" href="/admin/tickets?durum=open">
+          {waitingQueue.length === 0 ? (
+            <EmptyStateV3 variant="compact" title="Bekleyen talep yok" description="Açık talep geldiğinde en uzun bekleyen başa gelir." />
+          ) : (
+            <ul className="-mx-1 space-y-0.5">
+              {waitingQueue.slice(0, 6).map((t) => {
+                const days = Math.floor(msSince(t.created_at) / DAY_MS);
+                return (
+                  <li key={t.id}>
+                    <Link href={`/admin/tickets/${t.id}`} className="qrow focus-ring group">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-text">{t.subject}</span>
+                        <span className="block truncate text-xs text-text-muted">{nameOf(t.tenant as Rel)} · {days > 0 ? `${days} gündür açık` : "bugün açıldı"}</span>
+                      </span>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${priorityChip[t.priority] ?? "bg-ink-950/5 text-text-muted"}`}>
+                        {priorityLabel[t.priority] ?? t.priority}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Bx>
+        <Bx className="md:col-span-6 xl:col-span-5" eyebrow="Çözüm durumu" icon={CheckCircle2} title="Çözülen / toplam">
+          {rows.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-5">
+              <Ring value={resolvedTotal} max={rows.length} tone="success" size={104} ariaLabel={`Son ${rows.length} talebin ${resolvedTotal} tanesi çözüldü`}>
+                <span>
+                  <span className="num block text-xl text-text">%{Math.round((resolvedTotal / rows.length) * 100)}</span>
+                  <span className="block text-xs text-text-muted">çözüldü</span>
+                </span>
+              </Ring>
+              <div className="min-w-0 flex-1 basis-40 space-y-1">
+                <Link href="/admin/tickets?durum=resolved" className="qrow focus-ring justify-between">
+                  <span className="text-sm text-text-muted">Çözülen</span>
+                  <span className="num text-sm text-text">{resolvedTotal}</span>
+                </Link>
+                <Link href="/admin/tickets?durum=open" className="qrow focus-ring justify-between">
+                  <span className="text-sm text-text-muted">Açık kuyruk</span>
+                  <span className="num text-sm text-text">{openRows.length}</span>
+                </Link>
+                <p className="px-3 text-xs text-text-faint">Son {rows.length} talep üzerinden</p>
+              </div>
+            </div>
+          ) : (
+            <EmptyStateV3 variant="compact" title="Henüz destek talebi yok" description="Talepler geldikçe çözüm oranı burada görünür." />
+          )}
+        </Bx>
+      </Bento>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Bu ay çözülen" value={resolvedThisMonth} href="/admin/tickets?durum=resolved" icon={CheckCircle2} tone="success" hint="Çözüldü veya kapatıldı" />

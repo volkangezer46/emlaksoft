@@ -3,7 +3,9 @@ import { AlertTriangle, ArrowUpRight, CreditCard, FileText, Sparkles, TrendingUp
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import { GlassKpi, HeroBanner, KpiCard } from "@/components/ui/premium";
-import { TR_OFFSET_MS, now, trParts } from "@/lib/clock";
+import { Bento, Bx } from "@/components/ui/console/bento";
+import { Ring } from "@/components/ui/console/ring";
+import { DAY_MS, TR_OFFSET_MS, msSince, now, trParts } from "@/lib/clock";
 import { adminEyebrow, adminGreeting, firstNameOf } from "./shared";
 import { PLANS } from "@/lib/billing/plans";
 
@@ -84,6 +86,9 @@ export async function BillingHome({ staffName }: { staffName: string }) {
   }));
   const maxPlan = Math.max(1, ...planRevenue.map((p) => p.value));
 
+  const overdueQueue = [...overdue].sort((a, b) => new Date(a.due_at as string).getTime() - new Date(b.due_at as string).getTime());
+  const paidTotal = invRows.filter((i) => i.status === "paid").reduce((sum, i) => sum + Number(i.total_try || 0), 0);
+
   const heroKpis = [
     { label: "Aylık yinelenen gelir", href: "/admin/billing", value: money(mrr), sub: `Yıllık ${money(mrr * 12)}`, icon: TrendingUp },
     { label: "Aktif abonelik", href: "/admin/billing?durum=active", value: String(activeCount), sub: `${trialing} deneme`, icon: CreditCard },
@@ -115,6 +120,58 @@ export async function BillingHome({ staffName }: { staffName: string }) {
           <GlassKpi key={k.label} label={k.label} value={k.value} sub={k.sub} subTone={k.subTone} href={k.href} icon={k.icon} />
         ))}
       </HeroBanner>
+
+      <Bento>
+        <Bx className="md:col-span-6 xl:col-span-7" eyebrow="Tahsilat kuyruğu" icon={AlertTriangle} title="Geciken faturalar" href="/admin/billing?durum=open">
+          {overdueQueue.length === 0 ? (
+            <EmptyStateV3 variant="compact" title="Geciken fatura yok" description="Vadesi geçen açık fatura olursa en eskisi burada başa gelir." />
+          ) : (
+            <ul className="-mx-1 space-y-0.5">
+              {overdueQueue.slice(0, 6).map((i) => {
+                const tenantId = idOf(i.tenant as Rel);
+                const days = Math.max(1, Math.floor(msSince(i.due_at as string) / DAY_MS));
+                return (
+                  <li key={i.id}>
+                    <Link href={tenantId ? `/admin/tenants/${tenantId}` : "/admin/billing?durum=open"} className="qrow focus-ring group">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-danger-600" aria-hidden />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-text">{nameOf(i.tenant as Rel)}</span>
+                        <span className="block truncate text-xs text-text-muted">{i.invoice_no ?? "Fatura"} · {days} gün gecikti</span>
+                      </span>
+                      <span className="num text-sm text-text">{money(Number(i.total_try || 0))}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Bx>
+        <Bx className="md:col-span-6 xl:col-span-5" eyebrow="Tahsilat durumu" icon={Wallet} title="Ödenen ve açık tutar">
+          {paidTotal + openTotal > 0 ? (
+            <div className="flex flex-wrap items-center gap-5">
+              <Ring value={paidTotal} max={paidTotal + openTotal} tone="success" size={104} ariaLabel={`Son ${invRows.length} faturanın ödenen payı`}>
+                <span>
+                  <span className="num block text-xl text-text">%{Math.round((paidTotal / (paidTotal + openTotal)) * 100)}</span>
+                  <span className="block text-xs text-text-muted">ödendi</span>
+                </span>
+              </Ring>
+              <div className="min-w-0 flex-1 basis-40 space-y-1">
+                <Link href="/admin/billing?durum=paid" className="qrow focus-ring justify-between">
+                  <span className="text-sm text-text-muted">Ödenen</span>
+                  <span className="num text-sm text-text">{money(paidTotal)}</span>
+                </Link>
+                <Link href="/admin/billing?durum=open" className="qrow focus-ring justify-between">
+                  <span className="text-sm text-text-muted">Açık</span>
+                  <span className="num text-sm text-text">{money(openTotal)}</span>
+                </Link>
+                <p className="px-3 text-xs text-text-faint">Son {invRows.length} fatura üzerinden</p>
+              </div>
+            </div>
+          ) : (
+            <EmptyStateV3 variant="compact" title="Henüz fatura tutarı yok" description="Fatura kesildikçe tahsilat oranı burada görünür." />
+          )}
+        </Bx>
+      </Bento>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Deneme abonelik" value={trialing} href="/admin/billing?durum=trialing" icon={Sparkles} tone="brand" hint="Ödemeye dönüşmeyi bekleyen" />
