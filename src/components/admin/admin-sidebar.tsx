@@ -180,13 +180,13 @@ export function AdminSidebar({
 
   const renderContent = (variant: "desktop" | "drawer") => (
     <aside className="flex h-full w-full flex-col bg-[linear-gradient(180deg,#0b1220_0%,#070d19_100%)]">
-      <div className="sb-head relative flex h-14 items-center gap-3 overflow-hidden border-b border-white/8 px-4">
+      <div className="sb-head relative flex min-h-14 shrink-0 items-center gap-3 overflow-hidden border-b border-white/8 px-4">
         <div className="pointer-events-none absolute -right-6 -top-8 h-24 w-24 rounded-full bg-amber-400/15 blur-2xl" />
         <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-card)] bg-amber-400 shadow-[0_0_24px_-4px_rgba(251,191,36,0.65)]">
           <Shield className="h-5 w-5 text-ink-950" aria-hidden />
         </span>
         <div className="sb-label relative min-w-0 flex-1">
-          <p className="font-display text-sm font-extrabold leading-5 text-white">EmlakSoft Platform</p>
+          <p className="truncate font-display text-sm font-extrabold leading-5 text-white">EmlakSoft Platform</p>
           <p className="truncate text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold-300)]">{roleLabel}</p>
         </div>
         <SidebarCollapseButton className="relative" />
@@ -307,6 +307,11 @@ export function AdminSidebar({
                 ? ` · ${health.cronTotal} cron işi${(health.cronErrors ?? 0) > 0 ? `, ${health.cronErrors} hatalı` : " hatasız"}`
                 : ""}
             </span>
+            {health.failedJobs && health.failedJobs.length > 0 ? (
+              <span className="mt-1 block truncate text-xs text-amber-300" title={health.failedJobs.join(", ")}>
+                Hatalı: {health.failedJobs.join(", ")}
+              </span>
+            ) : null}
           </Link>
         ) : null}
 

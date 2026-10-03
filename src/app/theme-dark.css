@@ -105,6 +105,11 @@ html[data-theme="dark"] :is(.bg-white\/95, .bg-white\/90, .bg-white\/85, .bg-whi
 html[data-theme="dark"] :is(.text-ink-950, .text-ink-900, .text-ink-800):not(.theme-dark *) {
   color: var(--text);
 }
+/* Sekme çubuğu: aktif/hover etiketi variant sınıfıyla (data-[active=true]:text-ink-950) gelir; yukarıdaki
+   .text-ink-950 override'ı onu yakalamaz, koyu lacivert metin koyu zeminde okunmaz (QA #1). --text >= 4.5:1. */
+html[data-theme="dark"] .mt-tab:is([data-active="true"], :hover):not(.theme-dark *) {
+  color: var(--text);
+}
 html[data-theme="dark"] .bg-amber-50:not(.theme-dark *) {
   background-color: rgba(242, 184, 75, 0.12);
 }

@@ -134,7 +134,15 @@ export default async function HedeflerPage() {
   const memberList = (members ?? []) as { id: string; full_name: string }[];
 
   // Kart hesapları tek yerde: özet KPI'lar, takım kıyası ve kartlar aynı sayıları okur.
-  const enriched = targets.map((t) => {
+  // Varsayılan görünüm GÜNCEL dönem: şimdi içinde bulunduğumuz dönemin hedefleri listenin ve takım kıyasının başına
+  // alınır (eskiden en yeni period_start gelirdi; eski dönem hedefleri güncelmiş gibi görünüyordu). Sıra korunur.
+  const nowMs = now();
+  const isCurrentPeriod = (t: { period_start: string; period: string }) => {
+    const r = targetPeriodRange(t.period_start, t.period);
+    return r.start <= nowMs && nowMs < r.end;
+  };
+  const hasCurrentPeriod = targets.some(isCurrentPeriod);
+  const enrichedAll = targets.map((t) => {
     const dealPct = pct(t.actual_deals, t.target_deals);
     const revPct = pct(Number(t.actual_revenue), Number(t.target_revenue));
     const elapsed = elapsedPct(t.period_start, t.period);
@@ -143,6 +151,7 @@ export default async function HedeflerPage() {
     const behind = !done && elapsed > 0 && elapsed < 100 && progress < elapsed - 10;
     return { t, dealPct, revPct, elapsed, progress, done, behind };
   });
+  const enriched = [...enrichedAll.filter((e) => isCurrentPeriod(e.t)), ...enrichedAll.filter((e) => !isCurrentPeriod(e.t))];
   const doneCount = enriched.filter((e) => e.done).length;
   const behindCount = enriched.filter((e) => e.behind).length;
   const onTrackCount = enriched.length - doneCount - behindCount;
@@ -237,6 +246,13 @@ canCreate ? (
             })}
           </div>
         </section>
+      ) : null}
+
+      {targets.length > 0 && !hasCurrentPeriod ? (
+        <p role="status" className="rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-ink-950">
+          Güncel dönem için tanımlı hedef yok; aşağıda geçmiş dönem hedefleri listelenir.
+          {canCreate ? " Yukarıdaki düğmeyle bu ay için yeni hedef ekleyebilirsiniz." : ""}
+        </p>
       ) : null}
 
       {targets.length === 0 ? (

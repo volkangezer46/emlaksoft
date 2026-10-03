@@ -475,6 +475,7 @@ export function TabbedFormShell({
                   activeId={active}
                   onSelect={(id) => select(id)}
                   orientation={isDesktop ? "vertical" : "horizontal"}
+                  inactive="label"
                   label="Form bölümleri"
                   idPrefix={uid}
                   railCollapsed={railCollapsed}
@@ -548,7 +549,13 @@ export function TabbedFormShell({
               ) : null}
 
               {hasSide ? (
-                <details className="group rounded-[var(--radius-card)] border border-line bg-surface p-4 text-sm shadow-[var(--shadow-sm)] xl:hidden">
+                <details
+                  className="group scroll-mb-40 rounded-[var(--radius-card)] border border-line bg-surface p-4 text-sm shadow-[var(--shadow-sm)] xl:hidden"
+                  onToggle={(e) => {
+                    // Açılan özet, yapışkan Kaydet çubuğunun arkasında kalmasın: scroll-mb-40 payıyla görünür alana getir.
+                    if (e.currentTarget.open) e.currentTarget.scrollIntoView({ block: "nearest", behavior: "smooth" });
+                  }}
+                >
                   <summary className="focus-ring flex cursor-pointer list-none items-center gap-2 rounded-[var(--radius-control)] font-semibold text-ink-950">
                     <Sparkles aria-hidden="true" className="h-4 w-4 text-brand-600" /> Özet ve önizleme
                     <ChevronRight aria-hidden="true" className="ml-auto h-4 w-4 text-text-faint transition-transform duration-150 group-open:rotate-90 motion-reduce:transition-none" />

@@ -50,7 +50,7 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
   const { monthKey, monthStartIso, elapsedPct } = trMonthContext(now());
   const supabase = await createClient();
 
-  const [profilesRes, kpiRes, propsRes, targetsRes] = await Promise.all([
+  const [profilesRes, kpiRes, targetsRes] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, full_name, role", { count: "exact" })
@@ -61,13 +61,6 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
     tenantId
       ? supabase.rpc("advisor_kpis", { p_tenant_id: tenantId, p_month_start: monthStartIso })
       : Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null }),
-    supabase
-      .from("properties")
-      .select("assigned_to")
-      .is("deleted_at", null)
-      .in("status", ["live", "Yayında"])
-      .not("assigned_to", "is", null)
-      .limit(5000),
     supabase
       .from("targets")
       .select("profile_id, target_deals, target_revenue")
@@ -82,9 +75,34 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
   const kpiById = new Map<string, Record<string, unknown>>();
   for (const r of (kpiRes.data ?? []) as Array<Record<string, unknown>>) kpiById.set(String(r.assigned_to), r);
 
+  // Yayındaki portföy sayısı: eskiden 5000 satır çekilip bellekte sayılıyordu (yavaş sekme, QA #6).
+  // Ekip küçük/orta ise üye başına tek "head count" (satır taşımaz) paralel koşar; çok büyük ekipte tek taramaya düşer.
   const propsById = new Map<string, number>();
-  for (const r of (propsRes.data ?? []) as { assigned_to: string | null }[]) {
-    if (r.assigned_to) propsById.set(r.assigned_to, (propsById.get(r.assigned_to) ?? 0) + 1);
+  const LIVE = ["live", "Yayında"];
+  if (profiles.length <= 80) {
+    const counts = await Promise.all(
+      profiles.map((p) =>
+        supabase
+          .from("properties")
+          .select("id", { count: "exact", head: true })
+          .is("deleted_at", null)
+          .in("status", LIVE)
+          .eq("assigned_to", p.id)
+          .then((r) => [p.id, r.count ?? 0] as const),
+      ),
+    );
+    for (const [id, n] of counts) if (n > 0) propsById.set(id, n);
+  } else {
+    const { data: propRows } = await supabase
+      .from("properties")
+      .select("assigned_to")
+      .is("deleted_at", null)
+      .in("status", LIVE)
+      .not("assigned_to", "is", null)
+      .limit(5000);
+    for (const r of (propRows ?? []) as { assigned_to: string | null }[]) {
+      if (r.assigned_to) propsById.set(r.assigned_to, (propsById.get(r.assigned_to) ?? 0) + 1);
+    }
   }
 
   const targetById = new Map<string, { deals: number; revenue: number }>();

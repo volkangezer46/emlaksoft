@@ -45,7 +45,7 @@ export function TableFrame({
         // tarayıcıya söyler → iç overflow-x-auto belgeyi yatay kaydırılabilir
         // yapmaz (WebKit/iOS Safari dahil; `overflow:clip` orada belge-kaydırmasını
         // durdurmuyordu).
-        "surface-card min-w-0 max-w-full [contain:inline-size] overflow-hidden rounded-[var(--radius-panel)]",
+        "surface-card w-full min-w-0 max-w-full [contain:inline-size] overflow-hidden rounded-[var(--radius-panel)]",
         density === "kompakt" && "[&_td]:py-1.5 [&_th]:py-1.5",
         className,
       )}

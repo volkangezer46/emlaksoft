@@ -41,6 +41,7 @@ export function MorphTabs({
   onToggleRail,
   title,
   footer,
+  inactive = "icon",
   className,
 }: {
   items: MorphTabItem[];
@@ -58,6 +59,8 @@ export function MorphTabs({
   title?: string;
   /** Dikey rayın altındaki içerik (ör. "2/3 bölüm tamam"). */
   footer?: ReactNode;
+  /** Yalnız yatay: pasif sekmeler ikon-only ("icon") veya etiketli ("label", yatay kaydırılır). */
+  inactive?: "icon" | "label";
   className?: string;
 }) {
   const vertical = orientation === "vertical";
@@ -129,7 +132,7 @@ export function MorphTabs({
     >
       {items.map((t) => {
         const active = t.id === activeId;
-        const density = tabDensity({ active, orientation, railCollapsed: collapsed, peek: peeking });
+        const density = tabDensity({ active, orientation, railCollapsed: collapsed, peek: peeking, inactive });
         return (
           <button
             key={t.id}

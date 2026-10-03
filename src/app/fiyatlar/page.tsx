@@ -93,7 +93,7 @@ export default function FiyatlarPage() {
       <Section
         id="kacan-komisyon"
         title="Kaçan komisyonunuzu kendi sayılarınızla hesaplayın"
-        lead="Girdiler sizindir; sektör ortalaması kullanılmaz. Alanlar bilerek boş bırakıldı."
+        lead="Aşağıdaki sayı alanlarına kendi rakamlarınızı yazın; sonuç anında hesaplanır. Sektör ortalaması kullanılmaz, alanlar bilerek boş bırakıldı."
       >
         <RoiCalculator plans={roiPlans} defaultPlanId={defaultPlanId} />
       </Section>

@@ -59,8 +59,25 @@ export function NavScroller({
     bar.dataset.on = "1";
   }, []);
 
+  // Aktif öğe değişince (gezinme) görünür alana getir: kullanım kartı/alt blok altında kesik kalmasın.
+  const lastActive = useRef<string | null>(null);
+  const revealActive = useCallback(() => {
+    const scroller = scrollRef.current;
+    const inner = innerRef.current;
+    if (!scroller || !inner) return;
+    const actives = [...inner.querySelectorAll<HTMLElement>('[data-nav-active="true"]')].filter(visible);
+    const target = actives[actives.length - 1];
+    const key = target?.getAttribute("href") ?? null;
+    if (!target || key === lastActive.current) return;
+    lastActive.current = key;
+    const s = scroller.getBoundingClientRect();
+    const t = target.getBoundingClientRect();
+    if (t.top < s.top + 8 || t.bottom > s.bottom - 8) target.scrollIntoView({ block: "nearest" });
+  }, []);
+
   // Her render'dan sonra (gezinme, akordeon, arama) çubuk ve gölge güncellenir.
   useEffect(() => {
+    revealActive();
     syncBar();
     syncShadow();
   });
@@ -98,7 +115,7 @@ export function NavScroller({
   }
 
   return (
-    <nav ref={scrollRef} aria-label={label} onScroll={syncShadow} onKeyDown={onKeyDown} className={`nav-scroll overflow-y-auto ${className}`}>
+    <nav ref={scrollRef} aria-label={label} onScroll={syncShadow} onKeyDown={onKeyDown} className={`nav-scroll min-h-0 overflow-y-auto ${className}`}>
       <div ref={innerRef} className={`relative ${innerClassName}`}>
         <span ref={barRef} aria-hidden className="nav-bar" data-on="0" />
         {children}

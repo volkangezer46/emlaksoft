@@ -27,12 +27,13 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
   const fromParam = UUID_RE.test(sp.from ?? "") ? sp.from! : "";
 
   const supabase = await createClient();
-  const [membersRes, countsRes, propsRes] = await Promise.all([
+  // Üye listesi + müşteri sayıları paralel. Portföy sayısı eskiden 5000 satır çekilip bellekte sayılıyordu;
+  // artık üye başına tek "head count" (satır taşımaz) paralel koşar.
+  const [membersRes, countsRes] = await Promise.all([
     supabase.from("profiles").select("id, full_name, role, is_active").order("full_name").limit(500),
     tenantId
       ? supabase.rpc("customer_counts_by_advisor", { p_tenant_id: tenantId })
       : Promise.resolve({ data: [] as { assigned_to: string; cnt: number }[], error: null }),
-    supabase.from("properties").select("assigned_to").is("deleted_at", null).not("assigned_to", "is", null).limit(5000),
   ]);
 
   const failed = Boolean(membersRes.error);
@@ -42,9 +43,17 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
     customerBy.set(r.assigned_to, Number(r.cnt) || 0);
   }
   const propertyBy = new Map<string, number>();
-  for (const r of (propsRes.data ?? []) as { assigned_to: string | null }[]) {
-    if (r.assigned_to) propertyBy.set(r.assigned_to, (propertyBy.get(r.assigned_to) ?? 0) + 1);
-  }
+  const propCounts = await Promise.all(
+    members.slice(0, 200).map((m) =>
+      supabase
+        .from("properties")
+        .select("id", { count: "exact", head: true })
+        .is("deleted_at", null)
+        .eq("assigned_to", m.id)
+        .then((r) => [m.id, r.count ?? 0] as const),
+    ),
+  );
+  for (const [id, n] of propCounts) if (n > 0) propertyBy.set(id, n);
 
   const active = members.filter((m) => m.is_active);
   const inactiveWithWork = members.filter(
