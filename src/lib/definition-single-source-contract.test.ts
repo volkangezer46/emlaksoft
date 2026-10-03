@@ -49,8 +49,10 @@ describe("tanım listeleri tek kaynak sözleşmesi", () => {
         if (re.test(f.text)) offenders.push(`${f.rel}: ${name}`);
       }
     }
-    // Seed değil: playbook-labels örnek metin, arama-sonuclari hızlı arama çipleri.
-    const notSeeds = ["lib/playbook-labels.ts", "app/arama-sonuclari/page.tsx"];
+    // Seed değil: playbook-labels örnek metin, arama-sonuclari hızlı arama çipleri,
+    // destek talebi önceliği (support_tickets.priority sabit sistem sıralaması; ofis tanımı "talep aciliyeti" ile
+    // aynı değerleri paylaşır ama ayrı kavramdır ve tenant tarafından değiştirilmez).
+    const notSeeds = ["lib/playbook-labels.ts", "app/arama-sonuclari/page.tsx", "app/destek/yeni/new-ticket-form.tsx"];
     expect(offenders.filter((o) => !notSeeds.some((n) => o.includes(n)))).toEqual([]);
   });
 
