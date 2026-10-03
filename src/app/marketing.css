@@ -136,8 +136,8 @@
 .mk-url { flex: 1; max-width: 22rem; margin-inline: auto; padding: 0.2rem 0.75rem; border-radius: 999px; background: #fff; border: 1px solid var(--mk-line); font-size: 0.75rem; color: var(--mk-muted); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mk-device-screen { display: block; width: 100%; height: auto; background: #f6f8fc; }
 .mk-crop { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 0; }
-.mk-crop .mk-device-screen-wrap { position: relative; max-height: 30rem; overflow: hidden; }
-.mk-crop .mk-device-screen-wrap::after { content: ""; position: absolute; inset: auto 0 0 0; height: 38%; background: linear-gradient(180deg, rgba(251, 250, 247, 0), var(--mk-bg) 92%); pointer-events: none; }
+.mk-crop .mk-device-screen-wrap { position: relative; max-height: 34rem; overflow: hidden; }
+.mk-crop .mk-device-screen-wrap::after { content: ""; position: absolute; inset: auto 0 0 0; height: 30%; background: linear-gradient(180deg, rgba(251, 250, 247, 0), var(--mk-bg) 92%); pointer-events: none; }
 .mk-svg text { font-family: var(--font-inter), system-ui, sans-serif; }
 .mk-svg .mk-m { font-family: var(--font-manrope), system-ui, sans-serif; }
 @media (min-width: 1024px) {
@@ -165,9 +165,13 @@
 .mk-f2 .mk-floater { animation-delay: -2.4s; animation-duration: 8s; }
 .mk-f3 .mk-floater { animation-delay: -4.2s; animation-duration: 9s; }
 @media (min-width: 1024px) {
-  .mk-f1 { left: -3rem; bottom: 18%; }
-  .mk-f2 { right: -2.5rem; top: 24%; }
-  .mk-f3 { display: block; right: 8%; bottom: 8%; }
+  .mk-f1 { left: -1.25rem; bottom: 18%; }
+  .mk-f2 { right: -1.25rem; top: 46%; }
+  .mk-f3 { display: block; left: 36%; bottom: 7%; }
+}
+@media (min-width: 1280px) {
+  .mk-f1 { left: -3rem; }
+  .mk-f2 { right: -3rem; }
 }
 @keyframes mk-float { to { transform: translateY(-8px); } }
 
@@ -349,3 +353,7 @@
   .mk-btn, .mk-bcard, .mk-nav-links a::after { transition: none; }
   .mk-btn:hover, .mk-bcard:hover { transform: none; }
 }
+
+.mk-bento-a .mk-art { flex: 1; display: flex; align-items: center; }
+.mk-step { display: flex; flex-direction: column; }
+.mk-step p { flex: 1; }

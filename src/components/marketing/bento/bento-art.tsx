@@ -2,30 +2,30 @@
 const common = { "aria-hidden": true, focusable: false } as const;
 
 export function MatchArt() {
-  const left = ["Talep · 3+1", "Talep · Arsa", "Talep · Kiralık", "Talep · Dükkan"];
-  const right = ["Portföy · Daire", "Portföy · Arsa", "Portföy · Daire", "Portföy · Ofis"];
+  const left = ["3+1 talep", "Arsa talebi", "Kiralık talep", "Dükkan talebi"];
+  const right = ["Daire", "Arsa", "Daire", "Ofis"];
   const links: [number, number, boolean][] = [[0, 0, true], [0, 2, false], [1, 1, true], [2, 2, false], [3, 3, true], [2, 0, false]];
   return (
     <svg viewBox="0 0 560 300" {...common}>
       {links.map(([a, b, on], i) => (
-        <path key={i} d={`M170 ${46 + a * 66} C280 ${46 + a * 66} 280 ${46 + b * 66} 390 ${46 + b * 66}`} fill="none" stroke={on ? "#0e9f8c" : "#c4cfe3"} strokeWidth={on ? 3 : 2} strokeDasharray={on ? undefined : "4 6"} strokeLinecap="round" />
+        <path key={i} d={`M190 ${46 + a * 66} C290 ${46 + a * 66} 290 ${46 + b * 66} 370 ${46 + b * 66}`} fill="none" stroke={on ? "#0e9f8c" : "#c4cfe3"} strokeWidth={on ? 3 : 2} strokeDasharray={on ? undefined : "4 6"} strokeLinecap="round" />
       ))}
       {left.map((t, i) => (
         <g key={t}>
-          <rect x="20" y={26 + i * 66} width="150" height="40" rx="10" fill="#fff" stroke="#e7e3da" />
-          <circle cx="40" cy={46 + i * 66} r="6" fill="#1463ff" />
-          <text x="56" y={51 + i * 66} fontSize="14" fontWeight="600" fill="#071a38">{t}</text>
+          <rect x="10" y={22 + i * 66} width="180" height="48" rx="12" fill="#fff" stroke="#e7e3da" />
+          <circle cx="34" cy={46 + i * 66} r="7" fill="#1463ff" />
+          <text x="52" y={53 + i * 66} fontSize="18" fontWeight="600" fill="#071a38">{t}</text>
         </g>
       ))}
       {right.map((t, i) => (
         <g key={i}>
-          <rect x="390" y={26 + i * 66} width="150" height="40" rx="10" fill="#fff" stroke="#e7e3da" />
-          <circle cx="410" cy={46 + i * 66} r="6" fill="#0e9f8c" />
-          <text x="426" y={51 + i * 66} fontSize="14" fontWeight="600" fill="#071a38">{t}</text>
+          <rect x="370" y={22 + i * 66} width="180" height="48" rx="12" fill="#fff" stroke="#e7e3da" />
+          <circle cx="394" cy={46 + i * 66} r="7" fill="#0e9f8c" />
+          <text x="412" y={53 + i * 66} fontSize="18" fontWeight="600" fill="#071a38">{t}</text>
         </g>
       ))}
-      <rect x="235" y="272" width="90" height="22" rx="11" fill="#e3f6f2" />
-      <text x="280" y="288" textAnchor="middle" fontSize="12" fontWeight="600" fill="#0b8172">Eşleşme</text>
+      <rect x="225" y="268" width="110" height="28" rx="14" fill="#e3f6f2" />
+      <text x="280" y="288" textAnchor="middle" fontSize="15" fontWeight="600" fill="#0b8172">Eşleşme</text>
     </svg>
   );
 }
@@ -71,7 +71,7 @@ export function ValuationArt() {
       <rect x="10" y="40" width="380" height="50" rx="10" fill="#dbe7ff" opacity="0.55" />
       <path d="M10 104 L390 28" stroke="#1463ff" strokeWidth="2" strokeDasharray="5 6" />
       {dots.map(([x, y], i) => <circle key={i} cx={x} cy={y} r="6" fill={i === 7 ? "#0e9f8c" : "#1463ff"} opacity={i === 7 ? 1 : 0.8} />)}
-      <text x="22" y="140" fontSize="12" fill="#5b6577">Emsal dağılımı ve aralık</text>
+      <text x="22" y="140" fontSize="14" fill="#5b6577">Emsal dağılımı ve aralık</text>
     </svg>
   );
 }
@@ -86,7 +86,7 @@ export function SignatureArt() {
           <text x={38 + i * 63} y="76" textAnchor="middle" fontSize="28" fontWeight="700" fill="#071a38" fontFamily="var(--font-geist-mono), monospace">{d}</text>
         </g>
       ))}
-      <text x="12" y="132" fontSize="12" fill="#5b6577">SMS ile gelen 6 haneli doğrulama kodu</text>
+      <text x="12" y="132" fontSize="14" fill="#5b6577">SMS ile gelen 6 haneli doğrulama kodu</text>
     </svg>
   );
 }
@@ -97,7 +97,7 @@ export function AutomationArt() {
     <svg viewBox="0 0 400 150" {...common}>
       <line x1="10" x2="390" y1="70" y2="70" stroke="#d6dcea" strokeWidth="2" />
       {pts.map((x, i) => <circle key={i} cx={x + 8} cy="70" r={i % 5 === 0 ? 7 : 4.5} fill={i % 5 === 0 ? "#1463ff" : "#9db6e8"} />)}
-      {["00:00", "06:00", "12:00", "18:00"].map((t, i) => <text key={t} x={10 + i * 120} y="112" fontSize="12" fill="#5b6577">{t}</text>)}
+      {["00:00", "06:00", "12:00", "18:00"].map((t, i) => <text key={t} x={10 + i * 112} y="112" fontSize="14" fill="#5b6577">{t}</text>)}
       <text x="10" y="40" fontSize="14" fontWeight="700" fill="#071a38" className="mk-m">Gün boyu arka planda</text>
     </svg>
   );
