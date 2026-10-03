@@ -1,15 +1,13 @@
 import type { AppModule } from "@/lib/permissions";
-import { OFFICE_WIDE_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
+import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import {
   effectiveCanAccessModule,
   effectiveHasPermission,
   type EffectivePermissions,
 } from "@/lib/permissions-effective";
 
-/** Roller için mevcut panel davranışı: bu üç rol tenant genelini, diğerleri kendi satırlarını görür. */
-export function hasOfficeWideDataScope(role: string | null | undefined): boolean {
-  return OFFICE_WIDE_ROLES.includes(role as TeamRole);
-}
+/** Tek kaynak `team/assignable-roles` (istemci güvenli); eski içe aktarma yolu için yeniden dışa aktarılır. */
+export { hasOfficeWideDataScope };
 
 export const SEARCH_KIND_MODULE = {
   customer: "customers",

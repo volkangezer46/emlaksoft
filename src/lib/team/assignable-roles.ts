@@ -19,6 +19,12 @@ export type TeamRole =
  */
 export const MANAGER_ROLES: readonly TeamRole[] = ["owner", "gm", "branch_manager"];
 export const OFFICE_WIDE_ROLES: readonly TeamRole[] = MANAGER_ROLES;
+/** Ofis geneli veri kapsamı: owner/gm/branch_manager tenant genelini, diğerleri kendi satırlarını görür.
+ *  İstemci bileşenleri de kullanabilsin diye burada (sunucu bağımlılığı yok); permission-data-scope yeniden dışa aktarır. */
+export function hasOfficeWideDataScope(role: string | null | undefined): boolean {
+  return OFFICE_WIDE_ROLES.includes(role as TeamRole);
+}
+
 export const MANAGEMENT_TIER_ROLES: readonly TeamRole[] = [...MANAGER_ROLES, "team_lead"];
 /** İzin matrisini/istisnalarını düzenleyebilen roller (owner, gm). */
 export const PERMISSION_EDITOR_ROLES: readonly TeamRole[] = ["owner", "gm"];
