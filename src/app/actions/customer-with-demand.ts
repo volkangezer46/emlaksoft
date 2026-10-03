@@ -26,7 +26,7 @@ export type CustomerWithDemandResult = {
 };
 
 /** Çift gönderim koruma penceresi. */
-export const DUPLICATE_SUBMIT_WINDOW_MS = 30_000;
+const DUPLICATE_SUBMIT_WINDOW_MS = 30_000;
 
 async function findRecentDuplicateCustomer(formData: FormData): Promise<string | null> {
   const gate = await requirePermission("customers", "create");
