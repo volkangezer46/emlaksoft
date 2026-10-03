@@ -63,7 +63,7 @@ function RequiredToggle({ k, req }: { k: CriteriaKey; req: DemandRequiredState }
 function LabelWithToggle({ text, k, req }: { text: string; k: CriteriaKey; req: DemandRequiredState }) {
   return (
     <span className="inline-flex items-center gap-2">
-      {text}
+      <span>{text}</span>
       <RequiredToggle k={k} req={req} />
     </span>
   );

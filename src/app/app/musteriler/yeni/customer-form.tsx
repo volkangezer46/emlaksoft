@@ -5,13 +5,14 @@ import Link from "next/link";
 import { Save, UserRound } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { createCustomerWithDemand } from "@/app/actions/customer-with-demand";
+import { DemandMatchPreview } from "@/components/app/demand-match-preview";
 import { DemandSummaryGroups } from "@/components/app/demand-summary";
 import { StructuredDemandFields, useDemandRequired } from "@/components/app/structured-demand-fields";
 import { isOwnerSideCustomerType, hasDemandContent } from "@/lib/demand-criteria";
 import { GeoSelect } from "@/components/app/geo-select";
 import { useCreateForm } from "@/components/app/use-create-form";
 import { FormField, FormInput, FormSelect, FormTextarea, fieldClass } from "@/components/ui/form-controls";
-import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
+import { CollapsibleSummaryGroup, SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { detailOrList } from "@/lib/form-logic";
 import { formatPhoneDisplay, parsePhone } from "@/lib/phone";
@@ -30,7 +31,7 @@ const TAB_ICONS = {
   not: TI.not,
 } as const;
 
-const FIELD_LABELS = { full_name: "Ad soyad" };
+const FIELD_LABELS = { full_name: "Ad soyad", phone: "Telefon" };
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -190,8 +191,10 @@ export function CustomerForm({
     const birth = display.birth_date;
     const anniversary = display.anniversary_date;
     const note = (values.notes ?? "").trim().replace(/\s+/g, " ");
+    const demandBrief = [values.transaction_type, values.property_type].filter(Boolean).join(" · ");
     return (
       <>
+        {ownerSide || !canCreateDemand ? null : <DemandMatchPreview values={values} />}
         <div className="flex items-center gap-3 rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
           <span
             aria-hidden="true"
@@ -204,7 +207,7 @@ export function CustomerForm({
             <p className="truncate text-xs text-text-muted">{values.type || "Tür seçilmedi"}</p>
           </div>
         </div>
-        <SummaryGroup title="Kayıt bilgisi">
+        <CollapsibleSummaryGroup title="Kayıt bilgisi" defaultOpen brief={[name, phone?.ok ? "Telefon var" : null].filter(Boolean).join(" · ")}>
           <SummaryRow label="Ad soyad" value={name || "Zorunlu"} muted={!name} tab="kisi" field="full_name" />
           {branches.length > 0 ? <SummaryRow label="Şube" value={branch ?? "Atanmadı"} muted={!branch} tab="kisi" field="branch_id" /> : null}
           <SummaryRow
@@ -219,9 +222,9 @@ export function CustomerForm({
           <SummaryRow label="Doğum tarihi" value={birth ?? "Girilmedi"} muted={!birth} tab="ozel-gunler" field="birth_date" />
           <SummaryRow label="Yıldönümü" value={anniversary ?? "Girilmedi"} muted={!anniversary} tab="ozel-gunler" field="anniversary_date" />
           <SummaryRow label="Not" value={note || "Girilmedi"} muted={!note} tab="not" field="notes" />
-        </SummaryGroup>
+        </CollapsibleSummaryGroup>
         {ownerSide || !canCreateDemand ? null : (
-          <>
+          <CollapsibleSummaryGroup title="Talep özeti" brief={hasDemandContent(values) ? demandBrief || "Talep açılır" : "Yalnız müşteri kaydedilir"}>
             <SummaryGroup title="Talep kaydı">
               <SummaryRow
                 label="Kayıt"
@@ -236,8 +239,9 @@ export function CustomerForm({
               urgencyOptions={urgencyOptions}
               display={display}
               tabs={{ ne: "talep", kriter: "talep", bolge: "talep" }}
+              showPreview={false}
             />
-          </>
+          </CollapsibleSummaryGroup>
         )}
       </>
     );

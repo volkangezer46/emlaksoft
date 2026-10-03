@@ -27,6 +27,7 @@ import { useFormDraft, type FormDraftConfig } from "@/components/app/use-form-dr
 import { useFormFields } from "@/components/app/use-form-fields";
 import { useFormValues } from "@/components/app/use-form-values";
 import { now } from "@/lib/clock";
+import { fieldLabelFor, fieldTextFor } from "@/lib/form-field-labels";
 import {
   computeTabState,
   formatDraftTime,
@@ -379,7 +380,7 @@ export function TabbedFormShell({
       summary
     );
   const missingList = tabs.flatMap((t) =>
-    (tabStates[t.id]?.missing ?? []).map((name) => ({ tab: t, name, label: fieldLabels?.[name] ?? name })),
+    (tabStates[t.id]?.missing ?? []).map((name) => ({ tab: t, name, label: fieldLabelFor(name, fieldLabels?.[name]) })),
   );
   const hasSide = Boolean(summaryNode) || missingList.length > 0 || progress.total > 0;
 
@@ -408,8 +409,12 @@ export function TabbedFormShell({
       ) : null}
       {summaryNode ? <div className="space-y-3">{summaryNode}</div> : null}
       {tabs.some((t) => t.fields.some((f) => fieldInfo[f])) ? (
-        <div className="space-y-3">
-          <p className="text-xs font-semibold text-ink-950">Girilen bilgiler</p>
+        <details className="group rounded-[var(--radius-control)] border border-line bg-canvas/40 p-2">
+          <summary className="focus-ring flex min-h-8 cursor-pointer list-none items-center gap-2 rounded-[var(--radius-control)] px-2 text-xs font-semibold text-ink-950">
+            Girilen bilgiler
+            <ChevronRight aria-hidden="true" className="ml-auto h-3.5 w-3.5 text-text-faint transition-transform duration-150 group-open:rotate-90 motion-reduce:transition-none" />
+          </summary>
+          <div className="mt-2 space-y-3">
           {tabs.map((t) => {
             const rows = t.fields.filter((f) => fieldInfo[f]);
             if (rows.length === 0) return null;
@@ -420,9 +425,9 @@ export function TabbedFormShell({
                   return (
                     <SummaryRow
                       key={f}
-                      label={fieldLabels?.[f] ?? info.label ?? f}
-                      value={info.text ?? "Girilmedi"}
-                      muted={info.text == null}
+                      label={fieldLabelFor(f, fieldLabels?.[f] ?? info.label)}
+                      value={fieldTextFor(f, info.text) ?? "Girilmedi"}
+                      muted={fieldTextFor(f, info.text) == null}
                       tab={t.id}
                       field={f}
                     />
@@ -431,7 +436,8 @@ export function TabbedFormShell({
               </SummaryGroup>
             );
           })}
-        </div>
+          </div>
+        </details>
       ) : null}
       {missingList.length > 0 ? (
         <div>
@@ -602,7 +608,8 @@ export function TabbedFormShell({
                 aria-label="Özet ve önizleme"
                 className={cn(
                   "hidden rounded-[var(--radius-card)] border border-line bg-surface text-sm shadow-[var(--elev-1)] xl:sticky xl:top-20 xl:block xl:max-h-[calc(100vh-6rem)] xl:self-start xl:overflow-y-auto",
-                  sideOpen ? "p-4" : "p-0.5",
+                  // Alt boşluk: yapışkan eylem çubuğunun altında içerik kalmasın.
+                  sideOpen ? "p-4 xl:pb-24" : "p-0.5",
                 )}
               >
                 <div className={cn("flex items-center gap-2", sideOpen && "mb-3")}>
@@ -729,5 +736,30 @@ export function SummaryGroup({ title, children }: { title?: string; children: Re
       {title ? <p className="px-2 pb-1 text-xs font-semibold text-ink-950">{title}</p> : null}
       {children}
     </div>
+  );
+}
+
+/** Katlanır özet grubu: başlıkta kısa özet, varsayılan kapalı/açık seçilebilir. */
+export function CollapsibleSummaryGroup({
+  title,
+  brief,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  /** Kapalıyken başlıkta görünen kısa özet. */
+  brief?: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details open={defaultOpen || undefined} className="group rounded-[var(--radius-control)] border border-line bg-canvas/60 p-2">
+      <summary className="focus-ring flex min-h-8 cursor-pointer list-none items-center gap-2 rounded-[var(--radius-control)] px-2 text-xs">
+        <span className="shrink-0 font-semibold text-ink-950">{title}</span>
+        {brief ? <span className="min-w-0 flex-1 truncate text-right text-text-muted group-open:hidden" title={brief}>{brief}</span> : <span className="flex-1" />}
+        <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-text-faint transition-transform duration-150 group-open:rotate-90 motion-reduce:transition-none" />
+      </summary>
+      <div className="mt-1 space-y-3">{children}</div>
+    </details>
   );
 }

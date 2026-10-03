@@ -79,6 +79,9 @@ export function KpiTile({
     dim && "opacity-70 hover:opacity-100",
     className,
   );
+  // Uzun biçimli tutar ("44.300.000 ₺") kartı taşırmasın: boyut küçülür, ₺ ayrılmaz boşlukla yapışır.
+  const rawValue = typeof value === "string" ? value.replace(/ (?=₺)/g, "\u00a0") : value;
+  const valueCls = typeof value === "string" && value.length >= 11 ? "pm-value-long" : "";
   const valueStyle = attention ? { color: "var(--t-text)" } : undefined;
 
   const body =
@@ -93,8 +96,8 @@ export function KpiTile({
           <span className="pm-card-title line-clamp-2 break-words" title={label}>
             {label}
           </span>
-          <span className="pm-value mt-0.5 block" style={valueStyle}>
-            {value}
+          <span className={cn("pm-value mt-0.5 block", valueCls)} style={valueStyle}>
+            {rawValue}
           </span>
           <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
             {trend ? <TrendPill trend={trend} /> : null}
@@ -119,8 +122,8 @@ export function KpiTile({
           {href ? <ChevronRight className="pm-card-arrow h-4 w-4" aria-hidden="true" /> : null}
         </span>
         <span className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-          <span className="pm-value" style={valueStyle}>
-            {value}
+          <span className={cn("pm-value", valueCls)} style={valueStyle}>
+            {rawValue}
           </span>
           {trend ? <TrendPill trend={trend} /> : null}
         </span>

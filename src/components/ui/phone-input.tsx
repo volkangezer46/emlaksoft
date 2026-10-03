@@ -133,15 +133,15 @@ export function PhoneInput(props: PhoneInputProps) {
   const showError = touched && invalid;
   const hintId = `${useId()}-phone-err`;
   const describedByIds = [ariaDescribedBy, showError ? hintId : undefined].filter(Boolean).join(" ") || undefined;
-  const inputClassName = `${className ?? DEFAULT_INPUT_CLASS} min-w-0 flex-1${
+  const inputClassName = `${className ?? DEFAULT_INPUT_CLASS} min-w-0 flex-[1_1_9.5rem]${
     showError ? " border-danger-500! ring-1 ring-danger-500/25" : ""
   }`;
 
   return (
     <div>
-    <div className="flex items-stretch gap-2">
+    <div className="flex flex-wrap items-stretch gap-2">
       <label
-        className="relative inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-sm text-ink transition focus-within:border-brand-400"
+        className="relative inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2 py-2.5 text-sm text-ink transition focus-within:border-brand-400"
       >
         <span
           aria-hidden="true"

@@ -66,6 +66,14 @@ function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
 }
 
+/** KPI kartı için kompakt tutar ("₺44,3 Mn"); tam değer kartın title'ında. */
+function moneyKpi(n: number) {
+  const abs = Math.abs(n);
+  if (abs < 1_000_000) return `₺${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n)}`;
+  const v = abs >= 1_000_000_000 ? n / 1_000_000_000 : n / 1_000_000;
+  return `₺${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(v)} ${abs >= 1_000_000_000 ? "Mr" : "Mn"}`;
+}
+
 function one<T>(v: T | T[] | null | undefined): T | null {
   if (!v) return null;
   return Array.isArray(v) ? (v[0] ?? null) : v;
@@ -276,16 +284,17 @@ export default async function DealsPage({
 
   const kpis: KpiItem[] = [];
   if (sums) {
-    kpis.push({ label: "Açık hat", value: money(sums.openValue), icon: <TrendingUp />, tone: "info", href: hrefWith({ gorunum: "liste", asama: "acik", sayfa: "" }), hint: `${openCount} açık anlaşma` });
+    kpis.push({ label: "Açık hat", value: moneyKpi(sums.openValue), title: money(sums.openValue), icon: <TrendingUp />, tone: "info", href: hrefWith({ gorunum: "liste", asama: "acik", sayfa: "" }), hint: `${openCount} açık anlaşma` });
     kpis.push({
       label: "Ağırlıklı tahmin",
-      value: money(sums.weighted),
+      value: moneyKpi(sums.weighted),
+      title: money(sums.weighted),
       icon: <Target />,
       tone: "info",
       href: `${hrefWith({ gorunum: "", asama: "", sayfa: "" })}#huni`,
       hint: "olasılıkla ağırlıklı açık hat",
     });
-    kpis.push({ label: "Kazanılan", value: money(sums.wonValue), icon: <Trophy />, tone: "success", href: hrefWith({ gorunum: "liste", asama: "won", sayfa: "" }), hint: `${stageCounts.won} anlaşma` });
+    kpis.push({ label: "Kazanılan", value: moneyKpi(sums.wonValue), title: money(sums.wonValue), icon: <Trophy />, tone: "success", href: hrefWith({ gorunum: "liste", asama: "won", sayfa: "" }), hint: `${stageCounts.won} anlaşma` });
   } else {
     kpis.push({ label: "Açık anlaşma", value: openCount, icon: <TrendingUp />, tone: "info", href: hrefWith({ gorunum: "liste", asama: "acik", sayfa: "" }), hint: "kazanılmamış, kaybedilmemiş" });
     kpis.push({ label: "Kazanılan", value: stageCounts.won!, icon: <Trophy />, tone: "success", href: hrefWith({ gorunum: "liste", asama: "won", sayfa: "" }), hint: "anlaşma" });
