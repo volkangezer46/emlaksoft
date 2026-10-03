@@ -4,7 +4,7 @@ import type { ComboboxOption } from "@/components/ui/combobox";
 import { NewApprovalForm } from "./new-approval-form";
 
 export default async function YeniOnayTalebiPage() {
-  const { perms } = await requireModulePage("commissions", "/app/onaylar");
+  const { perms, userId } = await requireModulePage("commissions", "/app/onaylar");
   const supabase = await createClient();
   // Gider havuzu yalnız gider görme yetkisi olana (komisyon yetkisi gider listesini açmaz).
   const canSeeExpenses = (perms.expenses ?? []).includes("view");
@@ -39,5 +39,5 @@ export default async function YeniOnayTalebiPage() {
     })),
   ];
 
-  return <NewApprovalForm entityOptions={entityOptions} />;
+  return <NewApprovalForm entityOptions={entityOptions} userId={userId} />;
 }
