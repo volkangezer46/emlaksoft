@@ -75,7 +75,7 @@ export async function KpiSatiri({ ctx }: { ctx: HomeCtx }) {
   return (
     <div className="stagger-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map(({ key, ...card }) => (
-        <KpiCard key={key} {...card} />
+        <KpiCard key={key} {...card} layout="inline" chart="bars" />
       ))}
     </div>
   );

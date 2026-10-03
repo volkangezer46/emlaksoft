@@ -27,6 +27,7 @@ export type HomeCtx = {
   tvMode: boolean;
   canSeeRentals: boolean;
   canSeeProjects: boolean;
+  canSeeProperties: boolean;
   fullName: string;
   firstName: string;
   /** Dönem seçici (?donem=7|30|90): yalnız dönem-duyarlı hero özeti ve kartlar kullanır. */
@@ -402,6 +403,67 @@ export const loadCustomerSources = cache(async () => {
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   return { total: rows.length, counts: Object.fromEntries(counts) as Record<string, number> };
+});
+
+/** Portföy şeridi: son eklenenler + son 30 günde liste fiyatı düşenler (property_price_history). */
+export type StripProperty = {
+  id: string;
+  code: string | null;
+  title: string | null;
+  price: number | null;
+  transaction: string | null;
+  district: string | null;
+  createdAt: string | null;
+  dropPct?: number;
+};
+type RawStripProperty = {
+  id: string;
+  property_code: string | null;
+  title: string | null;
+  list_price: number | null;
+  transaction_type: string | null;
+  created_at?: string | null;
+  district: { name: string | null } | { name: string | null }[] | null;
+};
+const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
+const toStrip = (r: RawStripProperty, dropPct?: number): StripProperty => ({
+  id: r.id,
+  code: r.property_code,
+  title: r.title,
+  price: r.list_price == null ? null : Number(r.list_price),
+  transaction: r.transaction_type,
+  district: one(r.district)?.name ?? null,
+  createdAt: r.created_at ?? null,
+  dropPct,
+});
+export const loadPropertyStrip = cache(async () => {
+  const supabase = await createClient();
+  const cols = "id, property_code, title, list_price, transaction_type, created_at, district:geo_districts(name)";
+  const results = await Promise.all([
+    supabase.from("properties").select(cols).is("deleted_at", null).order("created_at", { ascending: false }).limit(5),
+    supabase
+      .from("property_price_history")
+      .select(
+        "change_pct, created_at, property:properties!property_price_history_property_id_fkey(id, property_code, title, list_price, transaction_type, district:geo_districts(name))",
+      )
+      .eq("price_field", "list_price")
+      .lt("change_pct", 0)
+      .gte("created_at", daysAgoIso(30))
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
+  assertQueryBatchSucceeded(results, ["strip-recent", "strip-price-drops"], "Ana panel");
+  const recent = ((results[0].data ?? []) as unknown as RawStripProperty[]).map((r) => toStrip(r));
+  const seen = new Set<string>();
+  const drops: StripProperty[] = [];
+  for (const row of (results[1].data ?? []) as unknown as { change_pct: number | null; property: RawStripProperty | RawStripProperty[] | null }[]) {
+    const prop = one(row.property);
+    if (!prop || seen.has(prop.id)) continue;
+    seen.add(prop.id);
+    drops.push(toStrip(prop, Number(row.change_pct)));
+    if (drops.length >= 5) break;
+  }
+  return { recent, drops };
 });
 
 /* ------------------------------ Liste/akış bölümleri ------------------------- */
