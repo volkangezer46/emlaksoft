@@ -23,7 +23,11 @@ export function AppBreadcrumb({ accessibleModules }: { accessibleModules: AppMod
   const isDetail = pathname !== href && !pathname.startsWith(`${href}?`) && pathname.length > href.length;
   items.push({ label: section.title, href: sectionHref });
   items.push({ label: item.label, href: isDetail ? href : undefined });
-  if (isDetail) items.push({ label: "Ayrıntı" });
+  if (isDetail) {
+    // Son segment: /yeni → "Yeni kayıt", diğer her şey (kimlik) → "Ayrıntı".
+    const last = pathname.replace(/\/+$/, "").split("/").pop();
+    items.push({ label: last === "yeni" ? "Yeni kayıt" : "Ayrıntı" });
+  }
   const unique = items.filter((it, i) => i === 0 || it.label !== items[i - 1]!.label);
   const trimmed = unique.length > 3 ? unique.slice(-3) : unique;
   return <Breadcrumb items={trimmed} className="hidden min-w-0 shrink-0 lg:block" />;
