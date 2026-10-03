@@ -3,6 +3,11 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { CUSTOMER_DRAFT_FIELDS, CUSTOMER_TABS } from "@/app/app/musteriler/yeni/customer-tabs";
 import { PROPERTY_DRAFT_FIELDS, PROPERTY_TABS } from "@/app/app/portfoyler/yeni/property-tabs";
+import { APPOINTMENT_DRAFT_FIELDS, APPOINTMENT_TABS } from "@/app/app/randevular/yeni/appointment-tabs";
+import { TASK_DRAFT_FIELDS, TASK_TABS } from "@/app/app/gorevler/yeni/task-tabs";
+import { RENTAL_DRAFT_FIELDS, RENTAL_TABS } from "@/app/app/kiralama/yeni/rental-tabs";
+import { OPEN_HOUSE_DRAFT_FIELDS, OPEN_HOUSE_TABS } from "@/app/app/acik-ev/yeni/open-house-tabs";
+import { PRESENTATION_DRAFT_FIELDS, PRESENTATION_TABS } from "@/app/app/portfoyler/sunumlar/yeni/presentation-tabs";
 import { isSensitiveFieldName } from "./form-tabs";
 
 /**
@@ -45,6 +50,36 @@ const FORMS = [
     source: "src/app/app/portfoyler/yeni/property-form.tsx",
     tabs: PROPERTY_TABS as readonly TabLike[],
     draft: PROPERTY_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "randevu",
+    source: "src/app/app/randevular/yeni/appointment-form.tsx",
+    tabs: APPOINTMENT_TABS as readonly TabLike[],
+    draft: APPOINTMENT_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "görev",
+    source: "src/app/app/gorevler/yeni/task-form.tsx",
+    tabs: TASK_TABS as readonly TabLike[],
+    draft: TASK_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "kira kaydı",
+    source: "src/app/app/kiralama/yeni/rental-form.tsx",
+    tabs: RENTAL_TABS as readonly TabLike[],
+    draft: RENTAL_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "açık ev",
+    source: "src/app/app/acik-ev/yeni/open-house-form.tsx",
+    tabs: OPEN_HOUSE_TABS as readonly TabLike[],
+    draft: OPEN_HOUSE_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "sunum",
+    source: "src/app/app/portfoyler/sunumlar/yeni/presentation-form.tsx",
+    tabs: PRESENTATION_TABS as readonly TabLike[],
+    draft: PRESENTATION_DRAFT_FIELDS as readonly string[],
   },
 ];
 
