@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeftRight, Info, Trophy, UsersRound } from "lucide-react";
+import { ArrowLeftRight, Info, UsersRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now } from "@/lib/clock";
@@ -116,22 +116,6 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
         eyebrow="Ekip Merkezi"
         title="Danışman kıyası"
         description={`${monthLabel} dönemi karnesi. Ölçümler mevcut çağrı, randevu, teklif, anlaşma, portföy ve hedef kayıtlarınızdan gelir.`}
-        actions={
-          <>
-            <Link
-              href="/app/danisman-kpi"
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-line-strong hover:text-text"
-            >
-              <UsersRound className="h-3.5 w-3.5" aria-hidden /> Aylık karne ve geçmiş aylar
-            </Link>
-            <Link
-              href="/app/lig"
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-line-strong hover:text-text"
-            >
-              <Trophy className="h-3.5 w-3.5" aria-hidden /> Ekip ligi
-            </Link>
-          </>
-        }
       />
 
       {loadFailed ? (
