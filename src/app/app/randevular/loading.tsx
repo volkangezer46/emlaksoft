@@ -1,27 +1,20 @@
-import { Skeleton, SkeletonBlock, SkeletonLine, SkeletonStat } from "@/components/ui/skeleton";
+import { SkeletonKpiStrip, SkeletonLine, SkeletonPage, SkeletonPageHeader } from "@/components/ui/skeleton";
 
-/**
- * Randevular iskeleti — gerçek düzeni taklit eder (hero + 3 KPI + tur planı).
- * Eskiden `animate-pulse`'lı düz gri bloklardı; artık ortak `.skeleton`
- * shimmer'ı ve tek bir erişilebilir "yükleniyor" duyurusu kullanılıyor.
- */
+/** Randevular: PageHeader → KPI şeridi → tur planı + yan panel. */
 export default function Loading() {
   return (
-    <SkeletonBlock label="Randevular yükleniyor" className="space-y-6">
-      <Skeleton className="h-52 rounded-[var(--radius-panel)]" />
-      <div className="grid gap-4 sm:grid-cols-3">
-        <SkeletonStat />
-        <SkeletonStat />
-        <SkeletonStat />
-      </div>
+    <SkeletonPage label="Randevular yükleniyor">
+      <SkeletonPageHeader actions={2} />
+      <SkeletonKpiStrip cols={3} />
       <div className="grid gap-4 xl:grid-cols-[1.55fr_1fr]">
-        <div className="space-y-3 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <SkeletonLine key={i} />
-          ))}
-        </div>
-        <Skeleton className="h-72 rounded-[var(--radius-panel)]" />
+        {[6, 4].map((n, k) => (
+          <div key={k} className="space-y-3 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+            {Array.from({ length: n }).map((_, i) => (
+              <SkeletonLine key={i} />
+            ))}
+          </div>
+        ))}
       </div>
-    </SkeletonBlock>
+    </SkeletonPage>
   );
 }

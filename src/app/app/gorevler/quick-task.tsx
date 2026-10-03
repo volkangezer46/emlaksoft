@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { Zap } from "lucide-react";
 import { createTask } from "@/app/actions/tasks";
 import { useToast } from "@/components/app/toast-provider";
@@ -9,25 +8,36 @@ import { Input } from "@/components/ui/input";
 
 /** Tek satır "hızlı görev": başlığı yaz, Enter — varsayılanlarla (Takip, normal, bana atanır) eklenir. */
 export function QuickTask() {
-  const router = useRouter();
   const { push } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const restore = (title: string, message: string) => {
+    if (inputRef.current && !inputRef.current.value) inputRef.current.value = title;
+    setError(message);
+    push(message, "err");
+  };
+
   const action = (formData: FormData) => {
     const title = String(formData.get("title") ?? "").trim();
     if (!title) return;
+    // Anında geri bildirim: alan hemen boşalır, hatada yazılan başlık geri gelir.
+    if (inputRef.current) inputRef.current.value = "";
+    setError(null);
     startTransition(async () => {
-      const res = await createTask({}, formData);
-      if (res.ok) {
-        setError(null);
-        if (inputRef.current) inputRef.current.value = "";
-        push("Görev eklendi", "ok");
-        router.refresh();
-        return;
+      try {
+        const res = await createTask({}, formData);
+        if (res.ok) {
+          // createTask zaten revalidatePath("/app/gorevler") yapıyor: action yanıtı
+          // taze listeyi getirir, ayrıca router.refresh() gereksiz (çift gidiş-dönüş).
+          push("Görev eklendi", "ok");
+          return;
+        }
+        restore(title, res.error ?? "Görev eklenemedi.");
+      } catch {
+        restore(title, "Görev eklenemedi. Lütfen tekrar deneyin.");
       }
-      setError(res.error ?? "Görev eklenemedi.");
     });
   };
 

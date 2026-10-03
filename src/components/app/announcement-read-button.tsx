@@ -1,17 +1,19 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { Check, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Check } from "lucide-react";
 import { markAnnouncementRead } from "@/app/actions/announcements";
+import { useToast } from "@/components/app/toast-provider";
+import { runOptimistic } from "@/lib/optimistic";
 
 /**
- * Duyuru bandındaki "Okudum" butonu — tıklanınca announcement_reads'e upsert,
- * satır anında soluklaşır (done state), router.refresh sıralamayı tazeler.
+ * Duyuru bandındaki "Okudum" butonu — tıklanınca satır ANINDA "Okundu" olur,
+ * announcement_reads upsert'i arkada çalışır; hatada buton geri gelir + toast.
+ * markAnnouncementRead zaten revalidatePath("/app") yapıyor (action yanıtı taze
+ * sayfayı getirir) — ayrıca router.refresh() çağrılmaz.
  */
 export function AnnouncementReadButton({ id }: { id: string }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { push } = useToast();
   const [done, setDone] = useState(false);
 
   if (done) {
@@ -25,19 +27,18 @@ export function AnnouncementReadButton({ id }: { id: string }) {
   return (
     <button
       type="button"
-      disabled={pending}
       onClick={() =>
-        startTransition(async () => {
-          const res = await markAnnouncementRead(id);
-          if (!res.error) {
-            setDone(true);
-            router.refresh();
-          }
+        void runOptimistic({
+          apply: () => setDone(true),
+          commit: () => markAnnouncementRead(id),
+          rollback: () => setDone(false),
+          onError: (m) => push(m, "err"),
+          fallbackError: "Okundu işaretlenemedi",
         })
       }
       className="focus-ring press mt-0.5 inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs font-bold text-text-muted transition hover:border-mint-500/40 hover:text-mint-600 disabled:opacity-60"
     >
-      {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+      <Check className="h-3.5 w-3.5" />
       Okudum
     </button>
   );

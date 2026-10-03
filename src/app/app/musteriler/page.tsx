@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IntentLink } from "@/components/app/intent-link";
 import { redirect } from "next/navigation";
 import { daysAgoIso, msSince, now } from "@/lib/clock";
 import { Badge } from "@/components/ui/badge";
@@ -880,8 +881,8 @@ export default async function CustomersPage({
                       {/* prefetch={false}: sayfa başına 50 satır × dinamik [id] rotası (loading.tsx
                           sınırı) viewport girişinde 50 RSC isteği tetikliyor, networkidle'a
                           ulaşılmıyordu. Tıklamada loading.tsx zaten anında açılır. */}
-                      <Link prefetch={false} href={`/app/musteriler/${c.id}`} className="absolute inset-0 hidden sm:block" aria-label={`${c.full_name} detayları`} />
-                      <Link prefetch={false} href={`/app/musteriler/${c.id}`} className="flex items-center gap-3 sm:pointer-events-none">
+                      <IntentLink href={`/app/musteriler/${c.id}`} className="absolute inset-0 hidden sm:block" aria-label={`${c.full_name} detayları`} />
+                      <IntentLink href={`/app/musteriler/${c.id}`} className="flex items-center gap-3 sm:pointer-events-none">
                         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[image:var(--grad-brand)] text-xs font-bold text-white shadow-[var(--shadow-xs)]">
                           {c.full_name.split(/\s+/).map((part) => part[0] ?? "").join("").slice(0, 2).toUpperCase()}
                         </span>
@@ -917,7 +918,7 @@ export default async function CustomersPage({
                             <p className="mt-0.5 flex items-center gap-1 text-xs text-text-faint"><Clock3 className="h-3 w-3" /> {relativeAdded(c.created_at)}</p>
                           )}
                         </div>
-                      </Link>
+                      </IntentLink>
                     </TD>
                     <TD className="hidden sm:table-cell">
                       {c.customer_types && c.customer_types.length > 0 ? (

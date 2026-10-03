@@ -1,15 +1,18 @@
+import { Skeleton, SkeletonPage, SkeletonPageHeader } from "@/components/ui/skeleton";
+
+/** Gelen kutusu: PageHeader → liste (340px) + okuma paneli. */
 export default function Loading() {
   return (
-    <div className="animate-pulse space-y-6">
-      <div className="h-44 rounded-[var(--radius-panel)] bg-ink-950/8" />
+    <SkeletonPage label="Gelen kutusu yükleniyor">
+      <SkeletonPageHeader actions={1} />
       <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
         <div className="space-y-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-20 rounded-[var(--radius-card)] bg-ink-950/8" />
+            <Skeleton key={i} className="h-20 rounded-[var(--radius-card)]" />
           ))}
         </div>
-        <div className="h-[30rem] rounded-[var(--radius-panel)] bg-ink-950/8" />
+        <Skeleton className="h-[30rem] rounded-[var(--radius-panel)]" />
       </div>
-    </div>
+    </SkeletonPage>
   );
 }
