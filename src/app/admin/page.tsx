@@ -186,12 +186,12 @@ async function Overview({ period }: { period: Period }) {
   const prev = mrrSeries.length >= 2 ? mrrSeries[mrrSeries.length - 2]!.value : null;
   const trend = last !== null && prev !== null ? computeTrend(last, prev) : null;
 
-  const queue: QueueItem[] = [
+  const queue = ([
     d.risk > 0 ? { href: "/admin/tenants?durum=past_due", icon: AlertTriangle, tone: "danger", count: d.risk, label: "Riskli ofis", hint: "Gecikmiş veya askıda; inceleyin" } : null,
     d.urgentTickets > 0 ? { href: "/admin/tickets?oncelik=urgent", icon: LifeBuoy, tone: "warn", count: d.urgentTickets, label: "Acil destek talebi", hint: "Yanıt bekliyor" } : null,
     d.demoCount > 0 ? { href: "/admin/satis", icon: Handshake, tone: "brand", count: d.demoCount, label: "Yeni demo talebi", hint: "Satış fırsatı, yanıt bekliyor" } : null,
     d.soon > 0 ? { href: "/admin/tenants?durum=trial", icon: Sparkles, tone: "brand", count: d.soon, label: "Deneme 7 gün içinde bitiyor", hint: "Dönüşüm fırsatı" } : null,
-  ].filter((q): q is QueueItem => q !== null);
+  ] as (QueueItem | null)[]).filter((q): q is QueueItem => q !== null);
 
   return (
     <Bento>
