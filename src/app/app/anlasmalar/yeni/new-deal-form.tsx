@@ -136,7 +136,7 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
     ),
   };
 
-  function renderSummary({ values }: TabbedSummaryContext) {
+  function renderSummary({ values, display }: TabbedSummaryContext) {
     const prop = properties.find((p) => p.id === values.property_id);
     const hasProp = (values.property_id ?? "") !== "";
     const cust = customers.find((c) => c.id === values.customer_id);
@@ -162,8 +162,8 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
           </p>
         </div>
         <SummaryGroup title="Anlaşma">
-          <SummaryRow label="Portföy" value={prop?.property_code ?? (hasProp ? "Seçildi" : "Seçilmedi")} muted={!hasProp} tab="taraflar" field="deal-property" />
-          <SummaryRow label="Müşteri" value={cust?.full_name ?? (hasCust ? "Seçildi" : "Seçilmedi")} muted={!hasCust} tab="taraflar" field="deal-customer" />
+          <SummaryRow label="Portföy" value={prop?.property_code ?? display.property_id ?? "Seçilmedi"} muted={!hasProp} tab="taraflar" field="deal-property" />
+          <SummaryRow label="Müşteri" value={cust?.full_name ?? display.customer_id ?? "Seçilmedi"} muted={!hasCust} tab="taraflar" field="deal-customer" />
           <SummaryRow label="Tür" value={values.deal_type === "rent" ? "Kiralama" : "Satış"} tab="detay" field="deal_type" />
           <SummaryRow label="Aşama" value={nameOf(stageMeta.value)} tab="detay" field="stage" />
           <SummaryRow label="Liste fiyatı" value={list ? formatTry(list) : "Portföy seçilince"} muted={!list} tab="taraflar" field="deal-property" />
@@ -174,7 +174,7 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
             tab="detay"
             field="deal_value"
           />
-          <SummaryRow label="Yetki belgesi" value={hasAuthority ? "Onaylı" : "Yok"} muted={!hasAuthority} tab="detay" field="has_authority" />
+          <SummaryRow label="Yetki belgesi" value={hasAuthority ? "Onaylı" : "Onaylı değil"} muted={!hasAuthority} tab="detay" field="has_authority" />
         </SummaryGroup>
         {missing.length > 0 ? (
           <p role="status" className="rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-medium text-amber-800">

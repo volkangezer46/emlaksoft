@@ -280,3 +280,50 @@ describe("kabuk kaynağı sözleşmesi", () => {
     expect(shell).not.toMatch(/Date\.now\(|new Date\(/);
   });
 });
+
+describe("özet maskeleme yasağı (değer her zaman olduğu gibi gösterilir)", () => {
+  const SOURCES = [
+    ...FORMS.map((f) => f.source),
+    "src/components/app/demand-summary.tsx",
+    "src/components/ui/tabbed-form-shell.tsx",
+    "src/components/ui/inline-tabbed-panel.tsx",
+  ];
+  // Soyut, değeri gizleyen sabit metinler. İstisna yalnız parola/OTP/token/API anahtarı (form-summary.ts içinde "Girildi").
+  const FORBIDDEN: [RegExp, string][] = [
+    [/"Girildi"/, '"Girildi" (soyut özet)'],
+    [/Biçim geçerli/, '"Biçim geçerli"'],
+    [/"Seçildi"/, '"Seçildi" (etiketi göster)'],
+    [/\$\{[A-Za-z_.]*\.length\} karakter`/, "N karakter (metnin kendisini göster)"],
+    [/İlçe \+ mahalle"/, '"İlçe + mahalle" (etiketleri göster)'],
+  ];
+  it("form özetlerinde maskeleyen sabit metin yok", () => {
+    for (const rel of SOURCES) {
+      const src = read(rel);
+      for (const [re, what] of FORBIDDEN) expect(re.test(src), `${rel}: ${what}`).toBe(false);
+    }
+  });
+  it("merkezi çözüm: parola/OTP/token/API anahtarı dışında değer maskelenmez", () => {
+    const summary = read("src/lib/form-summary.ts");
+    expect(summary).toContain("isSecretFieldName");
+    const hook = read("src/components/app/use-form-fields.ts");
+    expect(hook).toContain('type === "password"');
+  });
+});
+
+describe("FormActionBar (ortak Kaydet/İptal alt çubuğu)", () => {
+  it("sekmeli kabuk ve satır içi panel ortak çubuğu kullanır (eski FormActions yok)", () => {
+    for (const rel of ["src/components/ui/tabbed-form-shell.tsx", "src/components/ui/inline-tabbed-panel.tsx"]) {
+      const src = read(rel);
+      expect(src, rel).toContain("<FormActionBar");
+      expect(src, rel).not.toContain("<FormActions");
+    }
+  });
+  it("çubuk: aria-live durum, odak halkası, popup yok, Date.now yok", () => {
+    const bar = read("src/components/ui/form-action-bar.tsx");
+    expect(bar).toContain('aria-live="polite"');
+    expect(bar).toContain('role="alertdialog"');
+    expect(bar).not.toMatch(/window\.confirm|<Dialog|Date\.now\(|new Date\(/);
+    expect(bar).toContain("env(safe-area-inset-bottom");
+    expect(bar).toContain("min-h-11");
+  });
+});

@@ -175,7 +175,7 @@ export function NewTicketForm({
     const subject = (values.subject ?? "").trim();
     const category = categoryOptions.find((o) => o.value === (values.category ?? "general"))?.label;
     const priority = PRIORITY_OPTIONS.find((o) => o.value === (values.priority ?? "normal"))?.label;
-    const bodyLen = (values.body ?? "").trim().length;
+    const body = (values.body ?? "").trim().replace(/\s+/g, " ");
     return (
       <>
         <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
@@ -188,8 +188,8 @@ export function NewTicketForm({
           <SummaryRow label="Öncelik" value={priority ?? "Normal"} tab="talep" field="priority" />
           <SummaryRow
             label="Açıklama"
-            value={bodyLen > 0 ? `${bodyLen} karakter` : "Zorunlu"}
-            muted={bodyLen === 0}
+            value={body || "Zorunlu"}
+            muted={!body}
             tab="aciklama"
             field="body"
           />

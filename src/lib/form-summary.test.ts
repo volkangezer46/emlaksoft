@@ -26,3 +26,16 @@ describe("fieldDisplay", () => {
     expect(cleanLabel("*")).toBeNull();
   });
 });
+
+describe("gizli alanlar (istisna)", () => {
+  it("parola/OTP/token/API anahtarı değeri asla gösterilmez", () => {
+    expect(fieldDisplay("temp_password", { kind: "text", raw: "Abc123!x" })).toBe("Girildi");
+    expect(fieldDisplay("otp_code", { kind: "text", raw: "123456" })).toBe("Girildi");
+    expect(fieldDisplay("api_key", { kind: "text", raw: "sk-live" })).toBe("Girildi");
+    expect(fieldDisplay("x", { kind: "text", raw: "gizli", secret: true })).toBe("Girildi");
+    expect(fieldDisplay("temp_password", { kind: "text", raw: "" })).toBeNull();
+  });
+  it("not gibi alanlar olduğu gibi görünür", () => {
+    expect(fieldDisplay("notes", { kind: "text", raw: "  Ali   bey aradı " })).toBe("Ali bey aradı");
+  });
+});

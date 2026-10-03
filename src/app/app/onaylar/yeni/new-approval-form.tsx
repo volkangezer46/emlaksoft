@@ -114,7 +114,7 @@ export function NewApprovalForm({ entityOptions, userId }: { entityOptions: Comb
             field="current_value"
           />
           <SummaryRow label="İlgili kayıt" value={entityLabel ?? "Seçilmedi"} muted={!entityLabel} tab="kayit" />
-          <SummaryRow label="Gerekçe" value={desc ? `${desc.length} karakter` : "Yok"} muted={!desc} tab="kayit" field="description" />
+          <SummaryRow label="Gerekçe" value={desc || "Girilmedi"} muted={!desc} tab="kayit" field="description" />
         </SummaryGroup>
       </>
     );

@@ -123,7 +123,7 @@ export function TaskForm({ members, customers, userId }: { members: Member[]; cu
     ),
   };
 
-  function renderSummary({ values }: TabbedSummaryContext) {
+  function renderSummary({ values, display }: TabbedSummaryContext) {
     const title = (values.title ?? "").trim();
     const kind = kindOptions.find((o) => o.value === values.kind)?.label;
     const priority = priorityOptions.find((o) => o.value === values.priority)?.label;
@@ -131,9 +131,10 @@ export function TaskForm({ members, customers, userId }: { members: Member[]; cu
     // Devre dışı alan FormData'ya girmez: değer yoksa "Yok".
     const recurrence = recurrenceOptions.find((o) => o.value === (values.recurrence ?? ""))?.label ?? "Yok";
     const assigneeId = (values.assigned_to ?? "").trim();
-    const assignee = assigneeId ? (members.find((m) => m.id === assigneeId)?.full_name ?? "Seçildi") : "Ben";
+    const assignee = assigneeId ? (members.find((m) => m.id === assigneeId)?.full_name ?? display.assigned_to ?? "Seçilen kişi") : "Ben";
     const customerId = (values.customer_id ?? "").trim();
-    const customer = customerId ? (customers.find((c) => c.id === customerId)?.full_name ?? "Seçildi") : null;
+    const notes = (values.notes ?? "").trim();
+    const customer = customerId ? (customers.find((c) => c.id === customerId)?.full_name ?? display.customer_id ?? null) : null;
     return (
       <>
         <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
@@ -148,6 +149,7 @@ export function TaskForm({ members, customers, userId }: { members: Member[]; cu
           <SummaryRow label="Tekrar" value={dueText ? recurrence : "Yok"} muted={!dueText || recurrence === "Yok"} tab="zamanlama" field="recurrence" />
           <SummaryRow label="Atanan" value={assignee} tab="zamanlama" field="assigned_to" />
           <SummaryRow label="Müşteri" value={customer ?? "Bağlı değil"} muted={!customer} tab="zamanlama" field="customer_id" />
+          <SummaryRow label="Not" value={notes || "Girilmedi"} muted={!notes} tab="gorev" field="notes" />
         </SummaryGroup>
       </>
     );
@@ -168,6 +170,7 @@ export function TaskForm({ members, customers, userId }: { members: Member[]; cu
       tabs={tabs}
       tabPanels={tabPanels}
       summary={renderSummary}
+      saveAndNew
       fieldLabels={FIELD_LABELS}
       draft={{ userId, formId: TASK_FORM_ID, fields: [...TASK_DRAFT_FIELDS] }}
     />

@@ -12,11 +12,12 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { FormEventHandler, KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
-import { ChevronLeft, ChevronRight, PanelRightClose, PanelRightOpen, RotateCcw, Sparkles, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, PanelRightClose, PanelRightOpen, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/form-controls";
-import { FormActions } from "@/components/ui/form-page";
+import { FormActionBar, useFormDirty } from "@/components/ui/form-action-bar";
+import { setSubmitIntent } from "@/lib/form-submit-intent";
 import { MorphTabs, type MorphTabItem } from "@/components/ui/morph-tabs";
 import { PageHeader } from "@/components/ui/page-header";
 import { usePersistedFlag } from "@/components/ui/use-persisted-flag";
@@ -28,7 +29,6 @@ import { useFormValues } from "@/components/app/use-form-values";
 import { now } from "@/lib/clock";
 import {
   computeTabState,
-  formatClock,
   formatDraftTime,
   neighborTabId,
   nextTabId,
@@ -78,6 +78,11 @@ export type FormTab = {
 export type TabbedSummaryContext = {
   /** Tüm sekme alanlarının canlı değerleri (yalnız tabs[].fields içindekiler). */
   values: FormValues;
+  /**
+   * Alanın EKRANDA görünen metni (select/combobox için seçili etiket, telefon biçimli, tarih GG.AA.YYYY);
+   * boşsa null. Özet satırlarında soyut "Seçildi/Girildi" yerine bunu göster.
+   */
+  display: Record<string, string | null>;
   tabStates: Record<string, TabState>;
   activeTab: string;
   /** Sekmeye geç; `field` verilirse o alana odaklan. */
@@ -112,11 +117,16 @@ export type TabbedFormShellProps = {
   /**
    * Sağ "Özet ve önizleme" içeriği. Fonksiyon verilirse canlı değerlerle çağrılır.
    * İçine FORM KONTROLÜ koyma (iki yerde render edilir: sağ panel + dar ekran `<details>`).
-   * Telefon/e-posta gibi kişisel veri gösterme.
+   * Girilen değerler OLDUĞU GİBİ gösterilir (telefon formatPhoneDisplay, e-posta, tarih, tutar ₺, not en çok 3 satır);
+   * soyut "Girildi/Var/N karakter" yazma. Tek istisna parola/OTP/token/API anahtarı (yalnız Girildi ya da güç etiketi).
    */
   summary?: ReactNode | ((ctx: TabbedSummaryContext) => ReactNode);
   /** Eksik zorunlu alan listesinde gösterilecek etiketler (name -> "Ad soyad"). */
   fieldLabels?: Record<string, string>;
+  /** "Kaydet ve yenisini ekle" düğmesi (yalnız useCreateForm kullanan formlarda). */
+  saveAndNew?: boolean;
+  /** Yıkıcı eylem: Kaydet kırmızı. */
+  destructive?: boolean;
   /** Verilirse taslak açılır: { userId, formId, fields: beyaz liste }. */
   draft?: FormDraftConfig;
   initialTab?: string;
@@ -158,6 +168,8 @@ export function TabbedFormShell({
   summary,
   fieldLabels,
   draft,
+  saveAndNew,
+  destructive,
   initialTab,
   layout = "auto",
   className,
@@ -192,6 +204,11 @@ export function TabbedFormShell({
   }, [tabs, values]);
   const progress = useMemo(() => progressSummary(tabs, values), [tabs, values]);
   const fieldInfo = useFormFields(formRef, fieldNames);
+  const display = useMemo(() => {
+    const out: Record<string, string | null> = {};
+    for (const [k, v] of Object.entries(fieldInfo)) out[k] = v.text;
+    return out;
+  }, [fieldInfo]);
   const morphItems = useMemo<MorphTabItem[]>(
     () =>
       tabs.map((t) => {
@@ -212,6 +229,8 @@ export function TabbedFormShell({
   const draftApi = useFormDraft(formRef, draft);
   const wasPending = useRef(false);
   const { clear: clearDraft } = draftApi;
+  const dirty = useFormDirty(formRef, pending);
+  const [previousSaved, setPreviousSaved] = useState(false);
   useEffect(() => {
     // Gönderim bitti ve hata yok -> başarılı kayıt: taslağı sil.
     if (wasPending.current && !pending && !error) clearDraft();
@@ -265,6 +284,7 @@ export function TabbedFormShell({
       try {
         const wanted = new URLSearchParams(window.location.search).get("sekme");
         if (wanted && ids.includes(wanted)) setActive(wanted);
+        if (new URLSearchParams(window.location.search).get("kaydedildi") === "1") setPreviousSaved(true);
       } catch {
         /* sessiz */
       }
@@ -341,6 +361,7 @@ export function TabbedFormShell({
   function onFormKeyDown(e: ReactKeyboardEvent<HTMLFormElement>) {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.altKey) {
       e.preventDefault();
+      setSubmitIntent(null);
       if (!pending && !submitDisabled) formRef.current?.requestSubmit();
       return;
     }
@@ -353,7 +374,7 @@ export function TabbedFormShell({
   // Özet fonksiyonu ayrı bileşende çağrılır (goToTab bağlamdan gelir): React Compiler "ref render'da okunuyor" uyarısını önler.
   const summaryNode =
     typeof summary === "function" ? (
-      <SummarySlot render={summary} values={values} tabStates={tabStates} activeTab={active} />
+      <SummarySlot render={summary} values={values} display={display} tabStates={tabStates} activeTab={active} />
     ) : (
       summary
     );
@@ -435,7 +456,6 @@ export function TabbedFormShell({
     </div>
   );
 
-  const statusText = draftApi.savedAt ? `Taslak kaydedildi ${formatClock(draftApi.savedAt)}` : null;
   const prevId = neighborTabId(ids, active, -1);
   const nextId = neighborTabId(ids, active, 1);
   const prevTab = tabs.find((t) => t.id === prevId);
@@ -446,6 +466,13 @@ export function TabbedFormShell({
       <form ref={formRef} onSubmit={onSubmit} onKeyDown={onFormKeyDown} className="tfs-form" data-dir={dir}>
         <div className={cn("mx-auto w-full max-w-[80rem]", className)}>
           <PageHeader title={title} description={description} eyebrow={eyebrow} breadcrumbs={breadcrumbs} actions={headerActions} />
+
+          {previousSaved ? (
+            <div role="status" className="tone-success mb-4 flex items-center gap-2 rounded-[var(--radius-card)] px-4 py-2.5 text-sm font-semibold">
+              <Check aria-hidden="true" className="h-4 w-4 shrink-0" />
+              Önceki kayıt eklendi. Yenisini girebilirsiniz.
+            </div>
+          ) : null}
 
           {draftApi.restorable && draftApi.restorableAt ? (
             <div
@@ -607,44 +634,24 @@ export function TabbedFormShell({
             </div>
           ) : null}
 
-          <FormActions className="mt-4">
-            {tabbed && progress.total > 0 ? (
-              <div
-                role="progressbar"
-                aria-label="Form ilerlemesi"
-                aria-valuemin={0}
-                aria-valuemax={progress.total}
-                aria-valuenow={progress.done}
-                className="-mt-3 basis-full overflow-hidden"
-              >
-                <div
-                  className="h-0.5 bg-brand-600 transition-[width] duration-200 motion-reduce:transition-none"
-                  style={{ width: `${(progress.done / progress.total) * 100}%` }}
-                />
-              </div>
-            ) : null}
-            <p aria-live="polite" className="mr-auto hidden min-w-0 truncate text-xs text-text-faint sm:block">
-              {statusText ?? (
-                <>
-                  <kbd className="rounded border border-line bg-canvas px-1 font-sans">Ctrl</kbd>
-                  {" + "}
-                  <kbd className="rounded border border-line bg-canvas px-1 font-sans">Enter</kbd> ile kaydet
-                  {tabbed ? (
-                    <>
-                      {" · "}
-                      <kbd className="rounded border border-line bg-canvas px-1 font-sans">Alt</kbd>
-                      {" + "}
-                      <kbd className="rounded border border-line bg-canvas px-1 font-sans">↑↓</kbd> sekme
-                    </>
-                  ) : null}
-                </>
-              )}
-            </p>
-            <ButtonLink href={cancelHref} variant="secondary">İptal</ButtonLink>
-            <Button type="submit" loading={pending} disabled={submitDisabled} icon={submitIcon}>
-              {pending && pendingLabel ? pendingLabel : submitLabel}
-            </Button>
-          </FormActions>
+          <FormActionBar
+            className="mt-4"
+            formRef={formRef}
+            pending={pending}
+            error={error}
+            dirty={dirty}
+            submitLabel={submitLabel}
+            pendingLabel={pendingLabel}
+            submitIcon={submitIcon}
+            submitDisabled={submitDisabled}
+            destructive={destructive}
+            cancelHref={cancelHref}
+            progress={tabbed && progress.total > 0 ? progress : null}
+            missing={missingList.map((m) => ({ label: m.label, onGo: () => goToTab(m.tab.id, m.name) }))}
+            draft={draft ? { savedAt: draftApi.savedAt, onSave: draftApi.saveNow } : null}
+            saveAndNew={saveAndNew}
+            shortcuts={tabbed ? "save-tabs" : "save"}
+          />
         </div>
       </form>
     </ShellContext.Provider>
@@ -654,17 +661,19 @@ export function TabbedFormShell({
 function SummarySlot({
   render,
   values,
+  display,
   tabStates,
   activeTab,
 }: {
   render: (ctx: TabbedSummaryContext) => ReactNode;
   values: FormValues;
+  display: Record<string, string | null>;
   tabStates: Record<string, TabState>;
   activeTab: string;
 }) {
   const shell = useContext(ShellContext);
   const goToTab = shell?.goToTab ?? (() => {});
-  return <>{render({ values, tabStates, activeTab, goToTab })}</>;
+  return <>{render({ values, display, tabStates, activeTab, goToTab })}</>;
 }
 
 /** Özet satırı: etiket + gerçek değer; `tab` verilirse tıklanınca o sekmeye (ve `field`'a) götürür. */
@@ -683,10 +692,20 @@ export function SummaryRow({
   muted?: boolean;
 }) {
   const shell = useContext(ShellContext);
+  // Değer her zaman olduğu gibi gösterilir (maskeleme yok); uzun metin en çok 3 satır, tamamı title'da.
+  const title = typeof value === "string" || typeof value === "number" ? String(value) : undefined;
   const inner = (
     <>
       <span className="shrink-0 text-text-muted">{label}</span>
-      <span className={cn("min-w-0 flex-1 truncate text-right font-medium", muted ? "text-text-faint" : "text-ink-950")}>{value}</span>
+      <span
+        title={title}
+        className={cn(
+          "line-clamp-3 min-w-0 flex-1 break-words text-right font-medium",
+          muted ? "text-text-faint" : "text-ink-950",
+        )}
+      >
+        {value}
+      </span>
     </>
   );
   if (tab && shell) {

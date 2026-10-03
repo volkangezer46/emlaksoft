@@ -421,9 +421,10 @@ export function NewContractForm({
           <SummaryRow label="Portföy bağı" value={prefillProperty ? "Eklenecek" : "Yok"} muted={!prefillProperty} tab="bilgiler" />
         </SummaryGroup>
         <SummaryGroup title="İçerik">
+          <SummaryRow label="Metin" value={trimmed ? trimmed.replace(/\s+/g, " ") : "Zorunlu"} muted={!trimmed} tab="icerik" field="sozl-body" />
           <SummaryRow
-            label="Metin"
-            value={trimmed ? `${new Intl.NumberFormat("tr-TR").format(trimmed.length)} karakter · ${lines} satır` : "Zorunlu"}
+            label="Uzunluk"
+            value={trimmed ? `${new Intl.NumberFormat("tr-TR").format(trimmed.length)} karakter · ${lines} satır` : "Metin girilince"}
             muted={!trimmed}
             tab="icerik"
             field="sozl-body"

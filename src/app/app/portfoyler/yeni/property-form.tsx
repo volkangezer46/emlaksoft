@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
+import { takeSubmitIntent } from "@/lib/form-submit-intent";
 import { createProperty } from "@/app/actions/properties";
 import { DuplicateHint } from "@/components/app/duplicate-hint";
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
@@ -89,10 +90,17 @@ export function PropertyForm({
   async function submit(formData: FormData) {
     setPending(true);
     setError(null);
+    const intent = takeSubmitIntent();
     const result = await createProperty(formData);
     if (result.ok) {
       clearFormDraft(userId, PROPERTY_FORM_ID);
       push("Portföy taslak olarak oluşturuldu", "ok");
+      if (intent === "new") {
+        // "Kaydet ve yenisini ekle": aynı sayfa temiz açılsın — tam yükleme.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- bilinçli tam yükleme: form durumu sıfırlanır
+        window.location.assign(`${window.location.pathname}?kaydedildi=1`);
+        return;
+      }
       router.push("/app/portfoyler");
       return;
     }
@@ -209,7 +217,7 @@ export function PropertyForm({
     ),
   };
 
-  function renderSummary({ values }: TabbedSummaryContext) {
+  function renderSummary({ values, display }: TabbedSummaryContext) {
     const title = (values.title ?? "").trim();
     const price = parseLooseNumber(values.list_price);
     const rate = parseLooseNumber(values.commission_rate);
@@ -239,6 +247,9 @@ export function PropertyForm({
         </SummaryGroup>
         <SummaryGroup title="Konum">
           <SummaryRow label="İl" value={province ?? "Seçilmedi"} muted={!province} tab="konum" />
+          <SummaryRow label="İlçe" value={display.district_id ?? "Seçilmedi"} muted={!display.district_id} tab="konum" field="district_id" />
+          <SummaryRow label="Mahalle" value={display.neighborhood_id ?? "Seçilmedi"} muted={!display.neighborhood_id} tab="konum" field="neighborhood_id" />
+          <SummaryRow label="Adres" value={(values.address_line ?? "").trim() || "Girilmedi"} muted={!(values.address_line ?? "").trim()} tab="konum" field="address_line" />
           {branches.length > 0 ? <SummaryRow label="Şube" value={branch ?? "Atanmadı"} muted={!branch} tab="temel" field="branch_id" /> : null}
         </SummaryGroup>
       </>
@@ -260,6 +271,7 @@ export function PropertyForm({
       tabs={tabs}
       tabPanels={tabPanels}
       summary={renderSummary}
+      saveAndNew
       fieldLabels={FIELD_LABELS}
       draft={{ userId, formId: PROPERTY_FORM_ID, fields: [...PROPERTY_DRAFT_FIELDS] }}
     />

@@ -294,6 +294,21 @@ import: `@/components/ui/list-kit`.
   yoğunluk ve kayıtlı görünüm gereken liste ekranları `ListToolbar` kullanır. İkisi de `lib/ui/filter-params`
   yardımcılarını paylaşır.
 
+## Kaydet/İptal çubuğu (FormActionBar) ve özet kuralı
+
+`src/components/ui/form-action-bar.tsx`: TabbedFormShell ve InlineTabbedPanel ortak alt çubuğu.
+Sol: durum rozeti (Kaydediliyor / Kaydedilemedi / Kaydedildi / Taslak kaydedildi hh:mm / Kaydedilmemiş değişiklik),
+zorunlu alan sayacı (tıklayınca ilk eksik alana gider; hepsi tamamsa "Hepsi tamam"), kısayol ipucu, üst kenarda ilerleme çizgisi.
+Sağ: İptal (kirliyse SATIR İÇİ onay, popup yok), "Taslak kaydet" (`draft` verilen formlarda), "Kaydet ve yenisini ekle"
+(`saveAndNew`; yalnız `useCreateForm`/özel submit'inde `takeSubmitIntent()` okuyan formlar), Kaydet (spinner, ✓ animasyonu,
+hatada sallanma + hata bandına odak). `destructive` Kaydet'i kırmızı yapar. Mobilde iki satır, 44px düğme, safe-area, klavye açıkken akışa döner.
+Sunucu action'ı/doğrulama değişmez; niyet yalnız `src/lib/form-submit-intent.ts` üzerinden başarı sonrası yönlendirmeyi etkiler.
+
+Özet kuralı: özet/önizlemede girilen değer OLDUĞU GİBİ görünür (telefon `formatPhoneDisplay`, e-posta, il/ilçe/mahalle etiketi,
+tarih GG.AA.YYYY, tutar ₺, not en çok 3 satır + tamamı `title`). Soyut "Girildi/Seçildi/N karakter" yazılmaz; seçili etiket için
+özet fonksiyonuna gelen `display[alanAdı]` kullanılır. Tek istisna parola/OTP/token/API anahtarı (`isSecretFieldName`, `input[type=password]`):
+yalnız "Girildi" veya güç etiketi. Taslak (localStorage) tarafında `isSensitiveFieldName` aynen geçerlidir. Sözleşme testi: `form-tabs-contract.test.ts`.
+
 ## Sayfa içi sekme alanları (popup yerine)
 
 **Kural:** yeni kayıt ekleme ve düzenleme için popup/diyalog YASAK. Ekle/düzenle akışı ya tam sayfa sekmeli form

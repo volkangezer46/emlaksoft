@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/app/toast-provider";
+import { takeSubmitIntent } from "@/lib/form-submit-intent";
 import { resolveSubmitOutcome, type FormResultLike, type SubmitOptions } from "@/lib/form-logic";
 
 export type UseCreateFormOptions<R extends FormResultLike> = SubmitOptions<R> & {
@@ -50,6 +51,7 @@ export function useCreateForm<R extends FormResultLike>(
   function submit(formData: FormData) {
     if (inFlight.current) return;
     inFlight.current = true;
+    const intent = takeSubmitIntent();
     startTransition(async () => {
       let result: R;
       try {
@@ -66,6 +68,12 @@ export function useCreateForm<R extends FormResultLike>(
         console.error("useCreateForm.afterSuccess", e);
       }
       push(outcome.message, "ok");
+      if (intent === "new") {
+        // "Kaydet ve yenisini ekle": aynı sayfa temiz açılsın (alan durumu sıfırlansın) — tam yükleme.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- bilinçli tam yükleme: form durumu sıfırlanır
+        window.location.assign(`${window.location.pathname}?kaydedildi=1`); // bayrak: kabuk "önceki kayıt eklendi" bandı gösterir
+        return;
+      }
       router.push(outcome.redirect);
       if (options.refresh) router.refresh();
     });
