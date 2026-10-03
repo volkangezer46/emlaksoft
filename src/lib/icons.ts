@@ -105,6 +105,8 @@ import {
   Trophy,
   UserRound,
   Users,
+  UserCog,
+  LockKeyhole,
   UsersRound,
   Wallet,
   Zap,
@@ -289,6 +291,8 @@ export const TAB_ICONS = {
   kriter: SlidersHorizontal,
   yetki: ShieldCheck,
   hedef: Flag,
+  guvenlik: LockKeyhole,
+  rol: UserCog,
 } satisfies Record<string, LucideIcon>;
 
 /**

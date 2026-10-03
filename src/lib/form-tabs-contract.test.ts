@@ -17,6 +17,8 @@ import { RENTAL_DRAFT_FIELDS, RENTAL_TABS } from "@/app/app/kiralama/yeni/rental
 import { OPEN_HOUSE_DRAFT_FIELDS, OPEN_HOUSE_TABS } from "@/app/app/acik-ev/yeni/open-house-tabs";
 import { PRESENTATION_DRAFT_FIELDS, PRESENTATION_TABS } from "@/app/app/portfoyler/sunumlar/yeni/presentation-tabs";
 import { ADVISOR_DRAFT_FIELDS, ADVISOR_TABS } from "@/app/app/ekip/yeni/advisor-tabs";
+import { BROADCAST_DRAFT_FIELDS, BROADCAST_TABS } from "@/app/admin/duyuru/broadcast-tabs";
+import { STAFF_DRAFT_FIELDS, STAFF_TABS } from "@/app/admin/personel/yeni/staff-tabs";
 import { isSensitiveFieldName } from "./form-tabs";
 import { TAB_ICONS } from "./icons";
 
@@ -161,7 +163,28 @@ const FORMS = [
     tabs: ADVISOR_TABS as readonly TabLike[],
     draft: ADVISOR_DRAFT_FIELDS as readonly string[],
   },
+  {
+    name: "platform duyurusu",
+    source: "src/app/admin/duyuru/broadcast-form.tsx",
+    tabs: BROADCAST_TABS as readonly TabLike[],
+    draft: BROADCAST_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "platform personeli",
+    source: "src/app/admin/personel/yeni/staff-form.tsx",
+    tabs: STAFF_TABS as readonly TabLike[],
+    draft: STAFF_DRAFT_FIELDS as readonly string[],
+  },
 ];
+
+describe("platform personeli formu: parola asla taslağa yazılmaz", () => {
+  it("taslak kullanılmaz ve parola localStorage'a gitmez", () => {
+    const src = read("src/app/admin/personel/yeni/staff-form.tsx");
+    expect(STAFF_DRAFT_FIELDS.length).toBe(0);
+    expect(src).not.toContain("draft=");
+    expect(src).not.toMatch(/localStorage|sessionStorage/);
+  });
+});
 
 describe.each(FORMS)("sekme sözleşmesi: $name formu", (form) => {
   const { source, tabs, draft } = form;

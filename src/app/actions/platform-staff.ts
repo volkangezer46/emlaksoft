@@ -23,12 +23,17 @@ export async function addPlatformStaff(fd: FormData): Promise<StaffActionResult>
   const email = normalizeEmail(fd.get("email") as string | null);
   const fullName = (fd.get("full_name") as string | null)?.trim();
   const role = (fd.get("role") as PlatformRole | null) ?? "support";
+  // İsteğe bağlı geçici parola: verilirse (ve auth'da kullanıcı yoksa) davet yerine hesap parolayla açılır.
+  const tempPassword = ((fd.get("temp_password") as string | null) ?? "").trim();
 
   if (!email || !isValidEmail(email)) {
     return { error: `${EMAIL_ERROR_MESSAGE}.` };
   }
   if (!fullName) return { error: "Ad Soyad zorunludur." };
   if (!VALID_ROLES.includes(role)) return { error: "Geçersiz rol." };
+  if (tempPassword && tempPassword.length < 10) {
+    return { error: "Geçici parola en az 10 karakter olmalıdır." };
+  }
 
   const admin = createAdminClient();
 
@@ -81,11 +86,18 @@ export async function addPlatformStaff(fd: FormData): Promise<StaffActionResult>
     return { ok: true };
   }
 
-  // Auth'da yok → davet e-postası gönder, ardından platform_staff'a taslak yaz
-  const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
-    data: { full_name: fullName },
-    redirectTo: `${getBaseUrl()}/admin`,
-  });
+  // Auth'da yok → geçici parolayla hesap aç ya da davet e-postası gönder; ardından platform_staff'a yaz
+  const { data: invited, error: invErr } = tempPassword
+    ? await admin.auth.admin.createUser({
+        email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: { full_name: fullName, must_change_password: true },
+      })
+    : await admin.auth.admin.inviteUserByEmail(email, {
+        data: { full_name: fullName },
+        redirectTo: `${getBaseUrl()}/admin`,
+      });
 
   if (invErr || !invited.user) {
     return { error: invErr?.message ?? "Davet gönderilemedi." };
@@ -101,10 +113,10 @@ export async function addPlatformStaff(fd: FormData): Promise<StaffActionResult>
 
   await logPlatformActivity({
     actorId: staff.id,
-    action: "platform_staff.invite",
+    action: tempPassword ? "platform_staff.add" : "platform_staff.invite",
     entityType: "platform_staff",
     entityId: invited.user.id,
-    meta: { email, role },
+    meta: { email, role, ...(tempPassword ? { temp_password: true } : {}) },
   });
   revalidatePath("/admin/personel");
   return { ok: true };
