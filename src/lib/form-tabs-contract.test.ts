@@ -33,10 +33,18 @@ const read = (rel: string) => readFileSync(path.join(root, rel), "utf8");
 function namesInSource(src: string): Set<string> {
   const names = new Set<string>();
   for (const m of src.matchAll(/\bname="([A-Za-z_]+)"/g)) names.add(m[1]);
-  if (/<GeoSelect\b/.test(src)) {
+  // Her <GeoSelect .../>: `names={{ ... "ad" ... }}` verilmişse o adlar (dinamik şablon adlar sayılmaz),
+  // verilmemişse varsayılan DB kolon adları.
+  for (const m of src.matchAll(/<GeoSelect\b[\s\S]*?\/>/g)) {
+    const block = m[0];
+    const custom = block.match(/names=\{\{([\s\S]*?)\}\}/);
+    if (custom) {
+      for (const q of custom[1].matchAll(/"([A-Za-z_]+)"/g)) names.add(q[1]);
+      continue;
+    }
     names.add("province_id");
     names.add("district_id");
-    if (!/withNeighborhood=\{false\}/.test(src)) names.add("neighborhood_id");
+    if (!/withNeighborhood=\{false\}/.test(block)) names.add("neighborhood_id");
   }
   if (/<LatLngPicker\b/.test(src)) {
     names.add("lat");
@@ -47,10 +55,17 @@ function namesInSource(src: string): Set<string> {
 
 type TabLike = { id: string; fields: readonly string[]; required: readonly string[] };
 
+/**
+ * Müşteri ve talep formları talep alanlarını ortak bileşenden alır (mükerrer form yok):
+ * bu kaynak dosya her iki formun `name=` kümesine katılır.
+ */
+const SHARED_DEMAND_FIELDS_SOURCE = "src/components/app/structured-demand-fields.tsx";
+
 const FORMS = [
   {
     name: "müşteri",
     source: "src/app/app/musteriler/yeni/customer-form.tsx",
+    extraSources: [SHARED_DEMAND_FIELDS_SOURCE],
     tabs: CUSTOMER_TABS as readonly TabLike[],
     draft: CUSTOMER_DRAFT_FIELDS as readonly string[],
   },
@@ -87,6 +102,7 @@ const FORMS = [
   {
     name: "talep",
     source: "src/app/app/talepler/yeni/demand-form.tsx",
+    extraSources: [SHARED_DEMAND_FIELDS_SOURCE],
     tabs: DEMAND_TABS as readonly TabLike[],
     draft: DEMAND_DRAFT_FIELDS as readonly string[],
   },
@@ -140,8 +156,10 @@ const FORMS = [
   },
 ];
 
-describe.each(FORMS)("sekme sözleşmesi: $name formu", ({ source, tabs, draft }) => {
-  const src = read(source);
+describe.each(FORMS)("sekme sözleşmesi: $name formu", (form) => {
+  const { source, tabs, draft } = form;
+  const extraSources = (form as { extraSources?: string[] }).extraSources ?? [];
+  const src = [source, ...extraSources].map(read).join("\n");
   const declared = tabs.flatMap((t) => t.fields);
 
   it("sekme sayısı 2-5, id'ler benzersiz", () => {

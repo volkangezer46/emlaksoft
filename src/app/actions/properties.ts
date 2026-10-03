@@ -95,7 +95,7 @@ async function notifyPriceDropToMatchingDemands(input: {
     const { data: demands } = await admin
       .from("customer_demands")
       .select(
-        "id, transaction_type, property_type, province_id, district_id, budget_min, budget_max, rooms, min_sqm, urgency, status, customer:customers!customer_demands_customer_id_fkey(full_name, assigned_to)",
+        "id, transaction_type, property_type, province_id, district_id, neighborhood_id, budget_min, budget_max, rooms, min_sqm, urgency, status, criteria, customer:customers!customer_demands_customer_id_fkey(full_name, assigned_to)",
       )
       .eq("tenant_id", input.tenantId)
       .in("status", ["new", "active", "matched"])
@@ -109,7 +109,7 @@ async function notifyPriceDropToMatchingDemands(input: {
     const matched: { customerName: string; advisorId: string | null; score: number }[] = [];
     for (const d of demands) {
       const result = scoreDemandProperty(d as unknown as MatchDemand, input.property, weights);
-      if (result.score >= MATCH_THRESHOLD) {
+      if (!result.eliminated && result.score >= MATCH_THRESHOLD) {
         const rel = d.customer as CustomerRel | CustomerRel[] | null;
         const customer = Array.isArray(rel) ? rel[0] : rel;
         matched.push({
@@ -278,7 +278,8 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
     // Onceden burada `district_id: null` sabiti vardi: talep eslestirme ilceye
     // gore puanladigi icin ilce esmesi HIC calismiyordu.
     district_id: districtId || null,
-    features: { rooms: rooms || null, sqm: Number.isFinite(sqmValue) ? sqmValue : null },
+    neighborhood_id: neighborhoodId || null,
+    features: features as MatchProperty["features"],
   });
 
   // Otomasyon tetikle — hata ana işlemi asla bozmasın
@@ -456,6 +457,7 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
         list_price: priceValue,
         province_id: provinceId || null,
         district_id: districtId || null,
+        neighborhood_id: neighborhoodId || null,
         features: { rooms: rooms || null, sqm: Number.isFinite(sqmValue) ? sqmValue : null },
       },
       oldPrice,

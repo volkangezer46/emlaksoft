@@ -16,6 +16,8 @@ type Props = {
   /** Form alan adları; varsayılanlar DB kolon adlarıyla birebir. */
   names?: { province?: string; district?: string; neighborhood?: string };
   className?: string;
+  /** Seçim değişince (kullanıcı eylemiyle) bildirir — çoklu bölge satırları için. Boş değer "". */
+  onSelectionChange?: (sel: { province_id: string; district_id: string; neighborhood_id: string }) => void;
 };
 
 const toOptions = (list: GeoOption[]): ComboboxOption[] =>
@@ -45,6 +47,7 @@ export function GeoSelect({
   required,
   names,
   className,
+  onSelectionChange,
 }: Props) {
   const provinceName = names?.province ?? "province_id";
   const districtName = names?.district ?? "district_id";
@@ -104,6 +107,7 @@ export function GeoSelect({
               setNeighborhoodId("");
               setDistricts([]);
               setNeighborhoods([]);
+              onSelectionChange?.({ province_id: v, district_id: "", neighborhood_id: "" });
             }}
             options={toOptions(provinces)}
             placeholder="İl seçin"
@@ -122,6 +126,7 @@ export function GeoSelect({
               setDistrictId(v);
               setNeighborhoodId("");
               setNeighborhoods([]);
+              onSelectionChange?.({ province_id: provinceId, district_id: v, neighborhood_id: "" });
             }}
             options={toOptions(districts)}
             disabled={!provinceId}
@@ -139,7 +144,10 @@ export function GeoSelect({
             <Combobox
               name={neighborhoodName}
               value={neighborhoodId}
-              onValueChange={setNeighborhoodId}
+              onValueChange={(v) => {
+                setNeighborhoodId(v);
+                onSelectionChange?.({ province_id: provinceId, district_id: districtId, neighborhood_id: v });
+              }}
               options={toOptions(neighborhoods)}
               disabled={!districtId}
               loading={loadingN}

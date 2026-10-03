@@ -24,7 +24,7 @@ export async function saveMatchAndNotify(formData: FormData): Promise<MatchActio
     supabase
       .from("customer_demands")
       .select(
-        "id, transaction_type, property_type, province_id, district_id, budget_min, budget_max, rooms, min_sqm, urgency, status, customer_id, customer:customers!customer_demands_customer_id_fkey(full_name)",
+        "id, transaction_type, property_type, province_id, district_id, neighborhood_id, budget_min, budget_max, rooms, min_sqm, urgency, status, criteria, customer_id, customer:customers!customer_demands_customer_id_fkey(full_name)",
       )
       .eq("id", demandId)
       .eq("tenant_id", gate.tenantId)
@@ -32,7 +32,7 @@ export async function saveMatchAndNotify(formData: FormData): Promise<MatchActio
     supabase
       .from("properties")
       .select(
-        "id, property_code, title, transaction_type, property_type, status, list_price, province_id, district_id, features, assigned_to",
+        "id, property_code, title, transaction_type, property_type, status, list_price, province_id, district_id, neighborhood_id, features, assigned_to",
       )
       .eq("id", propertyId)
       .eq("tenant_id", gate.tenantId)
@@ -48,6 +48,8 @@ export async function saveMatchAndNotify(formData: FormData): Promise<MatchActio
     property_type: demand.property_type,
     province_id: demand.province_id,
     district_id: demand.district_id,
+    neighborhood_id: demand.neighborhood_id,
+    criteria: demand.criteria,
     budget_min: demand.budget_min != null ? Number(demand.budget_min) : null,
     budget_max: demand.budget_max != null ? Number(demand.budget_max) : null,
     rooms: demand.rooms,
@@ -65,6 +67,7 @@ export async function saveMatchAndNotify(formData: FormData): Promise<MatchActio
     list_price: property.list_price != null ? Number(property.list_price) : null,
     province_id: property.province_id,
     district_id: property.district_id,
+    neighborhood_id: property.neighborhood_id,
     features: (property.features ?? {}) as MatchProperty["features"],
   };
 

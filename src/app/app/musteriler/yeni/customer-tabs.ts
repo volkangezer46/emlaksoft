@@ -3,6 +3,8 @@
  * `src/lib/form-tabs-contract.test.ts` aynı kaynağı kullanır. Yeni alan eklersen
  * hem formda hem burada (fields) olmalı; sözleşme testi eşitliği doğrular.
  */
+import { DEMAND_FIELD_GROUPS } from "@/lib/demand-criteria";
+
 export const CUSTOMER_FORM_ID = "yeni-musteri";
 
 export const CUSTOMER_TABS = [
@@ -21,6 +23,14 @@ export const CUSTOMER_TABS = [
     required: [],
   },
   {
+    // Alan adları talep formuyla TEK kaynak (demand-criteria.ts); alanlar StructuredDemandFields ortak bileşeninde.
+    id: "talep",
+    label: "Talep ve kriterler",
+    description: "Alıcı/kiracı için aradığı portföy: bütçe, oda, bölge ve olmazsa olmaz kriterler. Eşleştirme bunları kullanır.",
+    fields: [...DEMAND_FIELD_GROUPS.ne, ...DEMAND_FIELD_GROUPS.kriter, ...DEMAND_FIELD_GROUPS.bolge],
+    required: [],
+  },
+  {
     id: "ozel-gunler",
     label: "Özel günler",
     description: "Doğum günü ve yıldönümü hatırlatmaları için.",
@@ -30,7 +40,7 @@ export const CUSTOMER_TABS = [
   {
     id: "not",
     label: "Not",
-    description: "Talep, bütçe, tercih gibi serbest notlar.",
+    description: "Serbest not. Talep ve bütçe gibi eşleştirilecek bilgileri \"Talep ve kriterler\" sekmesine girin.",
     fields: ["notes"],
     required: [],
   },

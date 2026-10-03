@@ -1,9 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Save, UserRound } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
-import { createCustomer } from "@/app/actions/customers";
+import { createCustomerWithDemand } from "@/app/actions/customer-with-demand";
+import { DemandSummaryGroups } from "@/components/app/demand-summary";
+import { StructuredDemandFields, useDemandRequired } from "@/components/app/structured-demand-fields";
+import { isOwnerSideCustomerType, hasDemandContent } from "@/lib/demand-criteria";
 import { GeoSelect } from "@/components/app/geo-select";
 import { useCreateForm } from "@/components/app/use-create-form";
 import { FormField, FormInput, FormSelect, FormTextarea, fieldClass } from "@/components/ui/form-controls";
@@ -20,6 +24,7 @@ type Branch = { id: string; name: string };
 const TAB_ICONS = {
   kisi: TI.kisi,
   iletisim: TI.iletisim,
+  talep: TI.talepKriter,
   "ozel-gunler": TI.ozelGunler,
   not: TI.not,
 } as const;
@@ -39,16 +44,31 @@ export function CustomerForm({
   branches,
   types,
   userId,
+  canCreateDemand,
+  transactionTypes,
+  propertyTypes,
+  urgencyOptions,
 }: {
   provinces: Province[];
   branches: Branch[];
   types: string[];
   userId: string;
+  /** `demands:create` izni; yoksa talep sekmesi yalnız açıklama gösterir. */
+  canCreateDemand: boolean;
+  transactionTypes: string[];
+  propertyTypes: string[];
+  urgencyOptions: { value: string; label: string }[];
 }) {
-  const { onSubmit, pending, error } = useCreateForm((fd) => createCustomer({}, fd), {
-    successMessage: "Müşteri kaydedildi",
+  // Müşteri + talep tek kullanıcı işlemi (Faz 1: ardışık iki insert; atomik RPC Faz 2).
+  const { state, onSubmit, pending, error } = useCreateForm((fd) => createCustomerWithDemand({}, fd), {
+    successMessage: (r) => (r.demandId ? "Müşteri ve talep kaydedildi" : "Müşteri kaydedildi"),
     redirectTo: (r) => detailOrList("/app/musteriler", r.id),
   });
+  const req = useDemandRequired();
+  const [customerType, setCustomerType] = useState("Alıcı");
+  const ownerSide = isOwnerSideCustomerType(customerType);
+  // Müşteri kaydedildi ama talep düştü: yeniden gönderim müşteriyi çoğaltır — kilitle, devam bağlantısı ver.
+  const partialCustomerId = state.demandError ? state.id : undefined;
 
   const tabs: FormTab[] = useMemo(
     () =>
@@ -70,7 +90,7 @@ export function CustomerForm({
           <FormInput name="full_name" required placeholder="Örn. Ali Kaya" />
         </FormField>
         <FormField label="Müşteri türü" htmlFor="type">
-          <FormSelect name="type" defaultValue="Alıcı">
+          <FormSelect name="type" defaultValue="Alıcı" onChange={(e) => setCustomerType(e.target.value)}>
             {types.map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
@@ -102,6 +122,42 @@ export function CustomerForm({
         </div>
       </>
     ),
+    talep: ownerSide ? (
+      <div className="space-y-3 rounded-[var(--radius-control)] border border-line bg-canvas/60 p-4 sm:col-span-2">
+        <p className="text-sm font-semibold text-ink-950">{customerType} için talep değil, portföy girilir</p>
+        <p className="text-sm text-text-muted">
+          Mülk sahibi ve satıcı müşteriler aradığı bir portföy değil, satacağı/kiralayacağı portföyle takip edilir.
+          Müşteriyi kaydettikten sonra müşteri sayfasından, ya da şimdi doğrudan portföy ekleyin.
+        </p>
+        <Link
+          href="/app/portfoyler/yeni"
+          className="focus-ring inline-flex items-center rounded-[var(--radius-control)] bg-brand-600 px-3 py-2 text-sm font-semibold text-white"
+        >
+          Portföyü ekle
+        </Link>
+      </div>
+    ) : !canCreateDemand ? (
+      <p className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-4 text-sm text-text-muted sm:col-span-2">
+        Talep kaydı için yetkiniz yok; müşteri talep olmadan kaydedilir.
+      </p>
+    ) : (
+      <>
+        <p className="text-xs text-text-muted sm:col-span-2">
+          Bütçe, oda, bölge gibi en az bir kriter girerseniz müşteriyle birlikte talep de kaydedilir; hiçbir şey girmezseniz yalnız müşteri kaydedilir.
+        </p>
+        {(["ne", "kriter", "bolge"] as const).map((section) => (
+          <StructuredDemandFields
+            key={section}
+            section={section}
+            req={req}
+            transactionTypes={transactionTypes}
+            propertyTypes={propertyTypes}
+            urgencyOptions={urgencyOptions}
+            provinces={provinces}
+          />
+        ))}
+      </>
+    ),
     "ozel-gunler": (
       <>
         <FormField label="Doğum tarihi" htmlFor="birth_date">
@@ -117,7 +173,7 @@ export function CustomerForm({
     ),
     not: (
       <FormField label="Not" htmlFor="notes" className="sm:col-span-2">
-        <FormTextarea name="notes" rows={6} placeholder="Talep, bütçe, tercih vb." />
+        <FormTextarea name="notes" rows={6} placeholder="Müşteri hakkında serbest not (görüşme özeti, hatırlatma vb.)" />
       </FormField>
     ),
   };
@@ -164,6 +220,24 @@ export function CustomerForm({
             field="birth_date"
           />
         </SummaryGroup>
+        {ownerSide || !canCreateDemand ? null : (
+          <>
+            <SummaryGroup title="Talep kaydı">
+              <SummaryRow
+                label="Kayıt"
+                value={hasDemandContent(values) ? "Müşteriyle birlikte talep açılır" : "Yalnız müşteri kaydedilir"}
+                muted={!hasDemandContent(values)}
+                tab="talep"
+              />
+            </SummaryGroup>
+            <DemandSummaryGroups
+              values={values}
+              provinces={provinces}
+              urgencyOptions={urgencyOptions}
+              tabs={{ ne: "talep", kriter: "talep", bolge: "talep" }}
+            />
+          </>
+        )}
       </>
     );
   }
@@ -179,6 +253,26 @@ export function CustomerForm({
       submitIcon={Save}
       pending={pending}
       error={error}
+      submitDisabled={Boolean(partialCustomerId)}
+      notice={
+        partialCustomerId ? (
+          <div role="status" className="rounded-[var(--radius-control)] border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <p className="font-semibold">Müşteri kaydedildi, talep kaydedilemedi.</p>
+            <p className="mt-1">Müşteriyi tekrar kaydetmeyin (mükerrer olur). Talebi müşteri üzerinden yeniden girin.</p>
+            <div className="mt-2 flex flex-wrap gap-3">
+              <Link
+                href={`/app/musteriler/${partialCustomerId}/talep/yeni`}
+                className="font-semibold underline underline-offset-2"
+              >
+                Talebe devam et
+              </Link>
+              <Link href={`/app/musteriler/${partialCustomerId}`} className="font-semibold underline underline-offset-2">
+                Müşteriyi aç
+              </Link>
+            </div>
+          </div>
+        ) : undefined
+      }
       onSubmit={onSubmit}
       tabs={tabs}
       tabPanels={tabPanels}

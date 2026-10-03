@@ -258,6 +258,7 @@ export const ICONS = {
 export const TAB_ICONS = {
   kisi: UserRound,
   iletisim: Phone,
+  talepKriter: Target,
   ozelGunler: CalendarHeart,
   not: StickyNote,
   konum: MapPin,
