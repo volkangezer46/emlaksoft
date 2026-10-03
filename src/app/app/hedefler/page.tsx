@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowUpRight, Gauge, Rocket, Trash2, TrendingUp, Users }
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now } from "@/lib/clock";
+import { canSeeAllEarnings, canSeeEarningsOf } from "@/lib/team/earnings-scope";
 import { computeTargetActuals, targetPeriodRange } from "@/lib/team/target-actuals";
 import { deleteTarget, listTargets } from "@/app/actions/targets-openhouse-sources";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -82,6 +83,7 @@ export default async function HedeflerPage() {
   const canEdit   = (ctx.perms.targets ?? []).includes("edit");
   const canDelete = (ctx.perms.targets ?? []).includes("delete");
 
+  const seeAllEarnings = canSeeAllEarnings(ctx.perms);
   const supabase = await createClient();
   const [rawTargets, { data: members }] = await Promise.all([
     listTargets(),
@@ -102,9 +104,16 @@ export default async function HedeflerPage() {
             .gte("created_at", minStart)
             .lt("created_at", maxEnd)
             .limit(5000),
-          supabase
-            .from("commissions")
-            .select("gross_amount, created_at, deal:deals!commissions_deal_id_fkey(assigned_to)")
+          // B1: earnings_all yoksa yalnız kendi anlaşmalarının tahsil komisyonu okunur.
+          (seeAllEarnings
+            ? supabase
+                .from("commissions")
+                .select("gross_amount, created_at, deal:deals!commissions_deal_id_fkey(assigned_to)")
+            : supabase
+                .from("commissions")
+                .select("gross_amount, created_at, deal:deals!commissions_deal_id_fkey!inner(assigned_to)")
+                .eq("deal.assigned_to", ctx.userId)
+          )
             .in("status", ["paid", "collected"])
             .gte("created_at", minStart)
             .lt("created_at", maxEnd)
@@ -126,11 +135,18 @@ export default async function HedeflerPage() {
       return { gross_amount: c.gross_amount, created_at: c.created_at, assigned_to: deal?.assigned_to ?? null };
     }),
   );
-  const targets = rawTargets.map((t) => ({
-    ...t,
-    actual_deals: actuals.get(t.id)?.deals ?? 0,
-    actual_revenue: actuals.get(t.id)?.revenue ?? 0,
-  }));
+  const targets = rawTargets.map((t) => {
+    const prof = Array.isArray(t.profile) ? t.profile[0] : t.profile;
+    const profileId = (prof as { id?: string } | null)?.id ?? null;
+    // Ofis geneli hedef (profil yok) tüm ofisin cirosudur: yalnız earnings_all ile görünür.
+    const revVisible = profileId ? canSeeEarningsOf(ctx.perms, ctx.userId, profileId) : seeAllEarnings;
+    return {
+      ...t,
+      actual_deals: actuals.get(t.id)?.deals ?? 0,
+      actual_revenue: revVisible ? (actuals.get(t.id)?.revenue ?? 0) : 0,
+      revVisible,
+    };
+  });
   const memberList = (members ?? []) as { id: string; full_name: string }[];
 
   // Kart hesapları tek yerde: özet KPI'lar, takım kıyası ve kartlar aynı sayıları okur.
@@ -144,9 +160,9 @@ export default async function HedeflerPage() {
   const hasCurrentPeriod = targets.some(isCurrentPeriod);
   const enrichedAll = targets.map((t) => {
     const dealPct = pct(t.actual_deals, t.target_deals);
-    const revPct = pct(Number(t.actual_revenue), Number(t.target_revenue));
+    const revPct = t.revVisible ? pct(Number(t.actual_revenue), Number(t.target_revenue)) : 0;
     const elapsed = elapsedPct(t.period_start, t.period);
-    const progress = Math.max(dealPct, revPct);
+    const progress = t.revVisible ? Math.max(dealPct, revPct) : dealPct;
     const done = progress >= 100;
     const behind = !done && elapsed > 0 && elapsed < 100 && progress < elapsed - 10;
     return { t, dealPct, revPct, elapsed, progress, done, behind };
@@ -348,7 +364,7 @@ canCreate ? (
                     <div className="mb-1 flex justify-between text-xs">
                       <span className="text-text-muted">Gelir</span>
                       <Link href="/app/anlasmalar" className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-ink-950 hover:text-brand-600 hover:underline">
-                        {money(Number(t.actual_revenue))} / {money(Number(t.target_revenue))}
+                        {t.revVisible ? money(Number(t.actual_revenue)) : "Gizli"} / {money(Number(t.target_revenue))}
                       </Link>
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-line">
@@ -357,7 +373,7 @@ canCreate ? (
                         style={{ width: `${revPct}%` }}
                       />
                     </div>
-                    <p className="mt-0.5 text-right text-xs text-text-faint">%{revPct}</p>
+                    <p className="mt-0.5 text-right text-xs text-text-faint">{t.revVisible ? `%${revPct}` : "Kazanç gizliliği"}</p>
                   </div>
 
                   {/* Tempo: dönemin geçen kısmı vs hedef ilerlemesi */}

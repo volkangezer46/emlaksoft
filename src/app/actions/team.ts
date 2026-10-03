@@ -5,6 +5,14 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
+import { now } from "@/lib/clock";
+import type { AppModule } from "@/lib/permissions";
+import {
+  HANDOFF_SCOPES,
+  HANDOFF_SCOPE_LABELS,
+  parseHandoffInput,
+  type HandoffScope,
+} from "@/lib/team/handoff";
 import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { getPlan } from "@/lib/billing/plans";
@@ -375,49 +383,172 @@ export async function deleteBranchAction(formData: FormData): Promise<void> {
 }
 
 /**
- * İş yükü devri — bir danışmanın (ör. ekipten ayrılan) TÜM aktif müşteri VE
- * portföylerini başka bir danışmana tek işlemde aktarır. Önceden yalnız müşteri
- * toplu ataması vardı (bulkAssignCustomers); portföy devri hiç yoktu → ayrılan
- * kişinin portföyleri sahipsiz kalıyordu. İki toplu update + tek denetim kaydı.
+ * İş yükü devri — bir danışmanın (ör. ekipten ayrılan) seçilen iş kalemlerini başka bir danışmana aktarır:
+ * müşteri, portföy, AÇIK anlaşma, açık görev, yaklaşan randevu (açık talepler müşteri sahipliğiyle taşınır;
+ * `customer_demands`te ayrı sahip kolonu yoktur). Zorunlu gerekçe + seçili her kalem için düzenleme yetkisi.
+ *
+ * Atomik değil (RPC/migration yok) ama tutarlı: adımlar sırayla çalışır, biri hata verirse önceki adımlar
+ * aynı kimlik kümesiyle geri çevrilir; geri çevirme de başarısız olursa kısmi durum açıkça raporlanır ve
+ * denetim kaydına yazılır.
  */
-export async function handoffMemberWorkload(formData: FormData): Promise<TeamResult> {
+const HANDOFF_PERMISSION: Record<HandoffScope, AppModule> = {
+  customers: "customers",
+  properties: "properties",
+  deals: "commissions",
+  tasks: "tasks",
+  appointments: "appointments",
+};
+
+export type HandoffResult = TeamResult & {
+  counts?: Partial<Record<HandoffScope, number>>;
+  /** Hata sonrası geri çevrilemeyen adımlar (varsa kısmi durum). */
+  partial?: HandoffScope[];
+};
+
+export async function handoffMemberWorkload(formData: FormData): Promise<HandoffResult> {
   const gate = await requirePermission("team", "edit");
   if (!gate.ok) return { error: gate.error };
 
-  const from = String(formData.get("from") ?? "").trim();
-  const to = String(formData.get("to") ?? "").trim();
-  if (!from || !to) return { error: "Devreden ve devralan danışman seçilmelidir." };
-  if (from === to) return { error: "İş yükü aynı danışmana devredilemez." };
+  const parsed = parseHandoffInput(formData);
+  if (!parsed.ok) return { error: parsed.error };
+  const { from, to, scopes, reason } = parsed.input;
+
+  // Seçilen her kalem için o modülün düzenleme yetkisi (team:edit tek başına yetmez).
+  for (const scope of scopes) {
+    const perm = await requirePermission(HANDOFF_PERMISSION[scope], "edit");
+    if (!perm.ok) return { error: `${HANDOFF_SCOPE_LABELS[scope]} devri için ilgili modülde düzenleme yetkisi gerekir.` };
+  }
 
   const supabase = await createClient();
 
-  // Devralan aynı ofiste ve aktif mi? (RLS zaten tenant'ı kısıtlar; yine de doğrula)
-  const { data: target } = await supabase
+  // Devralan ve devreden aynı ofiste mi? (RLS zaten tenant'ı kısıtlar; yine de doğrula)
+  const { data: people } = await supabase
     .from("profiles")
-    .select("id, is_active, full_name")
-    .eq("id", to)
-    .eq("tenant_id", gate.tenantId)
-    .maybeSingle();
+    .select("id, is_active, full_name, role")
+    .in("id", [from, to])
+    .eq("tenant_id", gate.tenantId);
+  const target = (people ?? []).find((p) => p.id === to);
+  const source = (people ?? []).find((p) => p.id === from);
   if (!target) return { error: "Devralan danışman bulunamadı." };
   if (!target.is_active) return { error: "Devralan danışman pasif — önce aktifleştirin." };
+  if (!source) return { error: "Devreden danışman bu ofiste bulunamadı." };
+  if (source.role === "owner" && gate.role !== "owner") {
+    return { error: "Ofis sahibinin iş yükünü yalnız ofis sahibi devredebilir." };
+  }
 
-  const [{ error: cErr, count: cCount }, { error: pErr, count: pCount }] = await Promise.all([
-    supabase
-      .from("customers")
-      .update({ assigned_to: to }, { count: "exact" })
-      .eq("tenant_id", gate.tenantId)
-      .eq("assigned_to", from)
-      .is("deleted_at", null),
-    supabase
-      .from("properties")
-      .update({ assigned_to: to, updated_at: new Date().toISOString() }, { count: "exact" })
-      .eq("tenant_id", gate.tenantId)
-      .eq("assigned_to", from)
-      .is("deleted_at", null),
-  ]);
-  if (cErr || pErr) {
-    console.error("handoffMemberWorkload", cErr ?? pErr);
-    return { error: "Devir sırasında hata oluştu." };
+  const nowIso = new Date(now()).toISOString();
+  const steps: Record<HandoffScope, () => PromiseLike<{ data: { id: string }[] | null; error: unknown }>> = {
+    customers: () =>
+      supabase
+        .from("customers")
+        .update({ assigned_to: to })
+        .eq("tenant_id", gate.tenantId)
+        .eq("assigned_to", from)
+        .is("deleted_at", null)
+        .select("id"),
+    properties: () =>
+      supabase
+        .from("properties")
+        .update({ assigned_to: to, updated_at: nowIso })
+        .eq("tenant_id", gate.tenantId)
+        .eq("assigned_to", from)
+        .is("deleted_at", null)
+        .select("id"),
+    deals: () =>
+      supabase
+        .from("deals")
+        .update({ assigned_to: to, updated_at: nowIso })
+        .eq("tenant_id", gate.tenantId)
+        .eq("assigned_to", from)
+        .not("stage", "in", "(won,lost)")
+        .select("id"),
+    tasks: () =>
+      supabase
+        .from("tasks")
+        .update({ assigned_to: to })
+        .eq("tenant_id", gate.tenantId)
+        .eq("assigned_to", from)
+        .eq("status", "open")
+        .select("id"),
+    appointments: () =>
+      supabase
+        .from("appointments")
+        .update({ assigned_to: to })
+        .eq("tenant_id", gate.tenantId)
+        .eq("assigned_to", from)
+        .in("status", ["pending", "confirmed", "signature"])
+        .gte("scheduled_at", nowIso)
+        .select("id"),
+  };
+  const TABLE: Record<HandoffScope, string> = {
+    customers: "customers",
+    properties: "properties",
+    deals: "deals",
+    tasks: "tasks",
+    appointments: "appointments",
+  };
+
+  const moved: Partial<Record<HandoffScope, string[]>> = {};
+  let failedScope: HandoffScope | null = null;
+  for (const scope of HANDOFF_SCOPES) {
+    if (!scopes.includes(scope)) continue;
+    const { data, error } = await steps[scope]();
+    if (error) {
+      console.error("handoffMemberWorkload", scope, error);
+      failedScope = scope;
+      break;
+    }
+    moved[scope] = (data ?? []).map((r) => r.id);
+  }
+
+  const counts: Partial<Record<HandoffScope, number>> = {};
+  for (const scope of scopes) counts[scope] = moved[scope]?.length ?? 0;
+
+  if (failedScope) {
+    // Önceki adımları geri çevir (yalnız bu işlemde taşınan kimlikler, hâlâ devralana ait olanlar).
+    const notReverted: HandoffScope[] = [];
+    for (const scope of HANDOFF_SCOPES) {
+      const ids = moved[scope];
+      if (!ids?.length) continue;
+      const { error } = await supabase
+        .from(TABLE[scope])
+        .update({ assigned_to: from })
+        .eq("tenant_id", gate.tenantId)
+        .eq("assigned_to", to)
+        .in("id", ids);
+      if (error) {
+        console.error("handoffMemberWorkload revert", scope, error);
+        notReverted.push(scope);
+      }
+    }
+    await logActivity({
+      tenantId: gate.tenantId,
+      actorId: gate.userId,
+      action: "team.handoff.failed",
+      entityType: "profile",
+      entityId: from,
+      newValue: {
+        to,
+        to_name: target.full_name,
+        reason,
+        scopes,
+        failed_scope: failedScope,
+        not_reverted: notReverted,
+        moved_counts: counts,
+      },
+    });
+    revalidatePath("/app/musteriler");
+    revalidatePath("/app/portfoyler");
+    revalidatePath("/app/anlasmalar");
+    revalidatePath(`/app/ekip/${from}`);
+    revalidatePath(`/app/ekip/${to}`);
+    return {
+      error: notReverted.length
+        ? `Devir ${HANDOFF_SCOPE_LABELS[failedScope]} adımında hata verdi ve ${notReverted.map((s) => HANDOFF_SCOPE_LABELS[s]).join(", ")} geri çevrilemedi; devir kısmen uygulanmış durumda. Denetim kaydına işlendi.`
+        : `Devir ${HANDOFF_SCOPE_LABELS[failedScope]} adımında hata verdi; yapılan değişiklikler geri çevrildi, hiçbir kayıt devredilmedi.`,
+      partial: notReverted,
+      counts: {},
+    };
   }
 
   await logActivity({
@@ -426,12 +557,22 @@ export async function handoffMemberWorkload(formData: FormData): Promise<TeamRes
     action: "team.handoff",
     entityType: "profile",
     entityId: from,
-    newValue: { to, to_name: target.full_name, customers: cCount ?? 0, properties: pCount ?? 0 },
+    newValue: {
+      to,
+      to_name: target.full_name,
+      reason,
+      scopes,
+      ...counts,
+      moved_ids: Object.fromEntries(Object.entries(moved).map(([k, v]) => [k, (v ?? []).slice(0, 500)])),
+    },
   });
 
   revalidatePath("/app/musteriler");
   revalidatePath("/app/portfoyler");
+  revalidatePath("/app/anlasmalar");
+  revalidatePath("/app/gorevler");
+  revalidatePath("/app/randevular");
   revalidatePath(`/app/ekip/${from}`);
   revalidatePath(`/app/ekip/${to}`);
-  return { ok: true };
+  return { ok: true, counts };
 }

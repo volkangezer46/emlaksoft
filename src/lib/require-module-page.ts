@@ -20,6 +20,16 @@ import {
  * `href` verilirse paket kilidi de uygulanır (bkz. src/lib/billing/page-gates.ts):
  * kilitliyse kullanıcı özelliğin ne işe yaradığını anlatan yükseltme sayfasına gider.
  */
+/** Sayfa kabuğu rolü: impersonation = readonly, profil yoksa null (erişim reddedilir). */
+export function resolvePageRole(
+  impersonating: boolean,
+  profile: { role?: string | null } | null | undefined,
+): string | null {
+  if (impersonating) return "readonly";
+  const role = profile?.role;
+  return typeof role === "string" && role.trim() ? role : null;
+}
+
 export async function requireModulePage(mod: AppModule, href?: string) {
   const user = await getRequestUser();
   if (!user) redirect("/giris");
@@ -32,7 +42,9 @@ export async function requireModulePage(mod: AppModule, href?: string) {
   }
 
   const profile = await getRequestProfile(user.id);
-  const role = impersonating ? "readonly" : (profile?.role ?? "advisor");
+  // B12: fail-closed — profil/rol okunamıyorsa "advisor" yetkisi uydurulmaz.
+  const role = resolvePageRole(impersonating, profile);
+  if (!role) redirect("/giris");
   const claimedTenantId = typeof user.app_metadata?.tenant_id === "string"
     ? user.app_metadata.tenant_id.trim() || null
     : null;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/app/toast-provider";
@@ -29,6 +29,8 @@ export function useCreateForm<R extends FormResultLike>(
   const { push } = useToast();
   const [state, setState] = useState<R>({} as R);
   const [pending, startTransition] = useTransition();
+  // Çift gönderim kilidi (B13): pending state'i bir sonraki render'a kadar güncellenmez; ref anında kilitler.
+  const inFlight = useRef(false);
 
   // Gönderim başlamadan hedef listeyi ısıt: redirectTo çoğu formda id yokken liste
   // adresini döndürür (`detailOrList`); sonuç gelince push anında açılır. Detay
@@ -46,8 +48,15 @@ export function useCreateForm<R extends FormResultLike>(
   }, [router]);
 
   function submit(formData: FormData) {
+    if (inFlight.current) return;
+    inFlight.current = true;
     startTransition(async () => {
-      const result = await action(formData);
+      let result: R;
+      try {
+        result = await action(formData);
+      } finally {
+        inFlight.current = false;
+      }
       setState(result);
       const outcome = resolveSubmitOutcome(result, options);
       if (!outcome.ok) return;

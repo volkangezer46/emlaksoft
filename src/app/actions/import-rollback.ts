@@ -5,8 +5,14 @@ import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
-import { now } from "@/lib/clock";
 import type { ImportTarget } from "@/lib/import-rows";
+import {
+  activeRollbackClaims,
+  claimWon,
+  removeCreated,
+  restoreUpdated,
+  type RestoreEntry,
+} from "@/lib/import-undo";
 
 /**
  * İçe aktarma günlüğü + "son içe aktarmayı geri al".
@@ -22,7 +28,6 @@ import type { ImportTarget } from "@/lib/import-rows";
  */
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ID_CHUNK = 200;
 const IMPORT_ACTIONS = ["customer.import", "property.import", "demand.import"] as const;
 
 const TARGET_BY_ACTION: Record<string, ImportTarget> = {
@@ -31,7 +36,6 @@ const TARGET_BY_ACTION: Record<string, ImportTarget> = {
   "demand.import": "demands",
 };
 const MODULE_BY_TARGET = { customers: "customers", properties: "properties", demands: "demands" } as const;
-const TABLE_BY_TARGET = { customers: "customers", properties: "properties", demands: "customer_demands" } as const;
 const PATH_BY_TARGET = { customers: "/app/musteriler", properties: "/app/portfoyler", demands: "/app/talepler" } as const;
 
 export type ImportBatch = {
@@ -49,6 +53,7 @@ export type ImportBatch = {
 };
 
 type LogRow = {
+  id?: string | null;
   action: string;
   actor_id: string | null;
   created_at: string;
@@ -58,12 +63,6 @@ type LogRow = {
 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 
-function chunked<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out;
-}
-
 /** Son 30 günün içe aktarma günlüğü (toplu iş bazında, en yeni önce). */
 export async function listRecentImports(): Promise<{ batches: ImportBatch[]; error?: string }> {
   const gate = await requirePermission("customers", "view");
@@ -71,9 +70,9 @@ export async function listRecentImports(): Promise<{ batches: ImportBatch[]; err
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("audit_logs")
-    .select("action, actor_id, created_at, new_value")
+    .select("id, action, actor_id, created_at, new_value")
     .eq("tenant_id", gate.tenantId)
-    .in("action", [...IMPORT_ACTIONS, "import.rollback"])
+    .in("action", [...IMPORT_ACTIONS, "import.rollback", "import.rollback.released"])
     .order("created_at", { ascending: false })
     .limit(500);
   if (error) {
@@ -89,9 +88,11 @@ export async function listRecentImports(): Promise<{ batches: ImportBatch[]; err
     const batchId = typeof nv.batch_id === "string" ? nv.batch_id : "";
     if (!UUID_RE.test(batchId)) continue;
     if (row.action === "import.rollback") {
-      if (!rolled.has(batchId)) rolled.set(batchId, row.created_at);
+      // Serbest bırakılmış (kısmi/başarısız) talepler "geri alındı" sayılmaz.
+      if (activeRollbackClaims(data as LogRow[], batchId).length && !rolled.has(batchId)) rolled.set(batchId, row.created_at);
       continue;
     }
+    if (row.action === "import.rollback.released") continue;
     const target = TARGET_BY_ACTION[row.action];
     if (!target) continue;
     const cur = byBatch.get(batchId);
@@ -141,7 +142,22 @@ export type RollbackResult = {
   error?: string;
   removed?: number;
   restored?: number;
+  /** Bağlı iş verisi (anlaşma, randevu, teklif...) olduğu için dokunulmayan kayıt sayısı. */
+  skippedLinked?: number;
+  /** İçe aktarmadan sonra düzenlendiği için eski haline döndürülmeyen kayıt sayısı. */
+  skippedEdited?: number;
+  /** Hata nedeniyle geri alınamayan kayıt sayısı. */
+  failed?: number;
+  /** Kullanıcıya gösterilecek ek bilgi (atlananlar). */
+  warning?: string;
 };
+
+function rollbackWarning(skippedLinked: number, skippedEdited: number): string | undefined {
+  const parts: string[] = [];
+  if (skippedLinked) parts.push(`${skippedLinked} kayıt, bağlı anlaşma/randevu/teklif gibi kayıtlar olduğu için bırakıldı`);
+  if (skippedEdited) parts.push(`${skippedEdited} kayıt, içe aktarmadan sonra düzenlendiği için eski haline döndürülmedi`);
+  return parts.length ? `${parts.join("; ")}.` : undefined;
+}
 
 /** Bir toplu işte oluşan kayıtları geri çeker; güncellenenleri eski haline döndürür. */
 export async function rollbackImport(batchId: string): Promise<RollbackResult> {
@@ -152,19 +168,24 @@ export async function rollbackImport(batchId: string): Promise<RollbackResult> {
   if (!base.ok) return { error: base.error };
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("audit_logs")
-    .select("action, actor_id, created_at, old_value, new_value")
-    .eq("tenant_id", base.tenantId)
-    .in("action", [...IMPORT_ACTIONS, "import.rollback"])
-    .order("created_at", { ascending: true })
-    .limit(2000);
+  const readLogs = () =>
+    supabase
+      .from("audit_logs")
+      .select("id, action, actor_id, created_at, old_value, new_value")
+      .eq("tenant_id", base.tenantId)
+      .in("action", [...IMPORT_ACTIONS, "import.rollback", "import.rollback.released"])
+      .eq("new_value->>batch_id", batchId)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(2000);
+
+  const { data, error } = await readLogs();
   if (error) {
     console.error("rollbackImport read", error);
     return { error: "İçe aktarma kaydı okunamadı." };
   }
-  const logs = ((data ?? []) as LogRow[]).filter((r) => (r.new_value ?? {}).batch_id === batchId);
-  if (logs.some((r) => r.action === "import.rollback")) return { error: "Bu içe aktarma zaten geri alınmış." };
+  const logs = (data ?? []) as LogRow[];
+  if (activeRollbackClaims(logs, batchId).length > 0) return { error: "Bu içe aktarma zaten geri alınmış veya geri alınıyor." };
   const imports = logs.filter((r) => r.action in TARGET_BY_ACTION);
   if (!imports.length) return { error: "Bu içe aktarma için geri alınabilir kayıt bulunamadı." };
 
@@ -176,69 +197,105 @@ export async function rollbackImport(batchId: string): Promise<RollbackResult> {
   const createdIds = [...new Set(imports.flatMap((r) => ((r.new_value ?? {}).created_ids as string[] | undefined) ?? []))].filter(
     (id) => UUID_RE.test(id),
   );
-  const updates = imports.flatMap(
-    (r) => ((r.old_value ?? {}).updated_prev as { id: string; prev: Record<string, unknown> }[] | undefined) ?? [],
-  );
   // Aynı kayıt birden çok parçada güncellendiyse EN ESKİ eski değer geçerlidir (ilk görülen).
-  const firstPrev = new Map<string, Record<string, unknown>>();
-  for (const u of updates) if (UUID_RE.test(u.id) && !firstPrev.has(u.id)) firstPrev.set(u.id, u.prev);
+  // `importAt`: o parçanın audit zamanı — kayıt bundan sonra düzenlendiyse eski değer geri yazılmaz.
+  const firstPrev = new Map<string, RestoreEntry>();
+  for (const r of imports) {
+    const list = ((r.old_value ?? {}).updated_prev as { id: string; prev: Record<string, unknown> }[] | undefined) ?? [];
+    for (const u of list) {
+      if (UUID_RE.test(u.id) && !firstPrev.has(u.id)) firstPrev.set(u.id, { id: u.id, prev: u.prev, importAt: r.created_at });
+    }
+  }
   if (firstPrev.size) {
     const edit = await requirePermission(mod, "edit");
     if (!edit.ok) return { error: "Güncellenen kayıtları eski haline döndürmek için düzenleme yetkisi gerekir." };
   }
 
-  const table = TABLE_BY_TARGET[target];
-  let removed = 0;
-  for (const part of chunked(createdIds, ID_CHUNK)) {
-    if (target === "demands") {
-      const { data: gone, error: delErr } = await supabase
-        .from(table)
-        .delete()
-        .in("id", part)
-        .eq("tenant_id", gate.tenantId)
-        .select("id");
-      if (delErr) {
-        console.error("rollbackImport delete", delErr);
-        return { error: "Geri alma sırasında hata oluştu; işlem kısmen yapılmış olabilir. Tekrar deneyin.", removed };
-      }
-      removed += gone?.length ?? 0;
-    } else {
-      const { data: gone, error: delErr } = await supabase
-        .from(table)
-        .update({ deleted_at: new Date(now()).toISOString() })
-        .in("id", part)
-        .eq("tenant_id", gate.tenantId)
-        .is("deleted_at", null)
-        .select("id");
-      if (delErr) {
-        console.error("rollbackImport soft delete", delErr);
-        return { error: "Geri alma sırasında hata oluştu; işlem kısmen yapılmış olabilir. Tekrar deneyin.", removed };
-      }
-      removed += gone?.length ?? 0;
-    }
-  }
-
-  let restored = 0;
-  for (const part of chunked([...firstPrev.entries()], 10)) {
-    await Promise.all(
-      part.map(async ([id, prev]) => {
-        const { error: upErr } = await supabase.from(table).update(prev).eq("id", id).eq("tenant_id", gate.tenantId);
-        if (upErr) console.error("rollbackImport restore", upErr);
-        else restored += 1;
-      }),
-    );
-  }
-
-  await logActivity({
+  // Kilit: önce talep kaydı yaz, sonra en eski serbest bırakılmamış talebin bizimki olduğunu doğrula.
+  // (Çift tık / iki sekme: yalnız biri kazanır, diğeri hiçbir şeyi değiştirmeden döner.)
+  const claim = crypto.randomUUID();
+  const claimWrite = await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "import.rollback",
     entityType: target,
-    newValue: { batch_id: batchId, target, removed, restored, requested: createdIds.length },
+    newValue: { batch_id: batchId, target, claim, requested: createdIds.length },
   });
+  if (!claimWrite.ok) return { error: "Geri alma kaydı yazılamadı; hiçbir değişiklik yapılmadı. Tekrar deneyin." };
+  const recheck = await readLogs();
+  if (recheck.error || !claimWon((recheck.data ?? []) as LogRow[], batchId, claim)) {
+    await logActivity({
+      tenantId: gate.tenantId,
+      actorId: gate.userId,
+      action: "import.rollback.released",
+      entityType: target,
+      newValue: { batch_id: batchId, claim },
+    });
+    return {
+      error: recheck.error
+        ? "Geri alma doğrulanamadı; hiçbir değişiklik yapılmadı. Tekrar deneyin."
+        : "Bu içe aktarma şu anda başka bir oturumda geri alınıyor.",
+    };
+  }
+
+  const removeRes = await removeCreated(supabase, { target, tenantId: gate.tenantId, ids: createdIds, checkLinks: true });
+  const restoreRes = firstPrev.size
+    ? await restoreUpdated(supabase, { target, tenantId: gate.tenantId, entries: [...firstPrev.values()] })
+    : { restored: 0, skippedEdited: 0, failed: 0 };
+  const failed = removeRes.failed + restoreRes.failed;
+
+  const summary = {
+    batch_id: batchId,
+    target,
+    claim,
+    removed: removeRes.removed,
+    restored: restoreRes.restored,
+    skipped_linked: removeRes.skippedLinked,
+    skipped_edited: restoreRes.skippedEdited,
+    failed,
+    requested: createdIds.length,
+  };
+  if (failed > 0) {
+    // Kısmi sonuç: kilidi serbest bırak ki kalan kayıtlar için yeniden denenebilsin.
+    await logActivity({
+      tenantId: gate.tenantId,
+      actorId: gate.userId,
+      action: "import.rollback.released",
+      entityType: target,
+      newValue: summary,
+    });
+  } else {
+    await logActivity({
+      tenantId: gate.tenantId,
+      actorId: gate.userId,
+      action: "import.rollback.result",
+      entityType: target,
+      newValue: summary,
+    });
+  }
 
   revalidatePath(PATH_BY_TARGET[target]);
   revalidatePath("/app/ice-aktarma");
   revalidateTenantData(gate.tenantId);
-  return { ok: true, removed, restored };
+
+  const warning = rollbackWarning(removeRes.skippedLinked, restoreRes.skippedEdited);
+  if (failed > 0) {
+    return {
+      error: `Geri alma kısmen tamamlandı: ${removeRes.removed} kayıt kaldırıldı, ${restoreRes.restored} kayıt eski haline döndü, ${failed} kayıt işlenemedi. Tekrar deneyebilirsiniz.${warning ? ` ${warning}` : ""}`,
+      removed: removeRes.removed,
+      restored: restoreRes.restored,
+      skippedLinked: removeRes.skippedLinked,
+      skippedEdited: restoreRes.skippedEdited,
+      failed,
+    };
+  }
+  return {
+    ok: true,
+    removed: removeRes.removed,
+    restored: restoreRes.restored,
+    skippedLinked: removeRes.skippedLinked,
+    skippedEdited: restoreRes.skippedEdited,
+    failed: 0,
+    warning,
+  };
 }

@@ -54,6 +54,14 @@ export const MATCH_CANDIDATE_LIMIT = 200;
 
 const UUID_LIST_RE = /^[0-9a-fA-F-]{8,40}$/;
 
+export type MatchCandidateResult = {
+  properties: MatchProperty[];
+  /** Aday sayısı MATCH_CANDIDATE_LIMIT'i aştı: en yeni adaylar alındı, eski portföyler taranmadı. */
+  truncated: boolean;
+  /** Sorgu hatası (boş liste "eşleşme yok" anlamına GELMEZ). */
+  error: string | null;
+};
+
 export async function fetchMatchCandidateProperties(
   supabase: SupabaseClient,
   opts: {
@@ -62,7 +70,7 @@ export async function fetchMatchCandidateProperties(
     /** Verilirse açık tenant filtresi (RLS'e ek savunma). */
     tenantId?: string;
   },
-): Promise<MatchProperty[]> {
+): Promise<MatchCandidateResult> {
   const tx = transactionVariants(opts.demands.map((d) => d.transaction_type));
   const prov = demandProvinceFilter(opts.demands);
 
@@ -81,10 +89,18 @@ export async function fetchMatchCandidateProperties(
     query = query.or(`province_id.is.null,province_id.in.(${prov.ids.join(",")})`);
   }
 
-  const { data } = await query.order("created_at", { ascending: false }).limit(MATCH_CANDIDATE_LIMIT);
-  return (data ?? []).map((p) => ({
+  // LIMIT+1 çekilir: fazlası varsa kırpıldığı kesin bilinir (sessiz kırpma yok).
+  const { data, error } = await query.order("created_at", { ascending: false }).limit(MATCH_CANDIDATE_LIMIT + 1);
+  if (error) {
+    console.error("fetchMatchCandidateProperties", error);
+    return { properties: [], truncated: false, error: "Portföy adayları okunamadı. Lütfen tekrar deneyin." };
+  }
+  const rows = data ?? [];
+  const truncated = rows.length > MATCH_CANDIDATE_LIMIT;
+  const properties = rows.slice(0, MATCH_CANDIDATE_LIMIT).map((p) => ({
     ...p,
     list_price: p.list_price != null ? Number(p.list_price) : null,
     features: (p.features ?? {}) as MatchProperty["features"],
   })) as MatchProperty[];
+  return { properties, truncated, error: null };
 }

@@ -98,6 +98,23 @@ export async function getNavBadges({ supabase, tenantId, userId, role, accessibl
  */
 export type PlanUsageRow = { key: "seats" | "properties" | "customers"; label: string; used: number; limit: number; href: string };
 
+/**
+ * B11: her gezintide exact count taraması yerine önce planlayıcı tahmini (ucuz) okunur;
+ * tahmin limitin yarısına yaklaşmadıysa tahmin kullanılır, yaklaştıysa kesin sayım yapılır
+ * (limite yakın ofiste doğruluk korunur, büyük ofiste tam tarama her sayfa yüklemesinde olmaz).
+ * Aynı RLS'li istemci ve tenant süzgeci kullanılır; izolasyon değişmez.
+ */
+export const USAGE_EXACT_THRESHOLD = 0.5;
+export async function hybridCount(
+  limit: number,
+  run: (mode: "exact" | "estimated") => PromiseLike<{ count: number | null; error: unknown }>,
+): Promise<{ count: number | null; error: unknown }> {
+  const est = await run("estimated");
+  if (est.error || est.count == null) return run("exact");
+  if (est.count >= limit * USAGE_EXACT_THRESHOLD) return run("exact");
+  return est;
+}
+
 export async function getPlanUsage(supabase: SupabaseClient, tenantId: string | null, plan: string | undefined): Promise<PlanUsageRow[]> {
   if (!tenantId) return [];
   const limits = getPlan(plan ?? "office").limits;
@@ -115,12 +132,14 @@ export async function getPlanUsage(supabase: SupabaseClient, tenantId: string | 
     const limit = limits.activeProperties;
     jobs.push(
       (async () => {
-        const { count, error } = await supabase
-          .from("properties")
-          .select("id", { count: "exact", head: true })
-          .eq("tenant_id", tenantId)
-          .is("deleted_at", null)
-          .in("status", ["draft", "live", "reserved"]);
+        const { count, error } = await hybridCount(limit, (mode) =>
+          supabase
+            .from("properties")
+            .select("id", { count: mode, head: true })
+            .eq("tenant_id", tenantId)
+            .is("deleted_at", null)
+            .in("status", ["draft", "live", "reserved"]),
+        );
         return error || count == null ? null : { key: "properties" as const, label: "Aktif ilan", used: count, limit, href: "/app/portfoyler" };
       })(),
     );
@@ -129,7 +148,9 @@ export async function getPlanUsage(supabase: SupabaseClient, tenantId: string | 
     const limit = limits.customers;
     jobs.push(
       (async () => {
-        const { count, error } = await supabase.from("customers").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).is("deleted_at", null);
+        const { count, error } = await hybridCount(limit, (mode) =>
+          supabase.from("customers").select("id", { count: mode, head: true }).eq("tenant_id", tenantId).is("deleted_at", null),
+        );
         return error || count == null ? null : { key: "customers" as const, label: "Müşteri", used: count, limit, href: "/app/musteriler" };
       })(),
     );

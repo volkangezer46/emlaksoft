@@ -23,6 +23,8 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { getLossReasonOptions, getStageLabels } from "@/lib/definitions";
 import { formatLossReason, lossReasonLabels } from "@/lib/loss-reason";
 import { now } from "@/lib/clock";
+import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
+import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { Badge } from "@/components/ui/badge";
 import { ContactActions, DetailTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -93,7 +95,8 @@ export default async function DealDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { perms, userId } = await requireModulePage("commissions");
+  const { perms, userId, role } = await requireModulePage("commissions");
+  const seeAllEarnings = canSeeAllEarnings(perms);
   const { id } = await params;
   // Seçili sekme sunucuda çözülür; yalnız aktif sekmenin bölümleri çizilir
   const tab = resolveTab(await searchParams, DEAL_TAB_IDS, "ozet", { gorev: "gorevler" });
@@ -110,6 +113,11 @@ export default async function DealDetailPage({
 
   // RLS kiracı dışını zaten göstermiyor; burada yalnızca "yok" durumu.
   if (!deal) notFound();
+  // B2: ofis geneli kapsam dışındaki roller id ile yalnız kendilerine atanan anlaşmayı açabilir.
+  if (!hasOfficeWideDataScope(role) && deal.assigned_to !== userId) notFound();
+  // B1: başkasının anlaşmasında danışman kimliği ve brüt komisyon, earnings_all yoksa gizlenir.
+  const ownDeal = deal.assigned_to === userId;
+  const earningsVisible = seeAllEarnings || ownDeal;
 
   const [
     { data: property },
@@ -135,14 +143,16 @@ export default async function DealDetailPage({
             .eq("id", deal.customer_id)
             .maybeSingle()
         : Promise.resolve({ data: null }),
-      deal.assigned_to
+      deal.assigned_to && earningsVisible
         ? supabase.from("profiles").select("full_name, role").eq("id", deal.assigned_to).maybeSingle()
         : Promise.resolve({ data: null }),
-      supabase
-        .from("commissions")
-        .select("id, gross_amount, vat_amount, status, created_at")
-        .eq("deal_id", id)
-        .order("created_at", { ascending: false }),
+      earningsVisible
+        ? supabase
+            .from("commissions")
+            .select("id, gross_amount, vat_amount, status, created_at")
+            .eq("deal_id", id)
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: null }),
       supabase
         .from("tasks")
         .select("id, title, status, due_at, priority")
@@ -233,7 +243,7 @@ export default async function DealDetailPage({
       ? Math.round(dealValue * (olasilik > 1 ? olasilik / 100 : olasilik))
       : null;
 
-  const canSeeCommission = (perms.commissions ?? []).includes("view");
+  const canSeeCommission = (perms.commissions ?? []).includes("view") && earningsVisible;
 
   /*
    * Memnuniyet anketi kutusu — createSurveyForDeal action'ı reports.view VE
@@ -531,7 +541,9 @@ export default async function DealDetailPage({
                       <div className="hairline-t flex justify-between gap-3 pt-2 text-sm">
                         <dt className="text-text-muted">Sorumlu danışman</dt>
                         <dd className="font-semibold text-ink-950">
-                          {deal.assigned_to ? (
+                          {deal.assigned_to && !earningsVisible ? (
+                            "Başka danışman"
+                          ) : deal.assigned_to ? (
                             <Link
                               href={`/app/ekip/${deal.assigned_to}`}
                               className="focus-ring rounded-[var(--radius-control)] text-brand-600 hover:underline"

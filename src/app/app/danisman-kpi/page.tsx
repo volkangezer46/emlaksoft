@@ -9,6 +9,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
+import { now, TR_OFFSET_MS, trParts } from "@/lib/clock";
 import { buildCoachActions, type CoachAction } from "@/lib/advisor-coach";
 import { RevenueChart } from "./revenue-chart-lazy";
 import { CoachPanel, type CoachActionWithLink } from "./coach-panel";
@@ -155,25 +156,30 @@ export default async function DanismanKpiPage({
   // ?ay=YYYY-MM — dönem seçici. Geçersiz/gelecek değer bu aya düşer;
   // gezinme linkleri sunucuda hesaplanır (randevular hafta görünümü deseni).
   const sp = (await searchParams) ?? {};
-  const thisMonthStart = new Date();
-  thisMonthStart.setDate(1);
-  thisMonthStart.setHours(0, 0, 0, 0);
+  // B8: ay sınırları Türkiye takvimine göre (sunucu UTC; ayın ilk 3 saati önceki aya yazılmasın).
+  const trMonth = (y: number, m: number) => new Date(Date.UTC(y, m, 1) - TR_OFFSET_MS);
+  const trNow = trParts(now());
+  const thisMonthStart = trMonth(trNow.year, trNow.month);
 
   let monthStart = thisMonthStart;
-  const ayMatch = /^(\d{4})-(\d{2})$/.exec(sp.ay ?? "");
+  const ayMatch = /^(d{4})-(d{2})$/.exec(sp.ay ?? "");
   if (ayMatch) {
-    const requested = new Date(Number(ayMatch[1]), Number(ayMatch[2]) - 1, 1);
+    const requested = trMonth(Number(ayMatch[1]), Number(ayMatch[2]) - 1);
     if (!Number.isNaN(requested.getTime()) && requested.getTime() < thisMonthStart.getTime()) {
       monthStart = requested;
     }
   }
   const isCurrentMonth = monthStart.getTime() === thisMonthStart.getTime();
-  const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
+  const mp = trParts(monthStart);
+  const monthEnd = trMonth(mp.year, mp.month + 1);
 
-  const ayParam = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  const prevMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1);
+  const ayParam = (d: Date) => {
+    const p = trParts(d);
+    return `${p.year}-${String(p.month + 1).padStart(2, "0")}`;
+  };
+  const prevMonth = trMonth(mp.year, mp.month - 1);
   const prevHref = `/app/danisman-kpi?ay=${ayParam(prevMonth)}`;
-  const nextMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
+  const nextMonth = trMonth(mp.year, mp.month + 1);
   // Gelecek aya gezinme yok: sonraki ay linki yalnız geçmiş ay görüntülenirken.
   const nextHref = isCurrentMonth ? null : `/app/danisman-kpi?ay=${ayParam(nextMonth)}`;
 
@@ -184,7 +190,7 @@ export default async function DanismanKpiPage({
    * N+1 olurdu; koc kisisel bir arac oldugu icin yalnizca OTURUM ACAN
    * kullanici icin hesaplaniyor.
    */
-  const bugun = new Date();
+  const bugun = new Date(now());
   const onbesGunSonra = new Date(bugun.getTime() + 15 * 86_400_000).toISOString().slice(0, 10);
   const bugunISO = bugun.toISOString();
   const otuzGunOnce = new Date(bugun.getTime() - 30 * 86_400_000).toISOString();
@@ -261,7 +267,7 @@ export default async function DanismanKpiPage({
   ]);
 
   // Çıktı başlığındaki dönem etiketi ("Temmuz 2026" gibi).
-  const donem = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(monthStart);
+  const donem = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric", timeZone: "Europe/Istanbul" }).format(monthStart);
 
   // Danışman bazlı hesapla
   const advisorMap = new Map<string, AdvisorKpi>();

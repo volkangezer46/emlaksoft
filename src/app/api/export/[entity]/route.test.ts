@@ -9,12 +9,17 @@ const mocks = vi.hoisted(() => ({
   checkRateLimit: vi.fn(),
   logActivity: vi.fn(),
   createClient: vi.fn(),
+  getEffectivePermissions: vi.fn(),
 }));
 
 vi.mock("@/lib/require-permission", () => ({ requirePermission: mocks.requirePermission }));
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: mocks.checkRateLimit }));
 vi.mock("@/lib/activity", () => ({ logActivity: mocks.logActivity }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
+vi.mock("@/lib/permissions-effective", async (orig) => ({
+  ...(await orig<typeof import("@/lib/permissions-effective")>()),
+  getEffectivePermissions: mocks.getEffectivePermissions,
+}));
 
 const GATE_OK = { ok: true, userId: "u1", tenantId: "t1", role: "owner", impersonating: false };
 
@@ -63,6 +68,7 @@ beforeEach(() => {
   mocks.requirePermission.mockResolvedValue(GATE_OK);
   mocks.checkRateLimit.mockResolvedValue({ allowed: true });
   mocks.logActivity.mockResolvedValue({ ok: true });
+  mocks.getEffectivePermissions.mockResolvedValue({ earnings_all: ["view"] });
 });
 
 describe("GET /api/export/[entity]", () => {
@@ -138,6 +144,22 @@ describe("GET /api/export/[entity]", () => {
     mocks.createClient.mockResolvedValue(fake.client);
     await (await GET(req, ctx("musteriler"))).text();
     expect(fake.calls).toContainEqual(["customers", "eq", ["assigned_to", "u1"]]);
+  });
+
+  it("B1: şube müdürü earnings_all olmadan komisyon akışında yalnız kendi anlaşmalarını alır", async () => {
+    mocks.requirePermission.mockResolvedValue({ ...GATE_OK, role: "branch_manager" });
+    mocks.getEffectivePermissions.mockResolvedValue({ commissions: ["view"] });
+    const fake = fakeSupabase({ commissions: [] });
+    mocks.createClient.mockResolvedValue(fake.client);
+    await (await GET(req, ctx("komisyonlar"))).text();
+    expect(fake.calls).toContainEqual(["commissions", "eq", ["deal.assigned_to", "u1"]]);
+  });
+
+  it("B1: earnings_all sahibi ofis geneli komisyon akışını alır", async () => {
+    const fake = fakeSupabase({ commissions: [] });
+    mocks.createClient.mockResolvedValue(fake.client);
+    await (await GET(req, ctx("komisyonlar"))).text();
+    expect(fake.calls).not.toContainEqual(["commissions", "eq", ["deal.assigned_to", "u1"]]);
   });
 
   it("boş sonuç: yalnız BOM, 200", async () => {

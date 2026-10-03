@@ -7,7 +7,8 @@ const importExisting: string[][] = [];
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@/lib/revalidate", () => ({ revalidateTenantData: vi.fn() }));
-vi.mock("@/lib/activity", () => ({ logActivity: vi.fn() }));
+vi.mock("@/lib/activity", () => ({ logActivity: vi.fn(async () => ({ ok: true })) }));
+vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: vi.fn(async () => ({ allowed: true })) }));
 vi.mock("@/lib/automation-engine", () => ({ dispatchAutomationEvent: vi.fn() }));
 vi.mock("@/lib/playbook-trigger", () => ({ triggerPlaybooks: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => ({
