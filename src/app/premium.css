@@ -351,3 +351,86 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
 @media (prefers-reduced-motion: no-preference) {
   .tfs-panel:not([hidden]) { animation: tfs-in 150ms ease-out; }
 }
+
+/* ---- MorphTabs (docs/DESIGN_SYSTEM.md "Sekmeler (MorphTabs)") ----------------------
+   Aktif sekme genişler (ikon + etiket [+ açıklama]), pasifler ikona küçülür. Genişlik animasyonu
+   `grid-template-columns: 0fr -> 1fr` ile (içerik ölçmeden, <=200 ms); etiket DOM'da kalır (erişilebilir ad).
+   `prefers-reduced-motion: reduce` altında hepsi anında. Yalnız YENİ kurallar; mevcutlar değişmez. */
+.mt-tab { --mt-ease: cubic-bezier(0.3, 0.7, 0.2, 1); }
+.mt-lw {
+  display: grid;
+  grid-template-columns: 0fr;
+  min-width: 0;
+  opacity: 0;
+  transition: grid-template-columns 180ms var(--mt-ease), opacity 140ms ease-out;
+}
+.mt-li { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mt-tab[data-density="full"] .mt-lw,
+.mt-tab[data-density="label"] .mt-lw { grid-template-columns: 1fr; opacity: 1; }
+/* Açıklama satırı yalnız dikeyde ve yalnız aktifte açılır. */
+.mt-dw {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 180ms var(--mt-ease), opacity 140ms ease-out;
+}
+.mt-dw > span { min-height: 0; overflow: hidden; }
+.mt-tab[data-orient="vertical"][data-density="full"] .mt-dw { grid-template-rows: 1fr; opacity: 1; }
+/* Sayaç: ikon üstü yer paylaşımı yalnız etiket kapalıyken. */
+.mt-cnt-ovl { display: none; }
+.mt-tab[data-density="icon"] .mt-cnt-ovl { display: grid; }
+.mt-lw-count { display: none; }
+.mt-tab[data-density="full"] .mt-lw-count,
+.mt-tab[data-density="label"] .mt-lw-count { display: grid; }
+/* İkon kutusu + ilerleme halkası (--mt-p: 0..100). */
+.mt-ico { position: relative; display: grid; flex: none; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 9999px; }
+.mt-ico[data-ring="1"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: conic-gradient(var(--brand-600) calc(var(--mt-p, 0) * 1%), color-mix(in srgb, var(--text-muted) 24%, transparent) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+}
+/* Geniş şeritte (auto) pasif etiketler de görünür. */
+.mt-box { container: mt-strip / inline-size; }
+@container mt-strip (min-width: 52rem) {
+  .mt-strip[data-idle="auto"] .mt-tab[data-density="icon"] .mt-lw { grid-template-columns: 1fr; opacity: 1; }
+  .mt-strip[data-idle="auto"] .mt-tab[data-density="icon"] .mt-cnt-ovl { display: none; }
+  .mt-strip[data-idle="auto"] .mt-tab[data-density="icon"] .mt-lw-count { display: grid; }
+}
+/* Dikey ray: kendi hücresinde genişler; daraltılmışken üzerine gelince kayan yüzey (flyout) olarak taşar. */
+.mt-rail { position: relative; width: 100%; transition: width 200ms var(--mt-ease, ease-out), box-shadow 200ms ease-out; }
+.mt-rail[data-rail="collapsed"][data-peek="1"] {
+  width: 15rem;
+  z-index: 30;
+  box-shadow: 0 18px 40px -18px color-mix(in srgb, var(--ink-950) 40%, transparent);
+}
+/* Form yerleşimi: ray | panel | özet. Ray ve özet daraltılabilir. */
+.tfs-layout { --tfs-rail: 15rem; --tfs-side: 20rem; }
+.tfs-layout[data-rail="collapsed"] { --tfs-rail: 3.75rem; }
+.tfs-layout[data-side="closed"] { --tfs-side: 3rem; }
+@media (min-width: 1024px) {
+  .tfs-layout[data-tabbed="1"] {
+    display: grid;
+    align-items: start;
+    gap: 1.5rem;
+    grid-template-columns: var(--tfs-rail) minmax(0, 1fr);
+    transition: grid-template-columns 200ms cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+}
+@media (min-width: 1280px) {
+  .tfs-layout[data-tabbed="1"][data-side="open"],
+  .tfs-layout[data-tabbed="1"][data-side="closed"] { grid-template-columns: var(--tfs-rail) minmax(0, 1fr) var(--tfs-side); }
+}
+/* Panel geçişi: sekme sırasına göre yönlü kayma (ileri sağdan, geri soldan). */
+@keyframes mt-in-next { from { opacity: 0; transform: translateX(1.25rem); } to { opacity: 1; transform: none; } }
+@keyframes mt-in-prev { from { opacity: 0; transform: translateX(-1.25rem); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: no-preference) {
+  .tfs-form[data-dir="next"] .tfs-panel:not([hidden]) { animation: mt-in-next 200ms cubic-bezier(0.3, 0.7, 0.2, 1); }
+  .tfs-form[data-dir="prev"] .tfs-panel:not([hidden]) { animation: mt-in-prev 200ms cubic-bezier(0.3, 0.7, 0.2, 1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mt-lw, .mt-dw, .mt-rail, .tfs-layout { transition: none !important; }
+}

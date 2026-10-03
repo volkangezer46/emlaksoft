@@ -185,10 +185,20 @@ describe.each(FORMS)("sekme sözleşmesi: $name formu", ({ source, tabs, draft }
 describe("kabuk kaynağı sözleşmesi", () => {
   const shell = read("src/components/ui/tabbed-form-shell.tsx");
   it("WAI-ARIA sekme öznitelikleri", () => {
-    for (const s of ['role="tablist"', 'role="tab"', 'aria-selected', 'aria-controls', 'aria-labelledby', "aria-orientation", "tabIndex={selected ? 0 : -1}"]) {
-      expect(shell).toContain(s);
+    // Sekme düğmeleri MorphTabs'ta (tek sekme sistemi); paneller kabukta.
+    const morph = read("src/components/ui/morph-tabs.tsx");
+    for (const s of ['role="tablist"', 'role="tab"', "aria-selected", "aria-controls", "aria-orientation", "tabIndex={active ? 0 : -1}"]) {
+      expect(morph).toContain(s);
     }
+    expect(shell).toContain("<MorphTabs");
+    expect(shell).not.toContain('role="tab"');
+    expect(shell).toContain("aria-labelledby");
     expect(shell).toContain('role={tabbed ? "tabpanel" : undefined}');
+  });
+  it("MorphTabs: Date.now / new Date yok", () => {
+    for (const f of ["morph-tabs.tsx", "morph-tab-parts.tsx", "use-persisted-flag.ts"]) {
+      expect(read(`src/components/ui/${f}`)).not.toMatch(/Date\.now\(|new Date\(/);
+    }
   });
   it("paneller DOM'da kalır (hidden), tek <form>", () => {
     expect(shell).toContain("hidden={!selected}");
