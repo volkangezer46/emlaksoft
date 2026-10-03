@@ -270,3 +270,13 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
 .nav-search:focus-within { border-color: rgba(240, 195, 106, 0.6); background: rgba(255, 255, 255, 0.09); }
 .nav-search input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: #fff; font-size: 0.875rem; }
 .nav-search input::placeholder { color: rgba(255, 255, 255, 0.62); }
+
+/* ---- Sekmeli formlar (TabbedFormShell, docs/DESIGN_SYSTEM.md "Sekmeli formlar") ------
+   Panel geçişi: 150 ms opaklık + 4px kayma. Yalnız hareket tercihine saygılı ekranlarda. */
+@keyframes tfs-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tfs-panel:not([hidden]) { animation: tfs-in 150ms ease-out; }
+}

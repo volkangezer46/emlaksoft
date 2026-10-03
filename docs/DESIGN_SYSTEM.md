@@ -174,3 +174,59 @@ Kurallar:
   (şu an layout bu sinyali taşımadığı için eklenmedi).
 - **Tema:** "Gece Altın" vurgusu (`data-accent="gold"`): `--brand-600 #9a6700` (beyaz yazı 4.87:1), metin `#7a5200`
   açıkta, `#f0c36a` koyuda; `ACCENTS` tablosu, `themes.css` ve boot script ile senkron.
+
+## Sekmeli formlar
+
+"Yeni X" tam sayfa formlarının masaüstü kabuğu. Şartname: `docs/design/FORMS_SPEC.md`. Pilot: Yeni müşteri
+(`musteriler/yeni`) ve Yeni portföy (`portfoyler/yeni`). Eski `FormShell` / `FormPage` / `FormSection` AYNEN çalışır;
+sekme istemeyen (tek bölümlü, <=4 alanlı) formlar onlarda kalır.
+
+Dosyalar: `ui/tabbed-form-shell.tsx` (kabuk + `SummaryRow` / `SummaryGroup`), `lib/form-tabs.ts` (saf mantık, testli),
+`app/use-form-values.ts` (canlı değerler), `app/use-form-draft.ts` (taslak), `premium.css` (`tfs-in` geçişi).
+
+Yerleşim: >=1024px solda dikey sekme rayı (ikon, etiket, tamam tiki / eksik noktası / hata rozeti, "N/M bölüm tamam"),
+ortada aktif panel + Önceki/Sonraki, >=1280px sağda yapışkan "Özet ve önizleme"; altta yapışkan `FormActions`.
+<1024px: yatay kaydırılan sekme şeridi (dokunma hedefi 44px), tek sütun, özet panelin altında `<details>`.
+Kabuk `max-w-[80rem]`. Geçiş 150 ms (opaklık + 4px), `prefers-reduced-motion` ile kapalı. Yalnız token (açık/koyu/Gece Altın uyumlu).
+
+### Kullanım (yeni form eklerken)
+
+1. Sekme VERİSİNİ (ikonsuz) `…/yeni/<x>-tabs.ts` içine yaz: `id`, `label`, `description`, `fields` (sekmedeki TÜM name'ler),
+   `required`, ayrıca `FORM_ID` ve taslak beyaz listesi `DRAFT_FIELDS`. Sözleşme testi bu dosyayı form kaynağıyla eşler.
+2. Formda ikonları ekleyip `FormTab[]` üret; her sekme için panel içeriğini ver (içerik düz `FormField`'lar; 2 sütun ızgara kabuktan):
+
+```tsx
+<TabbedFormShell
+  title="Yeni X" breadcrumbs={…} cancelHref="/app/x" submitLabel="Kaydet" pendingLabel="Kaydediliyor…"
+  pending={pending} error={error} onSubmit={onSubmit}        // useCreateForm çıktısı, aynen
+  tabs={tabs}                                                  // FormTab[]: {id,label,icon?,description?,fields,required?}
+  tabPanels={{ temel: <>…FormField'lar…</>, konum: <>…</> }}  // id -> içerik
+  summary={({ values, goToTab }) => <>…SummaryGroup/SummaryRow…</>}  // GERÇEK değerden; kişisel veri YOK
+  fieldLabels={{ full_name: "Ad soyad" }}                      // "Eksik zorunlu alanlar" listesi etiketleri
+  draft={{ userId, formId: X_FORM_ID, fields: [...DRAFT_FIELDS] }}   // isteğe bağlı taslak
+  layout="auto" />                                             // "single": sekmesiz alt alta
+```
+
+3. `page.tsx` `requireModulePage(...)` sonucundan `userId` alıp forma geçir (taslak anahtarı için).
+4. Başarılı kayıtta taslağı sil: `useCreateForm` ile kabuk bunu kendiliğinden yapar (pending biter, hata yok);
+   `useState` ile elle gönderen formlar başarıda `clearFormDraft(userId, FORM_ID)` çağırır.
+5. `src/lib/form-tabs-contract.test.ts` içindeki `FORMS` listesine formu ekle (sekme alanları = form kaynağındaki `name=` kümesi).
+
+### Davranış kuralları
+
+- **Tek `<form>`, tüm paneller DOM'da:** pasif paneller `hidden` ama gönderilir. Gizli sekmedeki zorunlu/geçersiz alan hatasında
+  `invalid` olayı capture ile yakalanır, ilk bozuk sekme açılır, alana odaklanıp tarayıcı balonu gösterilir; hata rozeti
+  yalnız ilk gönderim denemesinden sonra görünür.
+- **Özet içine form kontrolü koyma** (iki yerde render edilir). Telefon/e-posta/TC/IBAN gösterme; her satır `SummaryRow tab=…`
+  ile ilgili sekmeye (ve `field`'a) götürsün (sıfır çıkmaz metrik). Veri yoksa "Girilmedi" de, sahte sayı üretme
+  (`commissionSummary` geçersiz girdide null döner).
+- **Taslak:** `localStorage` `emlaksoft:draft:v1:{userId}:{formId}`, 800 ms debounce, TTL 7 gün, yalnız beyaz liste VE
+  `isSensitiveFieldName` süzgecinden geçen alanlar (telefon, e-posta, TC, IBAN, not, açıklama, metin, adres asla yazılmaz).
+  Beyaz listeye YALNIZ kontrolsüz (native) alanları koy (GeoSelect/PhoneInput gibi kontrollü bileşenler geri yüklenemez).
+  Otomatik geri yükleme yok: üstte "Taslağı geri yükle / Sil" bandı; karar verilene kadar kayıt duraklar.
+- **Klavye:** Ctrl/Cmd+Enter kaydet; Alt+↑/↓ sekme değiştir (ilk alana odaklanır); rayda ↑↓←→ + Home/End
+  (roving tabindex, odak = seçim, `aria-orientation` dikeyde `vertical`, dar ekranda `horizontal`). Derin bağlantı: `?sekme=<id>`.
+- **ARIA:** `tablist` / `tab` (`aria-selected`, `aria-controls`, `aria-describedby` = "2 zorunlu alan eksik") / `tabpanel`
+  (`aria-labelledby`, `tabIndex=0`). Zamanı bileşende `clock.ts` ile oku (`Date.now()` yasak).
+- **Sekme kuralı:** 2-5 sekme; alanı olmayan sekme ("Ek bilgi") ilerlemeye girmez. Zorunlusuz sekme, en az bir alan
+  dolunca "tamam" sayılır.
