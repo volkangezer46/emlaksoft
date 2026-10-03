@@ -73,6 +73,8 @@ const MUAF: Record<string, string> = {
   // Ortak koruma deseni: UUID regex on eleme + admin client + checkRateLimit + honeypot;
   // yazma islemleri token'in cozdugu tek kayda sabit, kullanicidan tenant_id alinmaz.
   "appointments-confirm.ts::respondToAppointmentByToken": "Randevu teyit baglantisi token ile acilir.",
+  "appointments-suggest.ts::suggestAlternativeTimesByToken":
+    "Randevu teyit baglantisindaki musteri onerisi: UUID confirm_token dogrulanir, IP hiz siniri (deny), tenant filtreli tek randevu notuna yazar; durum degismez.",
   "booking-public.ts::createPublicBooking": "Online randevu rezervasyonu; token danismanin booking_settings kaydini cozer.",
   "open-house-public.ts::registerOpenHouseVisitorByToken": "Acik ev QR self check-in; token etkinlige sabit.",
   "owner-portal-offers.ts::respondToOfferByToken": "Malik portalinda teklif onay/ret; token ile.",
