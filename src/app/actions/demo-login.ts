@@ -212,5 +212,9 @@ export async function quickDemoLogin(personaId: string): Promise<DemoLoginResult
     return { error: `Demo giriş başarısız: ${error.message}` };
   }
 
-  redirect(persona.kind === "platform" ? "/admin" : "/app");
+  // Platform kişilikleri zorunlu iki adımlı doğrulamadan (TOTP) geçer. Doğrudan "/admin"e
+  // yönlendirmek, /admin render'ında ikinci bir yönlendirmeye (→ /giris/mfa) yol açıyor ve
+  // sunucu işleminin içinde iç içe yönlendirme istemciyi yarıda bırakıyordu (adres /admin,
+  // ekran giriş sayfası). Bu yüzden doğrulama sayfasına tek adımda gidilir.
+  redirect(persona.kind === "platform" ? `/giris/mfa?next=${encodeURIComponent("/admin")}` : "/app");
 }
