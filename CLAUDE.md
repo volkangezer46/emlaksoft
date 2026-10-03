@@ -60,6 +60,13 @@ Oturumlu E2E yalnız izole test DB'de, açık `E2E_MUTATION_ALLOWED=true` ve ben
   IBAN, kart) `src/lib/ai/redact.ts` ile maskelenir; doğrudan `api.openai.com` çağrısı yazma (sözleşme testi bunu yakalar).
 - **service_role:** `createAdminClient` kullanımı `src/lib/admin-client-allowlist.ts` kabul listesindedir; yeni kullanım
   testi kırar (`npx tsx scripts/audit-admin-client.ts --write` ile envanter ve kabul listesi yenilenir). Envanter: `docs/security/`.
+- **İletişim alanları:** her telefon girişi `PhoneInput` (`src/components/ui/phone-input.tsx`, ülke seçici, varsayılan TR,
+  saklama: TR `05XXXXXXXXX`, yabancı `+<E.164>`), her e-posta girişi `EmailInput` olmak zorundadır; sunucuda `src/lib/validation/contact.ts`
+  (`phoneSchema`/`emailSchema`) veya `parsePhone`/`normalizeEmail` ile doğrulanır. Ham `<input type="tel|email">` yazma;
+  `src/lib/contact-input-contract.test.ts` yeni ihlalde kırılır.
+- **PostgREST gömmeleri:** `properties`/`customers` gibi iki FK'lı tablolara gömme her zaman FK adıyla yazılır
+  (`alias:properties!<tablo>_property_id_fkey(...)`); ipucusuz gömme listeyi sessizce boş bırakır
+  (`src/lib/postgrest-embed-hint-contract.test.ts`).
 - **Cron:** 27 route `src/app/api/cron/*` + `vercel.json` (sayı `npm run check:cron` ile doğrulanır); hepsi `CRON_SECRET` Bearer doğrular
   ve `recordHeartbeat` yazar.
 
