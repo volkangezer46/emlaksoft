@@ -1,11 +1,10 @@
 "use client";
 
-import { useTransition, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, RefreshCw, Sparkles } from "lucide-react";
-import { Button, ButtonLink } from "@/components/ui/button";
-import { FormActions, FormPage, FormSection } from "@/components/ui/form-page";
-import { FormError, FormField, FormInput, FormSelect, fieldClass } from "@/components/ui/form-controls";
+import { MessageSquareText, Plus, RefreshCw, Send, Sparkles } from "lucide-react";
+import { FormField, FormInput, FormSelect, fieldClass } from "@/components/ui/form-controls";
+import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
 import { useToast } from "@/components/app/toast-provider";
 import {
   createCampaign,
@@ -13,6 +12,7 @@ import {
   type CampaignResult,
 } from "@/app/actions/campaigns";
 import { CAMPAIGN_TEMPLATES } from "@/lib/campaign-templates";
+import { CAMPAIGN_DRAFT_FIELDS, CAMPAIGN_FORM_ID, CAMPAIGN_REQUIRED_BY_CHANNEL, CAMPAIGN_TABS } from "./campaign-tabs";
 
 const FILTERS = [
   { value: "all",         label: "Tüm müşteriler" },
@@ -22,8 +22,15 @@ const FILTERS = [
 ];
 
 const init: CampaignResult = {};
+const TAB_ICONS = { kanal: Send, icerik: MessageSquareText } as const;
+const FIELD_LABELS = {
+  title: "Kampanya başlığı",
+  message: "Mesaj metni",
+  whatsappTemplateName: "Onaylı şablon adı",
+  whatsappTemplateLanguage: "Dil kodu",
+};
 
-export function NewCampaignForm() {
+export function NewCampaignForm({ userId }: { userId: string }) {
   const router = useRouter();
   const { push } = useToast();
   const [state, setState] = useState<CampaignResult>(init);
@@ -67,52 +74,66 @@ export function NewCampaignForm() {
     });
   }
 
-  return (
-    <form onSubmit={handleSubmit}>
-      <FormPage
-        title="Yeni kampanya"
-        description="SMS veya WhatsApp kampanyasını hazırlayın; yalnız açık kanal izni olan alıcılara teslim edilir."
-        breadcrumbs={[{ label: "Kampanyalar", href: "/app/kampanyalar" }, { label: "Yeni kampanya" }]}
-      >
-        <FormSection title="Kampanya ve kanal">
-          <FormField label="Kampanya başlığı" htmlFor="kamp-title" required className="sm:col-span-2">
-            <FormInput name="title" type="text" required placeholder="ör. Temmuz Fırsat Kampanyası" />
-          </FormField>
+  const tabs: FormTab[] = useMemo(
+    () =>
+      CAMPAIGN_TABS.map((t) => {
+        const extra: readonly string[] =
+          (CAMPAIGN_REQUIRED_BY_CHANNEL[channel] as Record<string, readonly string[]>)[t.id] ?? [];
+        return {
+          id: t.id,
+          label: t.label,
+          description: t.description,
+          icon: TAB_ICONS[t.id],
+          fields: [...t.fields],
+          required: [...t.required, ...extra],
+        };
+      }),
+    [channel],
+  );
 
-          <FormField
-            label="Kanal"
-            htmlFor="kamp-channel"
-            hint="WhatsApp kampanyaları yalnızca Meta tarafından onaylanmış mesaj şablonuyla gönderilir."
+  const tabPanels = {
+    kanal: (
+      <>
+        <FormField label="Kampanya başlığı" htmlFor="kamp-title" required className="sm:col-span-2">
+          <FormInput name="title" type="text" required placeholder="ör. Temmuz Fırsat Kampanyası" />
+        </FormField>
+
+        <FormField
+          label="Kanal"
+          htmlFor="kamp-channel"
+          hint="WhatsApp kampanyaları yalnızca Meta tarafından onaylanmış mesaj şablonuyla gönderilir."
+        >
+          <FormSelect
+            name="channel"
+            value={channel}
+            onChange={(event) => {
+              const nextChannel = event.target.value as "sms" | "whatsapp";
+              setChannel(nextChannel);
+              setMessage("");
+              setState(init);
+              if (nextChannel === "whatsapp") loadApprovedTemplates();
+            }}
+            className="appearance-none"
           >
-            <FormSelect
-              name="channel"
-              value={channel}
-              onChange={(event) => {
-                const nextChannel = event.target.value as "sms" | "whatsapp";
-                setChannel(nextChannel);
-                setMessage("");
-                setState(init);
-                if (nextChannel === "whatsapp") loadApprovedTemplates();
-              }}
-              className="appearance-none"
-            >
-              <option value="sms">SMS (Netgsm)</option>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="email" disabled>E-posta (yakında)</option>
-            </FormSelect>
-          </FormField>
+            <option value="sms">SMS (Netgsm)</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="email" disabled>E-posta (yakında)</option>
+          </FormSelect>
+        </FormField>
 
-          <FormField label="Hedef kitle" htmlFor="kamp-filter">
-            <FormSelect name="filter" defaultValue="all" className="appearance-none">
-              {FILTERS.map((f) => (
-                <option key={f.value} value={f.value}>{f.label}</option>
-              ))}
-            </FormSelect>
-          </FormField>
-        </FormSection>
-
+        <FormField label="Hedef kitle" htmlFor="kamp-filter">
+          <FormSelect name="filter" defaultValue="all" className="appearance-none">
+            {FILTERS.map((f) => (
+              <option key={f.value} value={f.value}>{f.label}</option>
+            ))}
+          </FormSelect>
+        </FormField>
+      </>
+    ),
+    icerik: (
+      <>
         {channel === "whatsapp" && (
-          <FormSection title="WhatsApp şablonu" description="Onaysız veya uyuşmayan şablon gönderilmez.">
+          <>
             <div className="sm:col-span-2">
               <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
                 <label htmlFor="kamp-approved-whatsapp-template" className="text-sm font-semibold text-ink-950">
@@ -195,73 +216,131 @@ export function NewCampaignForm() {
             <p className="text-xs leading-relaxed text-text-faint sm:col-span-2">
               Ad ve dil kodu Meta Business Manager&apos;daki onaylı şablonla birebir aynı olmalıdır. Onaysız veya uyuşmayan şablon gönderilmez.
             </p>
-          </FormSection>
+          </>
         )}
 
-        <FormSection title="Mesaj">
-          {/* Hazır SMS metinleri; WhatsApp serbest metne düşürülemez. */}
-          {channel === "sms" && (
-            <div className="sm:col-span-2">
-              <p className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-ink-950">
-                <Sparkles className="h-3.5 w-3.5 text-brand-600" /> Hazır şablon
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {CAMPAIGN_TEMPLATES.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setMessage(t.message)}
-                    className="rounded-full border border-line bg-canvas px-2.5 py-1 text-xs font-medium text-text-muted transition hover:border-brand-400 hover:text-brand-600"
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
+        {/* Hazır SMS metinleri; WhatsApp serbest metne düşürülemez. */}
+        {channel === "sms" && (
           <div className="sm:col-span-2">
-            <div className="mb-1.5 flex items-center justify-between">
-              <label htmlFor="kamp-message" className="text-sm font-semibold text-ink-950">
-                {channel === "sms" ? "Mesaj metni" : "Şablon gövde parametresi (isteğe bağlı)"}
-              </label>
-              <span className={`text-xs ${charCount > 160 ? "text-amber-600" : "text-text-faint"}`}>
-                {charCount}/612 karakter
-              </span>
+            <p className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-ink-950">
+              <Sparkles className="h-3.5 w-3.5 text-brand-600" /> Hazır şablon
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {CAMPAIGN_TEMPLATES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setMessage(t.message)}
+                  className="rounded-full border border-line bg-canvas px-2.5 py-1 text-xs font-medium text-text-muted transition hover:border-brand-400 hover:text-brand-600"
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
-            <textarea
-              id="kamp-message"
-              name="message"
-              required={channel === "sms"}
-              rows={5}
-              maxLength={612}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder={channel === "sms"
-                ? "Mesajınızı buraya yazın… ({ad} ve {ofis} otomatik değişir)"
-                : "Şablonda tek bir {{1}} gövde alanı varsa değerini yazın"}
-              className={`${fieldClass} resize-none`}
-            />
-            {channel === "sms" && charCount > 0 && charCount <= 160 && (
-              <p className="mt-1 text-xs text-text-faint">1 SMS kredisi kullanılacak</p>
-            )}
-            {channel === "sms" && charCount > 160 && (
-              <p className="mt-1 text-xs text-amber-600">
-                {Math.ceil(charCount / 153)} SMS kredisi kullanılacak (uzun mesaj)
-              </p>
+          </div>
+        )}
+
+        <div className="sm:col-span-2">
+          <div className="mb-1.5 flex items-center justify-between">
+            <label htmlFor="kamp-message" className="text-sm font-semibold text-ink-950">
+              {channel === "sms" ? "Mesaj metni" : "Şablon gövde parametresi (isteğe bağlı)"}
+            </label>
+            <span className={`text-xs ${charCount > 160 ? "text-amber-600" : "text-text-faint"}`}>
+              {charCount}/612 karakter
+            </span>
+          </div>
+          <textarea
+            id="kamp-message"
+            name="message"
+            required={channel === "sms"}
+            rows={5}
+            maxLength={612}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder={channel === "sms"
+              ? "Mesajınızı buraya yazın… ({ad} ve {ofis} otomatik değişir)"
+              : "Şablonda tek bir {{1}} gövde alanı varsa değerini yazın"}
+            className={`${fieldClass} resize-none`}
+          />
+          {channel === "sms" && charCount > 0 && charCount <= 160 && (
+            <p className="mt-1 text-xs text-text-faint">1 SMS kredisi kullanılacak</p>
+          )}
+          {channel === "sms" && charCount > 160 && (
+            <p className="mt-1 text-xs text-amber-600">
+              {Math.ceil(charCount / 153)} SMS kredisi kullanılacak (uzun mesaj)
+            </p>
+          )}
+        </div>
+      </>
+    ),
+  };
+
+  function renderSummary({ values }: TabbedSummaryContext) {
+    const title = (values.title ?? "").trim();
+    const filterLabel = FILTERS.find((f) => f.value === (values.filter ?? "all"))?.label ?? FILTERS[0].label;
+    const isSms = channel === "sms";
+    const credits = charCount === 0 ? null : charCount <= 160 ? 1 : Math.ceil(charCount / 153);
+    const templateName = whatsappTemplateName.trim();
+    const templateLang = whatsappTemplateLanguage.trim();
+    return (
+      <>
+        <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
+          <p className="truncate text-sm font-semibold text-ink-950">{title || "Başlık girilmedi"}</p>
+          <p className="truncate text-xs text-text-muted">{isSms ? "SMS" : "WhatsApp"} · {filterLabel}</p>
+        </div>
+        <SummaryGroup title="Kampanya özeti">
+          <SummaryRow label="Kanal" value={isSms ? "SMS (Netgsm)" : "WhatsApp"} tab="kanal" field="channel" />
+          <SummaryRow label="Hedef kitle" value={filterLabel} tab="kanal" field="filter" />
+          {isSms ? (
+            <>
+              <SummaryRow label="Karakter" value={`${charCount}/612`} muted={charCount === 0} tab="icerik" field="message" />
+              <SummaryRow
+                label="SMS kredisi (alıcı başı)"
+                value={credits === null ? "Mesaj girilmedi" : `${credits}`}
+                muted={credits === null}
+                tab="icerik"
+                field="message"
+              />
+            </>
+          ) : (
+            <>
+              <SummaryRow label="Şablon" value={templateName || "Girilmedi"} muted={!templateName} tab="icerik" field="whatsappTemplateName" />
+              <SummaryRow label="Dil" value={templateLang || "Girilmedi"} muted={!templateLang} tab="icerik" field="whatsappTemplateLanguage" />
+            </>
+          )}
+        </SummaryGroup>
+        <SummaryGroup title="Mesaj önizleme">
+          <div className="rounded-[var(--radius-control)] bg-surface p-2.5 text-xs leading-relaxed text-ink-950 shadow-sm">
+            {isSms ? (
+              message.trim() || <span className="text-text-faint">Mesaj yazıldığında burada görünür.</span>
+            ) : templateName ? (
+              `Şablon: ${templateName}${message.trim() ? ` · gövde: ${message.trim()}` : ""}`
+            ) : (
+              <span className="text-text-faint">Onaylı şablon seçildiğinde burada görünür.</span>
             )}
           </div>
-        </FormSection>
+        </SummaryGroup>
+      </>
+    );
+  }
 
-        <FormError error={state?.error} />
-
-        <FormActions>
-          <ButtonLink href="/app/kampanyalar" variant="secondary">İptal</ButtonLink>
-          <Button type="submit" loading={isPending}>
-            <Plus className="h-4 w-4" /> {isPending ? "Oluşturuluyor…" : "Kampanya oluştur"}
-          </Button>
-        </FormActions>
-      </FormPage>
-    </form>
+  return (
+    <TabbedFormShell
+      title="Yeni kampanya"
+      description="SMS veya WhatsApp kampanyasını hazırlayın; yalnız açık kanal izni olan alıcılara teslim edilir."
+      breadcrumbs={[{ label: "Kampanyalar", href: "/app/kampanyalar" }, { label: "Yeni kampanya" }]}
+      cancelHref="/app/kampanyalar"
+      submitLabel="Kampanya oluştur"
+      pendingLabel="Oluşturuluyor…"
+      submitIcon={Plus}
+      pending={isPending}
+      error={state?.error}
+      onSubmit={handleSubmit}
+      tabs={tabs}
+      tabPanels={tabPanels}
+      summary={renderSummary}
+      fieldLabels={FIELD_LABELS}
+      draft={{ userId, formId: CAMPAIGN_FORM_ID, fields: [...CAMPAIGN_DRAFT_FIELDS] }}
+    />
   );
 }
