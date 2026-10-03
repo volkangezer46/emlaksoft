@@ -25,9 +25,12 @@ export function TableFrame({
   className,
   minWidth,
   maxHeight,
+  density = "rahat",
 }: {
   children: ReactNode;
   className?: string;
+  /** "kompakt": satır dikey boşluğu azalır (liste yoğunluk anahtarı, ?yogunluk=kompakt). */
+  density?: "rahat" | "kompakt";
   /** İçerik bu genişliğin altına sıkışmaz; kap yatay kaydırılır. */
   minWidth?: number;
   /** Verilirse kap dikey kayar ve `THead sticky` başlık bu kapta yapışır (ör. "70vh"). */
@@ -43,6 +46,7 @@ export function TableFrame({
         // yapmaz (WebKit/iOS Safari dahil; `overflow:clip` orada belge-kaydırmasını
         // durdurmuyordu).
         "surface-card min-w-0 max-w-full [contain:inline-size] overflow-hidden rounded-[var(--radius-panel)]",
+        density === "kompakt" && "[&_td]:py-1.5 [&_th]:py-1.5",
         className,
       )}
     >
@@ -77,11 +81,19 @@ export function Table({ className, ...props }: ComponentProps<"table">) {
   return <table {...props} className={cn("w-full text-left text-sm", className)} />;
 }
 
-export function THead({ className, ...props }: ComponentProps<"thead">) {
+export function THead({
+  className,
+  sticky = false,
+  ...props
+}: ComponentProps<"thead"> & {
+  /** Başlık, `TableFrame maxHeight` kabında yukarıda yapışır (opak zemin). */
+  sticky?: boolean;
+}) {
   return (
     <thead
       {...props}
       className={cn(
+        sticky && "sticky top-0 z-10 bg-surface",
         // Başlık satırı: saç teli alt kenar + hafif gömülü zemin.
         // Kalın `border-line` çizgisi tabloyu ağırlaştırıyordu.
         "hairline-b bg-canvas/70 text-xs font-semibold uppercase tracking-[0.04em] text-text-faint",
