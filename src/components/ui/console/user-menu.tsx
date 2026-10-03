@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, LogOut } from "lucide-react";
+import { ChevronDown, LogOut, Settings, Undo2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
 import {
@@ -13,7 +13,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export type UserMenuLink = { href: string; label: string; icon: LucideIcon };
+/**
+ * `icon`: yalnız İSTEMCİ bileşenlerinden geçirilebilir (ikon bir fonksiyondur; sunucu bileşeninden
+ * istemci bileşenine fonksiyon geçirilemez → "Functions cannot be passed directly to Client Components").
+ * Sunucu bileşenlerinden (ör. /app layout) `iconName` kullan.
+ */
+export type UserMenuLink = { href: string; label: string } & (
+  | { icon: LucideIcon; iconName?: never }
+  | { iconName: "settings" | "back"; icon?: never }
+);
+
+const NAMED_ICONS: Record<"settings" | "back", LucideIcon> = { settings: Settings, back: Undo2 };
 
 /** Üst çubuk kullanıcı menüsü: ad + alt satır, bağlantılar ve çıkış. Klavye/odak Radix'ten. */
 export function UserMenu({
@@ -51,7 +61,10 @@ export function UserMenu({
         {links.map((l) => (
           <DropdownMenuItem key={l.href} asChild>
             <Link href={l.href}>
-              <l.icon aria-hidden />
+              {(() => {
+                const Icon = l.icon ?? NAMED_ICONS[l.iconName];
+                return <Icon aria-hidden />;
+              })()}
               {l.label}
             </Link>
           </DropdownMenuItem>

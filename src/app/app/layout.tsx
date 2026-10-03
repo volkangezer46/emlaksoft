@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Settings, Shield } from "lucide-react";
+import { Shield } from "lucide-react";
 import "@/app/console.css";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { UserMenu } from "@/components/ui/console/user-menu";
@@ -238,7 +238,7 @@ export default async function AppLayout({
                 initials={initials}
                 name={fullName}
                 subtitle={`${planLabel(office?.plan ?? "office")} plan`}
-                links={accessibleModules.includes("settings") ? [{ href: "/app/ayarlar", label: "Ayarlar", icon: Settings }] : []}
+                links={accessibleModules.includes("settings") ? [{ href: "/app/ayarlar", label: "Ayarlar", iconName: "settings" as const }] : []}
               />
             </div>
           </header>
