@@ -13,6 +13,11 @@ export type TabDef = {
   fields: readonly string[];
   /** Zorunlu alan name'leri (fields'in alt kümesi). */
   required?: readonly string[];
+  /**
+   * Önceden seçili gelen alanlar (ör. varsayılan "Satılık"): kullanıcı bir şey yazmadan
+   * dolu görünürler, bu yüzden isteğe bağlı sekmenin "tamamlandı" sayılmasına katkı vermez.
+   */
+  passive?: readonly string[];
 };
 
 export type FormValues = Record<string, string>;
@@ -75,16 +80,18 @@ const isFilled = (v: string | undefined) => (v ?? "").trim() !== "";
  * - zorunlu var ve hepsi dolu -> "complete"; eksik var -> "missing"
  * - zorunlu yok: en az bir alan dolu -> "complete", hiçbiri -> "empty"
  */
-export function computeTabState(tab: Pick<TabDef, "fields" | "required">, values: FormValues): TabState {
+export function computeTabState(tab: Pick<TabDef, "fields" | "required" | "passive">, values: FormValues): TabState {
   const required = tab.required ?? [];
   const missing = required.filter((n) => !isFilled(values[n]));
   const filled = tab.fields.filter((n) => isFilled(values[n])).length;
+  // İsteğe bağlı sekmede yalnız kullanıcının doldurduğu (ön dolu olmayan) alanlar sayılır.
+  const userFilled = tab.fields.filter((n) => !(tab.passive ?? []).includes(n) && isFilled(values[n])).length;
   if (tab.fields.length === 0 && required.length === 0) return { complete: false, missing, filled: 0, status: "none" };
   if (required.length > 0) {
     const complete = missing.length === 0;
     return { complete, missing, filled, status: complete ? "complete" : "missing" };
   }
-  return { complete: filled > 0, missing, filled, status: filled > 0 ? "complete" : "empty" };
+  return { complete: userFilled > 0, missing, filled, status: userFilled > 0 ? "complete" : "empty" };
 }
 
 /** Rayın altındaki "N/M bölüm tamam": bilgi sekmeleri (status none) M'ye girmez. */
@@ -104,13 +111,14 @@ export function progressSummary(tabs: readonly TabDef[], values: FormValues): { 
  * Sekme ilerlemesi 0..1 (ikon halkası): zorunlu varsa dolu zorunlu/zorunlu; yoksa
  * en az bir alan doluysa 1 ("tamam" ile tutarlı). Bilgi sekmesi (alan yok) 0.
  */
-export function tabProgress(tab: Pick<TabDef, "fields" | "required">, values: FormValues): number {
+export function tabProgress(tab: Pick<TabDef, "fields" | "required" | "passive">, values: FormValues): number {
   const required = tab.required ?? [];
   if (required.length > 0) {
     return required.filter((n) => isFilled(values[n])).length / required.length;
   }
   if (tab.fields.length === 0) return 0;
-  return tab.fields.some((n) => isFilled(values[n])) ? 1 : 0;
+  const passive = tab.passive ?? [];
+  return tab.fields.some((n) => !passive.includes(n) && isFilled(values[n])) ? 1 : 0;
 }
 
 export type SlideDirection = "next" | "prev" | "none";

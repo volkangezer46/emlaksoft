@@ -378,7 +378,7 @@ export default async function DemandsPage({
           icon={Target}
           illustration="start"
           title="Henüz talep yok"
-          description="Müşteri detayından ya da “Yeni talep” ile ilk talebi ekleyin; eşleştirme motoru portföyle otomatik karşılaştırır."
+          description="Müşteri detayından ya da “Yeni talep” ile ilk talebi ekleyin; sistem talebi portföylerinizle otomatik karşılaştırır."
           action={canCreate ? { href: "/app/talepler/yeni", label: "Yeni talep" } : undefined}
           secondary={{ href: "/app/musteriler", label: "Müşterilere git" }}
         />

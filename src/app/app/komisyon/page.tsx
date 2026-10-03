@@ -27,6 +27,7 @@ import { BulkCollectBar, BulkCollectCheckbox, BulkCollectProvider } from "./bulk
 import { requireReportingCount, requireReportingData } from "@/lib/reporting/result";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { HelpTip } from "@/components/ui/help-tip";
 import { MoneyValue } from "@/components/ui/money-value";
 type CommissionRow = {
   id: string;
@@ -256,7 +257,7 @@ export default async function CommissionPage({
       <PageHeader
         title="Komisyon & hakediş"
         eyebrow="Finans merkezi"
-        description="Çok taraflı paylaşım, KDV ve tahsilat görünümü tek defterde."
+        description={<>Komisyon paylaşımı, KDV ve tahsilat durumu tek defterde. <HelpTip topic="komisyon-payi" /></>}
         actions={
           <Link
             href="/app/onaylar?durum=bekliyor"

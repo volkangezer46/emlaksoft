@@ -21,6 +21,7 @@ import {
 import { loadLeagueData, periodOf, periodRange, previousPeriod } from "@/lib/gamification-query";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { HelpTip } from "@/components/ui/help-tip";
 /**
  * /app/lig — ofis motivasyon ekranı.
  *
@@ -324,7 +325,7 @@ export default async function LigPage({
   return (
     <div className="space-y-6">
       {/* Hero: dönem seçici + kapsam + TV modu girişi */}
-      <PageHeader title="Lig Tablosu" eyebrow="Ekip ligi" description="Aylık puan yarışı, rozetler ve günlük aktivite serileri." actions={
+      <PageHeader title="Lig Tablosu" eyebrow="Ekip ligi" description={<>Aylık puan sıralaması, rozetler ve günlük çalışma serileri. <HelpTip topic="lig" /></>} actions={
 <div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-3">
             <Link
               href="/app/danisman-kpi"

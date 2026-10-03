@@ -8,6 +8,7 @@ import { computeChurnRisk } from "@/lib/churn-risk";
 import { scoreSellerLikelihood, isOwnerCustomer } from "@/lib/seller-prediction";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { HelpTip } from "@/components/ui/help-tip";
 export const metadata = { title: "Akıllı Listeler" };
 
 type Cust = {
@@ -174,7 +175,7 @@ export default async function AkilliListelerPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Akıllı Listeler" eyebrow="Davranışsal segmentler" description="Müşteri tabanını her sabah otomatik tarar; kimi arayacağını davranış sinyallerinden önceliklendirir. Statik filtre değil — skor, churn ve niyet birleşimi." actions={
+      <PageHeader title="Akıllı Listeler" eyebrow="Kimi aramalıyım?" description={<>Müşterilerinizi son görüşme tarihine ve ilgisine göre gruplar; önce kimi arayacağınızı gösterir. <HelpTip topic="segment" label="Müşteri grupları" /></>} actions={
 <div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {segments.map((s) => (
               <a

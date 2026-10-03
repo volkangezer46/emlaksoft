@@ -21,6 +21,7 @@ import { IMPORT_ROW_LIMIT } from "./import-config";
 import { listRecentImports } from "@/app/actions/import-rollback";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { HelpTip } from "@/components/ui/help-tip";
 export const metadata = { title: "İçe aktarma" };
 
 const nf = new Intl.NumberFormat("tr-TR");
@@ -156,7 +157,7 @@ export default async function ImportPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <PageHeader title="CSV içe aktarma" eyebrow="Veri taşıma" description="Eski programınızdan veya Excel'den aldığınız müşteri, portföy ve talep listelerini EmlakSoft'a taşıyın: dosya yükleyin, eşleyin, önizleyin, aktarın; gerekirse geri alın." />
+      <PageHeader title="CSV içe aktarma" eyebrow="Veri taşıma" description={<>Eski programınızdan veya Excel&apos;den aldığınız müşteri, portföy ve talep listelerini EmlakSoft&apos;a taşıyın: dosya yükleyin, eşleyin, önizleyin, aktarın; gerekirse geri alın. <HelpTip topic="ice-aktarma" /></>} />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative"><p className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/70">
             <FileSpreadsheet className="h-3.5 w-3.5 text-mint-400" />
             Excel dosyanızı &quot;Farklı Kaydet → CSV&quot; ile kaydedin — .xlsx doğrudan desteklenmez.

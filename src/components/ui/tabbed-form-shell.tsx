@@ -69,6 +69,8 @@ export type FormTab = {
   fields: string[];
   /** Zorunlu alan name'leri (fields alt kümesi) -> tamamlanma + eksik listesi. */
   required?: string[];
+  /** Ön dolu gelen alanlar: isteğe bağlı sekmenin "tamamlandı" sayılmasına katkı vermez. */
+  passive?: string[];
   /** Sunucu hatasından eşlenen ek hata sayısı (isteğe bağlı). */
   errorCount?: number;
 };

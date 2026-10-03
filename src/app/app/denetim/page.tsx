@@ -240,7 +240,7 @@ export default async function AuditPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Denetim kayıtları" eyebrow="KVKK / denetim izi" description="Yazma işlemlerinin immutable günlüğü. Sahte aktivite yok — yalnızca `logActivity` kayıtları." actions={
+      <PageHeader title="Denetim kayıtları" eyebrow="KVKK / denetim izi" description="Kim, ne zaman, neyi değiştirdi? Yapılan işlemlerin değiştirilemeyen kayıt defteri." actions={
 <div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4">
             <p className="text-xs font-semibold text-white/70">Aktivite · son 24 saat (2s dilim)</p>
             <div className="mt-4 flex h-28 items-end gap-1.5">

@@ -6,6 +6,7 @@ import { DEFAULT_DEFINITIONS, DEFINITION_CATEGORIES } from "@/lib/definition-def
 import { DefinitionsManager, type DefRow } from "./definitions-manager";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { HelpTip } from "@/components/ui/help-tip";
 export const metadata = { title: "Tanımlar" };
 
 export default async function DefinitionsPage() {
@@ -54,7 +55,7 @@ export default async function DefinitionsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlar
       </Link>
 
-      <PageHeader title="Seçim listeleri & tanımlar" eyebrow="Tanımlar" description="Müşteri tipi, kaynak, portföy tipi, kayıp nedeni gibi tüm dropdown seçenekleri ve anlaşma aşama adları buradan yönetilir. Sistem varsayılanları korunur; ofisinize özel seçenekler ekleyebilir, kendi eklediklerinizi düzenleyebilirsiniz." />
+      <PageHeader title="Seçim listeleri & tanımlar" eyebrow="Tanımlar" description={<>Müşteri tipi, kaynak, portföy tipi, kayıp nedeni gibi formlardaki tüm seçenekler ve anlaşma aşama adları buradan yönetilir. Sistemin hazır seçenekleri korunur; ofisinize özel seçenekler ekleyebilir, kendi eklediklerinizi düzenleyebilirsiniz. <HelpTip topic="tanimlar" /></>} />
 
       <DefinitionsManager categories={categories} tenantId={tenantId} />
     </div>

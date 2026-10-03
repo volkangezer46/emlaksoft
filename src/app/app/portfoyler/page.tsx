@@ -39,6 +39,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { propertyStatusLabel } from "@/lib/property-labels";
 import { ICONS } from "@/lib/icons";
 import { PageHeader } from "@/components/ui/page-header";
+import { HelpTip } from "@/components/ui/help-tip";
 import { ButtonLink } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -557,7 +558,7 @@ export default async function PropertiesPage({
     <div className="space-y-5">
       <PageHeader
         title="Portföyler"
-        description="Fiyat sağlığı, portal teyidi ve yetki durumu tek merkezde."
+        description={<>Fiyat sağlığı, portal teyidi ve yetki durumu tek merkezde. <HelpTip topic="fiyat-sagligi" /></>}
         actions={
           <>
             <ExportCsvButton

@@ -29,6 +29,8 @@ export const CUSTOMER_TABS = [
     description: "Alıcı/kiracı için aradığı portföy: bütçe, oda, bölge ve olmazsa olmaz kriterler. Eşleştirme bunları kullanır.",
     fields: [...DEMAND_FIELD_GROUPS.ne, ...DEMAND_FIELD_GROUPS.kriter, ...DEMAND_FIELD_GROUPS.bolge],
     required: [],
+    // Bu üçü hazır seçili gelir (Satılık / Daire / Normal); doldurulmamış sekmeye yeşil tik vermesin.
+    passive: ["transaction_type", "property_type", "urgency"],
   },
   {
     id: "ozel-gunler",

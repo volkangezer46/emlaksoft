@@ -1,3 +1,4 @@
+import { HelpTip } from "@/components/ui/help-tip";
 import Link from "next/link";
 import { Suspense } from "react";
 import {
@@ -226,11 +227,12 @@ export default async function LeakShieldPage({
         <div className="relative grid gap-6 lg:grid-cols-[1.2fr_1fr] lg:items-center">
           <div>
             <span className="flex items-center gap-2 text-xs font-semibold text-danger-400">
-              <span className="status-pulse h-2 w-2 rounded-full bg-danger-400" /> Leak Shield · Kayıp-kaçak
+              <span className="status-pulse h-2 w-2 rounded-full bg-danger-400" /> Kayıp-kaçak
             </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Kaçan komisyon motoru</h1>
+            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Kaçan komisyonlar</h1>
             <p className="mt-1 max-w-lg text-sm text-white/60">
               Portal kapanışlarından otomatik hesaplanan tahmini kayıp. Rakip / ofis dışı işlemler burada görünür.
+              <HelpTip topic="kayip-kacak" />
             </p>
             <Suspense fallback={<HeroKpisSkeleton />}>
               <HeroKpis ctx={ctx} pending={pending} />

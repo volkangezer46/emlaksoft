@@ -191,7 +191,17 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { href: "/app/belgeler", label: "Belge Merkezi", icon: ICONS.belge, module: "settings" },
       { href: "/app/denetim", label: "Denetim", icon: ICONS.denetim, module: "settings" },
       { href: "/app/abonelik", label: "Abonelik ve paket", icon: ICONS.abonelik, module: "billing" },
-      { href: "/app/destek", label: "Destek", icon: ICONS.destek, module: "support" },
+      {
+        // Yardım ve Destek: tek menü öğesi; yardım merkezi + mevcut destek talepleri sekme.
+        href: "/app/yardim",
+        label: "Yardım ve Destek",
+        icon: ICONS.destek,
+        module: "support",
+        tabs: [
+          { href: "/app/yardim", label: "Yardım", icon: ICONS.destek, module: "support" },
+          { href: "/app/destek", label: "Destek talepleri", icon: ICONS.destek, module: "support" },
+        ],
+      },
       { href: "/app/ayarlar", label: "Ayarlar", icon: ICONS.ayar, module: "settings" },
     ],
   },

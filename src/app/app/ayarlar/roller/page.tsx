@@ -8,6 +8,7 @@ import { MODULE_LABELS, RolePermissionsMatrix } from "./role-permissions-matrix"
 import { UserExceptions, type ExceptionMember, type OverrideRow } from "./user-exceptions";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { HelpTip } from "@/components/ui/help-tip";
 const ROLES: { value: AppRole; label: string }[] = [
   { value: "owner", label: "Ofis sahibi" },
   { value: "gm", label: "Genel müdür" },
@@ -130,7 +131,7 @@ export default async function RolePermissionsPage({
         </Link>
       </div>
 
-      <PageHeader title="İzin matrisi" eyebrow="Rol & izin yönetimi" description={"Her rolün hangi modüle hangi işlemle erişebileceğini bu ekrandan özelleştirin. Değişiklikler yalnızca bu ofisi etkiler ve anında etkin olur. Kişiye özel durumlar için \"Kullanıcı istisnaları\" sekmesini kullanın."} />
+      <PageHeader title="İzin matrisi" eyebrow="Rol & izin yönetimi" description={<>Her rolün hangi sayfada neleri yapabileceğini bu ekrandan ayarlayın. Değişiklikler yalnızca bu ofisi etkiler ve hemen geçerli olur. Kişiye özel durumlar için &quot;Kullanıcı istisnaları&quot; sekmesini kullanın. <HelpTip topic="yetki-matrisi" /></>} />
 
       {/* Sekmeler: rol matrisi / kullanıcı istisnaları */}
       <div className="flex gap-2">
