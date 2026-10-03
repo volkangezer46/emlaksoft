@@ -117,6 +117,7 @@ export default async function AppointmentsPage({
   if (sp.property) newApptQuery.set("property", sp.property);
   const newApptHref = newApptQuery.size ? `/app/randevular/yeni?${newApptQuery.toString()}` : "/app/randevular/yeni";
   if (sp.yeni === "1") redirect(newApptHref);
+  const canCreateAppt = (gate.perms.appointments ?? []).includes("create");
   const tipF = sp.tip && typeLabel[sp.tip] ? sp.tip : "";
   const durumF = sp.durum && FILTERABLE_STATUSES.includes(sp.durum) ? sp.durum : "";
   const customerF = sp.customer ?? "";
@@ -361,6 +362,7 @@ export default async function AppointmentsPage({
     return { label: d.toLocaleDateString("tr-TR", { weekday: "short" }), day: d.getDate(), count, isToday: i === 0 };
   });
   const maxWeek = Math.max(1, ...week.map((w) => w.count));
+  const weekTotal = week.reduce((n, w) => n + w.count, 0);
 
   const sameLocalDay = (iso: string, d: Date) => {
     return trDayKey(iso) === fmtTarih(d);
@@ -555,14 +557,19 @@ export default async function AppointmentsPage({
               <p className="flex items-center gap-1.5 text-xs font-semibold text-white/75"><CalendarClock className="h-3.5 w-3.5 text-cyan-400" /> Haftalık yoğunluk</p>
               <span className="text-xs text-white/45">önümüzdeki 7 gün</span>
             </div>
-            <div className="mt-4 flex h-24 items-end gap-2">
+            {weekTotal === 0 ? (
+              <p className="mt-3 text-xs text-white/55">
+                Önümüzdeki 7 günde planlı randevu yok. Takvimden bir gün seçerek randevu ekleyebilirsiniz.
+              </p>
+            ) : null}
+            <div className="mt-4 flex h-24 items-stretch gap-2">
               {week.map((w, i) => (
-                <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
+                <div key={i} className="flex h-full flex-1 flex-col items-center gap-1.5">
                   <span className="text-xs font-bold tabular-nums text-white/55">{w.count || ""}</span>
-                  <div className="flex h-full w-full items-end justify-center">
+                  <div className="flex min-h-0 w-full flex-1 items-end justify-center">
                     <div
-                      className={`bar-live w-full max-w-[18px] rounded-t-[4px] ${w.isToday ? "bg-[image:var(--grad-brand)] shadow-[0_0_12px_-1px_rgba(20,99,255,0.7)]" : "bg-white/25"}`}
-                      style={{ height: `${Math.max((w.count / maxWeek) * 100, 6)}%`, animationDelay: `${i * 0.08}s` }}
+                      className={`bar-live w-full max-w-4 rounded-t-sm ${w.isToday ? "bg-[image:var(--grad-brand)] shadow-[0_0_12px_-1px_rgba(20,99,255,0.7)]" : "bg-white/25"}`}
+                      style={{ height: `${w.count === 0 ? 4 : Math.max((w.count / maxWeek) * 100, 12)}%`, animationDelay: `${i * 0.08}s` }}
                     />
                   </div>
                   <span className={`text-xs ${w.isToday ? "font-bold text-cyan-300" : "text-white/40"}`}>{w.label}</span>
@@ -663,6 +670,7 @@ export default async function AppointmentsPage({
         {gorunum === "ay" ? (
           <AppointmentCalendar
             todayKey={fmtTarih(todayStart)}
+            newHref={canCreateAppt ? newApptHref : null}
             appointments={rows.map((r) => ({
               id: r.id,
               scheduled_at: r.scheduled_at,
@@ -694,6 +702,7 @@ export default async function AppointmentsPage({
             prevHref={apptHref({ tarih: fmtTarih(shiftDate(selectedDate, gorunum === "hafta" ? -7 : -1)) })}
             nextHref={apptHref({ tarih: fmtTarih(shiftDate(selectedDate, gorunum === "hafta" ? 7 : 1)) })}
             todayHref={apptHref({ tarih: fmtTarih(todayStart) })}
+            newHref={canCreateAppt ? newApptHref : null}
           />
         )}
 

@@ -351,7 +351,7 @@ export default async function PropertyDetailPage({
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-mint-500/20 blur-[90px]" />
         <div className="relative grid gap-6 lg:grid-cols-[1.35fr_1fr] lg:items-center">
-          <div>
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-bold text-white/80">{property.property_code}</span>
               <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${healthGood ? "bg-mint-500/20 text-mint-300" : healthWarn ? "bg-amber-400/20 text-amber-300" : "bg-white/10 text-white/60"}`}>
@@ -381,7 +381,7 @@ export default async function PropertyDetailPage({
                   href={mapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group mt-2 inline-flex items-center gap-1.5 text-sm text-white/70 transition hover:text-mint-300"
+                  className="group mt-2 inline-flex max-w-full flex-wrap items-center gap-1.5 text-sm text-white/70 transition hover:text-mint-300"
                   title="Haritada göster"
                 >
                   <MapPin className="h-3.5 w-3.5 text-mint-400" />
@@ -462,15 +462,13 @@ export default async function PropertyDetailPage({
               </Link>
               <WhatsAppLink share label="Müşteriye WhatsApp ile gönder" message={listingText.description ? `${listingText.title}\n\n${listingText.description}` : null} />
               {canDelete ? <DeletePropertyButton propertyId={property.id} /> : null}
-              </MoreActions>
-            </div>
-            {/* Portal ara çözümü: ilan metnini üret, portala yapıştır */}
-            <div className="mt-3">
+              {/* Portal ara çözümü: ilan metnini üret, portala yapıştır */}
               <CopyListingText title={listingText.title} description={listingText.description} warnings={listingText.warnings} />
+              </MoreActions>
             </div>
           </div>
 
-          <div className="flex items-center gap-5 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
+          <div className="flex min-w-0 flex-wrap items-center gap-5 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="relative grid h-28 w-28 place-items-center">
               <div
                 className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-25 blur-md"
@@ -495,7 +493,7 @@ export default async function PropertyDetailPage({
                 <p className="text-xs text-white/45">teyit</p>
               </div>
             </div>
-            <div className="space-y-2 text-xs text-white/70">
+            <div className="min-w-0 space-y-2 text-xs text-white/70">
               <div className="flex items-center gap-2"><Building2 className="h-3.5 w-3.5 text-mint-400" /> {livePortals.length} canlı portal</div>
               <div className="flex items-center gap-2"><FileCheck2 className="h-3.5 w-3.5 text-amber-300" /> {overdue.length} teyit gecikmiş</div>
               <div className="flex items-center gap-2">
@@ -565,7 +563,7 @@ export default async function PropertyDetailPage({
                 <p className="mt-1 text-xs text-text-muted">Liste fiyatı × komisyon oranı (kayıp-kaçak hesabında da kullanılır)</p>
               </div>
               <div className="mt-3 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-3">
-                <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Price Health</p>
+                <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Fiyat sağlığı</p>
                 <p className="mt-1 text-sm font-semibold text-ink-950">
                   {priceSignal.health === "green" ? "Yeşil" : priceSignal.health === "yellow" ? "Sarı" : priceSignal.health === "red" ? "Kırmızı" : "Bekliyor"}
                   {priceSignal.deltaPct != null ? ` · %${priceSignal.deltaPct}` : ""}

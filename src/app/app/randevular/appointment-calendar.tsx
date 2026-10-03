@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { trDayKey, formatTrTime } from "@/lib/clock";
-import { ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { ArrowDown, CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react";
 
 type AppointmentItem = {
   id: string;
@@ -45,10 +46,13 @@ const keyOf = (y: number, m: number, d: number) => `${y}-${pad2(m + 1)}-${pad2(d
 export function AppointmentCalendar({
   appointments,
   todayKey,
+  newHref = null,
 }: {
   appointments: AppointmentItem[];
   /** Sunucudaki TR bugünü, "YYYY-MM-DD". */
   todayKey: string;
+  /** Randevu oluşturma yetkisi varsa yeni randevu sayfası adresi (ön seçim paramlı ya da düz); yoksa null. */
+  newHref?: string | null;
 }) {
   const [ty, tm] = todayKey.split("-").map(Number);
   const [view, setView] = useState({ year: ty, month: tm - 1 });
@@ -176,6 +180,14 @@ export function AppointmentCalendar({
             {selectedLabel}
             {" — "}{selectedAppts.length} randevu
           </p>
+          {newHref ? (
+            <Link
+              href={`${newHref}${newHref.includes("?") ? "&" : "?"}tarih=${selected}`}
+              className="focus-ring mb-2 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300 hover:bg-canvas"
+            >
+              <CalendarPlus className="h-3.5 w-3.5" aria-hidden /> Bu güne randevu ekle
+            </Link>
+          ) : null}
           {selectedAppts.length === 0 ? (
             <p className="text-xs text-text-faint">Bu gün randevu yok.</p>
           ) : (
