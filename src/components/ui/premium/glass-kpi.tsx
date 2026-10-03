@@ -35,16 +35,16 @@ export function GlassKpi({
         <Icon />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="pm-glass-label block truncate">{label}</span>
-        <span className="pm-glass-value block truncate">{value}</span>
+        <span className="pm-glass-label line-clamp-2 block" title={typeof label === "string" ? label : undefined}>{label}</span>
+        <span className="pm-glass-value block whitespace-nowrap">{value}</span>
         {sub ? (
-          <span className="pm-glass-sub block truncate" data-tone={subTone}>
+          <span className="pm-glass-sub line-clamp-2 block" data-tone={subTone}>
             {sub}
           </span>
         ) : null}
       </span>
       {hasSeries(series) ? (
-        <MiniBars data={series} onDark unit={seriesUnit} label={seriesLabel} width={52} height={34} className="hidden sm:block" />
+        <MiniBars data={series} onDark unit={seriesUnit} label={seriesLabel} width={52} height={34} className="hidden xl:block" />
       ) : null}
     </Link>
   );
