@@ -123,9 +123,9 @@ export function CustomerTable({
               <TH>Tür</TH>
               <TH>Sıcaklık</TH>
               <TH>İletişim</TH>
-              <TH className="hidden xl:table-cell">Danışman</TH>
+              <TH className="hidden 2xl:table-cell">Danışman</TH>
               <TH className="hidden lg:table-cell">Son temas</TH>
-              <TH className="hidden xl:table-cell" aria-sort={sortHeader.createdSort}>
+              <TH className="hidden 2xl:table-cell" aria-sort={sortHeader.createdSort}>
                 {sortHeader.created}
               </TH>
               <TH align="right">
@@ -179,11 +179,11 @@ export function CustomerTable({
                     </p>
                   ) : null}
                 </TD>
-                <TD className="hidden text-text-muted xl:table-cell">{c.advisor ?? <span className="text-text-faint">Atanmadı</span>}</TD>
+                <TD className="hidden text-text-muted 2xl:table-cell">{c.advisor ?? <span className="text-text-faint">Atanmadı</span>}</TD>
                 <TD className="hidden text-text-muted lg:table-cell">
                   {c.lastContact ?? <span className="text-text-faint">Temas yok</span>}
                 </TD>
-                <TD className="numeric hidden text-text-muted xl:table-cell">{c.createdLabel}</TD>
+                <TD className="numeric hidden text-text-muted 2xl:table-cell">{c.createdLabel}</TD>
                 <TD>
                   <RowActions>
                     <RowActionLink href={c.href} label={`${c.name} detayını aç`} icon={Eye} />

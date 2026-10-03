@@ -69,12 +69,12 @@ export function PropertyTable({
               ) : null}
               <TH>Portföy</TH>
               <TH>İşlem · tip</TH>
-              <TH className="hidden lg:table-cell">Konum</TH>
+              <TH className="hidden xl:table-cell">Konum</TH>
               <TH align="right">Fiyat</TH>
               <TH>Durum</TH>
               <TH className="hidden xl:table-cell">Fiyat sağlığı</TH>
-              <TH className="hidden xl:table-cell">Portal</TH>
-              <TH className="hidden lg:table-cell">Eklenme</TH>
+              <TH className="hidden 2xl:table-cell">Portal</TH>
+              <TH className="hidden 2xl:table-cell">Eklenme</TH>
               <TH align="right">
                 <span className="sr-only">İşlemler</span>
               </TH>
@@ -108,7 +108,7 @@ export function PropertyTable({
                   <p className="font-medium text-text">{p.type}</p>
                   <p className="text-xs text-text-muted">{p.tx}</p>
                 </TD>
-                <TD className="hidden text-text-muted lg:table-cell">
+                <TD className="hidden text-text-muted xl:table-cell">
                   <span className="flex items-center gap-1.5">
                     <MapPin aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-text-faint" />
                     <span className="max-w-[12rem] truncate">{p.location}</span>
@@ -123,10 +123,10 @@ export function PropertyTable({
                 <TD className="hidden xl:table-cell">
                   {p.health ? <StatusPill tone={p.health.tone}>{p.health.label}</StatusPill> : <span className="text-text-faint">—</span>}
                 </TD>
-                <TD className="hidden xl:table-cell">
+                <TD className="hidden 2xl:table-cell">
                   <PortalCell live={p.portalsLive} total={p.portalsTotal} />
                 </TD>
-                <TD className="numeric hidden text-text-muted lg:table-cell">{p.createdLabel}</TD>
+                <TD className="numeric hidden text-text-muted 2xl:table-cell">{p.createdLabel}</TD>
                 <TD>
                   <RowActions>
                     <RowActionLink href={p.href} label={`${p.title} detayını aç`} icon={Eye} />

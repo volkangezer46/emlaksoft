@@ -230,3 +230,33 @@ Kabuk `max-w-[80rem]`. Geçiş 150 ms (opaklık + 4px), `prefers-reduced-motion`
   (`aria-labelledby`, `tabIndex=0`). Zamanı bileşende `clock.ts` ile oku (`Date.now()` yasak).
 - **Sekme kuralı:** 2-5 sekme; alanı olmayan sekme ("Ek bilgi") ilerlemeye girmez. Zorunlusuz sekme, en az bir alan
   dolunca "tamam" sayılır.
+
+## Liste kiti (`src/components/ui/list-kit`)
+
+Liste sayfalarının ortak dili: sayaçlı kategori çipleri, ikon kapsüllü KPI kartları, kapak önizlemeli tablo, renkli
+durum kapsülleri, satır eylemleri. Portföy ve müşteri listeleri kullanır; talepler, anlaşmalar, teklifler,
+sözleşmeler, randevular, görevler ve kiralama aynı kalıba taşınacaktır. Hepsi sunucu bileşeni (JS yok);
+import: `@/components/ui/list-kit`.
+
+| Bileşen | Ne yapar | Önemli kural |
+| --- | --- | --- |
+| `KpiStrip` | İkon kapsüllü, tıklanabilir KPI kartları (`items: KpiItem[]`) | `href` zorunlu. `series` (eskiden yeniye sayılar) YALNIZ gerçek kayıt tarihlerinden (`bucketByWeek`) verilir; yoksa ya da tamamı 0 ise çubuk/trend çizilmez. `showTrend` son yarıyı önceki yarıyla kıyaslar (`trendOf`); önceki dönem 0 ise yüzde uydurmaz. `attention`: sıfır değilse kırmızı. |
+| `ListToolbar` | Görünüm anahtarı, arama, "Filtreler (n)" paneli, sıralama yuvası, yoğunluk, aktif filtre çipleri, kayıtlı görünüm yuvası | Tek `<form method=get>`; formun sahip olmadığı parametreler gizli alanla taşınır, `sayfa` sıfırlanır. `panel` içine `FilterGrid` + `FilterSelect` (native select) koy; `panelParamKeys` rozet sayısını belirler. |
+| `CategoryChips` | Sayaçlı kategori çipleri (`?kategori=` ya da `paramName`) | Sunucu filtresi (link). `counts` yalnız gerçek sayımla verilir; güvenilir değilse `null` (sayı gösterilmez). Sayacı 0 olan pasif çip gizlenir. |
+| `StatusPill` | `tone-*` token kapsülü (success / warning / danger / info / neutral) | Renk tek başına anlam taşımaz, metin zorunlu; kontrast token katmanında garantili (açık/koyu/vurgu temaları). |
+| `EntityThumb` | Satır görseli: kapak; yoksa `icon` ya da `name` baş harf avatarı | Sabit kutu, CLS yok. |
+| `RowActions`, `RowActionLink`, `RowActionAnchor` | Satır sonu ikon eylemleri | `label` zorunlu (aria-label + title); satır overlay linkinin üstünde (`z-10`). |
+| `ViewSwitcher` | Liste / Kart / Galeri / Harita (`?gorunum=`) | YALNIZ var olan görünümler verilir; 2'den az görünümde çizilmez. |
+| `BulkBar` | Toplu işlem çubuğu kabuğu (sticky) | Seçim durumu çağıranın istemci sağlayıcısındadır (bkz. `portfoyler/property-bulk-actions.tsx`). |
+
+- **Tablo:** `Table` primitive'leri + `TableFrame density="kompakt"` (`?yogunluk=kompakt`, `ListToolbar densityParam`)
+  + `THead sticky` (`TableFrame maxHeight` ile). md altında tablo yerine kart listesi çiz (`hidden md:block` /
+  `md:hidden`); yatay taşma olmamalı. Dar ekranda ikincil sütunları `hidden xl:table-cell` ile gizle.
+- **Satır kalıbı:** sayfa sunuma hazır bir satır modeli (VM) üretir; tablo ve mobil liste aynı VM'den beslenir
+  (bkz. `portfoyler/property-rows.tsx`, `musteriler/customer-rows.tsx`). Saf mantık (ton eşleme, özet metin,
+  sayım) `*-list-logic.ts` içinde, testiyle.
+- **Gerçek veri disiplini:** sayaç/trend/seri hesaplanamıyorsa çizilmez. Tarama tabanlı sayımlar (ör. tip
+  dağılımı) üst sınırı aşarsa gizlenir; yaklaşık sayı gösterilmez.
+- **FilterBar ile ilişki:** basit sayfalar için `FilterBar` (sekme + panel) yeterlidir; görünüm anahtarı, aktif çip,
+  yoğunluk ve kayıtlı görünüm gereken liste ekranları `ListToolbar` kullanır. İkisi de `lib/ui/filter-params`
+  yardımcılarını paylaşır.

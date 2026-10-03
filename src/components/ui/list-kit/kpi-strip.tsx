@@ -48,12 +48,18 @@ const BAR_COLOR: Record<PillTone, string> = {
   neutral: "text-[var(--neutral-strong)]",
 };
 
+/** Öğe sayısına göre sütun düzeni (Tailwind statik sınıf): 6 öğe 3×2 → 6×1, 5 öğe → 5×1. */
+function columnsFor(n: number): string {
+  if (n >= 6) return "grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6";
+  if (n === 5) return "grid-cols-2 lg:grid-cols-3 xl:grid-cols-5";
+  if (n === 4) return "grid-cols-2 lg:grid-cols-4";
+  if (n === 3) return "grid-cols-1 sm:grid-cols-3";
+  return "grid-cols-2";
+}
+
 export function KpiStrip({ items, label = "Özet göstergeler", className }: { items: readonly KpiItem[]; label?: string; className?: string }) {
   return (
-    <nav
-      aria-label={label}
-      className={cn("grid grid-cols-2 gap-3 lg:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]", className)}
-    >
+    <nav aria-label={label} className={cn("grid gap-3", columnsFor(items.length), className)}>
       {items.map((it) => {
         const tone = it.tone ?? "info";
         const zero = it.value === 0 || it.value === "0";
@@ -68,55 +74,57 @@ export function KpiStrip({ items, label = "Özet göstergeler", className }: { i
             href={it.href}
             title={it.title}
             className={cn(
-              "focus-ring press group flex min-h-[5.5rem] items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3.5 shadow-[var(--elev-1)] transition hover:border-brand-300 hover:shadow-[var(--shadow-card)]",
+              "focus-ring press group flex min-w-0 flex-col gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-3.5 shadow-[var(--elev-1)] transition hover:border-brand-300 hover:shadow-[var(--shadow-card)]",
               zero && !it.attention && "opacity-70 hover:opacity-100",
             )}
           >
-            <span
-              aria-hidden="true"
-              className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-control)] [&>svg]:h-5 [&>svg]:w-5", TONE_CLASS[tone])}
-            >
-              {it.icon}
+            <span className="flex items-center gap-2.5">
+              <span
+                aria-hidden="true"
+                className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] [&>svg]:h-[1.125rem] [&>svg]:w-[1.125rem]", TONE_CLASS[tone])}
+              >
+                {it.icon}
+              </span>
+              <span className="min-w-0 truncate text-xs font-medium text-text-muted">{it.label}</span>
             </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-medium text-text-muted">{it.label}</span>
+            <span className="flex items-end justify-between gap-2">
               <span
                 className={cn(
-                  "numeric block truncate font-display text-2xl font-bold leading-tight",
+                  "numeric min-w-0 truncate font-display text-2xl font-bold leading-none",
                   it.attention && !zero ? "text-danger-600" : "text-text",
                 )}
               >
                 {shown}
               </span>
-              {trend ? (
+              {heights && series ? (
                 <span
-                  className={cn(
-                    "mt-0.5 flex items-center gap-1 text-xs font-semibold",
-                    trend.dir === "up" ? "text-[var(--success-strong)]" : trend.dir === "down" ? "text-[var(--danger-strong)]" : "text-text-muted",
-                  )}
+                  role="img"
+                  aria-label={`${it.seriesLabel ?? "Seri"}: ${series.join(", ")}`}
+                  className={cn("flex h-8 shrink-0 items-end gap-0.5", BAR_COLOR[tone])}
                 >
-                  <TrendIcon aria-hidden="true" className="h-3.5 w-3.5" />
-                  {trend.label}
-                  <span className="truncate font-normal text-text-muted">{it.seriesLabel ?? "önceki döneme göre"}</span>
+                  {heights.map((h, i) => (
+                    <span
+                      key={i}
+                      className="w-1 rounded-full bg-current"
+                      style={{ height: `${Math.max(h, 8)}%`, opacity: h === 0 ? 0.15 : 0.35 + (i / heights.length) * 0.65 }}
+                    />
+                  ))}
                 </span>
-              ) : it.hint ? (
-                <span className="block truncate text-xs text-text-muted">{it.hint}</span>
               ) : null}
             </span>
-            {heights && series ? (
+            {trend ? (
               <span
-                role="img"
-                aria-label={`${it.seriesLabel ?? "Seri"}: ${series.join(", ")}`}
-                className={cn("hidden h-9 shrink-0 items-end gap-0.5 sm:flex", BAR_COLOR[tone])}
+                className={cn(
+                  "flex items-center gap-1 text-xs font-semibold",
+                  trend.dir === "up" ? "text-[var(--success-strong)]" : trend.dir === "down" ? "text-[var(--danger-strong)]" : "text-text-muted",
+                )}
               >
-                {heights.map((h, i) => (
-                  <span
-                    key={i}
-                    className="w-1 rounded-full bg-current"
-                    style={{ height: `${Math.max(h, 8)}%`, opacity: h === 0 ? 0.15 : 0.35 + (i / heights.length) * 0.65 }}
-                  />
-                ))}
+                <TrendIcon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                {trend.label}
+                <span className="truncate font-normal text-text-muted">{it.seriesLabel ?? "önceki döneme göre"}</span>
               </span>
+            ) : it.hint ? (
+              <span className="truncate text-xs text-text-muted">{it.hint}</span>
             ) : null}
           </Link>
         );

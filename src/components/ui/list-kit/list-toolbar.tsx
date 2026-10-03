@@ -97,7 +97,7 @@ export function ListToolbar({
             />
           </label>
           {panel ? (
-            <details className="group relative" open={panelActive > 0 || undefined}>
+            <details className="group relative">
               <summary
                 className={cn(
                   CONTROL,
