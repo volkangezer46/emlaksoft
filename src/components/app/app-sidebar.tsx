@@ -216,7 +216,7 @@ export function AppSidebar({
           <Menu className="h-5 w-5" />
         </button>
       </DialogTrigger>
-      <aside className="shell-aside sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden bg-[linear-gradient(180deg,#071a38_0%,#041127_100%)] lg:flex">
+      <aside className="shell-aside sticky top-0 hidden h-screen shrink-0 flex-col self-start overflow-hidden bg-[linear-gradient(180deg,#071a38_0%,#041127_100%)] lg:flex">
         {content}
       </aside>
       <DialogDrawerContent id="app-mobile-navigation" aria-describedby={undefined} responsiveClassName="lg:hidden">

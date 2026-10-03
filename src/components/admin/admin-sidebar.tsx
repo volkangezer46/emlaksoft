@@ -268,7 +268,7 @@ export function AdminSidebar({
       </DialogTrigger>
 
       {/* Masaüstü sabit sidebar */}
-      <div className="shell-aside sticky top-0 hidden h-screen shrink-0 overflow-hidden border-r border-white/6 md:block">{content}</div>
+      <div className="shell-aside sticky top-0 hidden h-screen shrink-0 self-start overflow-hidden border-r border-white/6 md:block">{content}</div>
 
       {/* Mobil çekmece — focus trap, Escape, scroll lock ve focus restore Radix'ten gelir. */}
       <DialogDrawerContent id="admin-mobile-navigation" aria-describedby={undefined}>
