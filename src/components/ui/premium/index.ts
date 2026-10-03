@@ -4,7 +4,7 @@
  */
 export { HeroBanner } from "./hero-banner";
 export { GlassKpi } from "./glass-kpi";
-export { KpiCard, type KpiCardProps } from "./kpi-card";
+export { KpiCard, KpiTile, type KpiCardProps, type KpiTileProps } from "./kpi-card";
 export { Sparkline } from "./sparkline";
 export { MiniBars } from "./mini-bars";
 export { TrendPill } from "./trend-pill";

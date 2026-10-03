@@ -27,6 +27,8 @@ import { isOnLeave, type LeaveLike } from "@/lib/leave-utils";
 import type { CSSProperties } from "react";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { DashboardGrid, DashCell, DashCard, SectionHeader, KpiGrid } from "@/components/ui/dashboard-grid";
+import { KpiTile } from "@/components/ui/premium/kpi-card";
 const RING_C = 2 * Math.PI * 42;
 
 type Rel = { name?: string } | { name?: string }[] | null;
@@ -186,92 +188,96 @@ export default async function TeamPage() {
     <div className="space-y-6">
       {/* premium header */}
       <PageHeader title="Çalışan yönetimi" eyebrow="Ekip & yetkiler" description="Danışmanları davet edin, rol ve şube atayın; herkes yalnızca yetkili olduğu müşteri ve portföyleri görür." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex flex-wrap items-center gap-2">
-                <Link href="/app/ayarlar/roller" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+<div className="flex flex-wrap items-center gap-2">
+                <Link href="/app/ayarlar/roller" className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-text transition hover:bg-surface-2">
                   <Fingerprint className="h-4 w-4" /> İzin matrisi
                 </Link>
-                <Link href="/app/ekip/izinler" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"><CalendarRange className="h-4 w-4" /> İzin takvimi</Link>
-                <Link href="/app/ekip/kartvizitim" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"><IdCard className="h-4 w-4" /> Kartvizitim</Link>
+                <Link href="/app/ekip/izinler" className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-text transition hover:bg-surface-2"><CalendarRange className="h-4 w-4" /> İzin takvimi</Link>
+                <Link href="/app/ekip/kartvizitim" className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-text transition hover:bg-surface-2"><IdCard className="h-4 w-4" /> Kartvizitim</Link>
                 {canManage ? (
-                  <Link href="/app/ekip/yeni" className="btn-shine inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-white/90">
+                  <Link href="/app/ekip/yeni" className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-accent px-4 py-2 text-sm font-semibold text-accent-fg transition hover:opacity-90">
                     <UserPlus className="h-4 w-4" /> Danışman ekle
                   </Link>
                 ) : null}
-              </div></div>
+              </div>
 } />
-<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-brand-600/30 blur-[90px]" />
-        <div className="relative grid gap-6 lg:grid-cols-[1.25fr_1fr] lg:items-center">
-          <div>
-            
-            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {kpis.map((k) => (
-                <Link
-                  key={k.label}
-                  href={k.href}
-                  className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur hover:border-white/30"
-                >
-                  <span className="flex items-start justify-between">
-                    <k.icon className="h-4 w-4 text-mint-400" />
-                    <ArrowUpRight className="hover-action h-4 w-4 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
-                  </span>
-                  <p className="mt-2 font-display text-xl font-extrabold text-white">{k.value}</p>
-                  <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
+<KpiGrid count={kpis.length}>
+        {kpis.map((k) => (
+          <KpiTile key={k.label} label={k.label} value={k.value} icon={k.icon} href={k.href} tone="brand" dim={k.value === 0} />
+        ))}
+      </KpiGrid>
+
+      <DashboardGrid>
+        <DashCell span={{ md: 6, xl: loadRows.length > 0 ? 5 : 12 }}>
+          <DashCard aria-labelledby="rol-karisimi">
+            <SectionHeader as="h2" title={<span id="rol-karisimi">Rol karışımı</span>} icon={<ShieldCheck />} />
+            <div className="flex items-center gap-5">
+              <div className="relative grid h-28 w-28 shrink-0 place-items-center">
+                <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" role="img" aria-label={`Aktif üye oranı yüzde ${Math.round(activeRate * 100)}`}>
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="var(--surface-sunken)" strokeWidth="8" />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="42"
+                    fill="none"
+                    stroke="var(--success)"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    className="ring-sweep"
+                    style={{ "--circ": RING_C, "--dash": RING_C * (1 - activeRate) } as CSSProperties}
+                  />
+                </svg>
+                <div className="absolute text-center">
+                  <p className="num text-xl text-text">%{Math.round(activeRate * 100)}</p>
+                  <p className="text-xs text-text-muted">aktif</p>
+                </div>
+              </div>
+              <div className="min-w-0 flex-1 space-y-2">
+                {roleMix.slice(0, 5).map((r, i) => (
+                  <div key={r.key}>
+                    <div className="mb-0.5 flex justify-between text-xs text-text-muted">
+                      <span>{r.label}</span>
+                      <span className="font-bold text-text">{r.count}</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-surface-sunken">
+                      <div
+                        className="bar-live h-full rounded-full"
+                        style={{ width: `${(r.count / maxRole) * 100}%`, background: r.color, animationDelay: `${i * 0.08}s` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </DashCard>
+        </DashCell>
+        <DashCell span={{ md: 6, xl: 7 }}>
+          {loadRows.length > 0 ? (
+          <DashCard aria-labelledby="is-yuku">
+            <SectionHeader as="h2" title={<span id="is-yuku">Müşteri dağılımı</span>} eyebrow="İş yükü" />
+            <div className="space-y-3">
+              {loadRows.map((r, i) => (
+                <Link key={r.id} href={`/app/ekip/${r.id}`} className="focus-ring group block rounded-[var(--radius-control)] p-1 -m-1">
+                  <div className="mb-1 flex justify-between text-xs">
+                    <span className="flex items-center gap-1 font-semibold text-ink-950 group-hover:text-brand-600">
+                      {r.name}
+                      <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                    </span>
+                    <span className="tabular-nums text-text-muted">{r.count}</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-canvas">
+                    <div
+                      className="bar-live h-full rounded-full bg-[image:var(--grad-brand)]"
+                      style={{ width: `${Math.max((r.count / maxLoad) * 100, 4)}%`, animationDelay: `${i * 0.07}s` }}
+                    />
+                  </div>
                 </Link>
               ))}
             </div>
-          </div>
-
-          <div className="flex items-center gap-5 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
-            <div className="relative grid h-28 w-28 place-items-center">
-              <div
-                className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-25 blur-md"
-                style={{ background: "conic-gradient(from 0deg, var(--mint-400), var(--brand-500), var(--mint-400))" }}
-              />
-              <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="42"
-                  fill="none"
-                  stroke="var(--mint-400)"
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  className="ring-sweep"
-                  style={{ "--circ": RING_C, "--dash": RING_C * (1 - activeRate) } as CSSProperties}
-                />
-              </svg>
-              <div className="absolute text-center">
-                <p className="font-display text-xl font-extrabold text-white">%{Math.round(activeRate * 100)}</p>
-                <p className="text-xs text-white/45">aktif</p>
-              </div>
-            </div>
-            <div className="min-w-0 flex-1 space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-white/45">Rol karışımı</p>
-              {roleMix.slice(0, 4).map((r, i) => (
-                <div key={r.key}>
-                  <div className="mb-0.5 flex justify-between text-xs text-white/60">
-                    <span>{r.label}</span>
-                    <span className="font-bold text-white">{r.count}</span>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
-                    <div
-                      className="bar-live h-full rounded-full"
-                      style={{
-                        width: `${(r.count / maxRole) * 100}%`,
-                        background: r.color,
-                        animationDelay: `${i * 0.08}s`,
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+          </DashCard>
+          ) : null}
+        </DashCell>
+      </DashboardGrid>
 
       {!canManage ? (
         <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/8 px-4 py-3 text-sm text-ink-950">
@@ -279,31 +285,7 @@ export default async function TeamPage() {
         </div>
       ) : null}
 
-      {loadRows.length > 0 ? (
-        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
-          <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><UserRound className="h-4 w-4" /> İş yükü</p>
-          <h2 className="mt-1 font-display font-bold text-ink-950">Müşteri dağılımı</h2>
-          <div className="mt-4 space-y-3">
-            {loadRows.map((r, i) => (
-              <Link key={r.id} href={`/app/ekip/${r.id}`} className="focus-ring group block rounded-[var(--radius-control)] p-1 -m-1">
-                <div className="mb-1 flex justify-between text-xs">
-                  <span className="flex items-center gap-1 font-semibold text-ink-950 group-hover:text-brand-600">
-                    {r.name}
-                    <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                  </span>
-                  <span className="tabular-nums text-text-muted">{r.count}</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-canvas">
-                  <div
-                    className="bar-live h-full rounded-full bg-[image:var(--grad-brand)]"
-                    style={{ width: `${Math.max((r.count / maxLoad) * 100, 4)}%`, animationDelay: `${i * 0.07}s` }}
-                  />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ) : null}
+      
 
       {/* team list */}
       <section id="uyeler" className="scroll-mt-24 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">

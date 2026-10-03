@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
-import { SkeletonCard } from "@/components/app/skeleton";
+import { Skeleton } from "@/components/app/skeleton";
 import { ProductTour } from "./product-tour";
 import { DashboardWidgetProvider } from "./dashboard-widgets";
 import { buildHomeBounds, type HomeCtx } from "./_home/data";
@@ -114,9 +114,17 @@ export default async function AppHomePage({
           <div data-tour="kpi" className="md:col-span-6 xl:col-span-12">
             <Suspense
               fallback={
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <SkeletonCard key={i} />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} role="status" aria-busy="true" className="pm-card pm-card-inline h-full">
+                      <span className="sr-only">Yükleniyor</span>
+                      <Skeleton className="h-12 w-12 shrink-0 rounded-[0.9rem]" />
+                      <span className="min-w-0 flex-1 space-y-2">
+                        <Skeleton className="h-4 w-2/3" />
+                        <Skeleton className="h-7 w-1/3" />
+                        <Skeleton className="h-4 w-1/2" />
+                      </span>
+                    </div>
                   ))}
                 </div>
               }

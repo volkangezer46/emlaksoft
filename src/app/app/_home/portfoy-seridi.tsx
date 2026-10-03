@@ -3,6 +3,7 @@ import { ArrowUpRight, Building2, MapPin, TrendingDown } from "lucide-react";
 import { trParts } from "@/lib/clock";
 import { moneyTry } from "@/lib/leak-shield";
 import { Widget } from "../dashboard-widgets";
+import { kpiColumns } from "@/components/ui/dashboard-grid";
 import { loadPropertyStrip, type HomeCtx, type StripProperty } from "./data";
 import { SekmeSerit } from "./sekme-serit";
 
@@ -72,7 +73,7 @@ export async function PortfoySeridi({ ctx }: { ctx: HomeCtx }) {
             id: t.id,
             label: t.label,
             count: t.count,
-            panel: <ul className="pm-prop-grid">{t.items.map((p) => <Card key={p.id} p={p} tone={t.tone} />)}</ul>,
+            panel: <ul className={`grid gap-3 ${kpiColumns(t.items.length)}`}>{t.items.map((p) => <Card key={p.id} p={p} tone={t.tone} />)}</ul>,
           }))}
         />
       </section>

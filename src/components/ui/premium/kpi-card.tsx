@@ -8,17 +8,23 @@ import { Sparkline } from "./sparkline";
 import { TrendPill } from "./trend-pill";
 
 /**
- * KpiCard v3 — ikon rozeti, başlık + sağ ok, büyük değer, trend rozeti, önceki dönem
- * metni ve alt grafik. "Sıfır çıkmaz metrik": `href` ZORUNLU; kart filtrelenmiş
- * hedefe götürür. Alt grafik yalnız GERÇEK seri verilirse çizilir (`series`, en az
- * 2 nokta); yoksa alan hiç ayrılmaz. Sunucu bileşeni, token renkleri, koyu temada uyumlu.
+ * KpiTile — dashboard KPI kartının TEK uygulaması (KpiCard, StatCard ve KpiStrip bunu çizer).
+ *
+ * Anatomi: ikon kapsülü + etiket (2 satıra kadar sarar, kırpılmaz) + sağ ok; büyük değer + trend
+ * rozeti; alt açıklama; yalnız GERÇEK seri varsa alt grafik. Aynı satırdaki kartlar ızgarada eşit
+ * yükseklikte biter (`h-full`, grafik `mt-auto`).
+ *
+ * "Sıfır çıkmaz metrik": `href` verilirse kart Link olur. `KpiCard` (aşağıda) `href`'i ZORUNLU kılar;
+ * `href`siz kullanım yalnız eski StatCard çağrıları içindir ve bilinçli olmalıdır.
  */
-export type KpiCardProps = {
+export type KpiTileProps = {
   label: string;
   /** Biçimlenmiş değer ("₺1,2 Mn") ya da sayı. */
   value: ReactNode;
-  href: string;
-  icon: ComponentType<{ className?: string }>;
+  href?: string;
+  /** İkon bileşeni (lucide) ya da hazır düğüm; ikisinden biri. */
+  icon?: ComponentType<{ className?: string }>;
+  iconNode?: ReactNode;
   tone?: PremiumTone;
   /** `computeTrend(...)` çıktısı. */
   trend?: Trend;
@@ -28,6 +34,8 @@ export type KpiCardProps = {
   hint?: ReactNode;
   /** Değer vurgusu: dikkat gerektiriyorsa değer ton renginde. */
   attention?: boolean;
+  /** Değer sıfırken kartı sönük çiz (yine tıklanabilir). */
+  dim?: boolean;
   /** Gerçek geçmiş seri (en eski → en yeni). */
   series?: readonly number[];
   chart?: "line" | "bars";
@@ -35,38 +43,57 @@ export type KpiCardProps = {
   seriesUnit?: string;
   /** Erişilebilir grafik özeti (verilmezse seriden üretilir). */
   seriesLabel?: string;
+  /** Fare üstü açıklaması. */
+  title?: string;
   className?: string;
   /** "inline": ikon kapsülü solda, değer + trend ortada, mini çubuklar sağda (yoğun ana ekran düzeni). */
   layout?: "stack" | "inline";
 };
 
-export function KpiCard({
+export function KpiTile({
   label,
   value,
   href,
   icon: Icon,
+  iconNode,
   tone = "brand",
   trend,
   previousText,
   hint,
   attention = false,
+  dim = false,
   series,
   chart = "line",
   seriesUnit,
   seriesLabel,
+  title,
   className,
   layout = "stack",
-}: KpiCardProps) {
+}: KpiTileProps) {
   const drawChart = hasSeries(series);
-  if (layout === "inline") {
-    return (
-      <Link href={href} className={cn(`pm-card pm-card-inline pm-t-${tone} focus-ring group`, className)}>
-        <span className="pm-ico pm-ico-lg" aria-hidden="true">
-          <Icon />
-        </span>
+  const ico = iconNode ?? (Icon ? <Icon /> : null);
+  const cls = cn(
+    `pm-card pm-t-${tone} h-full`,
+    layout === "inline" && "pm-card-inline",
+    href && "focus-ring group",
+    dim && "opacity-70 hover:opacity-100",
+    className,
+  );
+  const valueStyle = attention ? { color: "var(--t-text)" } : undefined;
+
+  const body =
+    layout === "inline" ? (
+      <>
+        {ico ? (
+          <span className="pm-ico pm-ico-lg" aria-hidden="true">
+            {ico}
+          </span>
+        ) : null}
         <span className="min-w-0 flex-1">
-          <span className="pm-card-title block truncate">{label}</span>
-          <span className="pm-value mt-0.5 block" style={attention ? { color: "var(--t-text)" } : undefined}>
+          <span className="pm-card-title line-clamp-2 break-words" title={label}>
+            {label}
+          </span>
+          <span className="pm-value mt-0.5 block" style={valueStyle}>
             {value}
           </span>
           <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -77,34 +104,59 @@ export function KpiCard({
         {drawChart ? (
           <MiniBars data={series} tone={tone} unit={seriesUnit} label={seriesLabel} width={64} height={44} className="pm-card-bars" />
         ) : null}
-      </Link>
+      </>
+    ) : (
+      <>
+        <span className="pm-card-head">
+          {ico ? (
+            <span className="pm-ico" aria-hidden="true">
+              {ico}
+            </span>
+          ) : null}
+          <span className="pm-card-title line-clamp-2 break-words" title={label}>
+            {label}
+          </span>
+          {href ? <ChevronRight className="pm-card-arrow h-4 w-4" aria-hidden="true" /> : null}
+        </span>
+        <span className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <span className="pm-value" style={valueStyle}>
+            {value}
+          </span>
+          {trend ? <TrendPill trend={trend} /> : null}
+        </span>
+        {previousText || hint ? <span className="pm-sub">{previousText ?? hint}</span> : null}
+        {drawChart ? (
+          <span className="pm-chart block">
+            {chart === "bars" ? (
+              <MiniBars data={series} tone={tone} unit={seriesUnit} label={seriesLabel} width={160} height={36} fluid />
+            ) : (
+              <Sparkline data={series} tone={tone} unit={seriesUnit} label={seriesLabel} height={40} />
+            )}
+          </span>
+        ) : null}
+      </>
+    );
+
+  if (!href) {
+    return (
+      <div className={cls} title={title}>
+        {body}
+      </div>
     );
   }
   return (
-    <Link href={href} className={cn(`pm-card pm-t-${tone} focus-ring group`, className)}>
-      <span className="pm-card-head">
-        <span className="pm-ico" aria-hidden="true">
-          <Icon />
-        </span>
-        <span className="pm-card-title truncate">{label}</span>
-        <ChevronRight className="pm-card-arrow h-4 w-4" aria-hidden="true" />
-      </span>
-      <span className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-        <span className="pm-value" style={attention ? { color: "var(--t-text)" } : undefined}>
-          {value}
-        </span>
-        {trend ? <TrendPill trend={trend} /> : null}
-      </span>
-      {previousText || hint ? <span className="pm-sub">{previousText ?? hint}</span> : null}
-      {drawChart ? (
-        <span className="pm-chart block">
-          {chart === "bars" ? (
-            <MiniBars data={series} tone={tone} unit={seriesUnit} label={seriesLabel} width={160} height={36} fluid />
-          ) : (
-            <Sparkline data={series} tone={tone} unit={seriesUnit} label={seriesLabel} height={40} />
-          )}
-        </span>
-      ) : null}
+    <Link href={href} title={title} className={cls}>
+      {body}
     </Link>
   );
+}
+
+/** KpiCard — `href` ZORUNLU (sıfır çıkmaz metrik). Gerisi `KpiTile` ile aynı. */
+export type KpiCardProps = Omit<KpiTileProps, "href" | "icon"> & {
+  href: string;
+  icon: ComponentType<{ className?: string }>;
+};
+
+export function KpiCard(props: KpiCardProps) {
+  return <KpiTile {...props} />;
 }
