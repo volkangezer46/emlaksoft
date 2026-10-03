@@ -11,11 +11,11 @@ import { loadEmptyProbe, loadOnboardingState, type HomeCtx } from "./data";
 export async function KurulumSeridi({ ctx }: { ctx: HomeCtx }) {
   if (ctx.tvMode) return null;
   const state = await loadOnboardingState(ctx);
-  if (!state || state.complete) return null;
+  if (!state || state.complete || state.settled) return null;
   const next = state.steps.find((s) => s.id === state.nextId) ?? state.steps.find((s) => !s.done);
   return (
     <Link
-      href="/app/baslangic"
+      href={`/app/baslangic?adim=${state.nextId}`}
       className="focus-ring pm-bx group flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition hover:border-brand-300"
     >
       <span className="text-sm font-bold text-ink-950">Kurulum %{state.percent}</span>

@@ -13,7 +13,7 @@ import { computeLeadScore } from "@/lib/lead-score";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { TR_OFFSET_MS, daysAgoIso, now, trParts } from "@/lib/clock";
 import type { Period } from "@/components/ui/premium";
-import { buildOnboarding } from "@/lib/onboarding-checklist";
+import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
 import {
   commissionSummaryFromAggregate,
   type CommissionAggregate,
@@ -523,34 +523,9 @@ export const loadEmptyProbe = cache(async (ctx: HomeCtx) => {
   return { customers: results[0].count ?? 0, properties: results[1].count ?? 0 };
 });
 
-/** Kurulum şeridi verisi (/app/baslangic ile aynı sayımlar). Hata varsa null — şerit gizlenir. */
+/** Kurulum şeridi verisi (/app/baslangic ile AYNI kaynak: lib/onboarding-state). Hata varsa null — şerit gizlenir. */
 export const loadOnboardingState = cache(async (ctx: HomeCtx) => {
   if (!ctx.tenantId) return null;
-  const supabase = await createClient();
-  const results = await Promise.all([
-    supabase.from("tenants").select("phone, city, license_no").eq("id", ctx.tenantId).maybeSingle(),
-    supabase.from("customers").select("id", { count: "exact", head: true }).eq("is_sample", false),
-    supabase.from("properties").select("id", { count: "exact", head: true }).eq("is_sample", false),
-    supabase.from("deals").select("id", { count: "exact", head: true }).eq("stage", "won").eq("is_sample", false),
-    supabase.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId),
-    supabase
-      .from("tenant_integrations")
-      .select("id", { count: "exact", head: true })
-      .eq("is_active", true)
-      .in("provider", ["netgsm", "whatsapp"]),
-  ]);
-  if (results.some((r) => r.error)) return null;
-  const tenant = results[0].data as { phone: string | null; city: string | null; license_no: string | null } | null;
-  return buildOnboarding({
-    profileFilled: {
-      phone: Boolean(tenant?.phone),
-      city: Boolean(tenant?.city),
-      licenseNo: Boolean(tenant?.license_no),
-    },
-    customers: results[1].count ?? 0,
-    properties: results[2].count ?? 0,
-    wonDeals: results[3].count ?? 0,
-    members: results[4].count ?? 0,
-    activeIntegrations: results[5].count ?? 0,
-  });
+  const snap = await loadOnboardingSnapshot(ctx.tenantId);
+  return snap?.state ?? null;
 });

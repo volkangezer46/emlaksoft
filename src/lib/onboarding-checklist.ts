@@ -1,6 +1,10 @@
 /**
  * Ofis kurulum sihirbazı — saf mantık. Salt sayımlardan adım listesi ve ilerleme
  * yüzdesi üretir; veritabanı/IO yok (sayfa sayıları toplar, burası yorumlar).
+ *
+ * Tek kaynak: hem /app/baslangic sihirbazı hem ana ekrandaki kurulum şeridi bu modülü
+ * kullanır. "Tamamlandı" bilgisi gerçek veriden çıkar (müşteri sayısı > 0 vb.); yeni şema
+ * yoktur. Yalnız "sonra yaparım" tercihi kullanıcı çerezinde tutulur (bkz. setup-skip.ts).
  */
 
 export type OnboardingCounts = {
@@ -10,22 +14,28 @@ export type OnboardingCounts = {
   customers: number;
   /** Örnek olmayan portföy sayısı. */
   properties: number;
-  /** Kazanılmış (stage = won) anlaşma sayısı; komisyon yalnız bundan doğar. */
-  wonDeals: number;
   /** Ofisteki toplam kullanıcı (profil) sayısı. */
   members: number;
   /** Aktif mesajlaşma entegrasyonu (netgsm/whatsapp) sayısı. */
   activeIntegrations: number;
+  /** Ofise özel (tenant_id dolu) tanım sayısı: kayıp nedeni, kaynak vb. */
+  customDefinitions: number;
+  /** Yayın tarihi (published_at) dolu, örnek olmayan portföy sayısı. */
+  publishedProperties: number;
 };
 
-export type OnboardingStepId = "profile" | "customer" | "property" | "deal" | "team" | "channel";
+export type OnboardingStepId = "office" | "team" | "data" | "property" | "defs" | "portals";
+
+/** Sihirbazın son (özet) adımı; ilerlemeye sayılmaz. */
+export const FINISH_STEP = "bitis" as const;
+export type WizardStepKey = OnboardingStepId | typeof FINISH_STEP;
 
 export type OnboardingStep = {
   id: OnboardingStepId;
   title: string;
   description: string;
-  href: string;
-  cta: string;
+  /** Adımın kısa adı (ilerleme çubuğu etiketi). */
+  short: string;
   done: boolean;
 };
 
@@ -34,8 +44,10 @@ export type OnboardingState = {
   doneCount: number;
   total: number;
   percent: number;
-  /** Atlanmamış ilk tamamlanmamış adım; hepsi bittiyse null. */
+  /** Atlanmamış ilk tamamlanmamış adım; hepsi bittiyse/atlandıysa null. */
   nextId: OnboardingStepId | null;
+  /** Tüm adımlar ya tamamlandı ya "sonra yaparım" denildi. */
+  settled: boolean;
   complete: boolean;
 };
 
@@ -45,59 +57,62 @@ export function isProfileComplete(p: OnboardingCounts["profileFilled"]): boolean
   return [p.phone, p.city, p.licenseNo].filter(Boolean).length >= PROFILE_MIN_FIELDS;
 }
 
+export const ONBOARDING_STEP_IDS: readonly OnboardingStepId[] = ["office", "team", "data", "property", "defs", "portals"];
+
+export function isOnboardingStepId(v: unknown): v is OnboardingStepId {
+  return typeof v === "string" && (ONBOARDING_STEP_IDS as readonly string[]).includes(v);
+}
+
+export function isWizardStepKey(v: unknown): v is WizardStepKey {
+  return v === FINISH_STEP || isOnboardingStepId(v);
+}
+
 export function buildOnboarding(
   counts: OnboardingCounts,
   skipped: readonly OnboardingStepId[] = [],
 ): OnboardingState {
   const steps: OnboardingStep[] = [
     {
-      id: "profile",
-      title: "Ofis profilini tamamlayın",
-      description: "Telefon, şehir ve ruhsat bilgisi sözleşme, portal ve vitrinde görünür.",
-      href: "/app/ayarlar",
-      cta: "Ayarlara git",
+      id: "office",
+      short: "Ofis",
+      title: "Ofis bilgileriniz",
+      description: "Ad, telefon ve şehir sözleşme, portal ve vitrinde görünür.",
       done: isProfileComplete(counts.profileFilled),
     },
     {
-      id: "customer",
-      title: "İlk müşterinizi ekleyin",
-      description: "Müşteri kaydı talep, randevu ve anlaşmaların başlangıç noktasıdır.",
-      href: "/app/musteriler",
-      cta: "Müşteri ekle",
+      id: "team",
+      short: "Ekip",
+      title: "Ekibinizi davet edin",
+      description: "Danışmanlarınızı ekleyin; görev ve müşteri paylaşımı başlasın.",
+      done: counts.members > 1,
+    },
+    {
+      id: "data",
+      short: "Veriler",
+      title: "Verilerinizi getirin",
+      description: "Mevcut müşteri listenizi içe aktarın ya da ilk müşterinizi ekleyin.",
       done: counts.customers > 0,
     },
     {
       id: "property",
+      short: "Portföy",
       title: "İlk portföyünüzü girin",
       description: "Portföy eklenince eşleştirme ve vitrin çalışmaya başlar.",
-      href: "/app/portfoyler",
-      cta: "Portföy ekle",
       done: counts.properties > 0,
     },
     {
-      id: "deal",
-      title: "İlk anlaşmanı kapat, komisyonun otomatik oluşsun",
-      description:
-        "Komisyon elle girilmez; anlaşmayı kazanıldı olarak kapattığınızda otomatik oluşur ve her kayıt bir anlaşmaya bağlı kalır.",
-      href: "/app/anlasmalar/yeni",
-      cta: "Anlaşma ekle",
-      done: counts.wonDeals > 0,
+      id: "defs",
+      short: "Tanımlar",
+      title: "Tanımlarınızı gözden geçirin",
+      description: "Kayıp nedenleri, aşama adları ve komisyon oranı ofisinizin diline uysun.",
+      done: counts.customDefinitions > 0,
     },
     {
-      id: "team",
-      title: "Ekibinizi davet edin",
-      description: "Danışmanlarınızı ekleyin; görev ve müşteri paylaşımı başlasın.",
-      href: "/app/ekip",
-      cta: "Ekibi davet et",
-      done: counts.members > 1,
-    },
-    {
-      id: "channel",
-      title: "WhatsApp veya SMS bağlayın",
-      description: "Portal ve kampanya mesajları kendi hattınızdan gitsin.",
-      href: "/app/ayarlar",
-      cta: "Bağlantıyı kur",
-      done: counts.activeIntegrations > 0,
+      id: "portals",
+      short: "Vitrin",
+      title: "Vitrin ve portallar",
+      description: "İlanlarınız vitrininizde ve portallarda yayınlansın, talepler size düşsün.",
+      done: counts.publishedProperties > 0 || counts.activeIntegrations > 0,
     },
   ];
 
@@ -110,6 +125,20 @@ export function buildOnboarding(
     total,
     percent: Math.round((doneCount / total) * 100),
     nextId: next?.id ?? null,
+    settled: next === null,
     complete: doneCount === total,
   };
+}
+
+/** Sihirbazda gösterilecek adım: geçerli istek yoksa sıradaki; hepsi bitmişse özet. */
+export function resolveWizardStep(requested: string | undefined, state: OnboardingState): WizardStepKey {
+  if (isWizardStepKey(requested)) return requested;
+  return state.nextId ?? FINISH_STEP;
+}
+
+/** Geri/ileri komşuları (özet adımı dahil). */
+export function wizardNeighbors(current: WizardStepKey): { prev: WizardStepKey | null; next: WizardStepKey | null } {
+  const order: WizardStepKey[] = [...ONBOARDING_STEP_IDS, FINISH_STEP];
+  const i = order.indexOf(current);
+  return { prev: i > 0 ? order[i - 1] : null, next: i >= 0 && i < order.length - 1 ? order[i + 1] : null };
 }
