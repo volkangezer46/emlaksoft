@@ -209,6 +209,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/api/ticket-attachments/route.ts", fn: "POST", calls: 1, tenantFilter: "var" },
   { file: "src/app/api/vitrin-favoriler/route.ts", fn: "POST", calls: 1, tenantFilter: "var" },
   { file: "src/app/app/ayarlar/guvenlik/actions.ts", fn: "setTwoFactorSms", calls: 1, tenantFilter: "var" },
+  { file: "src/app/app/ekip/invite-actions.ts", fn: "createAdvisor", calls: 1, tenantFilter: "var" },
   { file: "src/app/app/ekip/invite-actions.ts", fn: "resendInvite", calls: 1, tenantFilter: "var" },
   { file: "src/app/app/ekip/page.tsx", fn: "TeamPage", calls: 1, tenantFilter: "var" },
   { file: "src/app/app/sozlesmeler/[id]/page.tsx", fn: "ContractDetailPage", calls: 1, tenantFilter: "yok" },

@@ -42,7 +42,7 @@ describe("identity and session hardening contract", () => {
     expect(team).toContain('admin.rpc("revoke_team_member_sessions"');
     expect(migration).toContain("delete from auth.sessions where user_id = p_user_id");
     expect(migration).toContain("Service role required.");
-    expect(team).toContain("ROLES_BY_MANAGER");
+    expect(read("src/lib/team/assignable-roles.ts")).toContain("ROLES_BY_MANAGER");
     expect(team).toContain("canManageRole(actorRole, target.role as Role)");
     expect(team).toContain("ensureBranchBelongsToTenant");
   });
