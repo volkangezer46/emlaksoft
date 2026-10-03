@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
 import { getLossReasonOptions, getStageLabels } from "@/lib/definitions";
 import { daysAgoIso, msSince } from "@/lib/clock";
 import { InteractiveChart } from "@/components/app/interactive-chart";
@@ -102,7 +103,7 @@ export default async function DealsPage({
 }) {
   const sp = (await searchParams) ?? {};
   if (sp.yeni === "1") redirect("/app/anlasmalar/yeni");
-  const { perms } = await requireModulePage("commissions");
+  const { perms, role, userId } = await requireModulePage("commissions");
   const canCreate = (perms.commissions ?? []).includes("create");
   const canEdit = (perms.commissions ?? []).includes("edit");
   const supabase = await createClient();
@@ -112,7 +113,10 @@ export default async function DealsPage({
   const gorunum: "pano" | "liste" = sp.gorunum === "liste" ? "liste" : "pano";
   const q = (sp.q ?? "").trim().slice(0, 80);
   const asamaF = parseStageParam(sp.asama);
-  const danismanF = uuidParam(sp.danisman);
+  // Ofis geneli kapsam yalnız owner/gm/branch_manager; diğer roller yalnız kendi anlaşmalarını görür
+  // (arama ve dışa aktarma ile aynı kural). ?danisman= başkasının kimliğini açamaz.
+  const officeWide = hasOfficeWideDataScope(role);
+  const danismanF = officeWide ? uuidParam(sp.danisman) : userId;
   const bayatF = sp.bayat === "1";
   const density = densityOf(sp.yogunluk);
   const page = parsePage(sp.sayfa);
@@ -122,7 +126,7 @@ export default async function DealsPage({
   if (gorunum === "liste") urlParams.gorunum = "liste";
   if (q) urlParams.q = q;
   if (asamaF && gorunum === "liste") urlParams.asama = asamaF;
-  if (danismanF) urlParams.danisman = danismanF;
+  if (officeWide && danismanF) urlParams.danisman = danismanF;
   if (bayatF) urlParams.bayat = "1";
   if (density === "kompakt" && gorunum === "liste") urlParams.yogunluk = "kompakt";
   const hrefWith = (patch: Record<string, string>) => buildHref(PATH, mergeResetPage(urlParams, patch));
@@ -428,7 +432,7 @@ export default async function DealsPage({
             panelParamKeys={["danisman", "bayat"]}
             panel={
               <FilterGrid>
-                {advisors.length > 0 ? (
+                {officeWide && advisors.length > 0 ? (
                   <FilterSelect
                     name="danisman"
                     label="Danışman"
