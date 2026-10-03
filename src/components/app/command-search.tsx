@@ -1,7 +1,8 @@
 "use client";
 
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Command, Search } from "lucide-react";
+import { Search } from "lucide-react";
+import { ShortcutHint } from "./shortcut-hint";
 import type { AppModule } from "@/lib/permissions";
 import { OPEN_PALETTE_EVENT } from "@/lib/palette-core";
 
@@ -28,10 +29,8 @@ function Trigger({ onOpen, onWarm }: { onOpen?: () => void; onWarm?: () => void 
         className="focus-ring relative flex shrink-0 items-center rounded-[var(--radius-control)] border border-hairline bg-canvas h-10 w-10 justify-center text-left text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300 hover:bg-surface hover:shadow-[var(--elev-2)] sm:h-auto sm:w-full sm:justify-start sm:py-2.5 sm:pl-10 sm:pr-20"
       >
         <Search className="pointer-events-none absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 text-text-faint sm:left-3 sm:translate-x-0" aria-hidden />
-        <span className="hidden truncate sm:inline">Müşteri, portföy, anlaşma, görev, ilan no ara…</span>
-        <span className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded-md border border-hairline bg-surface px-2 py-1 text-xs text-text-faint sm:flex">
-          <Command className="h-3 w-3" /> K
-        </span>
+        <span className="hidden truncate sm:inline">Ad, telefon veya ilan no yazın…</span>
+        <ShortcutHint className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded-md border border-hairline bg-surface px-2 py-1 font-sans text-xs text-text-faint sm:block" />
       </button>
     </div>
   );

@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import { ICONS } from "@/lib/icons";
 import { findActiveNavigationHref } from "@/lib/navigation";
 import type { AppModule } from "@/lib/permissions";
+import { coreHrefsFor, isHiddenInSimple } from "@/lib/nav-roles";
 
 /**
  * /app menüsünün TEK kaynağı. 55 düz link yerine 9 iş başlığı: kullanıcı önce
@@ -32,7 +33,14 @@ export type NavItem = {
   module: AppModule;
   /** Birden çok sayfayı tek menü öğesinde toplar; ilk sekme öğenin girişidir. */
   tabs?: readonly NavTab[];
+  /**
+   * Sade görünümde çekirdek mi? "core" = en az bir rolün çekirdek menüsünde (rol eşlemesi
+   * `nav-roles.ts`; uyum testi ikisini eşitler), "more" = yalnız "Daha fazla" altında.
+   */
+  tier: NavTier;
 };
+
+export type NavTier = "core" | "more";
 
 export type NavSection = {
   id: string;
@@ -47,10 +55,10 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     title: "Bugün",
     icon: ICONS.baslikBugun,
     items: [
-      { href: "/app", label: "Ana ekran", icon: ICONS.dashboard, module: "dashboard" },
-      { href: "/app/brifing", label: "Günlük Brifing", icon: ICONS.briefing, module: "dashboard" },
-      { href: "/app/baslangic", label: "Ofis kurulumu", icon: ICONS.kurulum, module: "dashboard" },
-      { href: "/app/asistan", label: "AI Asistan", icon: ICONS.ai, module: "dashboard" },
+      { href: "/app", label: "Ana ekran", icon: ICONS.dashboard, module: "dashboard", tier: "core" },
+      { href: "/app/brifing", label: "Günlük Brifing", icon: ICONS.briefing, module: "dashboard", tier: "more" },
+      { href: "/app/baslangic", label: "Ofis kurulumu", icon: ICONS.kurulum, module: "dashboard", tier: "more" },
+      { href: "/app/asistan", label: "AI Asistan", icon: ICONS.ai, module: "dashboard", tier: "more" },
     ],
   },
   {
@@ -58,11 +66,11 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     title: "Müşteriler",
     icon: ICONS.baslikMusteri,
     items: [
-      { href: "/app/musteriler", label: "Müşteriler", icon: ICONS.musteri, module: "customers" },
-      { href: "/app/talepler", label: "Talepler", icon: ICONS.talep, module: "demands" },
-      { href: "/app/eslestirme", label: "Eşleştirme", icon: ICONS.eslestirme, module: "matching" },
-      { href: "/app/akilli-listeler", label: "Akıllı Listeler", icon: ICONS.akilliListe, module: "customers" },
-      { href: "/app/tavsiyeler", label: "Tavsiyeler", icon: ICONS.tavsiye, module: "customers" },
+      { href: "/app/musteriler", label: "Müşteriler", icon: ICONS.musteri, module: "customers", tier: "core" },
+      { href: "/app/talepler", label: "Talepler", icon: ICONS.talep, module: "demands", tier: "core" },
+      { href: "/app/eslestirme", label: "Eşleştirme", icon: ICONS.eslestirme, module: "matching", tier: "core" },
+      { href: "/app/akilli-listeler", label: "Akıllı Listeler", icon: ICONS.akilliListe, module: "customers", tier: "more" },
+      { href: "/app/tavsiyeler", label: "Tavsiyeler", icon: ICONS.tavsiye, module: "customers", tier: "more" },
     ],
   },
   {
@@ -70,7 +78,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     title: "Portföy",
     icon: ICONS.baslikPortfoy,
     items: [
-      { href: "/app/portfoyler", label: "Portföyler", icon: ICONS.portfoy, module: "properties" },
+      { href: "/app/portfoyler", label: "Portföyler", icon: ICONS.portfoy, module: "properties", tier: "core" },
       {
         href: "/app/kiralama",
         label: "Kiralama",
@@ -81,13 +89,14 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/kiralama", label: "Kiralama", icon: ICONS.anahtar, module: "rentals" },
           { href: "/app/kira-artis", label: "Kira artışı", icon: ICONS.oran, module: "valuation" },
         ],
+        tier: "more",
       },
-      { href: "/app/projeler", label: "Projeler", icon: ICONS.proje, module: "projects" },
-      { href: "/app/acik-ev", label: "Açık Ev", icon: ICONS.acikEv, module: "open_house" },
-      { href: "/app/portallar", label: "Portal Kontrol", icon: ICONS.portal, module: "portals" },
-      { href: "/app/portfoyler/anahtarlar", label: "Anahtar Takibi", icon: ICONS.anahtarTakip, module: "properties" },
-      { href: "/app/portfoyler/sunumlar", label: "Sunumlar", icon: ICONS.sunum, module: "properties" },
-      { href: "/app/ag", label: "Ofisler Arası Ağ", icon: ICONS.ag, module: "network" },
+      { href: "/app/projeler", label: "Projeler", icon: ICONS.proje, module: "projects", tier: "more" },
+      { href: "/app/acik-ev", label: "Açık Ev", icon: ICONS.acikEv, module: "open_house", tier: "more" },
+      { href: "/app/portallar", label: "Portal Kontrol", icon: ICONS.portal, module: "portals", tier: "more" },
+      { href: "/app/portfoyler/anahtarlar", label: "Anahtar Takibi", icon: ICONS.anahtarTakip, module: "properties", tier: "more" },
+      { href: "/app/portfoyler/sunumlar", label: "Sunumlar", icon: ICONS.sunum, module: "properties", tier: "more" },
+      { href: "/app/ag", label: "Ofisler Arası Ağ", icon: ICONS.ag, module: "network", tier: "more" },
     ],
   },
   {
@@ -95,9 +104,9 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     title: "Anlaşmalar",
     icon: ICONS.baslikAnlasma,
     items: [
-      { href: "/app/anlasmalar", label: "Anlaşmalar", icon: ICONS.anlasma, module: "commissions" },
-      { href: "/app/teklifler", label: "Teklifler", icon: ICONS.teklif, module: "offers" },
-      { href: "/app/sozlesmeler", label: "Sözleşmeler", icon: ICONS.sozlesme, module: "contracts" },
+      { href: "/app/anlasmalar", label: "Anlaşmalar", icon: ICONS.anlasma, module: "commissions", tier: "core" },
+      { href: "/app/teklifler", label: "Teklifler", icon: ICONS.teklif, module: "offers", tier: "more" },
+      { href: "/app/sozlesmeler", label: "Sözleşmeler", icon: ICONS.sozlesme, module: "contracts", tier: "more" },
     ],
   },
   {
@@ -105,11 +114,11 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     title: "İletişim",
     icon: ICONS.baslikIletisim,
     items: [
-      { href: "/app/gelen-kutusu", label: "Gelen Kutusu", icon: ICONS.gelenKutusu, module: "calls" },
-      { href: "/app/arama", label: "Akıllı Arama", icon: ICONS.telefon, module: "calls" },
-      { href: "/app/randevular", label: "Randevular", icon: ICONS.randevu, module: "appointments" },
-      { href: "/app/gorevler", label: "Görevler", icon: ICONS.gorev, module: "tasks" },
-      { href: "/app/kampanyalar", label: "Kampanyalar", icon: ICONS.mesaj, module: "campaigns" },
+      { href: "/app/gelen-kutusu", label: "Gelen Kutusu", icon: ICONS.gelenKutusu, module: "calls", tier: "core" },
+      { href: "/app/arama", label: "Akıllı Arama", icon: ICONS.telefon, module: "calls", tier: "core" },
+      { href: "/app/randevular", label: "Randevular", icon: ICONS.randevu, module: "appointments", tier: "core" },
+      { href: "/app/gorevler", label: "Görevler", icon: ICONS.gorev, module: "tasks", tier: "core" },
+      { href: "/app/kampanyalar", label: "Kampanyalar", icon: ICONS.mesaj, module: "campaigns", tier: "more" },
     ],
   },
   {
@@ -127,9 +136,10 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/cuzdan", label: "Cüzdanım", icon: ICONS.cuzdan, module: "commissions" },
           { href: "/app/onaylar", label: "Onaylar", icon: ICONS.onay, module: "commissions" },
             ],
+        tier: "core",
       },
-      { href: "/app/giderler", label: "Giderler", icon: ICONS.gider, module: "expenses" },
-      { href: "/app/aidat", label: "Aidat", icon: ICONS.aidat, module: "expenses" },
+      { href: "/app/giderler", label: "Giderler", icon: ICONS.gider, module: "expenses", tier: "core" },
+      { href: "/app/aidat", label: "Aidat", icon: ICONS.aidat, module: "expenses", tier: "core" },
     ],
   },
   {
@@ -137,8 +147,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     title: "Performans",
     icon: ICONS.baslikPerformans,
     items: [
-      { href: "/app/raporlar", label: "Raporlar", icon: ICONS.rapor, module: "reports" },
-      { href: "/app/kayip-kacak", label: "Kayıp-kaçak", icon: ICONS.alarm, module: "leak" },
+      { href: "/app/raporlar", label: "Raporlar", icon: ICONS.rapor, module: "reports", tier: "core" },
+      { href: "/app/kayip-kacak", label: "Kayıp-kaçak", icon: ICONS.alarm, module: "leak", tier: "more" },
       {
         href: "/app/danisman-kpi",
         label: "Ekip performansı",
@@ -148,10 +158,11 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/danisman-kpi", label: "Danışman KPI", icon: ICONS.kpi, module: "reports" },
           { href: "/app/lig", label: "Ekip Ligi", icon: ICONS.lig, module: "reports" },
         ],
+        tier: "more",
       },
-      { href: "/app/bolge-analizi", label: "Bölge Analizi", icon: ICONS.bolge, module: "reports" },
-      { href: "/app/kayip-satis", label: "Kayıp Satış", icon: ICONS.dusus, module: "customers" },
-      { href: "/app/pano-tv", label: "Ofis Panosu (TV)", icon: ICONS.panoTv, module: "reports" },
+      { href: "/app/bolge-analizi", label: "Bölge Analizi", icon: ICONS.bolge, module: "reports", tier: "more" },
+      { href: "/app/kayip-satis", label: "Kayıp Satış", icon: ICONS.dusus, module: "customers", tier: "more" },
+      { href: "/app/pano-tv", label: "Ofis Panosu (TV)", icon: ICONS.panoTv, module: "reports", tier: "more" },
     ],
   },
   {
@@ -159,10 +170,10 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     title: "Araçlar",
     icon: ICONS.baslikArac,
     items: [
-      { href: "/app/degerleme", label: "Değerleme", icon: ICONS.skor, module: "valuation" },
+      { href: "/app/degerleme", label: "Değerleme", icon: ICONS.skor, module: "valuation", tier: "core" },
       // Alım maliyeti + yatırım getirisi: tek sayfa, ?sekme= ile iki sekme.
-      { href: "/app/hesaplayici", label: "Hesaplayıcılar", icon: ICONS.hesaplayici, module: "valuation" },
-      { href: "/app/yabanci-satis", label: "Yabancıya Satış", icon: ICONS.yabanciSatis, module: "properties" },
+      { href: "/app/hesaplayici", label: "Hesaplayıcılar", icon: ICONS.hesaplayici, module: "valuation", tier: "more" },
+      { href: "/app/yabanci-satis", label: "Yabancıya Satış", icon: ICONS.yabanciSatis, module: "properties", tier: "more" },
     ],
   },
   {
@@ -184,15 +195,16 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/hedefler", label: "Hedefler", icon: ICONS.hedef, module: "targets" },
           { href: "/app/ekip/devir", label: "Devir / Atama", icon: ICONS.devir, module: "team" },
         ],
+        tier: "core",
       },
-      { href: "/app/otomasyonlar", label: "Otomasyonlar", icon: ICONS.otomasyon, module: "settings" },
-      { href: "/app/ayarlar/is-akislari", label: "İş Akışları", icon: ICONS.isAkisi, module: "settings" },
-      { href: "/app/uyum", label: "Uyum", icon: ICONS.uyum, module: "compliance" },
-      { href: "/app/belgeler", label: "Belge Merkezi", icon: ICONS.belge, module: "settings" },
-      { href: "/app/denetim", label: "Denetim", icon: ICONS.denetim, module: "settings" },
-      { href: "/app/abonelik", label: "Abonelik ve paket", icon: ICONS.abonelik, module: "billing" },
-      { href: "/app/destek", label: "Destek", icon: ICONS.destek, module: "support" },
-      { href: "/app/ayarlar", label: "Ayarlar", icon: ICONS.ayar, module: "settings" },
+      { href: "/app/otomasyonlar", label: "Otomasyonlar", icon: ICONS.otomasyon, module: "settings", tier: "more" },
+      { href: "/app/ayarlar/is-akislari", label: "İş Akışları", icon: ICONS.isAkisi, module: "settings", tier: "more" },
+      { href: "/app/uyum", label: "Uyum", icon: ICONS.uyum, module: "compliance", tier: "more" },
+      { href: "/app/belgeler", label: "Belge Merkezi", icon: ICONS.belge, module: "settings", tier: "more" },
+      { href: "/app/denetim", label: "Denetim", icon: ICONS.denetim, module: "settings", tier: "more" },
+      { href: "/app/abonelik", label: "Abonelik ve paket", icon: ICONS.abonelik, module: "billing", tier: "core" },
+      { href: "/app/destek", label: "Destek", icon: ICONS.destek, module: "support", tier: "core" },
+      { href: "/app/ayarlar", label: "Ayarlar", icon: ICONS.ayar, module: "settings", tier: "more" },
     ],
   },
 ];
@@ -216,10 +228,34 @@ function visibleItem(item: NavItem, accessible: readonly AppModule[]): NavItem |
   return { ...item, href: first.href, module: first.module, tabs };
 }
 
-/** Erişilebilir modüllere göre görünen başlıklar; her başlığın girişi ilk görünen sayfasıdır. */
-export function visibleSections(accessible: readonly AppModule[]): VisibleSection[] {
+/** "full": tüm yetkili sayfalar. "simple": yalnız rolün çekirdek sayfaları (gerisi `moreSections`). */
+export type NavMode = "simple" | "full";
+export type NavViewOptions = { mode?: NavMode; role?: string | null };
+
+/**
+ * Erişilebilir modüllere göre görünen başlıklar; her başlığın girişi ilk görünen sayfasıdır.
+ * `mode: "simple"` yalnız GÖRÜNÜRLÜĞÜ daraltır (yetki matrisi aynı): rolün çekirdek öğeleri kalır.
+ */
+export function visibleSections(accessible: readonly AppModule[], opts: NavViewOptions = {}): VisibleSection[] {
+  const core = opts.mode === "simple" ? coreHrefsFor(opts.role) : null;
   return NAV_SECTIONS.map((section) => {
-    const items = section.items.flatMap((item) => visibleItem(item, accessible) ?? []);
+    const items = section.items.flatMap((item) =>
+      core && !core.has(item.href) ? [] : (visibleItem(item, accessible) ?? []),
+    );
+    return { ...section, items, href: items[0]?.href ?? "/app" };
+  }).filter((section) => section.items.length > 0);
+}
+
+/**
+ * Sade görünümde "Daha fazla" altına inen yetkili öğeler (çekirdek dışı). Yönetici olmayan rollerde
+ * yönetim sayfaları (Ayarlar, Otomasyon…) burada da yer almaz; tam görünümde ve doğrudan adreste durur.
+ */
+export function moreSections(accessible: readonly AppModule[], opts: { role?: string | null } = {}): VisibleSection[] {
+  const core = coreHrefsFor(opts.role);
+  return NAV_SECTIONS.map((section) => {
+    const items = section.items.flatMap((item) =>
+      core.has(item.href) || isHiddenInSimple(opts.role, item.href) ? [] : (visibleItem(item, accessible) ?? []),
+    );
     return { ...section, items, href: items[0]?.href ?? "/app" };
   }).filter((section) => section.items.length > 0);
 }
