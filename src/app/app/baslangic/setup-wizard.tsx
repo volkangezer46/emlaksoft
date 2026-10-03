@@ -82,7 +82,7 @@ export function SetupWizard(props: SetupWizardProps) {
                         {s.short}
                         {s.done ? <span className="sr-only"> (tamamlandı)</span> : null}
                         {isSkipped ? <span className="sr-only"> (sonra yapılacak)</span> : null}
-                        {isSkipped ? <span aria-hidden className="text-[10px] font-normal opacity-70">sonra</span> : null}
+                        {isSkipped ? <span aria-hidden className="text-xs font-normal opacity-70">sonra</span> : null}
                       </Link>
                     </li>
                   );

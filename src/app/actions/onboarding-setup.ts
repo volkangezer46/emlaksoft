@@ -110,3 +110,26 @@ export async function completeWelcomeFlow(): Promise<OnboardingSetupResult> {
   });
   return { ok: true };
 }
+
+/** Hoş geldin akışı: danışmanın KENDİ telefon numarası (profiles.phone; yalnız kendi satırı). */
+export async function saveOwnPhone(formData: FormData): Promise<OnboardingSetupResult> {
+  const gate = await requirePermission("dashboard", "view");
+  if (!gate.ok) return { error: gate.error };
+  const phone = String(formData.get("phone") ?? "").trim().slice(0, 40);
+  if (!phone) return { error: "Telefon numarası girin." };
+  const parsed = parsePhone(phone);
+  if (!parsed.ok) return { error: parsed.error ?? PHONE_ERROR_MESSAGE };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ phone: parsed.stored })
+    .eq("id", gate.userId)
+    .eq("tenant_id", gate.tenantId);
+  if (error) {
+    console.error("saveOwnPhone", error);
+    return { error: "Telefon kaydedilemedi." };
+  }
+  revalidatePath("/app/hos-geldin");
+  revalidatePath("/app/ekip");
+  return { ok: true };
+}

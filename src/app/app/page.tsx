@@ -1,6 +1,8 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
+import { loadShouldShowWelcome } from "@/lib/welcome-state";
 import { SkeletonCard } from "@/components/app/skeleton";
 import { ProductTour } from "./product-tour";
 import { DashboardWidgetProvider } from "./dashboard-widgets";
@@ -41,7 +43,9 @@ export default async function AppHomePage({
   const { tv = "", donem } = (await searchParams) ?? {};
   const tvMode = tv === "1";
 
-  const { tenantId, perms } = await requireModulePage("dashboard");
+  const { tenantId, perms, role, userId } = await requireModulePage("dashboard");
+  // Yeni danışman ilk girişinde kısa "Hoş geldin" akışına yönlenir (bir kez; çerez tercihi).
+  if (!tvMode && tenantId && (await loadShouldShowWelcome(userId, role))) redirect("/app/hos-geldin");
   const user = await getRequestUser();
   const fullName = (user?.user_metadata?.full_name as string | undefined) ?? "";
 
