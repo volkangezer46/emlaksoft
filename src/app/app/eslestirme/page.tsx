@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
+  explainMatch,
   fetchTenantMatchingWeights,
   MATCHING_WEIGHT_KEYS,
   MATCHING_WEIGHT_LABELS,
@@ -26,11 +27,15 @@ import {
 } from "@/lib/matching";
 import { moneyTry } from "@/lib/leak-shield";
 import { requireModulePage } from "@/lib/require-module-page";
+import { decodeDemandPreviewParam, parseDemandValues } from "@/lib/demand-criteria";
+import { fetchMatchCandidateProperties } from "@/lib/match-candidates";
 import { SaveMatchButton } from "./save-match-button";
 import type { CSSProperties } from "react";
 
 import { PageHeader } from "@/components/ui/page-header";
 const RING_C = 2 * Math.PI * 42;
+/** ?kriter= önizleme bağlantısının sanal talep kimliği (kayıtlı talep değildir). */
+const PREVIEW_DEMAND_ID = "onizleme";
 
 type DemandRow = MatchDemand & {
   customer: { id: string; full_name: string } | { id: string; full_name: string }[] | null;
@@ -50,7 +55,7 @@ function budgetLabel(min: number | null, max: number | null) {
 export default async function MatchingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ demand?: string; property?: string; customer?: string; kademe?: string; minSkor?: string; sayfa?: string }>;
+  searchParams: Promise<{ demand?: string; property?: string; customer?: string; kademe?: string; minSkor?: string; sayfa?: string; kriter?: string }>;
 }) {
   await requireModulePage("matching");
   const sp = await searchParams;
@@ -68,6 +73,7 @@ export default async function MatchingPage({
     if (sp.customer) q.set("customer", sp.customer);
     if (sp.demand) q.set("demand", sp.demand);
     if (sp.property) q.set("property", sp.property);
+    if (sp.kriter) q.set("kriter", sp.kriter);
     const kademe = patch.kademe !== undefined ? patch.kademe : sp.kademe;
     const minSkor = patch.minSkor !== undefined ? patch.minSkor : sp.minSkor;
     if (kademe) q.set("kademe", kademe);
@@ -82,16 +88,34 @@ export default async function MatchingPage({
     (await fetchTenantMatchingWeights(supabase)) ?? null;
   const weightPercents = matchingWeightsPercent(tenantWeights ?? undefined);
 
-  const { data: demandsData } = await supabase
-    .from("customer_demands")
-    .select(
-      "id, transaction_type, property_type, province_id, district_id, budget_min, budget_max, rooms, min_sqm, urgency, status, customer:customers!customer_demands_customer_id_fkey(id, full_name)",
-    )
-    .neq("status", "closed")
-    .order("created_at", { ascending: false })
-    .limit(80);
+  // Form içi canlı önizleme bağlantısı (?kriter=): henüz kaydedilmemiş talebi tek sanal talep
+  // olarak skorlar (formdaki sayıyla AYNI parse + skor + aday sorgusu). Kayıt yazılmaz.
+  const previewValues = decodeDemandPreviewParam(sp.kriter);
+  const previewParsed = previewValues ? parseDemandValues(previewValues) : null;
+  const previewDemand: DemandRow | null =
+    previewParsed && previewParsed.ok
+      ? {
+          id: PREVIEW_DEMAND_ID,
+          ...previewParsed.columns,
+          property_type: previewParsed.columns.property_type,
+          status: "active",
+          criteria: previewParsed.criteria,
+          customer: null,
+        }
+      : null;
 
-  let demands = (demandsData ?? []) as DemandRow[];
+  const { data: demandsData } = previewDemand
+    ? { data: [] as DemandRow[] }
+    : await supabase
+        .from("customer_demands")
+        .select(
+          "id, transaction_type, property_type, province_id, district_id, neighborhood_id, budget_min, budget_max, rooms, min_sqm, urgency, status, criteria, customer:customers!customer_demands_customer_id_fkey(id, full_name)",
+        )
+        .neq("status", "closed")
+        .order("created_at", { ascending: false })
+        .limit(80);
+
+  let demands = previewDemand ? [previewDemand] : ((demandsData ?? []) as unknown as DemandRow[]);
 
   if (sp.customer) {
     demands = demands.filter((d) => customerOf(d)?.id === sp.customer);
@@ -100,58 +124,13 @@ export default async function MatchingPage({
     demands = demands.filter((d) => d.id === sp.demand);
   }
 
-  // ── SQL ön filtre ─────────────────────────────────────────────────────────
-  // Eskiden 80 talep × 120 portföy bellekte çapraz skorlanıyordu. Artık
-  // portföyler taleplerin il ve işlem türü kümesine göre TEK sorguda (.in())
-  // daraltılır; skor yine bellekte ama aday kümesi küçük.
-  //
-  // İşlem türü serbest metin ("Satılık", "satilik", "sale"...): talep
-  // gruplarına (satış/kira) karşılık gelen yaygın varyantlar listeye açılır,
-  // tanınmayan değerler olduğu gibi eklenir. Uyumsuz işlem türü skoru zaten
-  // 20'ye sabitlediği (eşik 35) için bu daraltma sonuç kaybetmez.
-  const SALE_VARIANTS = ["Satılık", "satılık", "Satilik", "satilik", "SATILIK", "sale", "Sale", "Satış", "satış", "Satis", "satis"];
-  const RENT_VARIANTS = ["Kiralık", "kiralık", "Kiralik", "kiralik", "KİRALIK", "rent", "Rent", "Kira", "kira"];
-  const isSaleTx = (v: string) => ["satılık", "satilik", "sale", "satış", "satis"].some((x) => v.includes(x));
-  const isRentTx = (v: string) => ["kiralık", "kiralik", "rent", "kira"].some((x) => v.includes(x));
-
-  const txVariants = new Set<string>();
-  let txFilterable = demands.length > 0;
-  for (const d of demands) {
-    const raw = (d.transaction_type ?? "").trim();
-    const n = raw.toLocaleLowerCase("tr-TR");
-    if (!n) {
-      // İşlem türü boş talep her portföyle uyumlu sayılır → tür filtresi kapanır.
-      txFilterable = false;
-      break;
-    }
-    if (isSaleTx(n)) SALE_VARIANTS.forEach((v) => txVariants.add(v));
-    else if (isRentTx(n)) RENT_VARIANTS.forEach((v) => txVariants.add(v));
-    txVariants.add(raw);
-  }
-
-  const provinceIds = [...new Set(demands.map((d) => d.province_id).filter((x): x is string => x != null))];
-  // İli belirsiz talep varsa il filtresi uygulanamaz (her il uyumlu olabilir).
-  const provinceFilterable = demands.length > 0 && demands.every((d) => d.province_id != null) && provinceIds.length > 0;
-
-  let propQuery = supabase
-    .from("properties")
-    .select(
-      "id, property_code, title, transaction_type, property_type, status, list_price, province_id, district_id, features",
-    )
-    .is("deleted_at", null)
-    .in("status", ["live", "draft", "reserved", "Yayında"]);
-  if (sp.property) propQuery = propQuery.eq("id", sp.property);
-  if (txFilterable && txVariants.size > 0) propQuery = propQuery.in("transaction_type", [...txVariants]);
-  // İli null portföy "İl (belirsiz)" olarak yine skorlanır — dışarıda bırakma.
-  if (provinceFilterable) propQuery = propQuery.or(`province_id.is.null,province_id.in.(${provinceIds.join(",")})`);
-
-  const { data: propertiesData } = await propQuery.order("created_at", { ascending: false }).limit(200);
-
-  const properties = (propertiesData ?? []).map((p) => ({
-    ...p,
-    list_price: p.list_price != null ? Number(p.list_price) : null,
-    features: (p.features ?? {}) as MatchProperty["features"],
-  })) as MatchProperty[];
+  // ── Aday portföyler ───────────────────────────────────────────────────────
+  // Form içi önizleme ile AYNI sorgu (src/lib/match-candidates.ts): talepler il/işlem
+  // türü kümesine göre TEK sorguda daraltılır, skor bellekte hesaplanır.
+  const properties = await fetchMatchCandidateProperties(supabase, {
+    demands,
+    propertyId: sp.property ?? null,
+  });
 
   // ── Geri bildirimden öğrenme (v1) ─────────────────────────────────────────
   // Portal geri bildirimi TEK toplu sorguyla çekilir (sayfadaki müşteri
@@ -423,7 +402,7 @@ export default async function MatchingPage({
                       href={customer ? `/app/musteriler/${customer.id}` : "/app/musteriler"}
                       className="mt-1 block truncate font-display text-base font-bold text-ink-950 hover:text-brand-600"
                     >
-                      {customer?.full_name ?? "Müşteri"}
+                      {customer?.full_name ?? (pair.demand.id === PREVIEW_DEMAND_ID ? "Önizleme (kaydedilmemiş talep)" : "Müşteri")}
                     </Link>
                     <p className="mt-0.5 text-xs text-text-muted">
                       {pair.demand.transaction_type}
@@ -478,6 +457,25 @@ export default async function MatchingPage({
                         </span>
                       ))}
                     </div>
+                    {/* Neden eşleşti / neden eşleşmedi: alan bazlı tek satır (explainMatch). */}
+                    {(() => {
+                      const why = explainMatch({ reasons: pair.reasons, eliminated: false, eliminatedBy: [] });
+                      if (why.missed.length === 0 && why.unknown.length === 0) return null;
+                      const missedTitle = why.missed
+                        .map((m) => `${m.label}${m.required ? " (olmazsa olmaz)" : ""}${m.detail ? `: ${m.detail}` : ""}`)
+                        .join("\n");
+                      return (
+                        <p className="max-w-xs text-xs text-text-muted lg:text-right" title={missedTitle || undefined}>
+                          {why.missed.length > 0 ? (
+                            <span className="font-semibold text-amber-700">
+                              Uymayan: {why.missed.map((m) => m.label).join(", ")}
+                            </span>
+                          ) : null}
+                          {why.missed.length > 0 && why.unknown.length > 0 ? " · " : null}
+                          {why.unknown.length > 0 ? <span>Belirsiz: {why.unknown.join(", ")}</span> : null}
+                        </p>
+                      );
+                    })()}
                     {/* Eşleşmeden ileri akış: sunum / randevu / teklif.
                         Önceki halde tek çıkış "Portföyü aç"tı — eşleşme
                         ekranı çıkmaz sokaktı. Üç kısayol da müşteri VE
@@ -508,7 +506,9 @@ export default async function MatchingPage({
                       </Link>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                      <SaveMatchButton demandId={pair.demand.id} propertyId={pair.property.id} />
+                      {pair.demand.id === PREVIEW_DEMAND_ID ? null : (
+                        <SaveMatchButton demandId={pair.demand.id} propertyId={pair.property.id} />
+                      )}
                       <Link
                         href={`/app/portfoyler/${pair.property.id}`}
                         className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600"

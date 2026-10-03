@@ -32,6 +32,7 @@ import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 // Talep formu tek kopya müşteri-360'ta yaşar — aynı dialog + updateDemand action'ı
 import { EditDemandDialog } from "../../musteriler/[id]/edit-demand-dialog";
 import { DemandStatusSwitch } from "./demand-status-switch";
+import { extraCriteriaChips, parseDemandCriteria } from "@/lib/demand-criteria";
 
 type Rel = { id?: string; name?: string; full_name?: string } | { id?: string; name?: string; full_name?: string }[] | null;
 
@@ -222,6 +223,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
   const criteriaChips = [
     demand.rooms,
     demand.min_sqm != null ? `≥ ${demand.min_sqm} m²` : null,
+    ...extraCriteriaChips(parseDemandCriteria(demand.criteria)),
     demand.urgency ? `Aciliyet: ${urgencyLabel[demand.urgency] ?? demand.urgency}` : null,
   ].filter((x): x is string => x != null);
 
