@@ -145,16 +145,16 @@ export function RolePermissionsMatrix({
         <table className="w-full min-w-[560px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
-              <th className="py-2 pr-3">Modül</th>
+              <th scope="col" className="py-2 pr-3">Modül</th>
               {ACTIONS.map((a) => (
-                <th key={a.value} className="px-2 py-2 text-center">{a.label}</th>
+                <th scope="col" key={a.value} className="px-2 py-2 text-center">{a.label}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {modules.map((mod) => (
               <tr key={mod} className="border-b border-line/60 last:border-0">
-                <td className="py-2.5 pr-3 text-sm font-medium text-ink-950">{MODULE_LABELS[mod]}</td>
+                <th scope="row" className="py-2.5 pr-3 text-left text-sm font-medium text-ink-950">{MODULE_LABELS[mod]}</th>
                 {ACTIONS.map((a) => {
                   const key = cellKey(mod, a.value);
                   const allowed = isAllowed(mod, a.value);
@@ -166,9 +166,11 @@ export function RolePermissionsMatrix({
                       <button
                         type="button"
                         disabled={readOnly || busy}
+                        aria-pressed={allowed}
+                        aria-label={`${MODULE_LABELS[mod]} — ${a.label}: ${allowed ? "izinli" : "izinsiz"}${isOverridden ? " (özelleştirilmiş)" : ""}`}
                         onClick={() => toggle(mod, a.value)}
                         title={isOverridden ? `Özelleştirilmiş (varsayılan: ${isDefault ? "izinli" : "izinsiz"})` : undefined}
-                        className={`relative grid h-7 w-7 place-items-center rounded-[var(--radius-control)] border transition ${
+                        className={`focus-ring relative grid h-7 w-7 touch:h-11 touch:w-11 place-items-center rounded-[var(--radius-control)] border transition ${
                           allowed
                             ? "border-mint-500/40 bg-mint-500/12 text-mint-600"
                             : "border-line bg-canvas text-transparent"

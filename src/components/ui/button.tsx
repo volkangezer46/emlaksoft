@@ -19,15 +19,15 @@ const VARIANTS = {
   secondary:
     "border border-hairline-strong bg-surface text-ink-950 hover:bg-canvas",
   ghost: "text-text-muted hover:bg-canvas hover:text-ink-950",
-  danger: "bg-danger-500 text-white hover:bg-danger-600",
+  danger: "bg-danger-600 text-white hover:bg-danger-700",
 } as const;
 
 /** Boy ölçeği. `xs` v2'de eklendi: tablo satırı içi aksiyonlar 32px'de bile iri
  *  duruyordu ve her ekran kendi `h-7 text-xs` reçetesini yazıyordu. */
 const SIZES = {
-  xs: "h-7 gap-1 rounded-[var(--radius-control)] px-2.5 text-xs",
-  sm: "h-8 gap-1.5 rounded-[var(--radius-control)] px-3 text-xs",
-  md: "h-10 gap-2 rounded-[var(--radius-control)] px-4 text-sm",
+  xs: "h-7 touch:h-11 gap-1 rounded-[var(--radius-control)] px-2.5 text-xs",
+  sm: "h-8 touch:h-11 gap-1.5 rounded-[var(--radius-control)] px-3 text-xs",
+  md: "h-10 touch:h-11 gap-2 rounded-[var(--radius-control)] px-4 text-sm",
   lg: "h-11 gap-2 rounded-[var(--radius-control)] px-5 text-sm",
 } as const;
 

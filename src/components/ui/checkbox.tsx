@@ -11,7 +11,7 @@ export function Checkbox({ className, ...props }: ComponentProps<"input">) {
     <input
       type="checkbox"
       className={cn(
-        "focus-ring h-4 w-4 shrink-0 cursor-pointer rounded-sm border border-line-strong accent-accent disabled:cursor-not-allowed disabled:opacity-50",
+        "focus-ring h-4 w-4 touch:h-6 touch:w-6 shrink-0 cursor-pointer rounded-sm border border-line-strong accent-accent disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}

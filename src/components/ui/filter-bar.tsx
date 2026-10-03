@@ -18,7 +18,7 @@ import {
 export type FilterTab = { label: string; value: string; count?: number };
 
 const CONTROL =
-  "min-h-9 rounded-[var(--radius-control)] border border-line bg-surface text-sm text-text transition focus:border-brand-400 focus:outline-none focus:shadow-[var(--focus-gap),var(--focus-ring)]";
+  "min-h-9 touch:min-h-11 rounded-[var(--radius-control)] border border-line bg-surface text-sm text-text transition focus:border-brand-400 focus:outline-none focus:shadow-[var(--focus-gap),var(--focus-ring)]";
 
 export function FilterBar({
   pathname,
@@ -107,14 +107,14 @@ export function FilterBar({
         ) : null}
         <button
           type="submit"
-          className="focus-ring min-h-9 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
+          className="focus-ring min-h-9 touch:min-h-11 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
         >
           Uygula
         </button>
         {hasAny ? (
           <Link
             href={pathname}
-            className="focus-ring inline-flex min-h-9 items-center rounded-[var(--radius-control)] px-2 text-sm text-text-muted underline-offset-2 hover:text-text hover:underline"
+            className="focus-ring inline-flex min-h-9 touch:min-h-11 items-center rounded-[var(--radius-control)] px-2 text-sm text-text-muted underline-offset-2 hover:text-text hover:underline"
           >
             Temizle
           </Link>
@@ -136,7 +136,7 @@ export function FilterBar({
                 href={tabHref(t.value)}
                 aria-current={on ? "page" : undefined}
                 className={cn(
-                  "focus-ring inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-sm font-medium transition",
+                  "focus-ring inline-flex min-h-8 touch:min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium transition",
                   on ? "bg-brand-600 text-white" : "text-text-muted hover:bg-surface-2 hover:text-text",
                 )}
               >

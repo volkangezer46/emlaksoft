@@ -190,7 +190,7 @@ export default async function SupportTicketDetailPage({ params }: { params: Prom
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <main className="min-w-0 space-y-4">
+        <div className="min-w-0 space-y-4">
           {ticketAttachments.length ? <section className="rounded-[var(--radius-card)] border border-line bg-surface p-4"><TicketAttachmentList attachments={ticketAttachments} currentUserId={gate.userId} label="Talep ekleri" /></section> : null}
 
           <TicketThread ticketId={ticket.id} initial={rows} names={names} attachments={attachments} audience="tenant" currentUserId={gate.userId} />
@@ -209,7 +209,7 @@ export default async function SupportTicketDetailPage({ params }: { params: Prom
               <TenantTicketControls ticketId={ticket.id} status={ticket.status} version={ticket.version} />
             </section>
           )}
-        </main>
+        </div>
 
         <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
           {ticket.resolution_code || ticket.resolution_summary ? (

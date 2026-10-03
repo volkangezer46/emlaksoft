@@ -26,8 +26,11 @@ export function TableFrame({
   minWidth,
   maxHeight,
   density = "rahat",
+  stickyFirst = false,
 }: {
   children: ReactNode;
+  /** Yatay kaydırmada ilk sütun (kimlik) sabit kalır — dar ekranda bağlam kaybolmaz. */
+  stickyFirst?: boolean;
   className?: string;
   /** "kompakt": satır dikey boşluğu azalır (liste yoğunluk anahtarı, ?yogunluk=kompakt). */
   density?: "rahat" | "kompakt";
@@ -47,11 +50,12 @@ export function TableFrame({
         // durdurmuyordu).
         "surface-card w-full min-w-0 max-w-full [contain:inline-size] overflow-hidden rounded-[var(--radius-panel)]",
         density === "kompakt" && "[&_td]:py-1.5 [&_th]:py-1.5",
+        stickyFirst && "tbl-sticky-first",
         className,
       )}
     >
       <div
-        className={cn("w-full max-w-full [contain:inline-size] overflow-x-auto", maxHeight && "overflow-y-auto")}
+        className={cn("relative w-full max-w-full [contain:inline-size] overflow-x-auto", maxHeight && "overflow-y-auto")}
         style={maxHeight ? { maxHeight } : undefined}
       >
         {/* İç kap `w-max` (width:max-content) — tablonun DOĞAL genişliğine büyür,
@@ -167,13 +171,22 @@ export function TH({
 export function TD({
   className,
   align = "left",
+  truncate = false,
   ...props
-}: Omit<ComponentProps<"td">, "align"> & { align?: keyof typeof alignClass }) {
+}: Omit<ComponentProps<"td">, "align"> & {
+  align?: keyof typeof alignClass;
+  /** Uzun metni tek satırda kırpar; metin çocuksa tam değer `title` olarak eklenir. */
+  truncate?: boolean;
+}) {
+  const title =
+    truncate && props.title === undefined && typeof props.children === "string" ? props.children : props.title;
   return (
     <td
       {...props}
+      title={title}
       className={cn(
         "px-4 py-3",
+        truncate && "td-truncate",
         alignClass[align],
         // Tablolarda sağa hizalama fiilen "sayı" demektir. tabular-nums'u
         // otomatik açıyoruz; tutar kolonları böylece kuruş kuruşa hizalanır.

@@ -783,9 +783,9 @@ export default async function CustomersPage({
         sort={
           <Link
             href={hrefWith({ sort: sortF === "hot" ? undefined : "hot", sayfa: undefined })}
-            aria-pressed={sortF === "hot"}
+            aria-current={sortF === "hot" ? "true" : undefined}
             title="Bu sayfadaki kayıtları lead skoruna göre sırala"
-            className={`focus-ring press inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] border px-3 text-sm font-semibold transition ${
+            className={`focus-ring press inline-flex min-h-9 touch:min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] border px-3 text-sm font-semibold transition ${
               sortF === "hot" ? "border-brand-300 bg-brand-600/10 text-brand-700" : "border-line bg-surface text-text-muted hover:text-text"
             }`}
           >

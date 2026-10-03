@@ -331,7 +331,7 @@ export function DealBoard({
                           {/* Klavye kullanıcıları için geçiş butonları zaten var;
                               tutamaç fare sürüklemesinin görsel ipucu + etiketi. */}
                           <span
-                            aria-label="Sürükleyerek taşı"
+                            role="img" aria-label="Sürükleyerek taşı"
                             title="Sürükleyerek taşı"
                             className="text-text-faint transition group-hover:text-text-muted"
                           >

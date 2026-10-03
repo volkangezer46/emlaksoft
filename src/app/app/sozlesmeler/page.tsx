@@ -303,9 +303,9 @@ export default async function SozlesmelerPage({
             sort={
               <Link
                 href={hrefWith({ yenileme: yenileme ? "" : "1" })}
-                aria-pressed={yenileme}
+                aria-current={yenileme ? "true" : undefined}
                 title="Süresi 30 gün içinde dolacak sözleşmeler, en yakın önce"
-                className={`focus-ring press inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] border px-3 text-sm font-semibold transition ${
+                className={`focus-ring press inline-flex min-h-9 touch:min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] border px-3 text-sm font-semibold transition ${
                   yenileme ? "border-brand-300 bg-brand-600/10 text-brand-700" : "border-line bg-surface text-text-muted hover:text-text"
                 }`}
               >

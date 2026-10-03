@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  * Ek (ör. diyalog tetikleyen istemci) düğmeler `children` ile eklenir.
  */
 const ACTION =
-  "focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-transparent text-text-muted transition hover:border-line hover:bg-canvas hover:text-brand-700";
+  "focus-ring press grid h-8 w-8 touch:h-11 touch:w-11 place-items-center rounded-[var(--radius-control)] border border-transparent text-text-muted transition hover:border-line hover:bg-canvas hover:text-brand-700";
 
 export function RowActions({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn("relative z-10 flex items-center justify-end gap-0.5", className)}>{children}</div>;

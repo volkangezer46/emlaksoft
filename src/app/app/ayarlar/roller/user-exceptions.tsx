@@ -280,11 +280,11 @@ export function UserExceptions({
             <table className="w-full min-w-[620px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
-                  <th className="py-2 pr-3">Modül</th>
+                  <th scope="col" className="py-2 pr-3">Modül</th>
                   {ACTIONS.map((a) => (
-                    <th key={a.value} className="px-2 py-2 text-center">{a.label}</th>
+                    <th scope="col" key={a.value} className="px-2 py-2 text-center">{a.label}</th>
                   ))}
-                  <th className="px-2 py-2 text-right">İstisna</th>
+                  <th scope="col" className="px-2 py-2 text-right">İstisna</th>
                 </tr>
               </thead>
               <tbody>
@@ -294,7 +294,7 @@ export function UserExceptions({
                   const expired = stored && !isActive(stored);
                   return (
                     <tr key={mod} className={`border-b border-line/60 last:border-0 ${override ? "bg-amber-400/[0.04]" : ""}`}>
-                      <td className="py-2.5 pr-3 text-sm font-medium text-ink-950">
+                      <th scope="row" className="py-2.5 pr-3 text-left text-sm font-medium text-ink-950">
                         {moduleLabels[mod]}
                         {override?.expires_at ? (
                           <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600">
@@ -306,7 +306,7 @@ export function UserExceptions({
                             Süresi doldu
                           </span>
                         ) : null}
-                      </td>
+                      </th>
                       {ACTIONS.map((a) => {
                         const key = `${mod}:${a.value}`;
                         const allowed = actions.includes(a.value);
@@ -316,6 +316,8 @@ export function UserExceptions({
                             <button
                               type="button"
                               disabled={readOnly || busy}
+                              aria-pressed={allowed}
+                              aria-label={`${moduleLabels[mod]} — ${a.label}: ${allowed ? "izinli" : "izinsiz"}${override ? " (kişiye özel istisna)" : ""}`}
                               onClick={() => toggle(mod, a.value)}
                               title={
                                 override
@@ -324,7 +326,7 @@ export function UserExceptions({
                                     ? "Rolünden geliyor"
                                     : undefined
                               }
-                              className={`relative grid h-7 w-7 place-items-center rounded-[var(--radius-control)] border transition ${
+                              className={`focus-ring relative grid h-7 w-7 touch:h-11 touch:w-11 place-items-center rounded-[var(--radius-control)] border transition ${
                                 allowed
                                   ? override
                                     ? "border-amber-400/60 bg-amber-400/15 text-amber-600"
@@ -348,7 +350,7 @@ export function UserExceptions({
                             type="button"
                             onClick={() => removeModule(mod)}
                             disabled={busyKey === `${mod}:row`}
-                            className="rounded-[var(--radius-control)] border border-line px-2 py-1 text-xs font-semibold text-text-muted transition hover:border-danger-500/40 hover:text-danger-500 disabled:opacity-50"
+                            className="focus-ring rounded-[var(--radius-control)] border border-line px-2 py-1 touch:min-h-11 text-xs font-semibold text-text-muted transition hover:border-danger-500/40 hover:text-danger-500 disabled:opacity-50"
                           >
                             Kaldır
                           </button>

@@ -4,9 +4,9 @@ import { formatCount, type ParamRecord } from "@/lib/ui/filter-params";
 import { pageHrefOf, type PageWindow } from "./list-logic";
 
 const BTN =
-  "focus-ring press inline-flex min-h-9 items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+  "focus-ring press inline-flex min-h-9 touch:min-h-11 items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
 const BTN_OFF =
-  "inline-flex min-h-9 items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
+  "inline-flex min-h-9 touch:min-h-11 items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
 /**
  * ListPager — gerçek sayfalama şeridi ("X–Y / Toplam Z", Önceki/Sonraki).

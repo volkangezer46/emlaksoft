@@ -24,7 +24,7 @@ export function FilterSelect({
       <select
         name={name}
         defaultValue={value}
-        className="min-h-9 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-sm font-normal text-text outline-none transition focus:border-brand-400 focus:bg-surface"
+        className="min-h-9 touch:min-h-11 touch:text-base rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-sm font-normal text-text outline-none transition focus:border-brand-400 focus:bg-surface"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -45,7 +45,7 @@ export function FilterDate({ name, label, value, className }: { name: string; la
         name={name}
         type="date"
         defaultValue={value}
-        className="min-h-9 min-w-0 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-sm font-normal text-text outline-none transition focus:border-brand-400 focus:bg-surface"
+        className="min-h-9 touch:min-h-11 touch:text-base min-w-0 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-sm font-normal text-text outline-none transition focus:border-brand-400 focus:bg-surface"
       />
     </label>
   );
