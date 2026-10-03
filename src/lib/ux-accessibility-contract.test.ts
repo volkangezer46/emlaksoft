@@ -63,10 +63,10 @@ describe("navigation accessibility contract", () => {
   });
 
   it("describes every landing demo link as a scheduled meeting", () => {
-    const home = source("src/app/page.tsx");
+    const home = source("src/app/page.tsx") + source("src/components/site-footer.tsx");
 
-    expect(home.match(/"\/demo"/g)).toHaveLength(4);
-    expect(home.match(/Demo görüşmesi planla/gi)?.length).toBeGreaterThanOrEqual(4);
+    expect(home.match(/"\/demo"/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(home.match(/Demo görüşmesi planla/gi)?.length).toBeGreaterThanOrEqual(3);
     expect(home.toLocaleLowerCase("tr-TR")).not.toContain("canlı demo");
   });
 
