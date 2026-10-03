@@ -23,6 +23,7 @@
  */
 import {
   AlignLeft,
+  Flag,
   HandCoins,
   Scale,
   ArrowLeftRight,
@@ -286,6 +287,8 @@ export const TAB_ICONS = {
   portfoyler: Files,
   sozlesme: FileSignature,
   kriter: SlidersHorizontal,
+  yetki: ShieldCheck,
+  hedef: Flag,
 } satisfies Record<string, LucideIcon>;
 
 /**

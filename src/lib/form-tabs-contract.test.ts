@@ -16,6 +16,7 @@ import { TASK_DRAFT_FIELDS, TASK_TABS } from "@/app/app/gorevler/yeni/task-tabs"
 import { RENTAL_DRAFT_FIELDS, RENTAL_TABS } from "@/app/app/kiralama/yeni/rental-tabs";
 import { OPEN_HOUSE_DRAFT_FIELDS, OPEN_HOUSE_TABS } from "@/app/app/acik-ev/yeni/open-house-tabs";
 import { PRESENTATION_DRAFT_FIELDS, PRESENTATION_TABS } from "@/app/app/portfoyler/sunumlar/yeni/presentation-tabs";
+import { ADVISOR_DRAFT_FIELDS, ADVISOR_TABS } from "@/app/app/ekip/yeni/advisor-tabs";
 import { isSensitiveFieldName } from "./form-tabs";
 import { TAB_ICONS } from "./icons";
 
@@ -153,6 +154,12 @@ const FORMS = [
     source: "src/app/app/portfoyler/sunumlar/yeni/presentation-form.tsx",
     tabs: PRESENTATION_TABS as readonly TabLike[],
     draft: PRESENTATION_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "danışman",
+    source: "src/app/app/ekip/yeni/advisor-form.tsx",
+    tabs: ADVISOR_TABS as readonly TabLike[],
+    draft: ADVISOR_DRAFT_FIELDS as readonly string[],
   },
 ];
 

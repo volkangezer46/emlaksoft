@@ -8,6 +8,7 @@ import {
   IdCard,
   PalmtreeIcon,
   ShieldCheck,
+  UserPlus,
   UserRound,
   Users,
 } from "lucide-react";
@@ -16,7 +17,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireModulePage } from "@/lib/require-module-page";
 import { setMemberActive, setMemberRole } from "@/app/actions/team";
 import { resendInvite } from "./invite-actions";
-import { AddBranchPanel, AddBranchTrigger, AddMemberPanel, AddMemberTrigger } from "./team-panels";
+import { AddBranchPanel, AddBranchTrigger } from "./team-panels";
 import { BranchCard } from "./branch-card";
 import { formatTurkishPhone } from "@/lib/phone";
 import { relativeTimeTR } from "@/lib/admin-format";
@@ -191,10 +192,13 @@ export default async function TeamPage() {
                 </Link>
                 <Link href="/app/ekip/izinler" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"><CalendarRange className="h-4 w-4" /> İzin takvimi</Link>
                 <Link href="/app/ekip/kartvizitim" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"><IdCard className="h-4 w-4" /> Kartvizitim</Link>
-                {canManage ? <AddMemberTrigger /> : null}
+                {canManage ? (
+                  <Link href="/app/ekip/yeni" className="btn-shine inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-white/90">
+                    <UserPlus className="h-4 w-4" /> Danışman ekle
+                  </Link>
+                ) : null}
               </div></div>
 } />
-{canManage ? <AddMemberPanel branches={branches.map((b) => ({ id: b.id, name: b.name }))} /> : null}
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-brand-600/30 blur-[90px]" />

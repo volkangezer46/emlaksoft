@@ -10,34 +10,11 @@ import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { getPlan } from "@/lib/billing/plans";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 
-export type TeamResult = { error?: string; ok?: boolean };
+import { ASSIGNABLE_ROLES, MANAGER_ROLES, canManageRole, type TeamRole } from "@/lib/team/assignable-roles";
 
-// Not: bu liste yalnızca tip kaynağı olarak kullanılıyordu (çalışma zamanında
-// hiç okunmuyor), bu yüzden dizi yerine doğrudan birleşim tipi.
-type Role =
-  | "owner"
-  | "gm"
-  | "branch_manager"
-  | "team_lead"
-  | "advisor"
-  | "call_center"
-  | "accounting"
-  | "readonly";
+export type TeamResult = { error?: string; ok?: boolean; id?: string };
 
-// Roles allowed to manage the team
-const MANAGER_ROLES: Role[] = ["owner", "gm", "branch_manager"];
-// Roles a manager can assign (owner cannot be created/assigned through this flow)
-const ASSIGNABLE_ROLES: Role[] = ["gm", "branch_manager", "team_lead", "advisor", "call_center", "accounting", "readonly"];
-const ROLES_BY_MANAGER: Record<"owner" | "gm" | "branch_manager", readonly Role[]> = {
-  owner: ASSIGNABLE_ROLES,
-  gm: ["branch_manager", "team_lead", "advisor", "call_center", "accounting", "readonly"],
-  branch_manager: ["team_lead", "advisor", "call_center", "accounting", "readonly"],
-};
-
-function canManageRole(actorRole: Role, targetRole: Role): boolean {
-  return MANAGER_ROLES.includes(actorRole) &&
-    ROLES_BY_MANAGER[actorRole as "owner" | "gm" | "branch_manager"].includes(targetRole);
-}
+type Role = TeamRole;
 
 async function ensureBranchBelongsToTenant(
   admin: ReturnType<typeof createAdminClient>,
@@ -165,7 +142,7 @@ export async function createTeamMember(_prev: TeamResult, formData: FormData): P
   }
 
   revalidatePath("/app/ekip");
-  return { ok: true };
+  return { ok: true, id: created.user.id };
 }
 
 export async function updateTeamMember(formData: FormData): Promise<TeamResult> {
