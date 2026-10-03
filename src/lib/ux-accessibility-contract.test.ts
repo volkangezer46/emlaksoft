@@ -123,7 +123,7 @@ describe("navigation accessibility contract", () => {
   });
 
   it("announces shared route loading states without forcing motion", () => {
-    const rootLoading = source("src/app/loading.tsx");
+    const rootLoading = source("src/components/route-splash.tsx");
     const sharedSkeleton = source("src/components/ui/skeleton.tsx");
 
     expect(rootLoading).toContain('role="status"');

@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { RouteSplash } from "@/components/route-splash";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { requirePlatformStaff } from "@/lib/platform";
@@ -8,7 +10,16 @@ import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { ThemeController } from "@/components/theme-controller";
 import { isPlatformMfaRequired } from "@/lib/platform-mfa";
 
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+/** Kok loading.tsx kaldirildi: kabuk sorgulari Suspense icinde, splash hemen ustunde. */
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<RouteSplash />}>
+      <AdminShell>{children}</AdminShell>
+    </Suspense>
+  );
+}
+
+async function AdminShell({ children }: { children: React.ReactNode }) {
   const staff = await requirePlatformStaff();
   const roleLabel = PLATFORM_ROLE_LABELS[staff.role] ?? staff.role;
   const modules = platformModulesFor(staff.role);

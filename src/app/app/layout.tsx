@@ -36,6 +36,7 @@ import type { AppModule } from "@/lib/permissions";
 import { planLabel } from "@/lib/billing/plans";
 import { lockedHrefs } from "@/lib/billing/page-gates";
 import { getAppActions } from "@/lib/palette-core";
+import { RouteSplash } from "@/components/route-splash";
 import { parseUiPrefs, uiPrefCookieName, uiPrefsCss } from "@/lib/ui-prefs";
 
 const NAV_MODULES: AppModule[] = [
@@ -85,7 +86,19 @@ async function NotificationBellStream() {
   return <NotificationBell initial={notifications} />;
 }
 
-export default async function AppLayout({
+/**
+ * Kabuk (oturum/izin/rozet sorgulari) Suspense icinde: kok loading.tsx kaldirildigi icin
+ * acilis ekrani burada, kabugun HEMEN ustunde verilir (davranis ayni: kabuk hazir olana dek splash).
+ */
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<RouteSplash />}>
+      <AppShell>{children}</AppShell>
+    </Suspense>
+  );
+}
+
+async function AppShell({
   children,
 }: {
   children: React.ReactNode;

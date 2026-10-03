@@ -12,7 +12,7 @@ const manrope = Manrope({
   variable: "--font-manrope",
   subsets: ["latin", "latin-ext"],
   display: "swap",
-  preload: true,
+  preload: false,
   fallback: ["system-ui", "sans-serif"],
 });
 
@@ -20,7 +20,7 @@ const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin", "latin-ext"],
   display: "swap",
-  preload: true,
+  preload: false,
   fallback: ["system-ui", "sans-serif"],
 });
 
