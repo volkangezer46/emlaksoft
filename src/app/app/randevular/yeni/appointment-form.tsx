@@ -142,16 +142,17 @@ export function AppointmentForm({
     ),
   };
 
-  function renderSummary({ values }: TabbedSummaryContext) {
+  function renderSummary({ values, display }: TabbedSummaryContext) {
     const typeLabel = typeOptions.find((o) => o.value === values.appointment_type)?.label;
     const day = dayLabel(values.date);
     const time = (values.time ?? "").trim();
     const duration = (values.duration_min ?? "").trim();
     const customerId = (values.customer_id ?? "").trim();
     const propertyId = (values.property_id ?? "").trim();
-    const customer = customerId ? (customers.find((c) => c.id === customerId)?.label ?? "Seçildi") : null;
-    const property = propertyId ? (properties.find((p) => p.id === propertyId)?.label ?? "Seçildi") : null;
+    const customer = customerId ? (customers.find((c) => c.id === customerId)?.label ?? display.customer_id ?? null) : null;
+    const property = propertyId ? (properties.find((p) => p.id === propertyId)?.label ?? display.property_id ?? null) : null;
     const location = (values.location ?? "").trim();
+    const notes = (values.notes ?? "").trim();
     return (
       <>
         {conflictWarning ? (
@@ -173,6 +174,7 @@ export function AppointmentForm({
           <SummaryRow label="Müşteri" value={customer ?? "Seçilmedi"} muted={!customer} tab="katilimci" field="customer_id" />
           <SummaryRow label="Portföy" value={property ?? "Seçilmedi"} muted={!property} tab="katilimci" field="property_id" />
           <SummaryRow label="Konum" value={location || "Girilmedi"} muted={!location} tab="katilimci" field="location" />
+          <SummaryRow label="Not" value={notes || "Girilmedi"} muted={!notes} tab="katilimci" field="notes" />
         </SummaryGroup>
       </>
     );
@@ -193,6 +195,7 @@ export function AppointmentForm({
       tabs={tabs}
       tabPanels={tabPanels}
       summary={renderSummary}
+      saveAndNew
       fieldLabels={FIELD_LABELS}
       draft={{ userId, formId: APPOINTMENT_FORM_ID, fields: [...APPOINTMENT_DRAFT_FIELDS] }}
       notice={

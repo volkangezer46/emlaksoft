@@ -178,14 +178,16 @@ export function CustomerForm({
     ),
   };
 
-  function renderSummary({ values }: TabbedSummaryContext) {
+  function renderSummary({ values, display }: TabbedSummaryContext) {
     const name = (values.full_name ?? "").trim();
     const branch = branches.find((b) => b.id === values.branch_id)?.name;
     const province = provinces.find((p) => p.id === values.province_id)?.name;
     const phoneRaw = (values.phone ?? "").trim();
     const phone = phoneRaw ? parsePhone(phoneRaw) : null;
     const email = (values.email ?? "").trim();
-    const days = [values.birth_date, values.anniversary_date].filter((v) => (v ?? "").trim() !== "").length;
+    const birth = display.birth_date;
+    const anniversary = display.anniversary_date;
+    const note = (values.notes ?? "").trim().replace(/\s+/g, " ");
     return (
       <>
         <div className="flex items-center gap-3 rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
@@ -212,13 +214,9 @@ export function CustomerForm({
           />
           <SummaryRow label="E-posta" value={email ? String(values.email ?? email) : "Girilmedi"} muted={!email} tab="iletisim" field="email" />
           <SummaryRow label="İl" value={province ?? "Seçilmedi"} muted={!province} tab="iletisim" />
-          <SummaryRow
-            label="Hatırlatma"
-            value={days > 0 ? `${days} özel gün` : "Yok"}
-            muted={days === 0}
-            tab="ozel-gunler"
-            field="birth_date"
-          />
+          <SummaryRow label="Doğum tarihi" value={birth ?? "Girilmedi"} muted={!birth} tab="ozel-gunler" field="birth_date" />
+          <SummaryRow label="Yıldönümü" value={anniversary ?? "Girilmedi"} muted={!anniversary} tab="ozel-gunler" field="anniversary_date" />
+          <SummaryRow label="Not" value={note || "Girilmedi"} muted={!note} tab="not" field="notes" />
         </SummaryGroup>
         {ownerSide || !canCreateDemand ? null : (
           <>
@@ -234,6 +232,7 @@ export function CustomerForm({
               values={values}
               provinces={provinces}
               urgencyOptions={urgencyOptions}
+              display={display}
               tabs={{ ne: "talep", kriter: "talep", bolge: "talep" }}
             />
           </>
@@ -277,6 +276,7 @@ export function CustomerForm({
       tabs={tabs}
       tabPanels={tabPanels}
       summary={renderSummary}
+      saveAndNew
       fieldLabels={FIELD_LABELS}
       draft={{ userId, formId: CUSTOMER_FORM_ID, fields: [...CUSTOMER_DRAFT_FIELDS] }}
     />

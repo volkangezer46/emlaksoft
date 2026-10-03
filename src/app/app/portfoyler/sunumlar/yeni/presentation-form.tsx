@@ -389,19 +389,19 @@ export function PresentationForm({
           <SummaryRow label="Başlık" value={title || "Zorunlu"} muted={!title} tab="bilgi" field="title" />
           <SummaryRow
             label="Müşteri"
-            value={pickedCustomer ? "Müşteri kartına bağlı" : customerName ? "Serbest ad" : "Girilmedi"}
+            value={customerName ? (pickedCustomer ? `${customerName} · müşteri kartına bağlı` : customerName) : "Girilmedi"}
             muted={!customerName}
             tab="bilgi"
             field="customer_name"
           />
-          <SummaryRow label="Kapak notu" value={note ? "Girildi" : "Yok"} muted={!note} tab="bilgi" field="note" />
+          <SummaryRow label="Kapak notu" value={note || "Girilmedi"} muted={!note} tab="bilgi" field="note" />
         </SummaryGroup>
         <SummaryGroup title="Seçilen portföyler">
           {chosen.length === 0 ? (
             <SummaryRow label="Portföy" value="Zorunlu (en az 1)" muted tab="portfoyler" />
           ) : (
             chosen.map((p) => (
-              <SummaryRow key={p.id} label={p.code} value={p.title ?? money(p.price, p.tx)} tab="portfoyler" />
+              <SummaryRow key={p.id} label={p.code} value={p.title ? `${p.title} · ${money(p.price, p.tx)}` : money(p.price, p.tx)} tab="portfoyler" />
             ))
           )}
         </SummaryGroup>

@@ -128,24 +128,26 @@ export function BroadcastForm({
     ),
   };
 
-  function renderSummary({ values }: TabbedSummaryContext) {
+  function renderSummary({ values, display }: TabbedSummaryContext) {
     const title = (values.title ?? "").trim();
     const body = (values.body ?? "").trim();
     const href = (values.href ?? "").trim();
     const kind = KIND_OPTIONS.find((k) => k.value === (values.kind ?? "info")) ?? KIND_OPTIONS[0];
     const tgt = TARGET_OPTIONS.find((t) => t.value === target);
     const count = target === "specific" ? (tenantId ? 1 : null) : audienceCounts[target];
-    const tenantLabel = tenantOptions.find((o) => o.value === tenantId)?.label ?? (tenantId ? "Seçildi" : null);
+    const tenantLabel = tenantOptions.find((o) => o.value === tenantId)?.label ?? (tenantId ? (display.tenant_id ?? null) : null);
     return (
       <>
         <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
           <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${kind.cls}`}>{kind.label}</span>
           <p className="mt-2 text-sm font-semibold text-ink-950">{title || "Başlık girilmedi"}</p>
-          {body ? <p className="mt-1 line-clamp-4 whitespace-pre-line text-xs text-text-muted">{body}</p> : null}
+          {body ? <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs text-text-muted">{body}</p> : null}
           {href ? <p className="mt-1 truncate text-xs font-medium text-brand-600">{href}</p> : null}
         </div>
         <SummaryGroup title="Gönderim özeti">
           <SummaryRow label="Başlık" value={title || "Zorunlu"} muted={!title} tab="icerik" field="title" />
+          <SummaryRow label="Mesaj" value={body || "Girilmedi"} muted={!body} tab="icerik" field="body" />
+          <SummaryRow label="Bağlantı" value={href || "Girilmedi"} muted={!href} tab="icerik" field="href" />
           <SummaryRow label="Tür" value={kind.label} tab="hedef" field="kind" />
           <SummaryRow label="Hedef" value={tgt?.label ?? "—"} tab="hedef" field="target" />
           {target === "specific" ? (

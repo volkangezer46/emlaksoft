@@ -28,11 +28,14 @@ export function DemandSummaryGroups({
   provinces,
   urgencyOptions,
   tabs,
+  display,
 }: {
   values: DemandFormValues;
   provinces: Province[];
   urgencyOptions: Option[];
   tabs: { ne: string; kriter: string; bolge: string };
+  /** Kabuktan gelen ekran metinleri (il/ilçe/mahalle etiketi için). */
+  display?: Record<string, string | null>;
 }) {
   const urgency = urgencyOptions.find((o) => o.value === values.urgency)?.label;
   const min = parseLooseNumber(values.budget_min);
@@ -51,8 +54,9 @@ export function DemandSummaryGroups({
     .map((t) => t.trim())
     .filter(Boolean);
   const province = provinces.find((p) => p.id === values.demand_province_id)?.name;
-  const hasDistrict = (values.demand_district_id ?? "") !== "";
-  const hasNeighborhood = (values.demand_neighborhood_id ?? "") !== "";
+  const district = display?.demand_district_id ?? null;
+  const neighborhood = display?.demand_neighborhood_id ?? null;
+  const districtText = [district, neighborhood].filter(Boolean).join(" / ");
   const parsed = parseDemandValues(values);
   const extraCount = parsed.ok ? parsed.criteria.extra_locations.length : 0;
   const requiredKeys = (values.required_keys ?? "").split(",").filter(Boolean);
@@ -80,7 +84,7 @@ export function DemandSummaryGroups({
         <SummaryRow label="Kat" value={floor ?? "Girilmedi"} muted={!floor} tab={tabs.kriter} field="floor_min" />
         <SummaryRow label="Isınma" value={heating || "Fark etmez"} muted={!heating} tab={tabs.kriter} field="heating" />
         <SummaryRow label="Cephe" value={facade || "Fark etmez"} muted={!facade} tab={tabs.kriter} field="facade" />
-        <SummaryRow label="Özellikler" value={tags.length ? `${tags.length} etiket` : "Girilmedi"} muted={tags.length === 0} tab={tabs.kriter} field="feature_tags" />
+        <SummaryRow label="Özellikler" value={tags.length ? tags.join(", ") : "Girilmedi"} muted={tags.length === 0} tab={tabs.kriter} field="feature_tags" />
         <SummaryRow label="Kredi / takas" value={loanSwap || "Belirtilmedi"} muted={!loanSwap} tab={tabs.kriter} field="uses_loan" />
         <SummaryRow
           label="Olmazsa olmaz"
@@ -94,8 +98,8 @@ export function DemandSummaryGroups({
         <SummaryRow label="İl" value={province ?? "Seçilmedi"} muted={!province} tab={tabs.bolge} />
         <SummaryRow
           label="İlçe / mahalle"
-          value={hasDistrict ? (hasNeighborhood ? "İlçe + mahalle" : "İlçe seçildi") : "Seçilmedi"}
-          muted={!hasDistrict}
+          value={districtText || "Seçilmedi"}
+          muted={!districtText}
           tab={tabs.bolge}
         />
         <SummaryRow label="Ek bölge" value={extraCount > 0 ? `${extraCount} bölge` : "Yok"} muted={extraCount === 0} tab={tabs.bolge} />

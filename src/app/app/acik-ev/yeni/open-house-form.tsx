@@ -89,8 +89,8 @@ export function OpenHouseForm({ userId }: { userId: string }) {
     ),
   };
 
-  function renderSummary({ values }: TabbedSummaryContext) {
-    const hasProperty = (values.property_id ?? "").trim() !== "";
+  function renderSummary({ values, display }: TabbedSummaryContext) {
+    const propertyText = display.property_id;
     const when = whenLabel(values.scheduled_at);
     const duration = (values.duration_min ?? "").trim();
     const location = (values.location ?? "").trim();
@@ -104,11 +104,11 @@ export function OpenHouseForm({ userId }: { userId: string }) {
           <p className="mt-0.5 text-xs text-text-muted">{duration ? `${duration} dk` : "Süre belirtilmedi"}</p>
         </div>
         <SummaryGroup title="Etkinlik bilgisi">
-          <SummaryRow label="Portföy" value={hasProperty ? "Seçildi" : "Zorunlu"} muted={!hasProperty} tab="zaman" field="property_id" />
+          <SummaryRow label="Portföy" value={propertyText ?? "Zorunlu"} muted={!propertyText} tab="zaman" field="property_id" />
           <SummaryRow label="Tarih ve saat" value={when ?? "Zorunlu"} muted={!when} tab="zaman" field="scheduled_at" />
           <SummaryRow label="Konum" value={location || "Girilmedi"} muted={!location} tab="yer" field="location" />
           <SummaryRow label="Kapasite" value={max ? `${max} ziyaretçi` : "Sınırsız"} muted={!max} tab="yer" field="max_visitors" />
-          <SummaryRow label="Not" value={notes ? "Girildi" : "Yok"} muted={!notes} tab="not" field="notes" />
+          <SummaryRow label="Not" value={notes || "Girilmedi"} muted={!notes} tab="not" field="notes" />
         </SummaryGroup>
       </>
     );

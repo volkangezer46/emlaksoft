@@ -339,7 +339,7 @@ export function AdvisorForm({
     ),
   };
 
-  function renderSummary({ values }: TabbedSummaryContext) {
+  function renderSummary({ values, display }: TabbedSummaryContext) {
     const currentRole = (values.role ?? role) as string;
     const meta = ROLE_META[currentRole];
     const name = (values.full_name ?? "").trim();
@@ -376,6 +376,13 @@ export function AdvisorForm({
             )}
           </div>
         ) : null}
+        <SummaryGroup title="Kişi bilgisi">
+          <SummaryRow label="Ad soyad" value={name || "Zorunlu"} muted={!name} tab="kimlik" field="full_name" />
+          <SummaryRow label="Telefon" value={display.phone ?? "Girilmedi"} muted={!display.phone} tab="kimlik" field="phone" />
+          <SummaryRow label="E-posta" value={display.email ?? "Zorunlu"} muted={!display.email} tab="kimlik" field="email" />
+          <SummaryRow label="Unvan" value={title || "Zorunlu"} muted={!title} tab="kimlik" field="title" />
+          <SummaryRow label="Şube" value={display.branch_id ?? "Atanmadı"} muted={!display.branch_id} tab="atama" field="branch_id" />
+        </SummaryGroup>
         <SummaryGroup title="Rol ve kapsam">
           <SummaryRow label="Rol" value={meta?.label ?? "Seçilmedi"} muted={!meta} tab="yetki" field="role" />
           <SummaryRow

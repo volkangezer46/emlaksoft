@@ -137,7 +137,7 @@ export function DemandForm({
     bolge: <StructuredDemandFields section="bolge" {...shared} />,
   };
 
-  function renderSummary({ values }: TabbedSummaryContext) {
+  function renderSummary({ values, display }: TabbedSummaryContext) {
     const customerId = fixedCustomer?.id ?? values.customer_id ?? "";
     const customerName = fixedCustomer?.full_name ?? customers.find((c) => c.id === customerId)?.full_name;
     return (
@@ -160,6 +160,7 @@ export function DemandForm({
           values={values}
           provinces={provinces}
           urgencyOptions={urgencyOptions}
+          display={display}
           tabs={{ ne: "musteri", kriter: "kriter", bolge: "bolge" }}
         />
       </>
@@ -181,6 +182,7 @@ export function DemandForm({
       tabs={tabs}
       tabPanels={tabPanels}
       summary={renderSummary}
+      saveAndNew
       fieldLabels={FIELD_LABELS}
       draft={{ userId, formId: DEMAND_FORM_ID, fields: [...DEMAND_DRAFT_FIELDS] }}
     />

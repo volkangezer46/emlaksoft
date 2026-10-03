@@ -101,7 +101,7 @@ export function NewProjectForm({ userId }: { userId: string }) {
           <SummaryRow label="Durum" value={STATUS_LABELS[values.status ?? ""] ?? "Satışta"} tab="proje" field="status" />
           <SummaryRow label="Konum" value={loc || "Girilmedi"} muted={!loc} tab="konum" field="location" />
           <SummaryRow label="Teslim" value={delivery ?? "Girilmedi"} muted={!delivery} tab="konum" field="delivery_date" />
-          <SummaryRow label="Açıklama" value={desc ? `${desc.length} karakter` : "Yok"} muted={!desc} tab="aciklama" field="description" />
+          <SummaryRow label="Açıklama" value={desc || "Girilmedi"} muted={!desc} tab="aciklama" field="description" />
         </SummaryGroup>
       </>
     );

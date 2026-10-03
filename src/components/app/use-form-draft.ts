@@ -81,6 +81,8 @@ export type FormDraftApi = {
   restore: () => void;
   discard: () => void;
   clear: () => void;
+  /** Taslağı şimdi yaz (yalnız beyaz liste + hassas olmayan alanlar). */
+  saveNow: () => void;
 };
 
 /**
@@ -101,6 +103,7 @@ export function useFormDraft(formRef: RefObject<HTMLFormElement | null>, config:
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const decidedRef = useRef(false);
   const foundRef = useRef(false);
+  const writeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!userId || !formId) return;
@@ -127,8 +130,8 @@ export function useFormDraft(formRef: RefObject<HTMLFormElement | null>, config:
     if (!form || !userId || !formId || !fieldsKey) return;
     const names = fieldsKey.split("|");
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const write = () => {
-      if (foundRef.current && !decidedRef.current) return; // karar bekleyen taslak ezilmez
+    const write = (force = false) => {
+      if (!force && foundRef.current && !decidedRef.current) return; // karar bekleyen taslak ezilmez
       try {
         const picked = pickDraftFields(readFormValues(form, names), names);
         const s = storage();
@@ -150,9 +153,15 @@ export function useFormDraft(formRef: RefObject<HTMLFormElement | null>, config:
       clearTimeout(timer);
       timer = setTimeout(write, DEBOUNCE_MS);
     };
+    writeRef.current = () => {
+      clearTimeout(timer);
+      write(true);
+      decidedRef.current = true;
+    };
     form.addEventListener("input", onEdit);
     form.addEventListener("change", onEdit);
     return () => {
+      writeRef.current = null;
       clearTimeout(timer);
       form.removeEventListener("input", onEdit);
       form.removeEventListener("change", onEdit);
@@ -178,6 +187,11 @@ export function useFormDraft(formRef: RefObject<HTMLFormElement | null>, config:
     setSavedAt(null);
   }, [userId, formId]);
 
+  /** "Taslak kaydet" düğmesi: bekleyen debounce'u beklemeden beyaz liste alanlarını hemen yazar. */
+  const saveNow = useCallback(() => {
+    writeRef.current?.();
+  }, []);
+
   const discard = useCallback(() => {
     clear();
     decidedRef.current = true;
@@ -191,5 +205,6 @@ export function useFormDraft(formRef: RefObject<HTMLFormElement | null>, config:
     restore,
     discard,
     clear,
+    saveNow,
   };
 }

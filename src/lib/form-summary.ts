@@ -14,9 +14,18 @@ export type FieldRead = {
   selectedLabel?: string | null;
   /** checkbox işaretli mi. */
   checked?: boolean;
+  /** input[type=password] vb. (ad kalıbından bağımsız): değer asla gösterilmez. */
+  secret?: boolean;
 };
 
 const PHONE_NAME = /(phone|tel|gsm|mobile)/i;
+
+/** Değeri ASLA gösterilmeyen alan adları (parola, OTP, token, API anahtarı, gizli anahtar). */
+const SECRET_NAME = /(password|parola|passwd|otp|token|api_?key|secret|webhook_?key)/i;
+
+export function isSecretFieldName(name: string): boolean {
+  return SECRET_NAME.test(name);
+}
 
 /** "2026-10-03" -> "03.10.2026"; "2026-10-03T14:30" -> "03.10.2026 14:30"; başka biçim -> null. */
 export function formatDateValue(raw: string): string | null {
@@ -27,7 +36,8 @@ export function formatDateValue(raw: string): string | null {
 }
 
 /**
- * Özet satırında gösterilecek metin; boşsa null ("Girilmedi").
+ * Özet satırında gösterilecek metin; boşsa null ("Girilmedi"). Değer HER ZAMAN olduğu gibi gösterilir
+ * (maskeleme yok); tek istisna parola/OTP/token/API anahtarıdır ("Girildi").
  * Telefon biçimlenir (formatPhoneDisplay), e-posta olduğu gibi, il/ilçe/mahalle ve seçimler etiketle,
  * onay kutusu Evet/Hayır, tarih GG.AA.YYYY.
  */
@@ -35,6 +45,8 @@ export function fieldDisplay(name: string, read: FieldRead): string | null {
   if (read.kind === "checkbox") return read.checked ? "Evet" : "Hayır";
   const raw = (read.raw ?? "").trim();
   if (!raw) return null;
+  // Tek istisna: gizli değerler ekrana yazılmaz.
+  if (read.secret || isSecretFieldName(name)) return "Girildi";
   if ((read.kind === "select" || read.kind === "radio") && read.selectedLabel) {
     return read.selectedLabel.replace(/\s+/g, " ").trim() || null;
   }

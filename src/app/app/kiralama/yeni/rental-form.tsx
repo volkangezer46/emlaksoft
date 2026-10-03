@@ -157,18 +157,19 @@ export function RentalForm({
     ),
   };
 
-  function renderSummary({ values }: TabbedSummaryContext) {
+  function renderSummary({ values, display }: TabbedSummaryContext) {
     const propertyId = (values.property_id ?? "").trim();
     const renterId = (values.renter_customer_id ?? "").trim();
     const property = properties.find((p) => p.id === propertyId);
-    const propertyText = propertyId ? (property ? (property.title ?? property.property_code) : "Seçildi") : null;
-    // Telefon özette gösterilmez: yalnız ad.
-    const renterText = renterId ? (customers.find((c) => c.id === renterId)?.full_name ?? "Seçildi") : null;
+    const propertyText = propertyId ? (property ? (property.title ?? property.property_code) : (display.property_id ?? null)) : null;
+    // Kiracı: ad (telefon gerçek değeriyle "Girilen bilgiler" listesinde görünür).
+    const renterText = renterId ? (customers.find((c) => c.id === renterId)?.full_name ?? display.renter_customer_id ?? null) : null;
     const rent = parseLooseNumber(values.monthly_rent);
     const deposit = parseLooseNumber(values.deposit);
     const dueDay = (values.due_day ?? "").trim();
     const start = dayLabel(values.start_date);
     const end = dayLabel(values.end_date);
+    const notes = (values.notes ?? "").trim();
     return (
       <>
         <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
@@ -184,9 +185,10 @@ export function RentalForm({
           <SummaryRow label="Aylık kira" value={rent != null && rent > 0 ? formatTry(rent) : "Zorunlu"} muted={!(rent != null && rent > 0)} tab="bedel" field="monthly_rent" />
           <SummaryRow label="Yıllık bedel" value={rent != null && rent > 0 ? formatTry(rent * 12) : "Hesaplanamadı"} muted={!(rent != null && rent > 0)} tab="bedel" field="monthly_rent" />
           <SummaryRow label="Vade günü" value={dueDay ? `Ayın ${dueDay}. günü` : "Zorunlu"} muted={!dueDay} tab="bedel" field="due_day" />
-          <SummaryRow label="Depozito" value={deposit != null && deposit > 0 ? formatTry(deposit) : "Yok"} muted={!(deposit != null && deposit > 0)} tab="bedel" field="deposit" />
+          <SummaryRow label="Depozito" value={deposit != null && deposit > 0 ? formatTry(deposit) : "Girilmedi"} muted={!(deposit != null && deposit > 0)} tab="bedel" field="deposit" />
           <SummaryRow label="Başlangıç" value={start ?? "Zorunlu"} muted={!start} tab="sure" field="start_date" />
           <SummaryRow label="Bitiş" value={end ?? "Süresiz"} muted={!end} tab="sure" field="end_date" />
+          <SummaryRow label="Notlar" value={notes || "Girilmedi"} muted={!notes} tab="sure" field="notes" />
         </SummaryGroup>
       </>
     );

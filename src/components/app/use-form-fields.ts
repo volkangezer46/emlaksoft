@@ -46,6 +46,7 @@ function readField(form: HTMLFormElement, name: string): FieldInfo | null {
   }
   if (first instanceof HTMLInputElement && first.type === "file") return null;
 
+  const secret = first instanceof HTMLInputElement && first.type === "password";
   let kind: FieldKind = "text";
   let selectedLabel: string | null = null;
   let label = labelFor(form, first);
@@ -60,7 +61,7 @@ function readField(form: HTMLFormElement, name: string): FieldInfo | null {
       label = labelFor(form, trigger) ?? label;
     }
   }
-  return { label, text: fieldDisplay(name, { kind, raw, selectedLabel }) };
+  return { label, text: fieldDisplay(name, { kind, raw, selectedLabel, secret }) };
 }
 
 function same(a: Record<string, FieldInfo>, b: Record<string, FieldInfo>): boolean {

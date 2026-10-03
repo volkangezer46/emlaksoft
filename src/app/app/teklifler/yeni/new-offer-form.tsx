@@ -150,13 +150,14 @@ export function NewOfferForm({
     ),
   };
 
-  function renderSummary({ values }: TabbedSummaryContext) {
+  function renderSummary({ values, display }: TabbedSummaryContext) {
     const prop = properties.find((p) => p.id === values.property_id);
     const cust = customers.find((c) => c.id === values.customer_id);
     const amount = parseLooseNumber(values.amount);
     const list = prop?.list_price ?? null;
     const ratio = amount != null && amount > 0 && list ? Math.round((amount / list) * 1000) / 10 : null;
     const validUntil = (values.valid_until ?? "").trim();
+    const notes = (values.notes ?? "").trim();
     return (
       <>
         <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
@@ -169,8 +170,8 @@ export function NewOfferForm({
           </p>
         </div>
         <SummaryGroup title="Teklif">
-          <SummaryRow label="Portföy" value={prop?.property_code ?? "Zorunlu"} muted={!prop} tab="taraflar" field="property_id" />
-          <SummaryRow label="Müşteri" value={cust?.full_name ?? "Seçilmedi"} muted={!cust} tab="taraflar" field="customer_id" />
+          <SummaryRow label="Portföy" value={prop?.property_code ?? display.property_id ?? "Zorunlu"} muted={!prop && !display.property_id} tab="taraflar" field="property_id" />
+          <SummaryRow label="Müşteri" value={cust?.full_name ?? display.customer_id ?? "Seçilmedi"} muted={!cust && !display.customer_id} tab="taraflar" field="customer_id" />
           <SummaryRow label="Liste fiyatı" value={list ? formatTry(list) : "Portföy seçilince"} muted={!list} tab="taraflar" field="property_id" />
           <SummaryRow label="Teklif tutarı" value={amount != null && amount > 0 ? formatTry(amount) : "Zorunlu"} muted={!(amount != null && amount > 0)} tab="kosullar" field="amount" />
           <SummaryRow
@@ -187,6 +188,7 @@ export function NewOfferForm({
             tab="kosullar"
             field="valid_until"
           />
+          <SummaryRow label="Not" value={notes || "Girilmedi"} muted={!notes} tab="kosullar" field="notes" />
         </SummaryGroup>
       </>
     );

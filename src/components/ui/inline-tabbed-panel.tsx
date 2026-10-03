@@ -3,9 +3,10 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Check, TriangleAlert, X } from "lucide-react";
+import { TriangleAlert, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FormActionBar } from "@/components/ui/form-action-bar";
 import { MorphTabs, type MorphTabItem } from "@/components/ui/morph-tabs";
 import { useFormFields } from "@/components/app/use-form-fields";
 import { useFormDraft, type FormDraftConfig } from "@/components/app/use-form-draft";
@@ -21,7 +22,7 @@ import { cn } from "@/lib/utils";
  *
  * Davranış: MorphTabs sekmeleri (tüm paneller DOM'da kalır, pasifler `hidden`; tek `<form>`), >=5 alanlı
  * formda yazdıkça güncellenen "Canlı özet" (useFormFields; satıra tıklayınca ilgili sekme/alan), kaydedilmemiş
- * değişiklik koruması (kapatırken satır içi onay + sekmeyi terk uyarısı), Ctrl/Cmd+Enter ile kaydet, Esc ile kapat,
+ * değişiklik koruması (kapatırken satır içi onay + sekmeyi terk uyarısı), Ctrl/⌘+Enter ile kaydet (kısayol ipucu FormActionBar’da), Esc ile kapat,
  * gizli sekmedeki geçersiz alanda sekmeyi açıp odaklanma, hata bandına odak, isteğe bağlı taslak (useFormDraft:
  * yalnız beyaz liste; telefon/e-posta/not saklanmaz). Mobilde tam genişlik tek sütun, özet altta.
  *
@@ -274,6 +275,34 @@ function PanelBody({
       }
     : { action };
 
+  // Zorunlu (required) alanlar: boş olanlar "N zorunlu alan eksik" sayacına ve ilerleme çizgisine girer.
+  const [required, setRequired] = useState<{ total: number; missing: { name: string; label: string; tab: string }[] }>({ total: 0, missing: [] });
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    const frame = requestAnimationFrame(() => {
+      const missing: { name: string; label: string; tab: string }[] = [];
+      let total = 0;
+      const seen = new Set<string>();
+      form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("[required]").forEach((el) => {
+        if (!el.name || el.disabled || seen.has(el.name)) return;
+        seen.add(el.name);
+        total += 1;
+        const box = el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio");
+        const empty = box ? !(el as HTMLInputElement).checked : !el.value.trim();
+        if (!empty) return;
+        const label = (info[el.name]?.label ?? el.getAttribute("aria-label") ?? el.name) || el.name;
+        missing.push({ name: el.name, label, tab: el.closest("[data-ip-panel]")?.getAttribute("data-ip-panel") ?? tabs[0]?.id ?? "" });
+      });
+      setRequired((prev) =>
+        prev.total === total && prev.missing.length === missing.length && prev.missing.every((m, i) => m.name === missing[i].name)
+          ? prev
+          : { total, missing },
+      );
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [info, tabs]);
+
   const summaryRows = tabs.map((t) => ({ tab: t, rows: t.fields.filter((f) => info[f]) }));
   const filled = fieldNames.filter((f) => info[f]?.text != null).length;
   const total = fieldNames.filter((f) => info[f]).length;
@@ -312,7 +341,10 @@ function PanelBody({
                     className="focus-ring flex min-h-8 w-full items-baseline gap-3 rounded-[var(--radius-control)] px-1.5 py-1 text-left text-xs transition-colors hover:bg-surface"
                   >
                     <span className="shrink-0 text-text-muted">{fieldLabels?.[f] ?? i.label ?? f}</span>
-                    <span className={cn("min-w-0 flex-1 truncate text-right font-medium", i.text == null ? "text-text-faint" : "text-ink-950")}>
+                    <span
+                      title={i.text ?? undefined}
+                      className={cn("line-clamp-3 min-w-0 flex-1 break-words text-right font-medium", i.text == null ? "text-text-faint" : "text-ink-950")}
+                    >
                       {i.text ?? "Girilmedi"}
                     </span>
                   </button>
@@ -428,15 +460,23 @@ function PanelBody({
           </div>
         ) : null}
 
-        <div className="hairline-t mt-5 flex flex-wrap items-center justify-end gap-2 pt-4">
-          <span className="mr-auto hidden text-xs text-text-faint sm:inline">
-            {dirty ? "Kaydedilmemiş değişiklikler · " : ""}Ctrl/⌘+Enter ile kaydet · Esc kapat
-          </span>
-          <Button type="button" variant="secondary" onClick={requestClose}>Vazgeç</Button>
-          <Button type="submit" loading={pending} icon={success ? Check : undefined}>
-            {pending ? pendingLabel : success ? "Kaydedildi" : (submitLabelOverride ?? submitLabel)}
-          </Button>
-        </div>
+        <FormActionBar
+          mode="inline"
+          formRef={formRef}
+          pending={pending}
+          error={error}
+          success={success}
+          dirty={dirty}
+          submitLabel={submitLabelOverride ?? submitLabel}
+          pendingLabel={pendingLabel}
+          cancelLabel="Vazgeç"
+          onCancel={requestClose}
+          progress={required.total > 0 ? { done: required.total - required.missing.length, total: required.total } : null}
+          missing={required.missing.map((m) => ({ label: m.label, onGo: () => goTo(m.tab, m.name) }))}
+          draft={draft ? { savedAt: draftApi.savedAt, onSave: draftApi.saveNow } : null}
+          shortcuts="save-esc"
+          focusErrorBand={false}
+        />
       </form>
     </section>
   );
