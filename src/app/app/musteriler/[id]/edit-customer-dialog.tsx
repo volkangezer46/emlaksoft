@@ -13,6 +13,7 @@ import {
 import { GeoSelect } from "@/components/app/geo-select";
 import { updateCustomer, type CustomerResult } from "@/app/actions/customers";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { EmailInput } from "@/components/ui/email-input";
 
 type Province = { id: string; name: string };
 
@@ -86,7 +87,7 @@ export function EditCustomerDialog({
               </div>
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="edit-email">E-posta</label>
-                <input id="edit-email" name="email" type="email" defaultValue={customer.email ?? ""} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" />
+                <EmailInput id="edit-email" name="email" defaultValue={customer.email ?? ""} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm text-text-muted" htmlFor="edit-type">Tür</label>

@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { validateTenantReferences } from "@/lib/tenant-references";
+import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 
 export type TargetResult = { ok?: boolean; error?: string; id?: string };
 
@@ -256,13 +258,15 @@ export async function registerOpenHouseVisitor(
   if (!gate.ok) return { error: gate.error };
 
   const fullName = String(visitor.full_name ?? "").trim();
-  const phone = String(visitor.phone ?? "").trim() || null;
-  const email = String(visitor.email ?? "").trim().toLowerCase() || null;
+  const rawPhone = String(visitor.phone ?? "").trim();
+  const parsedPhone = rawPhone ? parsePhone(rawPhone) : null;
+  const phone = parsedPhone?.ok ? parsedPhone.stored : null;
+  const email = normalizeEmail(String(visitor.email ?? "")) || null;
   const notes = String(visitor.notes ?? "").trim() || null;
   if (!fullName || fullName.length > 160) return { error: "Geçerli bir ad soyad girin." };
-  if (phone && (!/^\+?[0-9 ()-]{10,24}$/.test(phone))) return { error: "Geçerli bir telefon numarası girin." };
-  if (email && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 320)) {
-    return { error: "Geçerli bir e-posta adresi girin." };
+  if (parsedPhone && !parsedPhone.ok) return { error: PHONE_ERROR_MESSAGE };
+  if (email && !isValidEmail(email)) {
+    return { error: EMAIL_ERROR_MESSAGE };
   }
   if (notes && notes.length > 2000) return { error: "Not en fazla 2000 karakter olabilir." };
 

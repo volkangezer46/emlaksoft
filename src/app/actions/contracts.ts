@@ -16,6 +16,8 @@ import {
   isSignerSmsAvailable,
   sendSignerSms,
 } from "@/app/imza/_lib/sms";
+import { parsePhone } from "@/lib/phone";
+import { isValidEmail, normalizeEmail } from "@/lib/email";
 
 type TenantStatusRel = { status?: string | null } | { status?: string | null }[] | null;
 function tenantStatusOf(rel: TenantStatusRel): string | null | undefined {
@@ -192,17 +194,20 @@ export async function sendContractForSigning(
 
   const normalized = signers.map((signer) => ({
     full_name: String(signer.full_name ?? "").trim(),
-    email: String(signer.email ?? "").trim().toLowerCase() || undefined,
+    email: normalizeEmail(String(signer.email ?? "")) || undefined,
     phone: String(signer.phone ?? "").trim() || undefined,
   }));
   if (normalized.some((signer) => !signer.full_name || signer.full_name.length > 160)) {
     return { error: "Her imzalayan için geçerli bir ad soyad girin." };
   }
-  if (normalized.some((signer) => signer.email && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signer.email) || signer.email.length > 320))) {
+  if (normalized.some((signer) => signer.email && !isValidEmail(signer.email))) {
     return { error: "İmzalayan e-posta adreslerinden biri geçersiz." };
   }
-  if (normalized.some((signer) => signer.phone && !/^\+?[0-9 ()-]{10,24}$/.test(signer.phone))) {
+  if (normalized.some((signer) => signer.phone && !parsePhone(signer.phone).ok)) {
     return { error: "İmzalayan telefon numaralarından biri geçersiz." };
+  }
+  for (const signer of normalized) {
+    if (signer.phone) signer.phone = parsePhone(signer.phone).stored;
   }
   const identities = normalized.map((signer) =>
     signer.email || signer.phone?.replace(/\D/g, "") || signer.full_name.toLocaleLowerCase("tr-TR"),

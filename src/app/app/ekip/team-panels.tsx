@@ -6,6 +6,7 @@ import { Building2, RefreshCw, UserPlus } from "lucide-react";
 import { InlinePanel, InlinePanelTrigger } from "@/components/ui/inline-panel";
 import { createBranch, createTeamMember, type TeamResult } from "@/app/actions/team";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { EmailInput } from "@/components/ui/email-input";
 
 type Branch = { id: string; name: string };
 type Province = { id: string; name: string };
@@ -82,7 +83,7 @@ function AddMemberForm({ branches, onDone }: { branches: Branch[]; onDone: () =>
       </div>
       <div>
         <label className="mb-1.5 block text-sm text-text-muted" htmlFor="email">E-posta *</label>
-        <input id="email" name="email" type="email" required className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" placeholder="danisman@ofis.com" />
+        <EmailInput id="email" name="email" required className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" placeholder="danisman@ofis.com" />
       </div>
       <div>
         <label className="mb-1.5 block text-sm text-text-muted" htmlFor="phone">Telefon</label>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, Check, Save } from "lucide-react";
 import { updateTenantInfo } from "@/app/actions/settings";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 type Tenant = {
   name: string;
@@ -60,7 +61,7 @@ export function CompanyForm({ tenant }: { tenant: Tenant }) {
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-phone">Telefon</label>
-          <input id="tenant-phone" name="phone" type="tel" defaultValue={tenant.phone ?? ""} className={fieldClass} placeholder="+90 555 123 4567" />
+          <PhoneInput id="tenant-phone" name="phone" defaultValue={tenant.phone} className={fieldClass} />
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-city">Şehir</label>

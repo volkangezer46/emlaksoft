@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { FileSignature, Loader2, Send, Trash2, UserPlus } from "lucide-react";
 import { sendContractForSigning } from "@/app/actions/contracts";
+import { EmailInput } from "@/components/ui/email-input";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 type Signer = { full_name: string; email: string; phone: string };
 
@@ -84,19 +86,16 @@ export function ContractSignPanel({
               required
             />
             <div className="grid grid-cols-2 gap-2">
-              <input
-                type="email"
+              <EmailInput
                 placeholder="E-posta (opsiyonel)"
                 value={s.email}
                 onChange={(e) => updateSigner(i, "email", e.target.value)}
-                className="rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400"
+                className="rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400 aria-[invalid=true]:border-danger-400"
               />
-              <input
-                type="tel"
-                placeholder="Telefon (opsiyonel)"
+              <PhoneInput
                 value={s.phone}
-                onChange={(e) => updateSigner(i, "phone", e.target.value)}
-                className="rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400"
+                onValueChange={(v) => updateSigner(i, "phone", v)}
+                className="rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400 aria-[invalid=true]:border-danger-400"
               />
             </div>
           </div>

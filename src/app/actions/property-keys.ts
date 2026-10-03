@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { isKeyOut } from "@/lib/key-overdue";
+import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
 
 /**
  * Anahtar & emanet takibi action'ları.
@@ -240,10 +241,11 @@ export async function checkoutPropertyKey(_prev: KeyResult, fd: FormData): Promi
   } else {
     if (!holderName) return { error: "Kişi adı boş olamaz." };
     if (holderName.length > 120) return { error: "Kişi adı en fazla 120 karakter olabilir." };
-    if (holderPhone.length > 30) return { error: "Telefon en fazla 30 karakter olabilir." };
+    const parsedHolderPhone = holderPhone ? parsePhone(holderPhone) : null;
+    if (parsedHolderPhone && !parsedHolderPhone.ok) return { error: parsedHolderPhone.error ?? PHONE_ERROR_MESSAGE };
     nextStatus = "musteride";
     nameValue = holderName;
-    phoneValue = holderPhone || null;
+    phoneValue = parsedHolderPhone?.stored || null;
     holderLabel = holderName;
   }
 

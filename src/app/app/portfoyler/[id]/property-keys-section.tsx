@@ -31,6 +31,7 @@ import {
   keyStatusLabel,
   keyStatusTone,
 } from "@/lib/key-overdue";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 /**
  * Anahtar takibi — portföyün fiziksel anahtarları kimde?
@@ -395,13 +396,12 @@ export function PropertyKeysSection({
                         </label>
                         <label className="text-xs font-semibold text-text-muted">
                           Telefon
-                          <input
-                            name="holder_phone"
-                            maxLength={30}
-                            inputMode="tel"
-                            placeholder="0555 000 00 00"
-                            className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
-                          />
+                          <div className="mt-1">
+                            <PhoneInput
+                              name="holder_phone"
+                              className="w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300 aria-[invalid=true]:border-danger-400"
+                            />
+                          </div>
                         </label>
                       </>
                     )}

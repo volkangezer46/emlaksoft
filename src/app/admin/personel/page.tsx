@@ -30,6 +30,7 @@ import {
   DialogHeader,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { EmailInput } from "@/components/ui/email-input";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -104,7 +105,7 @@ function AddStaffDialog({ onDone }: { onDone: () => void }) {
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="ps-email">
                   E-posta <span className="text-danger-500">*</span>
                 </label>
-                <input id="ps-email" name="email" type="email" required className={field} placeholder="ornek@emlaksoft.com" />
+                <EmailInput id="ps-email" name="email" required className={field} placeholder="ornek@emlaksoft.com" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="ps-name">

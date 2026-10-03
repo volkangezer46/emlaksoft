@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
+import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
 
 export type OnboardingSetupResult = { error?: string; ok?: boolean };
 
@@ -21,10 +22,11 @@ export async function saveOfficeProfile(formData: FormData): Promise<OnboardingS
   const licenseNo = String(formData.get("license_no") ?? "").trim().slice(0, 60);
 
   if (!phone && !city && !licenseNo) return { error: "En az bir alanı doldurun." };
-  if (phone && !/^[0-9+()\s-]{7,}$/.test(phone)) return { error: "Telefon biçimi geçersiz." };
+  const parsedPhone = phone ? parsePhone(phone) : null;
+  if (parsedPhone && !parsedPhone.ok) return { error: parsedPhone.error ?? PHONE_ERROR_MESSAGE };
 
   const patch: Record<string, string> = { updated_at: new Date(now()).toISOString() };
-  if (phone) patch.phone = phone;
+  if (parsedPhone?.ok) patch.phone = parsedPhone.stored;
   if (city) patch.city = city;
   if (licenseNo) patch.license_no = licenseNo;
 
@@ -41,7 +43,7 @@ export async function saveOfficeProfile(formData: FormData): Promise<OnboardingS
     action: "settings.update",
     entityType: "tenant",
     entityId: gate.tenantId,
-    newValue: { phone: phone || null, city: city || null, license_no: licenseNo || null },
+    newValue: { phone: parsedPhone?.stored || null, city: city || null, license_no: licenseNo || null },
   });
 
   revalidatePath("/app/baslangic");
