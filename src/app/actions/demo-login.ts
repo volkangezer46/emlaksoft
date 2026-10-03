@@ -12,7 +12,8 @@ import { deriveDemoPassword } from "@/lib/demo-credentials";
 const DEMO_TENANT_SLUG = "demo-ofis";
 const DEMO_TENANT_NAME = "Demo Emlak Ofisi";
 
-export type DemoLoginResult = { error?: string };
+/** `redirectTo`: istemcinin tarayıcı gezinmesiyle gideceği adres (platform kişilikleri; yeni oturum çerezleri gönderilsin diye). */
+export type DemoLoginResult = { error?: string; redirectTo?: string };
 
 function passwordForDemoIdentity(email: string): string {
   const secret =
@@ -212,9 +213,12 @@ export async function quickDemoLogin(personaId: string): Promise<DemoLoginResult
     return { error: `Demo giriş başarısız: ${error.message}` };
   }
 
-  // Platform kişilikleri zorunlu iki adımlı doğrulamadan (TOTP) geçer. Doğrudan "/admin"e
-  // yönlendirmek, /admin render'ında ikinci bir yönlendirmeye (→ /giris/mfa) yol açıyor ve
-  // sunucu işleminin içinde iç içe yönlendirme istemciyi yarıda bırakıyordu (adres /admin,
-  // ekran giriş sayfası). Bu yüzden doğrulama sayfasına tek adımda gidilir.
-  redirect(persona.kind === "platform" ? `/giris/mfa?next=${encodeURIComponent("/admin")}` : "/app");
+  // Platform kişilikleri zorunlu iki adımlı doğrulamadan (TOTP) geçer. Sunucu işleminin içinden
+  // yönlendirmek, hedef sayfanın işlem sırasında henüz tarayıcıya gitmemiş oturum çerezlerini
+  // görememesine yol açıyordu (adres değişiyor, ekran giriş sayfasında kalıyor). Bu yüzden hedef
+  // döndürülür ve istemci tarayıcı gezinmesiyle (yeni çerezlerle) doğrulama sayfasına gider.
+  if (persona.kind === "platform") {
+    return { redirectTo: `/giris/mfa?next=${encodeURIComponent("/admin")}` };
+  }
+  redirect("/app");
 }

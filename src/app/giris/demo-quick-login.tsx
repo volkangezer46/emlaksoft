@@ -86,7 +86,10 @@ export function DemoQuickLogin() {
       if (res?.error) {
         setError(res.error);
         setActiveId(null);
+        return;
       }
+      // Platform kişilikleri: tarayıcı gezinmesi (yeni oturum çerezleriyle) → doğrulama sayfası.
+      if (res?.redirectTo) window.location.assign(res.redirectTo);
     });
   };
 
