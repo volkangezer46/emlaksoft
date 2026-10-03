@@ -63,6 +63,8 @@ import { fetchLatestRates, formatFx, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import { formatListingPrice } from "@/lib/format";
 import { formatDateTr } from "@/lib/format";
 
+export const metadata = { title: "Portföyler" };
+
 // Harita ağır bir client komponenti ve yalnız ?gorunum=harita'da görünür —
 // dynamic import ile liste görünümünün ilk yükünden çıkarılır (ayrı chunk).
 const MapView = dynamic(() => import("./map-view").then((m) => m.MapView), {

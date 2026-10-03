@@ -22,6 +22,7 @@ import { DetailTabs, type DetailTabDef } from "@/components/app/detail-tabs";
 import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import { CustomerFilesTab } from "./customer-files-tab";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
+import { formatLeadSource } from "@/lib/lead-sources";
 import { ActivityTimeline, type TimelineCategory, type TimelineEvent } from "@/components/ui/activity-timeline";
 import { APPT_STATUS_LABEL, APPT_TYPE_LABEL, CONTRACT_STATUS_LABEL, OFFER_STATUS_LABEL } from "@/lib/activity-timeline-sources";
 
@@ -482,7 +483,7 @@ export function Customer360Tabs({
             <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-text-muted">{notes || "Not eklenmedi."}</p>
             <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4 text-xs text-text-faint">
               <span>
-                Kaynak: {source || "belirtilmedi"}
+                Kaynak: {formatLeadSource(source) ?? "belirtilmedi"}
                 {sourceDetail ? (
                   <span className="ml-1 rounded-full bg-brand-600/10 px-1.5 py-0.5 font-semibold text-brand-700">
                     {sourceDetail}

@@ -38,6 +38,8 @@ import { KararBekleyenler, KararBekleyenlerIskelet } from "./_home/karar-bekleye
 import { Aranacaklar } from "./_home/aranacaklar";
 import { KapsamAnahtari, homeHref, type HomeParams } from "./_home/kapsam-anahtari";
 
+export const metadata = { title: "Ana ekran" };
+
 /**
  * "Bugün" ana ekranı. Sayfa yalnız iskelet + yetki + bağlamı kurar; her bölüm
  * `_home/*` içinde kendi verisini yükler ve <Suspense> ile akar. Aynı istekteki ortak

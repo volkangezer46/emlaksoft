@@ -60,6 +60,8 @@ import {
   winRate,
 } from "./deal-list-logic";
 
+export const metadata = { title: "Anlaşmalar" };
+
 const PATH = "/app/anlasmalar";
 
 function money(n: number) {

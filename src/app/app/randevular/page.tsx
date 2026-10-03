@@ -69,6 +69,8 @@ import {
   sumCounts,
 } from "./appointment-list-logic";
 
+export const metadata = { title: "Randevular" };
+
 const PATH = "/app/randevular";
 
 type RelRow = { id?: string; full_name?: string; title?: string; property_code?: string; lat?: number | null; lng?: number | null };

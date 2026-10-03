@@ -33,6 +33,8 @@ import { HelpTip } from "@/components/ui/help-tip";
 import { MoneyValue } from "@/components/ui/money-value";
 import { DashCard, SectionHeader, KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
+
+export const metadata = { title: "Komisyon" };
 type CommissionRow = {
   id: string;
   gross_amount: number;

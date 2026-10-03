@@ -1,5 +1,6 @@
 "use client";
 
+import { FileInput } from "@/components/ui/file-input";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
@@ -19,7 +20,7 @@ const inputCls =
 
 function Field({ label, htmlFor, children, hint }: { label: string; htmlFor: string; children: React.ReactNode; hint?: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <label htmlFor={htmlFor} className="mb-1 block text-xs font-semibold text-text-muted">
         {label}
       </label>
@@ -57,7 +58,7 @@ export function OfficeStep({ canEdit, nextHref, initial }: Props) {
   }
 
   return (
-    <form action={submit} className="grid gap-4 sm:grid-cols-2">
+    <form action={submit} className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>*]:min-w-0">
       <div className="sm:col-span-2">
         <Field label="Ofis adı" htmlFor="kur-name">
           <input id="kur-name" name="name" required defaultValue={initial.name} className={inputCls} autoComplete="organization" />
@@ -82,7 +83,7 @@ export function OfficeStep({ canEdit, nextHref, initial }: Props) {
               // eslint-disable-next-line @next/next/no-img-element -- tenant logosu dış depodan gelir
               <img src={initial.logoUrl} alt="Mevcut logo" className="h-10 w-10 rounded-[var(--radius-control)] border border-line object-contain" />
             ) : null}
-            <input id="kur-logo" ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-sm text-text-muted" />
+            <FileInput id="kur-logo" ref={fileRef} accept="image/png,image/jpeg,image/webp" />
           </div>
         </Field>
       </div>

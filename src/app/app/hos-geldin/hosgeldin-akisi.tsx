@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Target, UserPlus, ListChecks, UserRound } from "lucide-react";
+import { FileInput } from "@/components/ui/file-input";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -195,7 +196,7 @@ function ProfileStep(p: Props & { onSaved: () => void }) {
                 // eslint-disable-next-line @next/next/no-img-element -- depodan gelen portre
                 <img src={p.photoUrl} alt="Mevcut fotoğraf" className="h-10 w-10 rounded-full border border-line object-cover" />
               ) : null}
-              <input id="hg-photo" ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="text-sm text-text-muted" />
+              <FileInput id="hg-photo" ref={fileRef} accept="image/png,image/jpeg,image/webp" />
             </div>
           </div>
         ) : null}

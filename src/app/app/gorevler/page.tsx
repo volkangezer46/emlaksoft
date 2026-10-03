@@ -28,6 +28,8 @@ import {
   type KpiItem,
 } from "@/components/ui/list-kit";
 
+export const metadata = { title: "Görevler" };
+
 export const dynamic = "force-dynamic";
 
 const PATH = "/app/gorevler";

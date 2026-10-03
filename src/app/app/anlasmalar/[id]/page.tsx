@@ -364,11 +364,11 @@ export default async function DealDetailPage({
                     aktif
                       ? "border-white/40 bg-white text-ink-950"
                       : gecildi
-                        ? "border-mint-400/40 bg-mint-500/15 text-mint-300"
-                        : "border-white/12 bg-white/[0.04] text-white/45"
+                        ? "border-mint-400/40 bg-mint-500/15 text-mint-200"
+                        : "border-white/25 bg-white/10 text-white/80"
                   }`}
                 >
-                  <span style={aktif && stageLabels[s.key].color ? { color: stageLabels[s.key].color ?? undefined } : undefined}>
+                  <span className="inline-flex items-center gap-1.5">{aktif && stageLabels[s.key].color ? <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ backgroundColor: stageLabels[s.key].color ?? undefined }} /> : null}
                     {stageLabels[s.key].label}
                   </span>
                 </li>

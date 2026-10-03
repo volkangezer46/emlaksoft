@@ -31,8 +31,11 @@ import { LogoUploadForm } from "./logo-upload-form";
 import { IntegrationsForm } from "./integrations-form";
 import { NotificationPrefsPanel } from "@/components/app/notification-prefs";
 import { planLabel } from "@/lib/billing/plans";
+import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
 
 import { PageHeader } from "@/components/ui/page-header";
+
+export const metadata = { title: "Ayarlar" };
 type SettingCard = {
   title: string;
   desc: string;
@@ -59,7 +62,7 @@ const cards: SettingCard[] = [
 ];
 
 export default async function SettingsPage() {
-  await requireModulePage("settings");
+  const { tenantId } = await requireModulePage("settings");
   const supabase = await createClient();
 
   const [user, { data: tenantRow }, notifPrefs, { count: consentCount }, { count: activeConsentCount }, { count: auditCount }, { data: netgsmRow }, { data: whatsappRow }, netgsmPlatformConfigured] = await Promise.all([
@@ -146,8 +149,14 @@ export default async function SettingsPage() {
     { label: "Adres", done: !!tenant.address_line, href: "#marka-kimlik" },
     { label: "Hesap e-postası", done: !!user?.email },
   ];
-  const doneCount = checklist.filter((c) => c.done).length;
-  const completion = Math.round((doneCount / checklist.length) * 100);
+  // Kurulum yüzdesi: ana ekran şeridi ve /app/baslangic sihirbazıyla AYNI kaynak (onboarding-state).
+  // Okunamazsa (null) eski profil alanı hesabına düşülür.
+  const snap = tenantId ? await loadOnboardingSnapshot(tenantId) : null;
+  const items = snap
+    ? snap.state.steps.map((st) => ({ label: st.title, done: st.done, href: `/app/baslangic?adim=${st.id}` }))
+    : checklist;
+  const doneCount = items.filter((c) => c.done).length;
+  const completion = snap ? snap.state.percent : Math.round((doneCount / checklist.length) * 100);
   return (
     <div className="space-y-6">
       {/* premium header */}
@@ -182,10 +191,10 @@ export default async function SettingsPage() {
             </summary>
             <div className="mt-3 w-72 rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-4 backdrop-blur">
               <p className="text-xs font-bold uppercase tracking-[0.08em] text-white/55">
-                Kurulum kontrol listesi ({doneCount}/{checklist.length})
+                Kurulum kontrol listesi ({doneCount}/{items.length})
               </p>
               <ul className="mt-2.5 space-y-2">
-                {checklist.map((item) => (
+                {items.map((item) => (
                   <li key={item.label} className="flex items-center justify-between gap-3 text-xs">
                     <span className="flex min-w-0 items-center gap-2">
                       {item.done ? (
@@ -196,14 +205,14 @@ export default async function SettingsPage() {
                       <span className={`truncate ${item.done ? "text-white/55" : "text-white/85"}`}>{item.label}</span>
                     </span>
                     {!item.done && item.href ? (
-                      <a href={item.href} className="shrink-0 text-xs font-semibold text-mint-400 hover:text-mint-300">
+                      <Link href={item.href} className="shrink-0 text-xs font-semibold text-mint-400 hover:text-mint-300">
                         Tamamla →
-                      </a>
+                      </Link>
                     ) : null}
                   </li>
                 ))}
               </ul>
-              {doneCount === checklist.length ? (
+              {doneCount === items.length ? (
                 <p className="mt-3 border-t border-white/10 pt-3 text-xs font-semibold text-mint-400">Kurulum tamam 🎉</p>
               ) : null}
             </div>

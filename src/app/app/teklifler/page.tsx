@@ -33,6 +33,8 @@ import { buildHref } from "@/lib/ui/filter-params";
 import { OfferMobileList, OfferTable, type OfferVM } from "./offer-rows";
 import { OFFER_STATUS_LABELS, offerStatusTone, offerVolume } from "./offer-list-logic";
 
+export const metadata = { title: "Teklifler" };
+
 const PATH = "/app/teklifler";
 
 function money(n: number | null) {

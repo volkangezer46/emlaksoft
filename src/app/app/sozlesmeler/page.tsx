@@ -41,6 +41,8 @@ import {
   signRate,
 } from "./contract-list-logic";
 
+export const metadata = { title: "Sözleşmeler" };
+
 const PATH = "/app/sozlesmeler";
 
 function relativeDate(iso: string) {

@@ -19,6 +19,8 @@ import type { CSSProperties } from "react";
 import { now } from "@/lib/clock";
 import { Skeleton, SkeletonBlock, SkeletonTable } from "@/components/ui/skeleton";
 
+export const metadata = { title: "Kayıp-kaçak kalkanı" };
+
 const RING_C = 2 * Math.PI * 42;
 
 type Closure = {

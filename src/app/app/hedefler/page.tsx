@@ -14,6 +14,8 @@ import { TargetCreatePanel, TargetCreateTrigger } from "./target-create-panel";
 import { PageHeader } from "@/components/ui/page-header";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
+
+export const metadata = { title: "Hedefler" };
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 }

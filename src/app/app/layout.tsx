@@ -38,6 +38,9 @@ import { lockedHrefs } from "@/lib/billing/page-gates";
 import { getAppActions } from "@/lib/palette-core";
 import { parseUiPrefs, uiPrefCookieName, uiPrefsCss } from "@/lib/ui-prefs";
 
+/** Sekme başlığı: sayfalar `metadata.title` verir, şablon ofis uygulamasında "Sayfa · EmlakSoft" üretir. */
+export const metadata = { title: { default: "EmlakSoft", template: "%s · EmlakSoft" } };
+
 const NAV_MODULES: AppModule[] = [
   "dashboard",
   "customers",

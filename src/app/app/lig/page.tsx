@@ -24,6 +24,9 @@ import { loadAdvisorMetrics, trMonthPeriod } from "@/lib/team/advisor-metrics";
 import { PageHeader } from "@/components/ui/page-header";
 import { podiumColumns } from "@/components/ui/dashboard-grid";
 import { HelpTip } from "@/components/ui/help-tip";
+import { roleLabel } from "@/lib/role-labels";
+
+export const metadata = { title: "Ekip Ligi" };
 /**
  * /app/lig — ofis motivasyon ekranı.
  *
@@ -529,7 +532,7 @@ export default async function LigPage({
                             </span>
                           ) : null}
                         </p>
-                        <p className="text-xs capitalize text-text-faint">{r.agent!.role}</p>
+                        <p className="text-xs text-text-faint">{roleLabel(r.agent!.role)}</p>
                       </TD>
                       <TD align="right">
                         <span className="numeric font-display text-base font-extrabold text-brand-600">{r.total}</span>
@@ -699,7 +702,7 @@ export default async function LigPage({
 /** Puan tablosu kartı — kural şeffaflığı ligin güvenilirliğinin şartı. */
 function ScoreRulesCard() {
   const items: Array<{ key: keyof typeof SCORE_RULES; hint: string }> = [
-    { key: "deal_won", hint: "Kazanılan (won) anlaşma" },
+    { key: "deal_won", hint: "Kazanılan anlaşma" },
     { key: "property_new", hint: "Yeni portföy kaydı" },
     { key: "appointment_done", hint: "Tamamlanan randevu" },
     { key: "task_done", hint: "Tamamlanan görev" },
