@@ -13,7 +13,7 @@ const MOVED_UNDER_PARENTS = [
   "/app/ekip/izinler",
 ];
 const LEGACY_HREFS = [
-  "/app", "/app/brifing", "/app/asistan",
+  "/app", "/app/asistan",
   "/app/musteriler", "/app/akilli-listeler", "/app/tavsiyeler", "/app/talepler", "/app/eslestirme",
   "/app/anlasmalar", "/app/teklifler", "/app/sozlesmeler", "/app/gelen-kutusu", "/app/arama",
   "/app/randevular", "/app/gorevler",
@@ -43,6 +43,10 @@ describe("menü yapısı", () => {
   it("eski menüdeki hiçbir sayfa kaybolmadı (taşınanlar hariç)", () => {
     const missing = LEGACY_HREFS.filter((h) => !ALL_NAV_HREFS.includes(h));
     expect(missing).toEqual([]);
+  });
+
+  it("Günlük Brifing menüden kalktı (içerik ana ekranın Bugün bloğunda; adres yönlendirir)", () => {
+    expect(ALL_NAV_HREFS).not.toContain("/app/brifing");
   });
 
   it("her yol bir kez ve /app altındadır", () => {
