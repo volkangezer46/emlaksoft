@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient, resolveSupabaseAdminKey } from "@/lib/supabase/admin";
+import { restoreImpersonationMetadata } from "@/lib/impersonation";
 import { isDemoLoginEnabled, isPlatformDemoPersonaAllowed } from "@/lib/demo-environment";
 import { getDemoPersona, type DemoPersona } from "@/lib/demo-personas";
 import { planAmountTry } from "@/lib/billing/plans";
@@ -76,11 +77,14 @@ async function ensureAuthUser(
   const existingId = await findAuthUserIdByEmail(admin, persona.email);
   if (!existingId) throw new Error("Demo kullanıcı bulundu ama kimlik alınamadı.");
 
+  // GoTrue app_metadata'yı BİRLEŞTİRİR: önceki bir "ofis adına gör" oturumundan kalan
+  // impersonating/tenant_id gibi anahtarlar yalnız { role } yazınca silinmez ve hesabı kullanılamaz
+  // yapar (platform kimliği "taklit oturumu" sayılıp /app'e atılır). Bu yüzden açıkça temizlenir.
   const { error: updErr } = await admin.auth.admin.updateUserById(existingId, {
     password,
     email_confirm: true,
     user_metadata: { full_name: persona.label },
-    app_metadata: meta,
+    app_metadata: restoreImpersonationMetadata({}, meta),
   });
   if (updErr) throw new Error(updErr.message);
 
