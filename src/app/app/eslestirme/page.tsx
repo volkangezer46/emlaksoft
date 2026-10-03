@@ -84,9 +84,7 @@ export default async function MatchingPage({
   };
 
   // Ofise özel kriter ağırlıkları — null/eksik kolonda varsayılan set kullanılır.
-  const tenantWeights: MatchingWeights | null =
-    (await fetchTenantMatchingWeights(supabase)) ?? null;
-  const weightPercents = matchingWeightsPercent(tenantWeights ?? undefined);
+  const tenantWeightsPromise = fetchTenantMatchingWeights(supabase);
 
   // Form içi canlı önizleme bağlantısı (?kriter=): henüz kaydedilmemiş talebi tek sanal talep
   // olarak skorlar (formdaki sayıyla AYNI parse + skor + aday sorgusu). Kayıt yazılmaz.
@@ -104,9 +102,10 @@ export default async function MatchingPage({
         }
       : null;
 
-  const { data: demandsData } = previewDemand
-    ? { data: [] as DemandRow[] }
-    : await supabase
+  // Ağırlık + talep sorguları birbirinden bağımsız → paralel.
+  const demandsPromise = previewDemand
+    ? Promise.resolve({ data: [] as DemandRow[] })
+    : supabase
         .from("customer_demands")
         .select(
           "id, transaction_type, property_type, province_id, district_id, neighborhood_id, budget_min, budget_max, rooms, min_sqm, urgency, status, criteria, customer:customers!customer_demands_customer_id_fkey(id, full_name)",
@@ -114,6 +113,9 @@ export default async function MatchingPage({
         .neq("status", "closed")
         .order("created_at", { ascending: false })
         .limit(80);
+  const [tenantWeightsRaw, { data: demandsData }] = await Promise.all([tenantWeightsPromise, demandsPromise]);
+  const tenantWeights: MatchingWeights | null = tenantWeightsRaw ?? null;
+  const weightPercents = matchingWeightsPercent(tenantWeights ?? undefined);
 
   let demands = previewDemand ? [previewDemand] : ((demandsData ?? []) as unknown as DemandRow[]);
 
