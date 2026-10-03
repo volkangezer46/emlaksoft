@@ -230,3 +230,32 @@ Kabuk `max-w-[80rem]`. Geçiş 150 ms (opaklık + 4px), `prefers-reduced-motion`
   (`aria-labelledby`, `tabIndex=0`). Zamanı bileşende `clock.ts` ile oku (`Date.now()` yasak).
 - **Sekme kuralı:** 2-5 sekme; alanı olmayan sekme ("Ek bilgi") ilerlemeye girmez. Zorunlusuz sekme, en az bir alan
   dolunca "tamam" sayılır.
+- **Özet = "Girilen bilgiler":** kabuk her sekmenin TÜM alanlarını DOM'dan okuyup etiketli satır olarak gösterir
+  (`use-form-fields.ts` + `lib/form-summary.ts`): telefon biçimli (`formatPhoneDisplay`), e-posta olduğu gibi, il/ilçe/mahalle
+  ve seçimler görünen etiketle, boşsa "Girilmedi"; satır tıklanınca sekmeye/alana gider. Taslak kuralı değişmedi
+  (telefon/e-posta/not/gövde localStorage'a yazılmaz).
+
+## Sekmeler (MorphTabs)
+
+Büyüyen/küçülen sekme dili: **aktif sekme genişler** (ikon + etiket [+ açıklama]), **pasifler ikona küçülür** (erişilebilir ad
+ve `title` kalır). Tek sistem; ikinci sekme bileşeni yazma.
+
+| Parça | Dosya | Kullanım |
+|---|---|---|
+| Saf mantık | `lib/morph-tabs.ts` (+ `form-tabs.ts`: `tabProgress`, `slideDirection`) | yoğunluk (`full/label/icon`), rozet önceliği, tercih |
+| Yüz + `MorphNav` | `ui/morph-tab-parts.tsx` ("use client" YOK) | bağlantı sekmeleri; sunucudan da çizilir (`DetailTabs`, `SectionTabs`) |
+| `MorphTabs` | `ui/morph-tabs.tsx` | ARIA tablist (formlar); yatay + dikey ray |
+| Tercih | `ui/use-persisted-flag.ts` | ray/özet daraltma, localStorage try/catch + bellek yedeği |
+| CSS | `premium.css` "MorphTabs" | `grid-template-columns 0fr -> 1fr` ile <=200 ms; `prefers-reduced-motion` ile anında |
+
+- **Yön:** `horizontal` (mobil dahil; aktif etiketli, pasif ikon) ve `vertical` ray (açıkken aktif genişler + pasifler ikon+etiket;
+  `railCollapsed` ile tamamen ikon-only, rozetler görünür, üzerine gelince/klavye odağında geçici açılan flyout).
+- **Rozet (ikon üstü):** hata sayısı > eksik zorunlu nokta > tamam tiki; ilerleme halkası `--mt-p`. Sayaç yalnız GERÇEK veriden
+  (`count`); verilmeyen sekmede sayaç gösterilmez.
+- **Klavye (ARIA tabs):** yöne uygun oklar + Home/End, roving tabindex, odak = seçim. Form kısayolları (Alt+↑/↓, Ctrl+Enter) aynen.
+- **Stil türleri:** `rail` (form rayı), `pill` (kapsül içinde segment), `underline` (ikon kapsüllü aktif + marka alt çizgi + sayaç rozeti;
+  `SectionTabs` ve `DetailTabs`). `SectionTabs` `counts` (href -> sayı) ve `actions` (sağda filtre/ayar slotu) alır.
+- **Form yerleşimi:** `.tfs-layout` (ray | panel | özet), özet >=1280px'te daraltılabilir, panel geçişi `data-dir` ile yönlü kayma,
+  eylem çubuğunda ilerleme çizgisi.
+- **İkonlar:** form sekmeleri `lib/icons.ts` `TAB_ICONS` sözlüğünden (aynı kavram = aynı ikon, formda çakışma yok; sözleşme testi).
+- **Dokunma hedefi** >=44px (`min-h-11`, ikon-only `2.75rem`); renkler yalnız token (Gece Altın dahil, açık/koyu).
