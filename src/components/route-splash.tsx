@@ -1,4 +1,11 @@
-export default function RootLoading() {
+/**
+ * Ortak rota acilis ekrani. Kok `app/loading.tsx` kaldirildi: kok seviyedeki bir Suspense siniri,
+ * 12.8 KB'tan buyuk statik sayfalari (ana sayfa, fiyatlar, yasal sayfalar) "once yedek, sonra
+ * gizli bolum + $RC" bicimine ceviriyor ve icerik tum HTML inene kadar gorunmuyordu
+ * (olcum: mobil LCP ana sayfa 4.5 sn -> 2.5 sn). Bu bilesen yalnizca dinamik kabuklarda
+ * (/app, /admin layout'u ve token'li/dinamik public segmentler) kullanilir.
+ */
+export function RouteSplash() {
   return (
     <div role="status" aria-busy="true" aria-live="polite" className="flex min-h-screen items-center justify-center bg-canvas">
       <span className="sr-only">Sayfa yükleniyor</span>
@@ -15,3 +22,5 @@ export default function RootLoading() {
     </div>
   );
 }
+
+export default RouteSplash;
