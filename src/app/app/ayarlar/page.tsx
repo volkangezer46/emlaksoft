@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   ArrowUpRight,
   CheckCircle2,
-  CreditCard,
   Crosshair,
   Droplets,
   Fingerprint,
@@ -10,15 +9,12 @@ import {
   MessageSquareText,
   Plug,
   Radio,
-  ScrollText,
   ShieldCheck,
   Sliders,
   Sparkles,
   Square,
   Trash2,
-  UploadCloud,
   Users2,
-  Wallet,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
@@ -53,20 +49,11 @@ const cards: SettingCard[] = [
   { title: "Şube / ekip", desc: "Şubeler, ekipler ve bölge yetkilendirmeleri.", icon: Users2, tone: "bg-cyan-400/12 text-cyan-500", href: "/app/ekip" },
   { title: "Kullanıcı & roller", desc: "Danışman, yönetici ve broker rol izinleri.", icon: Fingerprint, tone: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/roller" },
   { title: "Entegrasyonlar", desc: "Hazır, yapılandırma bekleyen ve planlanan dış servis bağlantıları.", icon: Plug, tone: "bg-cyan-400/12 text-cyan-500", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/entegrasyonlar" },
-  { title: "Duyuru panosu", desc: "Ekibe duyuru yayınlayın, kim okudu takip edin.", icon: Megaphone, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/duyurular" },
+  { title: "Duyuru panosu", desc: "Ekibe duyuru yayınlayın, kim okudu takip edin.", icon: Megaphone, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/bildirimler?sekme=duyurular" },
   { title: "Mesaj şablonları", desc: "WhatsApp için hazır metinler — değişkenler tek tıkla dolar.", icon: MessageSquareText, tone: "bg-mint-500/12 text-mint-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/mesaj-sablonlari" },
   { title: "Güvenlik", desc: "SMS ile iki adımlı doğrulama ve giriş geçmişi.", icon: ShieldCheck, tone: "bg-mint-500/12 text-mint-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/guvenlik" },
   { title: "Çöp kutusu", desc: "Silinen müşteri ve portföyleri 90 gün içinde geri alın.", icon: Trash2, tone: "bg-danger-500/10 text-danger-500", href: "/app/ayarlar/cop-kutusu" },
   { title: "Tanımlar & seçim listeleri", desc: "Müşteri tipi, kaynak, portföy tipi gibi tüm dropdown seçeneklerini yönetin.", icon: Sliders, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/tanimlar" },
-  { title: "Komisyon defteri", desc: "Hakediş kayıtları, danışman payı ve ödeme bağlantıları.", icon: Wallet, tone: "bg-amber-400/15 text-amber-500", href: "/app/komisyon" },
-  { title: "İYS / EİDS", desc: "Kanal izin kayıtları ve EİDS hazırlık adımları.", icon: ShieldCheck, tone: "bg-mint-500/12 text-mint-600", badge: "Manuel", badgeCls: "bg-ink-950/8 text-text-muted", href: "/app/uyum" },
-  { title: "Abonelik & iyzico", desc: "Paket, fatura ve ödeme yöntemi yönetimi.", icon: CreditCard, tone: "bg-brand-600/10 text-brand-600", badge: "Pro", badgeCls: "bg-brand-600/10 text-brand-600", href: "/app/abonelik" },
-  { title: "Değerleme", desc: "Çok kaynaklı fiyat bandı ve ofis emsalleri.", icon: Sliders, tone: "bg-cyan-400/12 text-cyan-500", href: "/app/degerleme" },
-  { title: "Raporlar", desc: "Ofis skoru, komisyon ve kayıp-kaçak özeti.", icon: ScrollText, tone: "bg-danger-500/10 text-danger-500", href: "/app/raporlar" },
-  { title: "Denetim kayıtları", desc: "Yazma işlemleri ve KVKK erişim günlüğü.", icon: ScrollText, tone: "bg-danger-500/10 text-danger-500", href: "/app/denetim" },
-  { title: "Anlaşma hattı", desc: "Anlaşma tahtası · müzakere → kazanılan.", icon: Wallet, tone: "bg-amber-400/15 text-amber-500", href: "/app/anlasmalar" },
-  { title: "Portallar & ilanlar", desc: "Portal ilan bağlama, teyit ve kayıp-kaçak akışı.", icon: Plug, tone: "bg-cyan-400/12 text-cyan-500", href: "/app/portallar" },
-  { title: "İçe Aktarma", desc: "Excel/CSV'den müşteri ve portföy listelerini sihirbazla taşıyın.", icon: UploadCloud, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ice-aktarma" },
   { title: "Aday yakalama", desc: "Web formu/bağlantı, sırayla atama ve hızlı yanıt.", icon: Radio, tone: "bg-mint-500/12 text-mint-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/lead" },
   { title: "Fotoğraf filigranı", desc: "İlan fotoğraflarına ofis logosu/adı otomatik basılsın — ilan çalınmasına karşı.", icon: Droplets, tone: "bg-cyan-400/12 text-cyan-500", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/filigran" },
 ];
@@ -250,7 +237,7 @@ export default async function SettingsPage() {
               </p>
             </div>
           </div>
-          <Link href="/app/eslestirme" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600">
+          <Link href="/app/talepler?sekme=eslesme" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600">
             Eşleştirme sayfası <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>
         </div>

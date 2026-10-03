@@ -192,7 +192,7 @@ export default async function TeamPage() {
                 <Link href="/app/ayarlar/roller" className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-text transition hover:bg-surface-2">
                   <Fingerprint className="h-4 w-4" /> İzin matrisi
                 </Link>
-                <Link href="/app/ekip/izinler" className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-text transition hover:bg-surface-2"><CalendarRange className="h-4 w-4" /> İzin takvimi</Link>
+                <Link href="/app/ekip/izinler" className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-text transition hover:bg-surface-2"><CalendarRange className="h-4 w-4" /> Tatil ve izin takvimi</Link>
                 <Link href="/app/ekip/kartvizitim" className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-text transition hover:bg-surface-2"><IdCard className="h-4 w-4" /> Kartvizitim</Link>
                 {canManage ? (
                   <Link href="/app/ekip/yeni" className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-accent px-4 py-2 text-sm font-semibold text-accent-fg transition hover:opacity-90">

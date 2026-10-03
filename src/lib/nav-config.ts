@@ -67,10 +67,11 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     icon: ICONS.baslikMusteri,
     items: [
       { href: "/app/musteriler", label: "Müşteriler", icon: ICONS.musteri, module: "customers", tier: "core" },
+      // Talepler sayfasının ikinci sekmesi "Eşleşme" (matching izniyle gizlenir); /app/eslestirme yönlendirir.
       { href: "/app/talepler", label: "Talepler", icon: ICONS.talep, module: "demands", tier: "core" },
-      { href: "/app/eslestirme", label: "Eşleştirme", icon: ICONS.eslestirme, module: "matching", tier: "core" },
       { href: "/app/akilli-listeler", label: "Akıllı Listeler", icon: ICONS.akilliListe, module: "customers", tier: "more" },
       { href: "/app/tavsiyeler", label: "Tavsiyeler", icon: ICONS.tavsiye, module: "customers", tier: "more" },
+      { href: "/app/kayip-satis", label: "Kayıp nedenleri", icon: ICONS.dusus, module: "customers", tier: "more" },
     ],
   },
   {
@@ -114,8 +115,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     title: "İletişim",
     icon: ICONS.baslikIletisim,
     items: [
+      // İkinci sekme "Çağrı kaydı" (eski /app/arama, yönlendirir): iki sekme de `calls` modülünde.
       { href: "/app/gelen-kutusu", label: "Gelen Kutusu", icon: ICONS.gelenKutusu, module: "calls", tier: "core" },
-      { href: "/app/arama", label: "Akıllı Arama", icon: ICONS.telefon, module: "calls", tier: "core" },
       { href: "/app/randevular", label: "Randevular", icon: ICONS.randevu, module: "appointments", tier: "core" },
       { href: "/app/gorevler", label: "Görevler", icon: ICONS.gorev, module: "tasks", tier: "core" },
       { href: "/app/kampanyalar", label: "Kampanyalar", icon: ICONS.mesaj, module: "campaigns", tier: "more" },
@@ -147,8 +148,22 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     title: "Performans",
     icon: ICONS.baslikPerformans,
     items: [
-      { href: "/app/raporlar", label: "Raporlar", icon: ICONS.rapor, module: "reports", tier: "core" },
-      { href: "/app/kayip-kacak", label: "Kayıp-kaçak", icon: ICONS.alarm, module: "leak", tier: "more" },
+      {
+        // Raporlar kabuğu: yollar sabit, her sekme kendi sayfasının kapısını (ve paket kilidini) korur.
+        href: "/app/raporlar",
+        label: "Raporlar",
+        icon: ICONS.rapor,
+        module: "reports",
+        tabs: [
+          { href: "/app/raporlar", label: "Ofis", icon: ICONS.rapor, module: "reports" },
+          { href: "/app/bolge-analizi", label: "Bölge", icon: ICONS.bolge, module: "reports" },
+          { href: "/app/raporlar/talep-arz", label: "Talep-arz", icon: ICONS.talepArz, module: "reports" },
+          { href: "/app/raporlar/memnuniyet", label: "Memnuniyet", icon: ICONS.memnuniyet, module: "reports" },
+          { href: "/app/franchise", label: "Şube", icon: ICONS.sube, module: "reports" },
+        ],
+        tier: "core",
+      },
+      { href: "/app/kayip-kacak", label: "Kaçan komisyonlar", icon: ICONS.alarm, module: "leak", tier: "more" },
       {
         href: "/app/danisman-kpi",
         label: "Ekip performansı",
@@ -160,8 +175,6 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         ],
         tier: "more",
       },
-      { href: "/app/bolge-analizi", label: "Bölge Analizi", icon: ICONS.bolge, module: "reports", tier: "more" },
-      { href: "/app/kayip-satis", label: "Kayıp Satış", icon: ICONS.dusus, module: "customers", tier: "more" },
       { href: "/app/pano-tv", label: "Ofis Panosu (TV)", icon: ICONS.panoTv, module: "reports", tier: "more" },
     ],
   },
@@ -197,8 +210,18 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         ],
         tier: "core",
       },
-      { href: "/app/otomasyonlar", label: "Otomasyonlar", icon: ICONS.otomasyon, module: "settings", tier: "more" },
-      { href: "/app/ayarlar/is-akislari", label: "İş Akışları", icon: ICONS.isAkisi, module: "settings", tier: "more" },
+      {
+        // Otomasyon: kurallar + iş akışları (motorlar ayrı kalır, yalnız sayfa düzeyinde tek öğe).
+        href: "/app/otomasyonlar",
+        label: "Otomasyon",
+        icon: ICONS.otomasyon,
+        module: "settings",
+        tabs: [
+          { href: "/app/otomasyonlar", label: "Kurallar", icon: ICONS.otomasyon, module: "settings" },
+          { href: "/app/ayarlar/is-akislari", label: "İş akışları", icon: ICONS.isAkisi, module: "settings" },
+        ],
+        tier: "more",
+      },
       { href: "/app/uyum", label: "Uyum", icon: ICONS.uyum, module: "compliance", tier: "more" },
       { href: "/app/belgeler", label: "Belge Merkezi", icon: ICONS.belge, module: "settings", tier: "more" },
       { href: "/app/denetim", label: "Denetim", icon: ICONS.denetim, module: "settings", tier: "more" },
@@ -228,6 +251,8 @@ export type VisibleSection = NavSection & { href: string };
  */
 export const NAV_ALIASES: Readonly<Record<string, string>> = {
   "/app/yatirim": "/app/hesaplayici?sekme=yatirim",
+  "/app/arama": "/app/gelen-kutusu?sekme=cagri",
+  "/app/eslestirme": "/app/talepler?sekme=eslesme",
 };
 
 /** Sekmeli öğeyi erişilebilir sekmelere indirger; hiç sekme kalmazsa null. */

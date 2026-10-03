@@ -63,6 +63,7 @@ export async function createCall(formData: FormData): Promise<CallResult> {
   });
 
   revalidatePath("/app/arama");
+  revalidatePath("/app/gelen-kutusu");
   if (customerId) revalidatePath(`/app/musteriler/${customerId}`);
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);

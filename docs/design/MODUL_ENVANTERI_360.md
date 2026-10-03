@@ -329,3 +329,9 @@ Paket kapıları: sekme taşınsa bile `PLAN_GATES` sayfa yolu bazlı, doğru ka
 | Para/tarih/etiket yerel kopyaları (bölüm 5, #1-#2, #5) | Orta (bakım) | M | D |
 | Ölü dosyalar (13) + yalnız-test (3) | Düşük | S | D |
 | Menüsüz statik sayfa 21 | Bilgi: 0 gerçek yetim | - | - |
+
+## Birleştirme A notu (menü sadeleştirme)
+
+- Birleştirildi (eski yol redirect dosyası olarak durur): /app/arama -> /app/gelen-kutusu?sekme=cagri, /app/eslestirme -> /app/talepler?sekme=eslesme (matching izniyle gizli sekme), /app/ayarlar/duyurular -> /app/bildirimler?sekme=duyurular (settings izniyle gizli), /admin/hatalar -> /admin/sistem?sekme=hatalar. Sayfa içeriği `*-view.tsx` bileşenlerindedir.
+- Menüde tek öğe, yollar sabit (NavTab): Raporlar (raporlar, bolge-analizi, talep-arz, memnuniyet, franchise) ve Otomasyon (otomasyonlar, ayarlar/is-akislari).
+- BEKLEYEN: /app/brifing ana ekranla aynı üçlüyü (appointments, properties, tasks) yükler. Ana ekran ajanı bitince brifing içeriği ana ekranın üst bloğuna taşınıp /app/brifing -> /app?gorunum=brifing yönlendirilecek; o zamana dek Bugün başlığında tek öğe olarak durur.

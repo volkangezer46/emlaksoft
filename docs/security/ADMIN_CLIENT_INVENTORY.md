@@ -9,7 +9,7 @@
 
 - Toplam birim: **291** (176 dosya) — risk: P0=0, P1=15, P2=276
 - Tenant filtresi: var=197, yok=35, uygulanamaz=52, param=5, devir=2
-- Kapı türü: public-token=34, platform=68, dosya-duzeyi=38, oturum-izin=70, belirsiz=47, elle-dogrulandi=10, cron=21, webhook-imza=3
+- Kapı türü: public-token=34, platform=68, dosya-duzeyi=37, oturum-izin=70, belirsiz=48, elle-dogrulandi=10, cron=21, webhook-imza=3
 - Filtresiz (yok+devir): **37**; RLS'li client'a taşıma adayı: **59**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
@@ -137,8 +137,8 @@ Yok.
 | `src/app/actions/portal-publish.ts:219` | `unpublishPropertyFromPortal` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/actions/portal-publish.ts:167` | `updatePropertyOnPortal` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/actions/projects.ts:411` | `sellUnit` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
-| `src/app/actions/properties.ts:92` | `notifyPriceDropToMatchingDemands` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
-| `src/app/actions/properties.ts:484` | `setPropertyStatus` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
+| `src/app/actions/properties.ts:93` | `notifyPriceDropToMatchingDemands` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/app/actions/properties.ts:512` | `setPropertyStatus` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/property-management.ts:34` | `changePropertyStatus` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/property-media.ts:398` | `ocrPropertyMediaDocument` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/public-valuation.ts:104` | `estimatePublicValuation` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
@@ -180,16 +180,16 @@ Yok.
 | `src/app/admin/geo/[provinceId]/[districtId]/page.tsx:23` | `AdminGeoDistrictPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/admin/geo/[provinceId]/page.tsx:21` | `AdminGeoProvincePage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/admin/geo/page.tsx:16` | `AdminGeoPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
-| `src/app/admin/hatalar/page.tsx:89` | `ErrorLogsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
-| `src/app/admin/members/[id]/page.tsx:61` | `AdminMemberDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/admin/hatalar/errors-view.tsx:89` | `ErrorsView` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/admin/members/[id]/page.tsx:56` | `AdminMemberDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/members/page.tsx:78` | `AdminMembersPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/page.tsx:52` | `getAdminDashboardData` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/raporlar/page.tsx:44` | `AdminReportsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/admin/satis/[id]/page.tsx:24` | `AdminLeadDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/satis/page.tsx:49` | `AdminSalesPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
-| `src/app/admin/sistem/page.tsx:42` | `AdminSystemPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/admin/sistem/schema-checks.ts:55` | `probeSchema` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
-| `src/app/admin/tenants/[id]/page.tsx:54` | `AdminTenantDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/admin/sistem/system-view.tsx:42` | `SystemView` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
+| `src/app/admin/tenants/[id]/page.tsx:90` | `AdminTenantDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/tenants/page.tsx:65` | `AdminTenantsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/tickets/[id]/page.tsx:139` | `AdminTicketDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/tickets/page.tsx:240` | `AdminTicketsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
@@ -233,7 +233,7 @@ Yok.
 | `src/app/app/ayarlar/guvenlik/actions.ts:28` | `setTwoFactorSms` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/app/ekip/invite-actions.ts:140` | `createAdvisor` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/app/ekip/invite-actions.ts:30` | `resendInvite` | auth.admin API'si (RLS ile yapılamaz). | oturum-izin | var | P2 |
-| `src/app/app/ekip/page.tsx:89` | `TeamPage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
+| `src/app/app/ekip/page.tsx:91` | `TeamPage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/danisman/[slug]/page.tsx:142` | `AgentCardPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/danisman/[slug]/page.tsx:107` | `generateMetadata` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/danisman/[slug]/page.tsx:80` | `loadAgent` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
@@ -243,11 +243,11 @@ Yok.
 | `src/app/giris/dogrulama/actions.ts:265` | `cancelLoginVerification` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
 | `src/app/giris/dogrulama/actions.ts:202` | `resendLoginCode` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/app/giris/dogrulama/actions.ts:57` | `verifyLoginCode` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
-| `src/app/imza/[token]/page.tsx:29` | `PublicContractSignPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
+| `src/app/imza/[token]/page.tsx:30` | `PublicContractSignPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/lead/[token]/page.tsx:13` | `PublicLeadPage` | Oturumsuz token'lı public yüzey. | public-token | uygulanamaz | P2 |
-| `src/app/malik-portali/[token]/page.tsx:97` | `MalikPortaliPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/musteri-portali/[token]/page.tsx:95` | `CustomerPortalPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/odeme-link/[token]/page.tsx:44` | `PublicPaymentLinkPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
+| `src/app/malik-portali/[token]/page.tsx:96` | `MalikPortaliPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/musteri-portali/[token]/page.tsx:94` | `CustomerPortalPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/odeme-link/[token]/page.tsx:43` | `PublicPaymentLinkPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/paylas/[token]/page.tsx:63` | `generateMetadata` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/paylas/[token]/page.tsx:125` | `PublicSharePage` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
 | `src/app/randevu-al/[token]/page.tsx:46` | `BookingPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
@@ -262,8 +262,8 @@ Yok.
 | `src/app/vitrin/[slug]/favoriler/page.tsx:22` | `generateMetadata` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/vitrin/[slug]/favoriler/page.tsx:37` | `VitrinFavorilerPage` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/vitrin/[slug]/opengraph-image.tsx:13` | `Image` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/vitrin/[slug]/page.tsx:62` | `generateMetadata` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/vitrin/[slug]/page.tsx:105` | `VitrinPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
+| `src/app/vitrin/[slug]/page.tsx:63` | `generateMetadata` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/vitrin/[slug]/page.tsx:106` | `VitrinPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/lib/activity.ts:17` | `writeActivity` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/lib/admin-badges.ts:30` | `cachedBadges` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
 | `src/lib/automation-engine.ts:493` | `dispatchAutomationEvent` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
@@ -299,7 +299,7 @@ Yok.
 | `src/lib/platform-activity.ts:18` | `logPlatformActivity` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
 | `src/lib/platform-notify.ts:19` | `notifyPlatformStaff` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
 | `src/lib/platform-settings.ts:6` | `getPlatformSetting` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
-| `src/lib/platform-settings.ts:21` | `setPlatformSetting` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
+| `src/lib/platform-settings.ts:21` | `setPlatformSetting` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
 | `src/lib/platform.ts:35` | `bootstrapPlatformStaffIfAllowed` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
 | `src/lib/playbook-trigger.ts:28` | `triggerPlaybooks` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/lib/public-mutation-outbox.ts:59` | `processPublicMutationOutbox` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
