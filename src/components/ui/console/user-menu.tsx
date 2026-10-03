@@ -1,8 +1,9 @@
 "use client";
 
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { runWhenIdle } from "@/lib/idle";
 import type { UiPrefs } from "@/lib/ui-prefs";
 
 export type UserMenuLink = { href: string; label: string } & (
@@ -28,6 +29,8 @@ export function UserMenu(props: {
   viewPrefs?: { cookieName: string; initial: UiPrefs };
 }) {
   const [mounted, setMounted] = useState(false);
+  // Sayfa boşalınca panel parçasını arka planda indir: ilk tıklama beklemesin (hover/odak ısıtması ek güvence).
+  useEffect(() => runWhenIdle(() => void loadPanel()), []);
   if (mounted) {
     return (
       <Suspense fallback={<Trigger {...props} />}>

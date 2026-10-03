@@ -3,6 +3,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import type { NotificationRow } from "@/app/actions/notifications";
+import { runWhenIdle } from "@/lib/idle";
 import { onNotificationInsert } from "@/lib/realtime";
 
 /**
@@ -39,6 +40,9 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
   const [mounted, setMounted] = useState(false);
   const [items, setItems] = useState(initial);
   const [shake, setShake] = useState(false);
+
+  // Sayfa boşalınca panel parçasını arka planda indir: ilk tıklama beklemesin (hover/odak ısıtması ek güvence).
+  useEffect(() => runWhenIdle(() => void loadPanel()), []);
 
   // Canlı bildirim: RealtimeRefresh, notifications INSERT'lerini window event olarak
   // köprüler (bkz. src/lib/realtime.ts). Listeye anında ekle + zili bir kez salla.
