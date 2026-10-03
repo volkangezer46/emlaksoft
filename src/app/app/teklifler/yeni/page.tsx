@@ -11,7 +11,7 @@ export default async function NewOfferPage({
 }: {
   searchParams?: Promise<{ musteri?: string; portfoy?: string }>;
 }) {
-  const { perms } = await requireModulePage("offers", "/app/teklifler");
+  const { perms, userId } = await requireModulePage("offers", "/app/teklifler");
   const canCreate = perms.offers?.includes("create") ?? perms.commissions?.includes("create") ?? false;
   if (!canCreate) redirect("/app/teklifler");
 
@@ -77,6 +77,7 @@ export default async function NewOfferPage({
 
   return (
     <NewOfferForm
+      userId={userId}
       properties={properties}
       customers={customers}
       defaultPropertyId={prefillPropertyId}

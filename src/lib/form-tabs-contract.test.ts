@@ -3,6 +3,10 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { CUSTOMER_DRAFT_FIELDS, CUSTOMER_TABS } from "@/app/app/musteriler/yeni/customer-tabs";
 import { PROPERTY_DRAFT_FIELDS, PROPERTY_TABS } from "@/app/app/portfoyler/yeni/property-tabs";
+import { DEMAND_DRAFT_FIELDS, DEMAND_TABS } from "@/app/app/talepler/yeni/demand-tabs";
+import { DEAL_DRAFT_FIELDS, DEAL_TABS } from "@/app/app/anlasmalar/yeni/deal-tabs";
+import { OFFER_DRAFT_FIELDS, OFFER_TABS } from "@/app/app/teklifler/yeni/offer-tabs";
+import { CONTRACT_DRAFT_FIELDS, CONTRACT_TABS } from "@/app/app/sozlesmeler/yeni/contract-tabs";
 import { isSensitiveFieldName } from "./form-tabs";
 
 /**
@@ -45,6 +49,30 @@ const FORMS = [
     source: "src/app/app/portfoyler/yeni/property-form.tsx",
     tabs: PROPERTY_TABS as readonly TabLike[],
     draft: PROPERTY_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "talep",
+    source: "src/app/app/talepler/yeni/demand-form.tsx",
+    tabs: DEMAND_TABS as readonly TabLike[],
+    draft: DEMAND_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "anlaşma",
+    source: "src/app/app/anlasmalar/yeni/new-deal-form.tsx",
+    tabs: DEAL_TABS as readonly TabLike[],
+    draft: DEAL_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "teklif",
+    source: "src/app/app/teklifler/yeni/new-offer-form.tsx",
+    tabs: OFFER_TABS as readonly TabLike[],
+    draft: OFFER_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "sözleşme",
+    source: "src/app/app/sozlesmeler/yeni/new-contract-form.tsx",
+    tabs: CONTRACT_TABS as readonly TabLike[],
+    draft: CONTRACT_DRAFT_FIELDS as readonly string[],
   },
 ];
 

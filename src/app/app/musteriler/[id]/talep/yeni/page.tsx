@@ -8,7 +8,7 @@ export const metadata = { title: "Yeni talep" };
 
 export default async function NewCustomerDemandPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { perms } = await requireModulePage("customers");
+  const { perms, userId } = await requireModulePage("customers");
   const customerHref = `/app/musteriler/${id}`;
   if (!(perms.demands ?? []).includes("create")) redirect(customerHref);
 
@@ -29,6 +29,7 @@ export default async function NewCustomerDemandPage({ params }: { params: Promis
 
   return (
     <DemandForm
+      userId={userId}
       fixedCustomer={{ id: customer.id, full_name: customer.full_name }}
       provinces={provinces ?? []}
       defaultProvinceId={customer.province_id}

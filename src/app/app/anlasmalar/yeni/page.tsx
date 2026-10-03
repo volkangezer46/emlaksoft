@@ -6,7 +6,7 @@ import { NewDealForm } from "./new-deal-form";
 export const metadata = { title: "Yeni anlaşma" };
 
 export default async function NewDealPage() {
-  const { perms } = await requireModulePage("commissions");
+  const { perms, userId } = await requireModulePage("commissions");
   if (!(perms.commissions ?? []).includes("create")) redirect("/app/anlasmalar");
   const supabase = await createClient();
 
@@ -25,5 +25,5 @@ export default async function NewDealPage() {
       .limit(200),
   ]);
 
-  return <NewDealForm properties={properties ?? []} customers={customers ?? []} />;
+  return <NewDealForm properties={properties ?? []} customers={customers ?? []} userId={userId} />;
 }

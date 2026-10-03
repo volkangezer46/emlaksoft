@@ -11,7 +11,7 @@ export default async function NewContractPage({
 }: {
   searchParams?: Promise<{ customer?: string; property?: string; tur?: string }>;
 }) {
-  const { perms } = await requireModulePage("contracts", "/app/sozlesmeler");
+  const { perms, userId } = await requireModulePage("contracts", "/app/sozlesmeler");
   if (!(perms.contracts?.includes("create") ?? false)) redirect("/app/sozlesmeler");
 
   const params = (await searchParams) ?? {};
@@ -26,6 +26,7 @@ export default async function NewContractPage({
 
   return (
     <NewContractForm
+      userId={userId}
       contractTypes={contractTypes}
       templates={templates}
       prefillCustomer={params.customer ?? ""}

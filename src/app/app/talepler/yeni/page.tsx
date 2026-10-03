@@ -11,7 +11,7 @@ export default async function NewDemandPage({
 }: {
   searchParams: Promise<{ musteri?: string }>;
 }) {
-  const { perms } = await requireModulePage("demands");
+  const { perms, userId } = await requireModulePage("demands");
   if (!(perms.demands ?? []).includes("create")) redirect("/app/talepler");
 
   const { musteri } = await searchParams;
@@ -39,6 +39,7 @@ export default async function NewDemandPage({
 
   return (
     <DemandForm
+      userId={userId}
       customers={options}
       defaultCustomerId={pre?.id}
       provinces={provinces ?? []}
