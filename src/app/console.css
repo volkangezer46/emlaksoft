@@ -135,3 +135,4 @@ a.nav-flyout-title:hover { background: rgba(255, 255, 255, 0.08); }
 html[data-sidebar="collapsed"] .shell-aside .sb-rail { display: block; }
 html[data-sidebar="collapsed"] .shell-aside .sb-expanded { display: none; }
 html[data-sidebar="collapsed"] .shell-aside .nav-search { justify-content: center; padding-inline: 0; }
+.nav-badge.is-ok { background: #0f6b4a; }
