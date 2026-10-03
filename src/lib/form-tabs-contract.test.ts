@@ -7,6 +7,10 @@ import { APPROVAL_DRAFT_FIELDS, APPROVAL_TABS } from "@/app/app/onaylar/yeni/app
 import { CAMPAIGN_DRAFT_FIELDS, CAMPAIGN_TABS } from "@/app/app/kampanyalar/yeni/campaign-tabs";
 import { PROJECT_DRAFT_FIELDS, PROJECT_TABS } from "@/app/app/projeler/yeni/project-tabs";
 import { TICKET_DRAFT_FIELDS, TICKET_TABS } from "@/app/app/destek/yeni/ticket-tabs";
+import { DEMAND_DRAFT_FIELDS, DEMAND_TABS } from "@/app/app/talepler/yeni/demand-tabs";
+import { DEAL_DRAFT_FIELDS, DEAL_TABS } from "@/app/app/anlasmalar/yeni/deal-tabs";
+import { OFFER_DRAFT_FIELDS, OFFER_TABS } from "@/app/app/teklifler/yeni/offer-tabs";
+import { CONTRACT_DRAFT_FIELDS, CONTRACT_TABS } from "@/app/app/sozlesmeler/yeni/contract-tabs";
 import { APPOINTMENT_DRAFT_FIELDS, APPOINTMENT_TABS } from "@/app/app/randevular/yeni/appointment-tabs";
 import { TASK_DRAFT_FIELDS, TASK_TABS } from "@/app/app/gorevler/yeni/task-tabs";
 import { RENTAL_DRAFT_FIELDS, RENTAL_TABS } from "@/app/app/kiralama/yeni/rental-tabs";
@@ -78,6 +82,30 @@ const FORMS = [
     source: "src/app/app/destek/yeni/new-ticket-form.tsx",
     tabs: TICKET_TABS as readonly TabLike[],
     draft: TICKET_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "talep",
+    source: "src/app/app/talepler/yeni/demand-form.tsx",
+    tabs: DEMAND_TABS as readonly TabLike[],
+    draft: DEMAND_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "anlaşma",
+    source: "src/app/app/anlasmalar/yeni/new-deal-form.tsx",
+    tabs: DEAL_TABS as readonly TabLike[],
+    draft: DEAL_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "teklif",
+    source: "src/app/app/teklifler/yeni/new-offer-form.tsx",
+    tabs: OFFER_TABS as readonly TabLike[],
+    draft: OFFER_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "sözleşme",
+    source: "src/app/app/sozlesmeler/yeni/new-contract-form.tsx",
+    tabs: CONTRACT_TABS as readonly TabLike[],
+    draft: CONTRACT_DRAFT_FIELDS as readonly string[],
   },
   {
     name: "randevu",

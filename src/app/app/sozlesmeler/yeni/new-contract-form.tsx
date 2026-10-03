@@ -1,13 +1,22 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, FilePlus2, FileSignature } from "lucide-react";
+import { ArrowLeft, FilePlus2, FileSignature, FileText, ScrollText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button, ButtonLink } from "@/components/ui/button";
-import { FormActions, FormPage, FormSection } from "@/components/ui/form-page";
-import { FormError, FormField, FormInput, FormSelect, fieldClass } from "@/components/ui/form-controls";
+import { ButtonLink } from "@/components/ui/button";
+import { FormActions, FormPage } from "@/components/ui/form-page";
+import { FormField, FormInput, FormSelect, fieldClass } from "@/components/ui/form-controls";
+import {
+  SummaryGroup,
+  SummaryRow,
+  TabbedFormShell,
+  type FormTab,
+  type TabbedSummaryContext,
+} from "@/components/ui/tabbed-form-shell";
 import { useToast } from "@/components/app/toast-provider";
+import { DAY_MS, msUntil } from "@/lib/clock";
+import { CONTRACT_DRAFT_FIELDS, CONTRACT_FORM_ID, CONTRACT_TABS } from "./contract-tabs";
 import {
   createContract,
   saveContractTemplate,
@@ -147,6 +156,9 @@ Danışman: ___________________________  Tarih: _______
 Müşteri:  ___________________________  Tarih: _______`,
 };
 
+const TAB_ICONS = { bilgiler: FileText, icerik: ScrollText } as const;
+const FIELD_LABELS = { title: "Sözleşme başlığı", body: "Sözleşme içeriği" };
+
 const init: ContractResult = {};
 
 export function NewContractForm({
@@ -155,6 +167,7 @@ export function NewContractForm({
   prefillCustomer = "",
   prefillProperty = "",
   prefillTur = "",
+  userId,
 }: {
   contractTypes?: { value: string; label: string }[];
   /** DB'den gelen global + ofis şablonları ("Şablondan başla" galerisi). */
@@ -163,6 +176,7 @@ export function NewContractForm({
   prefillCustomer?: string;
   prefillProperty?: string;
   prefillTur?: string;
+  userId: string;
 }) {
   const [isPending, startTransition] = useTransition();
   const [localError, setLocalError] = useState<string | null>(null);
@@ -215,6 +229,19 @@ export function NewContractForm({
       router.refresh();
     });
   }
+
+  const tabs: FormTab[] = useMemo(
+    () =>
+      CONTRACT_TABS.map((t) => ({
+        id: t.id,
+        label: t.label,
+        description: t.description,
+        icon: TAB_ICONS[t.id],
+        fields: [...t.fields],
+        required: [...t.required],
+      })),
+    [],
+  );
 
   const crumbs = [{ label: "Sözleşmeler", href: "/app/sozlesmeler" }, { label: "Yeni sözleşme" }];
 
@@ -276,111 +303,176 @@ export function NewContractForm({
     );
   }
 
-  return (
-    <form onSubmit={handleSubmit}>
-      <FormPage
-        title="Yeni sözleşme"
-        description="Taslağı oluşturun; imzalayanları ekleyip imza linki gönderin."
-        breadcrumbs={crumbs}
-        actions={
-          templates.length > 0 && !hasPrefill ? (
-            <button
-              type="button"
-              onClick={() => setStep("template")}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:underline"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" /> Şablon galerisine dön
-            </button>
-          ) : undefined
-        }
-      >
+  const tabPanels = {
+    bilgiler: (
+      <>
         {prefillCustomer ? <input type="hidden" name="customer_id" value={prefillCustomer} /> : null}
         {prefillProperty ? <input type="hidden" name="property_id" value={prefillProperty} /> : null}
         {prefillCustomer || prefillProperty ? (
-          <p className="rounded-[var(--radius-control)] bg-brand-600/8 px-3 py-2 text-xs font-medium text-brand-700">
+          <p className="rounded-[var(--radius-control)] bg-brand-600/8 px-3 py-2 text-xs font-medium text-brand-700 sm:col-span-2">
             {isYerGosterme
               ? "Randevu akışından gelindi — müşteri ve portföy bağı otomatik eklenecek; içerikte yer gösterme tutanağı şablonu hazır."
               : "Teklif akışından gelindi — portföy ve müşteri bağı sözleşmeye otomatik eklenecek."}
           </p>
         ) : null}
-
-        <FormSection title="Sözleşme bilgileri">
-          <FormField label="Sözleşme başlığı" htmlFor="sozl-title" required className="sm:col-span-2">
-            <FormInput
-              name="title"
-              type="text"
-              required
-              defaultValue={isYerGosterme ? "Yer Gösterme Tutanağı" : undefined}
-              placeholder="ör. Daire Kira Sözleşmesi — Ahmet Yılmaz"
-            />
-          </FormField>
-          <FormField label="Tür" htmlFor="sozl-type">
-            <FormSelect
-              name="contract_type"
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
-              className="appearance-none"
-            >
-              {contractTypes.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </FormSelect>
-          </FormField>
-          <FormField label="Son geçerlilik tarihi (opsiyonel)" htmlFor="sozl-expires">
-            <FormInput name="expires_at" type="date" />
-          </FormField>
-        </FormSection>
-
-        <FormSection title="Sözleşme içeriği" description="Metni yazın veya türe uygun şablonu uygulayın.">
-          <div className="sm:col-span-2">
-            <div className="mb-1.5 flex items-center justify-between">
-              <label htmlFor="sozl-body" className="text-sm font-semibold text-ink-950">Sözleşme içeriği</label>
-              {activeTemplate && (
-                <button
-                  type="button"
-                  onClick={() => setBody(activeTemplate)}
-                  className="text-xs font-semibold text-brand-600 hover:underline"
-                >
-                  Şablonu uygula
-                </button>
-              )}
-            </div>
-            <textarea
-              id="sozl-body"
-              name="body"
-              required
-              rows={14}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Sözleşme metnini buraya yazın veya şablonu kullanın…"
-              className={`${fieldClass} resize-y font-mono text-xs`}
-            />
+        <FormField label="Sözleşme başlığı" htmlFor="sozl-title" required className="sm:col-span-2">
+          <FormInput
+            name="title"
+            type="text"
+            required
+            defaultValue={isYerGosterme ? "Yer Gösterme Tutanağı" : undefined}
+            placeholder="ör. Daire Kira Sözleşmesi — Ahmet Yılmaz"
+          />
+        </FormField>
+        <FormField label="Tür" htmlFor="sozl-type">
+          <FormSelect
+            name="contract_type"
+            value={selectedType}
+            onChange={(e) => setSelectedType(e.target.value)}
+            className="appearance-none"
+          >
+            {contractTypes.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </FormSelect>
+        </FormField>
+        <FormField label="Son geçerlilik tarihi (opsiyonel)" htmlFor="sozl-expires">
+          <FormInput name="expires_at" type="date" />
+        </FormField>
+      </>
+    ),
+    icerik: (
+      <>
+        <div className="sm:col-span-2">
+          <div className="mb-1.5 flex items-center justify-between">
+            <label htmlFor="sozl-body" className="text-sm font-semibold text-ink-950">Sözleşme içeriği</label>
+            {activeTemplate && (
+              <button
+                type="button"
+                onClick={() => setBody(activeTemplate)}
+                className="text-xs font-semibold text-brand-600 hover:underline"
+              >
+                Şablonu uygula
+              </button>
+            )}
           </div>
-          <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3.5 py-2.5 sm:col-span-2">
-            <input
-              type="checkbox"
-              checked={saveAsTemplate}
-              onChange={(e) => setSaveAsTemplate(e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
-            />
-            <span>
-              <span className="block text-sm font-semibold text-ink-950">Bu içeriği şablon olarak kaydet</span>
-              <span className="block text-xs text-text-muted">
-                Metin, ofisinizin şablon galerisine eklenir; sonraki sözleşmelerde hazır gelir.
-              </span>
+          <textarea
+            id="sozl-body"
+            name="body"
+            required
+            rows={14}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Sözleşme metnini buraya yazın veya şablonu kullanın…"
+            className={`${fieldClass} resize-y font-mono text-xs`}
+          />
+        </div>
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3.5 py-2.5 sm:col-span-2">
+          <input
+            type="checkbox"
+            checked={saveAsTemplate}
+            onChange={(e) => setSaveAsTemplate(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
+          />
+          <span>
+            <span className="block text-sm font-semibold text-ink-950">Bu içeriği şablon olarak kaydet</span>
+            <span className="block text-xs text-text-muted">
+              Metin, ofisinizin şablon galerisine eklenir; sonraki sözleşmelerde hazır gelir.
             </span>
-          </label>
-        </FormSection>
+          </span>
+        </label>
+      </>
+    ),
+  };
 
-        <FormError error={localError} />
+  function renderSummary({ values }: TabbedSummaryContext) {
+    const title = (values.title ?? "").trim();
+    const typeLabel = contractTypes.find((t) => t.value === selectedType)?.label ?? selectedType;
+    const expires = (values.expires_at ?? "").trim();
+    const days = expires ? Math.ceil(msUntil(expires) / DAY_MS) : null;
+    const text = values.body ?? "";
+    const trimmed = text.trim();
+    const lines = trimmed ? trimmed.split(/\r?\n/).length : 0;
+    const blanks = (text.match(/_{3,}/g) ?? []).length;
+    return (
+      <>
+        <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
+          <p className="line-clamp-2 text-sm font-semibold text-ink-950">{title || "Sözleşme başlığı girilmedi"}</p>
+          <p className="mt-0.5 truncate text-xs text-text-muted">{typeLabel}</p>
+        </div>
+        <SummaryGroup title="Sözleşme">
+          <SummaryRow label="Başlık" value={title || "Zorunlu"} muted={!title} tab="bilgiler" field="title" />
+          <SummaryRow label="Tür" value={typeLabel} tab="bilgiler" field="contract_type" />
+          <SummaryRow
+            label="Bitiş"
+            value={
+              days == null || Number.isNaN(days)
+                ? "Süresiz"
+                : days < 0
+                  ? `${expires.split("-").reverse().join(".")} · süresi geçmiş`
+                  : `${expires.split("-").reverse().join(".")} · ${days} gün kaldı`
+            }
+            muted={!expires}
+            tab="bilgiler"
+            field="expires_at"
+          />
+          <SummaryRow label="Müşteri bağı" value={prefillCustomer ? "Eklenecek" : "Yok"} muted={!prefillCustomer} tab="bilgiler" />
+          <SummaryRow label="Portföy bağı" value={prefillProperty ? "Eklenecek" : "Yok"} muted={!prefillProperty} tab="bilgiler" />
+        </SummaryGroup>
+        <SummaryGroup title="İçerik">
+          <SummaryRow
+            label="Metin"
+            value={trimmed ? `${new Intl.NumberFormat("tr-TR").format(trimmed.length)} karakter · ${lines} satır` : "Zorunlu"}
+            muted={!trimmed}
+            tab="icerik"
+            field="sozl-body"
+          />
+          <SummaryRow
+            label="Doldurulacak boşluk"
+            value={trimmed ? (blanks > 0 ? `${blanks} alan (___)` : "Yok") : "Metin girilince"}
+            muted={!trimmed || blanks === 0}
+            tab="icerik"
+            field="sozl-body"
+          />
+          <SummaryRow
+            label="Şablon olarak kaydet"
+            value={saveAsTemplate ? "Evet" : "Hayır"}
+            muted={!saveAsTemplate}
+            tab="icerik"
+          />
+        </SummaryGroup>
+      </>
+    );
+  }
 
-        <FormActions>
-          <ButtonLink href="/app/sozlesmeler" variant="secondary">İptal</ButtonLink>
-          <Button type="submit" loading={isPending} icon={FileSignature}>
-            {isPending ? "Kaydediliyor…" : "Sözleşme oluştur"}
-          </Button>
-        </FormActions>
-      </FormPage>
-    </form>
+  return (
+    <TabbedFormShell
+      title="Yeni sözleşme"
+      description="Taslağı oluşturun; imzalayanları ekleyip imza linki gönderin."
+      breadcrumbs={crumbs}
+      headerActions={
+        templates.length > 0 && !hasPrefill ? (
+          <button
+            type="button"
+            onClick={() => setStep("template")}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:underline"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Şablon galerisine dön
+          </button>
+        ) : undefined
+      }
+      cancelHref="/app/sozlesmeler"
+      submitLabel="Sözleşme oluştur"
+      pendingLabel="Kaydediliyor…"
+      submitIcon={FileSignature}
+      pending={isPending}
+      error={localError}
+      onSubmit={handleSubmit}
+      tabs={tabs}
+      tabPanels={tabPanels}
+      summary={renderSummary}
+      fieldLabels={FIELD_LABELS}
+      draft={{ userId, formId: CONTRACT_FORM_ID, fields: [...CONTRACT_DRAFT_FIELDS] }}
+    />
   );
 }
