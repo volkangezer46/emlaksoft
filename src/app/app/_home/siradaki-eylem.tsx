@@ -28,7 +28,7 @@ const TONE_BAR: Record<NextActionTone, string> = {
 };
 
 /** Kart yüksekliği iskelet ve gerçek kartta aynı (CLS yok). */
-const CARD_MIN = "min-h-[9.5rem]";
+const CARD_MIN = "min-h-[13.5rem] sm:min-h-[9.5rem]";
 
 export function SiradakiEylemIskelet() {
   return (

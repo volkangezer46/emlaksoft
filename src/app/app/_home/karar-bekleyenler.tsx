@@ -22,9 +22,10 @@ export function KararBekleyenlerIskelet() {
     <div role="status" aria-busy="true" className={`${CARD_MIN} rounded-[var(--radius-panel)] border border-line bg-surface p-5`}>
       <span className="sr-only">Yükleniyor</span>
       <Skeleton className="h-5 w-48" />
-      <div className="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <Skeleton className="mt-2 h-4 w-full sm:hidden" />
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-16 rounded-[var(--radius-card)]" />
+          <Skeleton key={i} className={cn("h-24 rounded-[var(--radius-card)] sm:h-16", i === 3 && "max-sm:hidden")} />
         ))}
       </div>
     </div>

@@ -58,7 +58,7 @@ export function StatRow({
                   {it.icon}
                 </span>
               ) : null}
-              <span className="line-clamp-2 min-w-0 break-words" title={it.label}>{it.label}</span>
+              <span className="line-clamp-2 min-w-0 [overflow-wrap:normal] hyphens-auto" title={it.label}>{it.label}</span>
             </span>
             <span className="flex items-baseline gap-1.5">
               <span

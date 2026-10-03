@@ -80,6 +80,7 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
 }
 .pm-card:hover { box-shadow: var(--inner-top), var(--pm-shadow-hover); border-color: color-mix(in srgb, var(--t, var(--accent)) 38%, var(--hairline)); }
 .pm-card-head { display: flex; align-items: center; gap: 0.7rem; }
+@media (max-width: 639px) { .pm-card-head { gap: 0.5rem; } }
 .pm-ico {
   display: grid;
   place-items: center;
@@ -91,7 +92,7 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
   color: var(--t-text);
 }
 .pm-ico svg { width: 1.2rem; height: 1.2rem; }
-.pm-card-title { flex: 1; min-width: 0; font-size: 0.875rem; font-weight: 600; color: var(--text); }
+.pm-card-title { flex: 1; min-width: 4.5rem; overflow-wrap: normal; word-break: normal; hyphens: auto; font-size: 0.875rem; font-weight: 600; color: var(--text); }
 .pm-card-arrow { flex: none; color: var(--text-faint); transition: transform 160ms ease, color 160ms ease; }
 .pm-card:hover .pm-card-arrow { color: var(--t-text); }
 .pm-value {
@@ -206,6 +207,8 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
 @media (prefers-reduced-motion: no-preference) {
   .pm-glass { transition: background-color 160ms ease, border-color 160ms ease; }
 }
+/* Mobil: iskelet ve gerçek kutu aynı asgari yüksekliği paylaşır (CLS). */
+@media (max-width: 639px) { .pm-glass { min-height: 8.75rem; } }
 .pm-glass-bars { position: absolute; top: 0.8rem; right: 0.9rem; opacity: 0.95; }
 .pm-glass[data-series="1"] .pm-glass-label { padding-right: 3.4rem; }
 .pm-glass:hover { background: rgba(255, 255, 255, 0.12); border-color: rgba(240, 195, 106, 0.5); }

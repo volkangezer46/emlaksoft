@@ -164,7 +164,7 @@ export function KpiGrid({
   label?: string;
 }) {
   return (
-    <div role="group" aria-label={label} className={cn("grid items-stretch gap-4", kpiColumns(count), className)}>
+    <div role="group" aria-label={label} className={cn("grid items-stretch gap-3 sm:gap-4", kpiColumns(count), className)}>
       {children}
     </div>
   );
