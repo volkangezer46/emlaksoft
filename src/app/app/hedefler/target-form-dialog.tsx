@@ -6,18 +6,9 @@ import {
   updateTarget,
   type TargetResult,
 } from "@/app/actions/targets-openhouse-sources";
-import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { FormField, Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogBody,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 
 type Member = { id: string; full_name: string };
 
@@ -66,65 +57,48 @@ export function TargetFormDialog({
   const defaultMonth = target.period_start.slice(0, 7);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <InlineTabbedPanel
+      open={open}
+      onOpenChange={setOpen}
+      title="Hedefi düzenle"
+      description="Danışman veya ofis geneli için dönemsel anlaşma ve gelir hedefi."
+      icon={<Pencil />}
+      action={formAction}
+      pending={pending}
+      error={state.error}
+      summary
+      hiddenFields={target ? <input type="hidden" name="id" value={target.id} /> : null}
+      fieldLabels={{ period: "Dönem", period_start: "Başlangıç", profile_id: "Danışman", target_deals: "Hedef anlaşma", target_revenue: "Hedef gelir (₺)" }}
+      trigger={({ onClick, ...aria }) => (
         <button
           type="button"
+          onClick={onClick}
+          {...aria}
           aria-label="Hedefi düzenle"
           // relative z-10: kartı kaplayan overlay linkin üstünde kalması için
           className="focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
         >
           <Pencil className="h-4 w-4" />
         </button>
-      </DialogTrigger>
-
-      <DialogContent size="md">
-        <DialogHeader
-          icon={<Pencil />}
-          title="Hedefi düzenle"
-          description="Danışman veya ofis geneli için dönemsel anlaşma ve gelir hedefi."
-        />
-        <form action={formAction}>
-          {target ? <input type="hidden" name="id" value={target.id} /> : null}
-          <DialogBody className="grid gap-4 sm:grid-cols-2">
+      )}
+      tabs={[{ id: "hedef", label: "Hedef", fields: ["period", "period_start", "profile_id", "target_deals", "target_revenue"] }]}
+      panels={{
+        hedef: (
+          <>
             <FormField label="Dönem" htmlFor="target-period" required>
               <div className="relative">
-                <select
-                  id="target-period"
-                  name="period"
-                  defaultValue={target?.period ?? "monthly"}
-                  className={selectClass}
-                >
+                <select id="target-period" name="period" defaultValue={target?.period ?? "monthly"} className={selectClass}>
                   {PERIODS.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}
-                    </option>
+                    <option key={p.value} value={p.value}>{p.label}</option>
                   ))}
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
               </div>
             </FormField>
-
-            <FormField
-              label="Dönem başlangıcı"
-              htmlFor="target-period-start"
-              required
-              hint="Çeyreklik/yıllık hedefte başlangıç ayını seçin."
-            >
-              <Input
-                id="target-period-start"
-                name="period_start"
-                type="month"
-                required
-                defaultValue={defaultMonth}
-              />
+            <FormField label="Dönem başlangıcı" htmlFor="target-period-start" required hint="Çeyreklik/yıllık hedefte başlangıç ayını seçin.">
+              <Input id="target-period-start" name="period_start" type="month" required defaultValue={defaultMonth} />
             </FormField>
-
-            <FormField
-              label="Danışman"
-              className="sm:col-span-2"
-              hint="Boş bırakılırsa hedef ofis geneli için tanımlanır."
-            >
+            <FormField label="Danışman" className="sm:col-span-2" hint="Boş bırakılırsa hedef ofis geneli için tanımlanır.">
               <Combobox
                 name="profile_id"
                 aria-label="Danışman"
@@ -135,49 +109,15 @@ export function TargetFormDialog({
                 options={members.map((m) => ({ value: m.id, label: m.full_name }))}
               />
             </FormField>
-
             <FormField label="Hedef anlaşma" htmlFor="target-deals" required>
-              <Input
-                id="target-deals"
-                name="target_deals"
-                type="number"
-                min={0}
-                step={1}
-                required
-                defaultValue={target ? target.target_deals : ""}
-                placeholder="Örn. 5"
-              />
+              <Input id="target-deals" name="target_deals" type="number" min={0} step={1} required defaultValue={target ? target.target_deals : ""} placeholder="Örn. 5" />
             </FormField>
-
             <FormField label="Hedef gelir (₺)" htmlFor="target-revenue" required>
-              <Input
-                id="target-revenue"
-                name="target_revenue"
-                type="number"
-                min={0}
-                step="any"
-                required
-                defaultValue={target ? target.target_revenue : ""}
-                placeholder="Örn. 250000"
-              />
+              <Input id="target-revenue" name="target_revenue" type="number" min={0} step="any" required defaultValue={target ? target.target_revenue : ""} placeholder="Örn. 250000" />
             </FormField>
-
-            {state.error ? (
-              <p className="text-xs font-semibold text-danger-600 sm:col-span-2" role="alert">
-                {state.error}
-              </p>
-            ) : null}
-          </DialogBody>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="secondary">Vazgeç</Button>
-            </DialogClose>
-            <Button type="submit" loading={pending}>
-              {target ? "Kaydet" : "Hedefi ekle"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+          </>
+        ),
+      }}
+    />
   );
 }

@@ -295,6 +295,8 @@ export default async function AppLayout({
             className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1fr)] content-start overflow-x-clip p-4 pb-28 md:px-6 md:pt-6 lg:p-8"
           >
             <SectionTabs accessibleModules={accessibleModules} lockedHrefs={lockedNavHrefs} counts={tabCounts} />
+            {/* Sayfa içi sekme alanları (InlineTabbedPanel) buraya yerleşir: popup değil, akışta. */}
+            <div id="inline-panel-host" className="min-w-0" />
             {children}
           </main>
         </div>

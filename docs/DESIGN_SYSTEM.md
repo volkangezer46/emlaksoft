@@ -293,3 +293,26 @@ import: `@/components/ui/list-kit`.
 - **FilterBar ile ilişki:** basit sayfalar için `FilterBar` (sekme + panel) yeterlidir; görünüm anahtarı, aktif çip,
   yoğunluk ve kayıtlı görünüm gereken liste ekranları `ListToolbar` kullanır. İkisi de `lib/ui/filter-params`
   yardımcılarını paylaşır.
+
+## Sayfa içi sekme alanları (popup yerine)
+
+**Kural:** yeni kayıt ekleme ve düzenleme için popup/diyalog YASAK. Ekle/düzenle akışı ya tam sayfa sekmeli form
+(`TabbedFormShell`) ya da bağlam içinde açılan sayfa içi sekme alanıdır (`InlineTabbedPanel`,
+`src/components/ui/inline-tabbed-panel.tsx`). Yalnız kısa onay diyaloğu (`ConfirmDialog`: silme, geri alınamaz işlem,
+tek alanlı kısa soru) ve gerçekten tam ekran önizleme yüzeyleri (galeri, belge, tur) serbesttir.
+
+`InlineTabbedPanel` modal değildir: arka planı kapatmaz, ekranın üstüne binmez. App layout'undaki
+`#inline-panel-host` yuvasına (bölüm sekmelerinin hemen altı) normal akışta yerleşir ve görünüme kaydırılır.
+Tetikleyici düğme olduğu yerde kalır (render prop `trigger`); kontrollü kullanım için `open`/`onOpenChange`.
+
+- Sekmeler `MorphTabs`; tüm paneller DOM'da kalır (tek `<form>`), pasifler `hidden`. Tek sekme varsa şerit çizilmez.
+- Canlı özet: izlenen alan sayısı >= 5 ise (veya `summary`) yazdıkça güncellenen "Canlı özet" (`useFormFields`);
+  satıra tıklayınca ilgili sekme/alan açılır. Mobilde özet alta yığılır, tek sütun.
+- Kaydedilmemiş değişiklik koruması (`lib/form-dirty.ts`): X/Vazgeç/Esc kirliyken satır içi onay ister,
+  sayfa terkinde `beforeunload` uyarısı. Ctrl/Cmd+Enter kaydeder. Hata bandına odak; gizli sekmedeki geçersiz alan sekmeyi açar.
+- Taslak: `draft` (useFormDraft) yeni kayıt akışlarında; yalnız beyaz liste, telefon/e-posta/not saklanmaz.
+- Gönderim: `action` (mevcut `<form action>` akışları) veya `onSubmit` (FormData; hatada alanlar korunur, tercih edilir).
+  Sunucu action'ı, doğrulama ve yetki değişmez; bileşen yalnız kabuktur.
+- Kullanım: `tabs=[{id,label,icon,fields}]`, `panels={{id: <alanlar/>}}`, `hiddenFields`, `fieldLabels`, `error`, `pending`.
+  Örnek: `gorevler/task-edit-dialog.tsx`, `randevular/appointment-edit-dialog.tsx`.
+- Sözleşme: `src/lib/accessible-dialog-contract.test.ts` "inline panel" bölümü taşınan akışların `Dialog` içermediğini doğrular.
