@@ -78,6 +78,8 @@ const FORMS = [
     source: "src/app/app/sozlesmeler/yeni/new-contract-form.tsx",
     tabs: CONTRACT_TABS as readonly TabLike[],
     draft: CONTRACT_DRAFT_FIELDS as readonly string[],
+  },
+  {
     name: "randevu",
     source: "src/app/app/randevular/yeni/appointment-form.tsx",
     tabs: APPOINTMENT_TABS as readonly TabLike[],
