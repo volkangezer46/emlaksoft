@@ -19,6 +19,7 @@ export function CategoryChips({
   params,
   paramName = "kategori",
   label = "Kategori",
+  allLabel,
   className,
 }: {
   options: readonly CategoryOption[];
@@ -29,9 +30,11 @@ export function CategoryChips({
   params: ParamRecord;
   paramName?: string;
   label?: string;
+  /** "Tümü" çipinin etiketi (varsayılan "Tümü"). */
+  allLabel?: string;
   className?: string;
 }) {
-  const chips = buildCategoryChips({ options, counts, total, active, pathname, params, paramName });
+  const chips = buildCategoryChips({ options, counts, total, active, pathname, params, paramName, allLabel });
   if (chips.length < 2) return null;
   return (
     <nav aria-label={label} className={cn("-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]", className)}>

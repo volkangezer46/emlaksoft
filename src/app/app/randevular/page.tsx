@@ -1,47 +1,74 @@
 import {
   AlertTriangle,
-  ArrowUpRight,
   CalendarClock,
+  CalendarDays,
+  CalendarRange,
   CheckCircle2,
-  XCircle,
   Clock3,
   FileSignature,
-  MapPin,
   MapPinned,
-  Navigation,
-  Radio,
   Plus,
-  Undo2,
+  Route as RouteIcon,
+  Search,
+  Hourglass,
 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { ButtonLink } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { resolveLazyTotal } from "@/lib/lazy-total";
 import { requireModulePage } from "@/lib/require-module-page";
-import { calendarDateToTrIso, formatTrTime, trDayKey, trTodayCalendarDate } from "@/lib/clock";
-import { setAppointmentStatus } from "@/app/actions/appointments";
-import { CompleteAppointmentDialog } from "./complete-appointment-dialog";
+import { calendarDateToTrIso, formatTrTime, now, trDayKey, trTodayCalendarDate } from "@/lib/clock";
 import { APPOINTMENT_OUTCOME_META, isAppointmentOutcome } from "@/lib/appointment-outcome";
 import { getDefinitions } from "@/lib/definitions";
-import { AddToCalendarButton } from "@/components/app/add-to-calendar-button";
 import { AppointmentCalendar } from "./appointment-calendar";
 import { AppointmentWeekView, type WeekViewAppointment } from "./appointment-week-view";
 import { RouteSuggestion, type RouteStop } from "./route-suggestion";
 import { RotaView, type RotaAdvisor, type RotaDurak } from "./rota-view";
 import { buildRoutePlan, type RoutePlanStop } from "@/lib/route-plan";
-import { AppointmentEditDialog } from "./appointment-edit-dialog";
 import { ExportIcsButton } from "./export-ics-button";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportAppointmentsCsv } from "@/app/actions/export";
-import { CopyConfirmLink } from "./copy-confirm-link";
+import { listSavedViews } from "@/app/actions/saved-views";
+import { SavedViews } from "@/components/app/saved-views";
 import { CalendarSubscribeCard } from "./calendar-subscribe-card";
 import { BookingLinkCard } from "./booking-link-card";
-import Link from "next/link";
 import { EmptyState } from "@/components/app/empty-state";
 import { TR_OFFSET_MIN } from "@/lib/booking-slots";
 import { isOnLeave, type LeaveLike } from "@/lib/leave-utils";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { ICONS } from "@/lib/icons";
+import { relatedSearchClause } from "@/lib/list-search";
+import {
+  CategoryChips,
+  FilterGrid,
+  FilterSelect,
+  KpiStrip,
+  ListPager,
+  ListToolbar,
+  buildActiveChips,
+  densityOf,
+  pageWindow,
+  parsePage,
+  uuidParam,
+  type KpiItem,
+  type ViewOption,
+} from "@/components/ui/list-kit";
+import { AppointmentMobileList, AppointmentTable, type AppointmentVM } from "./appointment-rows";
+import {
+  APPOINTMENT_STATUS_LABELS,
+  APPOINTMENT_TYPE_LABELS,
+  CUSTOMER_RESPONSE_META,
+  FILTERABLE_STATUSES,
+  OUTCOME_TONE,
+  appointmentStatusTone,
+  appointmentTypeTone,
+  needsFollowUp,
+  sumCounts,
+} from "./appointment-list-logic";
+
+const PATH = "/app/randevular";
 
 type RelRow = { id?: string; full_name?: string; title?: string; property_code?: string; lat?: number | null; lng?: number | null };
 type Rel = RelRow | RelRow[] | null;
@@ -65,19 +92,9 @@ type AppointmentRow = {
   property: Rel;
 };
 
-/** Müşterinin teyit linkinden verdiği yanıt — durum rozetinin yanında görünür. */
-const responseMeta: Record<string, { label: string; cls: string }> = {
-  coming: { label: "Geliyorum ✓", cls: "bg-mint-500/10 text-mint-600" },
-  cancelled: { label: "İptal etti", cls: "bg-danger-500/10 text-danger-500" },
-};
+const typeLabel = APPOINTMENT_TYPE_LABELS;
 
-const typeLabel: Record<string, string> = {
-  showing: "Yer gösterme",
-  office: "Ofis görüşmesi",
-  valuation: "Değerleme",
-  contract: "Sözleşme",
-};
-
+/** Rota görünümü rozeti için (istemci bileşeni sınıf bekler). */
 const typeTone: Record<string, string> = {
   showing: "bg-brand-600/10 text-brand-600",
   office: "bg-cyan-400/12 text-cyan-500",
@@ -85,33 +102,37 @@ const typeTone: Record<string, string> = {
   contract: "bg-mint-500/12 text-mint-600",
 };
 
-const statusMeta: Record<string, { label: string; cls: string }> = {
-  pending: { label: "Teyit bekliyor", cls: "bg-warn-500/10 text-warn-500" },
-  confirmed: { label: "Onaylandı", cls: "bg-mint-500/10 text-mint-600" },
-  signature: { label: "İmza eksik", cls: "bg-danger-500/10 text-danger-500" },
-  completed: { label: "Tamamlandı", cls: "bg-mint-500/10 text-mint-600" },
-  cancelled: { label: "İptal", cls: "bg-ink-950/8 text-text-muted" },
-};
-
 function rel(value: Rel) {
   if (!value) return null;
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
-function initials(name: string) {
-  return name.split(/\s+/).map((p) => p[0] ?? "").join("").slice(0, 2).toUpperCase();
-}
-
-const FILTERABLE_STATUSES = ["pending", "confirmed", "signature", "completed"];
+/** Liste (tablo) sayfa boyutu — pencere içindeki randevular bellekte sayfalanır (en çok APPT_LIMIT). */
+const PAGE_SIZE = 50;
+const NIL_UUID = "00000000-0000-0000-0000-000000000000";
 
 export default async function AppointmentsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ tip?: string; durum?: string; customer?: string; property?: string; gorunum?: string; tarih?: string; gun?: string; danisman?: string; yeni?: string }>;
+  searchParams?: Promise<{
+    q?: string;
+    tip?: string;
+    durum?: string;
+    customer?: string;
+    property?: string;
+    gorunum?: string;
+    tarih?: string;
+    gun?: string;
+    danisman?: string;
+    sayfa?: string;
+    yogunluk?: string;
+    yeni?: string;
+  }>;
 }) {
   const gate = await requireModulePage("appointments");
   const supabase = await createClient();
   const sp = (await searchParams) ?? {};
+  const savedViewsPromise = listSavedViews(PATH);
   // Eski ?yeni=1 adresleri tam sayfa forma gider (customer/property ön seçimi taşınır).
   const newApptQuery = new URLSearchParams();
   if (sp.customer) newApptQuery.set("customer", sp.customer);
@@ -120,11 +141,14 @@ export default async function AppointmentsPage({
   if (sp.yeni === "1") redirect(newApptHref);
   const canCreateAppt = (gate.perms.appointments ?? []).includes("create");
   const tipF = sp.tip && typeLabel[sp.tip] ? sp.tip : "";
-  const durumF = sp.durum && FILTERABLE_STATUSES.includes(sp.durum) ? sp.durum : "";
+  const durumF = sp.durum && (FILTERABLE_STATUSES as readonly string[]).includes(sp.durum) ? sp.durum : "";
   const customerF = sp.customer ?? "";
   // ?property= — eşleştirme ekranındaki "Randevu ver" kısayolu portföyü de
   // taşır: liste o portföye süzülür ve yeni randevu diyaloğu ön seçili gelir.
   const propertyF = sp.property ?? "";
+  const q = (sp.q ?? "").trim().slice(0, 80);
+  const density = densityOf(sp.yogunluk);
+  const page = parsePage(sp.sayfa);
 
   // ?gorunum=ay|hafta|gun|rota — ay: mevcut takvim, hafta: 7 kolonlu saat ızgarası,
   // gün: tek kolon detay, rota: günün durak listesi + harita. ?tarih=YYYY-MM-DD
@@ -135,7 +159,8 @@ export default async function AppointmentsPage({
   const rotaGun: "bugun" | "yarin" = sp.gun === "yarin" ? "yarin" : "bugun";
   const YONETICI_ROLES = ["owner", "gm", "branch_manager", "team_lead"];
   const isYonetici = YONETICI_ROLES.includes(gate.role);
-  const danismanF = isYonetici ? ((sp.danisman ?? "").trim() || "") : "";
+  // Danışman filtresi (Ekip Merkezi / Kıyas bağlantıları): yalnız yönetici rolleri; doğrulanmış uuid.
+  const danismanF = isYonetici ? uuidParam(sp.danisman) : "";
   const tarihMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(sp.tarih ?? "");
   // todayStart: TR takvim günü (sunucu UTC'de olsa da gece 00–03 TRT arası doğru gün).
   // "Sahte yerel" Date — yalnız gün bileşenleri anlamlı; DB sınırı için toIso() kullan.
@@ -153,11 +178,8 @@ export default async function AppointmentsPage({
   };
 
   // ---- Görünüme göre takvim penceresi ------------------------------------
-  // Eskiden .limit(100) scheduled_at'e göre EN ESKİ 100 randevuyu çekiyordu;
-  // dolu bir ofiste bunlar hep geçmişte kalıyor, bugünkü/yaklaşan randevular
-  // takvimde GÖRÜNMÜYORDU. Artık ana sorgu görünümün tarih penceresine (gte/lt)
-  // daraltılır — pencere içindeki TÜM randevular gelir (sayfalama takvime
-  // uygulanmaz; hafta/gün gezinmesi zaten sunucuya ?tarih= ile döner).
+  // Ana sorgu görünümün tarih penceresine (gte/lt) daraltılır — pencere içindeki TÜM
+  // randevular gelir (hafta/gün gezinmesi ?tarih= ile sunucuya döner).
   const monthStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
   let windowStart: Date;
   let windowEnd: Date;
@@ -174,35 +196,47 @@ export default async function AppointmentsPage({
     windowEnd = new Date(windowStart.getFullYear(), windowStart.getMonth(), windowStart.getDate() + 1);
   } else {
     // ay: aylık takvim istemci tarafında gezinir; sunucu makul bir pencere verir
-    // (2 ay öncesi – 3 ay sonrası). Küçük ofisin yakın verisi tam kapsanır,
-    // dolu ofis "en eski 100" yerine bugünün çevresini görür.
+    // (2 ay öncesi – 3 ay sonrası). Küçük ofisin yakın verisi tam kapsanır.
     windowStart = new Date(monthStart.getFullYear(), monthStart.getMonth() - 2, 1);
     windowEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 3, 1);
   }
 
+  // Arama: müşteri adı / portföy başlığı-kodu / konum → ana sorgunun or() koşulu
+  const search = await relatedSearchClause(supabase, q, {
+    customerColumn: "customer_id",
+    propertyColumn: "property_id",
+    extraColumns: ["location"],
+  });
+
   const APPT_LIMIT = 500;
   // Liste ve (tavana dayanınca) head-count aynı filtre kurucusunu paylaşır.
   const buildApptQuery = (select: string, opts?: { count: "exact"; head: true }) => {
-    let q = supabase
+    let query = supabase
       .from("appointments")
       .select(select, opts)
       .neq("status", "cancelled")
       .gte("scheduled_at", toIso(windowStart))
       .lt("scheduled_at", toIso(windowEnd));
-    if (tipF) q = q.eq("appointment_type", tipF);
-    if (durumF) q = q.eq("status", durumF);
-    if (customerF) q = q.eq("customer_id", customerF);
-    if (propertyF) q = q.eq("property_id", propertyF);
-    return q;
+    if (tipF) query = query.eq("appointment_type", tipF);
+    if (durumF) query = query.eq("status", durumF);
+    if (customerF) query = query.eq("customer_id", customerF);
+    if (propertyF) query = query.eq("property_id", propertyF);
+    if (danismanF) query = query.eq("assigned_to", danismanF);
+    if (search.empty) query = query.eq("id", NIL_UUID);
+    else if (search.clause) query = query.or(search.clause);
+    return query;
   };
   const apptQuery = buildApptQuery(
     "id, appointment_type, scheduled_at, duration_min, location, status, notes, confirm_token, customer_response, assigned_to, outcome, outcome_note, customer:customers!appointments_customer_id_fkey(id, full_name), property:properties!appointments_property_id_fkey(id, title, property_code, lat, lng)",
   );
 
-  // Durum/tür sayaçları — pencereden bağımsız gerçek toplamlar (head-count);
-  // iptaller hariç. Hero/panel çipleri bu sayıları filtreye çevirir.
-  const countBase = () =>
-    supabase.from("appointments").select("id", { count: "exact", head: true }).neq("status", "cancelled");
+  // Durum/tür sayaçları — pencereden bağımsız gerçek toplamlar (head-count; danışman kapsamlı);
+  // iptaller hariç. KPI/çip sayıları bu sayıları filtreye çevirir.
+  const countBase = () => {
+    let c = supabase.from("appointments").select("id", { count: "exact", head: true }).neq("status", "cancelled");
+    if (danismanF) c = c.eq("assigned_to", danismanF);
+    return c;
+  };
   const todayEndIso = toIso(new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + 1));
   const weekAheadIso = toIso(new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + 7));
 
@@ -213,34 +247,28 @@ export default async function AppointmentsPage({
   const rotaFetch =
     gorunum === "rota"
       ? (async () => {
-        let rotaQuery = supabase
-          .from("appointments")
-          .select(
-            "id, appointment_type, scheduled_at, duration_min, location, customer:customers!appointments_customer_id_fkey(id, full_name), property:properties!appointments_property_id_fkey(id, title, property_code, lat, lng)",
-          )
-          .neq("status", "cancelled")
-          .eq("assigned_to", rotaSelectedAdvisor);
-        // Üstteki tip/durum çipleri rota görünümünde de sorguya iner (filtre kontratı)
-        if (tipF) rotaQuery = rotaQuery.eq("appointment_type", tipF);
-        if (durumF) rotaQuery = rotaQuery.eq("status", durumF);
-        return Promise.all([
-          rotaQuery
+          let rotaQuery = supabase
+            .from("appointments")
+            .select(
+              "id, appointment_type, scheduled_at, duration_min, location, customer:customers!appointments_customer_id_fkey(id, full_name), property:properties!appointments_property_id_fkey(id, title, property_code, lat, lng)",
+            )
+            .neq("status", "cancelled")
+            .eq("assigned_to", rotaSelectedAdvisor);
+          // Üstteki tip/durum çipleri rota görünümünde de sorguya iner (filtre kontratı)
+          if (tipF) rotaQuery = rotaQuery.eq("appointment_type", tipF);
+          if (durumF) rotaQuery = rotaQuery.eq("status", durumF);
+          return rotaQuery
             .gte("scheduled_at", toIso(rotaDayStart))
             .lt("scheduled_at", toIso(rotaDayEnd))
             .order("scheduled_at", { ascending: true })
-            .limit(50),
-          isYonetici
-            ? supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name").limit(200)
-            : Promise.resolve({ data: null as { id: string; full_name: string | null }[] | null }),
-        ]);
+            .limit(50);
         })()
       : null;
 
   // Randevu listesi bir kez başlatılır; izin sorgusu liste biter bitmez DİĞER sorgularla
-  // paralel koşar (eskiden tüm Promise.all'dan sonra seri çalışıyordu).
+  // paralel koşar.
   const apptP = Promise.resolve(apptQuery.order("scheduled_at", { ascending: true }).limit(APPT_LIMIT));
-  // Gerçek toplam yalnız liste 500 tavanına dayanırsa sayılır (ListLimitNotice);
-  // tavandan azsa toplam = satır sayısı kesindir — ek COUNT sorgusu yok.
+  // Gerçek toplam yalnız liste 500 tavanına dayanırsa sayılır (ListLimitNotice).
   const apptTotalP = apptP.then((res) =>
     resolveLazyTotal({
       rows: (res.data ?? []).length,
@@ -269,6 +297,8 @@ export default async function AppointmentsPage({
     { data: filteredCustomer },
     { data: filteredProperty },
     { count: todayCount },
+    { count: pendingCount },
+    { count: confirmedCount },
     { count: signatureCount },
     { count: completedCount },
     { count: showingCount },
@@ -278,25 +308,24 @@ export default async function AppointmentsPage({
     { data: weekBarRows },
     { data: ownProfile },
     leaveRows,
+    { data: advisorRows },
+    savedViews,
   ] = await Promise.all([
     apptP,
     apptTotalP,
-    // Bu iki sorgu SINIRSIZDI: sayfa her acildiginda ofisin TUM musteri ve
-    // portfoy kayitlari cekiliyordu. Secici artik sunucu tarafinda arama
-    // yaptigi icin buradaki liste yalnizca "son eklenenler" kisayolu —
-    // 50 kayit yeterli, gerisi yazarak bulunuyor.
     getDefinitions("appointment_type"),
     // ?customer= ile gelindiğinde (müşteri kartındaki "Randevu ver") çipte ad
-    // gösterebilmek ve diyalogda müşteriyi önceden seçmek için tek kayıt.
+    // gösterebilmek için tek kayıt.
     customerF
       ? supabase.from("customers").select("id, full_name").eq("id", customerF).maybeSingle()
       : Promise.resolve({ data: null }),
-    // ?property= ile gelindiğinde (eşleştirme → "Randevu ver") çipte ad
-    // gösterebilmek ve diyalogda portföyü önceden seçmek için tek kayıt.
+    // ?property= ile gelindiğinde (eşleştirme → "Randevu ver") çipte ad için tek kayıt.
     propertyF
       ? supabase.from("properties").select("id, title, property_code").eq("id", propertyF).maybeSingle()
       : Promise.resolve({ data: null }),
     countBase().gte("scheduled_at", toIso(todayStart)).lt("scheduled_at", todayEndIso),
+    countBase().eq("status", "pending"),
+    countBase().eq("status", "confirmed"),
     countBase().eq("status", "signature"),
     countBase().eq("status", "completed"),
     countBase().eq("appointment_type", "showing"),
@@ -304,25 +333,40 @@ export default async function AppointmentsPage({
     countBase().eq("appointment_type", "valuation"),
     countBase().eq("appointment_type", "contract"),
     // Haftalık yoğunluk şeridi — önümüzdeki 7 gün, görünümden bağımsız pencere.
-    supabase
-      .from("appointments")
-      .select("scheduled_at")
-      .neq("status", "cancelled")
-      .gte("scheduled_at", toIso(todayStart))
-      .lt("scheduled_at", weekAheadIso)
-      .limit(1000),
+    (() => {
+      let w = supabase
+        .from("appointments")
+        .select("scheduled_at")
+        .neq("status", "cancelled")
+        .gte("scheduled_at", toIso(todayStart))
+        .lt("scheduled_at", weekAheadIso);
+      if (danismanF) w = w.eq("assigned_to", danismanF);
+      return w.limit(1000);
+    })(),
     // Takvim aboneliği (ICS) için kullanıcının gizli token'ı — diğerlerinden bağımsız.
     supabase.from("profiles").select("calendar_token").eq("id", gate.userId).maybeSingle(),
     leavesP,
+    // Danışman listesi (yönetici filtresi + rota seçicisi)
+    isYonetici
+      ? supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name").limit(200)
+      : Promise.resolve({ data: null as { id: string; full_name: string | null }[] | null }),
+    savedViewsPromise,
   ]);
 
-  // Tür başına gerçek toplam (hero + "Randevu türleri" paneli + rozetler).
+  // Tür başına gerçek toplam (KPI + çipler).
   const typeCounts: Record<string, number> = {
     showing: showingCount ?? 0,
     office: officeCount ?? 0,
     valuation: valuationCount ?? 0,
     contract: contractCount ?? 0,
   };
+  const statusCounts: Record<string, number> = {
+    pending: pendingCount ?? 0,
+    confirmed: confirmedCount ?? 0,
+    signature: signatureCount ?? 0,
+    completed: completedCount ?? 0,
+  };
+  const totalAppointments = sumCounts(typeCounts);
 
   // Takvim aboneliği (ICS) linki — ownProfile yukarıdaki toplu turda gelir.
   const calendarToken = (ownProfile?.calendar_token as string | null) ?? null;
@@ -330,16 +374,11 @@ export default async function AppointmentsPage({
 
   const rows = (appts ?? []) as unknown as AppointmentRow[];
 
-  /*
-   * "Danışman izinde" ipucu — randevunun düştüğü günde atanan danışman
-   * ONAYLI izinliyse satırda amber uyarı çıkar (izin kaynağı: staff_leaves,
-   * bkz. /app/ekip/izinler). Online randevu linki izinli günü zaten kapatır;
-   * bu ipucu ELLE girilmiş / izin sonradan yazılmış randevuları yakalar.
-   * Tek sorgu: listedeki randevuların kapsadığı gün aralığı.
-   */
+  const advisorList = (advisorRows ?? []).map((a) => ({ id: String(a.id), name: String(a.full_name ?? "İsimsiz danışman") }));
+  const advisorName = new Map(advisorList.map((a) => [a.id, a.name]));
 
-  // Filtre linkleri diğer parametreleri korur (görünüm/tarih dahil).
-  const apptHref = (patch: { tip?: string; durum?: string; customer?: string; property?: string; gorunum?: string; tarih?: string; gun?: string; danisman?: string }) => {
+  // Filtre linkleri diğer parametreleri korur (görünüm/tarih/arama/danışman dahil).
+  const apptHref = (patch: { tip?: string; durum?: string; customer?: string; property?: string; gorunum?: string; tarih?: string; gun?: string; danisman?: string; q?: string }) => {
     const tip = patch.tip !== undefined ? patch.tip : tipF;
     const durum = patch.durum !== undefined ? patch.durum : durumF;
     const cust = patch.customer !== undefined ? patch.customer : customerF;
@@ -348,41 +387,50 @@ export default async function AppointmentsPage({
     const tarih = patch.tarih !== undefined ? patch.tarih : (sp.tarih ?? "");
     const gun = patch.gun !== undefined ? patch.gun : rotaGun;
     const danisman = patch.danisman !== undefined ? patch.danisman : danismanF;
-    const q = new URLSearchParams();
-    if (tip) q.set("tip", tip);
-    if (durum) q.set("durum", durum);
-    if (cust) q.set("customer", cust);
-    if (prop) q.set("property", prop);
-    if (view && view !== "ay") q.set("gorunum", view);
-    if (tarih && (view === "hafta" || view === "gun")) q.set("tarih", tarih);
-    if (view === "rota") {
-      if (gun !== "bugun") q.set("gun", gun);
-      if (danisman) q.set("danisman", danisman);
-    }
-    const s = q.toString();
-    return s ? `/app/randevular?${s}` : "/app/randevular";
+    const qq = patch.q !== undefined ? patch.q : q;
+    const usp = new URLSearchParams();
+    if (qq) usp.set("q", qq);
+    if (tip) usp.set("tip", tip);
+    if (durum) usp.set("durum", durum);
+    if (cust) usp.set("customer", cust);
+    if (prop) usp.set("property", prop);
+    if (view && view !== "ay") usp.set("gorunum", view);
+    if (tarih && (view === "hafta" || view === "gun")) usp.set("tarih", tarih);
+    if (view === "rota" && gun !== "bugun") usp.set("gun", gun);
+    if (danisman) usp.set("danisman", danisman);
+    if (density === "kompakt") usp.set("yogunluk", "kompakt");
+    const s = usp.toString();
+    return s ? `${PATH}?${s}` : PATH;
   };
 
-  // Sayaçlar artık head-count sorgularından (pencereden bağımsız gerçek toplam).
-  const startOfDay = todayStart;
-  const todayTotal = todayCount ?? 0;
-  const showings = typeCounts.showing;
-  const pendingSign = signatureCount ?? 0;
-  const completedTotal = completedCount ?? 0;
+  // Doğrulanmış URL durumu — toolbar, çipler, sayfalama ve kayıtlı görünümler TEK kaynaktan beslenir.
+  const urlParams: Record<string, string> = {};
+  if (q) urlParams.q = q;
+  if (tipF) urlParams.tip = tipF;
+  if (durumF) urlParams.durum = durumF;
+  if (customerF) urlParams.customer = customerF;
+  if (propertyF) urlParams.property = propertyF;
+  if (gorunum !== "ay") urlParams.gorunum = gorunum;
+  if ((gorunum === "hafta" || gorunum === "gun") && sp.tarih) urlParams.tarih = sp.tarih;
+  if (gorunum === "rota" && rotaGun !== "bugun") urlParams.gun = rotaGun;
+  if (danismanF) urlParams.danisman = danismanF;
+  if (density === "kompakt") urlParams.yogunluk = "kompakt";
+  const savedViewParams = Object.fromEntries(
+    Object.entries(urlParams).filter(([k]) => ["q", "tip", "durum", "gorunum", "danisman"].includes(k)),
+  );
 
   // Haftalık yoğunluk — ayrı "önümüzdeki 7 gün" penceresinden (görünümden bağımsız).
   const week = Array.from({ length: 7 }).map((_, i) => {
-    const d = new Date(startOfDay.getFullYear(), startOfDay.getMonth(), startOfDay.getDate() + i);
+    const d = new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + i);
     const dKey = fmtTarih(d);
     const count = ((weekBarRows ?? []) as { scheduled_at: string }[]).filter((r) => trDayKey(r.scheduled_at) === dKey).length;
-    return { label: d.toLocaleDateString("tr-TR", { weekday: "short" }), day: d.getDate(), count, isToday: i === 0 };
+    return { label: d.toLocaleDateString("tr-TR", { weekday: "short" }), day: d.getDate(), count, isToday: i === 0, key: dKey };
   });
   const maxWeek = Math.max(1, ...week.map((w) => w.count));
   const weekTotal = week.reduce((n, w) => n + w.count, 0);
+  const weekReliable = (weekBarRows ?? []).length < 1000;
 
-  const sameLocalDay = (iso: string, d: Date) => {
-    return trDayKey(iso) === fmtTarih(d);
-  };
+  const sameLocalDay = (iso: string, d: Date) => trDayKey(iso) === fmtTarih(d);
 
   // Hafta/gün ızgarası için sadeleştirilmiş satırlar
   const weekViewRows: WeekViewAppointment[] = rows.map((r) => {
@@ -435,8 +483,8 @@ export default async function AppointmentsPage({
       customer: Rel;
       property: Rel;
     };
-    const [{ data: rotaRows }, advisorsRes] = await rotaFetch!;
-    const rotaList = (rotaRows ?? []) as RotaRow[];
+    const { data: rotaRows } = await rotaFetch!;
+    const rotaList = (rotaRows ?? []) as unknown as RotaRow[];
     const byId = new Map(rotaList.map((r) => [r.id, r]));
     const planStops: RoutePlanStop[] = rotaList.map((r) => {
       const p = rel(r.property);
@@ -451,7 +499,7 @@ export default async function AppointmentsPage({
     const plan = buildRoutePlan(planStops);
     rotaTotalKm = plan.totalKm;
     rotaTightCount = plan.tightCount;
-    
+
     rotaDuraklar = plan.stops.flatMap((s, i) => {
       const r = byId.get(s.id);
       if (!r) return [];
@@ -482,7 +530,7 @@ export default async function AppointmentsPage({
       }];
     });
     if (isYonetici) {
-      rotaAdvisors = (advisorsRes.data ?? []).map((a) => ({ id: a.id, name: a.full_name ?? "İsimsiz danışman" }));
+      rotaAdvisors = advisorList.map((a) => ({ id: a.id, name: a.name }));
       if (!rotaAdvisors.some((a) => a.id === gate.userId)) {
         rotaAdvisors.unshift({ id: gate.userId, name: "Ben" });
       }
@@ -493,36 +541,125 @@ export default async function AppointmentsPage({
   }
   // Danışman seçicinin koruyacağı diğer paramlar (danisman hariç)
   const rotaBaseQuery = (() => {
-    const q = new URLSearchParams();
-    if (tipF) q.set("tip", tipF);
-    if (durumF) q.set("durum", durumF);
-    if (customerF) q.set("customer", customerF);
-    q.set("gorunum", "rota");
-    if (rotaGun !== "bugun") q.set("gun", rotaGun);
-    return q.toString();
+    const usp = new URLSearchParams();
+    if (tipF) usp.set("tip", tipF);
+    if (durumF) usp.set("durum", durumF);
+    if (customerF) usp.set("customer", customerF);
+    usp.set("gorunum", "rota");
+    if (rotaGun !== "bugun") usp.set("gun", rotaGun);
+    return usp.toString();
   })();
 
-  const VIEW_TABS = [
-    { key: "ay", label: "Ay" },
-    { key: "hafta", label: "Hafta" },
-    { key: "gun", label: "Gün" },
-    { key: "rota", label: "Rota" },
-  ] as const;
+  const viewOptions: ViewOption[] = [
+    { value: "ay", label: "Ay", icon: CalendarDays, href: apptHref({ gorunum: "ay" }) },
+    { value: "hafta", label: "Hafta", icon: CalendarRange, href: apptHref({ gorunum: "hafta" }) },
+    { value: "gun", label: "Gün", icon: Clock3, href: apptHref({ gorunum: "gun" }) },
+    { value: "rota", label: "Rota", icon: RouteIcon, href: apptHref({ gorunum: "rota" }) },
+  ];
+
+  // ---- Satır modelleri (tablo + mobil liste ortak veri) ---------------------
+  const nowMs = now();
+  const win = pageWindow(page, rows.length, PAGE_SIZE, rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).length);
+  const pageRows = rows.slice(win.offset, win.offset + PAGE_SIZE);
+  const viewModels: AppointmentVM[] = pageRows.map((appt) => {
+    const customer = rel(appt.customer);
+    const property = rel(appt.property);
+    const date = new Date(appt.scheduled_at);
+    const customerName = customer?.full_name ?? "Belirtilmemiş";
+    const propertyName = property?.title || property?.property_code || "Portföy bağlanmadı";
+    const cardHref = customer?.id
+      ? `/app/musteriler/${customer.id}`
+      : property?.id
+        ? `/app/portfoyler/${property.id}`
+        : null;
+    // Yer gösterme randevusundan tutanak kısayolu: sözleşme diyaloğu
+    // customer/property/tur parametrelerini ön dolgu olarak okur.
+    const tutanakParams = new URLSearchParams();
+    if (customer?.id) tutanakParams.set("customer", customer.id);
+    if (property?.id) tutanakParams.set("property", property.id);
+    tutanakParams.set("tur", "yer_gosterme");
+    const outcome = appt.outcome && isAppointmentOutcome(appt.outcome) ? APPOINTMENT_OUTCOME_META[appt.outcome] : null;
+    return {
+      id: appt.id,
+      status: appt.status,
+      dateLabel: new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", timeZone: "Europe/Istanbul" }).format(date),
+      timeLabel: formatTrTime(date),
+      customerId: customer?.id ?? null,
+      customerName,
+      cardHref,
+      typeLabel: typeLabel[appt.appointment_type] ?? appt.appointment_type,
+      typeTone: appointmentTypeTone(appt.appointment_type),
+      propertyId: property?.id ?? null,
+      propertyName,
+      location: appt.location,
+      durationMin: appt.duration_min,
+      onLeave: Boolean(
+        appt.assigned_to &&
+          isOnLeave(leaveRows, appt.assigned_to, new Date(date.getTime() + TR_OFFSET_MIN * 60_000).toISOString().slice(0, 10)),
+      ),
+      statusLabel: APPOINTMENT_STATUS_LABELS[appt.status] ?? APPOINTMENT_STATUS_LABELS.pending!,
+      statusTone: appointmentStatusTone(appt.status),
+      response: appt.customer_response && CUSTOMER_RESPONSE_META[appt.customer_response] ? CUSTOMER_RESPONSE_META[appt.customer_response]! : null,
+      outcome:
+        outcome && appt.outcome
+          ? { label: outcome.label, emoji: outcome.emoji, tone: OUTCOME_TONE[appt.outcome] ?? "neutral", note: appt.outcome_note }
+          : null,
+      followUp: needsFollowUp(appt.status, date.getTime(), nowMs),
+      confirmToken: appt.confirm_token,
+      isShowing: appt.appointment_type === "showing",
+      tutanakHref: `/app/sozlesmeler?${tutanakParams.toString()}`,
+      edit: {
+        id: appt.id,
+        appointment_type: appt.appointment_type,
+        scheduled_at: appt.scheduled_at,
+        duration_min: appt.duration_min,
+        location: appt.location,
+        notes: appt.notes,
+      },
+      calendarEvent: {
+        uid: appt.id,
+        title: `${typeLabel[appt.appointment_type] ?? appt.appointment_type} — ${customerName}`,
+        description: `${propertyName}${appt.notes ? `\n${appt.notes}` : ""}`,
+        location: appt.location ?? undefined,
+        startAt: date,
+        endAt: appt.duration_min ? new Date(date.getTime() + appt.duration_min * 60_000) : undefined,
+      },
+    };
+  });
+
+  // ---- KPI şeridi: yalnız gerçekten hesaplanan sayılar -----------------------
+  const todayKey = fmtTarih(todayStart);
+  const kpis: KpiItem[] = [
+    { label: "Bugünkü randevu", value: todayCount ?? 0, icon: <ICONS.randevu />, tone: "info", href: apptHref({ gorunum: "gun", tarih: todayKey }), hint: "bugün planlı" },
+  ];
+  if (weekReliable) {
+    kpis.push({ label: "Önümüzdeki 7 gün", value: weekTotal, icon: <CalendarClock />, tone: "info", href: apptHref({ gorunum: "hafta", tarih: todayKey }), hint: "planlı randevu" });
+  }
+  kpis.push(
+    { label: "Teyit bekliyor", value: statusCounts.pending!, icon: <Hourglass />, tone: "warning", href: apptHref({ durum: "pending", gorunum: "ay" }), hint: "müşteri yanıtı yok" },
+    { label: "İmza eksik", value: statusCounts.signature!, icon: <FileSignature />, tone: "danger", href: apptHref({ durum: "signature", gorunum: "ay" }), attention: true, hint: "imza bekleyen" },
+    { label: "Yer gösterme", value: typeCounts.showing!, icon: <MapPinned />, tone: "success", href: apptHref({ tip: "showing", gorunum: "ay" }), hint: "toplam" },
+    { label: "Tamamlanan", value: statusCounts.completed!, icon: <CheckCircle2 />, tone: "success", href: apptHref({ durum: "completed", gorunum: "ay" }), hint: "sonuçlanan" },
+  );
+
+  const chips = buildActiveChips(PATH, urlParams, [
+    { key: "q", label: "Arama" },
+    { key: "tip", label: "Tür", format: (v) => typeLabel[v] ?? v },
+    { key: "durum", label: "Durum", format: (v) => APPOINTMENT_STATUS_LABELS[v] ?? v },
+    { key: "customer", label: "Müşteri", format: () => filteredCustomer?.full_name ?? "Seçili müşteri" },
+    { key: "property", label: "Portföy", format: () => filteredProperty?.title || filteredProperty?.property_code || "Seçili portföy" },
+    { key: "danisman", label: "Danışman", format: (v) => advisorName.get(v) ?? "Seçili danışman" },
+  ]);
 
   return (
-    <div className="space-y-6">
-      {/* premium header */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-brand-600/35 blur-[80px]" />
-        <div className="relative flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-mint-400"><Radio className="h-4 w-4" /> Saha planı canlı</span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Randevular & yer gösterme</h1>
-            <p className="mt-1 text-sm text-white/60">Yer gösterme, görüşme ve tur planını tek akışta yönetin.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Mevcut filtre kapsamındaki randevular tek .ics olarak (maks. 200) */}
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Saha planı"
+        title="Randevular & yer gösterme"
+        description="Yer gösterme, görüşme ve tur planını tek akışta yönetin."
+        actions={
+          <>
+            {/* Mevcut filtre kapsamındaki randevular tek .ics olarak (maks. 500) */}
             <ExportIcsButton
               events={rows.map((r) => {
                 const c = rel(r.customer);
@@ -541,151 +678,106 @@ export default async function AppointmentsPage({
             <ExportCsvButton
               label="CSV"
               action={exportAppointmentsCsv.bind(null, { tip: tipF, durum: durumF, customer: customerF, property: propertyF })}
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
             />
-            <ButtonLink href={newApptHref} icon={Plus}>Yeni randevu</ButtonLink>
+            {canCreateAppt ? <ButtonLink href={newApptHref} icon={Plus}>Yeni randevu</ButtonLink> : null}
+          </>
+        }
+      />
+
+      <KpiStrip items={kpis} />
+
+      {/* Haftalık yoğunluk — önümüzdeki 7 gün, gerçek randevu sayıları; her gün gün görünümüne iner */}
+      {weekReliable ? (
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
+              <CalendarClock aria-hidden="true" className="h-3.5 w-3.5 text-brand-600" /> Haftalık yoğunluk
+            </p>
+            <span className="text-xs text-text-faint">önümüzdeki 7 gün</span>
           </div>
-        </div>
-        <div className="relative mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
-          <div className="stagger-grid grid grid-cols-3 gap-3">
-            {/* Bugünkü sayaç takvime (bugün seçili açılır), diğerleri tip/durum filtresine iner. */}
-            {[
-              { label: "Bugünkü randevu", value: todayTotal, icon: ICONS.randevu, tone: "text-cyan-400", href: "#takvim" },
-              { label: "Yer gösterme", value: showings, icon: ICONS.bolge, tone: "text-mint-400", href: apptHref({ tip: tipF === "showing" ? "" : "showing" }) },
-              { label: "İmza eksik", value: pendingSign, icon: ICONS.sozlesme, tone: "text-danger-500", href: apptHref({ durum: durumF === "signature" ? "" : "signature" }) },
-            ].map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-brand-300"
+          {weekTotal === 0 ? (
+            <p className="mt-3 text-xs text-text-muted">
+              Önümüzdeki 7 günde planlı randevu yok. Takvimden bir gün seçerek randevu ekleyebilirsiniz.
+            </p>
+          ) : null}
+          <div className="mt-3 flex h-20 items-stretch gap-2">
+            {week.map((w) => (
+              <a
+                key={w.key}
+                href={apptHref({ gorunum: "gun", tarih: w.key })}
+                aria-label={`${w.label} ${w.day}: ${w.count} randevu`}
+                className="focus-ring group flex h-full flex-1 flex-col items-center gap-1 rounded-[var(--radius-control)]"
               >
-                <div className="flex items-start justify-between">
-                  <item.icon className={`h-4 w-4 ${item.tone}`} />
-                  <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                <span className="numeric text-xs font-bold text-text-muted">{w.count || ""}</span>
+                <div className="flex min-h-0 w-full flex-1 items-end justify-center">
+                  <div
+                    className={`w-full max-w-4 rounded-t-sm transition group-hover:opacity-80 ${w.isToday ? "bg-[image:var(--grad-brand)]" : "bg-line-strong"}`}
+                    style={{ height: `${w.count === 0 ? 4 : Math.max((w.count / maxWeek) * 100, 12)}%` }}
+                  />
                 </div>
-                <p className="mt-2 font-display text-xl font-extrabold text-white">{item.value}</p>
-                <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
-              </Link>
+                <span className={`text-xs ${w.isToday ? "font-bold text-brand-700" : "text-text-faint"}`}>{w.label}</span>
+              </a>
             ))}
           </div>
-          <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
-            <div className="flex items-center justify-between">
-              <p className="flex items-center gap-1.5 text-xs font-semibold text-white/75"><CalendarClock className="h-3.5 w-3.5 text-cyan-400" /> Haftalık yoğunluk</p>
-              <span className="text-xs text-white/45">önümüzdeki 7 gün</span>
-            </div>
-            {weekTotal === 0 ? (
-              <p className="mt-3 text-xs text-white/55">
-                Önümüzdeki 7 günde planlı randevu yok. Takvimden bir gün seçerek randevu ekleyebilirsiniz.
-              </p>
-            ) : null}
-            <div className="mt-4 flex h-24 items-stretch gap-2">
-              {week.map((w, i) => (
-                <div key={i} className="flex h-full flex-1 flex-col items-center gap-1.5">
-                  <span className="text-xs font-bold tabular-nums text-white/55">{w.count || ""}</span>
-                  <div className="flex min-h-0 w-full flex-1 items-end justify-center">
-                    <div
-                      className={`bar-live w-full max-w-4 rounded-t-sm ${w.isToday ? "bg-[image:var(--grad-brand)] shadow-[0_0_12px_-1px_rgba(20,99,255,0.7)]" : "bg-white/25"}`}
-                      style={{ height: `${w.count === 0 ? 4 : Math.max((w.count / maxWeek) * 100, 12)}%`, animationDelay: `${i * 0.08}s` }}
-                    />
-                  </div>
-                  <span className={`text-xs ${w.isToday ? "font-bold text-cyan-300" : "text-white/40"}`}>{w.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+        </Card>
+      ) : null}
 
-      {/* Tip / durum filtre çipleri — sunucu tarafında sorguya iner */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Link
-          href={apptHref({ tip: "", durum: "" })}
-          className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-            !tipF && !durumF
-              ? "bg-brand-600 text-white"
-              : "border border-line bg-surface text-text-muted hover:border-brand-400 hover:text-brand-600"
-          }`}
-        >
-          Tümü
-        </Link>
-        {Object.entries(typeLabel).map(([key, label]) => {
-          const active = tipF === key;
-          return (
-            <Link
-              key={key}
-              href={apptHref({ tip: active ? "" : key })}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-                active
-                  ? "bg-brand-600 text-white"
-                  : "border border-line bg-surface text-text-muted hover:border-brand-400 hover:text-brand-600"
-              }`}
-            >
-              {label}
-            </Link>
-          );
-        })}
-        <span className="mx-1 hidden h-4 w-px bg-line sm:block" aria-hidden />
-        {FILTERABLE_STATUSES.map((key) => {
-          const active = durumF === key;
-          return (
-            <Link
-              key={key}
-              href={apptHref({ durum: active ? "" : key })}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-                active
-                  ? "bg-mint-600 text-white"
-                  : "border border-line bg-surface text-text-muted hover:border-mint-500/50 hover:text-mint-600"
-              }`}
-            >
-              {statusMeta[key].label}
-            </Link>
-          );
-        })}
-        {filteredCustomer ? (
-          <Link
-            href={apptHref({ customer: "" })}
-            className="rounded-full bg-cyan-500/15 px-3.5 py-1.5 text-xs font-semibold text-cyan-600 transition hover:bg-cyan-500/25"
-            title="Müşteri filtresini kaldır"
-          >
-            Müşteri: {filteredCustomer.full_name} ✕
-          </Link>
-        ) : null}
-        {filteredProperty ? (
-          <Link
-            href={apptHref({ property: "" })}
-            className="rounded-full bg-mint-500/15 px-3.5 py-1.5 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/25"
-            title="Portföy filtresini kaldır"
-          >
-            Portföy: {filteredProperty.title || filteredProperty.property_code} ✕
-          </Link>
-        ) : null}
+      <ListToolbar
+        pathname={PATH}
+        params={urlParams}
+        views={viewOptions}
+        activeView={gorunum}
+        searchPlaceholder="Müşteri, portföy veya konum ara…"
+        searchLabel="Randevu ara"
+        panelParamKeys={["danisman"]}
+        panel={
+          isYonetici && advisorList.length > 0 ? (
+            <FilterGrid>
+              <FilterSelect
+                name="danisman"
+                label="Danışman"
+                value={danismanF}
+                options={[{ value: "", label: "Tüm danışmanlar" }, ...advisorList.map((a) => ({ value: a.id, label: a.name }))]}
+              />
+            </FilterGrid>
+          ) : undefined
+        }
+        densityParam="yogunluk"
+        chips={chips}
+        resultCount={chips.length > 0 ? rows.length : undefined}
+        resultNoun="randevu"
+        savedViews={<SavedViews route={PATH} views={savedViews} currentParams={savedViewParams} />}
+      />
+
+      <div className="space-y-2">
+        <CategoryChips
+          options={Object.entries(typeLabel).map(([value, label]) => ({ value, label }))}
+          counts={typeCounts}
+          total={totalAppointments}
+          active={tipF}
+          pathname={PATH}
+          params={urlParams}
+          paramName="tip"
+          label="Randevu türü"
+        />
+        <CategoryChips
+          options={FILTERABLE_STATUSES.map((value) => ({ value, label: APPOINTMENT_STATUS_LABELS[value]! }))}
+          counts={statusCounts}
+          total={totalAppointments}
+          allLabel="Tüm durumlar"
+          active={durumF}
+          pathname={PATH}
+          params={urlParams}
+          paramName="durum"
+          label="Randevu durumu"
+        />
       </div>
 
-      {/* Takvim görünümü — #takvim: hero "Bugünkü randevu" sayacının hedefi.
-          ?gorunum=ay|hafta|gun geçişi; hafta/gün ?tarih= ile gezinir. */}
+      {/* Takvim görünümü — ?gorunum=ay|hafta|gun|rota; hafta/gün ?tarih= ile gezinir. */}
       <div id="takvim" className="scroll-mt-24 space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          {VIEW_TABS.map((v) => {
-            const active = gorunum === v.key;
-            return (
-              <Link
-                key={v.key}
-                href={apptHref({ gorunum: v.key })}
-                className={`rounded-[var(--radius-control)] border px-3.5 py-2 text-xs font-semibold transition ${
-                  active
-                    ? "border-brand-400/50 bg-brand-600/10 text-brand-600"
-                    : "border-line bg-surface text-text-muted hover:border-brand-300 hover:text-brand-600"
-                }`}
-              >
-                {v.label}
-              </Link>
-            );
-          })}
-        </div>
-
         {gorunum === "ay" ? (
           <AppointmentCalendar
-            todayKey={fmtTarih(todayStart)}
+            todayKey={todayKey}
             newHref={canCreateAppt ? newApptHref : null}
             appointments={rows.map((r) => ({
               id: r.id,
@@ -706,9 +798,7 @@ export default async function AppointmentsPage({
             advisors={rotaAdvisors}
             selectedAdvisorId={rotaSelectedAdvisor}
             advisorBaseQuery={rotaBaseQuery}
-            newAppointmentSlot={
-              <ButtonLink href={newApptHref} icon={Plus}>Yeni randevu</ButtonLink>
-            }
+            newAppointmentSlot={canCreateAppt ? <ButtonLink href={newApptHref} icon={Plus}>Yeni randevu</ButtonLink> : null}
           />
         ) : (
           <AppointmentWeekView
@@ -732,259 +822,53 @@ export default async function AppointmentsPage({
         ) : null}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.55fr_1fr]">
-        {/* timeline */}
-        {rows.length === 0 ? (
+      {/* Randevu listesi — görünüm penceresindeki randevular (tablo + mobil kart) */}
+      {rows.length === 0 ? (
+        totalAppointments === 0 && !danismanF ? (
           <EmptyState
             icon={ICONS.randevu}
             illustration="start"
             title="Henüz randevu yok"
             description="İlk yer gösterme veya görüşmenizi planladığınızda tur planı burada oluşacak."
             tone="mint"
+            action={canCreateAppt ? { href: newApptHref, label: "Yeni randevu" } : undefined}
             secondary={{ href: "/app/musteriler", label: "Müşteri seç" }}
           />
         ) : (
-          <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
-            <div className="flex items-center justify-between border-b border-line px-5 py-4">
-              <div>
-                <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><CalendarClock className="h-4 w-4" /> Tur planı</p>
-                <h2 className="mt-1 font-display font-bold text-ink-950">Yaklaşan randevular</h2>
-              </div>
-              <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">{rows.length} kayıt</span>
-            </div>
-            <div className="px-5 pt-3">
-              <ListLimitNotice shown={rows.length} total={apptTotal} hint="Geçmiş randevular için takvimi kullanın." />
-            </div>
-            <div className="divide-y divide-line">
-              {rows.map((appt) => {
-                const status = statusMeta[appt.status] ?? statusMeta.pending;
-                const customer = rel(appt.customer);
-                const property = rel(appt.property);
-                const date = new Date(appt.scheduled_at);
-                const customerName = customer?.full_name ?? "Belirtilmemiş";
-                const propertyName = property?.title || property?.property_code || "Portföy bağlanmadı";
-                const cardHref = customer?.id
-                  ? `/app/musteriler/${customer.id}`
-                  : property?.id
-                    ? `/app/portfoyler/${property.id}`
-                    : null;
-                // Yer gösterme randevusundan tutanak kısayolu: sözleşme diyaloğu
-                // customer/property/tur parametrelerini ön dolgu olarak okur.
-                const tutanakParams = new URLSearchParams();
-                if (customer?.id) tutanakParams.set("customer", customer.id);
-                if (property?.id) tutanakParams.set("property", property.id);
-                tutanakParams.set("tur", "yer_gosterme");
-                const tutanakHref = `/app/sozlesmeler?${tutanakParams.toString()}`;
-                return (
-                  // id: takvimdeki gün öğeleri #randevu-{id} çapasıyla buraya kaydırır
-                  <article key={appt.id} id={`randevu-${appt.id}`} className="group relative grid scroll-mt-24 gap-3 px-5 py-4 transition target:bg-brand-600/[0.06] hover:bg-brand-600/[0.02] md:grid-cols-[64px_1fr_auto] md:items-center">
-                    {cardHref ? (
-                      <Link href={cardHref} className="absolute inset-0" aria-label={`${customerName} randevusu detayı`} />
-                    ) : null}
-                    <div className="flex flex-col items-center justify-center rounded-[var(--radius-card)] border border-line bg-canvas py-2">
-                      <span className="font-display text-base font-extrabold tabular-nums text-ink-950">{formatTrTime(date)}</span>
-                      <span className="text-xs uppercase tracking-[0.08em] text-text-faint">{new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", timeZone: "Europe/Istanbul" }).format(date)}</span>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink-800 text-xs font-bold text-white">{initials(customerName)}</span>
-                        <p className="text-sm font-semibold text-ink-950">{customerName}</p>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${typeTone[appt.appointment_type] ?? typeTone.showing}`}>{typeLabel[appt.appointment_type] ?? appt.appointment_type}</span>
-                      </div>
-                      {property?.id ? (
-                        <Link
-                          href={`/app/portfoyler/${property.id}`}
-                          className="relative z-10 mt-1.5 inline-block max-w-full truncate align-top text-xs text-text-muted transition hover:text-brand-600 hover:underline"
-                        >
-                          {propertyName}
-                        </Link>
-                      ) : (
-                        <p className="mt-1.5 truncate text-xs text-text-muted">{propertyName}</p>
-                      )}
-                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-faint">
-                        {appt.location ? <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {appt.location}</span> : null}
-                        {appt.duration_min ? <span className="flex items-center gap-1"><Clock3 className="h-3 w-3" /> {appt.duration_min} dk</span> : null}
-                        {appt.assigned_to && isOnLeave(leaveRows, appt.assigned_to, new Date(date.getTime() + TR_OFFSET_MIN * 60_000).toISOString().slice(0, 10)) ? (
-                          <Link
-                            href="/app/ekip/izinler"
-                            className="relative z-10 inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 font-bold text-amber-600 transition hover:bg-amber-400/25"
-                            title="Randevunun danışmanı o gün izinli — devretmeyi düşünün"
-                          >
-                            <AlertTriangle className="h-3 w-3" /> Danışman izinde
-                          </Link>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="relative z-10 flex items-center gap-2 md:flex-col md:items-end">
-                      <span className="flex flex-wrap items-center justify-end gap-1.5">
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${status.cls}`}>{status.label}</span>
-                        {appt.customer_response && responseMeta[appt.customer_response] ? (
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${responseMeta[appt.customer_response].cls}`}>
-                            {responseMeta[appt.customer_response].label}
-                          </span>
-                        ) : null}
-                        {/* Randevu sonucu — danışman değerlendirmesi (outcome) */}
-                        {appt.outcome && isAppointmentOutcome(appt.outcome) ? (
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${APPOINTMENT_OUTCOME_META[appt.outcome].cls}`}
-                            title={appt.outcome_note ?? "Randevu sonucu"}
-                          >
-                            {APPOINTMENT_OUTCOME_META[appt.outcome].emoji}{" "}
-                            {APPOINTMENT_OUTCOME_META[appt.outcome].label}
-                          </span>
-                        ) : null}
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {appt.status === "pending" ? (
-                          <form action={setAppointmentStatus}>
-                            <input type="hidden" name="id" value={appt.id} />
-                            <input type="hidden" name="status" value="confirmed" />
-                            <button type="submit" className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-mint-600 transition hover:border-mint-500/40"><CheckCircle2 className="h-3 w-3" /> Onayla</button>
-                          </form>
-                        ) : null}
-                        {/* Tamamlama artık sonuç soran diyalogdan geçer
-                            (olumlu/kararsız/olumsuz + not → appointments.outcome). */}
-                        {appt.status !== "completed" ? (
-                          <CompleteAppointmentDialog appointmentId={appt.id} customerName={customerName} />
-                        ) : (
-                          /* Yanlış tamamlanan randevu artık kilitli değil:
-                             server action zaten geri dönüşe izin veriyordu,
-                             UI'da düğmesi yoktu. Geri alma sonuç notunu da siler. */
-                          <form action={setAppointmentStatus}>
-                            <input type="hidden" name="id" value={appt.id} />
-                            <input type="hidden" name="status" value="confirmed" />
-                            <button
-                              type="submit"
-                              title="Randevuyu tamamlanmamışa çevir (sonuç notu silinir)"
-                              className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-amber-400 hover:text-amber-600"
-                            >
-                              <Undo2 className="h-3 w-3" /> Geri al
-                            </button>
-                          </form>
-                        )}
-                        {appt.status !== "completed" ? (
-                          <AppointmentEditDialog
-                            appointment={{ id: appt.id, appointment_type: appt.appointment_type, scheduled_at: appt.scheduled_at, duration_min: appt.duration_min, location: appt.location, notes: appt.notes }}
-                            typeOptions={appointmentTypeOptions}
-                          />
-                        ) : null}
-                        {appt.status !== "completed" ? (
-                          <form action={setAppointmentStatus}>
-                            <input type="hidden" name="id" value={appt.id} />
-                            <input type="hidden" name="status" value="cancelled" />
-                            <button type="submit" className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-danger-500 transition hover:border-danger-500/40"><XCircle className="h-3 w-3" /> İptal</button>
-                          </form>
-                        ) : null}
-                        {/* Müşteriye SMS/WhatsApp ile iletilecek teyit linki */}
-                        {appt.status !== "completed" && appt.confirm_token ? (
-                          <CopyConfirmLink token={appt.confirm_token} />
-                        ) : null}
-                        {appt.appointment_type === "showing" ? (
-                          <Link
-                            href={tutanakHref}
-                            className="relative z-10 inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
-                          >
-                            <FileSignature className="h-3 w-3" /> Tutanak oluştur
-                          </Link>
-                        ) : null}
-                        <AddToCalendarButton
-                          event={{
-                            uid:         appt.id,
-                            title:       `${typeLabel[appt.appointment_type] ?? appt.appointment_type} — ${customerName}`,
-                            description: `${propertyName}${appt.notes ? `\n${appt.notes}` : ""}`,
-                            location:    appt.location ?? undefined,
-                            startAt:     date,
-                            endAt:       appt.duration_min
-                              ? new Date(date.getTime() + appt.duration_min * 60_000)
-                              : undefined,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        )}
+          <EmptyState
+            icon={Search}
+            illustration="search"
+            title="Bu pencerede randevu bulunamadı"
+            description="Arama ifadenizi, filtreleri ya da takvim aralığını değiştirip tekrar deneyin."
+            action={{ href: PATH, label: "Filtreleri temizle" }}
+          />
+        )
+      ) : (
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-display text-base font-bold text-ink-950">
+              <CalendarClock aria-hidden="true" className="h-4 w-4 text-brand-600" /> Randevu listesi
+              <span className="numeric rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-semibold text-brand-700">{rows.length}</span>
+            </h2>
+            {rows.some((r) => r.status === "pending" || r.status === "signature") ? (
+              <span className="inline-flex items-center gap-1 text-xs text-text-muted">
+                <AlertTriangle aria-hidden="true" className="h-3 w-3" /> Teyit / imza bekleyenler durum sütununda işaretli
+              </span>
+            ) : null}
+          </div>
+          <ListLimitNotice shown={rows.length} total={apptTotal} hint="Geçmiş randevular için takvimi kullanın." />
+          <AppointmentTable rows={viewModels} density={density} typeOptions={appointmentTypeOptions} />
+          <AppointmentMobileList rows={viewModels} typeOptions={appointmentTypeOptions} />
+          <ListPager pathname={PATH} params={urlParams} window={win} total={rows.length} />
+        </section>
+      )}
 
-        {/* side: signature + gps */}
-        <div className="space-y-4">
-          {/* Kişisel ICS abonelik linki — Google/Apple/Outlook otomatik senkron */}
-          {calendarToken ? <CalendarSubscribeCard token={calendarToken} /> : null}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Kişisel ICS abonelik linki — Google/Apple/Outlook otomatik senkron */}
+        {calendarToken ? <CalendarSubscribeCard token={calendarToken} /> : null}
 
-          {/* Müşterinin kendi randevusunu aldığı public link (/randevu-al/[token]) */}
-          <BookingLinkCard userId={gate.userId} />
-
-          <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
-            <div className="flex items-center gap-2">
-              <span className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-mint-500/12 text-mint-600"><FileSignature className="h-4 w-4" /></span>
-              <div>
-                <p className="text-xs font-semibold text-mint-600">Yer gösterme takibi</p>
-                <h2 className="font-display font-bold text-ink-950">Randevu durumu</h2>
-              </div>
-            </div>
-            <p className="mt-3 text-xs leading-relaxed text-text-muted">
-              Yer gösterme ve görüşmelerin durumunu takip edin. Tamamlanan randevular komisyon ve anlaşma akışına kaynak olur.
-            </p>
-            <div className="mt-4 space-y-2">
-              {[
-                { label: "Tamamlanan", value: `${completedTotal} randevu`, icon: CheckCircle2, tone: "text-mint-600", href: apptHref({ durum: "completed" }) },
-                { label: "Bekleyen", value: `${pendingSign} randevu`, icon: Clock3, tone: "text-warn-500", href: apptHref({ durum: "signature" }) },
-                { label: "Yer gösterme", value: `${showings} adet`, icon: MapPinned, tone: "text-brand-600", href: apptHref({ tip: "showing" }) },
-              ].map((row) => (
-                <Link key={row.label} href={row.href} className="focus-ring group flex items-center justify-between rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300">
-                  <span className="flex items-center gap-2 text-xs font-medium text-text-muted"><row.icon className={`h-4 w-4 ${row.tone}`} /> {row.label}</span>
-                  <span className="flex items-center gap-1.5 text-xs font-bold text-ink-950">
-                    {row.value}
-                    <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white">
-            <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-mint-500/25 blur-[60px]" />
-            <div className="relative flex items-center justify-between">
-              <p className="flex items-center gap-2 text-xs font-semibold text-mint-400"><MapPinned className="h-4 w-4" /> Günlük tur planı</p>
-              <span className="rounded-full bg-mint-400/12 px-2.5 py-1 text-xs font-bold text-mint-400">PLAN</span>
-            </div>
-            <p className="relative mt-3 text-sm text-white/70">Bugün <span className="font-bold text-white">{todayTotal}</span> randevu planlı. Randevuları saatine göre sıralayıp turunuzu düzenleyin.</p>
-            <div className="relative mt-4 flex items-center justify-between rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-3">
-              <div><p className="text-xs text-white/45">Yaklaşan yer gösterme</p><p className="font-display text-xl font-extrabold text-mint-400">{showings}</p></div>
-              <Navigation className="h-5 w-5 text-white/40" />
-            </div>
-          </section>
-
-          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
-            <div className="flex items-center gap-2">
-              {/* İkonografi: burada UserRound (kişi ikonu) vardı; panel randevu
-                  türlerini anlatıyor — kavramın ikonu ICONS.randevu. */}
-              <ICONS.randevu className="h-4 w-4 text-brand-600" />
-              <h2 className="font-display font-bold text-ink-950">Randevu türleri</h2>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {Object.entries(typeLabel).map(([key, label]) => {
-                const count = typeCounts[key] ?? 0;
-                const active = tipF === key;
-                return (
-                  <Link
-                    key={key}
-                    href={apptHref({ tip: active ? "" : key })}
-                    className={`focus-ring press lift group block rounded-[var(--radius-card)] border px-3 py-2.5 transition ${typeTone[key]} ${active ? "border-brand-400" : "border-line hover:border-brand-300"}`}
-                  >
-                    <p className="flex items-start justify-between font-display text-lg font-extrabold">
-                      {count}
-                      <ArrowUpRight className="h-3.5 w-3.5 opacity-0 transition group-hover:opacity-60" />
-                    </p>
-                    <p className="text-xs font-medium opacity-80">{label}</p>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-        </div>
+        {/* Müşterinin kendi randevusunu aldığı public link (/randevu-al/[token]) */}
+        <BookingLinkCard userId={gate.userId} />
       </div>
     </div>
   );

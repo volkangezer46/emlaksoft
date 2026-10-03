@@ -264,8 +264,11 @@ ve `title` kalır). Tek sistem; ikinci sekme bileşeni yazma.
 ## Liste kiti (`src/components/ui/list-kit`)
 
 Liste sayfalarının ortak dili: sayaçlı kategori çipleri, ikon kapsüllü KPI kartları, kapak önizlemeli tablo, renkli
-durum kapsülleri, satır eylemleri. Portföy ve müşteri listeleri kullanır; talepler, anlaşmalar, teklifler,
-sözleşmeler, randevular, görevler ve kiralama aynı kalıba taşınacaktır. Hepsi sunucu bileşeni (JS yok);
+durum kapsülleri, satır eylemleri. Portföy, müşteri, talepler, anlaşmalar (liste görünümü; pano korunur), teklifler,
+sözleşmeler, randevular, görevler ve kiralama kullanır. Ek yapı taşları: `ListPager` (gerçek sayfalama şeridi),
+`FilterDate`, `CategoryChips allLabel` ("Tümü" yerine "Açık talepler" gibi), saf yardımcılar `uuidParam`
+(doğrulanmış `?danisman=`), `isoDateParam`, `parsePage`, `pageWindow`, `weeklySeriesOf`. İlişkili ad araması
+(müşteri/portföy adıyla) `lib/list-search.ts`. Hepsi sunucu bileşeni (JS yok);
 import: `@/components/ui/list-kit`.
 
 | Bileşen | Ne yapar | Önemli kural |

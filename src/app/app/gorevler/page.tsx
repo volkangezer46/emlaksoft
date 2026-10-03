@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlarmClock, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Plus, Repeat, Sunrise } from "lucide-react";
+import { AlarmClock, CalendarClock, CheckCircle2, Plus, Sunrise } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DAY_MS, daysFromNowIso, now, trDayStartMs } from "@/lib/clock";
@@ -10,18 +9,31 @@ import { TaskBulkList } from "./task-bulk-list";
 import { EmptyState } from "@/components/app/empty-state";
 import { ICONS } from "@/lib/icons";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button";
+import { listSavedViews } from "@/app/actions/saved-views";
+import { SavedViews } from "@/components/app/saved-views";
+import { orIlike } from "@/lib/pgrst";
+import { buildHref } from "@/lib/ui/filter-params";
+import {
+  CategoryChips,
+  FilterGrid,
+  FilterSelect,
+  KpiStrip,
+  ListPager,
+  ListToolbar,
+  buildActiveChips,
+  mergeResetPage,
+  pageWindow,
+  parsePage,
+  type KpiItem,
+} from "@/components/ui/list-kit";
 
 export const dynamic = "force-dynamic";
 
+const PATH = "/app/gorevler";
+
 /** Sayfa başına görev — gerçek sayfalama (blind .limit yerine). */
 const PAGE_SIZE = 50;
-
-const PAGER_BTN =
-  "focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
-const PAGER_BTN_DISABLED =
-  "inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
 const FILTERS = [
   { key: "open", label: "Açık" },
@@ -52,7 +64,7 @@ function endOfToday() {
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ filter?: string; mine?: string; tur?: string; tekrar?: string; sayfa?: string; yeni?: string }>;
+  searchParams?: Promise<{ q?: string; filter?: string; mine?: string; tur?: string; tekrar?: string; sayfa?: string; yeni?: string }>;
 }) {
   const ctx = await requireModulePage("tasks");
   const canEdit = (ctx.perms.tasks ?? []).includes("edit");
@@ -64,41 +76,27 @@ export default async function TasksPage({
   const mine = params.mine === "1";
   const tur = KIND_FILTERS.some((k) => k.key === params.tur) ? params.tur! : "";
   const tekrar = params.tekrar === "1";
-  const page = Math.max(1, Number.parseInt(params.sayfa ?? "", 10) || 1);
+  const q = (params.q ?? "").trim().slice(0, 80);
+  const page = parsePage(params.sayfa);
   const offset = (page - 1) * PAGE_SIZE;
 
-  // Filtre linkleri diğer parametreleri korur (filter ⇄ mine ⇄ tur ⇄ tekrar bağımsız).
-  // sayfa taşınmaz — çip değişince liste 1. sayfaya döner (filtre kontratı).
-  const taskHref = (patch: { filter?: string; mine?: boolean; tur?: string; tekrar?: boolean }) => {
-    const f = patch.filter !== undefined ? patch.filter : filter;
-    const m = patch.mine !== undefined ? patch.mine : mine;
-    const t = patch.tur !== undefined ? patch.tur : tur;
-    const r = patch.tekrar !== undefined ? patch.tekrar : tekrar;
-    const q = new URLSearchParams();
-    q.set("filter", f);
-    if (m) q.set("mine", "1");
-    if (t) q.set("tur", t);
-    if (r) q.set("tekrar", "1");
-    return `/app/gorevler?${q.toString()}`;
-  };
-
-  // Sayfalama linki — mevcut filtreleri korur, yalnız ?sayfa değişir.
-  const pageHref = (n: number) => {
-    const q = new URLSearchParams();
-    q.set("filter", filter);
-    if (mine) q.set("mine", "1");
-    if (tur) q.set("tur", tur);
-    if (tekrar) q.set("tekrar", "1");
-    if (n > 1) q.set("sayfa", String(n));
-    return `/app/gorevler?${q.toString()}`;
-  };
+  // Doğrulanmış URL durumu — varsayılan (açık) görünüm param taşımaz.
+  const urlParams: Record<string, string> = {};
+  if (q) urlParams.q = q;
+  if (filter !== "open") urlParams.filter = filter;
+  if (tur) urlParams.tur = tur;
+  if (tekrar) urlParams.tekrar = "1";
+  if (mine) urlParams.mine = "1";
+  const hrefWith = (patch: Record<string, string>) => buildHref(PATH, mergeResetPage(urlParams, patch));
+  const savedViewParams = urlParams;
 
   const supabase = await createClient();
+  const savedViewsPromise = listSavedViews(PATH);
+  const nowIso = new Date(now()).toISOString();
 
   let query = supabase
     .from("tasks")
-    // count: filtreye göre 100/200 sınırı var; hangi filtrede olursa olsun
-    // kullanıcı kaç görevin listede olmadığını görebilmeli.
+    // count: filtreye göre sayfalama ("X–Y / Toplam Z") gerçek toplamı ister.
     .select(
       "id, title, notes, kind, priority, status, due_at, assigned_to, customer_id, property_id, recurrence, created_at, assignee:profiles!tasks_assigned_to_fkey(full_name), customer:customers!tasks_customer_id_fkey(full_name)",
       { count: "exact" },
@@ -108,21 +106,16 @@ export default async function TasksPage({
   if (mine) query = query.eq("assigned_to", ctx.userId);
   if (tur) query = query.eq("kind", tur);
   if (tekrar) query = query.not("recurrence", "is", null);
+  if (q) query = query.or(orIlike(["title", "notes"], q));
 
-  // Eskiden her dal sabit .limit(100/200) ile kırpıyordu; 200'ü aşan ofiste
-  // "Daha sonra"/"Tarihsiz" görevler sessizce düşüyordu. Artık gerçek sayfalama:
-  // dal yalnız sıralamayı belirler, .range() aşağıda tek yerde uygulanır.
+  // Dal yalnız sıralamayı/durumu belirler, .range() aşağıda tek yerde uygulanır (gerçek sayfalama).
   if (filter === "done") {
     query = query.eq("status", "done").order("completed_at", { ascending: false });
   } else if (filter === "overdue") {
-    query = query.eq("status", "open").lt("due_at", new Date(now()).toISOString()).order("due_at", { ascending: true });
+    query = query.eq("status", "open").lt("due_at", nowIso).order("due_at", { ascending: true });
   } else if (filter === "yaklasan") {
     // Önümüzdeki 7 gün: bugünden itibaren vadeli açık görevler
-    query = query
-      .eq("status", "open")
-      .gte("due_at", new Date(now()).toISOString())
-      .lte("due_at", daysFromNowIso(7))
-      .order("due_at", { ascending: true });
+    query = query.eq("status", "open").gte("due_at", nowIso).lte("due_at", daysFromNowIso(7)).order("due_at", { ascending: true });
   } else if (filter === "today") {
     query = query
       .eq("status", "open")
@@ -136,29 +129,47 @@ export default async function TasksPage({
   }
   query = query.range(offset, offset + PAGE_SIZE - 1);
 
-  const [{ data: tasksData, count: taskTotal }, counts] = await Promise.all([
+  const head = () => supabase.from("tasks").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId);
+
+  const [
+    { data: tasksData, count: taskTotal },
+    savedViews,
+    openRes,
+    overdueRes,
+    todayRes,
+    upcomingRes,
+    doneRes,
+    allRes,
+    ...kindRes
+  ] = await Promise.all([
     query,
-    (async () => {
-      const nowIso = new Date(now()).toISOString();
-      const head = () => supabase.from("tasks").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId);
-      const [{ count: open }, { count: overdue }, { count: today }, { count: upcoming }, { count: done }] = await Promise.all([
-        head().eq("status", "open"),
-        head().eq("status", "open").lt("due_at", nowIso),
-        head().eq("status", "open").gte("due_at", startOfToday().toISOString()).lte("due_at", endOfToday().toISOString()),
-        head().eq("status", "open").gte("due_at", nowIso).lte("due_at", daysFromNowIso(7)),
-        head().eq("status", "done"),
-      ]);
-      return { open: open ?? 0, overdue: overdue ?? 0, today: today ?? 0, upcoming: upcoming ?? 0, done: done ?? 0 };
-    })(),
+    savedViewsPromise,
+    head().eq("status", "open"),
+    head().eq("status", "open").lt("due_at", nowIso),
+    head().eq("status", "open").gte("due_at", startOfToday().toISOString()).lte("due_at", endOfToday().toISOString()),
+    head().eq("status", "open").gte("due_at", nowIso).lte("due_at", daysFromNowIso(7)),
+    head().eq("status", "done"),
+    head(),
+    // Tür çipi sayaçları: açık görevler içinde
+    ...KIND_FILTERS.map((k) => head().eq("status", "open").eq("kind", k.key)),
   ]);
 
-  const tasks = (tasksData ?? []) as unknown as TaskRow[];
+  const counts = {
+    open: openRes.count ?? 0,
+    overdue: overdueRes.count ?? 0,
+    today: todayRes.count ?? 0,
+    upcoming: upcomingRes.count ?? 0,
+    done: doneRes.count ?? 0,
+    all: allRes.count ?? 0,
+  };
+  const kindCounts: Record<string, number> = {};
+  KIND_FILTERS.forEach((k, i) => {
+    kindCounts[k.key] = (kindRes[i] as { count: number | null }).count ?? 0;
+  });
 
-  // Sayfalama toplamları — count filtreye (mine/tür/tekrar) duyarlı gerçek toplam.
+  const tasks = (tasksData ?? []) as unknown as TaskRow[];
   const totalFiltered = taskTotal ?? tasks.length;
-  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
-  const rangeStart = totalFiltered === 0 ? 0 : offset + 1;
-  const rangeEnd = Math.min(offset + tasks.length, totalFiltered);
+  const win = pageWindow(page, totalFiltered, PAGE_SIZE, tasks.length);
 
   // "Açık" görünümünde görevler zaman şeritlerine ayrılır:
   // Gecikmiş → Bugün → Yaklaşan (7 gün) → Daha sonra → Tarihsiz.
@@ -218,8 +229,27 @@ export default async function TasksPage({
     }
   }
 
+  const kpis: KpiItem[] = [
+    // İkonografi: görev kavramının ikonu ICONS.gorev (ListChecks).
+    { label: "Açık görev", value: counts.open, icon: <ICONS.gorev />, tone: "info", href: hrefWith({ filter: "" }), hint: "tamamlanmamış" },
+    { label: "Gecikmiş", value: counts.overdue, icon: <AlarmClock />, tone: "danger", href: hrefWith({ filter: "overdue" }), attention: true, hint: "vadesi geçti" },
+    { label: "Bugün", value: counts.today, icon: <Sunrise />, tone: "warning", href: hrefWith({ filter: "today" }), hint: "bugün vadeli" },
+    { label: "Yaklaşan 7 gün", value: counts.upcoming, icon: <ICONS.randevu />, tone: "info", href: hrefWith({ filter: "yaklasan" }), hint: "önümüzdeki hafta" },
+    { label: "Tamamlanan", value: counts.done, icon: <CheckCircle2 />, tone: "success", href: hrefWith({ filter: "done" }), hint: "bitirilen görev" },
+  ];
+
+  const chips = buildActiveChips(PATH, urlParams, [
+    { key: "q", label: "Arama" },
+    { key: "filter", label: "Zaman", format: (v) => FILTERS.find((f) => f.key === v)?.label ?? v },
+    { key: "tur", label: "Tür", format: (v) => KIND_FILTERS.find((k) => k.key === v)?.label ?? v },
+    { key: "tekrar", label: "Tekrar", format: () => "Tekrarlayan" },
+    { key: "mine", label: "Atanan", format: () => "Sadece benim" },
+  ]);
+
+  const emptyAll = counts.all === 0;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title="Görevler"
         description="Arama, ziyaret, evrak ve takip görevlerini planlayın; ekibe atayın, gecikmeleri anında görün."
@@ -227,90 +257,83 @@ export default async function TasksPage({
       />
       {canCreate ? <QuickTask /> : null}
 
-      {/* Kompakt, tıklanabilir sayaçlar — mevcut ?filter= parametresiyle ilgili listeye iner; sıfırlar sönük. */}
-      <Card className="flex flex-wrap items-center gap-x-2 gap-y-1 p-2">
-        {[
-          // İkonografi: görev kavramının ikonu ICONS.gorev (ListChecks).
-          { label: "Açık görev", value: counts.open, icon: ICONS.gorev, tone: "text-cyan-600", href: taskHref({ filter: "open" }) },
-          { label: "Gecikmiş", value: counts.overdue, icon: AlarmClock, tone: "text-danger-500", href: taskHref({ filter: "overdue" }) },
-          { label: "Bugün", value: counts.today, icon: Sunrise, tone: "text-amber-600", href: taskHref({ filter: "today" }) },
-          { label: "Yaklaşan 7 gün", value: counts.upcoming, icon: ICONS.randevu, tone: "text-brand-600", href: taskHref({ filter: "yaklasan" }) },
-          { label: "Tamamlanan", value: counts.done, icon: CheckCircle2, tone: "text-mint-600", href: taskHref({ filter: "done" }) },
-        ].map((st) => (
-          <Link
-            key={st.label}
-            href={st.href}
-            className={`focus-ring press flex items-center gap-2.5 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-canvas ${st.value === 0 ? "opacity-55" : ""}`}
-          >
-            <st.icon className={`h-4 w-4 ${st.tone}`} />
-            <span className="font-display text-lg font-bold leading-none text-text">{st.value.toLocaleString("tr-TR")}</span>
-            <span className="text-xs text-text-muted">{st.label}</span>
-          </Link>
-        ))}
-      </Card>
+      {emptyAll ? null : <KpiStrip items={kpis} />}
 
-      <div className="flex flex-wrap items-center gap-2">
-        {FILTERS.map((f) => {
-          const active = f.key === filter;
-          return (
-            <Link
-              key={f.key}
-              href={taskHref({ filter: f.key })}
-              className={`rounded-[var(--radius-control)] border px-3.5 py-2 text-xs font-semibold transition ${
-                active ? "border-brand-400/50 bg-brand-600/10 text-brand-600" : "border-line bg-surface text-ink-950 hover:border-brand-300"
-              }`}
-            >
-              {f.label}
-            </Link>
-          );
-        })}
-        <span className="mx-1 hidden h-4 w-px bg-line sm:block" aria-hidden />
-        {/* Tür çipleri: aktifken tekrar tıklamak filtreyi kaldırır */}
-        {KIND_FILTERS.map((k) => {
-          const active = k.key === tur;
-          return (
-            <Link
-              key={k.key}
-              href={taskHref({ tur: active ? "" : k.key })}
-              className={`rounded-[var(--radius-control)] border px-3.5 py-2 text-xs font-semibold transition ${
-                active ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-600" : "border-line bg-surface text-text-muted hover:border-cyan-400/50 hover:text-cyan-600"
-              }`}
-            >
-              {k.label}
-            </Link>
-          );
-        })}
-        {/* Tekrarlayan çipi: ?tekrar=1 → sunucu filtresi recurrence not null */}
-        <Link
-          href={taskHref({ tekrar: !tekrar })}
-          className={`flex items-center gap-1.5 rounded-[var(--radius-control)] border px-3.5 py-2 text-xs font-semibold transition ${
-            tekrar ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-600" : "border-line bg-surface text-text-muted hover:border-cyan-400/50 hover:text-cyan-600"
-          }`}
-        >
-          <Repeat className="h-3.5 w-3.5" /> Tekrarlayan
-        </Link>
-        <Link
-          href={taskHref({ mine: !mine })}
-          className={`ml-auto rounded-[var(--radius-control)] border px-3.5 py-2 text-xs font-semibold transition ${
-            mine ? "border-mint-400/50 bg-mint-500/10 text-mint-600" : "border-line bg-surface text-text-muted hover:border-brand-300"
-          }`}
-        >
-          {mine ? "Sadece benim ✓" : "Sadece benim"}
-        </Link>
-      </div>
+      {emptyAll ? null : (
+        <>
+          <ListToolbar
+            pathname={PATH}
+            params={urlParams}
+            searchPlaceholder="Görev başlığı veya notu ara…"
+            searchLabel="Görev ara"
+            panelParamKeys={["tekrar", "mine"]}
+            panel={
+              <FilterGrid>
+                <FilterSelect
+                  name="mine"
+                  label="Atanan"
+                  value={mine ? "1" : ""}
+                  options={[
+                    { value: "", label: "Tüm görevler" },
+                    { value: "1", label: "Sadece benim" },
+                  ]}
+                />
+                <FilterSelect
+                  name="tekrar"
+                  label="Tekrar"
+                  value={tekrar ? "1" : ""}
+                  options={[
+                    { value: "", label: "Tümü" },
+                    { value: "1", label: "Tekrarlayan" },
+                  ]}
+                />
+              </FilterGrid>
+            }
+            chips={chips}
+            resultCount={chips.length > 0 ? totalFiltered : undefined}
+            resultNoun="görev"
+            savedViews={<SavedViews route={PATH} views={savedViews} currentParams={savedViewParams} />}
+          />
+
+          <div className="space-y-2">
+            <CategoryChips
+              options={FILTERS.filter((f) => f.key !== "open").map((f) => ({ value: f.key, label: f.label }))}
+              counts={{ overdue: counts.overdue, today: counts.today, yaklasan: counts.upcoming, done: counts.done, all: counts.all }}
+              total={counts.open}
+              allLabel="Açık"
+              active={filter === "open" ? "" : filter}
+              pathname={PATH}
+              params={urlParams}
+              paramName="filter"
+              label="Görev zamanı"
+            />
+            <CategoryChips
+              options={KIND_FILTERS.map((k) => ({ value: k.key, label: k.label }))}
+              counts={kindCounts}
+              total={null}
+              allLabel="Tüm türler"
+              active={tur}
+              pathname={PATH}
+              params={urlParams}
+              paramName="tur"
+              label="Görev türü"
+            />
+          </div>
+        </>
+      )}
 
       {tasks.length === 0 ? (
         <EmptyState
           icon={ICONS.gorev}
-          illustration={filter === "all" ? "start" : "search"}
-          title={filter === "all" ? "Henüz görev yok" : "Bu filtrede görev yok"}
+          illustration={emptyAll ? "start" : "search"}
+          title={emptyAll ? "Henüz görev yok" : "Bu filtrede görev yok"}
           description={
-            filter === "all"
+            emptyAll
               ? "Yeni görev ekleyerek takip akışınızı başlatın; arama, ziyaret ve evrak işleri tek listede toplanır."
-              : "Seçili filtreye uyan görev yok. Filtreyi genişletip tekrar deneyin."
+              : "Arama ifadenizi ya da filtreleri değiştirip tekrar deneyin."
           }
           tone="brand"
-          secondary={filter === "all" ? undefined : { href: "/app/gorevler?filter=all", label: "Tüm görevleri göster" }}
+          secondary={emptyAll ? undefined : { href: `${PATH}?filter=all`, label: "Tüm görevleri göster" }}
         />
       ) : (
         <div className="space-y-2">
@@ -321,38 +344,7 @@ export default async function TasksPage({
         </div>
       )}
 
-      {/* Sayfalama — filtre parametreleri linklerde korunur */}
-      {totalFiltered > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-          <p className="numeric text-text-muted">
-            {rangeStart.toLocaleString("tr-TR")}–{rangeEnd.toLocaleString("tr-TR")} / Toplam{" "}
-            {totalFiltered.toLocaleString("tr-TR")}
-          </p>
-          <div className="flex items-center gap-1.5">
-            {page > 1 ? (
-              <Link href={pageHref(page - 1)} className={PAGER_BTN}>
-                <ChevronLeft className="h-4 w-4" /> Önceki
-              </Link>
-            ) : (
-              <span className={PAGER_BTN_DISABLED} aria-disabled="true">
-                <ChevronLeft className="h-4 w-4" /> Önceki
-              </span>
-            )}
-            <span className="numeric px-1 text-text-faint">
-              {Math.min(page, totalPages)} / {totalPages}
-            </span>
-            {page < totalPages ? (
-              <Link href={pageHref(page + 1)} className={PAGER_BTN}>
-                Sonraki <ChevronRight className="h-4 w-4" />
-              </Link>
-            ) : (
-              <span className={PAGER_BTN_DISABLED} aria-disabled="true">
-                Sonraki <ChevronRight className="h-4 w-4" />
-              </span>
-            )}
-          </div>
-        </div>
-      ) : null}
+      <ListPager pathname={PATH} params={urlParams} window={win} total={totalFiltered} />
     </div>
   );
 }

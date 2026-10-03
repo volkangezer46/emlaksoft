@@ -36,6 +36,21 @@ export function FilterSelect({
   );
 }
 
+/** FilterDate — `ListToolbar panel` içi etiketli tarih alanı (YYYY-MM-DD, form GET ile URL'e yazılır). */
+export function FilterDate({ name, label, value, className }: { name: string; label: string; value: string; className?: string }) {
+  return (
+    <label className={cn("grid gap-1 text-xs font-semibold text-text-muted", className)}>
+      {label}
+      <input
+        name={name}
+        type="date"
+        defaultValue={value}
+        className="min-h-9 min-w-0 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-sm font-normal text-text outline-none transition focus:border-brand-400 focus:bg-surface"
+      />
+    </label>
+  );
+}
+
 /** Panel alanlarını iki sütuna dizer (dar ekranda tek sütun). */
 export function FilterGrid({ children }: { children: ReactNode }) {
   return <div className="grid gap-3 sm:grid-cols-2">{children}</div>;
