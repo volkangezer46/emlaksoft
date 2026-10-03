@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Inter, Manrope } from "next/font/google";
+import { Geist_Mono, Instrument_Serif, Inter, Manrope } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/app/sw-register";
 import { getBaseUrl } from "@/lib/base-url";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
@@ -27,6 +27,17 @@ const geistMono = Geist_Mono({
   display: "swap",
   preload: false,
   fallback: ["monospace"],
+});
+
+// Yalnız ana sayfa başlıklarında 1-2 kelimelik italik vurgu (docs/design/LANDING_SPEC.md).
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument-serif",
+  weight: "400",
+  style: "italic",
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
+  preload: false,
+  fallback: ["Iowan Old Style", "Georgia", "serif"],
 });
 
 const SITE_NAME = "EmlakSoft";
@@ -102,7 +113,7 @@ export default function RootLayout({
       lang="tr"
       suppressHydrationWarning
       data-scroll-behavior="smooth"
-      className={`${manrope.variable} ${inter.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${manrope.variable} ${inter.variable} ${geistMono.variable} ${instrumentSerif.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
