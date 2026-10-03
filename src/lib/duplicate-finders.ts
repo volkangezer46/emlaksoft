@@ -78,7 +78,7 @@ export async function findCustomerDuplicates(
   if (entries.length === 0) return [];
 
   const visibleIds = entries
-    .filter((e) => viewer.officeWide || e.row.assigned_to === viewer.userId || e.row.created_by === viewer.userId)
+    .filter((e) => viewer.officeWide || e.row.assigned_to === viewer.userId)
     .map((e) => e.row.id);
   const advisors = await advisorNames(
     supabase,
@@ -98,7 +98,8 @@ export async function findCustomerDuplicates(
   }
 
   return entries.map(({ row, reasons }) => {
-    const owner = row.assigned_to === viewer.userId || row.created_by === viewer.userId ? viewer.userId : row.assigned_to;
+    // Gizlilik: ayrıntı yalnız ofis geneli kapsam ya da KENDİNE ATANMIŞ kayıtta açılır (created_by yetmez).
+    const owner = row.assigned_to;
     return scopeHit(
       {
         ...EMPTY_HIT,
@@ -192,8 +193,7 @@ export async function findSimilarOpenDemands(
     .eq("status", "active")
     .order("created_at", { ascending: false })
     .limit(20);
-  const owner =
-    cust.assigned_to === viewer.userId || cust.created_by === viewer.userId ? viewer.userId : (cust.assigned_to as string | null);
+  const owner = cust.assigned_to as string | null;
   const rows = ((data ?? []) as { id: string; transaction_type: string | null; property_type: string | null; district_id: string | null }[]).filter(
     (r) => demandsSimilar(args, r),
   );

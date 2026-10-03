@@ -25,6 +25,7 @@ import { FavButton } from "@/components/public/fav-button";
 import { VitrinCardShell } from "@/components/public/vitrin-fav";
 import { FavNavBadge } from "../fav-nav-badge";
 import { PriceAlertForm } from "./price-alert-form";
+import { MapEmbed } from "./map-embed";
 import { PurchaseCalculator } from "./purchase-calculator";
 import { InvestmentPanel } from "./investment-panel";
 import { DAY_MS, msSince, now } from "@/lib/clock";
@@ -341,10 +342,16 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
       ? { label: "Yayın tarihi", value: new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(property.published_at)) }
       : null,
   ].filter((r): r is { label: string; value: string } => r != null && Boolean(r.value));
-  const mapEmbed =
-    property.lat != null && property.lng != null
-      ? `https://www.openstreetmap.org/export/embed.html?bbox=${Number(property.lng) - 0.006}%2C${Number(property.lat) - 0.004}%2C${Number(property.lng) + 0.006}%2C${Number(property.lat) + 0.004}&layer=mapnik&marker=${property.lat}%2C${property.lng}`
-      : null;
+  const latNum = property.lat != null ? Number(property.lat) : NaN;
+  const lngNum = property.lng != null ? Number(property.lng) : NaN;
+  const hasCoords = Number.isFinite(latNum) && Number.isFinite(lngNum);
+  const f5 = (n: number) => n.toFixed(5);
+  // embed.html: bbox = batı,güney,doğu,kuzey; marker = enlem,boylam.
+  const mapEmbed = hasCoords
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${f5(lngNum - 0.006)}%2C${f5(latNum - 0.004)}%2C${f5(lngNum + 0.006)}%2C${f5(latNum + 0.004)}&layer=mapnik&marker=${f5(latNum)}%2C${f5(lngNum)}`
+    : null;
+  const osmOpenHref = hasCoords ? `https://www.openstreetmap.org/?mlat=${f5(latNum)}&mlon=${f5(lngNum)}#map=16/${f5(latNum)}/${f5(lngNum)}` : null;
+  const leadOpen = tenant.lead_capture_enabled !== false && Boolean(tenant.lead_capture_token);
   const advisorTel = toTelHref(advisor?.phone ?? null);
   const advisorWhatsApp = toWhatsAppLink(
     advisor?.phone ?? null,
@@ -554,15 +561,9 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                 <h2 id="konum-baslik" className="flex items-center gap-2 px-5 pt-5 font-display text-base font-extrabold text-ink-950">
                   <MapPin className="h-4 w-4 text-brand-600" aria-hidden="true" /> Konum
                 </h2>
-                <iframe
-                  title="İlan konumu haritası"
-                  src={mapEmbed}
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                  className="mt-3 block h-64 w-full border-0 sm:h-72"
-                />
+                <MapEmbed src={mapEmbed} openHref={osmOpenHref as string} />
                 {mapsHref ? (
-                  <a href={mapsHref} target="_blank" rel="noopener noreferrer" className="block px-5 py-3 text-xs font-semibold text-brand-600 hover:underline">
+                  <a href={mapsHref} target="_blank" rel="noopener noreferrer" className="block px-5 pb-3 text-xs font-semibold text-brand-600 hover:underline">
                     Google Haritalar&apos;da aç
                   </a>
                 ) : null}
@@ -651,7 +652,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                   </Link>
                 ) : null}
 
-                {tenant.lead_capture_enabled !== false && tenant.lead_capture_token ? (
+                {leadOpen && tenant.lead_capture_token ? (
                   <LeadForm token={tenant.lead_capture_token} provinces={provinces ?? []} vitrinSlug={slug} />
                 ) : (
                   <p className="mt-4 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-white/60">
@@ -769,11 +770,11 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
             <Link href={`/randevu-al/${bookingToken}`} className="focus-ring press inline-flex min-h-12 flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-card)] border border-line bg-surface px-3 text-sm font-bold text-ink-950">
               <CalendarClock className="h-4 w-4" aria-hidden="true" /> Randevu
             </Link>
-          ) : (
+          ) : leadOpen ? (
             <a href="#talep-formu" className="focus-ring press inline-flex min-h-12 flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-card)] border border-line bg-surface px-3 text-sm font-bold text-ink-950">
               Talep bırak
             </a>
-          )}
+          ) : null}
         </div>
       </nav>
     </div>

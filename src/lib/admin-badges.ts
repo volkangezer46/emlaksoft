@@ -2,6 +2,9 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { now } from "@/lib/clock";
+import { CRON_JOBS } from "@/lib/cron-jobs";
+
+const KNOWN_JOBS: ReadonlySet<string> = new Set(CRON_JOBS.map((j) => j.job));
 
 export type AdminBadges = { tickets: number; risk: number; sales: number };
 
@@ -15,6 +18,8 @@ export type AdminHealth = {
   cronErrors: number | null;
   /** Son çalışması hatalı biten cron işlerinin adları (en çok 3): kart hangi iş olduğunu söyler. */
   failedJobs?: string[];
+  /** cron_heartbeats'te olup vercel.json'da tanımlı olmayan (eski/silinmiş) iş adları; sayıma katılmaz. */
+  unknownJobs?: string[];
   lastCronAt: string | null;
 };
 
@@ -36,7 +41,12 @@ const cachedBadges = unstable_cache(
       admin.from("cron_heartbeats").select("job, last_status, last_run_at"),
     ]);
     const dbMs = Math.max(0, now() - t0);
-    const cronRows = cronRes.error ? null : (cronRes.data ?? []);
+    const allCronRows = cronRes.error ? null : (cronRes.data ?? []);
+    // Yalnız vercel.json'daki (CRON_JOBS) işler sayılır; eski/silinmiş heartbeat adları ayrı not.
+    const cronRows = allCronRows ? allCronRows.filter((r) => KNOWN_JOBS.has(String(r.job))) : null;
+    const unknownJobs = allCronRows
+      ? allCronRows.filter((r) => !KNOWN_JOBS.has(String(r.job))).map((r) => String(r.job))
+      : [];
     return {
       tickets: ticketRes.count ?? 0,
       risk: riskRes.count ?? 0,
@@ -47,11 +57,12 @@ const cachedBadges = unstable_cache(
         cronTotal: cronRows ? cronRows.length : null,
         cronErrors: cronRows ? cronRows.filter((r) => r.last_status === "error").length : null,
         failedJobs: cronRows ? cronRows.filter((r) => r.last_status === "error").map((r) => String(r.job)).slice(0, 3) : [],
+        unknownJobs: unknownJobs.slice(0, 5),
         lastCronAt: cronRows && cronRows.length ? cronRows.map((r) => String(r.last_run_at)).sort().at(-1) ?? null : null,
       },
     };
   },
-  ["admin-sidebar-badges-v3"],
+  ["admin-sidebar-badges-v4"],
   { revalidate: 30, tags: ["admin-badges"] },
 );
 

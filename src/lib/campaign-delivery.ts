@@ -54,6 +54,8 @@ export type CampaignDeliveryWorkerSummary = {
   campaignsCompleted: number;
   campaignsRescheduled: number;
   campaignFailures: number;
+  /** Başarısız kampanya parti hatalarının kısa nedenleri (en çok 3; heartbeat ayrıntısında görünür). */
+  failureReasons?: string[];
   recipientsClaimed: number;
   sent: number;
   blocked: number;
@@ -471,9 +473,13 @@ export async function runCampaignDeliveryWorker(options?: {
       else summary.campaignsCompleted += 1;
     } catch (error) {
       summary.campaignFailures += 1;
+      const reason = error instanceof Error ? error.message.slice(0, 160) : "unknown";
+      if ((summary.failureReasons ?? []).length < 3) {
+        summary.failureReasons = [...(summary.failureReasons ?? []), reason];
+      }
       console.error("campaign delivery batch failed", {
         campaignId: campaign.id,
-        reason: error instanceof Error ? error.message : "unknown",
+        reason,
       });
     }
   }
