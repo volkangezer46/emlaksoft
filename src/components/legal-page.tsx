@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Brand } from "@/components/brand/brand";
 import { ArrowLeft, FileText, ShieldCheck } from "lucide-react";
 
 /**
@@ -27,7 +28,7 @@ export function LegalPage({
             <Link href="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-white/70 transition hover:text-white">
               <ArrowLeft className="h-4 w-4" /> Ana sayfa
             </Link>
-            <Link href="/" className="font-display text-lg font-extrabold text-white">EmlakSoft</Link>
+            <Link href="/" aria-label="EmlakSoft ana sayfa" className="inline-flex"><Brand variant="horizontal" tone="dark" height={34} alt="" /></Link>
           </div>
           <span className="mt-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-cyan-300">
             <FileText className="h-3.5 w-3.5" /> Yasal metin

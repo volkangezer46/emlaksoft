@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Brand } from "@/components/brand/brand";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { ChevronDown, ExternalLink, Lock, Menu, Pin, PinOff, Plus, Search, X } from "lucide-react";
@@ -209,7 +210,7 @@ export function AppSidebar({
   const renderContent = (variant: "desktop" | "drawer") => (
     <>
       <div className="sb-head flex min-h-14 shrink-0 items-center gap-3 border-b border-white/8 px-4">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-card)] bg-[image:var(--grad-brand)] font-display text-base font-extrabold text-white shadow-[0_12px_28px_-12px_rgba(34,211,238,.75)]">E</span>
+        <Brand variant="mark" tone="dark" height={36} alt="" className="rounded-[var(--radius-card)] shadow-[0_12px_28px_-12px_rgba(34,211,238,.75)]" />
         <div className="sb-label min-w-0 flex-1">
           <p className="font-display text-base font-extrabold leading-5 text-white">EmlakSoft</p>
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold-300)]">Ofis konsolu</p>

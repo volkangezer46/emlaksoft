@@ -4,7 +4,6 @@ export const alt = OG_ALT;
 export const size = OG_SIZE;
 export const contentType = "image/png";
 
-/** 1200x630 marka kartı (logo süper admin ayarından). */
-export default async function OpengraphImage() {
+export default async function TwitterImage() {
   return renderBrandCard();
 }

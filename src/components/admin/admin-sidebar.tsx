@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Brand } from "@/components/brand/brand";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import {
@@ -19,7 +20,7 @@ import {
   Menu,
   Radar,
   Search,
-  Shield,
+  Palette,
   ShieldCheck,
   Sparkles,
   Users,
@@ -100,6 +101,7 @@ const SECTIONS: { id: string; title: string | null; items: Item[] }[] = [
     title: "Sistem",
     items: [
       { href: "/admin/sistem", label: "Sistem sağlığı", icon: Radar, hint: "Geo, cron, push", module: "sistem" },
+      { href: "/admin/marka", label: "Marka", icon: Palette, hint: "Logo ve favicon", module: "marka" },
     ],
   },
 ];
@@ -182,9 +184,7 @@ export function AdminSidebar({
     <aside className="flex h-full w-full flex-col bg-[linear-gradient(180deg,#0b1220_0%,#070d19_100%)]">
       <div className="sb-head relative flex min-h-14 shrink-0 items-center gap-3 overflow-hidden border-b border-white/8 px-4">
         <div className="pointer-events-none absolute -right-6 -top-8 h-24 w-24 rounded-full bg-amber-400/15 blur-2xl" />
-        <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-card)] bg-amber-400 shadow-[0_0_24px_-4px_rgba(251,191,36,0.65)]">
-          <Shield className="h-5 w-5 text-ink-950" aria-hidden />
-        </span>
+        <Brand variant="mark" tone="dark" height={36} alt="" className="relative rounded-[var(--radius-card)] shadow-[0_0_24px_-4px_rgba(251,191,36,0.65)]" />
         <div className="sb-label relative min-w-0 flex-1">
           <p className="truncate font-display text-sm font-extrabold leading-5 text-white">EmlakSoft Platform</p>
           <p className="truncate text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold-300)]">{roleLabel}</p>

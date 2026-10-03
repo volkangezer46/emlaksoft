@@ -3,6 +3,9 @@ import { Geist_Mono, Caveat, Inter, Manrope } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/app/sw-register";
 import { getBaseUrl } from "@/lib/base-url";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
+import { BrandProvider } from "@/components/brand/brand";
+import { getBrandMeta } from "@/lib/brand/store";
+import { brandIcons } from "@/lib/brand/icons";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -44,7 +47,7 @@ const SITE_TITLE = "EmlakSoft — Türkiye’nin emlak işletim sistemi";
 const SITE_DESC =
   "Müşteriden tapuya, ilandan komisyona kadar emlak ofisinizi tek platformda yönetin. İYS/EİDS hazırlık süreçleri ve yapay zeka destekli emlak CRM.";
 
-export const metadata: Metadata = {
+const baseMetadata: Metadata = {
   title: {
     default: SITE_TITLE,
     template: "%s | EmlakSoft",
@@ -53,10 +56,6 @@ export const metadata: Metadata = {
   applicationName: SITE_NAME,
   metadataBase: new URL(getBaseUrl()),
   manifest: "/manifest.webmanifest",
-  icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
-    shortcut: "/icon.svg",
-  },
   keywords: [
     "emlak CRM", "emlak yazılımı", "emlak ofis yönetimi", "portföy yönetimi",
     "İYS süreç yönetimi", "EİDS hazırlığı", "emlak komisyon", "gayrimenkul CRM", "emlak danışmanı yazılımı",
@@ -93,6 +92,12 @@ export const metadata: Metadata = {
   },
 };
 
+/** Favicon/ana ekran simgesi süper admin ayarından gelir (/admin/marka); ayar yoksa varsayılan dosyalar. */
+export async function generateMetadata(): Promise<Metadata> {
+  const brand = await getBrandMeta();
+  return { ...baseMetadata, icons: brandIcons(brand) };
+}
+
 export const viewport: Viewport = {
   themeColor: "#071a38",
   width: "device-width",
@@ -102,11 +107,12 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const brandMeta = await getBrandMeta();
   return (
     <html
       lang="tr"
@@ -120,7 +126,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col font-[family-name:var(--font-inter)]">
         <a href="#main-content" className="skip-link">İçeriğe atla</a>
         <ServiceWorkerRegister />
-        {children}
+        <BrandProvider meta={brandMeta}>{children}</BrandProvider>
       </body>
     </html>
   );

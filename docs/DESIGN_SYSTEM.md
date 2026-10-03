@@ -340,3 +340,25 @@ Tetikleyici düğme olduğu yerde kalır (render prop `trigger`); kontrollü kul
 **EmptyState tek bileşen** (`@/components/ui/empty-state`; eski `components/app/empty-state` ve `ui/empty-state-v3` re-export): `variant` panel (varsayılan) | full | compact | inline; `illustration` (modül anahtarı; eski `list|search|error|start` da geçerli), tek ana `action` (+ `secondary`, `help` = "Nasıl çalışır?"). `icon` lucide bileşeni ya da düğüm olabilir.
 
 **İkon:** kavramsal ikonlar `src/lib/icons.ts` sözlüğünden (`ICONS.musteri`); rastgele lucide kavramları yalnız ok/çarpı gibi süslerde.
+
+## Marka
+
+**Seçilen sembol:** lacivert karo üzerinde altın çatı + beyaz "E" (omurga + 3 kol; orta kol marka mavisi). Üç alternatif
+çizildi ve PNG olarak 160/64/32/16 px, açık ve koyu zeminde gözle karşılaştırıldı: (A) çatı+E, (B) anahtar deliği evi,
+(C) iki bloklu yapı silueti. B koyu zeminde kayboldu ve 16 px'te okunmadı; C ayrıntıda dağıldı; A en küçük boyutta bile
+"ev + E" olarak okundu, lacivert/mavi/altın paletiyle (`tokens.css`, Gece Altın) uyumlu ve tek renk/ters sürümü kolay.
+Kelime işareti elle çizilmiş çizgi-harftir (font/telif yok); "Emlak" lacivert, "Soft" marka mavisi.
+
+**Dosyalar:** `scripts/generate-brand.mjs` hepsini üretir (`node scripts/generate-brand.mjs`): `public/brand/*`
+(logo-mark, logo-mark-dark, logo-horizontal[-dark], logo-vertical[-dark], logo-mono, logo-mono-white, favicon.svg,
+icon-192/512, maskable-192/512, apple-touch-icon, favicon-32), `public/icon.svg` (açık/koyu sekmeye göre karo rengi, `prefers-color-scheme`),
+`public/favicon.ico`. OG/Twitter kartı: `src/lib/brand/og-card.tsx`.
+
+**Kullanım kuralı:** logo gösteren HER yer `src/components/brand/brand.tsx` içindeki `<Brand variant tone>` bileşenini
+kullanır (elle "E" kutusu yazma). Özel marka kök layout'taki `BrandProvider` ile gelir.
+
+**Süper admin ayarı:** `/admin/marka` (`marka` platform modülü, yalnız super_admin; yükleme hız sınırlı + denetim kaydı).
+Depolama mevcut `platform_settings` (anahtarlar `brand.meta`, `brand.asset.<slot>`; yeni migration yok). SVG katı izin
+listesiyle doğrulanır (script/olay özniteliği/dış kaynak/foreignObject REDDEDİLİR), PNG imza + boyut kontrolü; sunum
+`/brand-asset/<slot>` (nosniff + CSP sandbox, `<img>` ile). Önbellek `unstable_cache` etiketi `platform-brand` + `updateTag`.
+Kapsam dışı: ofis bazlı (beyaz etiket) logo (`tenants.logo_url` ayrı kalır).

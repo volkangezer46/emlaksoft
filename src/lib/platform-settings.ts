@@ -16,10 +16,10 @@ export async function getPlatformSetting(key: string): Promise<string | null> {
   }
 }
 
-/** Platform ayarını yazar/günceller. */
-export async function setPlatformSetting(key: string, value: string | null, staffId?: string): Promise<void> {
+/** Platform ayarını yazar/günceller. Başarı bilgisini döner (eski çağıranlar dönüşü yok sayabilir). */
+export async function setPlatformSetting(key: string, value: string | null, staffId?: string): Promise<boolean> {
   const admin = createAdminClient();
-  await admin.from("platform_settings").upsert(
+  const { error } = await admin.from("platform_settings").upsert(
     {
       key,
       value,
@@ -28,4 +28,6 @@ export async function setPlatformSetting(key: string, value: string | null, staf
     },
     { onConflict: "key" },
   );
+  if (error) console.error("setPlatformSetting", key, error.message);
+  return !error;
 }

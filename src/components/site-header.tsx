@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { Brand } from "@/components/brand/brand";
 import {
   ArrowRight,
   BadgeCheck,
@@ -124,7 +125,7 @@ export function SiteHeader() {
       <header>
         <div className="mk-wrap mk-wrap-wide mk-nav-row">
           <Link href="/" className="mk-logo" aria-label="EmlakSoft ana sayfa" onClick={close}>
-            <i aria-hidden="true">E</i>EmlakSoft
+            <Brand variant="horizontal" tone="light" height={34} alt="" />
           </Link>
           <nav aria-label="Ana site navigasyonu" className="mk-nav-links">
             {GROUPS.map((g) => (
