@@ -61,8 +61,11 @@ export function AutomationWizard({
   initial,
   trigger,
   mode = "dialog",
+  stageNames,
 }: {
   staff: StaffOption[];
+  /** Ofisin görünen anlaşma aşaması adları (anahtar → ad); verilmezse varsayılan adlar. */
+  stageNames?: Record<string, string>;
   initial?: WizardInitial;
   /** Yalnız dialog modunda gerekli (düzenleme düğmesi). */
   trigger?: ReactNode;
@@ -108,7 +111,10 @@ export function AutomationWizard({
   const conditionFields = TRIGGER_CONDITION_FIELDS[triggerType] ?? [];
   const actionOptions = useMemo(() => availableActionsForTrigger(triggerType), [triggerType]);
   const statusEntity = STATUS_ENTITY_BY_TRIGGER[triggerType];
-  const statusOptions = statusEntity === "demand" ? DEMAND_STATUS_OPTIONS : DEAL_STAGE_OPTIONS;
+  const statusOptions =
+    statusEntity === "demand"
+      ? DEMAND_STATUS_OPTIONS
+      : DEAL_STAGE_OPTIONS.map((o) => ({ value: o.value, label: stageNames?.[o.value] ?? o.label }));
 
   function selectTrigger(value: string) {
     setTriggerType(value);

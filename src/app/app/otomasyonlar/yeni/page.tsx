@@ -3,6 +3,8 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/page-header";
 import { AutomationWizard } from "../automation-wizard";
+import { getStageLabels } from "@/lib/definitions";
+import { stageLabelMap } from "@/lib/deal-stage-labels";
 
 export default async function YeniOtomasyonPage() {
   const { perms } = await requireModulePage("settings", "/app/otomasyonlar");
@@ -29,7 +31,7 @@ export default async function YeniOtomasyonPage() {
           { label: "Yeni otomasyon" },
         ]}
       />
-      <AutomationWizard staff={staff} mode="page" />
+      <AutomationWizard staff={staff} mode="page" stageNames={stageLabelMap(await getStageLabels())} />
     </div>
   );
 }

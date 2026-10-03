@@ -1,6 +1,8 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getStageLabels } from "@/lib/definitions";
+import { stageLabelMap } from "@/lib/deal-stage-labels";
 import { orIlike, safeLike } from "@/lib/pgrst";
 import { requireActiveTenant } from "@/lib/tenant-guard";
 import { formatTurkishPhone } from "@/lib/phone";
@@ -17,14 +19,6 @@ export type SearchHit = {
   title: string;
   subtitle: string;
   href: string;
-};
-
-const DEAL_STAGE_LABEL: Record<string, string> = {
-  new: "Yeni",
-  qualified: "Nitelikli",
-  negotiation: "Müzakere",
-  won: "Kazanıldı",
-  lost: "Kaybedildi",
 };
 
 const TASK_KIND_LABEL: Record<string, string> = {
@@ -70,6 +64,7 @@ export async function searchWorkspace(query: string, limit: number = 20): Promis
   const cap = Math.min(Math.max(Math.floor(limit) || 20, 1), 100);
   const factor = Math.max(1, Math.ceil(cap / 20));
   const per = (n: number) => n * factor;
+  const DEAL_STAGE_LABEL = stageLabelMap(await getStageLabels());
 
   let customerQuery = supabase
     .from("customers")

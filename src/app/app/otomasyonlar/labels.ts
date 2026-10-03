@@ -6,6 +6,9 @@
  * Türkçe, detayda ham enum olarak görünebiliyordu. Buradaki birleşim iki
  * sayfanın tarihsel anahtarlarının tamamını kapsar.
  */
+import { DEAL_STAGES } from "@/lib/workflow-state";
+import { defaultStageLabels, stageLabelMap } from "@/lib/deal-stage-labels";
+
 export const TRIGGER_LABELS: Record<string, string> = {
   new_customer:       "Yeni müşteri",
   new_demand:         "Yeni talep",
@@ -155,13 +158,8 @@ export const DEMAND_STATUS_OPTIONS = [
   { value: "closed",  label: "Kapalı" },
 ] as const;
 
-export const DEAL_STAGE_OPTIONS = [
-  { value: "new",         label: "Yeni" },
-  { value: "qualified",   label: "Nitelikli" },
-  { value: "negotiation", label: "Pazarlık" },
-  { value: "won",         label: "Kazanıldı" },
-  { value: "lost",        label: "Kaybedildi" },
-] as const;
+/** Varsayılan aşama adları (tek kaynak); ofisin özel adları sihirbaza `stageNames` ile gelir. */
+export const DEAL_STAGE_OPTIONS = DEAL_STAGES.map((value) => ({ value, label: stageLabelMap(defaultStageLabels())[value] }));
 
 /** Müşteri bağlamı olmayan tetikleyiciler — SMS/WhatsApp/etiket burada anlamsız. */
 const NO_CUSTOMER_TRIGGERS = new Set(["new_property", "auth_expiring"]);
