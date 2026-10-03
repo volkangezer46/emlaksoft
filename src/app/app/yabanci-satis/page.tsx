@@ -307,7 +307,7 @@ export default async function ForeignSalePage() {
 
         {foreignCustomers.length === 0 ? (
           <div className="px-5 py-6">
-            <EmptyState
+            <EmptyState illustration="portfoy"
               icon={Globe2}
               title="Henüz yabancı müşteri işaretlenmedi"
               description="Yabancı uyruklu alıcılarınızı işaretleyin; talep bütçeleri döviz karşılığıyla burada toplansın ve evrak akışı ayrışsın."

@@ -245,7 +245,7 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
       ) : all.length === 0 ? (
         <EmptyState
           icon={UsersRound}
-          illustration="start"
+          illustration="ekip"
           title="Kıyaslanacak danışman yok"
           description="Ofise danışman davet ettiğinizde çağrı, randevu, teklif ve anlaşma ölçümleri burada karşılaştırılır."
           action={{ href: "/app/ekip", label: "Ekibe danışman ekle" }}

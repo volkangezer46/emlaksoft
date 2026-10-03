@@ -224,7 +224,7 @@ export default async function TekliflerPage({
       />
 
       {totalAll === 0 && !danismanF ? (
-        <EmptyState
+        <EmptyState illustration="teklif"
           icon={Tag}
           title="Henüz teklif yok"
           description="Portföylere gelen teklifler burada listelenir. Portföy detayından veya “Yeni teklif” ile ilk teklifi ekleyin."

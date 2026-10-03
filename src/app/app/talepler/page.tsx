@@ -376,7 +376,7 @@ export default async function DemandsPage({
       {allTotal === 0 && !danismanF ? (
         <EmptyState
           icon={Target}
-          illustration="start"
+          illustration="talep"
           title="Henüz talep yok"
           description="Müşteri detayından ya da “Yeni talep” ile ilk talebi ekleyin; eşleştirme motoru portföyle otomatik karşılaştırır."
           action={canCreate ? { href: "/app/talepler/yeni", label: "Yeni talep" } : undefined}

@@ -157,7 +157,7 @@ export function RotaView({
       </div>
 
       {stops.length === 0 ? (
-        <EmptyState
+        <EmptyState illustration="randevu"
           icon={CalendarDays}
           title={gun === "bugun" ? "Bugün randevun yok" : "Yarın için randevu yok"}
           description={`${gunLabel} için planlanmış randevu bulunmuyor. Yeni bir yer gösterme veya görüşme planlayınca rota burada oluşur.`}

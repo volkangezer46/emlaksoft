@@ -316,3 +316,27 @@ Tetikleyici düğme olduğu yerde kalır (render prop `trigger`); kontrollü kul
 - Kullanım: `tabs=[{id,label,icon,fields}]`, `panels={{id: <alanlar/>}}`, `hiddenFields`, `fieldLabels`, `error`, `pending`.
   Örnek: `gorevler/task-edit-dialog.tsx`, `randevular/appointment-edit-dialog.tsx`.
 - Sözleşme: `src/lib/accessible-dialog-contract.test.ts` "inline panel" bölümü taşınan akışların `Dialog` içermediğini doğrular.
+
+## Hareket ve illüstrasyon
+
+**GIF yok** (ağır, erişilemez, temaya uymaz). Yerine SVG + CSS: tek hareket dosyası `src/app/motion.css`, illüstrasyon kiti `src/components/ui/illustrations/`.
+
+**Token'lar:** `--motion-fast` 120 ms · `--motion-base` 200 ms · `--motion-slow` 360 ms · `--ease-out` · `--motion-stagger` 40 ms.
+**Bütçe:** yalnız `transform`/`opacity` (SVG çizgi için `stroke-dashoffset`); CLS yok; `will-change` yok; INP etkilenmez. Her hareket `prefers-reduced-motion: no-preference` içindedir; reduce'ta içerik bitiş durumunda durağandır.
+
+| İhtiyaç | Kullanım |
+|---|---|
+| KPI sayı sayacı | `StatCard` içinde otomatik (`ui/count-up.tsx`): sunucu sonuç değerini basar, ekrana girince bir kez sayar; biçimli (para, %) değerlere dokunmaz |
+| Liste giriş | `.list-stagger` ebeveyne (40 ms aralık, en çok 12 öğe) |
+| Kart hover | `.hover-lift`; düğme basma `.btn-press` (ya da mevcut `.press`) |
+| İlerleme dolumu | `Progress` otomatik (`.motion-progress-fill`) |
+| Başarı tiki | `<Illustration kind="basari" />` veya SVG path'ine `.tick-draw` |
+| Skeleton | `Skeleton` (`.skeleton` shimmer) |
+| Sayfa geçişi | view transitions varsa globals.css; yoksa `.motion-page` fade |
+| Konfeti | `<Celebration />` (CSS, 1.2 sn, bir kez; `relative` kapsayıcı içinde). YALNIZ anlaşma kazanılınca / ilk müşteri eklenince |
+
+**İllüstrasyon:** `<Illustration kind="musteri|portfoy|talep|randevu|gorev|teklif|komisyon|rapor|bildirim|gelenKutusu|arama|belge|otomasyon|ekip|aramaYok|hata|yetkiYok|cevrimdisi|basari" tone? size? />`. Renk `currentColor` + yüzey token'ları (koyu temada uyar). Dekoratif: `aria-hidden`, alt metin yazılmaz; bilgi başlıktadır.
+
+**EmptyState tek bileşen** (`@/components/ui/empty-state`; eski `components/app/empty-state` ve `ui/empty-state-v3` re-export): `variant` panel (varsayılan) | full | compact | inline; `illustration` (modül anahtarı; eski `list|search|error|start` da geçerli), tek ana `action` (+ `secondary`, `help` = "Nasıl çalışır?"). `icon` lucide bileşeni ya da düğüm olabilir.
+
+**İkon:** kavramsal ikonlar `src/lib/icons.ts` sözlüğünden (`ICONS.musteri`); rastgele lucide kavramları yalnız ok/çarpı gibi süslerde.

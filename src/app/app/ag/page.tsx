@@ -310,7 +310,7 @@ export default async function AgPage({
         />
 
         {pool.length === 0 ? (
-          <EmptyState
+          <EmptyState illustration="ekip"
             icon={Globe2}
             title="Havuzda ilan yok"
             description="Seçili filtrelerde ağa açılmış ilan bulunamadı. Filtreleri genişletin ya da ilk paylaşımı siz yapın — paylaşan ofis, gelen her iş birliğinde komisyonun aslan payını korur."
@@ -396,7 +396,7 @@ export default async function AgPage({
         <h2 className="font-display text-lg font-bold text-ink-950">Paylaştıklarım</h2>
 
         {myListings.length === 0 ? (
-          <EmptyState
+          <EmptyState illustration="ekip"
             icon={Share2}
             title="Henüz portföy paylaşmadınız"
             description="Yayındaki bir portföyünüzü komisyon paylaşım oranıyla ağa açın; diğer ofislerden iş birliği talepleri alın. Malik bilgisi ve açık adres her zaman maskeli kalır."
@@ -467,7 +467,7 @@ export default async function AgPage({
         <h2 className="font-display text-lg font-bold text-ink-950">Taleplerim</h2>
 
         {myRequests.length === 0 ? (
-          <EmptyState
+          <EmptyState illustration="ekip"
             icon={Send}
             title="Henüz talep göndermediniz"
             description="Ağ havuzundan ilginizi çeken bir ilana iş birliği talebi gönderin; kabul edilince ofis iletişim bilgileri burada açılır."
@@ -556,7 +556,7 @@ export default async function AgPage({
         />
 
         {demandPool.length === 0 ? (
-          <EmptyState
+          <EmptyState illustration="ekip"
             icon={Megaphone}
             title="Havuzda talep yok"
             description={
@@ -630,7 +630,7 @@ export default async function AgPage({
         <h2 className="font-display text-lg font-bold text-ink-950">Paylaştığım talepler</h2>
 
         {myDemands.length === 0 ? (
-          <EmptyState
+          <EmptyState illustration="ekip"
             icon={Megaphone}
             title="Henüz talep paylaşmadınız"
             description="Açık bir alıcı talebinizi komisyon paylaşım oranıyla ağa açın; diğer ofislerden portföy önerileri alın. Müşteri kimliği maskeli, bütçe yuvarlanmış aralık olarak görünür."
@@ -711,7 +711,7 @@ export default async function AgPage({
         <h2 className="font-display text-lg font-bold text-ink-950">Talep yanıtlarım</h2>
 
         {myDemandResponses.length === 0 ? (
-          <EmptyState
+          <EmptyState illustration="ekip"
             icon={Home}
             title="Henüz portföy önerisi göndermediniz"
             description="Talep havuzundan uygun bir talebe portföy önerinizi gönderin; kabul edilince iletişim burada açılır."

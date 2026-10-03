@@ -810,7 +810,7 @@ export default async function DocumentsPage({
       {total === 0 && !hasFilter ? (
         <EmptyState
           icon={Archive}
-          illustration="start"
+          illustration="belge"
           title="Henüz belge yok"
           description="Müşteri kartına dosya, portföye fotoğraf ya da anlaşmaya evrak eklendiğinde hepsi burada tek listede toplanır."
           action={{ href: "/app/musteriler", label: "Müşterilere git" }}

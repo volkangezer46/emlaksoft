@@ -411,7 +411,7 @@ export default async function DealsPage({
       {dealsTotal === 0 && !danismanF ? (
         <EmptyState
           icon={Handshake}
-          illustration="start"
+          illustration="teklif"
           title="Satış hattı boş"
           description="İlk anlaşmayı ekleyin veya portföyden “Anlaşma + komisyon” ile kazanan işlem açın."
           tone="mint"

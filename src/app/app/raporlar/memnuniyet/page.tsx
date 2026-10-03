@@ -205,7 +205,7 @@ export default async function SatisfactionReportPage() {
         </p>
         {openForSurvey.length === 0 ? (
           <div className="mt-4">
-            <EmptyState
+            <EmptyState illustration="rapor"
               icon={Smile}
               title="Anket bekleyen kapanış yok"
               description="Kazanılan her anlaşma burada listelenir; tümü için anket üretilmiş durumda."

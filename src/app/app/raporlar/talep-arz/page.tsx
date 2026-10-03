@@ -320,7 +320,7 @@ export default async function TalepArzPage({
       </div>
 
       {totalDemand === 0 ? (
-        <EmptyState
+        <EmptyState illustration="rapor"
           icon={Target}
           title={ilFilter || islem.key ? "Bu filtrede açık talep yok" : "Henüz açık talep yok"}
           description={

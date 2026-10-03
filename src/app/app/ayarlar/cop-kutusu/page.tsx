@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import Link from "next/link";
 import { daysAgoIso } from "@/lib/clock";
-import { Building2, RotateCcw, Trash2, Users2 } from "lucide-react";
+import { Building2, RotateCcw, Trash2, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
@@ -68,7 +68,7 @@ export default async function TrashPage() {
       <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center gap-3 border-b border-line pb-4">
           <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-cyan-400/12 text-cyan-500">
-            <Users2 className="h-5 w-5" />
+            <Users className="h-5 w-5" />
           </span>
           <div>
             <h2 className="font-display font-bold text-ink-950">Silinen müşteriler</h2>
@@ -77,7 +77,7 @@ export default async function TrashPage() {
         </div>
 
         {customers.length === 0 ? (
-          <EmptyStateV3 className="mt-4" variant="compact" icon={<Users2 />} title="Silinen müşteri yok" description={`Son ${RETENTION_DAYS} günde silinen müşteri bulunmuyor.`} action={<Link href="/app/musteriler" className="text-xs font-semibold text-brand-600 hover:underline">Müşterilere git</Link>} />
+          <EmptyStateV3 className="mt-4" variant="compact" icon={<Users />} title="Silinen müşteri yok" description={`Son ${RETENTION_DAYS} günde silinen müşteri bulunmuyor.`} action={<Link href="/app/musteriler" className="text-xs font-semibold text-brand-600 hover:underline">Müşterilere git</Link>} />
         ) : (
           <ul className="mt-4 divide-y divide-line/60">
             {customers.map((c) => (

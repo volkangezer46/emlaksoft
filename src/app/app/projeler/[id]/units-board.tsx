@@ -221,13 +221,13 @@ export function UnitsBoard({
       </div>
 
       {units.length === 0 ? (
-        <EmptyState
+        <EmptyState illustration="portfoy"
           icon={LayoutGrid}
           title="Henüz daire eklenmedi"
           description={'Sağ üstteki "Daire ekle" ile tekil daire girin ya da "Çoğalt" sekmesiyle kat kat üretin.'}
         />
       ) : filtered.length === 0 ? (
-        <EmptyState
+        <EmptyState illustration="portfoy"
           icon={LayoutGrid}
           title="Filtreye uyan daire yok"
           description="Durum ya da blok filtresini değiştirip tekrar deneyin."

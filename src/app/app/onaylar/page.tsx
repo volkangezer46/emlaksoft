@@ -325,14 +325,14 @@ export default async function OnaylarPage({
       {/* Liste */}
       {list.length === 0 ? (
         durum === "bekliyor" && !tur && !kim ? (
-          <EmptyState
+          <EmptyState illustration="gorev"
             icon={ShieldCheck}
             title="Bekleyen onay yok — her şey yolunda"
             description="Komisyon indirimi, olağandışı gider ya da fiyat değişikliği talebi açıldığında burada belirir ve yöneticilere bildirim gider."
             tone="mint"
           />
         ) : (
-          <EmptyState
+          <EmptyState illustration="gorev"
             icon={ShieldCheck}
             title={`${APPROVAL_STATUS_LABEL[durum]} talep yok`}
             description="Filtreleri değiştirerek diğer talepleri görebilirsiniz."
