@@ -118,3 +118,24 @@ Metin tokenları: açıkta `--text-muted #5b6577` ≥4.9:1, `--text-faint #66708
 
 **Tercih DB'de (öneri, yazılmadı):** `profiles.ui_prefs jsonb` (`{theme, accent}`), girişte localStorage ile birleştirilir;
 cihazlar arası senkron için gerekir. Şimdilik yalnız tarayıcıda kalıcı.
+
+## İletişim alanları (telefon / e-posta)
+
+Sistemin tamamında telefon ve e-posta girişi tek tiptir; yeni formlarda da aynısı kullanılır.
+
+- **Telefon:** `PhoneInput` (`src/components/ui/phone-input.tsx`) ZORUNLU. Solda ülke seçici (varsayılan Türkiye,
+  `defaultCountry` ile değişir), sağda yalnız rakam kabul eden ulusal numara alanı. `+90` / `0090` / `+49`
+  yapıştırılırsa ülke otomatik seçilir. Form'a giden `name` değeri SAKLAMA BİÇİMİdir (gizli input).
+- **E-posta:** `EmailInput` (`src/components/ui/email-input.tsx`) ZORUNLU. `type=email`, odak çıkınca kırpar + küçük harf,
+  geçersizse `Geçerli bir e-posta adresi girin`. Mevcut görünümü korumak için `className` geçilir (yoksa `fieldClass`).
+- **Saklama biçimi (DB):** Türkiye cep `05XXXXXXXXX`, Türkiye sabit `0XXXXXXXXXX` (geriye uyumlu); yabancı `+<E.164>`
+  (örn. `+4915123456789`). E-posta normalize (kırpılmış, küçük harf). Görüntüleme: `formatPhoneDisplay`
+  (`0532 123 45 67`, `+49 151 2345 6789`). Dış servisler: `toWhatsAppLink`, `toWhatsAppMsisdn`, `toTelHref`,
+  `toE164Phone` yabancı numaraları da doğru işler. Ham `type="tel"`/`type="email"` input yazma.
+- **Sunucu doğrulayıcıları:** `src/lib/validation/contact.ts` — `phoneSchema`, `optionalPhoneSchema`, `emailSchema`,
+  `optionalEmailSchema` (zod; telefon çıktısı saklama biçimi, boş isteğe bağlı -> `null`). Her action telefon/e-postayı
+  bunlarla (veya `parsePhone`/`isValidPhone`/`normalizeEmail`/`isValidEmail` ile) doğrular; `formData.get("phone")`
+  değerini doğrulamadan DB'ye yazma. Saf mantık: `src/lib/phone.ts`, `src/lib/phone-countries.ts`, `src/lib/email.ts`.
+- **Sözleşme testi:** `src/lib/contact-input-contract.test.ts` ham telefon/e-posta input'unu ve doğrulayıcısız action'ı
+  yakalar. Kalan eski ihlaller testteki `ALLOWLIST`'tedir ("rollout bekliyor"); bir dosya düzelince listeden SİLİNİR
+  (eskimiş girdi testi kırar). Yeni girdi eklemek yerine `PhoneInput`/`EmailInput` kullan.
