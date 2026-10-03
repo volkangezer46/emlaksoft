@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IntentLink } from "@/components/app/intent-link";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import { inFilter, orIlike, safeLike } from "@/lib/pgrst";
@@ -628,7 +629,7 @@ export default async function PropertiesPage({
                   ) : null
                 }
               >
-              <Link
+              <IntentLink
                 href={`/app/portfoyler/${property.id}`}
                 className="group overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)] transition hover:-translate-y-1 hover:border-brand-300 hover:shadow-[var(--shadow-card)]"
               >
@@ -681,7 +682,7 @@ export default async function PropertiesPage({
                     <span className="flex items-center justify-end gap-2 text-xs text-text-muted"><Gauge className="h-4 w-4 text-brand-600" />{portals.length} portal</span>
                   </div>
                 </div>
-              </Link>
+              </IntentLink>
               </PropertyCompareShell>
             );
           })}

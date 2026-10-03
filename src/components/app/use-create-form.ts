@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/app/toast-provider";
@@ -29,6 +29,21 @@ export function useCreateForm<R extends FormResultLike>(
   const { push } = useToast();
   const [state, setState] = useState<R>({} as R);
   const [pending, startTransition] = useTransition();
+
+  // Gönderim başlamadan hedef listeyi ısıt: redirectTo çoğu formda id yokken liste
+  // adresini döndürür (`detailOrList`); sonuç gelince push anında açılır. Detay
+  // adresi sonuçtaki id'ye bağlı olduğundan önceden bilinemez — push o rota için
+  // zaten loading.tsx iskeletini anında gösterir.
+  useEffect(() => {
+    try {
+      const target = options.redirectTo({} as R);
+      if (typeof target === "string" && target.startsWith("/app")) router.prefetch(target);
+    } catch {
+      // redirectTo sonuç alanlarına bağlıysa önceden hesaplanamaz — sorun değil.
+    }
+    // yalnız bağlanırken bir kez
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]);
 
   function submit(formData: FormData) {
     startTransition(async () => {

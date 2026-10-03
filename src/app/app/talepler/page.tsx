@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IntentLink } from "@/components/app/intent-link";
 import { Suspense } from "react";
 import {
   AlarmClock,
@@ -616,7 +617,7 @@ async function DemandList({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
                 className="group relative rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] transition hover:border-brand-400/40 hover:shadow-[var(--shadow-sm)]"
               >
                 {/* Kart artık talebin KENDİ detayına gider; müşteri linki ikincil (z-10) kalır. */}
-                <Link href={`/app/talepler/${d.id}`} className="absolute inset-0 rounded-[var(--radius-panel)]" aria-label={customer ? `${customer.full_name} talebinin detayını aç` : "Talep detayını aç"} />
+                <IntentLink href={`/app/talepler/${d.id}`} className="absolute inset-0 rounded-[var(--radius-panel)]" aria-label={customer ? `${customer.full_name} talebinin detayını aç` : "Talep detayını aç"} />
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">

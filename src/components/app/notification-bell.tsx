@@ -22,6 +22,9 @@ import {
 } from "@/app/actions/notifications";
 import { filterByNotifPrefs, readNotifPrefs, type NotifPrefs } from "@/components/app/notification-prefs";
 import { onNotificationInsert } from "@/lib/realtime";
+import { useToast } from "@/components/app/toast-provider";
+import { markAllRead, markReadById, runOptimistic } from "@/lib/optimistic";
+import { daysFromNowIso } from "@/lib/clock";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const KIND_META: Record<string, { icon: LucideIcon; cls: string }> = {
@@ -67,6 +70,7 @@ function relTime(iso: string) {
 }
 
 export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
+  const { push } = useToast();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState(initial);
   const [prefs, setPrefs] = useState<NotifPrefs | null>(null);
@@ -155,20 +159,30 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
   async function onRead(id: string) {
     // Okunmuşa tekrar tıklanınca sunucuya boş yere yazma + revalidate olmasın.
     if (items.find((n) => n.id === id)?.read_at) return;
-    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)));
-    await markNotificationRead(id);
+    const before = items;
+    // Anında okundu göster; sunucu hata verirse eski listeye dön + toast.
+    await runOptimistic({
+      apply: () => setItems((prev) => markReadById(prev, id, daysFromNowIso(0)) as NotificationRow[]),
+      commit: () => markNotificationRead(id),
+      rollback: () => setItems(before),
+      onError: (m) => push(m, "err"),
+      fallbackError: "Bildirim okundu işaretlenemedi",
+    });
   }
 
   async function onReadAll() {
     if (markingAll) return;
     setMarkingAll(true);
-    try {
-      await markAllNotificationsRead();
-      const now = new Date().toISOString();
-      setItems((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? now })));
-    } finally {
-      setMarkingAll(false);
-    }
+    const before = items;
+    // Liste anında okunmuş görünür (spinner yalnız çifte tıklamayı engeller).
+    await runOptimistic({
+      apply: () => setItems((prev) => markAllRead(prev, daysFromNowIso(0))),
+      commit: () => markAllNotificationsRead(),
+      rollback: () => setItems(before),
+      onError: (m) => push(m, "err"),
+      fallbackError: "Bildirimler okundu işaretlenemedi",
+    });
+    setMarkingAll(false);
   }
 
   function renderItem(n: NotificationRow) {

@@ -189,3 +189,93 @@ export function SkeletonList({ rows = 6 }: { rows?: number }) {
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* Sayfa düzeni iskeletleri — gerçek PageHeader / Card / FilterBar ile */
+/* aynı ızgara ve yükseklik (CLS=0 hedefi). Rota loading.tsx'leri bunları */
+/* birleştirir; ölçüler burada, tek yerde.                              */
+/* ------------------------------------------------------------------ */
+
+/** PageHeader ile aynı kutu: başlık (32px) + açıklama (20px) + mb-6; sağda aksiyon. */
+export function SkeletonPageHeader({ actions = 1 }: { actions?: number }) {
+  return (
+    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0 space-y-1">
+        <Skeleton className="h-8 w-56 max-w-full" />
+        <Skeleton className="h-5 w-80 max-w-full" />
+      </div>
+      {actions > 0 ? (
+        <div className="flex shrink-0 gap-2">
+          {Array.from({ length: actions }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-28" />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Tek kartlı bölünmüş KPI şeridi (Card + divide-x). */
+export function SkeletonKpiStrip({ cols = 4, className }: { cols?: 3 | 4; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "grid divide-line rounded-[var(--radius-panel)] border border-line bg-surface sm:divide-x",
+        cols === 3 ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-4",
+        className,
+      )}
+    >
+      {Array.from({ length: cols }).map((_, i) => (
+        <div key={i} className="space-y-2 p-4">
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-7 w-16" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** FilterBar: arama + filtre düğmesi satırı (h-10 kontroller). */
+export function SkeletonFilterBar({ className }: { className?: string }) {
+  return (
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+      <Skeleton className="h-10 min-w-48 flex-1" />
+      <Skeleton className="h-10 w-24" />
+      <Skeleton className="h-10 w-24" />
+    </div>
+  );
+}
+
+/** Kenarlıklı panel (bölüm kartı): başlık + n satır. */
+export function SkeletonPanel({
+  rows = 5,
+  className,
+  title = true,
+}: {
+  rows?: number;
+  className?: string;
+  title?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "space-y-3 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]",
+        className,
+      )}
+    >
+      {title ? <Skeleton className="h-5 w-40" /> : null}
+      {Array.from({ length: rows }).map((_, i) => (
+        <SkeletonRow key={i} />
+      ))}
+    </div>
+  );
+}
+
+/** Sayfa kabuğu: erişilebilir tek duyuru + gerçek sayfayla aynı `space-y-6`. */
+export function SkeletonPage({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <SkeletonBlock label={label} className="space-y-6">
+      {children}
+    </SkeletonBlock>
+  );
+}

@@ -1,1 +1,13 @@
-export default function Loading() { return ( <div className="space-y-6 animate-pulse"><div className="h-52 rounded-[var(--radius-panel)] bg-ink-950/8" /><div className="grid gap-4 sm:grid-cols-2"><div className="h-32 rounded-[var(--radius-panel)] bg-ink-950/8" /><div className="h-32 rounded-[var(--radius-panel)] bg-ink-950/8" /></div><div className="h-64 rounded-[var(--radius-panel)] bg-ink-950/8" /></div> ); } 
+import { Skeleton, SkeletonPage, SkeletonPageHeader, SkeletonTable } from "@/components/ui/skeleton";
+
+/** Komisyon: PageHeader → koyu özet bandı (3 metrik) → özet panel → tablo. */
+export default function Loading() {
+  return (
+    <SkeletonPage label="Komisyon yükleniyor">
+      <SkeletonPageHeader actions={1} />
+      <Skeleton className="h-44 rounded-[var(--radius-panel)]" />
+      <Skeleton className="h-32 rounded-[var(--radius-panel)]" />
+      <SkeletonTable rows={7} cols={4} />
+    </SkeletonPage>
+  );
+}
