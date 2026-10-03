@@ -23,10 +23,11 @@ describe("composite feature permission truthfulness", () => {
 
     expect(page).toContain('requireModulePage("customers")');
     expect(page).toContain('effectiveHasPermission(perms, "properties", "create")');
-    expect(page).toContain("<ImportWizard canImportProperties={canImportProperties} />");
-    expect(wizard).toContain('const allowed = t.key !== "properties" || canImportProperties');
+    expect(page).toContain("canImportProperties={canImportProperties}");
+    expect(page).toContain('effectiveHasPermission(perms, "demands", "create")');
+    expect(wizard).toContain('t.key === "properties" ? canImportProperties : t.key === "demands" ? canImportDemands : true');
     expect(wizard).toContain("disabled={!allowed}");
-    expect(wizard).toContain('aria-describedby={!allowed ? "property-import-permission-note" : undefined}');
+    expect(wizard).toContain("aria-describedby={!allowed ? `${t.key}-import-permission-note` : undefined}");
   });
 
   it("preflights every module touched by sample-data create and delete flows", () => {

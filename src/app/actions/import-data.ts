@@ -5,31 +5,54 @@ import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
-import { parsePhone } from "@/lib/phone";
-import { isValidEmail, normalizeEmail } from "@/lib/email";
+import { now } from "@/lib/clock";
+import { IMPORT_ROW_LIMIT } from "@/app/app/ice-aktarma/import-config";
+import {
+  buildCustomerLookup,
+  collectCustomerKeys,
+  countPlanned,
+  planCustomerRows,
+  planDemandRows,
+  planPropertyRows,
+  propertyKey,
+  demandKey,
+  validatePropertyRow,
+  type CustomerLookup,
+  type DuplicatePolicy,
+  type ExistingCustomer,
+  type ExistingProperty,
+  type ImportCounters,
+  type ImportRow,
+  type ImportTarget,
+  type PlannedRow,
+  type RowIssue,
+  type RowStatus,
+} from "@/lib/import-rows";
 
 /**
- * CSV içe aktarma (X — /app/ice-aktarma sihirbazı, adım 3).
+ * İçe aktarma (müşteri / portföy / talep) — /app/ice-aktarma sihirbazı.
  *
- * Tasarım notları:
- *  - Satırlar client'ta kolon eşlemesinden geçmiş halde gelir (alan adı →
- *    değer); dosya/parse işi tamamen client'ta, burada yalnızca doğrulama +
- *    yazma var. 1000 satır üst sınırı hem client hem burada uygulanır.
- *  - MÜKERRER KORUMASI (yalnız müşteri): normalize telefon tenant'ta zaten
- *    kayıtlıysa satır eklenmez, "atlandı (mevcut)" olarak raporlanır. Dosya
- *    içi tekrar eden telefonlar da ilkinden sonrası için atlanır.
- *  - Insert'ler 100'lük parçalarda yapılır; bir parça patlarsa yalnız o
- *    parçadaki satırlar "hatalı" sayılır, kalanlar denenmeye devam eder.
- *  - logActivity TEK toplu kayıt yazar (bkz. customer.bulk_assign deseni).
+ * Tasarım:
+ *  - Dosya çözümleme ve kolon eşleme istemcidedir; sunucu satırları parçalar halinde
+ *    (IMPORT_CHUNK_SIZE) alır. Her parça HER ZAMAN sunucuda yeniden doğrulanır
+ *    (istemciye güvenilmez); doğrulama/planlama `src/lib/import-rows.ts` saf modülündedir.
+ *  - `previewImportChunk` yazmaz (dry-run); `importChunk` aynı planı uygular. Böylece
+ *    önizleme sayaçları ile sonuç aynı mantıktan çıkar.
+ *  - GERİ ALMA için migration yok: her parça tek audit kaydı yazar (action `<varlık>.import`);
+ *    `new_value.batch_id` + oluşturulan id'ler, `old_value.updated_prev` güncellenen kayıtların
+ *    eski değerleridir. Geri alma `import-rollback.ts`'te bu kayıtlardan yapılır.
+ *  - Insert'ler 100'lük parçalarda; bir parça patlarsa yalnız o parçadaki satırlar hatalı
+ *    sayılır, kalanlar denenmeye devam eder.
  */
 
-// "use server" dosyası yalnız async fonksiyon export edebilir — satır sınırı
-// client ile paylaşılan sabit olarak ice-aktarma/import-config.ts'te yaşar.
-const IMPORT_ROW_LIMIT = 1000;
-const CHUNK_SIZE = 100;
+const INSERT_CHUNK = 100;
+const LOOKUP_CHUNK = 200;
+const UPDATE_PARALLEL = 10;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type ImportRowError = { row: number; reason: string };
 
+/** Eski sözleşme (importCustomers / importProperties dönüşü). */
 export type ImportSummary = {
   ok?: boolean;
   error?: string;
@@ -60,24 +83,59 @@ export type PropertyImportRow = {
   address_line?: string;
 };
 
-const clean = (v: string | undefined | null) => String(v ?? "").trim();
+export type DemandImportRow = {
+  row: number;
+  customer_phone?: string;
+  customer_email?: string;
+  transaction_type?: string;
+  property_type?: string;
+  budget_min?: string;
+  budget_max?: string;
+  rooms?: string;
+  min_sqm?: string;
+  urgency?: string;
+};
 
-/** "1.250.000,50" / "1250000.50" / "1 250 000 TL" → sayı; geçersizse null. */
-function parseTurkishNumber(raw: string): number | null {
-  const s = clean(raw).replace(/[^\d.,]/g, "");
-  if (!s) return null;
-  let normalized = s;
-  if (s.includes(",")) {
-    // Virgül ondalık, noktalar binlik kabul edilir (TR yazımı).
-    normalized = s.replace(/\./g, "").replace(",", ".");
-  } else {
-    const dots = (s.match(/\./g) ?? []).length;
-    // Birden çok nokta ya da 1.250 gibi binlik kalıbı → noktalar binlik.
-    if (dots > 1 || /^\d{1,3}(\.\d{3})+$/.test(s)) normalized = s.replace(/\./g, "");
-  }
-  const n = Number(normalized);
-  return Number.isFinite(n) ? n : null;
-}
+export type ImportOptions = {
+  /** Varsayılan "skip". */
+  duplicatePolicy?: DuplicatePolicy;
+  /** undefined → işlemi yapan kullanıcı; "" → danışmansız; aksi halde ofisteki bir kullanıcının id'si. */
+  assignTo?: string;
+  /** Aynı dosyanın parçalarını birbirine bağlar (UUID). Yazma sırasında zorunludur. */
+  batchId?: string;
+  fileName?: string;
+  /** Yalnız önizleme: önceki parçalarda görülen dosya içi anahtarlar. */
+  seen?: string[];
+};
+
+export type PlannedRowView = {
+  row: number;
+  status: RowStatus;
+  issues: RowIssue[];
+  existingName?: string;
+  matchedBy?: string;
+  /** Önizleme tablosu için kısa özet (ad / başlık). */
+  label?: string;
+};
+
+export type ChunkResult = {
+  ok?: boolean;
+  error?: string;
+  rows?: PlannedRowView[];
+  counters?: ImportCounters;
+  /** Yalnız önizleme: sonraki parçaya taşınacak dosya içi anahtarlar. */
+  seen?: string[];
+  created?: number;
+  updated?: number;
+};
+
+const ENTITY: Record<ImportTarget, { action: string; entityType: string; path: string; module: "customers" | "properties" | "demands" }> = {
+  customers: { action: "customer.import", entityType: "customer", path: "/app/musteriler", module: "customers" },
+  properties: { action: "property.import", entityType: "property", path: "/app/portfoyler", module: "properties" },
+  demands: { action: "demand.import", entityType: "customer_demand", path: "/app/talepler", module: "demands" },
+};
+
+type Db = Awaited<ReturnType<typeof createClient>>;
 
 function limitCheck<T>(rows: T[]): string | null {
   if (!Array.isArray(rows) || rows.length === 0) return "İçe aktarılacak satır bulunamadı.";
@@ -87,200 +145,375 @@ function limitCheck<T>(rows: T[]): string | null {
   return null;
 }
 
-export async function importCustomers(rows: CustomerImportRow[]): Promise<ImportSummary> {
-  const gate = await requirePermission("customers", "create");
+function chunked<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Mevcut kayıt aramaları (tenant + silinmemiş)
+// ---------------------------------------------------------------------------
+
+async function loadCustomerLookup(
+  supabase: Db,
+  tenantId: string,
+  rows: ImportRow[],
+  columns: { phone: string; email: string },
+): Promise<CustomerLookup | null> {
+  // Müşteri ve talep satırları farklı kolon adı kullanır; anahtarları ortak biçime çevir.
+  const mapped = rows.map((r) => ({ row: r.row, full_name: "x", phone: r[columns.phone], email: r[columns.email] }));
+  const { phones, emails } = collectCustomerKeys(mapped);
+  const found: ExistingCustomer[] = [];
+  const select = "id, full_name, phone, email, customer_types, source, notes";
+  for (const [col, values] of [
+    ["phone", phones],
+    ["email", emails],
+  ] as const) {
+    for (const part of chunked(values, LOOKUP_CHUNK)) {
+      const { data, error } = await supabase
+        .from("customers")
+        .select(select)
+        .eq("tenant_id", tenantId)
+        .is("deleted_at", null)
+        .in(col, part);
+      if (error) {
+        console.error("import customer lookup", error);
+        return null;
+      }
+      for (const d of (data ?? []) as ExistingCustomer[]) found.push(d);
+    }
+  }
+  return buildCustomerLookup(found);
+}
+
+async function loadExistingProperties(
+  supabase: Db,
+  tenantId: string,
+  rows: ImportRow[],
+): Promise<Map<string, ExistingProperty> | null> {
+  const titles = new Set<string>();
+  for (const r of rows) {
+    const v = validatePropertyRow(r);
+    if (v.data) titles.add(v.data.title);
+  }
+  const map = new Map<string, ExistingProperty>();
+  for (const part of chunked([...titles], LOOKUP_CHUNK)) {
+    const { data, error } = await supabase
+      .from("properties")
+      .select("id, title, address_line, list_price, features")
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
+      .in("title", part);
+    if (error) {
+      console.error("import property lookup", error);
+      return null;
+    }
+    for (const d of (data ?? []) as ExistingProperty[]) map.set(propertyKey(d.title, d.address_line), d);
+  }
+  return map;
+}
+
+async function loadExistingDemandKeys(
+  supabase: Db,
+  tenantId: string,
+  customerIds: string[],
+): Promise<Set<string> | null> {
+  const keys = new Set<string>();
+  for (const part of chunked(customerIds, LOOKUP_CHUNK)) {
+    const { data, error } = await supabase
+      .from("customer_demands")
+      .select("customer_id, transaction_type, property_type, rooms, budget_max, status")
+      .eq("tenant_id", tenantId)
+      .in("customer_id", part);
+    if (error) {
+      console.error("import demand lookup", error);
+      return null;
+    }
+    for (const d of data ?? []) {
+      if (d.status === "cancelled" || d.status === "closed") continue;
+      keys.add(
+        demandKey(d.customer_id as string, {
+          transaction_type: String(d.transaction_type ?? ""),
+          property_type: (d.property_type as string | null) ?? null,
+          rooms: (d.rooms as string | null) ?? null,
+          budget_max: d.budget_max == null ? null : Number(d.budget_max),
+        }),
+      );
+    }
+  }
+  return keys;
+}
+
+// ---------------------------------------------------------------------------
+// Planlama (sunucuda yeniden doğrulama) + uygulama
+// ---------------------------------------------------------------------------
+
+type AnyPlan = PlannedRow<Record<string, unknown>>;
+
+function labelOf(target: ImportTarget, r: ImportRow, p: AnyPlan): string {
+  if (target === "customers") return String(r.full_name ?? "").trim();
+  if (target === "properties") return String(r.title ?? "").trim();
+  return String(p.existingName ?? r.customer_phone ?? r.customer_email ?? "").trim();
+}
+
+async function planChunk(
+  supabase: Db,
+  tenantId: string,
+  target: ImportTarget,
+  rows: ImportRow[],
+  policy: DuplicatePolicy,
+  seen: Set<string>,
+): Promise<AnyPlan[] | null> {
+  if (target === "customers") {
+    const lookup = await loadCustomerLookup(supabase, tenantId, rows, { phone: "phone", email: "email" });
+    if (!lookup) return null;
+    return planCustomerRows(rows, lookup, policy, seen) as unknown as AnyPlan[];
+  }
+  if (target === "properties") {
+    const existing = await loadExistingProperties(supabase, tenantId, rows);
+    if (!existing) return null;
+    return planPropertyRows(rows, existing, policy, seen) as unknown as AnyPlan[];
+  }
+  const lookup = await loadCustomerLookup(supabase, tenantId, rows, { phone: "customer_phone", email: "customer_email" });
+  if (!lookup) return null;
+  const customerIds = [...new Set([...lookup.byPhone.values(), ...lookup.byEmail.values()].map((c) => c.id))];
+  const existing = await loadExistingDemandKeys(supabase, tenantId, customerIds);
+  if (!existing) return null;
+  return planDemandRows(rows, lookup, existing, policy, seen) as unknown as AnyPlan[];
+}
+
+async function resolveAssignee(
+  supabase: Db,
+  tenantId: string,
+  userId: string,
+  assignTo: string | undefined,
+): Promise<{ ok: true; id: string | null } | { ok: false; error: string }> {
+  if (assignTo === undefined) return { ok: true, id: userId };
+  if (assignTo === "") return { ok: true, id: null };
+  if (!UUID_RE.test(assignTo)) return { ok: false, error: "Danışman seçimi geçersiz." };
+  const { data } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", assignTo)
+    .eq("tenant_id", tenantId)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (!data) return { ok: false, error: "Seçilen danışman bu ofiste aktif değil." };
+  return { ok: true, id: assignTo };
+}
+
+function toView(target: ImportTarget, rows: ImportRow[], plans: AnyPlan[], withLabel: boolean): PlannedRowView[] {
+  return plans.map((p, i) => ({
+    row: p.row,
+    status: p.status,
+    issues: p.issues,
+    existingName: p.existingName,
+    matchedBy: p.matchedBy,
+    label: withLabel ? labelOf(target, rows[i], p) : undefined,
+  }));
+}
+
+async function runChunk(
+  target: ImportTarget,
+  rows: ImportRow[],
+  options: ImportOptions,
+  dryRun: boolean,
+): Promise<ChunkResult> {
+  const meta = ENTITY[target];
+  const policy: DuplicatePolicy = options.duplicatePolicy ?? "skip";
+  if (!["skip", "update", "create"].includes(policy)) return { error: "Mükerrer politikası geçersiz." };
+
+  const gate = await requirePermission(meta.module, "create");
   if (!gate.ok) return { error: gate.error };
+  if (policy === "update") {
+    if (target === "demands") return { error: "Talepler için güncelleme politikası desteklenmez (atla veya yeni oluştur)." };
+    const edit = await requirePermission(meta.module, "edit");
+    if (!edit.ok) return { error: "Mevcut kayıtları güncellemek için düzenleme yetkisi gerekir." };
+  }
   const limitError = limitCheck(rows);
   if (limitError) return { error: limitError };
+  if (!dryRun && !(options.batchId && UUID_RE.test(options.batchId))) {
+    return { error: "İçe aktarma kimliği geçersiz. Sayfayı yenileyip tekrar deneyin." };
+  }
 
   const supabase = await createClient();
-  const errors: ImportRowError[] = [];
-  let skipped = 0;
+  const assignee = await resolveAssignee(supabase, gate.tenantId, gate.userId, options.assignTo);
+  if (!assignee.ok) return { error: assignee.error };
 
-  // 1) Satır bazlı doğrulama + normalize
-  type ValidRow = { row: number; insert: Record<string, unknown>; phone: string };
-  const valid: ValidRow[] = [];
-  for (const r of rows) {
-    const fullName = clean(r.full_name);
-    const phoneRaw = clean(r.phone);
-    const email = normalizeEmail(clean(r.email));
-    if (!fullName) {
-      errors.push({ row: r.row, reason: "Ad soyad boş." });
-      continue;
-    }
-    const parsedPhone = phoneRaw ? parsePhone(phoneRaw) : null;
-    if (parsedPhone && !parsedPhone.ok) {
-      errors.push({
-        row: r.row,
-        reason: `Telefon geçersiz: "${phoneRaw}" (${parsedPhone.error ?? "05XX XXX XX XX veya +<ülke kodu> numara bekleniyor"}).`,
-      });
-      continue;
-    }
-    if (email && !isValidEmail(email)) {
-      errors.push({ row: r.row, reason: `E-posta biçimi geçersiz: "${email}".` });
-      continue;
-    }
-    const phone = parsedPhone?.stored ?? "";
-    const type = clean(r.customer_type);
-    valid.push({
-      row: r.row,
-      phone,
-      insert: {
+  const seen = new Set(options.seen ?? []);
+  const plans = await planChunk(supabase, gate.tenantId, target, rows, policy, seen);
+  if (!plans) return { error: "Mükerrer kontrolü yapılamadı. Lütfen tekrar deneyin." };
+
+  if (dryRun) {
+    return {
+      ok: true,
+      rows: toView(target, rows, plans, true),
+      counters: countPlanned(plans),
+      seen: [...seen],
+    };
+  }
+
+  // ---- yazma ----
+  const fail = (p: AnyPlan, reason: string) => {
+    p.status = "error";
+    p.issues = [...p.issues, { level: "error", message: reason }];
+  };
+  const toCreate = plans.filter((p) => p.status === "new");
+  const toUpdate = plans.filter((p) => p.status === "update");
+  const createdIds: string[] = [];
+  const updatedPrev: { id: string; prev: Record<string, unknown> }[] = [];
+  const stamp = new Date(now()).toISOString().slice(2, 7).replace("-", "");
+
+  const buildInsert = (p: AnyPlan): Record<string, unknown> => {
+    const d = p.data as Record<string, unknown>;
+    if (target === "customers") {
+      return {
         tenant_id: gate.tenantId,
-        full_name: fullName,
-        phone: phone || null,
-        email: email || null,
-        customer_types: type ? [type] : [],
-        source: clean(r.source) || "İçe aktarma",
-        notes: clean(r.notes) || null,
-        assigned_to: gate.userId,
+        full_name: d.full_name,
+        phone: d.phone || null,
+        email: d.email || null,
+        customer_types: d.customer_type ? [d.customer_type] : [],
+        source: d.source || "İçe aktarma",
+        notes: d.notes || null,
+        assigned_to: assignee.id,
         created_by: gate.userId,
-      },
-    });
-  }
-
-  // 2) Mükerrer koruması — tenant'taki mevcut normalize telefonlar
-  const phones = [...new Set(valid.map((v) => v.phone).filter(Boolean))];
-  const existing = new Set<string>();
-  for (let i = 0; i < phones.length; i += 200) {
-    const { data, error } = await supabase
-      .from("customers")
-      .select("phone")
-      .eq("tenant_id", gate.tenantId)
-      .is("deleted_at", null)
-      .in("phone", phones.slice(i, i + 200));
-    if (error) {
-      console.error("importCustomers duplicate check", error);
-      return { error: "Mükerrer kontrolü yapılamadı. Lütfen tekrar deneyin." };
+      };
     }
-    for (const d of data ?? []) if (d.phone) existing.add(String(d.phone));
-  }
-
-  const seenInFile = new Set<string>();
-  const toInsert: ValidRow[] = [];
-  for (const v of valid) {
-    if (v.phone && existing.has(v.phone)) {
-      skipped += 1;
-      errors.push({ row: v.row, reason: "Atlandı (mevcut): bu telefon zaten kayıtlı." });
-      continue;
+    if (target === "properties") {
+      return {
+        tenant_id: gate.tenantId,
+        property_code: `ES-${stamp}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
+        title: d.title,
+        transaction_type: d.transaction_type,
+        property_type: d.property_type,
+        status: "draft",
+        list_price: d.list_price,
+        address_line: d.address_line,
+        features: { rooms: d.rooms, sqm: d.sqm },
+        assigned_to: assignee.id,
+        created_by: gate.userId,
+      };
     }
-    if (v.phone && seenInFile.has(v.phone)) {
-      skipped += 1;
-      errors.push({ row: v.row, reason: "Atlandı (mevcut): aynı telefon dosyada daha önce geçiyor." });
-      continue;
-    }
-    if (v.phone) seenInFile.add(v.phone);
-    toInsert.push(v);
-  }
+    return {
+      tenant_id: gate.tenantId,
+      customer_id: d.customer_id,
+      ...(d.columns as Record<string, unknown>),
+      criteria: d.criteria,
+      status: "active",
+    };
+  };
 
-  // 3) 100'lük parçalarla insert — patlayan parça yalnız kendi satırlarını düşürür
-  let inserted = 0;
-  for (let i = 0; i < toInsert.length; i += CHUNK_SIZE) {
-    const chunk = toInsert.slice(i, i + CHUNK_SIZE);
-    const { error } = await supabase.from("customers").insert(chunk.map((c) => c.insert));
-    if (error) {
-      console.error("importCustomers insert chunk", error);
-      for (const c of chunk) errors.push({ row: c.row, reason: "Veritabanına yazılamadı." });
+  const table = target === "customers" ? "customers" : target === "properties" ? "properties" : "customer_demands";
+  for (const part of chunked(toCreate, INSERT_CHUNK)) {
+    const res = await supabase.from(table).insert(part.map(buildInsert)).select("id");
+    if (res?.error) {
+      console.error("import insert chunk", target, res.error);
+      for (const p of part) fail(p, "Veritabanına yazılamadı.");
     } else {
-      inserted += chunk.length;
+      for (const d of (res?.data ?? []) as { id: string }[]) createdIds.push(d.id);
     }
   }
 
+  for (const part of chunked(toUpdate, UPDATE_PARALLEL)) {
+    await Promise.all(
+      part.map(async (p) => {
+        if (!p.existingId || !p.patch) return;
+        const { error } = await supabase
+          .from(table)
+          .update(p.patch)
+          .eq("id", p.existingId)
+          .eq("tenant_id", gate.tenantId);
+        if (error) {
+          console.error("import update", target, error);
+          fail(p, "Mevcut kayıt güncellenemedi.");
+        } else {
+          updatedPrev.push({ id: p.existingId, prev: p.prev ?? {} });
+        }
+      }),
+    );
+  }
+
+  const counters = countPlanned(plans);
+  const created = plans.filter((p) => p.status === "new").length;
+  const updated = updatedPrev.length;
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
-    action: "customer.import",
-    entityType: "customer",
+    action: meta.action,
+    entityType: meta.entityType,
+    oldValue: updatedPrev.length ? { updated_prev: updatedPrev } : null,
     newValue: {
+      batch_id: options.batchId,
+      file_name: (options.fileName ?? "").slice(0, 200),
+      target,
+      policy,
+      assigned_to: assignee.id,
       total: rows.length,
-      inserted,
-      skipped,
-      failed: rows.length - inserted - skipped,
+      inserted: created,
+      updated,
+      skipped: counters.skip,
+      failed: counters.error,
+      created_ids: createdIds,
+      updated_ids: updatedPrev.map((u) => u.id),
     },
   });
 
-  revalidatePath("/app/musteriler");
+  revalidatePath(meta.path);
   revalidateTenantData(gate.tenantId);
-  errors.sort((a, b) => a.row - b.row);
-  return { ok: true, inserted, skipped, errors };
+  return { ok: true, rows: toView(target, rows, plans, false), counters, created, updated };
 }
 
-export async function importProperties(rows: PropertyImportRow[]): Promise<ImportSummary> {
-  const gate = await requirePermission("properties", "create");
-  if (!gate.ok) return { error: gate.error };
-  const limitError = limitCheck(rows);
-  if (limitError) return { error: limitError };
+/** Önizleme: yazmaz; satır bazlı durum + sayaçlar döner. Parça parça çağrılır. */
+export async function previewImportChunk(
+  target: ImportTarget,
+  rows: ImportRow[],
+  options: ImportOptions = {},
+): Promise<ChunkResult> {
+  if (!(target in ENTITY)) return { error: "Hedef geçersiz." };
+  return runChunk(target, rows, options, true);
+}
 
-  const supabase = await createClient();
+/** Gerçek yazma: bir parçayı uygular, audit kaydını (geri alma kaynağı) yazar. */
+export async function importChunk(
+  target: ImportTarget,
+  rows: ImportRow[],
+  options: ImportOptions,
+): Promise<ChunkResult> {
+  if (!(target in ENTITY)) return { error: "Hedef geçersiz." };
+  return runChunk(target, rows, options, false);
+}
+
+// ---------------------------------------------------------------------------
+// Eski sözleşme (geriye dönük uyum — tek çağrıda tüm satırlar)
+// ---------------------------------------------------------------------------
+
+function legacySummary(res: ChunkResult): ImportSummary {
+  if (res.error || !res.rows) return { error: res.error ?? "İçe aktarma başarısız." };
   const errors: ImportRowError[] = [];
-
-  // properties.transaction_type/property_type NOT NULL — eşlenmemiş/boş
-  // değerlerde en yaygın varsayılanlar kullanılır (tanımlar ekranından
-  // sonradan düzeltilebilir serbest metin alanları).
-  const stamp = new Date().toISOString().slice(2, 7).replace("-", "");
-  type ValidRow = { row: number; insert: Record<string, unknown> };
-  const toInsert: ValidRow[] = [];
-  for (const r of rows) {
-    const title = clean(r.title);
-    if (!title) {
-      errors.push({ row: r.row, reason: "Başlık boş." });
-      continue;
-    }
-    const priceRaw = clean(r.list_price);
-    let listPrice: number | null = null;
-    if (priceRaw) {
-      listPrice = parseTurkishNumber(priceRaw);
-      if (listPrice === null || listPrice <= 0) {
-        errors.push({ row: r.row, reason: `Fiyat sayı değil: "${priceRaw}".` });
-        continue;
-      }
-    }
-    const sqmRaw = clean(r.sqm);
-    const sqm = sqmRaw ? parseTurkishNumber(sqmRaw) : null;
-    const suffix = crypto.randomUUID().slice(0, 6).toUpperCase();
-    toInsert.push({
-      row: r.row,
-      insert: {
-        tenant_id: gate.tenantId,
-        property_code: `ES-${stamp}-${suffix}`,
-        title,
-        transaction_type: clean(r.transaction_type) || "Satılık",
-        property_type: clean(r.property_type) || "Diğer",
-        status: "draft",
-        list_price: listPrice,
-        address_line: clean(r.address_line) || null,
-        features: {
-          rooms: clean(r.rooms) || null,
-          sqm: sqm !== null && Number.isFinite(sqm) ? sqm : null,
-        },
-        assigned_to: gate.userId,
-        created_by: gate.userId,
-      },
-    });
-  }
-
-  let inserted = 0;
-  for (let i = 0; i < toInsert.length; i += CHUNK_SIZE) {
-    const chunk = toInsert.slice(i, i + CHUNK_SIZE);
-    const { error } = await supabase.from("properties").insert(chunk.map((c) => c.insert));
-    if (error) {
-      console.error("importProperties insert chunk", error);
-      for (const c of chunk) errors.push({ row: c.row, reason: "Veritabanına yazılamadı." });
-    } else {
-      inserted += chunk.length;
+  for (const r of res.rows) {
+    if (r.status === "error" || r.status === "skip") {
+      errors.push({ row: r.row, reason: r.issues.map((i) => i.message).join(" ") });
     }
   }
-
-  await logActivity({
-    tenantId: gate.tenantId,
-    actorId: gate.userId,
-    action: "property.import",
-    entityType: "property",
-    newValue: { total: rows.length, inserted, failed: rows.length - inserted },
-  });
-
-  revalidatePath("/app/portfoyler");
-  revalidateTenantData(gate.tenantId);
   errors.sort((a, b) => a.row - b.row);
-  return { ok: true, inserted, skipped: 0, errors };
+  return { ok: true, inserted: res.created ?? 0, skipped: res.counters?.skip ?? 0, errors };
+}
+
+export async function importCustomers(rows: CustomerImportRow[], options: ImportOptions = {}): Promise<ImportSummary> {
+  return legacySummary(
+    await runChunk("customers", rows, { ...options, batchId: options.batchId ?? crypto.randomUUID() }, false),
+  );
+}
+
+export async function importProperties(rows: PropertyImportRow[], options: ImportOptions = {}): Promise<ImportSummary> {
+  return legacySummary(
+    await runChunk("properties", rows, { ...options, batchId: options.batchId ?? crypto.randomUUID() }, false),
+  );
+}
+
+export async function importDemands(rows: DemandImportRow[], options: ImportOptions = {}): Promise<ImportSummary> {
+  return legacySummary(
+    await runChunk("demands", rows, { ...options, batchId: options.batchId ?? crypto.randomUUID() }, false),
+  );
 }
