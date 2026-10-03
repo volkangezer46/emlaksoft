@@ -108,6 +108,7 @@ import {
   UserCog,
   LockKeyhole,
   UsersRound,
+  SquarePlus,
   Wallet,
   Zap,
   type LucideIcon,
@@ -216,6 +217,8 @@ export const ICONS = {
   tavsiye: HeartHandshake,
   /** Otomasyon / tetikleyici. */
   otomasyon: Zap,
+  /** Hızlı kayıt (sahada tek ekranda müşteri / görüşme / randevu). */
+  hizli: SquarePlus,
   /** Belge / genel evrak. */
   belge: FileText,
   /** Denetim kaydı. */

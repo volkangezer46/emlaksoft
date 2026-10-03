@@ -26,14 +26,15 @@ type Customer = {
   notes: string | null;
 };
 
-const dispositions = [
+export const CALL_DISPOSITIONS = [
   "Ulaşıldı",
   "Randevu aldı",
   "Portföy istedi",
   "Tekrar aranacak",
   "İlgilenmiyor",
   "Kara liste",
-];
+] as const;
+const dispositions = CALL_DISPOSITIONS;
 
 export function CallConsole({
   customers,
