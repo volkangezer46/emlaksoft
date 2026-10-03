@@ -1,10 +1,12 @@
+import { PageHeader } from "@/components/ui/page-header";
+import { StatRow } from "@/components/ui/stat-row";
+import { ButtonLink } from "@/components/ui/button";
 import Link from "next/link";
 import {
   Zap,
   Play,
   Pause,
   BarChart3,
-  ArrowUpRight,
   Bolt,
   ChevronDown,
   Filter,
@@ -108,51 +110,22 @@ export default async function OtomasyonlarPage({
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-brand-300">
-              <Zap className="h-4 w-4" /> Otomasyon motoru
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Otomasyonlar</h1>
-            <p className="mt-1 text-sm text-white/75">
-              Tetikleyici → koşul → aksiyon zinciriyle tekrar eden işleri otomatikleştirin.
-            </p>
-            {canEdit && (
-              <div className="mt-3">
-                <Link
-                  href="/app/otomasyonlar/yeni"
-                  className="btn-shine focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white"
-                >
-                  <Plus className="h-4 w-4" /> Yeni otomasyon
-                </Link>
-              </div>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:flex">
-            {([
-              { label: "Aktif", value: active, href: "/app/otomasyonlar?durum=aktif" },
-              { label: "Pasif", value: inactive, href: "/app/otomasyonlar?durum=pasif" },
-              { label: "Toplam çalışma", value: rows.reduce((s, r) => s + r.run_count, 0), href: "/app/otomasyonlar" },
-              { label: "Çalışma (7g)", value: runs7, href: "#son-calismalar" },
-              { label: "Hata (7g)", value: err7, href: "#son-calismalar", danger: err7 > 0 },
-            ] as { label: string; value: number; href: string; danger?: boolean }[]).map((k) => (
-              <Link
-                key={k.label}
-                href={k.href}
-                className={`focus-ring press group relative block min-w-[92px] rounded-[var(--radius-card)] border p-3 text-center transition hover:border-white/30 ${
-                  k.danger ? "border-danger-500/40 bg-danger-500/15" : "border-white/12 bg-white/8"
-                }`}
-              >
-                <ArrowUpRight className="hover-action absolute right-2 top-2 h-3.5 w-3.5 text-white/50 opacity-0 transition group-hover:opacity-100" />
-                <p className="numeric font-display text-2xl font-extrabold text-white">{k.value}</p>
-                <p className="text-xs text-white/70">{k.label}</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+      <PageHeader
+        eyebrow="Otomasyon motoru"
+        title="Otomasyonlar"
+        description="Tetikleyici → koşul → aksiyon zinciriyle tekrar eden işleri otomatikleştirin."
+        actions={canEdit ? <ButtonLink href="/app/otomasyonlar/yeni" icon={Plus}>Yeni otomasyon</ButtonLink> : undefined}
+      />
+      <StatRow
+        className="mb-6"
+        items={[
+          { label: "Aktif", value: active, href: "/app/otomasyonlar?durum=aktif" },
+          { label: "Pasif", value: inactive, href: "/app/otomasyonlar?durum=pasif" },
+          { label: "Toplam çalışma", value: rows.reduce((s, r) => s + r.run_count, 0), href: "/app/otomasyonlar" },
+          { label: "Çalışma (7g)", value: runs7, href: "#son-calismalar" },
+          { label: "Hata (7g)", value: err7, href: "#son-calismalar", attention: err7 > 0 },
+        ]}
+      />
 
       {/* Hazır şablonlar */}
       <section className="rounded-[var(--radius-panel)] border border-dashed border-brand-300/40 bg-brand-600/[0.02] p-5">

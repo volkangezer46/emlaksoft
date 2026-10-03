@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -165,22 +166,11 @@ export default async function ForeignSalePage() {
         <ArrowLeft className="h-4 w-4" /> Portföy merkezine dön
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-mint-500/20 blur-[80px]" />
-        <div className="relative">
-          <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-            <Globe2 className="h-3.5 w-3.5" /> Yabancıya satış
-          </span>
-          <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">
-            Yabancı alıcı operasyonu
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm text-white/60">
-            Zorunlu evraklar, mevzuat eşikleri ve yabancı müşteri portföyünüz tek ekranda.
-            {rates ? ` Döviz karşılıkları TCMB ${rates.rateDate} satış kuruyla hesaplandı.` : ""}
-          </p>
-        </div>
-      </section>
+      <PageHeader
+        eyebrow="Yabancıya satış"
+        title="Yabancı alıcı operasyonu"
+        description={`Zorunlu evraklar, mevzuat eşikleri ve yabancı müşteri portföyünüz tek ekranda.${rates ? ` Döviz karşılıkları TCMB ${rates.rateDate} satış kuruyla hesaplandı.` : ""}`}
+      />
 
       {/* Yasal uyarı — mevzuat kartlarının hepsini kapsar */}
       <div className="flex items-start gap-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/[0.07] px-4 py-3">

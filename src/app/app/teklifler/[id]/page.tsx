@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -192,38 +193,32 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
       </Link>
 
       {/* Hero */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/30 blur-[70px]" />
-        <div className="relative flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-brand-300">
-              <Tag className="h-4 w-4" /> Teklif detayı
+      <PageHeader
+        eyebrow="Teklif detayı"
+        title={money(offerAmount)}
+        meta={
+          <span className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${STATUS_STYLE[offer.status] ?? STATUS_STYLE.draft}`}>
+            {STATUS_LABELS[offer.status] ?? offer.status}
+          </span>
+        }
+        description={
+          diffPct !== null ? (
+            <span className={`font-semibold ${diffPct < 0 ? "text-mint-700" : diffPct > 0 ? "text-amber-700" : "text-text-muted"}`}>
+              Liste fiyatına göre {diffPct > 0 ? "+" : ""}{diffPct}%
             </span>
-            <h1 className="mt-2 font-display text-3xl font-extrabold text-white md:text-4xl">{money(offerAmount)}</h1>
-            <div className="mt-2 flex flex-wrap items-center gap-3">
-              <span className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${STATUS_STYLE[offer.status] ?? STATUS_STYLE.draft}`}>
-                {STATUS_LABELS[offer.status] ?? offer.status}
-              </span>
-              {diffPct !== null ? (
-                <span className={`text-sm font-semibold ${diffPct < 0 ? "text-mint-300" : diffPct > 0 ? "text-amber-300" : "text-white/70"}`}>
-                  Liste fiyatına göre {diffPct > 0 ? "+" : ""}{diffPct}%
-                </span>
-              ) : null}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 text-center">
-              <p className="font-display text-lg font-extrabold text-white">{money(listPrice)}</p>
-              <p className="text-xs text-white/70">Liste fiyatı</p>
-            </div>
-            <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 text-center">
-              <p className="font-display text-lg font-extrabold text-white">{offer.counter_amount ? money(Number(offer.counter_amount)) : "—"}</p>
-              <p className="text-xs text-white/70">Karşı teklif</p>
-            </div>
-          </div>
+          ) : undefined
+        }
+      />
+      <div className="mb-6 grid max-w-md grid-cols-2 gap-3">
+        <div className="rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]">
+          <p className="numeric font-display text-lg font-extrabold text-text">{money(listPrice)}</p>
+          <p className="text-xs text-text-muted">Liste fiyatı</p>
         </div>
-      </section>
+        <div className="rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]">
+          <p className="numeric font-display text-lg font-extrabold text-text">{offer.counter_amount ? money(Number(offer.counter_amount)) : "—"}</p>
+          <p className="text-xs text-text-muted">Karşı teklif</p>
+        </div>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Sol: ilişkili kayıtlar + detaylar */}

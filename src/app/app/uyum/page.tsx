@@ -1,5 +1,6 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
-import { ArrowUpRight, CircleCheck, CircleX, Clock3, Eraser, FileCheck2, History, ShieldAlert, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, CircleCheck, CircleX, Clock3, Eraser, FileCheck2, History, ShieldAlert } from "lucide-react";
 import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -139,35 +140,27 @@ export default async function CompliancePage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-mint-500/20 blur-[80px]" />
-        <div className="relative">
-          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-mint-400">
-            <ShieldCheck className="h-3.5 w-3.5" /> İYS / EİDS kalkanı
-          </p>
-          <h1 className="mt-2 font-display text-3xl font-extrabold">Uyum merkezi</h1>
-          <p className="mt-2 max-w-xl text-sm text-white/60">
-            Ticari ileti izinleri ve yetki belgesi kontrolü. İYS entegratör API’si bağlanınca senkron otomatikleşir.
-          </p>
-          <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {heroKpis.map((k) => (
-              <a
-                key={k.label}
-                href={k.href}
-                className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur transition hover:border-white/30"
-              >
-                <span className="flex items-start justify-between">
-                  <k.icon className={`h-4 w-4 ${k.tone}`} />
-                  <ArrowUpRight className="h-4 w-4 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
-                </span>
-                <p className="numeric mt-2 font-display text-xl font-extrabold text-white">{k.value}</p>
-                <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
-              </a>
-            ))}
-          </div>
-        </div>
-      </section>
+      <PageHeader
+        eyebrow="İYS / EİDS kalkanı"
+        title="Uyum merkezi"
+        description="Ticari ileti izinleri ve yetki belgesi kontrolü. İYS entegratör API’si bağlanınca senkron otomatikleşir."
+      />
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {heroKpis.map((k) => (
+          <a
+            key={k.label}
+            href={k.href}
+            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)] transition hover:border-brand-400"
+          >
+            <span className="flex items-start justify-between">
+              <k.icon className={`h-4 w-4 ${k.tone}`} />
+              <ArrowUpRight className="h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+            </span>
+            <p className="numeric mt-2 font-display text-xl font-extrabold text-text">{k.value}</p>
+            <p className="text-xs text-text-muted">{k.label}</p>
+          </a>
+        ))}
+      </div>
 
       {channelRisk.length > 0 ? (
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">

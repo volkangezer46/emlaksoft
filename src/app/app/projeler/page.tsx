@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -81,40 +82,26 @@ export default async function ProjelerPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-500/25 blur-[70px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-brand-300">
-              <Layers className="h-4 w-4" /> İnşaat proje satışı
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Projeler</h1>
-            <p className="mt-1 max-w-xl text-sm text-white/75">
-              Müteahhit projelerinin daire stoğunu, rezervasyon ve satışlarını tek ekrandan yönetin.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            {allUnits.length > 0 ? (
-              <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/8 px-4 py-3">
-                <p className="text-xs text-white/60">Genel eritme oranı</p>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="numeric font-display text-xl font-extrabold text-white">%{genelPct}</span>
-                  <span className="h-2 w-24 overflow-hidden rounded-full bg-white/15">
-                    <span className="block h-full rounded-full bg-mint-500" style={{ width: `${genelPct}%` }} />
-                  </span>
-                </div>
-              </div>
-            ) : null}
-            <ExportCsvButton
-              label="Dışa aktar"
-              action={exportProjectsCsv.bind(null, { durum: durum ?? "" })}
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
-            />
+      <PageHeader
+        eyebrow="İnşaat proje satışı"
+        title="Projeler"
+        description="Müteahhit projelerinin daire stoğunu, rezervasyon ve satışlarını tek ekrandan yönetin."
+        actions={
+          <>
+            <ExportCsvButton label="Dışa aktar" action={exportProjectsCsv.bind(null, { durum: durum ?? "" })} />
             {canCreate ? <ButtonLink href="/app/projeler/yeni" icon={Plus}>Yeni proje</ButtonLink> : null}
-          </div>
+          </>
+        }
+      />
+      {allUnits.length > 0 ? (
+        <div className="mb-6 flex flex-wrap items-center gap-4 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
+          <p className="text-xs font-medium text-text-muted">Genel eritme oranı</p>
+          <span className="numeric font-display text-xl font-extrabold text-text">%{genelPct}</span>
+          <span className="h-2 w-32 overflow-hidden rounded-full bg-surface-2">
+            <span className="block h-full rounded-full bg-mint-500" style={{ width: `${genelPct}%` }} />
+          </span>
         </div>
-      </section>
+      ) : null}
 
       {/* KPI şeridi — her kart listeyi süzer ya da listeye döner */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

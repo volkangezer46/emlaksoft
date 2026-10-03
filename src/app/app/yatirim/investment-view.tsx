@@ -1,5 +1,6 @@
-import Link from "next/link";
-import { LineChart, ShieldAlert } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
+import { ButtonLink } from "@/components/ui/button";
+import { ArrowUpRight, ShieldAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { now } from "@/lib/clock";
 import { fetchLatestRates, fxAgeLabel } from "@/lib/fx";
@@ -187,47 +188,27 @@ export async function InvestmentView({ sp }: { sp: InvestmentSearchParams }) {
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark no-print relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-mint-400/20 blur-[80px]" />
-        <div className="relative">
-          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-mint-400">
-            <LineChart className="h-3.5 w-3.5" /> Yatırımcı sorusu: &quot;kaç yılda kendini amorti eder?&quot;
-          </p>
-          <h1 className="mt-2 font-display text-3xl font-extrabold">Yatırım getirisi analizi</h1>
-          <p className="mt-2 max-w-2xl text-sm text-white/60">
-            Kira getirisi, aylık nakit akışı ve {INVESTMENT_DEFAULTS.projectionYears} yıllık projeksiyon tek ekranda.
-            Amorti süresini, aylık cebe kalanı ve kredi bittikten sonraki sıçramayı yıl yıl gösterir — sonucu tek tıkla
-            müşteriye link olarak gönderin.
-          </p>
-          <p className="mt-4 inline-flex items-start gap-2 rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/70">
-            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-mint-400" />
-            Kira ve değer artışı varsayılanı, TÜFE 12 aylık ortalamasının en güncel ayından ({DEFAULT_GROWTH_SOURCE_MONTH})
-            gelir — kira yenileme radarıyla aynı kaynak. Çıktı her hâlükârda{" "}
-            <strong className="text-white">yaklaşıktır</strong>.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2 text-xs">
-            <Link
-              href="/app/hesaplayici"
-              className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3 py-2 font-semibold text-white/80 transition hover:border-white/35"
-            >
-              Alım maliyeti hesaplayıcı →
-            </Link>
-            <Link
-              href="/app/kira-artis"
-              className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3 py-2 font-semibold text-white/80 transition hover:border-white/35"
-            >
-              Kira artış hesaplayıcı →
-            </Link>
-            <Link
-              href="/app/bolge-analizi"
-              className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3 py-2 font-semibold text-white/80 transition hover:border-white/35"
-            >
-              Bölge analizi →
-            </Link>
-          </div>
-        </div>
-      </section>
+      <PageHeader
+        className="no-print"
+        eyebrow="Yatırımcı sorusu: &quot;kaç yılda kendini amorti eder?&quot;"
+        title="Yatırım getirisi analizi"
+        description={`Kira getirisi, aylık nakit akışı ve ${INVESTMENT_DEFAULTS.projectionYears} yıllık projeksiyon tek ekranda. Amorti süresini, aylık cebe kalanı ve kredi bittikten sonraki sıçramayı yıl yıl gösterir — sonucu tek tıkla müşteriye link olarak gönderin.`}
+        actions={
+          <>
+            <ButtonLink href="/app/hesaplayici" variant="secondary" iconRight={ArrowUpRight}>Alım maliyeti hesaplayıcı</ButtonLink>
+            <ButtonLink href="/app/kira-artis" variant="secondary" iconRight={ArrowUpRight}>Kira artış hesaplayıcı</ButtonLink>
+            <ButtonLink href="/app/bolge-analizi" variant="secondary" iconRight={ArrowUpRight}>Bölge analizi</ButtonLink>
+          </>
+        }
+      />
+      <p className="no-print mb-6 flex items-start gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-3 py-2 text-xs text-text-muted">
+        <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-mint-700" />
+        <span>
+          Kira ve değer artışı varsayılanı, TÜFE 12 aylık ortalamasının en güncel ayından ({DEFAULT_GROWTH_SOURCE_MONTH})
+          gelir — kira yenileme radarıyla aynı kaynak. Çıktı her hâlükârda{" "}
+          <strong className="text-text">yaklaşıktır</strong>.
+        </span>
+      </p>
 
       <InvestmentAnalyzer
         properties={properties}

@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -89,12 +90,12 @@ function TrendBadge({ trend }: { trend: TrendInfo }) {
   const Icon = trend.dir === "down" ? TrendingDown : trend.dir === "flat" ? ArrowRight : TrendingUp;
   const cls =
     trend.dir === "new" || trend.dir === "flat"
-      ? "text-white/60"
+      ? "text-text-muted"
       : trend.good
-        ? "text-mint-300"
-        : "text-danger-400";
+        ? "text-mint-700"
+        : "text-danger-500";
   return (
-    <span className={`flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold tabular-nums ${cls}`}>
+    <span className={`flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold tabular-nums ${cls}`}>
       <Icon className="h-3 w-3" /> {trend.label}
     </span>
   );
@@ -223,32 +224,27 @@ export default async function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-cyan-400">
-              <BarChart3 className="h-3.5 w-3.5" /> Rapor merkezi
-            </p>
-            <h1 className="mt-2 font-display text-3xl font-extrabold">Ofis sağlık & performans</h1>
-            <p className="mt-2 text-sm text-white/60">Gerçek toplulaştırma · sahte satış hattı yok.</p>
-          </div>
-          <details className="rounded-[var(--radius-card)] border border-white/10 bg-white/5">
-            <summary className="focus-ring cursor-pointer list-none rounded-[var(--radius-card)] px-5 py-4 text-center transition hover:bg-white/5 [&::-webkit-details-marker]:hidden">
-              <p className="font-display text-3xl font-extrabold text-mint-400">{office.score}</p>
-              <p className="text-xs text-white/55">{office.label} ofis skoru · bileşenler ▾</p>
+      <PageHeader
+        eyebrow="Rapor merkezi"
+        title="Ofis sağlık & performans"
+        description="Gerçek toplulaştırma · sahte satış hattı yok."
+        actions={
+          <details className="rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-xs)]">
+            <summary className="focus-ring cursor-pointer list-none rounded-[var(--radius-card)] px-5 py-3 text-center transition hover:bg-surface-2 [&::-webkit-details-marker]:hidden">
+              <p className="font-display text-2xl font-extrabold text-mint-700">{office.score}</p>
+              <p className="text-xs text-text-muted">{office.label} ofis skoru · bileşenler ▾</p>
             </summary>
-            <div className="border-t border-white/10 px-5 py-4 text-left">
-              <p className="text-xs font-bold uppercase tracking-[0.1em] text-white/45">
+            <div className="border-t border-line px-5 py-4 text-left">
+              <p className="text-xs font-bold uppercase tracking-[0.1em] text-text-muted">
                 Skor nasıl hesaplanır? Baz 42 puan
               </p>
               <ul className="mt-2 space-y-1.5 text-xs">
                 {scoreFactors.map((f) => (
                   <li key={f.label} className="flex items-center justify-between gap-6">
-                    <span className="text-white/70">
-                      {f.label} <span className="text-white/40">({f.input} · {f.note})</span>
+                    <span className="text-text">
+                      {f.label} <span className="text-text-muted">({f.input} · {f.note})</span>
                     </span>
-                    <span className={`numeric font-bold ${f.points >= 0 ? "text-mint-400" : "text-danger-400"}`}>
+                    <span className={`numeric font-bold ${f.points >= 0 ? "text-mint-700" : "text-danger-500"}`}>
                       {f.points >= 0 ? "+" : ""}{f.points}
                     </span>
                   </li>
@@ -256,40 +252,39 @@ export default async function ReportsPage() {
               </ul>
             </div>
           </details>
-        </div>
-        <div className="stagger-grid relative mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: "Aylık komisyon", value: money(commissionTotal), icon: ICONS.komisyon, tone: "text-amber-300", href: "/app/komisyon", trend: commissionMoM, trendTitle: "Geçen aya göre" },
-            { label: "Tahmini kayıp", value: money(lost), icon: ICONS.alarm, tone: "text-danger-400", href: "/app/kayip-kacak", trend: lostMoM, trendTitle: "Geçen aya göre" },
-            // Gecikmiş teyit anlık (stok) bir metrik; geçmiş anlık görüntüsü
-            // tutulmadığından dürüst bir dönem kıyası üretilemiyor — rozetsiz.
-            // İkonografi: "Gecikmiş teyit" /app/portallar'a gidiyor ama Building2
-            // (portföy ikonu) ile çiziliyordu — portal kavramı ICONS.portal.
-            { label: "Gecikmiş teyit", value: String(overdue), icon: ICONS.portal, tone: "text-warn-400", href: "/app/portallar?durum=teyit", trend: undefined as TrendInfo | undefined, trendTitle: "" },
-            { label: "Açık talep", value: String(demands), icon: ICONS.talep, tone: "text-mint-300", href: "/app/talepler", trend: demandFlowMoM, trendTitle: "Yeni talep akışı, geçen aya göre" },
-          ].map((k) => (
-            <Link
-              key={k.label}
-              href={k.href}
-              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-4 hover:border-white/30"
-            >
-              <span className="flex items-start justify-between">
-                <k.icon className={`h-4 w-4 ${k.tone}`} />
-                <span className="flex items-center gap-1.5">
-                  {k.trend ? (
-                    <span title={k.trendTitle}>
-                      <TrendBadge trend={k.trend} />
-                    </span>
-                  ) : null}
-                  <ArrowUpRight className="hover-action h-4 w-4 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
-                </span>
+        }
+      />
+      <div className="stagger-grid mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          { label: "Aylık komisyon", value: money(commissionTotal), icon: ICONS.komisyon, tone: "text-amber-700", href: "/app/komisyon", trend: commissionMoM, trendTitle: "Geçen aya göre" },
+          { label: "Tahmini kayıp", value: money(lost), icon: ICONS.alarm, tone: "text-danger-500", href: "/app/kayip-kacak", trend: lostMoM, trendTitle: "Geçen aya göre" },
+          // Gecikmiş teyit anlık (stok) bir metrik; geçmiş anlık görüntüsü
+          // tutulmadığından dürüst bir dönem kıyası üretilemiyor — rozetsiz.
+          // "Gecikmiş teyit" /app/portallar'a gidiyor; portal kavramı ICONS.portal.
+          { label: "Gecikmiş teyit", value: String(overdue), icon: ICONS.portal, tone: "text-amber-700", href: "/app/portallar?durum=teyit", trend: undefined as TrendInfo | undefined, trendTitle: "" },
+          { label: "Açık talep", value: String(demands), icon: ICONS.talep, tone: "text-mint-700", href: "/app/talepler", trend: demandFlowMoM, trendTitle: "Yeni talep akışı, geçen aya göre" },
+        ].map((k) => (
+          <Link
+            key={k.label}
+            href={k.href}
+            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] transition hover:border-brand-400"
+          >
+            <span className="flex items-start justify-between">
+              <k.icon className={`h-4 w-4 ${k.tone}`} />
+              <span className="flex items-center gap-1.5">
+                {k.trend ? (
+                  <span title={k.trendTitle}>
+                    <TrendBadge trend={k.trend} />
+                  </span>
+                ) : null}
+                <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
               </span>
-              <p className="mt-2 font-display text-xl font-extrabold">{k.value}</p>
-              <p className="text-xs text-white/45">{k.label}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
+            </span>
+            <p className="numeric mt-2 font-display text-xl font-extrabold text-text">{k.value}</p>
+            <p className="text-xs font-medium text-text-muted">{k.label}</p>
+          </Link>
+        ))}
+      </div>
 
       <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <h2 className="font-display font-bold text-ink-950">Hacim dağılımı</h2>

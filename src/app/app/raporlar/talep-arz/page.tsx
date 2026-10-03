@@ -1,3 +1,5 @@
+import { PageHeader } from "@/components/ui/page-header";
+import { ButtonLink } from "@/components/ui/button";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
@@ -209,28 +211,12 @@ export default async function TalepArzPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-brand-600/25 blur-[80px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-cyan-400">
-              <MapIcon className="h-3.5 w-3.5" /> Rapor merkezi
-            </p>
-            <h1 className="mt-2 font-display text-3xl font-extrabold">Talep-Arz Haritası</h1>
-            <p className="mt-2 max-w-2xl text-sm text-white/60">
-              {donem.label.toLowerCase()}de açılan açık talepler ile şu an yayındaki portföy stoku ilçe
-              kırılımında karşılaştırılır — nerede portföy toplamalı, nerede talep üretmeli.
-            </p>
-          </div>
-          <Link
-            href="/app/raporlar"
-            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white"
-          >
-            <BarChart3 className="h-4 w-4" /> Rapor merkezi
-          </Link>
-        </div>
-      </section>
+      <PageHeader
+        eyebrow="Rapor merkezi"
+        title="Talep-Arz Haritası"
+        description={`${donem.label.toLowerCase()}de açılan açık talepler ile şu an yayındaki portföy stoku ilçe kırılımında karşılaştırılır — nerede portföy toplamalı, nerede talep üretmeli.`}
+        actions={<ButtonLink href="/app/raporlar" variant="secondary" icon={BarChart3}>Rapor merkezi</ButtonLink>}
+      />
 
       {/* Filtreler — işlem türü + dönem pill'leri, il seçimi form (JS'siz GET) */}
       <div className="flex flex-wrap items-center gap-2">

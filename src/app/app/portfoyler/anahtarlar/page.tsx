@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -180,19 +181,11 @@ export default async function PropertyKeysBoardPage({
         </Link>
       </div>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-mint-500/20 blur-[80px]" />
-        <div className="relative">
-          <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-            <KeyRound className="h-3.5 w-3.5" /> Anahtar &amp; emanet
-          </span>
-          <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Anahtar panosu</h1>
-          <p className="mt-1 text-sm text-white/60">
-            Ofisteki, dışarıdaki ve iadesi geciken tüm anahtarlar tek ekranda.
-          </p>
-        </div>
-      </section>
+      <PageHeader
+        eyebrow="Anahtar &amp; emanet"
+        title="Anahtar panosu"
+        description="Ofisteki, dışarıdaki ve iadesi geciken tüm anahtarlar tek ekranda."
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Ofiste" value={officeCount} icon={Building2} tone="success" href={href({ durum: "ofiste", sayfa: 1 })} />

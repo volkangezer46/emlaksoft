@@ -1,6 +1,7 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Eye, MonitorPlay, Presentation, UserRound } from "lucide-react";
+import { Eye, MonitorPlay, Presentation, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -128,37 +129,23 @@ export default async function PresentationsPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="relative flex flex-wrap items-start justify-between gap-5">
-          <div>
-            <Link
-              href="/app/portfoyler"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/60 transition hover:text-white"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" /> Portföy merkezine dön
-            </Link>
-            <h1 className="mt-2 flex items-center gap-2.5 font-display text-2xl font-extrabold text-white md:text-3xl">
-              <Presentation className="h-7 w-7 text-mint-400" /> Portföy sunumları
-            </h1>
-            <p className="mt-1 text-sm text-white/60">
-              Müşteriye özel seçki hazırlayın; link telefonda sunum, yazıcıda A4 dosya olur.
-              Paylaştığınız müşteri/malik portalı linkleri de aşağıda listelenir.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-2.5 text-center backdrop-blur">
-              <p className="font-display text-xl font-extrabold text-white">{presentations.length}</p>
-              <p className="text-xs text-white/50">Sunum</p>
-            </div>
-            <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-2.5 text-center backdrop-blur">
-              <p className="font-display text-xl font-extrabold text-mint-400">{totalViews}</p>
-              <p className="text-xs text-white/50">Görüntülenme</p>
-            </div>
-            <ButtonLink href="/app/portfoyler/sunumlar/yeni">Yeni sunum</ButtonLink>
-          </div>
+      <PageHeader
+        breadcrumbs={[{ label: "Portföyler", href: "/app/portfoyler" }, { label: "Sunumlar" }]}
+        title="Portföy sunumları"
+        description="Müşteriye özel seçki hazırlayın; link telefonda sunum, yazıcıda A4 dosya olur. Paylaştığınız müşteri/malik portalı linkleri de aşağıda listelenir."
+        icon={<span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-mint-500/12 text-mint-700"><Presentation className="h-5 w-5" /></span>}
+        actions={<ButtonLink href="/app/portfoyler/sunumlar/yeni">Yeni sunum</ButtonLink>}
+      />
+      <div className="mb-6 grid max-w-md grid-cols-2 gap-3">
+        <div className="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2.5 shadow-[var(--shadow-xs)]">
+          <p className="numeric font-display text-xl font-extrabold text-text">{presentations.length}</p>
+          <p className="text-xs text-text-muted">Sunum</p>
         </div>
-      </section>
+        <div className="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2.5 shadow-[var(--shadow-xs)]">
+          <p className="numeric font-display text-xl font-extrabold text-mint-700">{totalViews}</p>
+          <p className="text-xs text-text-muted">Görüntülenme</p>
+        </div>
+      </div>
 
       {presentations.length === 0 ? (
         <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
