@@ -26,9 +26,12 @@ describe("B1/B2 kazanç ve kapsam atlama yolları sözleşmesi", () => {
 
   it("hedefler: başkasının cirosu earnings_all olmadan gizli", () => {
     const src = read("src/app/app/hedefler/page.tsx");
-    expect(src).toContain("canSeeEarningsOf(ctx.perms, ctx.userId, profileId)");
+    // Gerçekleşme tek kaynaktan: komisyon okuma kapısı advisor-metrics içindedir.
+    expect(src).toContain("loadTargetActualsLive");
     expect(src).toContain("revVisible");
-    expect(src).toContain('.eq("deal.assigned_to", ctx.userId)');
+    const lib = read("src/lib/team/advisor-metrics.ts");
+    expect(lib).toContain('.eq("deal.assigned_to", opts.viewerId)');
+    expect(lib).toContain("const visible = t.profile_id ? seeAll || t.profile_id === viewer.userId : seeAll;");
   });
 
   it("dışa aktarma: komisyon ve denetim earnings_all olmadan kendi kapsamı (hızlı + tam akış)", () => {
@@ -43,5 +46,29 @@ describe("B1/B2 kazanç ve kapsam atlama yolları sözleşmesi", () => {
   it("danisman-kpi: ciro sütunu showRevenue ile kapalı", () => {
     const src = read("src/app/app/danisman-kpi/page.tsx");
     expect(src).toContain("showRevenue(a.id)");
+  });
+
+  it("metrik tek kaynağı: yetkisiz rolde komisyon satırı yalnız kendi anlaşması/payı için çekilir, ofis brüt toplamı earnings_all ister", () => {
+    const lib = read("src/lib/team/advisor-metrics.ts");
+    expect(lib).toContain("if (opts.seeAll)");
+    expect(lib).toContain('.contains("splits", [{ profile_id: opts.viewerId }])');
+    expect(lib).toContain("const gross = seeAllEarnings ? officeGross(facts.commissions, period) : null;");
+    expect(lib).toContain("const canSee = (id: string) => seeAllEarnings || id === viewerId;");
+  });
+
+  it("danışman ekranları tek kaynaktan beslenir: kendi RPC/toplama sorgusu yazmaz", () => {
+    for (const p of [
+      "src/app/app/danisman-kpi/page.tsx",
+      "src/app/app/ekip/kiyas/page.tsx",
+      "src/app/app/pano-tv/page.tsx",
+      "src/app/app/lig/page.tsx",
+      "src/app/app/ekip/[id]/advisor-view.tsx",
+    ]) {
+      const src = read(p);
+      expect(src, p).toContain("loadAdvisorMetrics");
+      expect(src, p).not.toContain('rpc("advisor_kpis"');
+    }
+    expect(read("src/app/app/ekip/[id]/advisor-data.ts")).toContain("loadAdvisorMetrics");
+    expect(read("src/app/app/cuzdan/office-earnings.tsx")).toContain("loadAdvisorMetrics");
   });
 });

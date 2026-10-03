@@ -6,10 +6,12 @@ import {
   Info,
   ReceiptText,
   TrendingUp,
+  Users,
+  Wallet,
 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { now as nowMs } from "@/lib/clock";
+import { now as nowMs, trParts } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
 import { PageHeader } from "@/components/ui/page-header";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
@@ -19,6 +21,13 @@ import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { PrintButton } from "./print-button";
 import { advisorShare, dealOf, isPaid, type SplitEntry } from "@/lib/team/advisor-share";
+import { redirect } from "next/navigation";
+import { lockedGate } from "@/lib/billing/page-gates";
+import { getTenantGateContext } from "@/lib/cache/request";
+import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
+import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
+import { currentMonthPeriod, earningInRange, fetchCommissionRows, trYearPeriod } from "@/lib/team/advisor-metrics";
+import { OfficeEarnings } from "./office-earnings";
 
 type CommissionRow = {
   id: string;
@@ -49,29 +58,59 @@ function money(value: number) {
 const MONTH_LABELS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
 const LIST_LIMIT = 100;
 
-export default async function CuzdanPage() {
-  const { userId, tenantId } = await requireModulePage("commissions");
+export default async function CuzdanPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // Tek "Kazanç" sayfası. Kapı: yalnız Komisyon modülü (paket kilidi YOK: Danışman paketinde de kendi kazancı açık).
+  // "Ofis geneli" sekmesi: earnings_all izni + Ofis paketi (eski Ekip Merkezi / Kazanç kapısı) gerekir.
+  const { userId, tenantId, role, perms } = await requireModulePage("commissions");
+  const sp = (await searchParams) ?? {};
+  const seeAll = canSeeAllEarnings(perms);
+  const officeGate = seeAll && tenantId ? lockedGate("/app/ekip", await getTenantGateContext(tenantId)) : null;
+  const officeTabAvailable = seeAll && !officeGate;
+  if (officeGate && (Array.isArray(sp.sekme) ? sp.sekme[0] : sp.sekme) === "ofis") {
+    redirect(`/app/paket?ozellik=${encodeURIComponent(officeGate.href)}`);
+  }
+  const tabs: DetailTabDef[] = [
+    { id: "benim", label: "Benim kazancım", icon: Wallet },
+    { id: "ofis", label: "Ofis geneli", icon: Users, hidden: !officeTabAvailable },
+  ];
+  const activeTab = resolveTab(sp, tabs.filter((t) => !t.hidden).map((t) => t.id), "benim");
+
+  if (activeTab === "ofis") {
+    return (
+      <div className="space-y-5">
+        <DetailTabs basePath="/app/cuzdan" tabs={tabs} active={activeTab} label="Kazanç sekmeleri" />
+        <OfficeEarnings viewer={{ userId, role, perms }} tenantId={tenantId} />
+      </div>
+    );
+  }
+
   const supabase = await createClient();
 
-  const [{ data: profile }, { data: office }, { data: commissionData }] = await Promise.all([
+  const [{ data: profile }, { data: office }, commissionRes] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
     // Bordro çıktısının başlık bandı: ofis adı belgeye kimlik verir.
     tenantId
       ? supabase.from("tenants").select("name").eq("id", tenantId).maybeSingle()
       : Promise.resolve({ data: null }),
-    // Pay hesabı jsonb split etiketi üzerinden yapıldığından filtre sunucuda
-    // kurulamıyor; komisyon KPI'larındaki gibi geniş çekilip bellekte süzülür.
-    supabase
-      .from("commissions")
-      .select(
-        "id, gross_amount, status, splits, created_at, deal_id, deal:deals!commissions_deal_id_fkey(id,assigned_to,property:properties!deals_property_id_fkey(id,property_code,title))",
-      )
-      .order("created_at", { ascending: false })
-      .limit(1000),
+    // Pay hesabı jsonb split etiketi üzerinden yapıldığından filtre sunucuda kurulamıyor; geniş çekilip bellekte süzülür.
+    // Okuma yolu Danışman KPI / Kıyas / Hedefler ile ORTAK (fetchCommissionRows): earnings_all yoksa başkasının
+    // satırı sunucudan hiç çekilmez.
+    fetchCommissionRows<CommissionRow>(supabase, {
+      tenantId,
+      viewerId: userId,
+      seeAll,
+      limit: 1000,
+      extraColumns: "deal_id",
+      dealSelect: "id, assigned_to, property:properties!deals_property_id_fkey(id, property_code, title)",
+    }),
   ]);
 
   const fullName = (profile?.full_name as string | undefined) ?? null;
-  const rows = (commissionData ?? []) as CommissionRow[];
+  const rows = commissionRes.rows;
 
   // Cüzdan satırları: yalnızca oturum açan kullanıcının payına düşenler
   const mine = rows
@@ -81,42 +120,45 @@ export default async function CuzdanPage() {
     })
     .filter((x): x is { row: CommissionRow; share: { amount: number; note: string } } => x !== null);
 
-  const now = new Date(nowMs());
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const yearStart = new Date(now.getFullYear(), 0, 1);
+  // Dönem sınırları Türkiye takvimine göre ve metriklerle AYNI aralık tanımı (advisor-metrics).
+  const nowTs = nowMs();
+  const monthPeriod = currentMonthPeriod(nowTs);
+  const yearPeriod = trYearPeriod(trParts(nowTs).year);
+  const monthStart = new Date(monthPeriod.startIso);
+  const inMonth = (iso: string) => iso >= monthPeriod.startIso && iso < monthPeriod.endIso;
+  const now = new Date(nowTs);
 
-  const thisMonth = mine
-    .filter(({ row }) => new Date(row.created_at) >= monthStart)
-    .reduce((sum, { share }) => sum + share.amount, 0);
+  const thisMonth = mine.filter(({ row }) => inMonth(row.created_at)).reduce((sum, { share }) => sum + share.amount, 0);
   const pending = mine
     .filter(({ row }) => !isPaid(row.status))
     .reduce((sum, { share }) => sum + share.amount, 0);
-  const paidThisYear = mine
-    .filter(({ row }) => isPaid(row.status) && new Date(row.created_at) >= yearStart)
-    .reduce((sum, { share }) => sum + share.amount, 0);
+  // Tahsil edilen pay (bu ay / bu yıl): Danışman KPI "Gelir", Kıyas, Hedefler ve Performansım ile aynı hesap.
+  const collectedThisMonth = earningInRange(rows, monthPeriod, fullName, userId).collected;
+  const paidThisYear = earningInRange(rows, yearPeriod, fullName, userId).collected;
 
   // Dönem bordrosu (içinde bulunulan ay) — yalnızca çıktıda görünen resmi döküm.
-  const donem = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(monthStart);
-  const bordroItems = mine.filter(({ row }) => new Date(row.created_at) >= monthStart);
+  const donem = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric", timeZone: "Europe/Istanbul" }).format(monthStart);
+  const bordroItems = mine.filter(({ row }) => inMonth(row.created_at));
   const bordroBrut = bordroItems.reduce((sum, { row }) => sum + (Number(row.gross_amount) || 0), 0);
   const bordroTahsil = bordroItems
     .filter(({ row }) => isPaid(row.status))
     .reduce((sum, { share }) => sum + share.amount, 0);
   const bordroBekleyen = thisMonth - bordroTahsil;
 
-  // Son 6 ay hakediş serisi (raporlardaki trend deseni)
+  // Son 6 ay hakediş serisi (raporlardaki trend deseni), TR ay sınırlarıyla
+  const trNow = trParts(nowTs);
   const trendMonths = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(monthStart);
-    d.setMonth(d.getMonth() - (5 - i));
+    const d = new Date(Date.UTC(trNow.year, trNow.month - (5 - i), 1));
     return {
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-      label: MONTH_LABELS[d.getMonth()],
+      key: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`,
+      label: MONTH_LABELS[d.getUTCMonth()],
       amount: 0,
     };
   });
   const trendIndex = new Map(trendMonths.map((m, i) => [m.key, i]));
   for (const { row, share } of mine) {
-    const idx = trendIndex.get(String(row.created_at).slice(0, 7));
+    const p = trParts(row.created_at);
+    const idx = trendIndex.get(`${p.year}-${String(p.month + 1).padStart(2, "0")}`);
     if (idx !== undefined) trendMonths[idx].amount += share.amount;
   }
   const trendMax = Math.max(1, ...trendMonths.map((m) => m.amount));
@@ -140,10 +182,15 @@ export default async function CuzdanPage() {
 
   return (
     <div className="space-y-6">
+      {officeTabAvailable ? (
+        <div className="no-print">
+          <DetailTabs basePath="/app/cuzdan" tabs={tabs} active={activeTab} label="Kazanç sekmeleri" />
+        </div>
+      ) : null}
       <PageHeader
         className="no-print mb-0"
         eyebrow="Kişisel hakediş"
-        title={`Cüzdanım${fullName ? ` · ${fullName}` : ""}`}
+        title={`Kazanç${fullName ? ` · ${fullName}` : ""}`}
         description="Kapanan anlaşmalardan payına düşen hakediş, tahsilat ve bekleyen tutarlar tek ekranda."
         actions={<PrintButton />}
       />
@@ -169,7 +216,7 @@ export default async function CuzdanPage() {
             <div className="mt-1 flex justify-end gap-2">
               <dt>Düzenlenme tarihi</dt>
               <dd className="font-semibold text-ink-950">
-                {new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(now)}
+                {new Intl.DateTimeFormat("tr-TR", { dateStyle: "long", timeZone: "Europe/Istanbul" }).format(now)}
               </dd>
             </div>
             <div className="mt-1 flex justify-end gap-2">
@@ -256,7 +303,7 @@ export default async function CuzdanPage() {
 
       <KpiGrid count={4} className="no-print">
         <StatCard label="Bekleyen bakiye (tahsil edilmemiş)" value={money(pending)} icon={Clock3} tone="warning" href="/app/komisyon?durum=bekleyen" />
-        <StatCard label={`Bu ay hakediş · ${donem}`} value={money(thisMonth)} icon={CalendarDays} href="/app/komisyon" />
+        <StatCard label={`Bu ay tahsil edilen pay · ${donem}`} value={money(collectedThisMonth)} icon={CalendarDays} href="/app/komisyon?durum=tahsil" />
         <StatCard label="Tahsil edilen (bu yıl)" value={money(paidThisYear)} icon={CheckCircle2} tone="success" href="/app/komisyon?durum=tahsil" />
         <StatCard label="Toplam kayıt" value={mine.length} icon={ReceiptText} href="/app/komisyon" />
       </KpiGrid>

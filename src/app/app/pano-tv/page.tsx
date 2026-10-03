@@ -1,7 +1,8 @@
 import { Tv, TrendingUp, Layers, Trophy, Building2, Gauge } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
-import { daysAgoIso } from "@/lib/clock";
+import { now } from "@/lib/clock";
+import { currentMonthPeriod, loadAdvisorMetrics } from "@/lib/team/advisor-metrics";
 import { getOfficeScoreCached } from "@/lib/office-score";
 import { TvLive } from "./tv-live";
 
@@ -13,49 +14,51 @@ const compact = (n: number) =>
   n >= 1_000_000 ? `₺${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `₺${(n / 1_000).toFixed(0)}B` : `₺${nf.format(n)}`;
 
 export default async function PanoTvPage() {
-  const { tenantId } = await requireModulePage("reports", "/app/pano-tv");
+  const { tenantId, userId, role, perms } = await requireModulePage("reports", "/app/pano-tv");
   const supabase = await createClient();
-  const since = daysAgoIso(30);
+  const nowMs = now();
 
-  const [{ data: wonDeals }, { data: openDeals }, { data: recentProps }, { data: profiles }, score] =
-    await Promise.all([
-      supabase.from("deals").select("deal_value, assigned_to, updated_at").eq("stage", "won").gte("updated_at", since),
-      supabase.from("deals").select("deal_value").not("stage", "in", "(won,lost)"),
-      supabase
-        .from("properties")
-        .select("property_code, title, list_price, created_at, status")
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(6),
-      supabase.from("profiles").select("id, full_name").eq("is_active", true),
-      getOfficeScoreCached(tenantId).catch(() => null),
-    ]);
+  // Sayılar TEK KAYNAK (loadAdvisorMetrics): Danışman KPI / Lig / Kıyas / Kazanç ile aynı tanım, içinde bulunulan TR ayı.
+  // Gelir (komisyon payı) ve Ofis komisyonu (brüt) yalnız earnings_all ile gelir; yetkisiz hesapta sunucudan hiç
+  // çekilmez ve pano satış adedine göre sıralar.
+  const [metrics, { data: openDeals }, { data: recentProps }, score] = await Promise.all([
+    loadAdvisorMetrics(supabase, {
+      viewer: { userId, role, perms },
+      tenantId,
+      period: currentMonthPeriod(nowMs),
+      nowMs,
+    }),
+    supabase.from("deals").select("deal_value").not("stage", "in", "(won,lost)"),
+    supabase
+      .from("properties")
+      .select("property_code, title, list_price, created_at, status")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(6),
+    getOfficeScoreCached(tenantId).catch(() => null),
+  ]);
 
-  const won = (wonDeals ?? []) as { deal_value: number | null; assigned_to: string | null }[];
   const open = (openDeals ?? []) as { deal_value: number | null }[];
-  const nameOf = new Map(((profiles ?? []) as { id: string; full_name: string }[]).map((p) => [p.id, p.full_name]));
-
-  const ciro = won.reduce((s, d) => s + Number(d.deal_value ?? 0), 0);
-  const wonCount = won.length;
+  const seeRevenue = metrics.seeAllEarnings;
+  const grossCollected = metrics.office.commissionGrossCollected ?? 0;
+  const wonCount = metrics.totals.dealCount;
   const pipelineValue = open.reduce((s, d) => s + Number(d.deal_value ?? 0), 0);
   const pipelineCount = open.length;
 
-  // Lig — son 30 günde kapatılan anlaşma cirosuna göre danışman sıralaması
-  const byAdvisor = new Map<string, { name: string; value: number; count: number }>();
-  for (const d of won) {
-    const id = d.assigned_to ?? "—";
-    const cur = byAdvisor.get(id) ?? { name: nameOf.get(id) ?? "Atanmamış", value: 0, count: 0 };
-    cur.value += Number(d.deal_value ?? 0);
-    cur.count += 1;
-    byAdvisor.set(id, cur);
-  }
-  const lig = [...byAdvisor.values()].sort((a, b) => b.value - a.value).slice(0, 5);
+  // Lig: gelir görünüyorsa tahsil edilen komisyon payına, aksi halde satış (kabul edilen teklif) adedine göre
+  const lig = metrics.rows
+    .map((m) => ({ id: m.id, name: m.fullName, value: seeRevenue ? (m.revenue ?? 0) : m.dealCount, count: m.dealCount }))
+    .filter((r) => r.value > 0)
+    .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name, "tr"))
+    .slice(0, 5);
   const maxLig = lig[0]?.value || 1;
 
   const props = (recentProps ?? []) as { property_code: string; title: string; list_price: number | null; status: string }[];
 
   const stats = [
-    { icon: TrendingUp, label: "Ciro · son 30 gün", value: compact(ciro), sub: `${wonCount} kapanan anlaşma`, tone: "text-mint-300" },
+    seeRevenue
+      ? { icon: TrendingUp, label: "Ofis komisyonu (brüt) · bu ay", value: compact(grossCollected), sub: `${wonCount} kabul edilen teklif`, tone: "text-mint-300" }
+      : { icon: TrendingUp, label: "Satış · bu ay", value: String(wonCount), sub: "kabul edilen teklif", tone: "text-mint-300" },
     { icon: Layers, label: "Açık pipeline", value: compact(pipelineValue), sub: `${pipelineCount} fırsat`, tone: "text-cyan-300" },
     { icon: Gauge, label: "Ofis skoru", value: score ? String(score.score) : "—", sub: score?.label ?? "hesaplanıyor", tone: "text-brand-300" },
     { icon: Building2, label: "Yeni portföy akışı", value: String(props.length), sub: "son eklenenler", tone: "text-amber-300" },
@@ -94,14 +97,14 @@ export default async function PanoTvPage() {
           {/* Lig */}
           <section className="rounded-[var(--radius-panel)] border border-white/10 bg-white/[0.05] p-6">
             <h2 className="flex items-center gap-2 text-sm font-bold text-white/80">
-              <Trophy className="h-5 w-5 text-amber-300" /> Danışman Ligi · son 30 gün
+              <Trophy className="h-5 w-5 text-amber-300" /> Danışman Ligi · bu ay · {seeRevenue ? "komisyon payı" : "satış adedi"}
             </h2>
             {lig.length === 0 ? (
-              <p className="mt-6 text-center text-sm text-white/50">Bu dönemde kapanan anlaşma yok.</p>
+              <p className="mt-6 text-center text-sm text-white/50">Bu ay henüz kayıt yok.</p>
             ) : (
               <ol className="mt-5 space-y-3">
                 {lig.map((a, i) => (
-                  <li key={a.name} className="flex items-center gap-3">
+                  <li key={a.id} className="flex items-center gap-3">
                     <span
                       className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] font-display text-lg font-extrabold ${
                         i === 0 ? "bg-amber-400 text-ink-950" : i === 1 ? "bg-white/25" : i === 2 ? "bg-amber-700/50" : "bg-white/10"
@@ -116,8 +119,8 @@ export default async function PanoTvPage() {
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="font-display text-lg font-extrabold tabular-nums text-mint-300">{compact(a.value)}</p>
-                      <p className="text-xs text-white/50">{a.count} anlaşma</p>
+                      <p className="font-display text-lg font-extrabold tabular-nums text-mint-300">{seeRevenue ? compact(a.value) : a.value}</p>
+                      <p className="text-xs text-white/50">{a.count} satış</p>
                     </div>
                   </li>
                 ))}

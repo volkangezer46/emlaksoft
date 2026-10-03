@@ -20,7 +20,7 @@ const LEGACY_HREFS = [
   "/app/portfoyler", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar", "/app/portallar",
   "/app/acik-ev", "/app/kiralama", "/app/ag", "/app/projeler", "/app/degerleme", "/app/hesaplayici",
   "/app/yatirim", "/app/yabanci-satis",
-  "/app/komisyon", "/app/cuzdan", "/app/giderler", "/app/aidat", "/app/kira-artis", "/app/abonelik",
+  "/app/komisyon", "/app/cuzdan", "/app/performansim", "/app/giderler", "/app/aidat", "/app/kira-artis", "/app/abonelik",
   "/app/raporlar", "/app/danisman-kpi", "/app/lig", "/app/pano-tv", "/app/hedefler",
   "/app/bolge-analizi", "/app/kayip-kacak", "/app/kayip-satis",
   "/app/ekip", "/app/otomasyonlar", "/app/kampanyalar", "/app/uyum", "/app/onaylar",
@@ -121,7 +121,8 @@ describe("sekmeli menü öğeleri", () => {
     const sections = visibleSections(ALL_MODULES);
     expect(resolveActiveNav("/app/cuzdan", sections).href).toBe("/app/komisyon");
     expect(resolveActiveNav("/app/onaylar", sections).href).toBe("/app/komisyon");
-    expect(resolveActiveNav("/app/lig", sections).href).toBe("/app/danisman-kpi");
+    expect(resolveActiveNav("/app/lig", sections).href).toBe("/app/ekip");
+    expect(resolveActiveNav("/app/danisman-kpi", sections).href).toBe("/app/ekip");
     expect(resolveActiveNav("/app/kira-artis", sections).href).toBe("/app/kiralama");
     expect(resolveActiveNav("/app/hesaplayici", sections).href).toBe("/app/hesaplayici");
   });

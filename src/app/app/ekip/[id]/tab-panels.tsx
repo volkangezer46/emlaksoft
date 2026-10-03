@@ -9,18 +9,18 @@ import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import { getStageLabels } from "@/lib/definitions";
 import { buildCoachActions } from "@/lib/advisor-coach";
 import { CoachPanel, type CoachActionWithLink } from "@/app/app/danisman-kpi/coach-panel";
-import { computeTargetActuals, targetPeriodRange } from "@/lib/team/target-actuals";
+import { targetPeriodRange } from "@/lib/team/target-actuals";
+import { loadTargetActualsLive, type MetricsViewer } from "@/lib/team/advisor-metrics";
 import { conversionPct, targetProgressPct } from "@/lib/team/scorecard";
 import { summarizeAdvisorEarning, type ShareRow } from "@/lib/team/advisor-share";
 import {
   buildTimeline,
   compareMonths,
-  monthRanges,
   openPipeline,
   type Delta,
   type TimelineEvent,
 } from "@/lib/team/advisor-360";
-import { loadLeadData, loadMonthKpis } from "./advisor-data";
+import { loadLeadData, type MemberMonth } from "./advisor-data";
 import { MemberHandoff } from "./member-handoff";
 import type { HandoffScope } from "@/lib/team/handoff";
 
@@ -36,6 +36,11 @@ export type Ctx = {
   isSelf: boolean;
   /** Kazanç görünürse yıl başından komisyon satırları (aksi halde boş: veri hiç çekilmez). */
   commissions: CommissionRow[];
+  /** İzleyici (hedef gerçekleşmesi aynı tek kaynaktan hesaplanır). */
+  viewer: MetricsViewer;
+  tenantId: string | null;
+  /** Bu ay / önceki ay metrikleri (loadAdvisorMetrics; sayfa bir kez yükler). */
+  month: MemberMonth;
 };
 
 function money(n: number) {
@@ -71,27 +76,15 @@ function deltaHint(prev: number, d: Delta, fmt: (n: number) => string = String):
   return `önceki ay ${fmt(prev)} · ${d.diff === 0 ? "aynı" : `${sign}${fmt(Math.abs(d.diff))}${pct}`}`;
 }
 
-function monthEarnings(rows: CommissionRow[], fullName: string, id: string, startIso: string, endIso: string) {
-  const s = Date.parse(startIso);
-  const e = Date.parse(endIso);
-  const inMonth = rows.filter((r) => {
-    const t = Date.parse(r.created_at);
-    return t >= s && t < e;
-  });
-  return summarizeAdvisorEarning(inMonth, fullName, id);
-}
-
 /* -------------------------------------------------------------------------- */
 /* Özet                                                                        */
 /* -------------------------------------------------------------------------- */
 
 export async function OverviewTab({ ctx, canHandoff, editableScopes }: { ctx: Ctx; canHandoff: boolean; editableScopes: HandoffScope[] }) {
-  const { supabase, id, fullName, showEarnings, commissions } = ctx;
-  const ranges = monthRanges(now());
+  const { supabase, id, fullName, showEarnings } = ctx;
+  const kpis = ctx.month.kpis;
 
-  const [kpis, customerCountRes, customersRes, propertyCountRes, propertiesRes, advisorRes] = await Promise.all([
-    loadMonthKpis(supabase, id, ranges),
-    supabase.from("customers").select("id", { count: "exact", head: true }).eq("assigned_to", id).is("deleted_at", null),
+  const [customersRes, propertyCountRes, propertiesRes, advisorRes] = await Promise.all([
     supabase.from("customers").select("id, full_name, phone").eq("assigned_to", id).is("deleted_at", null).order("created_at", { ascending: false }).limit(8),
     supabase.from("properties").select("id", { count: "exact", head: true }).eq("assigned_to", id).is("deleted_at", null),
     supabase.from("properties").select("id, property_code, title, list_price").eq("assigned_to", id).is("deleted_at", null).order("created_at", { ascending: false }).limit(8),
@@ -100,7 +93,7 @@ export async function OverviewTab({ ctx, canHandoff, editableScopes }: { ctx: Ct
       : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
   ]);
 
-  const customerCount = customerCountRes.count ?? 0;
+  const customerCount = ctx.month.customerTotal;
   const propertyCount = propertyCountRes.count ?? 0;
   const customers = (customersRes.data ?? []) as { id: string; full_name: string; phone: string | null }[];
   const properties = (propertiesRes.data ?? []) as { id: string; property_code: string | null; title: string | null; list_price: number | null }[];
@@ -122,9 +115,9 @@ export async function OverviewTab({ ctx, canHandoff, editableScopes }: { ctx: Ct
     },
   ];
   if (showEarnings) {
-    const cur = monthEarnings(commissions, fullName, id, ranges.thisStartIso, ranges.nextStartIso).collected;
-    const prev = monthEarnings(commissions, fullName, id, ranges.prevStartIso, ranges.thisStartIso).collected;
-    items.push({ label: "Tahsil edilen pay (bu ay)", value: money(cur), href: ctx.isSelf ? "/app/cuzdan" : "/app/ekip/kazanc", hint: deltaHint(prev, compareMonths(cur, prev), money) });
+    const cur = ctx.month.revenue.cur ?? 0;
+    const prev = ctx.month.revenue.prev ?? 0;
+    items.push({ label: "Tahsil edilen pay (bu ay)", value: money(cur), href: ctx.isSelf ? "/app/cuzdan" : "/app/cuzdan?sekme=ofis", hint: deltaHint(prev, compareMonths(cur, prev), money) });
   }
   items.push(
     { label: "Müşteri (toplam)", value: customerCount, href: `/app/musteriler?assigned=${id}`, icon: <Users /> },
@@ -423,28 +416,14 @@ export async function TargetTab({ ctx }: { ctx: Ctx }) {
       />
     );
   }
-  const ranges = targets.map((t) => targetPeriodRange(t.period_start, t.period));
-  const minStart = new Date(Math.min(...ranges.map((r) => r.start))).toISOString();
-  const maxEnd = new Date(Math.max(...ranges.map((r) => r.end))).toISOString();
-  const [offerRes, commissionRes] = await Promise.all([
-    supabase.from("offers").select("created_by, created_at").eq("status", "accepted").eq("created_by", id).gte("created_at", minStart).lt("created_at", maxEnd).limit(2000),
-    showEarnings
-      ? supabase
-          .from("commissions")
-          .select("gross_amount, created_at, deal:deals!commissions_deal_id_fkey!inner(assigned_to)")
-          .eq("deal.assigned_to", id)
-          .in("status", ["paid", "collected"])
-          .gte("created_at", minStart)
-          .lt("created_at", maxEnd)
-          .limit(2000)
-      : Promise.resolve({ data: [] as unknown[] }),
-  ]);
-  const comm = ((commissionRes.data ?? []) as unknown as { gross_amount: number | string; created_at: string; deal: { assigned_to: string | null } | { assigned_to: string | null }[] | null }[]).map((c) => ({
-    gross_amount: c.gross_amount,
-    created_at: c.created_at,
-    assigned_to: (Array.isArray(c.deal) ? c.deal[0] : c.deal)?.assigned_to ?? null,
-  }));
-  const actuals = computeTargetActuals(targets, (offerRes.data ?? []) as { created_by: string | null; created_at: string }[], comm);
+  // Gerçekleşme: TEK KAYNAK (advisor-metrics): anlaşma = kabul edilen teklif, gelir = tahsil edilen komisyon payı.
+  const actualsLive = await loadTargetActualsLive(supabase, {
+    viewer: ctx.viewer,
+    tenantId: ctx.tenantId,
+    targets,
+    names: new Map([[id, ctx.fullName]]),
+  });
+  const actuals = new Map([...actualsLive].map(([k, v]) => [k, { deals: v.deals, revenue: v.revenue }]));
 
   return (
     <div className="space-y-4">
@@ -467,7 +446,7 @@ export async function TargetTab({ ctx }: { ctx: Ctx }) {
               </div>
               {showEarnings ? (
                 <div>
-                  <dt>Ciro (tahsil edilen brüt komisyon)</dt>
+                  <dt>Gelir (tahsil edilen komisyon payı)</dt>
                   <dd className="text-sm font-semibold text-ink-950">{money(a.revenue)} / {money(Number(t.target_revenue) || 0)}</dd>
                 </div>
               ) : null}
@@ -498,7 +477,7 @@ export function EarningsTab({ ctx, year }: { ctx: Ctx; year: string }) {
     });
     return { label, e: summarizeAdvisorEarning(sel, fullName, id) };
   }).filter((r) => r.e.count > 0);
-  const link = isSelf ? "/app/cuzdan" : "/app/ekip/kazanc";
+  const link = isSelf ? "/app/cuzdan" : "/app/cuzdan?sekme=ofis";
   return (
     <div className="space-y-6">
       <StatRow
@@ -534,12 +513,10 @@ export function EarningsTab({ ctx, year }: { ctx: Ctx; year: string }) {
 
 export async function CoachTab({ ctx }: { ctx: Ctx }) {
   const { supabase, id, fullName } = ctx;
-  const ranges = monthRanges(now());
+  const kpis = ctx.month.kpis;
   const todayIso = new Date(now()).toISOString();
-  const [kpis, lead, customerCountRes, overpriced, expiring] = await Promise.all([
-    loadMonthKpis(supabase, id, ranges),
+  const [lead, overpriced, expiring] = await Promise.all([
     loadLeadData(supabase, id),
-    supabase.from("customers").select("id", { count: "exact", head: true }).eq("assigned_to", id).is("deleted_at", null),
     supabase.from("properties").select("id", { count: "exact", head: true }).eq("assigned_to", id).is("deleted_at", null).eq("price_health", "red"),
     supabase
       .from("properties")
@@ -550,12 +527,12 @@ export async function CoachTab({ ctx }: { ctx: Ctx }) {
       .lte("authorization_end", trDayKey(now() + 15 * 86_400_000)),
   ]);
   const actions: CoachActionWithLink[] = buildCoachActions({
-    customerCount: customerCountRes.count ?? 0,
+    customerCount: ctx.month.customerTotal,
     callCount: kpis.callsCur,
     appointmentCount: kpis.appointments.cur,
     offerCount: kpis.offers.cur,
     dealCount: kpis.deals.cur,
-    revenue: 0,
+    revenue: ctx.month.revenue.cur ?? 0,
     staleCustomerCount: lead.staleCustomers,
     hotCustomerCount: 0,
     overpricedCount: overpriced.count ?? 0,

@@ -163,12 +163,14 @@ describe("hedef gerçekleşmesi (canlı)", () => {
       { created_by: "u2", created_at: "2026-03-11T10:00:00Z" },
       { created_by: "u1", created_at: "2026-04-02T10:00:00Z" },
     ];
+    // Gelir = danışmanın KOMİSYON PAYI (tahsil edilmiş); ofis geneli hedef = Ofis komisyonu (brüt).
     const commissions = [
-      { gross_amount: 1000, created_at: "2026-03-12T10:00:00Z", assigned_to: "u1" },
-      { gross_amount: "500", created_at: "2026-03-13T10:00:00Z", assigned_to: "u2" },
+      { gross_amount: 1000, status: "paid", splits: [{ label: "Danışman", rate: 40 }], created_at: "2026-03-12T10:00:00Z", deal: { assigned_to: "u1" } },
+      { gross_amount: "500", status: "collected", splits: [{ label: "Danışman", rate: 50 }], created_at: "2026-03-13T10:00:00Z", deal: { assigned_to: "u2" } },
+      { gross_amount: 9000, status: "calculated", splits: [{ label: "Danışman", rate: 50 }], created_at: "2026-03-14T10:00:00Z", deal: { assigned_to: "u1" } },
     ];
-    const out = computeTargetActuals(targets, offers, commissions);
-    expect(out.get("t1")).toEqual({ deals: 1, revenue: 1000 });
+    const out = computeTargetActuals(targets, offers, commissions, new Map([["u1", "Ayşe Yılmaz"], ["u2", "Can Demir"]]));
+    expect(out.get("t1")).toEqual({ deals: 1, revenue: 400 });
     expect(out.get("t2")).toEqual({ deals: 2, revenue: 1500 });
   });
 });
@@ -181,31 +183,50 @@ describe("Ekip Merkezi menü ve kapılar", () => {
     "compliance", "support",
   ];
 
-  it("ekip menü öğesi beş sekme taşır ve Hedefler artık orada", () => {
+  it("ekip menü öğesi performans sekmelerini tek kabukta toplar; Performans başlığında tekrar yok", () => {
     const ofis = visibleSections(ALL).find((s) => s.id === "ofis")!;
     const item = ofis.items.find((i) => i.href === "/app/ekip")!;
-    expect(item.tabs?.map((t) => t.label)).toEqual(["Genel", "Kıyas", "Kazanç", "Hedefler", "Devir / Atama"]);
+    expect(item.tabs?.map((t) => t.label)).toEqual(["Genel", "Kıyas", "Danışman KPI", "Ekip Ligi", "Hedefler", "Devir / Atama"]);
     const perf = visibleSections(ALL).find((s) => s.id === "performans")!;
     expect(perf.items.some((i) => i.href === "/app/hedefler")).toBe(false);
+    expect(perf.items.some((i) => i.href === "/app/danisman-kpi" || i.href === "/app/lig")).toBe(false);
+    expect(ALL_NAV_HREFS).toContain("/app/danisman-kpi");
+    expect(ALL_NAV_HREFS).toContain("/app/lig");
     expect(ALL_NAV_HREFS).toContain("/app/hedefler");
   });
 
   it("sekme sayfaları Ekip Merkezi öğesini etkin yapar", () => {
     const sections = visibleSections(ALL);
-    for (const p of ["/app/ekip/kiyas", "/app/ekip/kazanc", "/app/ekip/devir", "/app/hedefler"]) {
+    for (const p of ["/app/ekip/kiyas", "/app/danisman-kpi", "/app/lig", "/app/ekip/devir", "/app/hedefler"]) {
       expect(resolveActiveNav(p, sections).href, p).toBe("/app/ekip");
     }
   });
 
-  it("yetkisiz sekme gizlenir: danışman yalnız Kıyas ve Kazanç görür, giriş Kıyas olur", () => {
-    const item = visibleSections(["reports", "commissions"]).flatMap((s) => s.items).find((i) => i.label === "Ekip Merkezi")!;
-    expect(item.tabs?.map((t) => t.label)).toEqual(["Kıyas", "Kazanç"]);
-    expect(item.href).toBe("/app/ekip/kiyas");
+  it("ekip modülü olmayan rolde (danışman) Ekip Merkezi çıkmaz, yerine Performansım vardır", () => {
+    const items = visibleSections(["dashboard", "reports", "commissions"]).flatMap((s) => s.items);
+    expect(items.some((i) => i.label === "Ekip Merkezi")).toBe(false);
+    expect(items.some((i) => i.href === "/app/performansim" && i.label === "Performansım")).toBe(true);
+  });
+
+  it("yetkisiz sekme gizlenir: ekip modülü olan ama hedef izni olmayan rolde Hedefler çıkmaz", () => {
+    const item = visibleSections(["dashboard", "team", "reports"]).flatMap((s) => s.items).find((i) => i.label === "Ekip Merkezi")!;
+    expect(item.tabs?.map((t) => t.label)).toEqual(["Genel", "Kıyas", "Danışman KPI", "Ekip Ligi", "Devir / Atama"]);
+  });
+
+  it("Kazanç tek sayfa: Finans > Komisyon sekmesi, Ekip Merkezi'nde ayrı Kazanç sekmesi yok", () => {
+    const fin = visibleSections(ALL).find((s) => s.id === "finans")!;
+    const kom = fin.items.find((i) => i.href === "/app/komisyon")!;
+    expect(kom.tabs?.map((t) => t.label)).toContain("Kazanç");
+    const ekip = visibleSections(ALL).flatMap((s) => s.items).find((i) => i.href === "/app/ekip")!;
+    expect(ekip.tabs?.some((t) => t.label === "Kazanç" || t.href === "/app/ekip/kazanc")).toBe(false);
   });
 
   it("Kıyas profesyonel pakette, diğer ekip sekmeleri ofis paketinde", () => {
     expect(findGate("/app/ekip/kiyas")?.minPlan).toBe("professional");
-    expect(findGate("/app/ekip/kazanc")?.minPlan).toBe("office");
     expect(findGate("/app/ekip/devir")?.minPlan).toBe("office");
+    // Kazanç tek sayfa (/app/cuzdan) ve eski yolu kilitsiz: Danışman paketinde de kendi kazancı açık.
+    expect(findGate("/app/ekip/kazanc")).toBeNull();
+    expect(findGate("/app/cuzdan")).toBeNull();
+    expect(findGate("/app/performansim")).toBeNull();
   });
 });
