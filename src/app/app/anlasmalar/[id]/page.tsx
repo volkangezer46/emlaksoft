@@ -8,6 +8,7 @@ import {
   Building2,
   CalendarClock,
   FileText,
+  Flag,
   Gauge,
   LayoutDashboard,
   StickyNote,
@@ -38,6 +39,7 @@ import {
   NotesLoader,
   NotesSkeleton,
 } from "./sections";
+import { KapanisPanel } from "./kapanis-panel";
 /*
  * Anket üretme + link kopyalama client bileşenleri memnuniyet raporunda zaten
  * var; YENİDEN YAZILMADI, aynen import edildi (o dosyaya dokunulmadı). Aksi
@@ -86,7 +88,7 @@ function rel<T>(value: T | T[] | null | undefined): T | null {
  * eşleştiriliyor. Bu bir yaklaşım, kesin bağ değil; sayfada da öyle
  * etiketleniyor ("aynı portföy + müşteri").
  */
-const DEAL_TAB_IDS = ["ozet", "finans", "belgeler", "gorevler", "notlar"] as const;
+const DEAL_TAB_IDS = ["ozet", "finans", "belgeler", "gorevler", "notlar", "kapanis"] as const;
 
 export default async function DealDetailPage({
   params,
@@ -325,6 +327,7 @@ export default async function DealDetailPage({
     { id: "belgeler", label: "Belgeler & teklifler", icon: FileText },
     { id: "gorevler", label: "Görevler", icon: ListChecks, count: (tasks ?? []).length },
     { id: "notlar", label: "Notlar", icon: StickyNote },
+    { id: "kapanis", label: "Kapanış", icon: Flag },
   ];
 
   return (
@@ -410,6 +413,31 @@ export default async function DealDetailPage({
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-4">
           <DetailTabs basePath={`/app/anlasmalar/${deal.id}`} tabs={tabDefs} active={tab} label="Anlaşma sekmeleri" />
+
+          {tab === "kapanis" ? (
+            <KapanisPanel
+              dealId={deal.id}
+              stage={deal.stage}
+              dealType={deal.deal_type}
+              dealValue={dealValue}
+              propertyId={deal.property_id}
+              propertyTitle={property?.title ?? property?.property_code ?? null}
+              customerId={deal.customer_id}
+              customerName={customer?.full_name ?? null}
+              lossOptions={lossOptions.map((o) => ({ value: o.value, label: o.label }))}
+              lossReasonText={deal.loss_reason ? formatLossReason(deal.loss_reason, lossReasonLabels(lossOptions)) : null}
+              canEdit={(perms.commissions ?? []).includes("edit")}
+              canCreate={(perms.commissions ?? []).includes("create")}
+              canCreateTask={(perms.tasks ?? []).includes("create")}
+              canSurvey={canCreateSurvey}
+              showMoney={canSeeCommission}
+              survey={
+                surveyRow && surveyUrl
+                  ? { url: surveyUrl, answered: surveyAnswered, score: surveyRow.score }
+                  : null
+              }
+            />
+          ) : null}
 
           {tab === "ozet" ? (
             <div className="space-y-4">
