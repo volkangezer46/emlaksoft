@@ -194,9 +194,9 @@ describe("premium konsol paleti", () => {
     for (const bg of NAVY) {
       expect(contrast("#ffffff", bg), `beyaz/${bg}`).toBeGreaterThanOrEqual(4.5);
       expect(contrast(hex(premiumCss, "--gold-300"), bg), `altın/${bg}`).toBeGreaterThanOrEqual(4.5);
-      // Cam kutu: %7 beyaz katman; soluk yazı (%78 beyaz) bu zeminde
-      const glass = mix("#ffffff", bg, 0.07);
-      expect(contrast(mix("#ffffff", glass, 0.78), glass), `soluk beyaz/${glass}`).toBeGreaterThanOrEqual(4.5);
+      // Cam kutu: en açık uçta %11 beyaz katman; soluk yazı (%80 beyaz) bu zeminde
+      const glass = mix("#ffffff", bg, 0.11);
+      expect(contrast(mix("#ffffff", glass, 0.8), glass), `soluk beyaz/${glass}`).toBeGreaterThanOrEqual(4.5);
       expect(contrast(hex(premiumCss, "--gold-300"), glass), `altın/${glass}`).toBeGreaterThanOrEqual(4.5);
     }
   });
@@ -232,4 +232,35 @@ describe("premium konsol paleti", () => {
     expect(contrast(hex(light, "--pm-gold-text"), mix("#d4a24c", lightSurface, 0.18))).toBeGreaterThanOrEqual(4.5);
     expect(contrast(hex(dark, "--pm-gold-text"), mix("#f0c36a", darkSurface, 0.18))).toBeGreaterThanOrEqual(4.5);
   });
+
+  it("ana ekran grafikleri: seri renkleri UI/grafik çizgisi eşiğini (≥3:1) iki temada geçer", () => {
+    const light = block(premiumCss, ":root");
+    const dark = block(premiumCss, 'html[data-theme="dark"]');
+    const lightSurface = hex(LIGHT, "--surface");
+    const darkSurface = hex(DARK, "--surface-raised");
+    for (const t of ["--pm-chart-success", "--pm-chart-warn", "--pm-chart-danger"]) {
+      expect(contrast(hex(light, t), lightSurface), `açık ${t}`).toBeGreaterThanOrEqual(3);
+      expect(contrast(hex(dark, t), darkSurface), `koyu ${t}`).toBeGreaterThanOrEqual(3);
+    }
+    // Altın dolgu/halka (grafik işareti) iki temada
+    expect(contrast(hex(premiumCss, "--gold-500"), lightSurface)).toBeGreaterThanOrEqual(2.1); // dekoratif dolgu; değer metni ayrıca AA (--pm-gold-text)
+    expect(contrast(hex(premiumCss, "--gold-300"), darkSurface)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("ana ekran kart dili: radius 16, hover hareketsiz, gölge iki katmanlı", () => {
+    expect(premiumCss).toContain("--pm-r: 16px");
+    const bx = block(premiumCss, ".pm-bx");
+    expect(bx).toContain("border: 1px solid");
+    expect(bx).toContain("var(--pm-shadow)");
+    const hover = block(premiumCss, ".pm-bx:hover");
+    expect(hover).not.toContain("transform");
+    expect(block(premiumCss, ".pm-card:hover")).not.toContain("transform");
+  });
+
+  for (const a of ACCENTS) {
+    it(`${a.label}: vurgu metni ana ekran yumuşak vurgu zemininde (%10) AA`, () => {
+      for (const s of LIGHT_SURFACES) expect(contrast(a.text, mix(a.fill, s, 0.1)), `açık/${s}`).toBeGreaterThanOrEqual(4.5);
+      for (const s of DARK_SURFACES) expect(contrast(a.textDark, mix(a.fillDark, s, 0.1)), `koyu/${s}`).toBeGreaterThanOrEqual(4.5);
+    });
+  }
 });

@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
-import { ChevronRight, Lock, Menu, Search, Sparkles, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Lock, Menu, Search, Sparkles, X } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar `src/lib/icons.ts` sözlüğünden gelir.
 import { ICONS } from "@/lib/icons";
 import { findActiveNavigationHref } from "@/lib/navigation";
 import { resolveActiveNav, visibleSections, type NavItem, type VisibleSection } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
+import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
 
 export function AppSidebar({
@@ -38,6 +39,14 @@ export function AppSidebar({
   const sections = useMemo(() => visibleSections(accessibleModules), [accessibleModules]);
   const { section: activeSection, href: activeHref } = resolveActiveNav(pathname, sections);
 
+  // Akordeon: aktif başlık otomatik açık; kullanıcı açıp kapatabilir. Aktif başlık
+  // değişince (gezinme) elle yapılan tercihler sıfırlanır.
+  const activeId = activeSection?.id ?? null;
+  const [accordion, setAccordion] = useState<{ forId: string | null; map: Record<string, boolean> }>({ forId: activeId, map: {} });
+  if (accordion.forId !== activeId) setAccordion({ forId: activeId, map: {} });
+  const isOpen = (id: string) => accordion.map[id] ?? id === activeId;
+  const toggleSection = (id: string) => setAccordion((a) => ({ ...a, map: { ...a.map, [id]: !isOpen(id) } }));
+
   // Menü araması: yalnız izinli sayfalar (sections zaten izinle süzülü) üzerinde, Türkçe-duyarlı.
   const needle = query.trim().toLocaleLowerCase("tr-TR");
   const matches = needle
@@ -57,7 +66,7 @@ export function AppSidebar({
         }`}
       >
         <item.icon className={`h-3.5 w-3.5 shrink-0 ${active ? "text-[var(--gold-300)]" : "text-white/60"}`} />
-        <span className="flex-1 truncate">{item.label}</span>
+        <span className="sb-label flex-1 truncate">{item.label}</span>
         {lockedHrefs.some((h) => item.href === h || item.href.startsWith(`${h}/`)) ? (
           <Lock className="h-3 w-3 shrink-0 text-amber-400/80" aria-label="Paketinize dahil değil" />
         ) : null}
@@ -67,26 +76,43 @@ export function AppSidebar({
 
   const renderSection = (section: VisibleSection) => {
     const active = section.id === activeSection?.id;
+    const expandable = section.items.length > 1;
+    const expanded = expandable && isOpen(section.id);
     return (
       <div key={section.id}>
-        <Link
-          href={section.href}
-          aria-current={active ? "true" : undefined}
-          aria-expanded={active}
-          onClick={() => setOpen(false)}
-          className={`group relative flex items-center gap-3 overflow-hidden rounded-[var(--radius-control)] px-3 py-2.5 text-sm transition ${
-            active ? "nav-gold-active font-semibold" : "text-white/80 hover:bg-white/6 hover:text-white"
-          }`}
-        >
-          {active ? <span className="nav-gold-bar absolute inset-y-2 left-0 w-0.5 rounded-full" /> : null}
-          <span className={`grid h-8 w-8 place-items-center rounded-[var(--radius-control)] transition ${active ? "bg-[var(--gold-300)]/20 text-[var(--gold-300)]" : "bg-white/5 text-white/65 group-hover:bg-white/10 group-hover:text-white"}`}>
-            <section.icon className="h-4 w-4" />
-          </span>
-          <span className="flex-1">{section.title}</span>
-          <ChevronRight className={`h-3.5 w-3.5 transition ${active ? "rotate-90 text-[var(--gold-300)]" : "text-white/30 group-hover:translate-x-0.5"}`} />
-        </Link>
-        {active && section.items.length > 1 ? (
-          <div className="ml-6 mt-1 space-y-0.5 border-l border-white/10 pl-2">{section.items.map(renderChild)}</div>
+        <div className="relative flex items-center">
+          <Link
+            href={section.href}
+            aria-current={active ? "true" : undefined}
+            title={section.title}
+            onClick={() => setOpen(false)}
+            className={`sb-row group relative flex min-h-10 min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-[var(--radius-control)] px-3 py-2 text-sm transition-colors ${
+              active ? "nav-gold-active font-semibold" : "text-white/80 hover:bg-white/6 hover:text-white"
+            } ${expandable ? "pr-9" : ""}`}
+          >
+            {active ? <span className="nav-gold-bar absolute inset-y-2 left-0 w-0.5 rounded-full" /> : null}
+            <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] transition-colors ${active ? "bg-[var(--gold-300)]/20 text-[var(--gold-300)]" : "bg-white/5 text-white/65 group-hover:bg-white/10 group-hover:text-white"}`}>
+              <section.icon className="h-4 w-4" aria-hidden />
+            </span>
+            <span className="sb-label min-w-0 flex-1 truncate">{section.title}</span>
+          </Link>
+          {expandable ? (
+            <button
+              type="button"
+              onClick={() => toggleSection(section.id)}
+              aria-expanded={expanded}
+              aria-controls={`sb-${section.id}`}
+              aria-label={`${section.title} alt sayfalarını ${expanded ? "daralt" : "aç"}`}
+              className="sb-label focus-ring absolute right-1 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded ? "" : "-rotate-90"}`} aria-hidden />
+            </button>
+          ) : null}
+        </div>
+        {expanded ? (
+          <div id={`sb-${section.id}`} className="sb-label ml-6 mt-1 space-y-0.5 border-l border-white/10 pl-2">
+            {section.items.map(renderChild)}
+          </div>
         ) : null}
       </div>
     );
@@ -94,16 +120,17 @@ export function AppSidebar({
 
   const content = (
     <>
-      <div className="flex h-17 items-center gap-3 border-b border-white/8 px-5">
-        <span className="grid h-10 w-10 place-items-center rounded-[var(--radius-card)] bg-[image:var(--grad-brand)] font-display text-base font-extrabold text-white shadow-[0_12px_28px_-12px_rgba(34,211,238,.75)]">E</span>
-        <div>
-          <p className="font-display text-base font-extrabold text-white">EmlakSoft</p>
+      <div className="sb-head flex h-14 items-center gap-3 border-b border-white/8 px-4">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-card)] bg-[image:var(--grad-brand)] font-display text-base font-extrabold text-white shadow-[0_12px_28px_-12px_rgba(34,211,238,.75)]">E</span>
+        <div className="sb-label min-w-0 flex-1">
+          <p className="font-display text-base font-extrabold leading-5 text-white">EmlakSoft</p>
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-cyan-400">Command OS</p>
         </div>
+        <SidebarCollapseButton />
       </div>
 
-      <div className="px-3 pt-4">
-        <label className="nav-search">
+      <div className="sb-pad px-3 pt-4">
+        <label className="nav-search sb-label">
           <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
           <input
             type="search"
@@ -116,7 +143,7 @@ export function AppSidebar({
         </label>
       </div>
 
-      <nav aria-label="Uygulama ana menüsü" className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+      <nav aria-label="Uygulama ana menüsü" className="sb-pad flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {matches ? (
           matches.length > 0 ? (
             <>
@@ -131,11 +158,19 @@ export function AppSidebar({
         )}
       </nav>
 
-      <div className="p-3">
-        <div className="relative overflow-hidden rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-4">
+      <div className="sb-pad p-3">
+        <div
+          className="sb-when-collapsed mx-auto h-10 w-10 place-items-center rounded-[var(--radius-control)] border border-white/10 bg-white/8 font-display text-sm font-extrabold text-[var(--gold-300)]"
+          title={`${officeName} · ${plan}`}
+          role="img"
+          aria-label={`${officeName}, ${plan} paketi`}
+        >
+          {officeName.trim().charAt(0).toLocaleUpperCase("tr-TR") || "E"}
+        </div>
+        <div className="sb-label relative overflow-hidden rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-4">
           <div className="pointer-events-none absolute -right-7 -top-8 h-24 w-24 rounded-full bg-brand-600/25 blur-2xl" />
           <div className="relative flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-amber-400" />
+            <Sparkles className="h-4 w-4 text-amber-400" aria-hidden />
             <span className="text-xs font-bold uppercase tracking-[0.08em] text-amber-400">{trial ? "Deneme alanı" : "Aktif ofis"}</span>
           </div>
           <p className="relative mt-2 truncate text-sm font-bold text-white">{officeName}</p>
@@ -149,7 +184,7 @@ export function AppSidebar({
             <Link
               href="/app/abonelik"
               onClick={() => setOpen(false)}
-              className="relative mt-3 flex items-center justify-between rounded-[var(--radius-control)] bg-white/8 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/14"
+              className="relative mt-3 flex items-center justify-between rounded-[var(--radius-control)] bg-white/8 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/14"
             >
               {trial ? "Paketini seç" : "Paket ve kullanım"}
               <ChevronRight className="h-3.5 w-3.5 text-mint-400" aria-hidden />
@@ -181,7 +216,7 @@ export function AppSidebar({
           <Menu className="h-5 w-5" />
         </button>
       </DialogTrigger>
-      <aside className="hidden w-[260px] shrink-0 flex-col bg-[linear-gradient(180deg,#071a38_0%,#041127_100%)] lg:flex">
+      <aside className="shell-aside sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden bg-[linear-gradient(180deg,#071a38_0%,#041127_100%)] lg:flex">
         {content}
       </aside>
       <DialogDrawerContent id="app-mobile-navigation" aria-describedby={undefined} responsiveClassName="lg:hidden">

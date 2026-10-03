@@ -3,14 +3,14 @@ import { cn } from "@/lib/utils";
 import { CityNight } from "./city-night";
 
 /**
- * HeroBanner — lacivert gradient karşılama bandı (premium konsol). Her iki temada
+ * HeroBanner — lacivert, çok katmanlı karşılama bandı (premium konsol). Her iki temada
  * lacivert kalır; içindeki metin sabit açık/altın (kontrast testlidir). Sağda elle
- * çizilmiş saf-SVG gece şehri; hareket azaltma tercihinde animasyonsuz.
+ * çizilmiş saf-SVG gece şehri (CityNight); hareket azaltma tercihinde animasyonsuz.
  *
- * Slotlar: `eyebrow` (küçük üst etiket, ör. "3 EKİM CUMARTESİ · GENEL BAKIŞ"),
- * `title` + `highlight` (başlık; `highlight` altın renkte, ör. kullanıcı adı),
- * `summary` (tek cümle özet; ReactNode — Suspense ile akabilir), `actions` (sağ üst:
- * PeriodToggle, düğmeler), `children` (alttaki KPI ızgarası; GlassKpi'ler).
+ * Yerleşim: sol sütunda eyebrow, başlık, özet ve `actions` satırı (görselle çakışmaz;
+ * görsel yalnız sağ üst/orta alanı kaplar); altta `children` (GlassKpi ızgarası).
+ * Slotlar: `eyebrow`, `title` + `highlight` (altın vurgu), `summary` (ReactNode —
+ * Suspense ile akabilir), `actions`, `children`.
  */
 export function HeroBanner({
   eyebrow,
@@ -32,22 +32,20 @@ export function HeroBanner({
   return (
     <section className={cn("pm-hero", className)} aria-labelledby="pm-hero-title">
       <CityNight className="pm-hero-art" />
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
-        <div className="min-w-0 max-w-full flex-1 basis-80">
-          <p className="pm-hero-eyebrow">{eyebrow}</p>
-          <h1 id="pm-hero-title" className="pm-hero-title">
-            {title}
-            {highlight ? (
-              <>
-                , <em>{highlight}</em>
-              </>
-            ) : null}
-          </h1>
-          {summary ? <div className="pm-hero-summary">{summary}</div> : null}
-        </div>
-        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+      <div className="pm-hero-body">
+        <p className="pm-hero-eyebrow">{eyebrow}</p>
+        <h1 id="pm-hero-title" className="pm-hero-title">
+          {title}
+          {highlight ? (
+            <>
+              , <em>{highlight}</em>
+            </>
+          ) : null}
+        </h1>
+        {summary ? <div className="pm-hero-summary">{summary}</div> : null}
+        {actions ? <div className="pm-hero-actions">{actions}</div> : null}
       </div>
-      {children ? <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{children}</div> : null}
+      {children ? <div className="pm-hero-kpis">{children}</div> : null}
     </section>
   );
 }

@@ -1,15 +1,40 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { useMemo } from "react";
+import { Banknote, CalendarRange, Check, Handshake } from "lucide-react";
 import { createRental } from "@/app/actions/rentals";
 import { searchCustomers, searchProperties } from "@/app/actions/lookup";
 import { useCreateForm } from "@/components/app/use-create-form";
 import { Combobox } from "@/components/ui/combobox";
 import { FormField, FormInput, FormTextarea } from "@/components/ui/form-controls";
-import { FormSection, FormShell } from "@/components/ui/form-page";
+import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
+import { parseLooseNumber } from "@/lib/form-tabs";
+import { RENTAL_DRAFT_FIELDS, RENTAL_FORM_ID, RENTAL_TABS } from "./rental-tabs";
 
 type Property = { id: string; property_code: string; title: string | null };
 type Customer = { id: string; full_name: string | null; phone: string | null };
+
+const TAB_ICONS = {
+  taraflar: Handshake,
+  bedel: Banknote,
+  sure: CalendarRange,
+} as const;
+
+const FIELD_LABELS = {
+  property_id: "Portföy",
+  renter_customer_id: "Kiracı",
+  monthly_rent: "Aylık kira",
+  due_day: "Vade günü",
+  start_date: "Başlangıç tarihi",
+};
+
+const formatTry = (n: number) => `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(n)} ₺`;
+
+/** "YYYY-MM-DD" -> "GG.AA.YYYY" (yalnız biçim). */
+function dayLabel(value: string | undefined): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((value ?? "").trim());
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : null;
+}
 
 /**
  * "Yeni kira kaydı" tam sayfa formu — portföy + kiracı müşteri Combobox'la seçilir
@@ -24,6 +49,7 @@ export function RentalForm({
   defaultCustomerId = null,
   defaultMonthlyRent = null,
   defaultStartDate,
+  userId,
 }: {
   properties: Property[];
   customers: Customer[];
@@ -35,25 +61,29 @@ export function RentalForm({
   defaultMonthlyRent?: number | null;
   /** Sunucudan gelen bugün (YYYY-MM-DD). */
   defaultStartDate: string;
+  userId: string;
 }) {
   const { onSubmit, pending, error } = useCreateForm((fd) => createRental({}, fd), {
     successMessage: "Kira kaydı oluşturuldu",
     redirectTo: () => "/app/kiralama",
   });
 
-  return (
-    <FormShell
-      title="Yeni kira kaydı"
-      description="Portföyü kiracısıyla eşleştirin — aylık tahakkuklar vade gününe göre otomatik oluşturulur."
-      breadcrumbs={[{ label: "Kiralama", href: "/app/kiralama" }, { label: "Yeni kira kaydı" }]}
-      cancelHref="/app/kiralama"
-      submitLabel="Kaydet"
-      submitIcon={Check}
-      pending={pending}
-      error={error}
-      onSubmit={onSubmit}
-    >
-      <FormSection title="Taraflar" description="Kiralanan portföy ve kiracı müşteri.">
+  const tabs: FormTab[] = useMemo(
+    () =>
+      RENTAL_TABS.map((t) => ({
+        id: t.id,
+        label: t.label,
+        description: t.description,
+        icon: TAB_ICONS[t.id],
+        fields: [...t.fields],
+        required: [...t.required],
+      })),
+    [],
+  );
+
+  const tabPanels = {
+    taraflar: (
+      <>
         <FormField label="Portföy" htmlFor="rental-property" required className="sm:col-span-2">
           <Combobox
             name="property_id"
@@ -96,9 +126,10 @@ export function RentalForm({
             }))}
           />
         </FormField>
-      </FormSection>
-
-      <FormSection title="Bedel ve vade" description="Aylık kira, ödeme günü ve depozito.">
+      </>
+    ),
+    bedel: (
+      <>
         <FormField label="Aylık kira (₺)" htmlFor="rental-monthly-rent" required>
           <FormInput name="monthly_rent" type="number" min="1" step="0.01" required defaultValue={defaultMonthlyRent ?? undefined} placeholder="ör. 25.000" />
         </FormField>
@@ -108,9 +139,10 @@ export function RentalForm({
         <FormField label="Depozito (₺)" htmlFor="rental-deposit">
           <FormInput name="deposit" type="number" min="0" step="0.01" placeholder="Opsiyonel" />
         </FormField>
-      </FormSection>
-
-      <FormSection title="Süre ve notlar" description="Sözleşme dönemi ve özel koşullar.">
+      </>
+    ),
+    sure: (
+      <>
         <FormField label="Başlangıç tarihi" htmlFor="rental-start-date" required>
           <FormInput name="start_date" type="date" required defaultValue={defaultStartDate} />
         </FormField>
@@ -120,7 +152,61 @@ export function RentalForm({
         <FormField label="Notlar" htmlFor="rental-notes" className="sm:col-span-2">
           <FormTextarea name="notes" rows={3} placeholder="Sözleşme koşulları, özel notlar…" />
         </FormField>
-      </FormSection>
-    </FormShell>
+      </>
+    ),
+  };
+
+  function renderSummary({ values }: TabbedSummaryContext) {
+    const propertyId = (values.property_id ?? "").trim();
+    const renterId = (values.renter_customer_id ?? "").trim();
+    const property = properties.find((p) => p.id === propertyId);
+    const propertyText = propertyId ? (property ? (property.title ?? property.property_code) : "Seçildi") : null;
+    // Telefon özette gösterilmez: yalnız ad.
+    const renterText = renterId ? (customers.find((c) => c.id === renterId)?.full_name ?? "Seçildi") : null;
+    const rent = parseLooseNumber(values.monthly_rent);
+    const deposit = parseLooseNumber(values.deposit);
+    const dueDay = (values.due_day ?? "").trim();
+    const start = dayLabel(values.start_date);
+    const end = dayLabel(values.end_date);
+    return (
+      <>
+        <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
+          <p className="truncate text-sm font-semibold text-ink-950">{propertyText ?? "Portföy seçilmedi"}</p>
+          <p className="mt-0.5 truncate text-xs text-text-muted">{renterText ? `Kiracı: ${renterText}` : "Kiracı seçilmedi"}</p>
+          <p className="numeric mt-1.5 text-sm font-semibold text-ink-950">
+            {rent != null && rent > 0 ? `${formatTry(rent)} / ay` : "Aylık kira girilmedi"}
+          </p>
+        </div>
+        <SummaryGroup title="Kira bilgisi">
+          <SummaryRow label="Portföy" value={propertyText ?? "Zorunlu"} muted={!propertyText} tab="taraflar" field="property_id" />
+          <SummaryRow label="Kiracı" value={renterText ?? "Zorunlu"} muted={!renterText} tab="taraflar" field="renter_customer_id" />
+          <SummaryRow label="Aylık kira" value={rent != null && rent > 0 ? formatTry(rent) : "Zorunlu"} muted={!(rent != null && rent > 0)} tab="bedel" field="monthly_rent" />
+          <SummaryRow label="Yıllık bedel" value={rent != null && rent > 0 ? formatTry(rent * 12) : "Hesaplanamadı"} muted={!(rent != null && rent > 0)} tab="bedel" field="monthly_rent" />
+          <SummaryRow label="Vade günü" value={dueDay ? `Ayın ${dueDay}. günü` : "Zorunlu"} muted={!dueDay} tab="bedel" field="due_day" />
+          <SummaryRow label="Depozito" value={deposit != null && deposit > 0 ? formatTry(deposit) : "Yok"} muted={!(deposit != null && deposit > 0)} tab="bedel" field="deposit" />
+          <SummaryRow label="Başlangıç" value={start ?? "Zorunlu"} muted={!start} tab="sure" field="start_date" />
+          <SummaryRow label="Bitiş" value={end ?? "Süresiz"} muted={!end} tab="sure" field="end_date" />
+        </SummaryGroup>
+      </>
+    );
+  }
+
+  return (
+    <TabbedFormShell
+      title="Yeni kira kaydı"
+      description="Portföyü kiracısıyla eşleştirin — aylık tahakkuklar vade gününe göre otomatik oluşturulur."
+      breadcrumbs={[{ label: "Kiralama", href: "/app/kiralama" }, { label: "Yeni kira kaydı" }]}
+      cancelHref="/app/kiralama"
+      submitLabel="Kaydet"
+      submitIcon={Check}
+      pending={pending}
+      error={error}
+      onSubmit={onSubmit}
+      tabs={tabs}
+      tabPanels={tabPanels}
+      summary={renderSummary}
+      fieldLabels={FIELD_LABELS}
+      draft={{ userId, formId: RENTAL_FORM_ID, fields: [...RENTAL_DRAFT_FIELDS] }}
+    />
   );
 }

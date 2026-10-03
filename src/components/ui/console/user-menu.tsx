@@ -1,0 +1,71 @@
+"use client";
+
+import Link from "next/link";
+import { ChevronDown, LogOut } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { signOut } from "@/app/actions/auth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+export type UserMenuLink = { href: string; label: string; icon: LucideIcon };
+
+/** Üst çubuk kullanıcı menüsü: ad + alt satır, bağlantılar ve çıkış. Klavye/odak Radix'ten. */
+export function UserMenu({
+  initials,
+  name,
+  subtitle,
+  links = [],
+}: {
+  initials: string;
+  name: string;
+  subtitle: string;
+  links?: UserMenuLink[];
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label={`Kullanıcı menüsü: ${name}`}
+        className="focus-ring flex h-10 items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface p-1 transition-colors hover:border-brand-300 sm:pr-2"
+      >
+        <span className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] text-xs font-bold text-white" aria-hidden>
+          {initials}
+        </span>
+        <span className="hidden min-w-0 text-left xl:block">
+          <span className="block max-w-28 truncate text-xs font-semibold text-text">{name}</span>
+          <span className="block max-w-28 truncate text-xs text-text-muted">{subtitle}</span>
+        </span>
+        <ChevronDown className="hidden h-3.5 w-3.5 text-text-faint sm:block" aria-hidden />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-60">
+        <DropdownMenuLabel>
+          <span className="block truncate text-sm font-semibold text-text">{name}</span>
+          <span className="block truncate text-xs font-normal text-text-muted">{subtitle}</span>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {links.map((l) => (
+          <DropdownMenuItem key={l.href} asChild>
+            <Link href={l.href}>
+              <l.icon aria-hidden />
+              {l.label}
+            </Link>
+          </DropdownMenuItem>
+        ))}
+        {links.length > 0 ? <DropdownMenuSeparator /> : null}
+        <form action={signOut}>
+          <DropdownMenuItem asChild danger>
+            <button type="submit" className="w-full">
+              <LogOut aria-hidden />
+              Çıkış yap
+            </button>
+          </DropdownMenuItem>
+        </form>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
