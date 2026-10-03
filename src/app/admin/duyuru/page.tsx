@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, History, Megaphone } from "lucide-react";
+import { Bell, History, Megaphone, Send } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { BroadcastForm } from "./broadcast-form";
@@ -28,8 +28,9 @@ function tenantNameOf(v: AnnouncementRow["tenant"]) {
   return (Array.isArray(v) ? v[0]?.name : v.name) ?? null;
 }
 
-export default async function BroadcastPage() {
+export default async function BroadcastPage({ searchParams }: { searchParams: Promise<{ yeni?: string }> }) {
   await requirePlatformModule("broadcast");
+  const { yeni } = await searchParams;
   const admin = createAdminClient();
 
   /*
@@ -67,6 +68,16 @@ export default async function BroadcastPage() {
 
   const rows = (history ?? []) as unknown as AnnouncementRow[];
 
+  // Yeni duyuru: tam sayfa sekmeli form (hedef sayıları yukarıda hazır).
+  if (yeni === "1") {
+    return (
+      <BroadcastForm
+        audienceCounts={{ all: allCount ?? 0, active: activeCount ?? 0, trial: trialCount ?? 0 }}
+        tenantOptions={tenantOptions}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Başlık */}
@@ -87,11 +98,18 @@ export default async function BroadcastPage() {
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
-        {/* Form — hedef kitle sayıları sunucuda hesaplandı */}
-        <BroadcastForm
-          audienceCounts={{ all: allCount ?? 0, active: activeCount ?? 0, trial: trialCount ?? 0 }}
-          tenantOptions={tenantOptions}
-        />
+        <section className="dashboard-panel flex flex-col items-start gap-3 rounded-[var(--radius-panel)] border border-line bg-surface p-6">
+          <h2 className="font-display font-bold text-ink-950">Duyuru oluştur</h2>
+          <p className="text-sm text-text-muted">
+            Hedef kitle: {allCount ?? 0} ofis (aktif {activeCount ?? 0}, deneme {trialCount ?? 0}). İçerik, tür ve hedefi sekmeli formda canlı özetle birlikte hazırlayın.
+          </p>
+          <Link
+            href="/admin/duyuru?yeni=1"
+            className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-ink-950 px-5 py-3 text-sm font-bold text-white"
+          >
+            <Send className="h-4 w-4" /> Yeni duyuru
+          </Link>
+        </section>
 
         {/* Bilgi paneli */}
         <aside className="space-y-4">

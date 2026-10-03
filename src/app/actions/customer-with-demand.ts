@@ -1,6 +1,10 @@
 "use server";
 
 import { requirePermission } from "@/lib/require-permission";
+import { createClient } from "@/lib/supabase/server";
+import { now } from "@/lib/clock";
+import { parsePhone } from "@/lib/phone";
+import { normalizeEmail } from "@/lib/email";
 import {
   demandValuesFromFormData,
   hasDemandContent,
@@ -19,6 +23,36 @@ export type CustomerWithDemandResult = {
   /** Müşteri kaydedildi ama talep kaydedilemedi: kullanıcıya net uyarı + devam bağlantısı. */
   demandError?: string;
 };
+
+/** Çift gönderim koruma penceresi. */
+export const DUPLICATE_SUBMIT_WINDOW_MS = 30_000;
+
+async function findRecentDuplicateCustomer(formData: FormData): Promise<string | null> {
+  const gate = await requirePermission("customers", "create");
+  if (!gate.ok) return null; // asıl hata createCustomer'da döner
+  const phoneRaw = String(formData.get("phone") ?? "").trim();
+  const parsedPhone = phoneRaw ? parsePhone(phoneRaw) : null;
+  const phone = parsedPhone && parsedPhone.ok ? parsedPhone.stored : "";
+  const email = normalizeEmail(String(formData.get("email") ?? ""));
+  const fullName = String(formData.get("full_name") ?? "").trim();
+  if (!fullName) return null;
+
+  const supabase = await createClient();
+  let q = supabase
+    .from("customers")
+    .select("id")
+    .eq("tenant_id", gate.tenantId)
+    .eq("created_by", gate.userId)
+    .is("deleted_at", null)
+    .gte("created_at", new Date(now() - DUPLICATE_SUBMIT_WINDOW_MS).toISOString())
+    .limit(1);
+  // Kimlik: telefon varsa telefon, yoksa e-posta, ikisi de yoksa ad (tam eşleşme).
+  if (phone) q = q.eq("phone", phone);
+  else if (email) q = q.eq("email", email);
+  else q = q.eq("full_name", fullName);
+  const { data } = await q;
+  return data?.[0]?.id ?? null;
+}
 
 /**
  * Yeni müşteri + (varsa) talep — kullanıcı için tek işlem.
@@ -43,6 +77,11 @@ export async function createCustomerWithDemand(
     const parsed = parseDemandValues(values);
     if (!parsed.ok) return { error: parsed.error };
   }
+
+  // B13: çift gönderim (çift tık / yeniden deneme) — aynı kullanıcının kısa pencerede aynı kimlikle
+  // oluşturduğu müşteri varsa yenisi açılmaz, mevcut kayıt döndürülür (idempotent).
+  const recent = await findRecentDuplicateCustomer(formData);
+  if (recent) return { ok: true, id: recent };
 
   const customer = await createCustomer({}, formData);
   if (!customer.ok || !customer.id) return { error: customer.error ?? "Müşteri eklenemedi." };

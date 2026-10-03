@@ -8,7 +8,6 @@ import {
   TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { now as nowMs } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";

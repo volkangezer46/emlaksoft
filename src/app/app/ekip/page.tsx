@@ -8,6 +8,7 @@ import {
   IdCard,
   PalmtreeIcon,
   ShieldCheck,
+  UserPlus,
   UserRound,
   Users,
 } from "lucide-react";
@@ -16,7 +17,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireModulePage } from "@/lib/require-module-page";
 import { setMemberActive, setMemberRole } from "@/app/actions/team";
 import { resendInvite } from "./invite-actions";
-import { AddBranchPanel, AddBranchTrigger, AddMemberPanel, AddMemberTrigger } from "./team-panels";
+import { AddBranchPanel, AddBranchTrigger } from "./team-panels";
 import { BranchCard } from "./branch-card";
 import { formatTurkishPhone } from "@/lib/phone";
 import { relativeTimeTR } from "@/lib/admin-format";
@@ -193,10 +194,13 @@ export default async function TeamPage() {
                 </Link>
                 <Link href="/app/ekip/izinler" className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-text transition hover:bg-surface-2"><CalendarRange className="h-4 w-4" /> İzin takvimi</Link>
                 <Link href="/app/ekip/kartvizitim" className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-text transition hover:bg-surface-2"><IdCard className="h-4 w-4" /> Kartvizitim</Link>
-                {canManage ? <AddMemberTrigger /> : null}
+                {canManage ? (
+                  <Link href="/app/ekip/yeni" className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-accent px-4 py-2 text-sm font-semibold text-accent-fg transition hover:opacity-90">
+                    <UserPlus className="h-4 w-4" /> Danışman ekle
+                  </Link>
+                ) : null}
               </div>
 } />
-{canManage ? <AddMemberPanel branches={branches.map((b) => ({ id: b.id, name: b.name }))} /> : null}
 <KpiGrid count={kpis.length}>
         {kpis.map((k) => (
           <KpiTile key={k.label} label={k.label} value={k.value} icon={k.icon} href={k.href} tone="brand" dim={k.value === 0} />

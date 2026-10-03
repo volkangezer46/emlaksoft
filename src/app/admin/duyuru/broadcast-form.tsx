@@ -1,10 +1,15 @@
 "use client";
 
-import { useTransition, useState, useRef } from "react";
-import { CheckCircle2, ChevronDown, Loader2, Send, Users } from "lucide-react";
+import { startTransition, useMemo, useState } from "react";
+import type { FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { TAB_ICONS as TI } from "@/lib/icons";
 import { sendBroadcast, searchTenantsBroadcast, type BroadcastTarget } from "@/app/actions/platform-notifications";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
+import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
 import { KIND_OPTIONS } from "./broadcast-options";
+import { BROADCAST_TABS } from "./broadcast-tabs";
 
 const TARGET_OPTIONS: { value: BroadcastTarget; label: string; hint: string }[] = [
   { value: "all", label: "Tüm ofisler", hint: "İptal edilmemiş her ofise gönderir" },
@@ -13,14 +18,14 @@ const TARGET_OPTIONS: { value: BroadcastTarget; label: string; hint: string }[] 
   { value: "specific", label: "Belirli ofis", hint: "Ada göre arayıp tekil hedef seçin" },
 ];
 
-const field =
-  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400";
+const TAB_ICONS = { icerik: TI.icerik, hedef: TI.kanal } as const;
+const FIELD_LABELS = { title: "Başlık", tenant_id: "Ofis" };
 
 export type AudienceCounts = { all: number; active: number; trial: number };
 
 /**
- * Duyuru formu. Hedef kitle sayıları sunucu sayfasında ÖNCEDEN hesaplanıp
- * props ile gelir — audience değişince ek istek atılmaz, sayı anında görünür.
+ * Duyuru formu (sekmeli kabuk). Hedef kitle sayıları sunucu sayfasında ÖNCEDEN hesaplanıp
+ * props ile gelir — hedef değişince ek istek atılmaz, sayı özet panelinde anında görünür.
  */
 export function BroadcastForm({
   audienceCounts,
@@ -29,176 +34,151 @@ export function BroadcastForm({
   audienceCounts: AudienceCounts;
   tenantOptions: ComboboxOption[];
 }) {
-  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [target, setTarget] = useState<BroadcastTarget>("all");
-  const [kind, setKind] = useState("info");
-  const [result, setResult] = useState<{ ok?: boolean; error?: string; sent?: number } | null>(null);
-  const formRef = useRef<HTMLFormElement>(null);
+  const [tenantId, setTenantId] = useState("");
 
-  function submit(e: React.FormEvent<HTMLFormElement>) {
+  const tabs: FormTab[] = useMemo(
+    () =>
+      BROADCAST_TABS.map((t) => ({
+        id: t.id,
+        label: t.label,
+        description: t.description,
+        icon: TAB_ICONS[t.id],
+        fields: [...t.fields],
+        required: [...t.required],
+      })),
+    [],
+  );
+
+  function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    setResult(null);
+    setError(null);
+    setPending(true);
     startTransition(async () => {
       const res = await sendBroadcast(fd);
-      setResult(res);
-      if (res.ok) formRef.current?.reset();
+      setPending(false);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      router.push("/admin/duyuru");
+      router.refresh();
     });
   }
 
-  const selectedTarget = TARGET_OPTIONS.find((t) => t.value === target);
-  const audienceCount =
-    target === "all" ? audienceCounts.all : target === "active" ? audienceCounts.active : target === "trial" ? audienceCounts.trial : null;
-
-  return (
-    <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-6">
-      <div className="flex items-center gap-2 border-b border-line pb-4">
-        <Send className="h-4 w-4 text-brand-600" />
-        <h2 className="font-display font-bold text-ink-950">Duyuru oluştur</h2>
-      </div>
-
-      <form ref={formRef} onSubmit={submit} className="mt-5 grid gap-4">
-        {/* Başlık */}
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="bc-title">
-            Başlık <span className="text-danger-500">*</span>
-          </label>
-          <input
-            id="bc-title"
-            name="title"
-            required
-            maxLength={120}
-            className={field}
-            placeholder="Örn: Yeni özellik yayında — portallar güncellendi"
-          />
-        </div>
-
-        {/* Mesaj */}
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="bc-body">
-            Mesaj (opsiyonel)
-          </label>
-          <textarea
-            id="bc-body"
-            name="body"
-            rows={3}
-            className={`${field} resize-none`}
-            placeholder="Detay, link veya açıklama ekleyebilirsiniz…"
-          />
-        </div>
-
-        {/* Bağlantı */}
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="bc-href">
-            Bağlantı (opsiyonel)
-          </label>
-          <input
-            id="bc-href"
-            name="href"
-            className={field}
-            placeholder="https:// veya /app/... ile başlayan URL"
-          />
-        </div>
-
-        {/* Tür */}
-        <div>
-          <p className="mb-2 text-sm font-medium text-ink-950">Bildirim türü</p>
+  const tabPanels = {
+    icerik: (
+      <>
+        <FormField label="Başlık" htmlFor="title" required className="sm:col-span-2">
+          <FormInput name="title" required maxLength={120} placeholder="Örn: Yeni özellik yayında — portallar güncellendi" />
+        </FormField>
+        <FormField label="Mesaj (isteğe bağlı)" htmlFor="body" className="sm:col-span-2">
+          <FormTextarea name="body" rows={5} placeholder="Detay, link veya açıklama ekleyebilirsiniz…" />
+        </FormField>
+        <FormField label="Bağlantı (isteğe bağlı)" htmlFor="href" hint="https:// veya /app/... ile başlayan adres" className="sm:col-span-2">
+          <FormInput name="href" placeholder="/app/ayarlar" />
+        </FormField>
+      </>
+    ),
+    hedef: (
+      <>
+        <fieldset className="sm:col-span-2">
+          <legend className="mb-2 text-sm font-medium text-ink-950">Bildirim türü</legend>
           <div className="flex flex-wrap gap-2">
             {KIND_OPTIONS.map((k) => (
               <label key={k.value} className="cursor-pointer">
-                <input
-                  type="radio"
-                  name="kind"
-                  value={k.value}
-                  checked={kind === k.value}
-                  onChange={() => setKind(k.value)}
-                  className="sr-only"
-                />
-                <span
-                  className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ring-2 transition ${
-                    kind === k.value
-                      ? `${k.cls} ring-current`
-                      : "bg-canvas text-text-muted ring-transparent hover:ring-line"
-                  }`}
-                >
+                <input type="radio" name="kind" value={k.value} defaultChecked={k.value === "info"} className="peer sr-only" />
+                <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ring-2 ring-transparent transition peer-checked:ring-current peer-focus-visible:ring-brand-500 ${k.cls}`}>
                   {k.label}
                 </span>
               </label>
             ))}
           </div>
-        </div>
-
-        {/* Hedef */}
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="bc-target">
-            Hedef kitle
-          </label>
-          <div className="relative">
-            <select
-              id="bc-target"
-              name="target"
-              value={target}
-              onChange={(e) => setTarget(e.target.value as BroadcastTarget)}
-              className={`${field} appearance-none pr-9`}
-            >
-              {TARGET_OPTIONS.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label} — {t.hint}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-          </div>
-          {/* Gönderim ÖNCESİ kaç ofise ulaşacağı — sayı sunucudan geldi */}
-          {audienceCount !== null ? (
-            <p className="mt-2 flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600/[0.06] px-3 py-2 text-xs font-semibold text-brand-700">
-              <Users className="h-3.5 w-3.5" />
-              {selectedTarget?.label}: {audienceCount} ofis
-            </p>
-          ) : null}
-        </div>
-
-        {/* Belirli ofis — UUID yerine aranabilir seçim */}
+        </fieldset>
+        <FormField label="Hedef kitle" htmlFor="target" className="sm:col-span-2">
+          <FormSelect name="target" value={target} onChange={(e) => setTarget(e.target.value as BroadcastTarget)}>
+            {TARGET_OPTIONS.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label} — {t.hint}
+              </option>
+            ))}
+          </FormSelect>
+        </FormField>
         {target === "specific" ? (
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="bc-tenant">
-              Ofis <span className="text-danger-500">*</span>
-            </label>
+          <FormField label="Ofis" htmlFor="bc-tenant" required inject={false} className="sm:col-span-2">
             <Combobox
               id="bc-tenant"
               name="tenant_id"
               required
               clearable={false}
               options={tenantOptions}
+              onValueChange={setTenantId}
               onSearch={searchTenantsBroadcast}
               placeholder="Ofis ara ve seçin"
               searchPlaceholder="Ofis adı yazın…"
               emptyText="Eşleşen ofis yok"
             />
-          </div>
+          </FormField>
         ) : null}
+      </>
+    ),
+  };
 
-        {/* Hata / sonuç */}
-        {result?.error ? (
-          <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm text-danger-500" role="alert">
-            {result.error}
-          </p>
-        ) : null}
-        {result?.ok ? (
-          <p className="flex items-center gap-2 rounded-[var(--radius-control)] bg-mint-500/10 px-3 py-2 text-sm font-semibold text-mint-600" role="status">
-            <CheckCircle2 className="h-4 w-4" /> {result.sent} ofise duyuru iletildi.
-          </p>
-        ) : null}
+  function renderSummary({ values }: TabbedSummaryContext) {
+    const title = (values.title ?? "").trim();
+    const body = (values.body ?? "").trim();
+    const href = (values.href ?? "").trim();
+    const kind = KIND_OPTIONS.find((k) => k.value === (values.kind ?? "info")) ?? KIND_OPTIONS[0];
+    const tgt = TARGET_OPTIONS.find((t) => t.value === target);
+    const count = target === "specific" ? (tenantId ? 1 : null) : audienceCounts[target];
+    const tenantLabel = tenantOptions.find((o) => o.value === tenantId)?.label ?? (tenantId ? "Seçildi" : null);
+    return (
+      <>
+        <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
+          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${kind.cls}`}>{kind.label}</span>
+          <p className="mt-2 text-sm font-semibold text-ink-950">{title || "Başlık girilmedi"}</p>
+          {body ? <p className="mt-1 line-clamp-4 whitespace-pre-line text-xs text-text-muted">{body}</p> : null}
+          {href ? <p className="mt-1 truncate text-xs font-medium text-brand-600">{href}</p> : null}
+        </div>
+        <SummaryGroup title="Gönderim özeti">
+          <SummaryRow label="Başlık" value={title || "Zorunlu"} muted={!title} tab="icerik" field="title" />
+          <SummaryRow label="Tür" value={kind.label} tab="hedef" field="kind" />
+          <SummaryRow label="Hedef" value={tgt?.label ?? "—"} tab="hedef" field="target" />
+          {target === "specific" ? (
+            <SummaryRow label="Ofis" value={tenantLabel ?? "Seçilmedi"} muted={!tenantLabel} tab="hedef" field="tenant_id" />
+          ) : null}
+          <SummaryRow
+            label="Ulaşacağı ofis"
+            value={count === null ? "—" : `${count} ofis`}
+            muted={count === null}
+            tab="hedef"
+            field="target"
+          />
+        </SummaryGroup>
+      </>
+    );
+  }
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="btn-shine mt-1 inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-ink-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
-        >
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          {pending ? "Gönderiliyor…" : "Duyuruyu gönder"}
-        </button>
-      </form>
-    </section>
+  return (
+    <TabbedFormShell
+      title="Yeni duyuru"
+      description="Seçilen ofislerin bildirim kutusuna anlık mesaj iletir. Gönderim geri alınamaz."
+      eyebrow="Toplu duyuru"
+      breadcrumbs={[{ label: "Duyurular", href: "/admin/duyuru" }, { label: "Yeni duyuru" }]}
+      cancelHref="/admin/duyuru"
+      submitLabel="Duyuruyu gönder"
+      pendingLabel="Gönderiliyor…"
+      pending={pending}
+      error={error}
+      onSubmit={onSubmit}
+      tabs={tabs}
+      tabPanels={tabPanels}
+      summary={renderSummary}
+      fieldLabels={FIELD_LABELS}
+    />
   );
 }
