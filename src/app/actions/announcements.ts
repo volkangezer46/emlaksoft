@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { parseTrLocalDateTime } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { requireActiveTenant } from "@/lib/tenant-guard";
@@ -29,8 +30,8 @@ function parseAnnouncementForm(fd: FormData):
 
   let ends_at: string | null = null;
   if (endsAtRaw) {
-    const parsed = new Date(endsAtRaw);
-    if (Number.isNaN(parsed.getTime())) return { ok: false, error: "Bitiş tarihi geçersiz." };
+    const parsed = parseTrLocalDateTime(endsAtRaw);
+    if (!parsed) return { ok: false, error: "Bitiş tarihi geçersiz." };
     ends_at = parsed.toISOString();
   }
 

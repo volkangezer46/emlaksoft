@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { parseTrLocalDateTime } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { normalizeTurkishPhone, isValidTurkishMobile } from "@/lib/phone";
@@ -47,7 +48,7 @@ export async function createCommunication(
       body,
       outcome,
       duration_sec: durationSec,
-      scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+      scheduled_at: scheduledAt ? (parseTrLocalDateTime(scheduledAt)?.toISOString() ?? null) : null,
     })
     .select("id")
     .single();

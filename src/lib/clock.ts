@@ -68,6 +68,28 @@ export function isPast(value: DateInput | null | undefined): boolean {
 
 export const TR_OFFSET_MS = 3 * 3_600_000;
 
+/**
+ * `<input type="datetime-local">` değeri ("YYYY-MM-DDTHH:mm[:ss]") saat dilimi taşımaz. Sunucu (Vercel) UTC'de
+ * çalıştığı için `new Date(ham)` bunu UTC sayar ve Türkiye'de girilen 14:00 kayıtta 17:00 görünür.
+ * Bu yardımcı saat dilimsiz değeri Türkiye saati (+03:00) olarak yorumlar; saat dilimi taşıyan girdi (Z / ±hh:mm)
+ * aynen kullanılır. Geçersizse null.
+ */
+export function parseTrLocalDateTime(raw: string): Date | null {
+  const value = raw.trim();
+  if (!value) return null;
+  const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
+  const iso = hasZone ? value : /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(value) ? `${value}+03:00` : value;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Bir anı `datetime-local` değerine ("YYYY-MM-DDTHH:mm") Türkiye saatiyle çevirir (tarayıcı saat diliminden bağımsız). */
+export function toTrLocalInput(value: DateInput): string {
+  const t = ms(value);
+  if (!Number.isFinite(t)) return "";
+  return new Date(t + TR_OFFSET_MS).toISOString().slice(0, 16);
+}
+
 export type TrParts = {
   year: number;
   /** 0 tabanlı ay (Date ile aynı). */

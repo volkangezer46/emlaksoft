@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { parseTrLocalDateTime } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
@@ -134,7 +135,7 @@ export async function createTask(_prev: TaskResult, formData: FormData): Promise
       kind,
       priority,
       status: "open",
-      due_at: dueRaw ? new Date(dueRaw).toISOString() : null,
+      due_at: dueRaw ? (parseTrLocalDateTime(dueRaw)?.toISOString() ?? null) : null,
       assigned_to: assignedTo || gate.userId,
       customer_id: customerId || null,
       property_id: propertyId || null,
@@ -208,7 +209,7 @@ export async function updateTask(_prev: TaskResult, formData: FormData): Promise
       notes: notes || null,
       kind,
       priority,
-      due_at: dueRaw ? new Date(dueRaw).toISOString() : null,
+      due_at: dueRaw ? (parseTrLocalDateTime(dueRaw)?.toISOString() ?? null) : null,
       // Termin silinirse tekrar da düşer (terminsiz tekrar anlamsız).
       recurrence: dueRaw && recurrenceRaw ? recurrenceRaw : null,
       ...(assignedTo ? { assigned_to: assignedTo } : {}),

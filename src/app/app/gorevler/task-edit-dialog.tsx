@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { toTrLocalInput } from "@/lib/clock";
 import { Pencil } from "lucide-react";
 import { updateTask, type TaskResult } from "@/app/actions/tasks";
 import {
@@ -41,13 +42,9 @@ const RECURRENCES = [
   { value: "monthly", label: "Her ay" },
 ];
 
-// datetime-local için yerel saate göre biçimlendirme (UTC kaymasını önle)
+// datetime-local değeri Türkiye saatiyle (tarayıcı saat diliminden bağımsız; sunucu da aynı yorumla kaydeder).
 function toLocalInput(iso: string | null) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const off = d.getTimezoneOffset();
-  return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16);
+  return iso ? toTrLocalInput(iso) : "";
 }
 
 export function TaskEditDialog({

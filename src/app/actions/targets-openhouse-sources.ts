@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { parseTrLocalDateTime } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { validateTenantReferences } from "@/lib/tenant-references";
@@ -207,8 +208,8 @@ export async function createOpenHouse(
 
   if (!propertyId)  return { error: "Portföy seçimi zorunludur." };
   if (!scheduledAt) return { error: "Tarih/saat zorunludur." };
-  const scheduledDate = new Date(scheduledAt);
-  if (!Number.isFinite(scheduledDate.getTime())) return { error: "Geçerli bir tarih/saat girin." };
+  const scheduledDate = parseTrLocalDateTime(scheduledAt);
+  if (!scheduledDate) return { error: "Geçerli bir tarih/saat girin." };
   if (!Number.isInteger(durationMin) || durationMin < 15 || durationMin > 1_440) {
     return { error: "Süre 15-1440 dakika arasında olmalıdır." };
   }
