@@ -74,8 +74,7 @@ describe("navigation accessibility contract", () => {
       "src/components/site-footer.tsx",
     ]
       .map(source)
-      .join("
-");
+      .join("\n");
 
     expect(home.match(/"\/demo"/g)?.length).toBeGreaterThanOrEqual(3);
     expect(home.match(/Demo görüşmesi planla/gi)?.length).toBeGreaterThanOrEqual(3);
