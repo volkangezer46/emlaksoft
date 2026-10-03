@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { getAppActions, getAppGoItems, matchesQuery, mergeRecent, parseRecents } from "./palette-core";
+﻿import { describe, expect, it } from "vitest";
+import { APP_ACTIONS, getAppActions, getAppGoItems, matchesQuery, mergeRecent, parseRecents } from "./palette-core";
 
 describe("palette-core", () => {
   it("Türkçe duyarlı süzgeç", () => {
@@ -45,3 +45,30 @@ describe("palette-core", () => {
     expect(list.filter((r) => r.href === "/a/10")).toHaveLength(1);
   });
 });
+
+describe("palette-core: yeni eylemleri", () => {
+  it("her statik /yeni sayfası bir eylemdir; kısayollar benzersizdir", async () => {
+    const { readdirSync, statSync } = await import("node:fs");
+    const found: string[] = [];
+    const walk = (dir: string, url: string) => {
+      for (const name of readdirSync(dir)) {
+        const full = `${dir}/${name}`;
+        if (!statSync(full).isDirectory() || name.startsWith("[")) continue;
+        const next = `${url}/${name}`;
+        if (name === "yeni") found.push(next);
+        walk(full, next);
+      }
+    };
+    walk("src/app/app", "/app");
+    const hrefs = APP_ACTIONS.map((a) => a.href);
+    expect(found.filter((h) => !hrefs.includes(h))).toEqual([]);
+    const shortcuts = APP_ACTIONS.flatMap((a) => a.shortcut ?? []);
+    expect(new Set(shortcuts).size).toBe(shortcuts.length);
+  });
+
+  it("paket kilitli sayfalar Eylemler'den elenir", () => {
+    const all = ["customers", "properties"] as const;
+    expect(getAppActions(all, "", ["/app/portfoyler"]).map((a) => a.href)).toEqual(["/app/musteriler/yeni"]);
+  });
+});
+

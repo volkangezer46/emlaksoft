@@ -2,6 +2,7 @@
 
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { APP_ACTIONS } from "@/lib/palette-core";
 
 /**
  * Klavye kısayolları (X12).
@@ -54,6 +55,12 @@ const GIT: Kisayol[] = [
 
 const HARF_YOL = new Map(GIT.map((k) => [k.tuslar.split(" ")[1], k.hedef]));
 
+/** `n` önekinden sonraki harf → "Yeni ..." sayfası (palette-core APP_ACTIONS.shortcut ile birebir). */
+const YENI: Kisayol[] = APP_ACTIONS.flatMap((a) =>
+  a.shortcut ? [{ tuslar: a.shortcut, hedef: a.href, etiket: a.label }] : [],
+);
+const YENI_HARF_YOL = new Map(YENI.map((k) => [k.tuslar.split(" ")[1], k.hedef]));
+
 /** Yazma alanında mıyız? Kısayolların en sık şikâyet sebebi bu kontrol. */
 function yaziyorMu(t: EventTarget | null): boolean {
   const el = t as HTMLElement | null;
@@ -79,6 +86,7 @@ export function KeyboardShortcuts() {
     // `g` basıldıktan sonra ikinci tuşu bekleyen durum. Zaman aşımı var:
     // kullanıcı `g` basıp vazgeçerse sonraki harf kısayola dönüşmemeli.
     let bekleyen = false;
+    let onek: "g" | "n" = "g";
     let zamanlayici: ReturnType<typeof setTimeout> | null = null;
 
     function iptal() {
@@ -108,7 +116,7 @@ export function KeyboardShortcuts() {
       }
 
       if (bekleyen) {
-        const yol = HARF_YOL.get(k);
+        const yol = (onek === "n" ? YENI_HARF_YOL : HARF_YOL).get(k);
         iptal();
         if (yol) {
           e.preventDefault();
@@ -117,7 +125,8 @@ export function KeyboardShortcuts() {
         return;
       }
 
-      if (k === "g") {
+      if (k === "g" || k === "n") {
+        onek = k;
         bekleyen = true;
         // 1,2 sn: iki tuşu ayrı ayrı basan kullanıcı için rahat, kazara
         // birleşme için kısa.
@@ -142,6 +151,7 @@ export function KeyboardShortcuts() {
           { tuslar: "Ctrl K", etiket: "Komut paleti / arama" },
           { tuslar: "?", etiket: "Bu pencere" },
           ...GIT,
+          ...YENI,
         ]}
       />
     </Suspense>

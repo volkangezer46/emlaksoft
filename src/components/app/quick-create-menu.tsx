@@ -2,19 +2,15 @@
 
 import { lazy, Suspense, useState } from "react";
 import { Plus } from "lucide-react";
+import type { AppModule } from "@/lib/permissions";
 
 /**
  * Üst çubuk "Yeni" hızlı eylem menüsü — hafif kabuk. Radix DropdownMenu gövdesi
  * ilk etkileşime (tık, hover, odak) kadar yüklenmez; yüklenince menü açık gelir.
- * (Desen: command-search.tsx.) Yetki bayrakları sunucuda hesaplanıp prop gelir.
+ * (Desen: command-search.tsx.) "create" yetkili modüller sunucuda hesaplanıp prop gelir;
+ * eylem listesi komut paletiyle aynı kaynaktan (palette-core APP_ACTIONS) beslenir.
  */
-export type QuickCreateFlags = {
-  customer: boolean;
-  property: boolean;
-  call: boolean;
-  appointment: boolean;
-  task: boolean;
-};
+export type QuickCreateProps = { creatableModules: AppModule[]; lockedHrefs: string[] };
 
 const loadBody = () => import("./quick-create-menu-body").then((m) => ({ default: m.QuickCreateMenuBody }));
 const Body = lazy(loadBody);
@@ -37,14 +33,14 @@ function Trigger({ onOpen, onWarm }: { onOpen?: () => void; onWarm?: () => void 
   );
 }
 
-export function QuickCreateMenu({ flags }: { flags: QuickCreateFlags }) {
+export function QuickCreateMenu({ creatableModules, lockedHrefs }: QuickCreateProps) {
   const [mounted, setMounted] = useState(false);
   if (!mounted) {
     return <Trigger onOpen={() => setMounted(true)} onWarm={() => void loadBody()} />;
   }
   return (
     <Suspense fallback={<Trigger />}>
-      <Body flags={flags} />
+      <Body creatableModules={creatableModules} lockedHrefs={lockedHrefs} />
     </Suspense>
   );
 }

@@ -3,6 +3,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Command, Search } from "lucide-react";
 import type { AppModule } from "@/lib/permissions";
+import { OPEN_PALETTE_EVENT } from "@/lib/palette-core";
 
 /**
  * Üst çubuk arama kutusu — hafif kabuk. Palet gövdesi (arama aksiyonu, hesap makinesi,
@@ -14,7 +15,7 @@ const Panel = lazy(loadPanel);
 
 function Trigger({ onOpen, onWarm }: { onOpen?: () => void; onWarm?: () => void }) {
   return (
-    <div className="relative min-w-0 shrink-0 sm:w-full sm:max-w-lg sm:shrink">
+    <div className="topbar-search relative min-w-0 shrink-0 sm:w-full sm:shrink">
       <button
         type="button"
         onClick={onOpen}
@@ -36,7 +37,17 @@ function Trigger({ onOpen, onWarm }: { onOpen?: () => void; onWarm?: () => void 
   );
 }
 
-export function CommandSearch({ accessibleModules, storageScope }: { accessibleModules: AppModule[]; storageScope?: string }) {
+export function CommandSearch({
+  accessibleModules,
+  creatableModules,
+  lockedHrefs,
+  storageScope,
+}: {
+  accessibleModules: AppModule[];
+  creatableModules?: AppModule[];
+  lockedHrefs?: string[];
+  storageScope?: string;
+}) {
   const [mounted, setMounted] = useState(false);
   const [openOnMount, setOpenOnMount] = useState(false);
 
@@ -49,8 +60,16 @@ export function CommandSearch({ accessibleModules, storageScope }: { accessibleM
         setMounted(true);
       }
     };
+    const onOpen = () => {
+      setOpenOnMount(true);
+      setMounted(true);
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener(OPEN_PALETTE_EVENT, onOpen);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener(OPEN_PALETTE_EVENT, onOpen);
+    };
   }, [mounted]);
 
   if (!mounted) {
@@ -66,7 +85,7 @@ export function CommandSearch({ accessibleModules, storageScope }: { accessibleM
   }
   return (
     <Suspense fallback={<Trigger />}>
-      <Panel accessibleModules={accessibleModules} initialOpen={openOnMount} storageScope={storageScope} />
+      <Panel accessibleModules={accessibleModules} creatableModules={creatableModules} lockedHrefs={lockedHrefs} initialOpen={openOnMount} storageScope={storageScope} />
     </Suspense>
   );
 }

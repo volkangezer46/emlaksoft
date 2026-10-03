@@ -1,0 +1,116 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { now } from "@/lib/clock";
+import { isManagerRole } from "@/lib/approvals";
+import type { AppModule } from "@/lib/permissions";
+import { getPlan } from "@/lib/billing/plans";
+
+/**
+ * Yan menü sayı rozetleri — YALNIZ gerçek veri (oturum açmış kullanıcının RLS'li
+ * istemcisiyle head-count). Uydurma/sabit sayı yok; sorgu hata verirse rozet çıkmaz.
+ *
+ * `itemHref`: rozetin ait olduğu menü öğesinin (veya sekmesinin) yolu.
+ * `href`: rozete tıklayınca gidilecek FİLTRELİ hedef (sıfır çıkmaz metrik kuralı).
+ */
+export type NavBadge = {
+  itemHref: string;
+  href: string;
+  count: number;
+  label: string;
+  tone: "danger" | "warn";
+};
+
+type Input = {
+  supabase: SupabaseClient;
+  tenantId: string | null;
+  userId: string | null;
+  role: string | null | undefined;
+  accessible: readonly AppModule[];
+};
+
+export async function getNavBadges({ supabase, tenantId, userId, role, accessible }: Input): Promise<NavBadge[]> {
+  if (!tenantId || !userId) return [];
+  const nowIso = new Date(now()).toISOString();
+  const jobs: Promise<NavBadge | null>[] = [];
+
+  if (accessible.includes("tasks")) {
+    jobs.push(
+      (async () => {
+        const { count, error } = await supabase
+          .from("tasks")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId)
+          .eq("status", "open")
+          .eq("assigned_to", userId)
+          .lt("due_at", nowIso);
+        if (error || !count) return null;
+        return { itemHref: "/app/gorevler", href: "/app/gorevler?filter=overdue&mine=1", count, label: "geciken görevin", tone: "danger" as const };
+      })(),
+    );
+  }
+
+  if (accessible.includes("commissions") && isManagerRole(role)) {
+    jobs.push(
+      (async () => {
+        const { count, error } = await supabase
+          .from("approval_requests")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId)
+          .eq("status", "bekliyor")
+          .neq("requested_by", userId);
+        if (error || !count) return null;
+        return { itemHref: "/app/onaylar", href: "/app/onaylar?kim=bana", count, label: "onayınızı bekleyen talebin", tone: "warn" as const };
+      })(),
+    );
+  }
+
+  const settled = await Promise.allSettled(jobs);
+  return settled.flatMap((r) => (r.status === "fulfilled" && r.value ? [r.value] : []));
+}
+
+/**
+ * Yan menü "Kullanım" kartı: paket limitine karşı GERÇEK kullanım. Sayımlar abonelik
+ * sayfası ve DB entitlement tetikleyicisiyle aynı kapsamdadır. Limitsiz (null) kalemler
+ * hiç döndürülmez: yüzde/çubuk gösterilmez.
+ */
+export type PlanUsageRow = { key: "seats" | "properties" | "customers"; label: string; used: number; limit: number; href: string };
+
+export async function getPlanUsage(supabase: SupabaseClient, tenantId: string | null, plan: string | undefined): Promise<PlanUsageRow[]> {
+  if (!tenantId) return [];
+  const limits = getPlan(plan ?? "office").limits;
+  const jobs: Promise<PlanUsageRow | null>[] = [];
+  if (limits.seats != null) {
+    const limit = limits.seats;
+    jobs.push(
+      (async () => {
+        const { count, error } = await supabase.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("is_active", true);
+        return error || count == null ? null : { key: "seats" as const, label: "Kullanıcı", used: count, limit, href: "/app/ekip" };
+      })(),
+    );
+  }
+  if (limits.activeProperties != null) {
+    const limit = limits.activeProperties;
+    jobs.push(
+      (async () => {
+        const { count, error } = await supabase
+          .from("properties")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId)
+          .is("deleted_at", null)
+          .in("status", ["draft", "live", "reserved"]);
+        return error || count == null ? null : { key: "properties" as const, label: "Aktif ilan", used: count, limit, href: "/app/portfoyler" };
+      })(),
+    );
+  }
+  if (limits.customers != null) {
+    const limit = limits.customers;
+    jobs.push(
+      (async () => {
+        const { count, error } = await supabase.from("customers").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).is("deleted_at", null);
+        return error || count == null ? null : { key: "customers" as const, label: "Müşteri", used: count, limit, href: "/app/musteriler" };
+      })(),
+    );
+  }
+  const settled = await Promise.allSettled(jobs);
+  return settled.flatMap((r) => (r.status === "fulfilled" && r.value ? [r.value] : []));
+}
+

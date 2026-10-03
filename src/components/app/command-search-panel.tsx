@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   useCallback,
@@ -33,6 +33,7 @@ import {
   createRecentsStore,
   getAppActions,
   getAppGoItems,
+  OPEN_PALETTE_EVENT,
   type PaletteEntry,
   type RecentItem,
 } from "@/lib/palette-core";
@@ -78,10 +79,16 @@ function isSearchKind(kind: string): kind is SearchHit["kind"] {
  */
 export function CommandSearchPanel({
   accessibleModules,
+  creatableModules,
+  lockedHrefs,
   initialOpen = false,
   storageScope,
 }: {
   accessibleModules: AppModule[];
+  /** "create" yetkisi olan modüller; verilmezse erişilebilir modüller kullanılır. */
+  creatableModules?: AppModule[];
+  /** Pakete dahil olmayan sayfalar: Eylemler'de gösterilmez. */
+  lockedHrefs?: string[];
   initialOpen?: boolean;
   /** `${tenantId}:${userId}` — son görülenlerin yerel depolama anahtarı. */
   storageScope?: string;
@@ -100,20 +107,26 @@ export function CommandSearchPanel({
   const recents = useSyncExternalStore(recentsStore.subscribe, recentsStore.read, recentsStore.getServerSnapshot);
   const allowedModules = useMemo(() => new Set(accessibleModules), [accessibleModules]);
   // Yetki süzgeci: Eylemler ve Git, menüyle aynı kaynaktan (nav-config) ve erişilebilir modüllerden gelir.
-  const quickActions = useMemo(() => getAppActions(accessibleModules, q), [accessibleModules, q]);
+  const quickActions = useMemo(
+    () => getAppActions(creatableModules ?? accessibleModules, q, lockedHrefs ?? []),
+    [accessibleModules, creatableModules, lockedHrefs, q],
+  );
   const goItems = useMemo(() => getAppGoItems(accessibleModules, q), [accessibleModules, q]);
   const visibleRecents = useMemo(() => {
     const pageHrefs = new Set([
-      ...getAppActions(accessibleModules).map((a) => a.href),
+      ...getAppActions(creatableModules ?? accessibleModules, "", lockedHrefs ?? []).map((a) => a.href),
       ...getAppGoItems(accessibleModules).map((a) => a.href),
     ]);
     return recents.filter((item) =>
       isSearchKind(item.kind) ? allowedModules.has(RECENT_KIND_MODULE[item.kind]) : pageHrefs.has(item.href),
     );
-  }, [accessibleModules, allowedModules, recents]);
+  }, [accessibleModules, allowedModules, creatableModules, lockedHrefs, recents]);
   const pageIcons = useMemo(
-    () => new Map<string, PaletteEntry["icon"]>([...getAppActions(accessibleModules), ...getAppGoItems(accessibleModules)].map((e) => [e.href, e.icon])),
-    [accessibleModules],
+    () =>
+      new Map<string, PaletteEntry["icon"]>(
+        [...getAppActions(creatableModules ?? accessibleModules, "", lockedHrefs ?? []), ...getAppGoItems(accessibleModules)].map((e) => [e.href, e.icon]),
+      ),
+    [accessibleModules, creatableModules, lockedHrefs],
   );
 
   const runSearch = useCallback((value: string) => {
@@ -177,8 +190,17 @@ export function CommandSearchPanel({
       }
       if (e.key === "Escape") setOpen(false);
     };
+    const onOpen = () => {
+      setOpen(true);
+      setActive(0);
+      queueMicrotask(() => inputRef.current?.focus());
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener(OPEN_PALETTE_EVENT, onOpen);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener(OPEN_PALETTE_EVENT, onOpen);
+    };
   }, []);
 
   // Hesap makinesi: girdi matematiksel ifadeyse sonuç en üstte "= X" satırı.
@@ -343,7 +365,7 @@ export function CommandSearchPanel({
   return (
     /* Panel arama kutusuna bağlı açılıyor (admin paletiyle aynı desen).
        Öncesinde ekran ortasında modal olarak açılıp kutudan kopuk duruyordu. */
-    <div className="relative min-w-0 shrink-0 sm:w-full sm:max-w-lg sm:shrink">
+    <div className="topbar-search relative min-w-0 shrink-0 sm:w-full sm:shrink">
       <button
         type="button"
         onClick={() => {
@@ -492,6 +514,13 @@ export function CommandSearchPanel({
                                     <Icon className="h-4 w-4" />
                                   </span>
                                   <span className="flex-1 truncate text-sm font-semibold text-ink-950">{action.label}</span>
+                                  {action.shortcut ? (
+                                    <span className="ml-2 flex shrink-0 items-center gap-1" aria-label={`Kısayol ${action.shortcut}`}>
+                                      {action.shortcut.split(" ").map((k) => (
+                                        <kbd key={k} className="rounded-sm border border-hairline bg-canvas px-1.5 py-0.5 text-xs font-semibold uppercase text-text-muted">{k}</kbd>
+                                      ))}
+                                    </span>
+                                  ) : null}
                                 </button>
                               </li>
                             );

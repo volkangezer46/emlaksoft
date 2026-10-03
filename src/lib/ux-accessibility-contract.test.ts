@@ -42,7 +42,9 @@ describe("navigation accessibility contract", () => {
     const sidebar = source("src/components/app/app-sidebar.tsx");
     const siteHeader = source("src/components/site-header.tsx");
 
-    expect(sidebar).toContain('aria-label="Uygulama ana menüsü"');
+    // Landmark etiketi NavScroller (ortak <nav>) üzerinden verilir.
+    expect(sidebar).toContain('label="Uygulama ana menüsü"');
+    expect(source("src/components/ui/console/nav-kit.tsx")).toContain("aria-label={label}");
     expect(siteHeader).toContain('aria-label="Ana site navigasyonu"');
     expect(siteHeader).toContain('aria-label="Mobil site navigasyonu"');
   });
@@ -52,7 +54,7 @@ describe("navigation accessibility contract", () => {
 
     expect(sidebar).toContain('responsiveClassName="lg:hidden"');
     expect(sidebar).toContain(
-      'bg-[linear-gradient(180deg,#071a38_0%,#041127_100%)] lg:flex',
+      'bg-[linear-gradient(180deg,#0b1220_0%,#070d19_100%)] lg:flex',
     );
   });
 

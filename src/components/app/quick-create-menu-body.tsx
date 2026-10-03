@@ -1,17 +1,40 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, CalendarDays, ListChecks, Phone, Plus, UserPlus } from "lucide-react";
+import { Plus } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { QuickCreateFlags } from "./quick-create-menu";
+import { getAppActions, type PaletteEntry } from "@/lib/palette-core";
+import type { AppModule } from "@/lib/permissions";
+
+/** Menü grupları: href → grup. Listede olmayan yeni eylem "Diğer"e düşer (kaybolmaz). */
+const GROUPS: { title: string; hrefs: string[] }[] = [
+  { title: "Kayıtlar", hrefs: ["/app/musteriler/yeni", "/app/talepler/yeni", "/app/portfoyler/yeni", "/app/projeler/yeni", "/app/kiralama/yeni"] },
+  { title: "Gün planı", hrefs: ["/app/randevular/yeni", "/app/gorevler/yeni", "/app/arama", "/app/acik-ev/yeni"] },
+  { title: "Anlaşma", hrefs: ["/app/anlasmalar/yeni", "/app/teklifler/yeni", "/app/sozlesmeler/yeni", "/app/onaylar/yeni", "/app/portfoyler/sunumlar/yeni"] },
+];
+
+function groupEntries(entries: PaletteEntry[]) {
+  const used = new Set<string>();
+  const groups = GROUPS.map((g) => {
+    const items = g.hrefs.flatMap((h) => entries.find((e) => e.href === h) ?? []);
+    items.forEach((i) => used.add(i.href));
+    return { title: g.title, items };
+  });
+  const rest = entries.filter((e) => !used.has(e.href));
+  if (rest.length > 0) groups.push({ title: "Diğer", items: rest });
+  return groups.filter((g) => g.items.length > 0);
+}
 
 /** Lazy gövde: kabuk tıklanınca yüklenir ve menü açık gelir. */
-export function QuickCreateMenuBody({ flags }: { flags: QuickCreateFlags }) {
+export function QuickCreateMenuBody({ creatableModules, lockedHrefs }: { creatableModules: AppModule[]; lockedHrefs: string[] }) {
+  const groups = groupEntries(getAppActions(creatableModules, "", lockedHrefs));
   return (
     <DropdownMenu defaultOpen>
       <DropdownMenuTrigger asChild>
@@ -24,42 +47,30 @@ export function QuickCreateMenuBody({ flags }: { flags: QuickCreateFlags }) {
           <span className="hidden sm:inline">Yeni</span>
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-52">
-        {flags.customer ? (
-          <DropdownMenuItem asChild>
-            <Link href="/app/musteriler/yeni">
-              <UserPlus /> Yeni müşteri
-            </Link>
-          </DropdownMenuItem>
-        ) : null}
-        {flags.property ? (
-          <DropdownMenuItem asChild>
-            <Link href="/app/portfoyler/yeni">
-              <Building2 /> Yeni portföy
-            </Link>
-          </DropdownMenuItem>
-        ) : null}
-        {flags.call ? (
-          <DropdownMenuItem asChild>
-            <Link href="/app/arama">
-              <Phone /> Görüşme kaydet
-            </Link>
-          </DropdownMenuItem>
-        ) : null}
-        {flags.appointment ? (
-          <DropdownMenuItem asChild>
-            <Link href="/app/randevular/yeni">
-              <CalendarDays /> Randevu
-            </Link>
-          </DropdownMenuItem>
-        ) : null}
-        {flags.task ? (
-          <DropdownMenuItem asChild>
-            <Link href="/app/gorevler/yeni">
-              <ListChecks /> Görev
-            </Link>
-          </DropdownMenuItem>
-        ) : null}
+      <DropdownMenuContent className="max-h-[min(75vh,34rem)] w-72 overflow-y-auto">
+        {groups.map((g, gi) => (
+          <div key={g.title}>
+            {gi > 0 ? <DropdownMenuSeparator /> : null}
+            <DropdownMenuLabel>{g.title}</DropdownMenuLabel>
+            {g.items.map((a) => (
+              <DropdownMenuItem key={a.href} asChild>
+                <Link href={a.href}>
+                  <a.icon aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">{a.label}</span>
+                  {a.shortcut ? (
+                    <span className="ml-auto flex shrink-0 items-center gap-1" aria-label={`Kısayol ${a.shortcut}`}>
+                      {a.shortcut.split(" ").map((k) => (
+                        <kbd key={k} className="rounded-sm border border-hairline bg-canvas px-1.5 py-0.5 text-xs font-semibold uppercase text-text-muted">
+                          {k}
+                        </kbd>
+                      ))}
+                    </span>
+                  ) : null}
+                </Link>
+              </DropdownMenuItem>
+            ))}
+          </div>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
