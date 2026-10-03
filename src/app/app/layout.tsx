@@ -115,6 +115,8 @@ export default async function AppLayout({
   const specPermsPromise = canSpeculate
     ? getEffectivePermissions(claimedTenantId, claimedRole, user!.id)
     : null;
+  // B10: claim profille eşleşmezse bu promise hiç beklenmez; reddedilirse unhandled rejection olmasın.
+  specPermsPromise?.catch(() => undefined);
   const specScorePromise = canSpeculate ? getOfficeScoreCached(claimedTenantId!).catch(() => null) : null;
   const specBadgesPromise = canSpeculate
     ? getNavBadges({ supabase, tenantId: claimedTenantId, userId: user!.id, role: claimedRole, accessible: NAV_MODULES }).catch(() => [])
@@ -144,7 +146,7 @@ export default async function AppLayout({
   const tenantId = impersonating
     ? claimedTenantId
     : ((profile?.tenant_id as string | undefined) ?? null);
-  const effectiveRole = impersonating ? "readonly" : (profile?.role ?? "advisor");
+  const effectiveRole = impersonating ? "readonly" : (profile?.role ?? "readonly"); // B12: profil yoksa en düşük yetki (fail-closed)
   // Beyaz etiket: ofisin marka rengi geçerliyse panel tema değişkenlerini override et
   const brandColor = office?.brand_color && /^#[0-9a-fA-F]{6}$/.test(office.brand_color) ? office.brand_color : null;
   const fullName = String(profile?.full_name ?? platformStaff?.full_name ?? "ES");

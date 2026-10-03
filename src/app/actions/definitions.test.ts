@@ -5,12 +5,13 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   logActivity: vi.fn(),
   usage: vi.fn(),
+  updateTag: vi.fn(),
   row: null as null | Record<string, unknown>,
   updates: [] as Record<string, unknown>[],
   deleted: 0,
 }));
 
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn(), updateTag: mocks.updateTag }));
 vi.mock("@/lib/require-permission", () => ({ requirePermission: mocks.gate }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
 vi.mock("@/lib/activity", () => ({ logActivity: mocks.logActivity }));
@@ -98,6 +99,13 @@ describe("definitions action'ları", () => {
     expect((await setDefinitionColor(ID, "#10b981")).ok).toBe(true);
     expect(mocks.updates[0]).toEqual({ color: "#10b981" });
     expect(mocks.logActivity).toHaveBeenCalledWith(expect.objectContaining({ action: "definition.color" }));
+  });
+
+  it("B9: yazma sonrası önbellek updateTag ile anında düşer (bayat sunmaz)", async () => {
+    mocks.updateTag.mockClear();
+    expect((await setDefinitionColor(ID, "#10b981")).ok).toBe(true);
+    expect(mocks.updateTag).toHaveBeenCalledWith("definitions:t1");
+    expect(mocks.updateTag).toHaveBeenCalledWith("definitions");
   });
 
   it("geçersiz id reddedilir", async () => {

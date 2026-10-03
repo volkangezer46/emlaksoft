@@ -233,7 +233,7 @@ export function StaffForm() {
         </div>
         <SummaryGroup title="Hesap özeti">
           <SummaryRow label="Ad soyad" value={name || "Zorunlu"} muted={!name} tab="kimlik" field="full_name" />
-          <SummaryRow label="E-posta" value={email ? "Girildi" : "Zorunlu"} muted={!email} tab="kimlik" field="email" />
+          <SummaryRow label="E-posta" value={email ? email : "Zorunlu"} muted={!email} tab="kimlik" field="email" />
           <SummaryRow
             label="Giriş yöntemi"
             value={password ? `Geçici parola (${strength.label.toLocaleLowerCase("tr")})` : "Davet e-postası"}

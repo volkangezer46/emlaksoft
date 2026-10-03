@@ -6,7 +6,10 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
-import { IMPORT_ROW_LIMIT } from "@/app/app/ice-aktarma/import-config";
+import { IMPORT_CHUNK_SIZE, IMPORT_ROW_LIMIT } from "@/app/app/ice-aktarma/import-config";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { neutralizeFormulaCells } from "@/lib/import-sanitize";
+import { removeCreated, restoreUpdated } from "@/lib/import-undo";
 import {
   buildCustomerLookup,
   collectCustomerKeys,
@@ -137,10 +140,12 @@ const ENTITY: Record<ImportTarget, { action: string; entityType: string; path: s
 
 type Db = Awaited<ReturnType<typeof createClient>>;
 
-function limitCheck<T>(rows: T[]): string | null {
+function limitCheck<T>(rows: T[], max: number = IMPORT_ROW_LIMIT): string | null {
   if (!Array.isArray(rows) || rows.length === 0) return "İçe aktarılacak satır bulunamadı.";
-  if (rows.length > IMPORT_ROW_LIMIT) {
-    return `Tek seferde en fazla ${IMPORT_ROW_LIMIT} satır içe aktarılabilir. Dosyayı bölerek tekrar deneyin.`;
+  if (rows.length > max) {
+    return max === IMPORT_ROW_LIMIT
+      ? `Tek seferde en fazla ${IMPORT_ROW_LIMIT} satır içe aktarılabilir. Dosyayı bölerek tekrar deneyin.`
+      : `Tek istekte en fazla ${max} satır gönderilebilir.`;
   }
   return null;
 }
@@ -314,11 +319,19 @@ function toView(target: ImportTarget, rows: ImportRow[], plans: AnyPlan[], withL
   }));
 }
 
+/** Parça API'leri (sihirbaz) tek istekte en fazla bu kadar satır alır; eski tek-çağrı API'leri IMPORT_ROW_LIMIT'e kadar. */
+const CHUNK_API_MAX_ROWS = IMPORT_CHUNK_SIZE;
+/** Kullanıcı başına 10 dakikada yazma/önizleme parça sayısı: 5000 satırlık dosya = 20 parça, makul tekrarlara yer bırakır. */
+const WRITE_CHUNKS_PER_WINDOW = 60;
+const PREVIEW_CHUNKS_PER_WINDOW = 120;
+const RATE_WINDOW_SEC = 10 * 60;
+
 async function runChunk(
   target: ImportTarget,
-  rows: ImportRow[],
+  rawRows: ImportRow[],
   options: ImportOptions,
   dryRun: boolean,
+  maxRows: number = IMPORT_ROW_LIMIT,
 ): Promise<ChunkResult> {
   const meta = ENTITY[target];
   const policy: DuplicatePolicy = options.duplicatePolicy ?? "skip";
@@ -331,11 +344,20 @@ async function runChunk(
     const edit = await requirePermission(meta.module, "edit");
     if (!edit.ok) return { error: "Mevcut kayıtları güncellemek için düzenleme yetkisi gerekir." };
   }
-  const limitError = limitCheck(rows);
+  const limitError = limitCheck(rawRows, maxRows);
   if (limitError) return { error: limitError };
   if (!dryRun && !(options.batchId && UUID_RE.test(options.batchId))) {
     return { error: "İçe aktarma kimliği geçersiz. Sayfayı yenileyip tekrar deneyin." };
   }
+  // Sunucu tarafı hız sınırı (istemci döngüsüyle sınırsız tekrarı keser).
+  const rate = await checkRateLimit(`${dryRun ? "import-preview" : "import-write"}:${gate.userId}`, {
+    limit: dryRun ? PREVIEW_CHUNKS_PER_WINDOW : WRITE_CHUNKS_PER_WINDOW,
+    windowSec: RATE_WINDOW_SEC,
+    failurePolicy: "deny",
+  });
+  if (!rate.allowed) return { error: "Çok fazla içe aktarma isteği gönderildi. Birkaç dakika sonra tekrar deneyin." };
+  // Formül önekli serbest metin hücreleri güvenle saklanır (başında ' ile) ve satıra uyarı eklenir.
+  const { rows, flaggedRows } = neutralizeFormulaCells(rawRows);
 
   const supabase = await createClient();
   const assignee = await resolveAssignee(supabase, gate.tenantId, gate.userId, options.assignTo);
@@ -344,6 +366,14 @@ async function runChunk(
   const seen = new Set(options.seen ?? []);
   const plans = await planChunk(supabase, gate.tenantId, target, rows, policy, seen);
   if (!plans) return { error: "Mükerrer kontrolü yapılamadı. Lütfen tekrar deneyin." };
+  for (const p of plans) {
+    if (flaggedRows.has(p.row)) {
+      p.issues = [
+        ...p.issues,
+        { level: "warning", message: "Metin =, +, - veya @ ile başlıyordu; formül sayılmaması için başına ' eklenerek kaydedilir." },
+      ];
+    }
+  }
 
   if (dryRun) {
     return {
@@ -437,7 +467,7 @@ async function runChunk(
   const counters = countPlanned(plans);
   const created = plans.filter((p) => p.status === "new").length;
   const updated = updatedPrev.length;
-  await logActivity({
+  const audit = await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: meta.action,
@@ -459,6 +489,30 @@ async function runChunk(
     },
   });
 
+  if (!audit.ok) {
+    // Audit günlüğü geri almanın tek kaynağıdır: yazılamadıysa bu parça başarılı sayılmaz,
+    // yapılan değişiklikler hemen geri çekilir (yetim, geri alınamaz kayıt bırakılmaz).
+    const undoCreated = await removeCreated(supabase, {
+      target,
+      tenantId: gate.tenantId,
+      ids: createdIds,
+      checkLinks: false,
+    });
+    const undoUpdated = await restoreUpdated(supabase, {
+      target,
+      tenantId: gate.tenantId,
+      entries: updatedPrev.map((u) => ({ id: u.id, prev: u.prev, importAt: new Date(now() + 3_600_000).toISOString() })),
+    });
+    revalidatePath(meta.path);
+    revalidateTenantData(gate.tenantId);
+    const leftover = undoCreated.failed + undoUpdated.failed;
+    return {
+      error: leftover
+        ? `Denetim kaydı yazılamadığı için içe aktarma iptal edildi ancak ${leftover} kayıt geri çekilemedi; lütfen İçe aktarma günlüğünü ve kayıtları kontrol edin.`
+        : "Denetim kaydı yazılamadığı için bu parça içe aktarılmadı (değişiklikler geri çekildi). Lütfen tekrar deneyin.",
+    };
+  }
+
   revalidatePath(meta.path);
   revalidateTenantData(gate.tenantId);
   return { ok: true, rows: toView(target, rows, plans, false), counters, created, updated };
@@ -471,7 +525,7 @@ export async function previewImportChunk(
   options: ImportOptions = {},
 ): Promise<ChunkResult> {
   if (!(target in ENTITY)) return { error: "Hedef geçersiz." };
-  return runChunk(target, rows, options, true);
+  return runChunk(target, rows, options, true, CHUNK_API_MAX_ROWS);
 }
 
 /** Gerçek yazma: bir parçayı uygular, audit kaydını (geri alma kaynağı) yazar. */
@@ -481,7 +535,7 @@ export async function importChunk(
   options: ImportOptions,
 ): Promise<ChunkResult> {
   if (!(target in ENTITY)) return { error: "Hedef geçersiz." };
-  return runChunk(target, rows, options, false);
+  return runChunk(target, rows, options, false, CHUNK_API_MAX_ROWS);
 }
 
 // ---------------------------------------------------------------------------
