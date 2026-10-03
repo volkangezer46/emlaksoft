@@ -68,6 +68,7 @@ export async function addDefinition(_prev: DefinitionResult, fd: FormData): Prom
   if (!isDefinitionCategory(category)) return { error: "Geçersiz kategori." };
   if (category === STAGE_CATEGORY) return { error: STAGE_FIXED_ERROR };
   if (!label) return { error: "Etiket zorunludur." };
+  if (category === "loss_reason" && value.includes(" | ")) return { error: "Kayıp nedeni değeri “ | ” içeremez." };
   if (label.length > 120 || value.length > 120) {
     return { error: "Etiket ve değer en fazla 120 karakter olabilir." };
   }

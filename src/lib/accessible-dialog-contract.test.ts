@@ -6,7 +6,8 @@ function source(file: string): string {
 }
 
 const convertedDialogs = [
-  { file: "src/app/app/anlasmalar/deal-board.tsx", count: 2 },
+  { file: "src/app/app/anlasmalar/deal-board.tsx", count: 1 },
+  { file: "src/app/app/anlasmalar/loss-reason-dialog.tsx", count: 1 },
   { file: "src/app/app/anlasmalar/win-celebration-dialog.tsx", count: 1 },
   { file: "src/app/app/portfoyler/[id]/property-media-manager.tsx", count: 1 },
 ] as const;

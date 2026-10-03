@@ -25,7 +25,7 @@ export function LossReasonDialog({
   pending,
   onCancel,
   onConfirm,
-  onCloseAutoFocus,
+  onClosedFocus,
 }: {
   open: boolean;
   title: string;
@@ -33,7 +33,7 @@ export function LossReasonDialog({
   pending: boolean;
   onCancel: () => void;
   onConfirm: (value: string, note: string) => void;
-  onCloseAutoFocus?: (event: Event) => void;
+  onClosedFocus?: (event: Event) => void;
 }) {
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onCancel(); }}>
@@ -42,7 +42,7 @@ export function LossReasonDialog({
           size="sm"
           overlayClassName="bg-ink-950/40 backdrop-blur-sm"
           className="max-w-sm rounded-[var(--radius-panel)] border-line shadow-[var(--shadow-lg)]"
-          onCloseAutoFocus={onCloseAutoFocus}
+          onCloseAutoFocus={onClosedFocus}
         >
           <LossReasonForm title={title} options={options} pending={pending} onConfirm={onConfirm} />
         </DialogContent>

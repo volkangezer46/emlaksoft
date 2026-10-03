@@ -538,7 +538,7 @@ export function DealBoard({
         pending={pending}
         onCancel={() => setLossFor(null)}
         onConfirm={(value, note) => { const d = lossFor; setLossFor(null); if (d) move(d.id, "lost", { value, note }); }}
-        onCloseAutoFocus={(event) => {
+        onClosedFocus={(event) => {
           event.preventDefault();
           const target = lossReturnFocusRef.current;
           lossReturnFocusRef.current = null;

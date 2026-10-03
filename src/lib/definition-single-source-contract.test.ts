@@ -41,6 +41,8 @@ describe("tanım listeleri tek kaynak sözleşmesi", () => {
       ["expense category", /value:\s*"komisyon_gider"/],
       ["appointment_type", /value:\s*"showing"/],
       ["demand_urgency", /value:\s*"urgent"/],
+      ["loss_reason", /value:\s*"baska_ofis"/],
+      ["deal_stage_label", /value:\s*"qualified",\s*label:\s*"Nitelikli"/],
     ];
     const offenders: string[] = [];
     for (const f of files) {
