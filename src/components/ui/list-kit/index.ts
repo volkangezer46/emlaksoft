@@ -10,9 +10,17 @@ export { EntityThumb } from "./entity-thumb";
 export { RowActions, RowActionLink, RowActionAnchor } from "./row-actions";
 export { ViewSwitcher, type ViewOption } from "./view-switcher";
 export { BulkBar } from "./bulk-bar";
-export { FilterSelect, FilterGrid } from "./filter-field";
+export { FilterSelect, FilterGrid, FilterDate } from "./filter-field";
+export { ListPager } from "./list-pager";
 export {
+  uuidParam,
+  isoDateParam,
+  parsePage,
+  pageWindow,
+  pageHrefOf,
+  type PageWindow,
   bucketByWeek,
+  weeklySeriesOf,
   trendOf,
   hasSeries,
   barHeights,

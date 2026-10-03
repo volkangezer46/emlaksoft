@@ -1,21 +1,53 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
-import { Activity, AlertTriangle, CalendarClock, Hourglass, KeyRound, Plus, Wallet, Wrench, X } from "lucide-react";
+import { AlertTriangle, CalendarClock, Hourglass, KeyRound, Plus, Search, Wallet, Wrench } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { computeLegalIncrease } from "@/lib/tufe";
-import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/app/empty-state";
+import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { ApplyIncreaseDialog } from "./apply-increase-dialog";
 import { ButtonLink } from "@/components/ui/button";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportRentalsCsv } from "@/app/actions/export";
-
+import { listSavedViews } from "@/app/actions/saved-views";
+import { SavedViews } from "@/components/app/saved-views";
 import { PageHeader } from "@/components/ui/page-header";
+import { buildHref } from "@/lib/ui/filter-params";
+import {
+  CategoryChips,
+  FilterGrid,
+  FilterSelect,
+  KpiStrip,
+  ListPager,
+  ListToolbar,
+  buildActiveChips,
+  densityOf,
+  mergeResetPage,
+  pageWindow,
+  parsePage,
+  type KpiItem,
+} from "@/components/ui/list-kit";
+import { RentalMobileList, RentalTable, type RentalVM } from "./rental-rows";
+import {
+  DURUM_FILTERS,
+  DURUM_LABELS,
+  EVRELER,
+  EVRE_META,
+  dueDateOf,
+  evreOf,
+  matchesRentalFilters,
+  nextAnniversaryOf,
+  nextMonthOf,
+  type DurumFilter,
+  type Evre,
+} from "./rental-list-logic";
+
 export const metadata = { title: "Kiralama" };
+
+const PATH = "/app/kiralama";
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -29,52 +61,26 @@ function rel<T>(v: Rel<T>): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : v;
 }
 
-const DURUM_FILTERS = ["paid", "pending", "overdue"] as const;
-type DurumFilter = (typeof DURUM_FILTERS)[number];
-const DURUM_LABELS: Record<DurumFilter, string> = {
-  paid: "Bu ay tahsil edilen",
-  pending: "Bu ay bekleyen",
-  overdue: "Geciken",
-};
-
-/** Sözleşme yaşam döngüsü evreleri — şerit ve çipler listeyi ?evre= ile süzer. */
-const EVRELER = ["yeni", "devam", "yenileme", "bitiyor", "bitti"] as const;
-type Evre = (typeof EVRELER)[number];
-const EVRE_META: Record<Evre, { label: string; bar: string; dot: string; text: string }> = {
-  yeni:     { label: "Yeni (ilk 90 gün)",    bar: "bg-brand-500",   dot: "bg-brand-500",   text: "text-brand-600" },
-  devam:    { label: "Devam eden",           bar: "bg-mint-500",    dot: "bg-mint-500",    text: "text-mint-600" },
-  yenileme: { label: "Yenileme penceresi",   bar: "bg-amber-400",   dot: "bg-amber-400",   text: "text-amber-600" },
-  bitiyor:  { label: "Bitmek üzere (30 gün)", bar: "bg-danger-500", dot: "bg-danger-500",  text: "text-danger-500" },
-  bitti:    { label: "Sona ermiş",           bar: "bg-ink-950/25",  dot: "bg-ink-950/25",  text: "text-text-muted" },
-};
-
-/** `YYYY-MM` + vade günü → `YYYY-MM-DD` vade tarihi (string karşılaştırması yeterli). */
-function dueDateOf(month: string, dueDay: number) {
-  return `${month}-${String(dueDay).padStart(2, "0")}`;
-}
-function nextMonthOf(month: string) {
-  const [y, m] = month.split("-").map(Number);
-  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
-}
-
-/**
- * start_date'in bugünden sonraki ilk yıldönümü (`YYYY-MM-DD`).
- * İlk yıl dolmadan yıldönümü sayılmaz; 29 Şubat 28'e sabitlenir
- * (string karşılaştırması yeterli, Date aritmetiği gerekmez).
- */
-function nextAnniversaryOf(startDate: string, today: string): string | null {
-  const mm = startDate.slice(5, 7);
-  const dd = mm === "02" && startDate.slice(8, 10) === "29" ? "28" : startDate.slice(8, 10);
-  const y = Number(today.slice(0, 4));
-  let cand = `${y}-${mm}-${dd}`;
-  if (cand < today) cand = `${y + 1}-${mm}-${dd}`;
-  return cand > startDate ? cand : null;
-}
+/** Sayfa başına kayıt (bellek içi sayfalama: evre/tahsilat süzgeçleri türetilmiş veriye dayanır). */
+const PAGE_SIZE = 50;
+/** Kira kaydı tarama sınırı; aşılırsa ListLimitNotice açıkça söyler, evre sayaçları gizlenir. */
+const RENTAL_LIMIT = 300;
+const CHARGE_LIMIT = 2000;
 
 export default async function KiralamaPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; ariza?: string; evre?: string; portfoy?: string; musteri?: string; tutar?: string }>;
+  searchParams?: Promise<{
+    q?: string;
+    durum?: string;
+    ariza?: string;
+    evre?: string;
+    portfoy?: string;
+    musteri?: string;
+    tutar?: string;
+    sayfa?: string;
+    yogunluk?: string;
+  }>;
 }) {
   const { perms } = await requireModulePage("rentals", "/app/kiralama");
   const params = (await searchParams) ?? {};
@@ -89,68 +95,69 @@ export default async function KiralamaPage({
   const durumF = DURUM_FILTERS.includes(params.durum as DurumFilter) ? (params.durum as DurumFilter) : "";
   const arizaF = params.ariza === "acik";
   const evreF = EVRELER.includes(params.evre as Evre) ? (params.evre as Evre) : "";
+  const q = (params.q ?? "").trim().slice(0, 80);
+  const density = densityOf(params.yogunluk);
+  const page = parsePage(params.sayfa);
   const canCreate = perms.rentals?.includes("create") ?? false;
+  const canEdit = perms.rentals?.includes("edit") ?? false;
 
-  const supabase = await createClient();
-  const [{ data: rentalData }, { data: chargeData }, { data: maintData }] =
-    await Promise.all([
-      supabase
-        .from("rentals")
-        .select(
-          "id, monthly_rent, due_day, start_date, end_date, status, created_at, property:properties!rentals_property_id_fkey(id, property_code, title), renter:customers!rentals_renter_customer_id_fkey(id, full_name)",
-        )
-        .order("created_at", { ascending: false })
-        .limit(300),
-      supabase
-        .from("rent_charges")
-        .select("id, rental_id, period, amount, status")
-        .order("period", { ascending: false })
-        .limit(1000),
-      supabase.from("maintenance_requests").select("id, rental_id, status").limit(1000),
-    ]);
-
-  const rentals = rentalData ?? [];
-  const charges = chargeData ?? [];
-  const maints = maintData ?? [];
+  const urlParams: Record<string, string> = {};
+  if (q) urlParams.q = q;
+  if (durumF) urlParams.durum = durumF;
+  if (arizaF) urlParams.ariza = "acik";
+  if (evreF) urlParams.evre = evreF;
+  if (density === "kompakt") urlParams.yogunluk = "kompakt";
+  const hrefWith = (patch: Record<string, string>) => buildHref(PATH, mergeResetPage(urlParams, patch));
+  const savedViewParams = Object.fromEntries(Object.entries(urlParams).filter(([k]) => k !== "yogunluk"));
 
   const today = daysAgoIso(0).slice(0, 10);
   const curMonth = today.slice(0, 7);
   const curPeriodPrefix = `${curMonth}-01`;
   const in30 = daysFromNowIso(30).slice(0, 10);
+  const in60 = daysFromNowIso(60).slice(0, 10);
 
-  // Ay bazlı tahakkuk haritaları
-  const curMonthByRental = new Map<string, (typeof charges)[number]>();
-  const overdueRentals = new Set<string>();
+  const supabase = await createClient();
+  const savedViewsPromise = listSavedViews(PATH);
+  const [rentalRes, curChargeRes, overdueChargeRes, overdueHead, maintRes, activeHead, savedViews] = await Promise.all([
+    supabase
+      .from("rentals")
+      .select(
+        "id, monthly_rent, due_day, start_date, end_date, status, created_at, property:properties!rentals_property_id_fkey(id, property_code, title), renter:customers!rentals_renter_customer_id_fkey(id, full_name)",
+        { count: "exact" },
+      )
+      .order("created_at", { ascending: false })
+      .limit(RENTAL_LIMIT),
+    // Bu ayın tahakkukları (tahsilat/bekleyen toplamları + satır durumu)
+    supabase.from("rent_charges").select("rental_id, amount, status").eq("period", curPeriodPrefix).limit(CHARGE_LIMIT),
+    // Geciken tahakkuklar (hangi dönemde olursa olsun) — satır işareti için kira kimlikleri
+    supabase.from("rent_charges").select("rental_id").eq("status", "overdue").limit(CHARGE_LIMIT),
+    supabase.from("rent_charges").select("id", { count: "exact", head: true }).eq("status", "overdue"),
+    supabase.from("maintenance_requests").select("rental_id").neq("status", "done").limit(CHARGE_LIMIT),
+    supabase.from("rentals").select("id", { count: "exact", head: true }).eq("status", "active"),
+    savedViewsPromise,
+  ]);
+
+  const rentals = rentalRes.data ?? [];
+  const rentalTotal = rentalRes.count ?? rentals.length;
+  const truncated = rentalTotal > rentals.length;
+  const curCharges = curChargeRes.data ?? [];
+  const sumsReliable = curCharges.length < CHARGE_LIMIT;
+
+  const curMonthByRental = new Map<string, string>();
   let paidSum = 0;
   let pendingSum = 0;
-  let overdueCount = 0;
-  for (const c of charges) {
-    const period = String(c.period).slice(0, 10);
-    if (period === curPeriodPrefix) {
-      curMonthByRental.set(c.rental_id as string, c);
-      if (c.status === "paid") paidSum += Number(c.amount);
-      if (c.status === "pending") pendingSum += Number(c.amount);
-    }
-    if (c.status === "overdue") {
-      overdueCount += 1;
-      overdueRentals.add(c.rental_id as string);
-    }
+  for (const c of curCharges) {
+    curMonthByRental.set(String(c.rental_id), String(c.status));
+    if (c.status === "paid") paidSum += Number(c.amount);
+    if (c.status === "pending") pendingSum += Number(c.amount);
   }
-
-  const openMaintRentals = new Set<string>();
-  let openMaint = 0;
-  for (const m of maints) {
-    if (m.status !== "done") {
-      openMaint += 1;
-      openMaintRentals.add(m.rental_id as string);
-    }
-  }
-
-  const activeCount = rentals.filter((r) => r.status === "active").length;
+  const overdueRentals = new Set((overdueChargeRes.data ?? []).map((c) => String(c.rental_id)));
+  const overdueCount = overdueHead.count ?? 0;
+  const openMaintRentals = new Set((maintRes.data ?? []).map((m) => String(m.rental_id)));
+  const openMaint = (maintRes.data ?? []).length;
+  const activeCount = activeHead.count ?? 0;
 
   // ---- Yenileme radarı: yıldönümü YA DA sözleşme bitişi 60 gün içinde ----
-  const in60 = daysFromNowIso(60).slice(0, 10);
-  const canEdit = perms.rentals?.includes("edit") ?? false;
   const renewalRadar = rentals
     .filter((r) => r.status === "active")
     .flatMap((r) => {
@@ -166,305 +173,253 @@ export default async function KiralamaPage({
     })
     .sort((a, b) => (a.renewalDate < b.renewalDate ? -1 : 1));
 
-  // ---- Sözleşme yaşam döngüsü: her kayıt tek evreye düşer (öncelik sıralı) ----
+  // ---- Sözleşme yaşam döngüsü ----
   const renewalIds = new Set(renewalRadar.map(({ rental }) => String(rental.id)));
   const yeni90 = daysAgoIso(90).slice(0, 10);
-  const evreOf = (r: (typeof rentals)[number]): Evre => {
-    if (r.status !== "active") return "bitti";
-    if (r.end_date && r.end_date >= today && r.end_date <= in30) return "bitiyor";
-    if (renewalIds.has(String(r.id))) return "yenileme";
-    if (String(r.start_date) >= yeni90) return "yeni";
-    return "devam";
-  };
-  const evreCounts: Record<Evre, number> = { yeni: 0, devam: 0, yenileme: 0, bitiyor: 0, bitti: 0 };
-  for (const r of rentals) evreCounts[evreOf(r)] += 1;
+  const evreCtx = { today, in30, yeni90, renewalIds };
+  const evreOfRental = (r: { id: string; status: string; start_date: string; end_date: string | null }) => evreOf(r, evreCtx);
+  const evreCounts: Record<string, number> = { yeni: 0, devam: 0, yenileme: 0, bitiyor: 0, bitti: 0 };
+  for (const r of rentals) {
+    evreCounts[evreOfRental({ id: String(r.id), status: String(r.status), start_date: String(r.start_date), end_date: r.end_date ? String(r.end_date) : null })] += 1;
+  }
 
-  // Liste filtreleri — KPI kartlarının drill-down hedefleri
+  // ---- Liste filtreleri (arama + KPI drill-down hedefleri) ----
+  const filterCtx = {
+    evreOf: evreOfRental,
+    openMaintRentals,
+    overdueRentals,
+    curMonthStatus: (id: string) => curMonthByRental.get(id),
+  };
   const filtered = rentals.filter((r) => {
-    if (evreF && evreOf(r) !== evreF) return false;
-    if (arizaF && !openMaintRentals.has(r.id as string)) return false;
-    if (durumF === "overdue") return overdueRentals.has(r.id as string);
-    if (durumF === "paid") return curMonthByRental.get(r.id as string)?.status === "paid";
-    if (durumF === "pending") return curMonthByRental.get(r.id as string)?.status === "pending";
-    return true;
+    const prop = rel(r.property);
+    const renter = rel(r.renter);
+    return matchesRentalFilters(
+      {
+        id: String(r.id),
+        status: String(r.status),
+        start_date: String(r.start_date),
+        end_date: r.end_date ? String(r.end_date) : null,
+        text: `${prop?.title ?? ""} ${prop?.property_code ?? ""} ${renter?.full_name ?? ""}`.toLocaleLowerCase("tr-TR"),
+      },
+      { evre: evreF, ariza: arizaF, durum: durumF, q },
+      filterCtx,
+    );
+  });
+  const win = pageWindow(page, filtered.length, PAGE_SIZE, filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).length);
+  const pageRows = filtered.slice(win.offset, win.offset + PAGE_SIZE);
+
+  const viewModels: RentalVM[] = pageRows.map((r) => {
+    const prop = rel(r.property);
+    const renter = rel(r.renter);
+    const curStatus = curMonthByRental.get(String(r.id));
+    // Sonraki vade: bu ay ödenmişse gelecek ay, değilse bu ayın vadesi
+    const dueMonth = curStatus === "paid" ? nextMonthOf(curMonth) : curMonth;
+    const nextDue = dueDateOf(dueMonth, Number(r.due_day));
+    const active = r.status === "active";
+    const evre = evreOfRental({ id: String(r.id), status: String(r.status), start_date: String(r.start_date), end_date: r.end_date ? String(r.end_date) : null });
+    return {
+      id: String(r.id),
+      href: `${PATH}/${r.id}`,
+      propertyId: prop?.id ?? null,
+      propertyLabel: prop ? (prop.title ?? prop.property_code) : null,
+      renterId: renter?.id ?? null,
+      renterName: renter?.full_name ?? null,
+      rent: money(Number(r.monthly_rent)),
+      nextDue: active ? dateLabel(nextDue) : null,
+      duePast: active && nextDue < today,
+      active,
+      evreLabel: EVRE_META[evre].label,
+      evreTone: EVRE_META[evre].tone,
+      endingSoon: Boolean(active && r.end_date && r.end_date >= today && r.end_date <= in30),
+      overdue: overdueRentals.has(String(r.id)),
+      maintenance: openMaintRentals.has(String(r.id)),
+    };
   });
 
+  const kpis: KpiItem[] = [
+    { label: "Aktif kira", value: activeCount, icon: <KeyRound />, tone: "info", href: hrefWith({ durum: "", ariza: "", evre: "" }), hint: "sürmekte olan kira" },
+  ];
+  if (sumsReliable) {
+    kpis.push({ label: "Bu ay tahsilat", value: money(paidSum), icon: <Wallet />, tone: "success", href: hrefWith({ durum: "paid", evre: "" }), hint: "ödenen tahakkuk" });
+    kpis.push({ label: "Bu ay bekleyen", value: money(pendingSum), icon: <Hourglass />, tone: "warning", href: hrefWith({ durum: "pending", evre: "" }), hint: "vadesi gelmemiş/ödenmemiş" });
+  }
+  kpis.push({ label: "Geciken tahakkuk", value: overdueCount, icon: <AlertTriangle />, tone: "danger", href: hrefWith({ durum: "overdue", evre: "" }), attention: true, hint: "tüm dönemler" });
+  kpis.push({ label: "Açık arıza", value: openMaint, icon: <Wrench />, tone: openMaint > 0 ? "warning" : "neutral", href: hrefWith({ ariza: "acik", evre: "" }), hint: "bakım talebi" });
+
+  const chips = buildActiveChips(PATH, urlParams, [
+    { key: "q", label: "Arama" },
+    { key: "evre", label: "Evre", format: (v) => EVRE_META[v as Evre]?.label ?? v },
+    { key: "durum", label: "Tahsilat", format: (v) => DURUM_LABELS[v as DurumFilter] ?? v },
+    { key: "ariza", label: "Arıza", format: () => "Açık arıza" },
+  ]);
+
   return (
-    <div className="space-y-6">
-      <PageHeader title="Kiralama" eyebrow="Mülk yönetimi" description="Kira sözleşmeleri, aylık tahakkuklar ve bakım talepleri tek yerde." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-2">
-            <Link
-              href="/app/kira-artis"
-              className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/8 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-white/15"
-            >
+    <div className="space-y-5">
+      <PageHeader
+        title="Kiralama"
+        eyebrow="Mülk yönetimi"
+        description="Kira sözleşmeleri, aylık tahakkuklar ve bakım talepleri tek yerde."
+        actions={
+          <>
+            <ButtonLink href="/app/kira-artis" variant="secondary" size="sm">
               Kira artış hesaplayıcı
-            </Link>
-            <ExportCsvButton
-              label="Dışa aktar"
-              action={exportRentalsCsv.bind(null, { durum: durumF, ariza: arizaF ? "acik" : "", evre: evreF })}
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
-            />
+            </ButtonLink>
+            <ExportCsvButton label="Dışa aktar" action={exportRentalsCsv.bind(null, { durum: durumF, ariza: arizaF ? "acik" : "", evre: evreF })} />
             {canCreate ? <ButtonLink href="/app/kiralama/yeni" icon={Plus}>Yeni kira kaydı</ButtonLink> : null}
-          </div></div>
-} />
+          </>
+        }
+      />
 
-      {/* KPI'lar — hepsi tıklanınca listeyi süzer ("sıfır çıkmaz metrik") */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard label="Aktif kira" value={activeCount} icon={KeyRound} href="/app/kiralama" />
-        <StatCard label="Bu ay tahsilat" value={money(paidSum)} icon={Wallet} tone="success" href="/app/kiralama?durum=paid" />
-        <StatCard label="Bu ay bekleyen" value={money(pendingSum)} icon={Hourglass} tone="warning" href="/app/kiralama?durum=pending" />
-        <StatCard label="Geciken tahakkuk (ay)" value={overdueCount} icon={AlertTriangle} tone="danger" href="/app/kiralama?durum=overdue" />
-        <StatCard label="Açık arıza" value={openMaint} icon={Wrench} tone={openMaint > 0 ? "warning" : "neutral"} href="/app/kiralama?ariza=acik" />
-      </div>
-
-      {/* Sözleşme yaşam döngüsü — portföyün evre dağılımı; her segment/çip listeyi süzer */}
-      {rentals.length > 0 ? (
-        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-ink-950">
-              <Activity className="h-4 w-4 text-brand-600" /> Sözleşme yaşam döngüsü
-            </h2>
-            <p className="text-xs text-text-muted">
-              {rentals.length} sözleşme — imzadan yenilemeye, tüm evreler tek şeritte.
-            </p>
-          </div>
-          <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-ink-950/6" role="img" aria-label="Sözleşme evre dağılımı">
-            {EVRELER.map((e) =>
-              evreCounts[e] > 0 ? (
-                <div
-                  key={e}
-                  className={`h-full ${EVRE_META[e].bar} transition-all`}
-                  style={{ width: `${(evreCounts[e] / rentals.length) * 100}%` }}
-                  title={`${EVRE_META[e].label}: ${evreCounts[e]}`}
-                />
-              ) : null,
-            )}
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {EVRELER.map((e) => (
-              <Link
-                key={e}
-                href={evreF === e ? "/app/kiralama" : `/app/kiralama?evre=${e}`}
-                aria-current={evreF === e ? "page" : undefined}
-                className={`focus-ring press inline-flex min-h-10 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                  evreF === e
-                    ? "border-brand-400/50 bg-brand-600/10 text-brand-700"
-                    : "border-line bg-canvas text-text-muted hover:border-brand-300 hover:text-brand-600"
-                }`}
-              >
-                <span className={`h-2 w-2 rounded-full ${EVRE_META[e].dot}`} />
-                {EVRE_META[e].label}
-                <span className={`numeric font-bold ${EVRE_META[e].text}`}>{evreCounts[e]}</span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {/* Yenileme radarı — yıldönümü/bitişi 60 gün içindeki aktif kiralar */}
-      {renewalRadar.length > 0 ? (
-        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-ink-950">
-              <CalendarClock className="h-4 w-4 text-brand-600" /> Yenileme radarı
-              <span className="numeric rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-semibold text-brand-700">
-                {renewalRadar.length}
-              </span>
-            </h2>
-            <p className="text-xs text-text-muted">Önümüzdeki 60 gün — önerilen kira TÜFE tavanına göre hesaplanır (TBK m.344).</p>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {renewalRadar.map(({ rental: r, renewalDate, current, increase }) => {
-              const prop = rel(r.property);
-              const renter = rel(r.renter);
-              const propName = prop?.title ?? prop?.property_code ?? "Portföy";
-              return (
-                <div key={r.id} className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-line bg-canvas p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      {prop ? (
-                        <Link href={`/app/portfoyler/${prop.id}`} className="focus-ring block truncate rounded-[var(--radius-control)] text-sm font-bold text-ink-950 hover:text-brand-600 hover:underline">
-                          {propName}
-                        </Link>
-                      ) : (
-                        <p className="truncate text-sm font-bold text-ink-950">{propName}</p>
-                      )}
-                      {renter ? (
-                        <Link href={`/app/musteriler/${renter.id}`} className="focus-ring rounded-[var(--radius-control)] text-xs text-text-muted hover:text-brand-600 hover:underline">
-                          {renter.full_name ?? "İsimsiz"}
-                        </Link>
-                      ) : (
-                        <p className="text-xs text-text-muted">—</p>
-                      )}
-                    </div>
-                    <Badge variant="warning" size="sm" className="shrink-0">
-                      +%{increase.appliedRate.toFixed(1)}
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="rounded-[var(--radius-control)] bg-surface p-2">
-                      <p className="text-xs text-text-muted">Mevcut kira</p>
-                      <p className="text-sm font-bold text-ink-950">{money(current)}</p>
-                    </div>
-                    <div className="rounded-[var(--radius-control)] bg-surface p-2">
-                      <p className="text-xs text-text-muted">Yenileme</p>
-                      <p className="text-sm font-bold text-ink-950">{dateLabel(renewalDate)}</p>
-                    </div>
-                    <div className="rounded-[var(--radius-control)] bg-surface p-2">
-                      <p className="text-xs text-text-muted">Önerilen</p>
-                      <p className="text-sm font-bold text-mint-600">{money(increase.newRent)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <Link href={`/app/kiralama/${r.id}`} className="focus-ring rounded-[var(--radius-control)] text-xs font-semibold text-brand-600 hover:underline">
-                      Kira detayı
-                    </Link>
-                    {canEdit ? (
-                      <ApplyIncreaseDialog
-                        rentalId={String(r.id)}
-                        propertyName={propName}
-                        currentRent={current}
-                        suggestedRent={increase.newRent}
-                        appliedRate={increase.appliedRate}
-                        renewalDate={renewalDate}
-                      />
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
-
-      {/* Aktif filtre çipleri */}
-      {durumF || arizaF || evreF ? (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-text-muted">Filtre:</span>
-          {evreF ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1 text-xs font-semibold text-brand-700">
-              {EVRE_META[evreF].label}
-              <Link href="/app/kiralama" aria-label="Evre filtresini temizle" className="focus-ring rounded-full hover:text-brand-900">
-                <X className="h-3.5 w-3.5" />
-              </Link>
-            </span>
-          ) : null}
-          {durumF ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1 text-xs font-semibold text-brand-700">
-              {DURUM_LABELS[durumF]}
-              <Link href={arizaF ? "/app/kiralama?ariza=acik" : "/app/kiralama"} aria-label="Durum filtresini temizle" className="focus-ring rounded-full hover:text-brand-900">
-                <X className="h-3.5 w-3.5" />
-              </Link>
-            </span>
-          ) : null}
-          {arizaF ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-3 py-1 text-xs font-semibold text-amber-700">
-              Açık arıza
-              <Link href={durumF ? `/app/kiralama?durum=${durumF}` : "/app/kiralama"} aria-label="Arıza filtresini temizle" className="focus-ring rounded-full hover:text-amber-900">
-                <X className="h-3.5 w-3.5" />
-              </Link>
-            </span>
-          ) : null}
-          <span className="numeric text-xs text-text-faint">{filtered.length} kayıt</span>
-        </div>
-      ) : null}
-
-      {filtered.length === 0 ? (
+      {rentals.length === 0 && rentalTotal === 0 ? (
         <EmptyState
           icon={KeyRound}
-          title={rentals.length === 0 ? "Henüz kira kaydı yok" : "Filtreye uyan kayıt yok"}
-          description={
-            rentals.length === 0
-              ? "Portföyünüzdeki kiralık mülkleri kiracısıyla eşleştirip aylık tahakkukları buradan takip edin."
-              : "Filtreyi temizleyip tüm kira kayıtlarını görüntüleyebilirsiniz."
-          }
+          title="Henüz kira kaydı yok"
+          description="Portföyünüzdeki kiralık mülkleri kiracısıyla eşleştirip aylık tahakkukları buradan takip edin."
           tone="brand"
-          action={
-            rentals.length > 0
-              ? { href: "/app/kiralama", label: "Filtreyi temizle" }
-              : canCreate
-                ? {
-                    href: "/app/kiralama/yeni",
-                    label: "Yeni kira kaydı",
-                  }
-                : undefined
-          }
+          action={canCreate ? { href: "/app/kiralama/yeni", label: "Yeni kira kaydı" } : undefined}
         />
       ) : (
-        <TableFrame minWidth={860}>
-          <Table>
-            <THead>
-              <TR>
-                <TH>Portföy</TH>
-                <TH>Kiracı</TH>
-                <TH align="right">Aylık kira</TH>
-                <TH>Sonraki vade</TH>
-                <TH>Durum</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {filtered.map((r) => {
-                const prop = rel(r.property);
-                const renter = rel(r.renter);
-                const cur = curMonthByRental.get(r.id as string);
-                // Sonraki vade: bu ay ödenmişse gelecek ay, değilse bu ayın vadesi
-                const dueMonth = cur?.status === "paid" ? nextMonthOf(curMonth) : curMonth;
-                const nextDue = dueDateOf(dueMonth, Number(r.due_day));
-                const duePast = r.status === "active" && nextDue < today;
-                const active = r.status === "active";
-                const endingSoon = active && r.end_date && r.end_date >= today && r.end_date <= in30;
-                return (
-                  <TR key={r.id} interactive>
-                    <TD className="font-semibold text-ink-950">
-                      {/* Satır örtü linki → kira detayına gider */}
-                      <Link
-                        href={`/app/kiralama/${r.id}`}
-                        className="absolute inset-0"
-                        aria-label={`${prop?.title ?? prop?.property_code ?? "Kira kaydı"} kira detayını aç`}
-                      />
-                      {prop ? (
-                        <Link href={`/app/portfoyler/${prop.id}`} className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-brand-600 hover:underline">
-                          {prop.title ?? prop.property_code}
-                        </Link>
-                      ) : (
-                        "—"
-                      )}
-                    </TD>
-                    <TD className="text-text-muted">
-                      {renter ? (
-                        <Link href={`/app/musteriler/${renter.id}`} className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-ink-950 hover:text-brand-600 hover:underline">
-                          {renter.full_name ?? "İsimsiz"}
-                        </Link>
-                      ) : (
-                        "—"
-                      )}
-                    </TD>
-                    <TD align="right" className="font-bold text-ink-950">{money(Number(r.monthly_rent))}</TD>
-                    <TD className={duePast ? "font-semibold text-danger-600" : "text-text-muted"}>
-                      {active ? dateLabel(nextDue) : "—"}
-                    </TD>
-                    <TD>
-                      <span className="inline-flex flex-wrap items-center gap-1.5">
-                        <Badge variant={active ? "success" : "outline"} size="sm">
-                          {active ? "Aktif" : "Bitti"}
+        <>
+          <KpiStrip items={kpis} />
+
+          {/* Yenileme radarı — yıldönümü/bitişi 60 gün içindeki aktif kiralar */}
+          {renewalRadar.length > 0 ? (
+            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 text-sm font-bold text-ink-950">
+                  <CalendarClock className="h-4 w-4 text-brand-600" /> Yenileme radarı
+                  <span className="numeric rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-semibold text-brand-700">{renewalRadar.length}</span>
+                </h2>
+                <p className="text-xs text-text-muted">Önümüzdeki 60 gün — önerilen kira TÜFE tavanına göre hesaplanır (TBK m.344).</p>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {renewalRadar.map(({ rental: r, renewalDate, current, increase }) => {
+                  const prop = rel(r.property);
+                  const renter = rel(r.renter);
+                  const propName = prop?.title ?? prop?.property_code ?? "Portföy";
+                  return (
+                    <div key={r.id} className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-line bg-canvas p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          {prop ? (
+                            <Link href={`/app/portfoyler/${prop.id}`} className="focus-ring block truncate rounded-[var(--radius-control)] text-sm font-bold text-ink-950 hover:text-brand-600 hover:underline">
+                              {propName}
+                            </Link>
+                          ) : (
+                            <p className="truncate text-sm font-bold text-ink-950">{propName}</p>
+                          )}
+                          {renter ? (
+                            <Link href={`/app/musteriler/${renter.id}`} className="focus-ring rounded-[var(--radius-control)] text-xs text-text-muted hover:text-brand-600 hover:underline">
+                              {renter.full_name ?? "İsimsiz"}
+                            </Link>
+                          ) : (
+                            <p className="text-xs text-text-muted">—</p>
+                          )}
+                        </div>
+                        <Badge variant="warning" size="sm" className="shrink-0">
+                          +%{increase.appliedRate.toFixed(1)}
                         </Badge>
-                        {endingSoon ? (
-                          <Badge variant="warning" size="sm">Sözleşme bitiyor</Badge>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="rounded-[var(--radius-control)] bg-surface p-2">
+                          <p className="text-xs text-text-muted">Mevcut kira</p>
+                          <p className="text-sm font-bold text-ink-950">{money(current)}</p>
+                        </div>
+                        <div className="rounded-[var(--radius-control)] bg-surface p-2">
+                          <p className="text-xs text-text-muted">Yenileme</p>
+                          <p className="text-sm font-bold text-ink-950">{dateLabel(renewalDate)}</p>
+                        </div>
+                        <div className="rounded-[var(--radius-control)] bg-surface p-2">
+                          <p className="text-xs text-text-muted">Önerilen</p>
+                          <p className="text-sm font-bold text-mint-600">{money(increase.newRent)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <Link href={`/app/kiralama/${r.id}`} className="focus-ring rounded-[var(--radius-control)] text-xs font-semibold text-brand-600 hover:underline">
+                          Kira detayı
+                        </Link>
+                        {canEdit ? (
+                          <ApplyIncreaseDialog
+                            rentalId={String(r.id)}
+                            propertyName={propName}
+                            currentRent={current}
+                            suggestedRent={increase.newRent}
+                            appliedRate={increase.appliedRate}
+                            renewalDate={renewalDate}
+                          />
                         ) : null}
-                        {overdueRentals.has(r.id as string) ? (
-                          <Badge variant="danger" size="sm">Gecikme</Badge>
-                        ) : null}
-                        {openMaintRentals.has(r.id as string) ? (
-                          <Badge variant="warning" size="sm">Arıza</Badge>
-                        ) : null}
-                      </span>
-                    </TD>
-                  </TR>
-                );
-              })}
-            </TBody>
-          </Table>
-        </TableFrame>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+
+          <ListToolbar
+            pathname={PATH}
+            params={urlParams}
+            searchPlaceholder="Portföy veya kiracı ara…"
+            searchLabel="Kira ara"
+            panelParamKeys={["durum", "ariza"]}
+            panel={
+              <FilterGrid>
+                <FilterSelect
+                  name="durum"
+                  label="Tahsilat durumu"
+                  value={durumF}
+                  options={[{ value: "", label: "Tümü" }, ...DURUM_FILTERS.map((d) => ({ value: d, label: DURUM_LABELS[d] }))]}
+                />
+                <FilterSelect
+                  name="ariza"
+                  label="Bakım"
+                  value={arizaF ? "acik" : ""}
+                  options={[
+                    { value: "", label: "Tümü" },
+                    { value: "acik", label: "Açık arızası olan" },
+                  ]}
+                />
+              </FilterGrid>
+            }
+            densityParam="yogunluk"
+            chips={chips}
+            resultCount={chips.length > 0 ? filtered.length : undefined}
+            savedViews={<SavedViews route={PATH} views={savedViews} currentParams={savedViewParams} />}
+          />
+
+          <CategoryChips
+            options={EVRELER.map((e) => ({ value: e, label: EVRE_META[e].label }))}
+            counts={truncated ? null : evreCounts}
+            total={truncated ? null : rentals.length}
+            active={evreF}
+            pathname={PATH}
+            params={urlParams}
+            paramName="evre"
+            label="Sözleşme evresi"
+          />
+
+          {truncated ? (
+            <ListLimitNotice shown={rentals.length} total={rentalTotal} hint="Arama ve süzgeçler son eklenen kayıtlar içinde çalışır; evre sayaçları gizlendi." />
+          ) : null}
+
+          {filtered.length === 0 ? (
+            <EmptyState
+              icon={Search}
+              illustration="search"
+              title="Eşleşen kira kaydı bulunamadı"
+              description="Arama ifadenizi ya da filtreleri değiştirip tekrar deneyin."
+              tone="brand"
+              action={{ href: PATH, label: "Filtreleri temizle" }}
+            />
+          ) : (
+            <>
+              <RentalTable rows={viewModels} density={density} />
+              <RentalMobileList rows={viewModels} />
+            </>
+          )}
+
+          <ListPager pathname={PATH} params={urlParams} window={win} total={filtered.length} />
+        </>
       )}
     </div>
   );

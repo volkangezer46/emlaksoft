@@ -30,6 +30,20 @@ export function bucketByWeek(isos: ReadonlyArray<string | null | undefined>, now
   return buckets;
 }
 
+/**
+ * Tarama tabanlı haftalık seri: tarama `scanLimit`e dayandıysa (kesilmiş olabilir) seri
+ * GÜVENİLİR DEĞİLDİR → undefined (çubuk/trend çizilmez, yaklaşık sayı uydurulmaz).
+ */
+export function weeklySeriesOf(
+  isos: ReadonlyArray<string | null | undefined>,
+  nowMs: number,
+  scanLimit: number,
+  weeks = 8,
+): number[] | undefined {
+  if (isos.length >= scanLimit) return undefined;
+  return bucketByWeek(isos, nowMs, weeks);
+}
+
 export type Trend = {
   dir: "up" | "down" | "flat";
   /** Yüzde değişim; önceki dönem 0 ise hesaplanamaz (null). */
@@ -87,6 +101,8 @@ export function buildCategoryChips(args: {
   pathname: string;
   params: ParamRecord;
   paramName?: string;
+  /** "Tümü" çipinin etiketi (varsayılan görünüm "Tümü" değilse, ör. "Açık talepler"). */
+  allLabel?: string;
 }): CategoryChipModel[] {
   const { options, counts, total, active, pathname, params } = args;
   const paramName = args.paramName ?? "kategori";
@@ -99,7 +115,7 @@ export function buildCategoryChips(args: {
     }
   }
   const chips: CategoryChipModel[] = [
-    { value: "", label: "Tümü", count: total ?? undefined, href: hrefFor(""), active: !active },
+    { value: "", label: args.allLabel ?? "Tümü", count: total ?? undefined, href: hrefFor(""), active: !active },
   ];
   for (const opt of all) {
     const count = counts ? (counts[opt.value] ?? 0) : undefined;
@@ -152,6 +168,62 @@ export function hiddenFields(params: ParamRecord, ownKeys: readonly string[], pa
     out.push([key, raw]);
   }
   return out;
+}
+
+const UUID_PARAM_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Doğrulanmış uuid paramı (ör. `?danisman=<profil id>`): geçersiz/boş değer "" döner,
+ * böylece bozuk param sorguya sızıp listeyi sessizce boşaltmaz.
+ */
+export function uuidParam(value: string | string[] | null | undefined): string {
+  const v = (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
+  return UUID_PARAM_RE.test(v) ? v : "";
+}
+
+/** Yalnız YYYY-MM-DD kabul edilir; aksi halde "". */
+export function isoDateParam(value: string | string[] | null | undefined): string {
+  const v = (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "";
+}
+
+/** `?sayfa=` değerini >= 1 tam sayıya çevirir. */
+export function parsePage(value: string | string[] | null | undefined): number {
+  const v = Array.isArray(value) ? value[0] : value;
+  return Math.max(1, Number.parseInt(v ?? "", 10) || 1);
+}
+
+export type PageWindow = {
+  page: number;
+  totalPages: number;
+  offset: number;
+  rangeStart: number;
+  rangeEnd: number;
+  hasPrev: boolean;
+  hasNext: boolean;
+};
+
+/** Gerçek sayfalama penceresi: toplam, sayfa boyutu ve o sayfadaki satır sayısından. */
+export function pageWindow(page: number, total: number, pageSize: number, rowsOnPage: number): PageWindow {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const offset = (page - 1) * pageSize;
+  return {
+    page,
+    totalPages,
+    offset,
+    rangeStart: total === 0 ? 0 : offset + 1,
+    rangeEnd: Math.min(offset + rowsOnPage, total),
+    hasPrev: page > 1,
+    hasNext: page < totalPages,
+  };
+}
+
+/** Sayfa linki: mevcut filtreler korunur, yalnız `sayfa` değişir (1. sayfada param yok). */
+export function pageHrefOf(pathname: string, params: ParamRecord, n: number): string {
+  const sp = toSearchParams(params);
+  sp.delete("sayfa");
+  if (n > 1) sp.set("sayfa", String(n));
+  return buildHref(pathname, sp);
 }
 
 function toSearchParamsRecord(params: ParamRecord): Record<string, string> {

@@ -8,8 +8,57 @@ import {
   densityOf,
   hasSeries,
   hiddenFields,
+  isoDateParam,
+  pageHrefOf,
+  pageWindow,
+  parsePage,
   trendOf,
+  uuidParam,
+  weeklySeriesOf,
 } from "./list-logic";
+
+describe("uuidParam / isoDateParam / parsePage", () => {
+  it("yalnız geçerli uuid kabul edilir, bozuk değer sorguya sızmaz", () => {
+    const id = "123e4567-e89b-12d3-a456-426614174000";
+    expect(uuidParam(id)).toBe(id);
+    expect(uuidParam(` ${id} `)).toBe(id);
+    expect(uuidParam([id, "x"])).toBe(id);
+    expect(uuidParam("x' or 1=1")).toBe("");
+    expect(uuidParam(undefined)).toBe("");
+  });
+  it("tarih paramı YYYY-MM-DD dışını reddeder", () => {
+    expect(isoDateParam("2026-10-03")).toBe("2026-10-03");
+    expect(isoDateParam("03.10.2026")).toBe("");
+    expect(isoDateParam("")).toBe("");
+  });
+  it("sayfa paramı en az 1", () => {
+    expect(parsePage("3")).toBe(3);
+    expect(parsePage("0")).toBe(1);
+    expect(parsePage("abc")).toBe(1);
+    expect(parsePage(undefined)).toBe(1);
+  });
+});
+
+describe("weeklySeriesOf", () => {
+  it("tarama tavana dayandıysa seri güvenilmez (undefined)", () => {
+    expect(weeklySeriesOf([ago(0), ago(1)], NOW, 2)).toBeUndefined();
+    expect(weeklySeriesOf([ago(0), ago(1)], NOW, 10)?.reduce((a, c) => a + c, 0)).toBe(2);
+  });
+});
+
+describe("pageWindow / pageHrefOf", () => {
+  it("gerçek toplamdan aralık ve sayfa sayısı üretir", () => {
+    const w = pageWindow(2, 120, 50, 50);
+    expect(w).toMatchObject({ totalPages: 3, offset: 50, rangeStart: 51, rangeEnd: 100, hasPrev: true, hasNext: true });
+    const last = pageWindow(3, 120, 50, 20);
+    expect(last).toMatchObject({ rangeStart: 101, rangeEnd: 120, hasNext: false });
+    expect(pageWindow(1, 0, 50, 0)).toMatchObject({ totalPages: 1, rangeStart: 0, rangeEnd: 0 });
+  });
+  it("sayfa linki filtreleri korur, 1. sayfada param yok", () => {
+    expect(pageHrefOf("/app/x", { q: "ev", sayfa: "4", durum: "a" }, 2)).toBe("/app/x?q=ev&durum=a&sayfa=2");
+    expect(pageHrefOf("/app/x", { q: "ev", sayfa: "4" }, 1)).toBe("/app/x?q=ev");
+  });
+});
 
 const NOW = Date.UTC(2026, 9, 3, 12);
 const ago = (weeks: number) => new Date(NOW - weeks * WEEK_MS - 1000).toISOString();

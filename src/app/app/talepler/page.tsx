@@ -1,38 +1,61 @@
-import Link from "next/link";
-import { IntentLink } from "@/components/app/intent-link";
 import { Suspense } from "react";
-import {
-  AlarmClock,
-  ArrowUpRight,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  Crosshair,
-  MapPin,
-  Plus,
-  Sparkles,
-  Target,
-  Users,
-  Wallet,
-} from "lucide-react";
+import { AlarmClock, Crosshair, Flame, Plus, Search, Sparkles, Target } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { daysAgoIso, msSince } from "@/lib/clock";
+import { daysAgoIso, msSince, now } from "@/lib/clock";
 import {
   fetchTenantMatchingWeights,
   scoreDemandProperty,
   type MatchDemand,
   type MatchProperty,
 } from "@/lib/matching";
-import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Skeleton, SkeletonBlock } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/app/empty-state";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportDemandsCsv } from "@/app/actions/export";
+import { listSavedViews } from "@/app/actions/saved-views";
+import { SavedViews } from "@/components/app/saved-views";
+import { relatedSearchClause } from "@/lib/list-search";
+import { buildHref } from "@/lib/ui/filter-params";
+import {
+  CategoryChips,
+  FilterGrid,
+  FilterSelect,
+  KpiStrip,
+  ListPager,
+  ListToolbar,
+  buildActiveChips,
+  densityOf,
+  mergeResetPage,
+  pageWindow,
+  parsePage,
+  uuidParam,
+  weeklySeriesOf,
+  type Density,
+  type KpiItem,
+} from "@/components/ui/list-kit";
+import { DemandMobileList, DemandTable, type DemandVM } from "./demand-rows";
+import {
+  AGING_DAYS,
+  BUDGET_BANDS,
+  DEMAND_STATUS_LABELS,
+  URGENCY_LABELS,
+  budgetLabel,
+  budgetOrFilter,
+  demandAgeLabel,
+  demandStatusTone,
+  parseUrgencyParam,
+  tallyPool,
+  urgencyTone,
+  type BandKey,
+  type PoolRow,
+} from "./demand-list-logic";
 
-type Rel = { id?: string; full_name?: string; name?: string } | { id?: string; full_name?: string; name?: string }[] | null;
+const PATH = "/app/talepler";
+
+type Rel = { id?: string; full_name?: string; name?: string; assigned_to?: string | null } | { id?: string; full_name?: string; name?: string; assigned_to?: string | null }[] | null;
 
 type DemandRow = {
   id: string;
@@ -51,187 +74,123 @@ type DemandRow = {
   province: Rel;
 };
 
-function relOne<T extends { full_name?: string; name?: string; id?: string }>(value: Rel): T | null {
+function relOne<T extends { full_name?: string; name?: string; id?: string; assigned_to?: string | null }>(value: Rel): T | null {
   if (!value) return null;
   return (Array.isArray(value) ? value[0] : value) as T;
 }
 
-function money(value: number | null) {
-  if (value === null) return null;
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(value) + " ₺";
-}
-
-function budgetLabel(min: number | null, max: number | null) {
-  if (min && max) return `${money(min)} – ${money(max)}`;
-  if (max) return `≤ ${money(max)}`;
-  if (min) return `≥ ${money(min)}`;
-  return "Bütçe yok";
-}
-
-const statusLabel: Record<string, string> = {
-  new: "Yeni",
-  active: "Aktif",
-  matched: "Eşleşti",
-  closed: "Kapalı",
-};
-
-const urgencyLabel: Record<string, string> = {
-  low: "Düşük",
-  normal: "Normal",
-  high: "Yüksek",
-  urgent: "Acil",
-};
-
-const URGENCY_VALUES = Object.keys(urgencyLabel);
-
-/** Talebin kaç gündür açık olduğu (tam gün). */
-function ageDays(iso: string) {
-  return Math.floor(msSince(iso) / 86_400_000);
-}
-
-/** Talep yaşı — kartta "kaç gündür açık" göstergesi. */
-function demandAge(iso: string, status: string) {
-  const days = ageDays(iso);
-  if (status === "closed") return days <= 0 ? "Bugün açıldı" : `${days} gün önce açıldı`;
-  if (days <= 0) return "Bugün açıldı";
-  if (days === 1) return "1 gündür açık";
-  return `${days} gündür açık`;
-}
-
-/** Yaşlanan talep eşiği (gün) — uyarı şeridi + ?yas= filtresi. */
-const AGING_DAYS = 30;
-
-// ── Bütçe segmentasyon bantları (bütçe üst sınırı, yoksa alt sınır esas) ────
-const BUDGET_BANDS = [
-  { key: "2m", label: "≤ 2 Mn ₺", min: 0, max: 2_000_000 },
-  { key: "5m", label: "2–5 Mn ₺", min: 2_000_000, max: 5_000_000 },
-  { key: "10m", label: "5–10 Mn ₺", min: 5_000_000, max: 10_000_000 },
-  { key: "10m+", label: "10 Mn ₺ üzeri", min: 10_000_000, max: Infinity },
-] as const;
-type BandKey = (typeof BUDGET_BANDS)[number]["key"];
-
-function bandOf(d: { budget_min: number | null; budget_max: number | null }): BandKey | null {
-  const v = d.budget_max ?? d.budget_min;
-  if (v == null) return null;
-  const n = Number(v);
-  const band = BUDGET_BANDS.find((b) => n > b.min && n <= b.max) ?? (n === 0 ? BUDGET_BANDS[0] : null);
-  return band?.key ?? null;
-}
-
-/**
- * Bütçe bandını Supabase `.or()` filtresine çevirir — segment bellekte değil
- * sunucuda kesilsin (200'ü aşan ofiste band filtresi doğru çalışsın).
- * Karar değeri: `coalesce(budget_max, budget_min)`; band aralığı (min, max].
- */
-function budgetOrFilter(key: BandKey): string {
-  const band = BUDGET_BANDS.find((b) => b.key === key)!;
-  // İlk bant (min=0) 0 değerini de kapsar (bandOf'taki n===0 kuralı) → gte.
-  const lo = band.min === 0 ? "gte" : "gt";
-  const hiMax = Number.isFinite(band.max) ? `,budget_max.lte.${band.max}` : "";
-  const hiMin = Number.isFinite(band.max) ? `,budget_min.lte.${band.max}` : "";
-  return `and(budget_max.${lo}.${band.min}${hiMax}),and(budget_max.is.null,budget_min.${lo}.${band.min}${hiMin})`;
-}
-
-/** Sayfa başına kayıt — gerçek sayfalama, 200'lük sessiz dilim yerine. */
+/** Sayfa başına kayıt — gerçek sayfalama. */
 const PAGE_SIZE = 50;
 
 /**
- * Segmentasyon şeridi (bütçe bantları + en yoğun iller) havuz sınırı: bantlar
- * TS'te (bandOf) türetildiğinden şerit sayıları filtrelenmiş listenin ilk
- * POOL_LIMIT kaydından hesaplanır. Liste FİLTRESİ ise (il/bütçe/yaş) sunucuda
- * çalışır — bu yüzden yalnız şerit "yaklaşık", liste her ofis boyutunda doğru.
+ * Segment çipleri (bütçe bantları + en yoğun iller) havuz sınırı: bantlar TS'te türetildiğinden
+ * sayılar filtrelenmiş listenin ilk POOL_LIMIT kaydından hesaplanır. Havuz tavana dayanırsa
+ * sayılar GİZLENİR (yaklaşık sayı gösterilmez); liste FİLTRESİ ise her zaman sunucuda doğru çalışır.
  */
 const POOL_LIMIT = 500;
-
-const PAGER_BTN =
-  "focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
-const PAGER_BTN_DISABLED =
-  "inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
-
-type DemandHref = (patch: { status?: string; aciliyet?: string; il?: string; butce?: string; yas?: string }) => string;
+const SERIES_SCAN_LIMIT = 2000;
+const OPEN_STATUSES = ["new", "active", "matched"];
 
 type Matches = Map<string, { strong: number; good: number; best: number }>;
 
-type PoolRow = { status: string; budget_min: number | null; budget_max: number | null; province_id: string | null; province: Rel };
-
-/** Sayfa düzeyinde BAŞLATILAN (await edilmeyen) sorgular — her bölüm kendi Suspense sınırında bekler. */
 type Pending = {
   /** Sayfa dilimi + gerçek toplam + eşleşme potansiyeli (liste, portföy havuzu ve ofis ağırlıklarından türer). */
   listP: Promise<{ rows: DemandRow[]; total: number; matchByDemand: Matches }>;
-  urgentP: Promise<number>;
-  agingP: Promise<number>;
   poolP: Promise<PoolRow[]>;
-};
-
-type Ctx = {
-  yasF: boolean;
-  ilF: string;
-  butceF: BandKey | "";
-  canCreate: boolean;
-  page: number;
-  demandHref: DemandHref;
-  pageHref: (n: number) => string;
 };
 
 export default async function DemandsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; aciliyet?: string; yas?: string; il?: string; butce?: string; sayfa?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    status?: string;
+    aciliyet?: string;
+    yas?: string;
+    il?: string;
+    butce?: string;
+    danisman?: string;
+    sayfa?: string;
+    yogunluk?: string;
+  }>;
 }) {
   const { perms } = await requireModulePage("demands");
   const canCreate = (perms.demands ?? []).includes("create");
   const sp = await searchParams;
   const supabase = await createClient();
+  const savedViewsPromise = listSavedViews(PATH);
 
-  // ?aciliyet= virgülle birden çok değer alır (örn. "Acil / yüksek" KPI'sı
-  // high,urgent gönderir) — yalnızca DB'de geçen değerler kabul edilir.
-  const aciliyetValues = (sp.aciliyet ?? "")
-    .split(",")
-    .map((v) => v.trim())
-    .filter((v) => URGENCY_VALUES.includes(v));
+  // ?aciliyet= virgülle birden çok değer alır (örn. "Acil / yüksek" KPI'sı high,urgent gönderir).
+  const aciliyetValues = parseUrgencyParam(sp.aciliyet);
   const aciliyetF = aciliyetValues.join(",");
-
-  // ── Liste-kesen kullanıcı filtreleri: ?il= (province_id) ?butce= ?yas= ──────
-  // Eskiden .limit(200) sonrası bellekte (array.filter) uygulanıyordu; 200'ü
-  // aşan ofiste filtre yalnız ilk 200 kayıtta çalışıp yanlış "sonuç yok"
-  // veriyordu. Artık üçü de Supabase sorgusuna itiliyor.
-  const ilF = (sp.il ?? "").trim();
-  const butceF = BUDGET_BANDS.some((b) => b.key === sp.butce) ? (sp.butce as BandKey) : "";
+  // Liste-kesen kullanıcı filtreleri: ?il= (province_id, doğrulanmış uuid) ?butce= ?yas= ?danisman= — hepsi sunucuda.
+  const ilF = uuidParam(sp.il);
+  const butceF: BandKey | "" = BUDGET_BANDS.some((b) => b.key === sp.butce) ? (sp.butce as BandKey) : "";
   const yasF = sp.yas === String(AGING_DAYS);
-
-  const page = Math.max(1, Number.parseInt(sp.sayfa ?? "", 10) || 1);
+  // Talepte danışman sütunu yok: danışman = talep sahibi müşterinin atandığı kişi (customers.assigned_to).
+  const danismanF = uuidParam(sp.danisman);
+  const q = (sp.q ?? "").trim().slice(0, 80);
+  const statusF = sp.status === "all" || (sp.status && DEMAND_STATUS_LABELS[sp.status]) ? sp.status : "";
+  const density = densityOf(sp.yogunluk);
+  const page = parsePage(sp.sayfa);
   const offset = (page - 1) * PAGE_SIZE;
 
-  // Ana sorgunun kolonları — hem sayfa dilimi hem segment havuzu bu setten çeker.
-  const LIST_COLS =
-    "id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, province_id, district_id, customer:customers!customer_demands_customer_id_fkey(id, full_name), province:geo_provinces(name)";
+  // Doğrulanmış URL durumu — toolbar, çipler, sayfalama ve kayıtlı görünümler TEK kaynaktan beslenir.
+  const urlParams: Record<string, string> = {};
+  if (q) urlParams.q = q;
+  if (statusF) urlParams.status = statusF;
+  if (aciliyetF) urlParams.aciliyet = aciliyetF;
+  if (ilF) urlParams.il = ilF;
+  if (butceF) urlParams.butce = butceF;
+  if (yasF) urlParams.yas = String(AGING_DAYS);
+  if (danismanF) urlParams.danisman = danismanF;
+  if (density === "kompakt") urlParams.yogunluk = "kompakt";
+  const hrefWith = (patch: Record<string, string>) => buildHref(PATH, mergeResetPage(urlParams, patch));
+  const savedViewParams = Object.fromEntries(Object.entries(urlParams).filter(([k]) => k !== "yogunluk"));
 
-  // Temel filtreler (status + aciliyet) — hem listeye hem segment şeridi havuzuna.
-  const buildBase = (select: string, opts?: { count: "exact"; head?: boolean }) => {
-    let q = supabase.from("customer_demands").select(select, opts);
-    if (sp.status && sp.status !== "all") q = q.eq("status", sp.status);
-    else if (!sp.status) q = q.in("status", ["new", "active", "matched"]);
-    if (aciliyetValues.length > 0) q = q.in("urgency", aciliyetValues);
-    return q;
+  const search = await relatedSearchClause(supabase, q, {
+    customerColumn: "customer_id",
+    extraColumns: ["property_type", "rooms"],
+  });
+
+  // Danışman filtresi müşteri üzerinden: inner gömme + embed alanı filtresi (FK adıyla).
+  const CUSTOMER_FK = "customers!customer_demands_customer_id_fkey";
+  const scopeEmbed = danismanF ? `, customer:${CUSTOMER_FK}!inner(id)` : "";
+  const listCustomerEmbed = danismanF
+    ? `customer:${CUSTOMER_FK}!inner(id, full_name, assigned_to)`
+    : `customer:${CUSTOMER_FK}(id, full_name, assigned_to)`;
+
+  const LIST_COLS = `id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, province_id, district_id, ${listCustomerEmbed}, province:geo_provinces(name)`;
+
+  /** Danışman kapsamı + (isteğe bağlı) durum/aciliyet filtreleriyle temel sorgu. */
+  const buildBase = (select: string, opts?: { count: "exact"; head?: boolean }, useUserFilters = true) => {
+    let query = supabase.from("customer_demands").select(select, opts);
+    if (danismanF) query = query.eq("customer.assigned_to", danismanF);
+    if (useUserFilters) {
+      if (statusF && statusF !== "all") query = query.eq("status", statusF);
+      else if (!statusF) query = query.in("status", OPEN_STATUSES);
+      if (aciliyetValues.length > 0) query = query.in("urgency", aciliyetValues);
+    }
+    return query;
   };
+  /** Kullanıcı filtresi OLMAYAN, yalnız danışman kapsamlı sayaç sorgusu. */
+  const scopeHead = () => buildBase(`id${scopeEmbed}`, { count: "exact", head: true }, false);
 
-  // Liste sorgusu = temel filtreler + il/bütçe/yaş (liste-kesen kullanıcı filtreleri).
   const buildList = (select: string, opts?: { count: "exact"; head?: boolean }) => {
-    let q = buildBase(select, opts);
-    if (ilF) q = q.eq("province_id", ilF);
-    if (butceF) q = q.or(budgetOrFilter(butceF));
-    // Yaşlanan: 30+ gündür açık; kapalılar sayılmaz (orijinal bellek filtresiyle aynı).
-    if (yasF) q = q.lte("created_at", daysAgoIso(AGING_DAYS)).neq("status", "closed");
-    return q;
+    let query = buildBase(select, opts);
+    if (ilF) query = query.eq("province_id", ilF);
+    if (butceF) query = query.or(budgetOrFilter(butceF));
+    // Yaşlanan: 30+ gündür açık; kapalılar sayılmaz.
+    if (yasF) query = query.lte("created_at", daysAgoIso(AGING_DAYS)).neq("status", "closed");
+    if (search.clause) query = query.or(search.clause);
+    return query;
   };
 
   const listQuery = buildList(LIST_COLS, { count: "exact" })
     .order("created_at", { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1);
 
-
-  // Sorgular burada BAŞLATILIR ama await edilmez: başlık/filtreler hemen akar,
-  // ağır havuz/liste bölümleri kendi Suspense sınırında bekler (bağımsız, paralel).
+  // Ağır bölümler (liste + eşleşme skorları, segment havuzu) kendi Suspense sınırında bekler.
   const propsP = Promise.resolve(
     supabase
       .from("properties")
@@ -242,90 +201,155 @@ export default async function DemandsPage({
       .limit(300),
   ).then((res) => res.data);
   const weightsP = fetchTenantMatchingWeights(supabase);
-  const rawListP = Promise.resolve(listQuery);
+  const rawListP = search.empty ? Promise.resolve({ data: [], count: 0 }) : Promise.resolve(listQuery);
 
   const pending: Pending = {
     listP: Promise.all([rawListP, propsP, weightsP]).then(([{ data, count }, propsData, weights]) => {
       const rows = (data ?? []) as unknown as DemandRow[];
-  const matchProps = (propsData ?? []).map((p) => ({
-    ...p,
-    list_price: p.list_price != null ? Number(p.list_price) : null,
-    features: (p.features ?? {}) as MatchProperty["features"],
-  })) as MatchProperty[];
-  const matchByDemand = new Map<string, { strong: number; good: number; best: number }>();
-  for (const d of rows) {
-    if (d.status === "closed") continue;
-    let strong = 0;
-    let good = 0;
-    let best = 0;
-    for (const p of matchProps) {
-      const res = scoreDemandProperty(d as unknown as MatchDemand, p, weights);
-      if (res.score > best) best = res.score;
-      if (res.score >= 75) strong += 1;
-      else if (res.score >= 55) good += 1;
-    }
-    matchByDemand.set(d.id, { strong, good, best });
-  }
+      const matchProps = (propsData ?? []).map((p) => ({
+        ...p,
+        list_price: p.list_price != null ? Number(p.list_price) : null,
+        features: (p.features ?? {}) as MatchProperty["features"],
+      })) as MatchProperty[];
+      const matchByDemand: Matches = new Map();
+      for (const d of rows) {
+        if (d.status === "closed") continue;
+        let strong = 0;
+        let good = 0;
+        let best = 0;
+        for (const p of matchProps) {
+          const res = scoreDemandProperty(d as unknown as MatchDemand, p, weights);
+          if (res.score > best) best = res.score;
+          if (res.score >= 75) strong += 1;
+          else if (res.score >= 55) good += 1;
+        }
+        matchByDemand.set(d.id, { strong, good, best });
+      }
       return { rows, total: count ?? rows.length, matchByDemand };
     }),
-    // Hero "Acil / yüksek" — filtrelenmiş kümedeki gerçek toplam (sayfa dilimi değil).
-    urgentP: Promise.resolve(buildList("id", { count: "exact", head: true }).in("urgency", ["urgent", "high"])).then(
-      (res) => res.count ?? 0,
-    ),
-    // Yaşlanan uyarı şeridi — temel filtreler + 30+ gün açık (yaş filtresinden bağımsız).
-    agingP: Promise.resolve(
-      buildBase("id", { count: "exact", head: true })
-        .lte("created_at", daysAgoIso(AGING_DAYS))
-        .neq("status", "closed"),
-    ).then((res) => res.count ?? 0),
-    // Segment şeridi havuzu (bütçe bantları + en yoğun iller) — türetilmiş, ilk POOL_LIMIT.
     poolP: Promise.resolve(
-      buildBase("id, status, budget_min, budget_max, province_id, province:geo_provinces(name)").limit(POOL_LIMIT),
-    ).then((res) => (res.data ?? []) as unknown as PoolRow[]),
+      buildBase(`id, status, budget_min, budget_max, province_id, province:geo_provinces(name)${scopeEmbed}`).limit(POOL_LIMIT),
+    ).then((res) =>
+      ((res.data ?? []) as unknown as Array<{
+        status: string;
+        budget_min: number | null;
+        budget_max: number | null;
+        province_id: string | null;
+        province: Rel;
+      }>).map((r) => ({
+        status: r.status,
+        budget_min: r.budget_min,
+        budget_max: r.budget_max,
+        province_id: r.province_id,
+        provinceName: relOne<{ name: string }>(r.province)?.name ?? null,
+      })),
+    ),
   };
 
-  // Filtre linkleri diğer parametreleri korur (status ⇄ aciliyet ⇄ il ⇄ bütçe ⇄ yaş).
-  // Filtre değişince sayfa 1'e döner: demandHref sayfa parametresini taşımaz.
-  const demandHref = (patch: { status?: string; aciliyet?: string; il?: string; butce?: string; yas?: string }) => {
-    const status = patch.status !== undefined ? patch.status : (sp.status ?? "");
-    const aciliyet = patch.aciliyet !== undefined ? patch.aciliyet : aciliyetF;
-    const il = patch.il !== undefined ? patch.il : ilF;
-    const butce = patch.butce !== undefined ? patch.butce : butceF;
-    const yas = patch.yas !== undefined ? patch.yas : (yasF ? String(AGING_DAYS) : "");
-    const q = new URLSearchParams();
-    if (status) q.set("status", status);
-    if (aciliyet) q.set("aciliyet", aciliyet);
-    if (il) q.set("il", il);
-    if (butce) q.set("butce", butce);
-    if (yas) q.set("yas", yas);
-    const s = q.toString();
-    return s ? `/app/talepler?${s}` : "/app/talepler";
-  };
+  // ── Hızlı (head-count) veriler: KPI + çip sayaçları + araç çubuğu ───────────────
+  const nowMs = now();
+  const [
+    advisorsRes,
+    savedViews,
+    newRes,
+    activeRes,
+    matchedRes,
+    closedRes,
+    urgentRes,
+    highRes,
+    agingRes,
+    seriesRes,
+    ilRes,
+  ] = await Promise.all([
+    supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
+    savedViewsPromise,
+    scopeHead().eq("status", "new"),
+    scopeHead().eq("status", "active"),
+    scopeHead().eq("status", "matched"),
+    scopeHead().eq("status", "closed"),
+    scopeHead().in("status", OPEN_STATUSES).eq("urgency", "urgent"),
+    scopeHead().in("status", OPEN_STATUSES).eq("urgency", "high"),
+    scopeHead().in("status", OPEN_STATUSES).lte("created_at", daysAgoIso(AGING_DAYS)),
+    buildBase(`created_at${scopeEmbed}`, undefined, false).gte("created_at", daysAgoIso(56)).limit(SERIES_SCAN_LIMIT),
+    ilF ? supabase.from("geo_provinces").select("name").eq("id", ilF).maybeSingle() : Promise.resolve({ data: null }),
+  ]);
 
-  // Sayfalama linki — aktif filtreleri korur, yalnız sayfayı değiştirir.
-  const pageHref = (n: number) => {
-    const base = demandHref({});
-    if (n <= 1) return base;
-    return base + (base.includes("?") ? "&" : "?") + `sayfa=${n}`;
+  const advisors = (advisorsRes.data ?? []).map((a) => ({ id: String(a.id), name: String(a.full_name ?? "") }));
+  const advisorName = new Map(advisors.map((a) => [a.id, a.name]));
+  const statusCounts: Record<string, number> = {
+    new: newRes.count ?? 0,
+    active: activeRes.count ?? 0,
+    matched: matchedRes.count ?? 0,
+    closed: closedRes.count ?? 0,
   };
+  const openTotal = statusCounts.new! + statusCounts.active! + statusCounts.matched!;
+  const allTotal = openTotal + statusCounts.closed!;
+  const urgentCounts: Record<string, number> = { urgent: urgentRes.count ?? 0, high: highRes.count ?? 0 };
+  const urgentTotal = urgentCounts.urgent! + urgentCounts.high!;
+  const agingCount = agingRes.count ?? 0;
+  const weekly = weeklySeriesOf(((seriesRes.data ?? []) as unknown as Array<{ created_at: string }>).map((r) => r.created_at), nowMs, SERIES_SCAN_LIMIT);
+  const ilName = (ilRes.data as { name?: string } | null)?.name ?? null;
 
-  const filters = [
-    { key: "", label: "Açık" },
-    { key: "all", label: "Tümü" },
-    { key: "new", label: "Yeni" },
-    { key: "active", label: "Aktif" },
-    { key: "matched", label: "Eşleşti" },
-    { key: "closed", label: "Kapalı" },
+  const kpis: KpiItem[] = [
+    {
+      label: "Açık talepler",
+      value: openTotal,
+      icon: <Target />,
+      tone: "info",
+      href: hrefWith({ status: "", aciliyet: "", yas: "", il: "", butce: "", q: "" }),
+      series: weekly,
+      showTrend: true,
+      seriesLabel: "haftalık yeni talep",
+      hint: "yeni + aktif + eşleşti",
+    },
+    {
+      label: "Acil / yüksek",
+      value: urgentTotal,
+      icon: <Flame />,
+      tone: "warning",
+      href: hrefWith({ status: "", aciliyet: "high,urgent", yas: "" }),
+      hint: "öncelikli açık talep",
+    },
+    {
+      label: `${AGING_DAYS}+ gündür açık`,
+      value: agingCount,
+      icon: <AlarmClock />,
+      tone: "danger",
+      href: hrefWith({ status: "", yas: String(AGING_DAYS) }),
+      attention: true,
+      hint: "müşteri soğuyor",
+    },
+    {
+      label: "Eşleşti",
+      value: statusCounts.matched!,
+      icon: <Sparkles />,
+      tone: "success",
+      href: hrefWith({ status: "matched", yas: "" }),
+      hint: "portföy eşleşmiş talep",
+    },
   ];
 
-  const urgencyFilters = [
-    { key: "urgent", label: "Acil" },
-    { key: "high", label: "Yüksek" },
+  const chips = buildActiveChips(PATH, urlParams, [
+    { key: "q", label: "Arama" },
+    { key: "status", label: "Durum", format: (v) => (v === "all" ? "Kapalılar dahil" : (DEMAND_STATUS_LABELS[v] ?? v)) },
+    {
+      key: "aciliyet",
+      label: "Aciliyet",
+      format: (v) => v.split(",").map((x) => URGENCY_LABELS[x] ?? x).join(" + "),
+    },
+    { key: "il", label: "İl", format: () => ilName ?? "Seçili il" },
+    { key: "butce", label: "Bütçe", format: (v) => BUDGET_BANDS.find((b) => b.key === v)?.label ?? v },
+    { key: "yas", label: "Açık süre", format: (v) => `${v}+ gün` },
+    { key: "danisman", label: "Danışman", format: (v) => advisorName.get(v) ?? "Seçili danışman" },
+  ]);
+
+  const statusOptions = [
+    ...Object.entries(DEMAND_STATUS_LABELS).map(([value, label]) => ({ value, label })),
+    { value: "all", label: "Kapalılar dahil" },
   ];
-  const ctx: Ctx = { yasF, ilF, butceF, canCreate, page, demandHref, pageHref };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title="Talepler"
         description="Açık talepleri yönetin, bütçe ve konum kriterlerini eşleştirme motoruna bağlayın."
@@ -337,7 +361,7 @@ export default async function DemandsPage({
             <ExportCsvButton
               label="Dışa aktar"
               action={exportDemandsCsv.bind(null, {
-                status: sp.status ?? "",
+                status: statusF,
                 aciliyet: aciliyetF,
                 il: ilF,
                 butce: butceF,
@@ -349,381 +373,219 @@ export default async function DemandsPage({
         }
       />
 
-      <Suspense fallback={<StatsSkeleton />}>
-        <DemandStats ctx={ctx} pending={pending} />
-      </Suspense>
+      {allTotal === 0 && !danismanF ? (
+        <EmptyState
+          icon={Target}
+          illustration="start"
+          title="Henüz talep yok"
+          description="Müşteri detayından ya da “Yeni talep” ile ilk talebi ekleyin; eşleştirme motoru portföyle otomatik karşılaştırır."
+          action={canCreate ? { href: "/app/talepler/yeni", label: "Yeni talep" } : undefined}
+          secondary={{ href: "/app/musteriler", label: "Müşterilere git" }}
+        />
+      ) : (
+        <>
+          <KpiStrip items={kpis} />
 
-      <Suspense fallback={null}>
-        <AgingAlert ctx={ctx} pending={pending} />
-      </Suspense>
-      {yasF ? (
-        <p className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-xs font-semibold text-amber-700">
-          <AlarmClock className="h-3.5 w-3.5" /> Yalnız {AGING_DAYS}+ gündür açık talepler gösteriliyor.
-          <Link href={demandHref({ yas: "" })} className="focus-ring rounded-full underline-offset-2 hover:underline">
-            Filtreyi kaldır ✕
-          </Link>
-        </p>
-      ) : null}
+          <ListToolbar
+            pathname={PATH}
+            params={urlParams}
+            searchPlaceholder="Müşteri, tip veya oda ara…"
+            searchLabel="Talep ara"
+            panelParamKeys={["danisman", "yas"]}
+            panel={
+              <FilterGrid>
+                {advisors.length > 0 ? (
+                  <FilterSelect
+                    name="danisman"
+                    label="Danışman"
+                    value={danismanF}
+                    options={[{ value: "", label: "Tüm danışmanlar" }, ...advisors.map((a) => ({ value: a.id, label: a.name }))]}
+                  />
+                ) : null}
+                <FilterSelect
+                  name="yas"
+                  label="Açık süre"
+                  value={yasF ? String(AGING_DAYS) : ""}
+                  options={[
+                    { value: "", label: "Tümü" },
+                    { value: String(AGING_DAYS), label: `${AGING_DAYS}+ gündür açık` },
+                  ]}
+                />
+              </FilterGrid>
+            }
+            densityParam="yogunluk"
+            chips={chips}
+            savedViews={<SavedViews route={PATH} views={savedViews} currentParams={savedViewParams} />}
+          />
 
-      <div className="flex flex-wrap items-center gap-2">
-        {filters.map((f) => {
-          const active = (sp.status ?? "") === f.key || (!sp.status && f.key === "");
-          return (
-            <Link
-              key={f.key || "open"}
-              href={demandHref({ status: f.key })}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-                active
-                  ? "bg-brand-600 text-white"
-                  : "border border-line bg-surface text-text-muted hover:border-brand-400 hover:text-brand-600"
-              }`}
-            >
-              {f.label}
-            </Link>
-          );
-        })}
-        <span className="mx-1 hidden h-4 w-px bg-line sm:block" aria-hidden />
-        {urgencyFilters.map((f) => {
-          const active = aciliyetValues.length === 1 && aciliyetValues[0] === f.key;
-          return (
-            <Link
-              key={f.key}
-              href={demandHref({ aciliyet: active ? "" : f.key })}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-                active
-                  ? "bg-brand-600 text-white"
-                  : "border border-line bg-surface text-text-muted hover:border-brand-400 hover:text-brand-600"
-              }`}
-            >
-              {f.label}
-            </Link>
-          );
-        })}
-        {aciliyetValues.length > 1 ? (
-          <Link
-            href={demandHref({ aciliyet: "" })}
-            className="rounded-full bg-brand-600 px-3.5 py-1.5 text-xs font-semibold text-white"
-            title="Aciliyet filtresini kaldır"
-          >
-            Acil + Yüksek ✕
-          </Link>
-        ) : null}
-      </div>
+          <div className="space-y-2">
+            <CategoryChips
+              options={statusOptions}
+              counts={{ ...statusCounts, all: allTotal }}
+              total={openTotal}
+              allLabel="Açık talepler"
+              active={statusF}
+              pathname={PATH}
+              params={urlParams}
+              paramName="status"
+              label="Talep durumu"
+            />
+            <CategoryChips
+              options={["urgent", "high"].map((value) => ({ value, label: URGENCY_LABELS[value]! }))}
+              counts={urgentCounts}
+              total={openTotal}
+              allLabel="Tüm aciliyetler"
+              active={aciliyetF}
+              pathname={PATH}
+              params={urlParams}
+              paramName="aciliyet"
+              label="Aciliyet"
+            />
+            <Suspense fallback={<Skeleton className="h-9 w-full rounded-full" />}>
+              <SegmentChips pending={pending} urlParams={urlParams} butceF={butceF} ilF={ilF} ilName={ilName} />
+            </Suspense>
+          </div>
 
-      <Suspense fallback={<Skeleton className="h-20 w-full rounded-[var(--radius-card)]" />}>
-        <SegmentStrip ctx={ctx} pending={pending} />
-      </Suspense>
-
-      <Suspense fallback={<ListSkeleton />}>
-        <DemandList ctx={ctx} pending={pending} />
-      </Suspense>
+          <Suspense fallback={<ListSkeleton />}>
+            <DemandList
+              pending={pending}
+              urlParams={urlParams}
+              density={density}
+              page={page}
+              advisorName={advisorName}
+            />
+          </Suspense>
+        </>
+      )}
     </div>
-  );
-}
-
-function StatsSkeleton() {
-  return (
-    <SkeletonBlock label="Talep özeti yükleniyor">
-      <Skeleton className="h-[68px] w-full rounded-[var(--radius-card)]" />
-    </SkeletonBlock>
   );
 }
 
 function ListSkeleton() {
   return (
     <SkeletonBlock label="Talepler yükleniyor" className="grid gap-3">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <Skeleton key={i} className="h-[120px] w-full rounded-[var(--radius-panel)]" />
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Skeleton key={i} className="h-14 w-full rounded-[var(--radius-card)]" />
       ))}
     </SkeletonBlock>
   );
 }
 
-async function DemandStats({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
-  const { demandHref } = ctx;
-  const [{ rows, total, matchByDemand }, urgentTotal] = await Promise.all([pending.listP, pending.urgentP]);
-  // "Eşleşme hazır" türetilmiş (skor motoru) → görünen sayfadan hesaplanır.
-  const openCount = total;
-  const urgentCount = urgentTotal;
-  const matchReadyCount = rows.filter((r) => (matchByDemand.get(r.id)?.strong ?? 0) > 0).length;
-  return (
-    <Card className="grid grid-cols-1 divide-line sm:grid-cols-3 sm:divide-x">
-        {[
-          { label: "Listelenen", value: openCount, href: "/app/talepler" },
-          { label: "Acil / yüksek", value: urgentCount, href: demandHref({ aciliyet: "high,urgent" }) },
-          { label: "Eşleşme hazır", value: matchReadyCount, href: "/app/eslestirme" },
-        ].map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            className="focus-ring group flex items-center justify-between gap-3 px-4 py-3 transition hover:bg-canvas"
-          >
-            <span>
-              <span className="numeric block font-display text-lg font-bold text-ink-950">{item.value.toLocaleString("tr-TR")}</span>
-              <span className="block text-xs text-text-muted">{item.label}</span>
-            </span>
-            <ArrowUpRight aria-hidden="true" className="h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" />
-          </Link>
-        ))}
-      </Card>
-  );
-}
-
-async function AgingAlert({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
-  const { yasF, demandHref } = ctx;
-  const agingCount = await pending.agingP;
-  if (!(agingCount > 0 && !yasF)) return null;
-  return (
-        <Link
-          href={demandHref({ yas: String(AGING_DAYS) })}
-          className="focus-ring press group flex min-h-[44px] items-center gap-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 transition hover:border-amber-500/60"
-        >
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-amber-400/20 text-amber-600">
-            <AlarmClock className="h-4.5 w-4.5" />
-          </span>
-          <span className="min-w-0 flex-1 text-sm">
-            <span className="font-bold text-ink-950">{agingCount} talep {AGING_DAYS}+ gündür açık.</span>{" "}
-            <span className="text-text-muted">Yaşlanan talepte müşteri soğur — arayıp kriterleri tazeleyin veya kapatın.</span>
-          </span>
-          <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-amber-600">
-            Yaşlananları göster <ArrowUpRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-          </span>
-        </Link>
-  );
-}
-
-async function SegmentStrip({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
-  const { ilF, butceF, demandHref } = ctx;
+/** Bütçe bandı + bölge çipleri (sunucu filtresi). Havuz tavana dayanırsa sayılar gizlenir. */
+async function SegmentChips({
+  pending,
+  urlParams,
+  butceF,
+  ilF,
+  ilName,
+}: {
+  pending: Pending;
+  urlParams: Record<string, string>;
+  butceF: string;
+  ilF: string;
+  ilName: string | null;
+}) {
   const poolRows = await pending.poolP;
-  const bandCounts = new Map<BandKey, number>();
-  // İl sayaçları province_id ile tutulur (ad değil) — ?il= sunucuda .eq ile kesilsin.
-  const provinceCounts = new Map<string, { name: string; count: number }>();
-  for (const d of poolRows) {
-    if (d.status === "closed") continue;
-    const b = bandOf(d);
-    if (b) bandCounts.set(b, (bandCounts.get(b) ?? 0) + 1);
-    const pid = d.province_id;
-    const pn = relOne<{ name: string }>(d.province)?.name;
-    if (pid && pn) {
-      const e = provinceCounts.get(pid) ?? { name: pn, count: 0 };
-      e.count += 1;
-      provinceCounts.set(pid, e);
-    }
-  }
-  const topProvinces = [...provinceCounts.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 5);
-  const poolLimited = poolRows.length >= POOL_LIMIT;
-  if (!(bandCounts.size > 0 || topProvinces.length > 0)) return null;
-  return (
-        <Card className="px-4 py-3.5">
-          <div className="flex flex-col gap-2.5">
-            {bandCounts.size > 0 ? (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="mr-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
-                  <Wallet className="h-3.5 w-3.5 text-brand-600" /> Bütçe
-                </span>
-                {BUDGET_BANDS.filter((b) => (bandCounts.get(b.key) ?? 0) > 0).map((b) => {
-                  const active = butceF === b.key;
-                  return (
-                    <Link
-                      key={b.key}
-                      href={demandHref({ butce: active ? "" : b.key })}
-                      aria-current={active ? "page" : undefined}
-                      className={`focus-ring press inline-flex min-h-[32px] items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                        active
-                          ? "bg-brand-600 text-white"
-                          : "border border-line bg-canvas/60 text-text-muted hover:border-brand-400 hover:text-brand-600"
-                      }`}
-                    >
-                      {b.label}
-                      <span className={`numeric rounded-full px-1.5 text-xs font-bold ${active ? "bg-white/20" : "bg-brand-600/10 text-brand-700"}`}>
-                        {bandCounts.get(b.key)}
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
-            ) : null}
-            {topProvinces.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="mr-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
-                  <MapPin className="h-3.5 w-3.5 text-brand-600" /> Bölge
-                </span>
-                {topProvinces.map(([id, { name, count }]) => {
-                  const active = ilF === id;
-                  return (
-                    <Link
-                      key={id}
-                      href={demandHref({ il: active ? "" : id })}
-                      aria-current={active ? "page" : undefined}
-                      className={`focus-ring press inline-flex min-h-[32px] items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                        active
-                          ? "bg-brand-600 text-white"
-                          : "border border-line bg-canvas/60 text-text-muted hover:border-brand-400 hover:text-brand-600"
-                      }`}
-                    >
-                      {name}
-                      <span className={`numeric rounded-full px-1.5 text-xs font-bold ${active ? "bg-white/20" : "bg-brand-600/10 text-brand-700"}`}>
-                        {count}
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
-          {poolLimited ? (
-            <p className="mt-2 text-xs text-text-faint">
-              Segment sayıları filtrelenmiş listenin ilk {POOL_LIMIT.toLocaleString("tr-TR")} kaydından hesaplanır
-              (yaklaşık). Filtre uygulandığında liste tamamı sunucuda doğru daraltılır.
-            </p>
-          ) : null}
-        </Card>
-  );
-}
-
-async function DemandList({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
-  const { canCreate, page, pageHref } = ctx;
-  const { rows, total, matchByDemand } = await pending.listP;
-  const offset = (page - 1) * PAGE_SIZE;
-  // ── Sayfalama (gerçek toplamlar) ──────────────────────────────────────────
-  const totalFiltered = total;
-  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
-  const rangeStart = totalFiltered === 0 ? 0 : offset + 1;
-  const rangeEnd = Math.min(offset + rows.length, totalFiltered);
+  const { bandCounts, provinces } = tallyPool(poolRows);
+  const reliable = poolRows.length < POOL_LIMIT;
+  const provOptions = provinces.map((p) => ({ value: p.id, label: p.name }));
+  if (ilF && !provOptions.some((o) => o.value === ilF)) provOptions.push({ value: ilF, label: ilName ?? "Seçili il" });
+  const provCounts = reliable ? Object.fromEntries(provinces.map((p) => [p.id, p.count])) : null;
+  const hasBands = Object.keys(bandCounts).length > 0 || Boolean(butceF);
+  if (!hasBands && provOptions.length === 0) return null;
   return (
     <>
-      {rows.length === 0 ? (
-        <div className="rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
-          <Target className="mx-auto h-8 w-8 text-text-faint" />
-          <p className="mt-3 font-display text-lg font-bold text-ink-950">Bu filtrede talep yok</p>
-          <p className="mt-1 text-sm text-text-muted">
-            {canCreate ? "Buradan veya müşteri detayından yeni talep ekleyebilirsiniz." : "Müşteri detayından yeni talep ekleyebilirsiniz."}
-          </p>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/app/musteriler" className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:underline">
-              <Users className="h-4 w-4" /> Müşterilere git
-            </Link>
-          </div>
-        </div>
-      ) : (
-        <div className="grid gap-3">
-          {rows.map((d) => {
-            const customer = relOne<{ id: string; full_name: string }>(d.customer);
-            const province = relOne<{ name: string }>(d.province);
-            const match = d.status !== "closed" ? matchByDemand.get(d.id) : undefined;
-            return (
-              <article
-                key={d.id}
-                className="group relative rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)] transition hover:border-brand-400/40 hover:shadow-[var(--shadow-sm)]"
-              >
-                {/* Kart artık talebin KENDİ detayına gider; müşteri linki ikincil (z-10) kalır. */}
-                <IntentLink href={`/app/talepler/${d.id}`} className="absolute inset-0 rounded-[var(--radius-panel)]" aria-label={customer ? `${customer.full_name} talebinin detayını aç` : "Talep detayını aç"} />
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">
-                        {d.transaction_type}{d.property_type ? ` · ${d.property_type}` : ""}
-                      </span>
-                      <Badge size="sm" variant={d.status === "matched" ? "success" : "neutral"}>
-                        {statusLabel[d.status] ?? d.status}
-                      </Badge>
-                      {d.urgency ? (
-                        <Badge size="sm" variant={d.urgency === "urgent" || d.urgency === "high" ? "warning" : "neutral"}>
-                          {urgencyLabel[d.urgency] ?? d.urgency}
-                        </Badge>
-                      ) : null}
-                      {/* Eşleşme potansiyeli — gerçek skor motorundan (lib/matching) */}
-                      {match && (match.strong > 0 || match.good > 0) ? (
-                        <Link
-                          href={`/app/eslestirme?demand=${d.id}`}
-                          title={`En iyi skor ${match.best} · eşleştirmede aç`}
-                          className={`focus-ring relative z-10 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold transition hover:opacity-80 ${
-                            match.strong > 0 ? "tone-success" : "tone-neutral"
-                          }`}
-                        >
-                          <Sparkles className="h-3 w-3" />
-                          {match.strong > 0
-                            ? `${match.strong} güçlü eşleşme`
-                            : `${match.good} iyi eşleşme`}
-                        </Link>
-                      ) : match ? (
-                        <span title="Portföy havuzunda skor ≥ 55 aday yok" className="text-xs text-text-faint">
-                          Eşleşme adayı yok
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-2 font-display text-xl font-extrabold text-ink-950">
-                      {budgetLabel(d.budget_min, d.budget_max)}
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-muted">
-                      {customer ? (
-                        <Link href={`/app/musteriler/${customer.id}`} className="relative z-10 font-semibold text-ink-950 hover:text-brand-600">
-                          {customer.full_name}
-                        </Link>
-                      ) : null}
-                      {province?.name ? <span>{province.name}</span> : null}
-                      {d.rooms ? <span>{d.rooms}</span> : null}
-                      {d.min_sqm ? <span>≥ {d.min_sqm} m²</span> : null}
-                      <span className={`flex items-center gap-1 ${d.status !== "closed" && d.urgency === "urgent" ? "font-semibold text-amber-600" : "text-text-faint"}`}>
-                        <Clock3 className="h-3 w-3" /> {demandAge(d.created_at, d.status)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="relative z-10 flex flex-wrap gap-2">
-                    {customer ? (
-                      <Link
-                        href={`/app/musteriler/${customer.id}`}
-                        className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-400 hover:text-brand-600"
-                      >
-                        <Users className="h-3.5 w-3.5" /> Müşteri kartı
-                      </Link>
-                    ) : null}
-                    <Link
-                      href={`/app/eslestirme?demand=${d.id}`}
-                      className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 py-2 text-xs font-semibold text-white hover:bg-brand-700"
-                    >
-                      <Crosshair className="h-3.5 w-3.5" /> Eşleştir
-                    </Link>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Sayfalama — filtreler linklerde korunur */}
-      {totalFiltered > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-          <p className="numeric text-text-muted">
-            {rangeStart.toLocaleString("tr-TR")}–{rangeEnd.toLocaleString("tr-TR")} / Toplam{" "}
-            {totalFiltered.toLocaleString("tr-TR")}
-          </p>
-          <div className="flex items-center gap-1.5">
-            {page > 1 ? (
-              <Link href={pageHref(page - 1)} className={PAGER_BTN}>
-                <ChevronLeft className="h-4 w-4" /> Önceki
-              </Link>
-            ) : (
-              <span className={PAGER_BTN_DISABLED} aria-disabled="true">
-                <ChevronLeft className="h-4 w-4" /> Önceki
-              </span>
-            )}
-            <span className="numeric px-1 text-text-faint">
-              {Math.min(page, totalPages)} / {totalPages}
-            </span>
-            {page < totalPages ? (
-              <Link href={pageHref(page + 1)} className={PAGER_BTN}>
-                Sonraki <ChevronRight className="h-4 w-4" />
-              </Link>
-            ) : (
-              <span className={PAGER_BTN_DISABLED} aria-disabled="true">
-                Sonraki <ChevronRight className="h-4 w-4" />
-              </span>
-            )}
-          </div>
-        </div>
+      {hasBands ? (
+        <CategoryChips
+          options={BUDGET_BANDS.map((b) => ({ value: b.key, label: b.label }))}
+          counts={reliable ? bandCounts : null}
+          total={null}
+          allLabel="Tüm bütçeler"
+          active={butceF}
+          pathname={PATH}
+          params={urlParams}
+          paramName="butce"
+          label="Bütçe bandı"
+        />
       ) : null}
+      {provOptions.length > 0 ? (
+        <CategoryChips
+          options={provOptions}
+          counts={provCounts ? { ...provCounts, ...(ilF && !(ilF in provCounts) ? { [ilF]: 1 } : {}) } : null}
+          total={null}
+          allLabel="Tüm iller"
+          active={ilF}
+          pathname={PATH}
+          params={urlParams}
+          paramName="il"
+          label="Bölge"
+        />
+      ) : null}
+    </>
+  );
+}
+
+async function DemandList({
+  pending,
+  urlParams,
+  density,
+  page,
+  advisorName,
+}: {
+  pending: Pending;
+  urlParams: Record<string, string>;
+  density: Density;
+  page: number;
+  advisorName: Map<string, string>;
+}) {
+  const { rows, total, matchByDemand } = await pending.listP;
+  const win = pageWindow(page, total, PAGE_SIZE, rows.length);
+
+  const viewModels: DemandVM[] = rows.map((d) => {
+    const customer = relOne<{ id: string; full_name: string; assigned_to?: string | null }>(d.customer);
+    const province = relOne<{ name: string }>(d.province);
+    const days = Math.floor(msSince(d.created_at) / 86_400_000);
+    const criteria: string[] = [];
+    if (d.rooms) criteria.push(d.rooms);
+    if (d.min_sqm) criteria.push(`≥ ${d.min_sqm} m²`);
+    return {
+      id: d.id,
+      href: `/app/talepler/${d.id}`,
+      customerId: customer?.id ?? null,
+      customerName: customer?.full_name ?? null,
+      kind: `${d.transaction_type}${d.property_type ? ` · ${d.property_type}` : ""}`,
+      budget: budgetLabel(d.budget_min, d.budget_max),
+      province: province?.name ?? null,
+      criteria,
+      statusLabel: DEMAND_STATUS_LABELS[d.status] ?? d.status,
+      statusTone: demandStatusTone(d.status),
+      urgencyLabel: d.urgency ? (URGENCY_LABELS[d.urgency] ?? d.urgency) : null,
+      urgencyTone: urgencyTone(d.urgency),
+      match: d.status !== "closed" ? (matchByDemand.get(d.id) ?? null) : null,
+      ageLabel: demandAgeLabel(days, d.status),
+      ageUrgent: d.status !== "closed" && d.urgency === "urgent",
+      advisor: customer?.assigned_to ? (advisorName.get(customer.assigned_to) ?? null) : null,
+    };
+  });
+
+  return (
+    <>
+      {viewModels.length === 0 ? (
+        <EmptyState
+          icon={Search}
+          illustration="search"
+          title="Eşleşen talep bulunamadı"
+          description="Arama ifadenizi ya da filtreleri değiştirip tekrar deneyin; yeni talep müşteri detayından da eklenebilir."
+          action={{ href: PATH, label: "Filtreleri temizle" }}
+          secondary={{ href: "/app/musteriler", label: "Müşterilere git" }}
+        />
+      ) : (
+        <>
+          <DemandTable rows={viewModels} density={density} />
+          <DemandMobileList rows={viewModels} />
+        </>
+      )}
+      <ListPager pathname={PATH} params={urlParams} window={win} total={total} />
     </>
   );
 }

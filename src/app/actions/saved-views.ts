@@ -22,6 +22,14 @@ const ROUTE_PARAM_WHITELIST: Record<string, readonly string[]> = {
   "/app/komisyon": ["durum", "from", "to"],
   // src/app/app/gelen-kutusu/page.tsx
   "/app/gelen-kutusu": ["q", "kanal", "from", "to", "durum"],
+  // Liste kiti sayfaları (talepler, anlaşmalar, teklifler, sözleşmeler, randevular, görevler, kiralama)
+  "/app/talepler": ["q", "status", "aciliyet", "il", "butce", "yas", "danisman"],
+  "/app/anlasmalar": ["q", "gorunum", "asama", "danisman"],
+  "/app/teklifler": ["q", "durum", "from", "to", "danisman"],
+  "/app/sozlesmeler": ["q", "durum", "tip", "from", "to", "yenileme"],
+  "/app/randevular": ["q", "tip", "durum", "gorunum", "danisman"],
+  "/app/gorevler": ["q", "filter", "tur", "tekrar", "mine"],
+  "/app/kiralama": ["q", "durum", "ariza", "evre"],
 };
 
 const NAME_MAX = 60;
