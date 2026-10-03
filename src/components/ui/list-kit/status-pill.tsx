@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  */
 export type PillTone = "success" | "warning" | "danger" | "info" | "neutral";
 
-const TONE_CLASS: Record<PillTone, string> = {
+export const TONE_CLASS: Record<PillTone, string> = {
   success: "tone-success",
   warning: "tone-warning",
   danger: "tone-danger",

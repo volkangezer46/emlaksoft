@@ -32,7 +32,7 @@ import { PropertyCompareShell } from "./compare-shell";
 import { PropertyBulkBar, PropertyBulkProvider } from "./property-bulk-actions";
 import { PropertySortSelect } from "./property-sort-select";
 import { PropertyMobileList, PropertyTable, type PropertyVM } from "./property-rows";
-import { countByType, featureSummary, priceHealthPill, propertyStatusTone } from "./property-list-logic";
+import { compactTry, countByType, featureSummary, priceHealthPill, propertyStatusTone } from "./property-list-logic";
 import { OwnerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { EmptyState } from "@/components/app/empty-state";
@@ -507,12 +507,12 @@ export default async function PropertiesPage({
     },
     {
       label: "Portföy değeri",
-      value: formatFx(totalValueTry, "TRY"),
+      value: compactTry(totalValueTry),
       icon: <Banknote />,
       tone: "success",
       href: buildHref(PATH, new URLSearchParams({ sirala: "fiyat_yuksek" })),
       hint: totalValueFx ?? (scanTruncated ? `en yeni ${SCAN_LIMIT.toLocaleString("tr-TR")} kayıt` : undefined),
-      title: fxTitle,
+      title: [formatFx(totalValueTry, "TRY"), fxTitle].filter(Boolean).join(" · ") || undefined,
     },
     {
       label: "Fiyat uyarısı",

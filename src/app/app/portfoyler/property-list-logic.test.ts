@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countByType, featureSummary, priceHealthPill, propertyStatusTone } from "./property-list-logic";
+import { compactTry, countByType, featureSummary, priceHealthPill, propertyStatusTone } from "./property-list-logic";
 
 describe("propertyStatusTone", () => {
   it("yayında → success, rezerve → warning, satıldı/kiralandı → info, vazgeçildi → danger", () => {
@@ -31,6 +31,15 @@ describe("featureSummary", () => {
     expect(featureSummary({ rooms: "2+1" })).toBe("2+1");
     expect(featureSummary({ sqm: 0, rooms: " " })).toBeNull();
     expect(featureSummary(null)).toBeNull();
+  });
+});
+
+describe("compactTry", () => {
+  it("milyon/milyar kısaltır, küçük tutarı tam yazar", () => {
+    expect(compactTry(93_549_500)).toBe("₺93,5 Mn");
+    expect(compactTry(1_250_000_000)).toBe("₺1,3 Mr");
+    expect(compactTry(450_000)).toBe("₺450.000");
+    expect(compactTry(0)).toBe("₺0");
   });
 });
 
