@@ -21,5 +21,5 @@ export default async function NewTaskPage() {
       .limit(100),
   ]);
 
-  return <TaskForm members={members ?? []} customers={customers ?? []} />;
+  return <TaskForm members={members ?? []} customers={customers ?? []} userId={ctx.userId} />;
 }

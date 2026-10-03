@@ -7,6 +7,11 @@ import { DEMAND_DRAFT_FIELDS, DEMAND_TABS } from "@/app/app/talepler/yeni/demand
 import { DEAL_DRAFT_FIELDS, DEAL_TABS } from "@/app/app/anlasmalar/yeni/deal-tabs";
 import { OFFER_DRAFT_FIELDS, OFFER_TABS } from "@/app/app/teklifler/yeni/offer-tabs";
 import { CONTRACT_DRAFT_FIELDS, CONTRACT_TABS } from "@/app/app/sozlesmeler/yeni/contract-tabs";
+import { APPOINTMENT_DRAFT_FIELDS, APPOINTMENT_TABS } from "@/app/app/randevular/yeni/appointment-tabs";
+import { TASK_DRAFT_FIELDS, TASK_TABS } from "@/app/app/gorevler/yeni/task-tabs";
+import { RENTAL_DRAFT_FIELDS, RENTAL_TABS } from "@/app/app/kiralama/yeni/rental-tabs";
+import { OPEN_HOUSE_DRAFT_FIELDS, OPEN_HOUSE_TABS } from "@/app/app/acik-ev/yeni/open-house-tabs";
+import { PRESENTATION_DRAFT_FIELDS, PRESENTATION_TABS } from "@/app/app/portfoyler/sunumlar/yeni/presentation-tabs";
 import { isSensitiveFieldName } from "./form-tabs";
 
 /**
@@ -73,6 +78,34 @@ const FORMS = [
     source: "src/app/app/sozlesmeler/yeni/new-contract-form.tsx",
     tabs: CONTRACT_TABS as readonly TabLike[],
     draft: CONTRACT_DRAFT_FIELDS as readonly string[],
+    name: "randevu",
+    source: "src/app/app/randevular/yeni/appointment-form.tsx",
+    tabs: APPOINTMENT_TABS as readonly TabLike[],
+    draft: APPOINTMENT_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "görev",
+    source: "src/app/app/gorevler/yeni/task-form.tsx",
+    tabs: TASK_TABS as readonly TabLike[],
+    draft: TASK_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "kira kaydı",
+    source: "src/app/app/kiralama/yeni/rental-form.tsx",
+    tabs: RENTAL_TABS as readonly TabLike[],
+    draft: RENTAL_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "açık ev",
+    source: "src/app/app/acik-ev/yeni/open-house-form.tsx",
+    tabs: OPEN_HOUSE_TABS as readonly TabLike[],
+    draft: OPEN_HOUSE_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "sunum",
+    source: "src/app/app/portfoyler/sunumlar/yeni/presentation-form.tsx",
+    tabs: PRESENTATION_TABS as readonly TabLike[],
+    draft: PRESENTATION_DRAFT_FIELDS as readonly string[],
   },
 ];
 

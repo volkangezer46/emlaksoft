@@ -10,6 +10,7 @@ export { MiniBars } from "./mini-bars";
 export { TrendPill } from "./trend-pill";
 export { PeriodToggle } from "./period-toggle";
 export { CityNight } from "./city-night";
+export { AreaChart, BarColumns, EmptyArt, Ring, type AreaSeries } from "./charts";
 export {
   PERIODS,
   PERIOD_PARAM,

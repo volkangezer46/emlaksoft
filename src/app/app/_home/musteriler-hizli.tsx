@@ -13,7 +13,7 @@ const quickTile =
 export function HizliAksiyonlar() {
   return (
     <Widget id="hizli" className="h-full">
-      <section className="surface-card h-full rounded-[var(--radius-panel)] p-5">
+      <section className="pm-bx h-full p-5">
         <h2 className="font-display font-bold text-ink-950">Hızlı aksiyonlar</h2>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <Link href="/app/musteriler/yeni" className={quickTile}>
@@ -51,7 +51,7 @@ export async function SonMusteriler() {
 
   return (
     <Widget id="musteriler" className="h-full">
-      <section className="surface-card h-full rounded-[var(--radius-panel)] p-5">
+      <section className="pm-bx h-full p-5">
         <div className="flex items-center justify-between">
           <h2 className="font-display font-bold text-ink-950">Son müşteriler</h2>
           <PanelLink href="/app/musteriler">
