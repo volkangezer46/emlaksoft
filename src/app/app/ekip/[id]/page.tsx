@@ -1,22 +1,29 @@
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import {
-  ArrowLeft,
-  ArrowUpRight,
-  Building2,
-  CalendarDays,
-  Phone,
-  PhoneCall,
-  Users,
-  Wallet,
-} from "lucide-react";
+import { notFound, redirect } from "next/navigation";
+import { Activity, ArrowLeft, ArrowUpRight, CalendarDays, Gauge, GitBranch, LayoutDashboard, Phone, Sparkles, Target, Wallet } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { formatTurkishPhone } from "@/lib/phone";
+import { now } from "@/lib/clock";
+import { effectiveCanAccessModule } from "@/lib/permissions-effective";
+import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
 import { canSeeEarningsOf } from "@/lib/team/earnings-scope";
-import { MemberHandoff } from "./member-handoff";
-import { ArrowLeftRight } from "lucide-react";
+import { summarizeAdvisorEarning } from "@/lib/team/advisor-share";
+import { monthRanges } from "@/lib/team/advisor-360";
+import { trMonthContext } from "@/lib/team/scorecard";
+import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
+import {
+  ActivityTab,
+  CoachTab,
+  EarningsTab,
+  LeadTab,
+  OverviewTab,
+  PipelineTab,
+  TargetTab,
+  type CommissionRow,
+  type Ctx,
+} from "./tab-panels";
 
 const ROLE_LABELS: Record<string, string> = {
   owner: "Ofis sahibi",
@@ -39,61 +46,66 @@ function initials(name: string) {
   return name.split(/\s+/).map((p) => p[0] ?? "").join("").slice(0, 2).toUpperCase();
 }
 
-export default async function TeamMemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { perms, userId } = await requireModulePage("team", "/app/ekip");
+export default async function TeamMemberDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { perms, userId, role } = await requireModulePage("team", "/app/ekip");
   const canHandoff = (perms.team ?? []).includes("edit");
   const { id } = await params;
+  // Kapsam: ofis geneli rol (sahip, GM, şube müdürü) herkesin profilini, diğerleri yalnız kendi profilini görür.
+  if (id !== userId && !hasOfficeWideDataScope(role)) redirect(`/app/ekip/${userId}`);
   // Kazanç gizliliği: başkasının kazancı yalnız `earnings_all` izniyle görünür.
   const showEarnings = canSeeEarningsOf(perms, userId, id);
   const supabase = await createClient();
+  const sp = (await searchParams) ?? {};
 
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
-
-  const [
-    { data: member },
-    { count: customerCount },
-    { data: customers },
-    { count: propertyCount },
-    { data: properties },
-    { data: commissions },
-    { count: apptCount },
-    { count: callCount },
-    { data: advisorRows },
-  ] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, phone, role, is_active, created_at, branch:branches!profiles_branch_id_fkey(name)").eq("id", id).maybeSingle(),
-    supabase.from("customers").select("id", { count: "exact", head: true }).eq("assigned_to", id).is("deleted_at", null),
-    supabase.from("customers").select("id, full_name, phone, customer_types, created_at").eq("assigned_to", id).is("deleted_at", null).order("created_at", { ascending: false }).limit(8),
-    supabase.from("properties").select("id", { count: "exact", head: true }).eq("assigned_to", id).is("deleted_at", null),
-    supabase.from("properties").select("id, property_code, title, status, list_price").eq("assigned_to", id).is("deleted_at", null).order("created_at", { ascending: false }).limit(8),
-    supabase.from("commissions").select("gross_amount, status, deal:deals!commissions_deal_id_fkey(assigned_to)").gte("created_at", monthStart.toISOString()).limit(500),
-    supabase.from("appointments").select("id", { count: "exact", head: true }).eq("assigned_to", id).gte("scheduled_at", monthStart.toISOString()),
-    supabase.from("calls").select("id", { count: "exact", head: true }).eq("handled_by", id).gte("started_at", monthStart.toISOString()),
-    // Devralabilecek aktif danışmanlar (bu üye hariç) — iş yükü devri paneli için
-    supabase.from("profiles").select("id, full_name").eq("is_active", true).neq("id", id).order("full_name"),
-  ]);
-
+  const { data: member } = await supabase
+    .from("profiles")
+    .select("id, full_name, phone, role, is_active, created_at, branch:branches!profiles_branch_id_fkey(name)")
+    .eq("id", id)
+    .maybeSingle();
   if (!member) notFound();
-  const advisors = (advisorRows ?? []) as { id: string; full_name: string }[];
 
-  // Bu danışmana ait komisyonlar (deal.assigned_to eşleşmesi)
-  const myCommission = (commissions ?? []).reduce((sum, c) => {
-    const deal = Array.isArray(c.deal) ? c.deal[0] : c.deal;
-    return deal?.assigned_to === id ? sum + Number(c.gross_amount || 0) : sum;
-  }, 0);
+  const nowMs = now();
+  const ranges = monthRanges(nowMs);
+  const year = trMonthContext(nowMs).monthKey.slice(0, 4);
 
-  const branch = relName(member.branch);
-  const cust = customers ?? [];
-  const props = properties ?? [];
+  // Komisyon satırları yalnız kazancı görme hakkı varsa çekilir (başkasının kazancı sunucudan bile çıkmaz).
+  let commissions: CommissionRow[] = [];
+  if (showEarnings) {
+    const { data } = await supabase
+      .from("commissions")
+      .select("gross_amount, status, splits, created_at, deal:deals!commissions_deal_id_fkey(assigned_to)")
+      .gte("created_at", `${year}-01-01T00:00:00+03:00`)
+      .limit(2000);
+    commissions = (data ?? []) as unknown as CommissionRow[];
+  }
+  const monthCollected = showEarnings
+    ? summarizeAdvisorEarning(
+        commissions.filter((c) => Date.parse(c.created_at) >= Date.parse(ranges.thisStartIso)),
+        member.full_name,
+        id,
+      ).collected
+    : 0;
 
-  // Stat kartları ilgili listelere iner (portföylerde danışman filtresi yok — tam liste)
-  const stats = [
-    { label: "Müşteri", value: customerCount ?? 0, icon: Users, tone: "text-brand-600", href: `/app/musteriler?assigned=${id}` },
-    { label: "Portföy", value: propertyCount ?? 0, icon: Building2, tone: "text-mint-600", href: "/app/portfoyler" },
-    { label: "Randevu (ay)", value: apptCount ?? 0, icon: CalendarDays, tone: "text-cyan-600", href: "/app/randevular" },
-    { label: "Çağrı (ay)", value: callCount ?? 0, icon: PhoneCall, tone: "text-amber-500", href: `/app/arama?danisman=${id}` },
+  const tabs: DetailTabDef[] = [
+    { id: "ozet", label: "Özet", icon: LayoutDashboard },
+    { id: "aktivite", label: "Aktivite", icon: Activity },
+    { id: "oncul", label: "Öncül göstergeler", icon: Gauge },
+    { id: "pipeline", label: "Pipeline", icon: GitBranch },
+    { id: "hedef", label: "Hedef", icon: Target, hidden: !effectiveCanAccessModule(perms, "targets") },
+    { id: "kazanc", label: "Kazanç", icon: Wallet, hidden: !showEarnings },
+    { id: "kosluk", label: "Koçluk", icon: Sparkles },
   ];
+  const visible = tabs.filter((t) => !t.hidden).map((t) => t.id);
+  const active = resolveTab(sp, visible, "ozet");
+
+  const ctx: Ctx = { supabase, id, fullName: member.full_name, showEarnings, isSelf: id === userId, commissions };
+  const branch = relName(member.branch);
 
   return (
     <div className="space-y-6">
@@ -123,120 +135,36 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
                 <Phone className="h-3.5 w-3.5" /> {formatTurkishPhone(member.phone)}
               </a>
             ) : null}
+            <Link href={`/app/randevular?danisman=${id}`} className="inline-flex items-center gap-1.5 hover:text-brand-600">
+              <CalendarDays className="h-3.5 w-3.5" /> Randevular
+            </Link>
           </span>
         }
         actions={
           !showEarnings ? undefined : (
-          <Link
-            href="/app/komisyon"
-            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-surface px-5 py-3 text-center shadow-[var(--shadow-xs)] hover:border-brand-300"
-          >
-            <p className="flex items-center justify-center gap-1.5 text-xs text-text-muted"><Wallet className="h-3.5 w-3.5" /> Bu ay komisyon</p>
-            <p className="mt-1 flex items-center justify-center gap-1 font-display text-xl font-extrabold text-mint-700">
-              {money(myCommission)}
-              <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-            </p>
-          </Link>
+            <Link
+              href={id === userId ? "/app/cuzdan" : "/app/ekip/kazanc"}
+              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-surface px-5 py-3 text-center shadow-[var(--shadow-xs)] hover:border-brand-300"
+            >
+              <p className="flex items-center justify-center gap-1.5 text-xs text-text-muted"><Wallet className="h-3.5 w-3.5" /> Bu ay tahsil edilen pay</p>
+              <p className="mt-1 flex items-center justify-center gap-1 font-display text-xl font-extrabold text-mint-700">
+                {money(monthCollected)}
+                <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+              </p>
+            </Link>
           )
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((s) => (
-          <Link
-            key={s.label}
-            href={s.href}
-            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] hover:border-brand-300"
-          >
-            <span className="flex items-start justify-between">
-              <s.icon className={`h-4 w-4 ${s.tone}`} />
-              <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-            </span>
-            <p className="mt-2 font-display text-2xl font-extrabold text-ink-950">{s.value}</p>
-            <p className="text-xs text-text-muted">{s.label}</p>
-          </Link>
-        ))}
-      </div>
+      <DetailTabs basePath={`/app/ekip/${id}`} tabs={tabs} active={active} label="Danışman 360 sekmeleri" />
 
-      {/* İş yükü devri — ayrılan/pasife alınan danışmanın müşteri + portföyünü aktar (C.5) */}
-      {canHandoff ? (
-        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-            <ArrowLeftRight className="h-4 w-4 text-brand-600" /> İş yükünü devret
-          </h2>
-          <p className="mt-1 mb-3 text-xs text-text-muted">
-            {member.full_name} ekipten ayrılıyorsa müşteri ve portföylerini başka bir danışmana aktarın —
-            hiçbir kayıt sahipsiz kalmasın.
-          </p>
-          <MemberHandoff
-            fromId={id}
-            fromName={member.full_name}
-            advisors={advisors}
-            customerCount={customerCount ?? 0}
-            propertyCount={propertyCount ?? 0}
-          />
-        </section>
-      ) : null}
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Müşteriler */}
-        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950"><Users className="h-4 w-4 text-brand-600" /> Müşteriler <span className="ml-auto text-xs text-text-muted">{customerCount ?? 0}</span></h2>
-          {cust.length === 0 ? (
-            <p className="py-8 text-center text-sm text-text-muted">Atanmış müşteri yok.</p>
-          ) : (
-            <>
-              <ul className="space-y-1.5">
-                {cust.map((c) => (
-                  <li key={c.id}>
-                    <Link href={`/app/musteriler/${c.id}`} className="group flex items-center justify-between rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm transition hover:border-brand-400 hover:bg-brand-600/[0.03]">
-                      <span className="font-medium text-ink-950 group-hover:text-brand-600">{c.full_name}</span>
-                      <span className="flex items-center gap-2 text-xs text-text-muted">
-                        {c.phone ? formatTurkishPhone(c.phone) : "—"} <ArrowUpRight className="hover-action h-3.5 w-3.5 opacity-0 transition group-hover:opacity-100" />
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href={`/app/musteriler?assigned=${id}`}
-                className="focus-ring mt-3 inline-flex items-center gap-1 rounded-[var(--radius-control)] text-xs font-semibold text-brand-600 hover:underline"
-              >
-                Tümünü gör ({customerCount ?? 0}) <ArrowUpRight className="h-3.5 w-3.5" />
-              </Link>
-            </>
-          )}
-        </section>
-
-        {/* Portföyler */}
-        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950"><Building2 className="h-4 w-4 text-mint-600" /> Portföyler <span className="ml-auto text-xs text-text-muted">{propertyCount ?? 0}</span></h2>
-          {props.length === 0 ? (
-            <p className="py-8 text-center text-sm text-text-muted">Atanmış portföy yok.</p>
-          ) : (
-            <>
-              <ul className="space-y-1.5">
-                {props.map((p) => (
-                  <li key={p.id}>
-                    <Link href={`/app/portfoyler/${p.id}`} className="group flex items-center justify-between rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm transition hover:border-brand-400 hover:bg-brand-600/[0.03]">
-                      <span className="min-w-0 truncate font-medium text-ink-950 group-hover:text-brand-600">{p.title ?? p.property_code}</span>
-                      <span className="flex shrink-0 items-center gap-2 text-xs text-text-muted">
-                        {p.list_price ? money(Number(p.list_price)) : "—"} <ArrowUpRight className="hover-action h-3.5 w-3.5 opacity-0 transition group-hover:opacity-100" />
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/app/portfoyler"
-                className="focus-ring mt-3 inline-flex items-center gap-1 rounded-[var(--radius-control)] text-xs font-semibold text-brand-600 hover:underline"
-              >
-                Tümünü gör ({propertyCount ?? 0}) <ArrowUpRight className="h-3.5 w-3.5" />
-              </Link>
-            </>
-          )}
-        </section>
-      </div>
+      {active === "ozet" ? <OverviewTab ctx={ctx} canHandoff={canHandoff} /> : null}
+      {active === "aktivite" ? <ActivityTab ctx={ctx} /> : null}
+      {active === "oncul" ? <LeadTab ctx={ctx} /> : null}
+      {active === "pipeline" ? <PipelineTab ctx={ctx} /> : null}
+      {active === "hedef" ? <TargetTab ctx={ctx} /> : null}
+      {active === "kazanc" ? <EarningsTab ctx={ctx} year={year} /> : null}
+      {active === "kosluk" ? <CoachTab ctx={ctx} /> : null}
     </div>
   );
 }
