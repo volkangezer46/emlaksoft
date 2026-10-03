@@ -35,7 +35,7 @@ export function ViewSwitcher({
             aria-current={on ? "page" : undefined}
             aria-label={o.label}
             className={cn(
-              "focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] px-2.5 text-sm font-semibold transition",
+              "focus-ring press inline-flex h-8 touch:h-11 items-center gap-1.5 rounded-[var(--radius-control)] px-2.5 text-sm font-semibold transition",
               on ? "bg-surface text-brand-700 shadow-[var(--elev-1)]" : "text-text-muted hover:text-text",
             )}
           >

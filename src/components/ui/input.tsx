@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  * `aria-invalid` ile danger kenar/halka otomatik bağlanır.
  */
 const FIELD_BASE =
-  "surface-sunken w-full rounded-[var(--radius-control)] border border-hairline px-3.5 py-2.5 text-sm text-ink-950 placeholder:text-text-faint transition focus:border-brand-400 focus:bg-surface focus:outline-none focus:shadow-[var(--focus-gap),var(--focus-ring)] aria-[invalid=true]:border-danger-400 aria-[invalid=true]:focus:shadow-[0_0_0_2px_var(--surface),0_0_0_4px_rgba(229,72,77,0.28)]";
+  "surface-sunken w-full rounded-[var(--radius-control)] border border-hairline px-3.5 py-2.5 touch:min-h-11 touch:text-base text-sm text-ink-950 placeholder:text-text-faint transition focus:border-brand-400 focus:bg-surface focus:outline-none focus:shadow-[var(--focus-gap),var(--focus-ring)] aria-[invalid=true]:border-danger-400 aria-[invalid=true]:focus:shadow-[0_0_0_2px_var(--surface),0_0_0_4px_rgba(229,72,77,0.28)]";
 
 export function Input({ className, ...props }: ComponentProps<"input">) {
   return <input className={cn(FIELD_BASE, className)} {...props} />;

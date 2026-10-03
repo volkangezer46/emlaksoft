@@ -44,7 +44,7 @@ export function CategoryChips({
           href={c.href}
           aria-current={c.active ? "page" : undefined}
           className={cn(
-            "focus-ring press inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full px-3.5 text-sm font-semibold transition",
+            "focus-ring press inline-flex min-h-9 touch:min-h-11 shrink-0 items-center gap-2 rounded-full px-3.5 text-sm font-semibold transition",
             c.active
               ? "bg-brand-600/10 text-brand-700 ring-1 ring-inset ring-brand-600/25"
               : "text-text-muted hover:bg-surface-2 hover:text-text",

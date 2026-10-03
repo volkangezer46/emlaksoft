@@ -13,7 +13,7 @@ import { errorNextStep, fieldAriaProps, type NextStep } from "@/lib/form-logic";
  * - `FormError`: role=alert hata bandı (+ isteğe bağlı "sonraki adım" bağlantısı).
  */
 export const fieldClass =
-  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-danger-400";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 touch:min-h-11 touch:text-base text-sm outline-none transition focus:border-brand-400 focus:bg-surface disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-danger-400";
 
 export function FormInput({ className, ...props }: ComponentProps<"input">) {
   return <input className={cn(fieldClass, className)} {...props} />;

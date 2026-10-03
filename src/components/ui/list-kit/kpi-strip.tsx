@@ -75,7 +75,7 @@ export function KpiStrip({ items, label = "Özet göstergeler", className }: { i
             title={it.title}
             className={cn(
               "focus-ring press group flex min-w-0 flex-col gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-3.5 shadow-[var(--elev-1)] transition hover:border-brand-300 hover:shadow-[var(--shadow-card)]",
-              zero && !it.attention && "opacity-70 hover:opacity-100",
+              zero && !it.attention && "hover:shadow-[var(--shadow-card)]",
             )}
           >
             <span className="flex items-center gap-2.5">

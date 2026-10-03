@@ -1,0 +1,84 @@
+/* ============================================================================
+   ERİŞİLEBİLİRLİK KATMANI — dokunma hedefi varyantı, forced-colors, hareket.
+   Kaynak: docs/design/ERISILEBILIRLIK_RESPONSIVE.md
+   ========================================================================== */
+
+/* `touch:` varyantı: dokunmatik (kaba imleç) VEYA dar ekran (<768px).
+   Bileşenler `touch:min-h-11` ile 44px dokunma hedefi alır; masaüstünde yoğun
+   yerleşim korunur. Playwright/axe dar viewport'ta da aynı kuralı görür. */
+@custom-variant touch (@media (pointer: coarse), (max-width: 767.98px));
+
+/* Windows Yüksek Kontrast / forced-colors: gölge tabanlı odak halkası ve
+   yüzeyler sistem renklerinde kaybolur; kalıcı outline + kenar zorunlu. */
+@media (forced-colors: active) {
+  :focus-visible,
+  .focus-ring:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px !important;
+  }
+  .surface-card,
+  .surface-sunken,
+  .glass-card {
+    border: 1px solid CanvasText;
+  }
+  /* Renkle verilen durum (rozet/çip) metinle birlikte kenar da taşısın. */
+  [class*="rounded-full"][class*="bg-"],
+  [data-status] {
+    border: 1px solid CanvasText;
+  }
+  /* Seçili sekme/görünüm yalnız zeminle ayrılıyordu. */
+  [aria-selected="true"],
+  [aria-current="page"],
+  [data-state="active"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  /* İlerleme çubukları ve dolgular sistem rengine geçsin. */
+  [role="progressbar"] > * {
+    background: Highlight !important;
+    forced-color-adjust: none;
+  }
+}
+
+/* Hareket azaltma: gerekli olmayan tüm animasyon/geçiş kapanır, kaydırma anlık. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Tablo hücresi uzun metin kırpma: title ile birlikte `TD truncate` kullanır. */
+.td-truncate {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Sabit (sticky) ilk sütun: dar ekranda yatay kaydırırken kimlik sütunu görünür. */
+.tbl-sticky-first :is(th, td):first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface);
+  box-shadow: 1px 0 0 var(--hairline);
+}
+.tbl-sticky-first thead :is(th):first-child {
+  background: var(--canvas);
+  z-index: 11;
+}
+
+/* Kontrast (WCAG 1.4.3): açık temada küçük metin için okunur tonlar. Koyu temada
+   mint/amber-600 zaten yeterli kontrastlı; orada değişiklik YOK. */
+html:not([data-theme="dark"]) .text-mint-600 { color: var(--mint-700); }
+html:not([data-theme="dark"]) .text-amber-600 { color: var(--amber-700); }
+html:not([data-theme="dark"]) .bg-danger-500.text-white { background-color: var(--danger-600); }

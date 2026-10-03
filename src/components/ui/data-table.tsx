@@ -269,7 +269,7 @@ function CellContent({
         href={target}
         // relative + z-10: satırı kaplayan görünmez bağlantının
         // üstünde kalsın, tıklama buraya gelsin
-        className="focus-ring press relative z-10 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-[var(--elev-1)] transition hover:bg-brand-600/5"
+        className="focus-ring press relative z-10 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 py-1.5 touch:min-h-11 text-xs font-semibold text-brand-700 shadow-[var(--elev-1)] transition hover:bg-brand-600/5"
       >
         {col.linkLabel ?? "Aç"}
       </Link>
@@ -288,7 +288,7 @@ function CellContent({
 }
 
 const pagerButton =
-  "focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas disabled:pointer-events-none disabled:opacity-40";
+  "focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 touch:min-h-11 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas disabled:pointer-events-none disabled:opacity-40";
 
 export function DataTable({
   columns,
@@ -567,7 +567,7 @@ export function DataTable({
       <button
         type="button"
         onClick={() => setQuery("")}
-        className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 text-xs font-semibold text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas"
+        className="focus-ring press inline-flex h-8 touch:h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 text-xs font-semibold text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas"
       >
         <X className="h-3.5 w-3.5" aria-hidden="true" /> Aramayı temizle
       </button>
@@ -618,7 +618,7 @@ export function DataTable({
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 text-xs font-semibold text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas"
+                      className="focus-ring press inline-flex h-8 touch:h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 text-xs font-semibold text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas"
                     >
                       <Columns3 className="h-3.5 w-3.5" aria-hidden="true" /> Sütunlar
                       {hiddenKeys.size > 0 ? (
@@ -657,7 +657,7 @@ export function DataTable({
                       title={`${DENSITY_META[d].label} · ${DENSITY_META[d].height}px satır`}
                       onClick={() => setDensityRaw(d)}
                       className={cn(
-                        "focus-ring inline-flex h-7 items-center rounded-[var(--radius-chip)] px-2.5 text-xs font-semibold transition",
+                        "focus-ring inline-flex h-7 touch:h-11 items-center rounded-[var(--radius-chip)] px-2.5 text-xs font-semibold transition",
                         density === d
                           ? "bg-brand-600/10 text-brand-700"
                           : "text-text-muted hover:text-ink-950",
@@ -981,7 +981,7 @@ export function DataTable({
             <button
               type="button"
               onClick={clearSelection}
-              className="focus-ring press ml-auto inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] px-2.5 text-xs font-semibold text-text-muted transition hover:bg-canvas hover:text-ink-950"
+              className="focus-ring press ml-auto inline-flex h-8 touch:h-11 items-center gap-1.5 rounded-[var(--radius-control)] px-2.5 text-xs font-semibold text-text-muted transition hover:bg-canvas hover:text-ink-950"
             >
               <X className="h-3.5 w-3.5" aria-hidden="true" /> Seçimi temizle
             </button>

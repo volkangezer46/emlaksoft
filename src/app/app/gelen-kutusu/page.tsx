@@ -365,18 +365,20 @@ export default async function InboxPage({
             <input
               name="from"
               type="date"
+              aria-label="Başlangıç tarihi"
               defaultValue={fromF}
-              className="min-w-0 max-w-[150px] flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 sm:flex-none"
+              className="min-w-0 max-w-[150px] flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 touch:min-h-11 text-sm outline-none focus:border-brand-400 sm:flex-none"
             />
             <span>—</span>
             <input
               name="to"
               type="date"
+              aria-label="Bitiş tarihi"
               defaultValue={toF}
-              className="min-w-0 max-w-[150px] flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 sm:flex-none"
+              className="min-w-0 max-w-[150px] flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 touch:min-h-11 text-sm outline-none focus:border-brand-400 sm:flex-none"
             />
           </div>
-          <button type="submit" className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700">
+          <button type="submit" className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 touch:min-h-11 text-xs font-semibold text-white transition hover:bg-brand-700">
             Filtrele
           </button>
           {hasAnyFilter ? (

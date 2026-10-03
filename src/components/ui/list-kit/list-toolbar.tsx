@@ -20,7 +20,7 @@ import { ViewSwitcher, type ViewOption } from "./view-switcher";
  * çipler ve yoğunluk gereken liste ekranları bunu kullanır.
  */
 const CONTROL =
-  "min-h-9 rounded-[var(--radius-control)] border border-line bg-surface text-sm text-text transition focus:border-brand-400 focus:outline-none focus:shadow-[var(--focus-gap),var(--focus-ring)]";
+  "min-h-9 touch:min-h-11 rounded-[var(--radius-control)] border border-line bg-surface text-sm text-text transition focus:border-brand-400 focus:outline-none focus:shadow-[var(--focus-gap),var(--focus-ring)]";
 
 export function ListToolbar({
   pathname,
@@ -114,7 +114,7 @@ export function ListToolbar({
                 {panel}
                 <button
                   type="submit"
-                  className="focus-ring press min-h-9 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  className="focus-ring press min-h-9 touch:min-h-11 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
                   Filtreleri uygula
                 </button>
@@ -133,7 +133,7 @@ export function ListToolbar({
             href={buildHref(pathname, mergeParams(params, { [densityParam]: density === "kompakt" ? "" : "kompakt" }, { resetPage: false }))}
             aria-label={density === "kompakt" ? "Rahat satır yoğunluğuna geç" : "Kompakt satır yoğunluğuna geç"}
             title={density === "kompakt" ? "Rahat görünüm" : "Kompakt görünüm"}
-            className={cn(CONTROL, "focus-ring press inline-grid w-9 place-items-center text-text-muted hover:bg-canvas hover:text-text", density === "kompakt" && "border-brand-300 bg-brand-600/10 text-brand-700")}
+            className={cn(CONTROL, "focus-ring press inline-grid w-9 touch:w-11 place-items-center text-text-muted hover:bg-canvas hover:text-text", density === "kompakt" && "border-brand-300 bg-brand-600/10 text-brand-700")}
           >
             {density === "kompakt" ? <Rows4 aria-hidden="true" className="h-4 w-4" /> : <Rows3 aria-hidden="true" className="h-4 w-4" />}
           </Link>
@@ -149,7 +149,7 @@ export function ListToolbar({
               key={c.key}
               href={c.clearHref}
               title="Bu filtreyi kaldır"
-              className="focus-ring press inline-flex min-h-8 items-center gap-1.5 rounded-full bg-brand-600/10 px-3 text-xs font-semibold text-brand-700 transition hover:bg-brand-600/15"
+              className="focus-ring press inline-flex min-h-8 touch:min-h-11 items-center gap-1.5 rounded-full bg-brand-600/10 px-3 text-xs font-semibold text-brand-700 transition hover:bg-brand-600/15"
             >
               {c.text}
               <X aria-hidden="true" className="h-3.5 w-3.5" />
