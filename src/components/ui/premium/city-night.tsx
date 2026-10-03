@@ -71,6 +71,31 @@ const STARS = Array.from({ length: 46 }, (_, i) => ({
   a: 0.4 + (hash(i, 6) % 5) * 0.12,
 }));
 
+/**
+ * Sabit (yanıp sönmeyen) pencereleri renge göre tek <path>'te toplar: yüzlerce
+ * <rect> yerine iki path (HTML + RSC flight boyutu küçülür). Yanıp sönenler
+ * animasyon gecikmesi taşıdığı için ayrı <rect> kalır.
+ */
+function windowPath(list: { x: number; y: number }[], w: number, h: number): string {
+  return list.map((p) => `M${p.x} ${p.y}h${w}v${h}h-${w}z`).join("");
+}
+
+function Windows({ list, w, h, rx, warmFill, coolFill, opacity }: {
+  list: { x: number; y: number; d: number; warm: boolean }[];
+  w: number; h: number; rx: number; warmFill: string; coolFill: string; opacity: number;
+}) {
+  const fixed = list.filter((i) => !i.d);
+  return (
+    <>
+      <path d={windowPath(fixed.filter((i) => i.warm), w, h)} fill={warmFill} opacity={opacity} />
+      <path d={windowPath(fixed.filter((i) => !i.warm), w, h)} fill={coolFill} opacity={opacity} />
+      {list.filter((i) => i.d).map((i, k) => (
+        <rect key={k} x={i.x} y={i.y} width={w} height={h} rx={rx} fill={i.warm ? warmFill : coolFill} opacity={opacity} className="pm-twinkle" data-d={i.d} />
+      ))}
+    </>
+  );
+}
+
 function Roofs({ blds, fill }: { blds: Bld[]; fill: string }) {
   return (
     <>
@@ -147,18 +172,14 @@ export function CityNight({ className }: { className?: string }) {
       {MID.map((b, i) => (
         <rect key={i} x={b.x} y={BASE - b.h} width={b.w} height="1.2" fill="#d4a24c" opacity="0.2" />
       ))}
-      {LIT_MID.map((w, i) => (
-        <rect key={i} x={w.x} y={w.y} width="3.4" height="5" rx="0.5" fill={w.warm ? "#f0c36a" : "#bcd4ff"} opacity="0.62" className={w.d ? "pm-twinkle" : undefined} data-d={w.d || undefined} />
-      ))}
+      <Windows list={LIT_MID} w={3.4} h={5} rx={0.5} warmFill="#f0c36a" coolFill="#bcd4ff" opacity={0.62} />
 
       {/* Ön sıra */}
       <Roofs blds={NEAR} fill="url(#pm-near)" />
       {NEAR.map((b, i) => (
         <rect key={i} x={b.x} y={BASE - b.h} width={b.w} height="1.4" fill="#d4a24c" opacity="0.3" />
       ))}
-      {LIT_NEAR.map((w, i) => (
-        <rect key={i} x={w.x} y={w.y} width="4" height="6" rx="0.6" fill={w.warm ? "#f0c36a" : "#cfe0ff"} opacity="0.88" className={w.d ? "pm-twinkle" : undefined} data-d={w.d || undefined} />
-      ))}
+      <Windows list={LIT_NEAR} w={4} h={6} rx={0.6} warmFill="#f0c36a" coolFill="#cfe0ff" opacity={0.88} />
 
       {/* Alt sis + zemin */}
       <rect x="0" y={BASE - 56} width={W} height="70" fill="url(#pm-mist)" />
