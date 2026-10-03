@@ -12,6 +12,8 @@ import { ArrowUpRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { now as nowMs } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
+import { PageHeader } from "@/components/ui/page-header";
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/app/empty-state";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
@@ -139,55 +141,13 @@ export default async function CuzdanPage() {
 
   return (
     <div className="space-y-6">
-      <section className="no-print theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-mint-400/20 blur-[80px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-mint-400"><HandCoins className="h-4 w-4" /> Kişisel hakediş</span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Cüzdanım{fullName ? ` · ${fullName}` : ""}</h1>
-            <p className="mt-1 text-sm text-white/60">Kapanan anlaşmalardan payına düşen hakediş, tahsilat ve bekleyen tutarlar tek ekranda.</p>
-          </div>
-          <PrintButton />
-        </div>
-        {/* Bakiye hero'su — bekleyen bakiye büyük, yanında dönem metrikleri.
-            Kartlar komisyon defterinin okuduğu ?durum= filtresine gider. */}
-        <div className="relative mt-6 grid gap-3 sm:grid-cols-[1.4fr_1fr_1fr]">
-          <Link
-            href="/app/komisyon?durum=bekleyen"
-            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-mint-400/25 bg-white/8 p-4 backdrop-blur transition hover:border-mint-400/50"
-          >
-            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.1em] text-mint-300">
-              Bekleyen bakiye
-              <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
-            </p>
-            <p className="numeric mt-1.5 font-display text-3xl font-extrabold text-white md:text-4xl">{money(pending)}</p>
-            <p className="mt-1 text-xs text-white/50">Tahsil edilmemiş hakediş toplamın</p>
-          </Link>
-          <Link
-            href="/app/komisyon"
-            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-4 backdrop-blur transition hover:border-white/30"
-          >
-            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.1em] text-white/50">
-              Bu ay hakediş
-              <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
-            </p>
-            <p className="numeric mt-1.5 font-display text-2xl font-extrabold text-white">{money(thisMonth)}</p>
-            <p className="mt-1 text-xs text-white/50">{donem} dönemi</p>
-          </Link>
-          <Link
-            href="/app/komisyon?durum=tahsil"
-            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-4 backdrop-blur transition hover:border-white/30"
-          >
-            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.1em] text-white/50">
-              Bu yıl tahsil
-              <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
-            </p>
-            <p className="numeric mt-1.5 font-display text-2xl font-extrabold text-white">{money(paidThisYear)}</p>
-            <p className="mt-1 text-xs text-white/50">Ödemesi tamamlanan pay</p>
-          </Link>
-        </div>
-      </section>
+      <PageHeader
+        className="no-print mb-0"
+        eyebrow="Kişisel hakediş"
+        title={`Cüzdanım${fullName ? ` · ${fullName}` : ""}`}
+        description="Kapanan anlaşmalardan payına düşen hakediş, tahsilat ve bekleyen tutarlar tek ekranda."
+        actions={<PrintButton />}
+      />
 
       {/* Dönem bordrosu — yalnızca çıktıda: değerleme raporundaki print deseni
           (başlık bandı + print-sheet tablo + imza alanları). */}
@@ -295,12 +255,12 @@ export default async function CuzdanPage() {
         </div>
       </article>
 
-      <div className="no-print grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Bu ay hakediş" value={money(thisMonth)} icon={CalendarDays} href="/app/komisyon" />
-        <StatCard label="Bekleyen (tahsil edilmemiş)" value={money(pending)} icon={Clock3} tone="warning" href="/app/komisyon?durum=bekleyen" />
+      <KpiGrid count={4} className="no-print">
+        <StatCard label="Bekleyen bakiye (tahsil edilmemiş)" value={money(pending)} icon={Clock3} tone="warning" href="/app/komisyon?durum=bekleyen" />
+        <StatCard label={`Bu ay hakediş · ${donem}`} value={money(thisMonth)} icon={CalendarDays} href="/app/komisyon" />
         <StatCard label="Tahsil edilen (bu yıl)" value={money(paidThisYear)} icon={CheckCircle2} tone="success" href="/app/komisyon?durum=tahsil" />
         <StatCard label="Toplam kayıt" value={mine.length} icon={ReceiptText} href="/app/komisyon" />
-      </div>
+      </KpiGrid>
 
       {hasTrendData ? (
         <section className="no-print rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">

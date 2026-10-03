@@ -1,9 +1,11 @@
 import Link from "next/link";
 import {
-  ArrowUpRight, CalendarCheck2, ChevronLeft, ChevronRight, Crown, FileSignature,
-  Handshake, PhoneCall, Trophy,
+  CalendarCheck2, ChevronLeft, ChevronRight, Crown, FileSignature,
+  Handshake, PhoneCall, Trophy, Users, Wallet,
 } from "lucide-react";
 import { StatCard } from "@/components/app/stat-card";
+import { PageHeader } from "@/components/ui/page-header";
+import { KpiGrid, kpiColumns, podiumColumns } from "@/components/ui/dashboard-grid";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { ChartFrame } from "@/app/app/_ui/lazy-chart";
@@ -412,84 +414,50 @@ export default async function DanismanKpiPage({
   return (
     <div className="space-y-6">
       {/* Hero — çıktıda yok; kâğıttaki başlık aşağıdaki print-only bant. */}
-      <section className="no-print theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-brand-300">
-              <Trophy className="h-4 w-4" /> {isCurrentMonth ? "Bu ay sıralaması" : "Dönem sıralaması"}
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Danışman KPI Paneli</h1>
-            <p className="mt-1 text-sm text-white/75">
-              {isCurrentMonth ? "Bu ayki" : `${donem} dönemi`} aktivite, teklif ve gelir performansı.
-            </p>
-            {/* Dönem gezinme — ?ay=YYYY-MM, sunucuda hesaplanan Link'ler
-                (randevular hafta görünümü deseni). Gelecek aya gidilmez. */}
-            <div className="mt-3 flex items-center gap-1">
-              <Link
-                href={prevHref}
-                className="focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-white/15 text-white/70 transition hover:bg-white/10 hover:text-white"
-                aria-label="Önceki ay"
-              >
+      <PageHeader
+        className="no-print mb-0"
+        eyebrow={isCurrentMonth ? "Bu ay sıralaması" : "Dönem sıralaması"}
+        title="Danışman KPI Paneli"
+        description={`${isCurrentMonth ? "Bu ayki" : `${donem} dönemi`} aktivite, teklif ve gelir performansı.`}
+        actions={
+          <>
+            {/* Dönem gezinme — ?ay=YYYY-MM, sunucuda hesaplanan Link'ler. Gelecek aya gidilmez. */}
+            <div className="flex items-center gap-1">
+              <Link href={prevHref} className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:bg-surface-2 hover:text-text" aria-label="Önceki ay">
                 <ChevronLeft className="h-4 w-4" />
               </Link>
-              <span className="min-w-[120px] px-2 text-center text-sm font-bold text-white first-letter:uppercase">
-                {donem}
-              </span>
+              <span className="min-w-[120px] px-2 text-center text-sm font-bold text-text first-letter:uppercase">{donem}</span>
               {nextHref ? (
-                <Link
-                  href={nextHref}
-                  className="focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-white/15 text-white/70 transition hover:bg-white/10 hover:text-white"
-                  aria-label="Sonraki ay"
-                >
+                <Link href={nextHref} className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:bg-surface-2 hover:text-text" aria-label="Sonraki ay">
                   <ChevronRight className="h-4 w-4" />
                 </Link>
               ) : (
-                <span
-                  className="grid h-8 w-8 cursor-not-allowed place-items-center rounded-[var(--radius-control)] border border-white/8 text-white/25"
-                  aria-hidden="true"
-                >
+                <span className="grid h-9 w-9 cursor-not-allowed place-items-center rounded-[var(--radius-control)] border border-line text-text-faint opacity-60" aria-hidden="true">
                   <ChevronRight className="h-4 w-4" />
                 </span>
               )}
               {!isCurrentMonth ? (
-                <Link
-                  href="/app/danisman-kpi"
-                  className="focus-ring ml-1 rounded-[var(--radius-control)] border border-white/15 px-2.5 py-1.5 text-xs font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
-                >
+                <Link href="/app/danisman-kpi" className="focus-ring ml-1 rounded-[var(--radius-control)] border border-line px-2.5 py-2 text-xs font-semibold text-text-muted transition hover:bg-surface-2 hover:text-text">
                   Bu ay
                 </Link>
               ) : null}
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <PrintButton />
-              {/* Karne parayı ölçer, lig davranışı — puan/rozet/seri için /app/lig */}
-              <Link href={`/app/lig?donem=${ayParam(monthStart)}`} className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"><Trophy className="h-3.5 w-3.5" /> Lig tablosu</Link>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            {[
-              { label: "Danışman", value: advisors.length, href: "/app/ekip" },
-              seeAllEarnings
-                ? { label: "Toplam gelir", value: money(advisors.reduce((s, a) => s + a.revenue, 0)), href: "/app/komisyon" }
-                : { label: "Gelirim", value: money(advisors.find((a) => a.id === userId)?.revenue ?? 0), href: "/app/cuzdan" },
-              { label: "Toplam satış", value: advisors.reduce((s, a) => s + a.dealCount, 0), href: "/app/anlasmalar" },
-            ].map((k) => (
-              <Link
-                key={k.label}
-                href={k.href}
-                className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 text-center hover:border-white/30"
-              >
-                <p className="flex items-center justify-center gap-1 font-display text-xl font-extrabold text-white">
-                  {k.value}
-                  <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
-                </p>
-                <p className="text-xs text-white/70">{k.label}</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+            <PrintButton />
+            {/* Karne parayı ölçer, lig davranışı — puan/rozet/seri için /app/lig */}
+            <Link href={`/app/lig?donem=${ayParam(monthStart)}`} className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm font-semibold text-text transition hover:bg-surface-2"><Trophy className="h-4 w-4" /> Lig tablosu</Link>
+          </>
+        }
+      />
+
+      <KpiGrid count={3} className="no-print" label="Dönem özeti">
+        <StatCard label="Danışman" value={advisors.length} icon={Users} href="/app/ekip" />
+        {seeAllEarnings ? (
+          <StatCard label="Toplam gelir" value={money(advisors.reduce((s, a) => s + a.revenue, 0))} icon={Wallet} tone="success" href="/app/komisyon" />
+        ) : (
+          <StatCard label="Gelirim" value={money(advisors.find((a) => a.id === userId)?.revenue ?? 0)} icon={Wallet} tone="success" href="/app/cuzdan" />
+        )}
+        <StatCard label="Toplam satış" value={advisors.reduce((s, a) => s + a.dealCount, 0)} icon={Handshake} href="/app/anlasmalar" />
+      </KpiGrid>
 
       {/* ── Liderlik podyumu: skoru olan ilk üç danışman (ekran, çıktı dışı) ── */}
       {podium.length > 0 ? (
@@ -502,7 +470,7 @@ export default async function DanismanKpiPage({
             <h2 className="mt-1 font-display text-lg font-bold text-ink-950">
               {isCurrentMonth ? "Bu ayın" : `${donem} döneminin`} ilk üçü
             </h2>
-            <div className="mt-6 grid gap-3 sm:grid-cols-3 sm:items-end">
+            <div className={`mt-6 grid gap-3 sm:items-end ${podiumColumns(podium.length)}`}>
               {podium.map((a, i) => {
                 const sira = i + 1;
                 const stil = [
@@ -538,7 +506,7 @@ export default async function DanismanKpiPage({
       ) : null}
 
       {/* ── Ekip metrik kartları — önceki döneme kıyasla (ekran, çıktı dışı) ── */}
-      <div className="no-print grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <KpiGrid count={4} className="no-print" label="Ekip aktivitesi">
         <StatCard
           label="Ekip çağrısı"
           value={teamNow.call}
@@ -572,14 +540,14 @@ export default async function DanismanKpiPage({
             ? trendOf(convNow, convPrev)
             : { trend: "neutral" as const, trendLabel: "önceki ay verisi yok" })}
         />
-      </div>
+      </KpiGrid>
 
       {/* Rozet şeridi — seçili ayın verisinden türetilir, veri yoksa gizli.
           Bilinçli olarak sade: tablodaki madalya renk diliyle uyumlu amber
           vurgu, animasyon/konfeti yok. Resmi karne çıktısına girmez. */}
       {rozetler.length > 0 ? (
         <section className="no-print space-y-2">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className={`grid gap-3 ${kpiColumns(rozetler.length)}`}>
             {rozetler.map((r) => (
               <Link
                 key={r.ad}

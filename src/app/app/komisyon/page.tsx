@@ -28,6 +28,8 @@ import { requireReportingCount, requireReportingData } from "@/lib/reporting/res
 
 import { PageHeader } from "@/components/ui/page-header";
 import { MoneyValue } from "@/components/ui/money-value";
+import { DashCard, SectionHeader, KpiGrid } from "@/components/ui/dashboard-grid";
+import { KpiTile } from "@/components/ui/premium/kpi-card";
 type CommissionRow = {
   id: string;
   gross_amount: number;
@@ -268,62 +270,39 @@ export default async function CommissionPage({
           </Link>
         }
       />
-<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-amber-400/20 blur-[80px]" />
-        
-        <div className="relative mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {/* KPI kartları defter filtresine bağlı: tıklayınca ?durum= uygulanır (tarih aralığı korunur) */}
-          {[
-            { label: "Toplam komisyon", value: <MoneyValue amount={total} />, icon: Wallet, tone: "text-cyan-400", href: filterHref({ durum: null }), active: durum === null },
-            { label: "Tahsil edilen", value: <MoneyValue amount={paid} />, icon: CheckCircle2, tone: "text-mint-400", href: filterHref({ durum: "tahsil" }), active: durum === "tahsil" },
-            { label: "Bekleyen", value: <MoneyValue amount={pending} />, icon: Clock3, tone: "text-amber-400", href: filterHref({ durum: "bekleyen" }), active: durum === "bekleyen" },
-          ].map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={`focus-ring press lift group block rounded-[var(--radius-card)] border p-3 backdrop-blur transition hover:border-brand-300 ${
-                item.active ? "border-white/35 bg-white/12" : "border-white/10 bg-white/5"
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <item.icon className={`h-4 w-4 ${item.tone}`} />
-                <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-              </div>
-              <p className="mt-2 truncate font-display text-lg font-extrabold text-white md:text-xl">{item.value}</p>
-              <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
+<KpiGrid count={3} label="Toplam komisyon göstergeleri">
+        {/* KPI kartları defter filtresine bağlı: tıklayınca ?durum= uygulanır (tarih aralığı korunur) */}
+        {[
+          { label: "Toplam komisyon", value: <MoneyValue amount={total} />, icon: Wallet, tone: "brand" as const, href: filterHref({ durum: null }), active: durum === null },
+          { label: "Tahsil edilen", value: <MoneyValue amount={paid} />, icon: CheckCircle2, tone: "success" as const, href: filterHref({ durum: "tahsil" }), active: durum === "tahsil" },
+          { label: "Bekleyen", value: <MoneyValue amount={pending} />, icon: Clock3, tone: "warn" as const, href: filterHref({ durum: "bekleyen" }), active: durum === "bekleyen" },
+        ].map((item) => (
+          <KpiTile
+            key={item.label}
+            label={item.label}
+            value={item.value}
+            icon={item.icon}
+            tone={item.tone}
+            href={item.href}
+            className={item.active ? "!border-[var(--accent)]" : undefined}
+          />
+        ))}
+      </KpiGrid>
 
       {/* Dönem KPI şeridi — bu ayın tahakkuk/tahsilat özeti; kartlar defteri
           ilgili tarih aralığı + durumla süzer (?from/?to/?durum). */}
-      <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
-        <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.1em] text-text-faint">
-          <CalendarRange className="h-3.5 w-3.5 text-brand-600" /> Dönem özeti · {donemLabel}
-        </p>
-        <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <DashCard>
+        <SectionHeader as="h2" title={`Dönem özeti · ${donemLabel}`} icon={<CalendarRange />} />
+        <KpiGrid count={4} label="Dönem özeti göstergeleri">
           {[
-            { label: "Dönem komisyonu", value: <MoneyValue amount={donemToplam} />, href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "text-ink-950" },
-            { label: "Tahsil edilen", value: <MoneyValue amount={donemTahsil} />, href: filterHref({ durum: "tahsil", from: presets[0].from, to: presets[0].to }), tone: "text-mint-600" },
-            { label: "Bekleyen", value: <MoneyValue amount={donemBekleyen} />, href: filterHref({ durum: "bekleyen", from: presets[0].from, to: presets[0].to }), tone: "text-amber-600" },
-            { label: "Kayıt", value: Number(aggregate.month_record_count).toLocaleString("tr-TR"), href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "text-brand-600" },
+            { label: "Dönem komisyonu", value: <MoneyValue amount={donemToplam} />, href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "brand" as const },
+            { label: "Tahsil edilen", value: <MoneyValue amount={donemTahsil} />, href: filterHref({ durum: "tahsil", from: presets[0].from, to: presets[0].to }), tone: "success" as const },
+            { label: "Bekleyen", value: <MoneyValue amount={donemBekleyen} />, href: filterHref({ durum: "bekleyen", from: presets[0].from, to: presets[0].to }), tone: "warn" as const },
+            { label: "Kayıt", value: Number(aggregate.month_record_count).toLocaleString("tr-TR"), href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "neutral" as const },
           ].map((k) => (
-            <Link
-              key={k.label}
-              href={k.href}
-              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-canvas/50 p-3 transition hover:border-brand-300"
-            >
-              <p className="flex items-center gap-1 text-xs font-semibold text-text-muted">
-                {k.label}
-                <ArrowUpRight className="hover-action h-3 w-3 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-              </p>
-              <p className={`numeric mt-1 truncate font-display text-lg font-extrabold ${k.tone}`}>{k.value}</p>
-            </Link>
+            <KpiTile key={k.label} label={k.label} value={k.value} href={k.href} tone={k.tone} className="!shadow-none" />
           ))}
-        </div>
-        {/* Dönem tahsilat oranı çubuğu */}
+        </KpiGrid>
         {donemToplam > 0 ? (
           <div className="mt-3">
             <div className="flex items-center justify-between text-xs font-semibold text-text-muted">
@@ -335,11 +314,11 @@ export default async function CommissionPage({
             </div>
           </div>
         ) : null}
-      </section>
+      </DashCard>
 
       {/* Danışman bazlı dağılım + beklenen vs tahsil edilen trend */}
       {advisorDist.length > 0 || hasAylikSeri ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid items-stretch gap-4 lg:grid-cols-2">
           {advisorDist.length > 0 ? (
             <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Wallet className="h-4 w-4" /> Paylaşım analizi</p>

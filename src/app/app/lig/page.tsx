@@ -21,6 +21,7 @@ import {
 import { loadLeagueData, periodOf, periodRange, previousPeriod } from "@/lib/gamification-query";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { podiumColumns } from "@/components/ui/dashboard-grid";
 /**
  * /app/lig — ofis motivasyon ekranı.
  *
@@ -325,10 +326,10 @@ export default async function LigPage({
     <div className="space-y-6">
       {/* Hero: dönem seçici + kapsam + TV modu girişi */}
       <PageHeader title="Lig Tablosu" eyebrow="Ekip ligi" description="Aylık puan yarışı, rozetler ve günlük aktivite serileri." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-3">
+<div className="flex flex-wrap items-center gap-3"><div className="flex items-center gap-3">
             <Link
               href="/app/danisman-kpi"
-              className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-xs font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
+              className="focus-ring press rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-text-muted transition hover:bg-surface-2 hover:text-text"
             >
               Danışman KPI karnesi
             </Link>
@@ -336,33 +337,33 @@ export default async function LigPage({
               href={`/app/lig?donem=${period}${keepScope}&tv=1`}
               title="TV modu — ofis ekranı görünümü"
               aria-label="TV modunu aç"
-              className="focus-ring press grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-white/15 bg-white/5 text-white/75 transition hover:bg-white/10 hover:text-white"
+              className="focus-ring press grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:bg-surface-2 hover:text-text"
             >
               <Tv className="h-4 w-4" />
             </Link>
           </div>
-<><div className="mt-3 flex flex-wrap items-center gap-1">
+<><div className="flex flex-wrap items-center gap-1">
               <Link
                 href={prevHref}
-                className="focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-white/15 text-white/70 transition hover:bg-white/10 hover:text-white"
+                className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-surface-2 hover:text-text"
                 aria-label="Önceki dönem"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Link>
-              <span className="min-w-[128px] px-2 text-center text-sm font-bold text-white first-letter:uppercase">
+              <span className="min-w-[128px] px-2 text-center text-sm font-bold text-text first-letter:uppercase">
                 {range.label}
               </span>
               {nextHref ? (
                 <Link
                   href={nextHref}
-                  className="focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-white/15 text-white/70 transition hover:bg-white/10 hover:text-white"
+                  className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-surface-2 hover:text-text"
                   aria-label="Sonraki dönem"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Link>
               ) : (
                 <span
-                  className="grid h-8 w-8 cursor-not-allowed place-items-center rounded-[var(--radius-control)] border border-white/8 text-white/25"
+                  className="grid h-9 w-9 cursor-not-allowed place-items-center rounded-[var(--radius-control)] border border-line text-text-faint opacity-60"
                   aria-hidden="true"
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -371,7 +372,7 @@ export default async function LigPage({
               {!isCurrent ? (
                 <Link
                   href={`/app/lig${branchId ? `?kapsam=${branchId}` : ""}`}
-                  className="focus-ring ml-1 rounded-[var(--radius-control)] border border-white/15 px-2.5 py-1.5 text-xs font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
+                  className="focus-ring ml-1 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:bg-surface-2 hover:text-text"
                 >
                   Bu ay
                 </Link>
@@ -380,11 +381,11 @@ export default async function LigPage({
 
             {/* Kapsam: yalnız birden çok şube varsa anlamlı */}
             {branches.length > 1 ? (
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <Link
                   href={`/app/lig?donem=${period}`}
                   className={`focus-ring rounded-full px-3 py-1 text-xs font-semibold transition ${
-                    branchId === null ? "bg-white text-ink-950" : "border border-white/15 text-white/70 hover:bg-white/10"
+                    branchId === null ? "bg-accent text-accent-fg" : "border border-line text-text-muted hover:bg-surface-2"
                   }`}
                 >
                   Tüm ofis
@@ -394,7 +395,7 @@ export default async function LigPage({
                     key={String(b.id)}
                     href={`/app/lig?donem=${period}&kapsam=${b.id}`}
                     className={`focus-ring rounded-full px-3 py-1 text-xs font-semibold transition ${
-                      branchId === String(b.id) ? "bg-white text-ink-950" : "border border-white/15 text-white/70 hover:bg-white/10"
+                      branchId === String(b.id) ? "bg-accent text-accent-fg" : "border border-line text-text-muted hover:bg-surface-2"
                     }`}
                   >
                     {String(b.name)}
@@ -428,7 +429,7 @@ export default async function LigPage({
                 <h2 className="mt-1 font-display text-lg font-bold text-ink-950 first-letter:uppercase">
                   {range.label} ilk üçü
                 </h2>
-                <div className="mt-6 grid gap-3 sm:grid-cols-3 sm:items-end">
+                <div className={`mt-6 grid gap-3 sm:items-end ${podiumColumns(podium.length)}`}>
                   {podium.map((r, i) => {
                     const s = podiumStyle[i];
                     return (

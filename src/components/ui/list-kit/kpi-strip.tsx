@@ -1,13 +1,14 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
 import { formatCount } from "@/lib/ui/filter-params";
 import { cn } from "@/lib/utils";
-import { barHeights, hasSeries, trendOf } from "./list-logic";
+import { KpiGrid } from "@/components/ui/dashboard-grid";
+import { KpiTile } from "@/components/ui/premium/kpi-card";
+import type { PremiumTone, Trend } from "@/components/ui/premium/premium-math";
+import { hasSeries, trendOf } from "./list-logic";
 import type { PillTone } from "./status-pill";
 
 /**
- * KpiStrip — ikon kapsüllü, tıklanabilir KPI kartları (sıfır çıkmaz metrik: `href` zorunlu).
+ * KpiStrip — tıklanabilir KPI kartları (görünüm `KpiTile` ile tek uygulama; StatCard/KpiCard ile aynı kart) (sıfır çıkmaz metrik: `href` zorunlu).
  *
  * GERÇEK VERİ KURALI: `series` (eskiden yeniye sayılar, ör. haftalık yeni kayıt) yalnız
  * gerçek kayıtlardan hesaplandığında verilir. Verilirse mini renkli çubuklar ve (isteğe bağlı
@@ -32,103 +33,56 @@ export type KpiItem = {
   title?: string;
 };
 
-const TONE_CLASS: Record<PillTone, string> = {
-  success: "tone-success",
-  warning: "tone-warning",
-  danger: "tone-danger",
-  info: "tone-info",
-  neutral: "tone-neutral",
+const TONE_MAP: Record<PillTone, PremiumTone> = {
+  success: "success",
+  warning: "warn",
+  danger: "danger",
+  info: "brand",
+  neutral: "neutral",
 };
 
-const BAR_COLOR: Record<PillTone, string> = {
-  success: "text-[var(--success-strong)]",
-  warning: "text-[var(--warning-strong)]",
-  danger: "text-[var(--danger-strong)]",
-  info: "text-[var(--info-strong)]",
-  neutral: "text-[var(--neutral-strong)]",
-};
-
-/** Öğe sayısına göre sütun düzeni (Tailwind statik sınıf): 6 öğe 3×2 → 6×1, 5 öğe → 5×1. */
-function columnsFor(n: number): string {
-  if (n >= 6) return "grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6";
-  if (n === 5) return "grid-cols-2 lg:grid-cols-3 xl:grid-cols-5";
-  if (n === 4) return "grid-cols-2 lg:grid-cols-4";
-  if (n === 3) return "grid-cols-1 sm:grid-cols-3";
-  return "grid-cols-2";
+/** Liste mantığındaki sade trendi ortak `Trend` biçimine çevirir (yeni / düz / yön). */
+function toTrend(t: { dir: "up" | "down" | "flat"; pct: number | null; label: string }): Trend {
+  if (t.pct === null && t.dir === "up") return { dir: "new", label: "yeni", pct: null, good: null, sr: "Önceki dönemde kayıt yoktu, yeni" };
+  if (t.dir === "flat") return { dir: "flat", label: t.label, pct: 0, good: null, sr: "Önceki döneme göre değişmedi" };
+  return {
+    dir: t.dir,
+    label: t.label,
+    pct: t.pct,
+    good: t.dir === "up",
+    sr: `Önceki döneme göre yüzde ${Math.abs(t.pct ?? 0)} ${t.dir === "up" ? "arttı" : "azaldı"}`,
+  };
 }
 
 export function KpiStrip({ items, label = "Özet göstergeler", className }: { items: readonly KpiItem[]; label?: string; className?: string }) {
   return (
-    <nav aria-label={label} className={cn("grid gap-3", columnsFor(items.length), className)}>
+    <KpiGrid count={items.length} label={label} className={cn(className)}>
       {items.map((it) => {
-        const tone = it.tone ?? "info";
         const zero = it.value === 0 || it.value === "0";
         const shown = typeof it.value === "number" ? formatCount(it.value) : it.value;
         const series = hasSeries(it.series) ? it.series : null;
-        const trend = series && it.showTrend ? trendOf(series) : null;
-        const heights = series ? barHeights(series) : null;
-        const TrendIcon = trend?.dir === "up" ? ArrowUpRight : trend?.dir === "down" ? ArrowDownRight : ArrowRight;
+        const t = series && it.showTrend ? trendOf(series) : null;
         return (
-          <Link
+          <KpiTile
             key={`${it.label}-${it.href}`}
+            label={it.label}
+            value={shown}
             href={it.href}
             title={it.title}
-            className={cn(
-              "focus-ring press group flex min-w-0 flex-col gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-3.5 shadow-[var(--elev-1)] transition hover:border-brand-300 hover:shadow-[var(--shadow-card)]",
-              zero && !it.attention && "opacity-70 hover:opacity-100",
-            )}
-          >
-            <span className="flex items-center gap-2.5">
-              <span
-                aria-hidden="true"
-                className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] [&>svg]:h-[1.125rem] [&>svg]:w-[1.125rem]", TONE_CLASS[tone])}
-              >
-                {it.icon}
-              </span>
-              <span className="min-w-0 truncate text-xs font-medium text-text-muted">{it.label}</span>
-            </span>
-            <span className="flex items-end justify-between gap-2">
-              <span
-                className={cn(
-                  "numeric min-w-0 truncate font-display text-2xl font-bold leading-none",
-                  it.attention && !zero ? "text-danger-600" : "text-text",
-                )}
-              >
-                {shown}
-              </span>
-              {heights && series ? (
-                <span
-                  role="img"
-                  aria-label={`${it.seriesLabel ?? "Seri"}: ${series.join(", ")}`}
-                  className={cn("flex h-8 shrink-0 items-end gap-0.5", BAR_COLOR[tone])}
-                >
-                  {heights.map((h, i) => (
-                    <span
-                      key={i}
-                      className="w-1 rounded-full bg-current"
-                      style={{ height: `${Math.max(h, 8)}%`, opacity: h === 0 ? 0.15 : 0.35 + (i / heights.length) * 0.65 }}
-                    />
-                  ))}
-                </span>
-              ) : null}
-            </span>
-            {trend ? (
-              <span
-                className={cn(
-                  "flex items-center gap-1 text-xs font-semibold",
-                  trend.dir === "up" ? "text-[var(--success-strong)]" : trend.dir === "down" ? "text-[var(--danger-strong)]" : "text-text-muted",
-                )}
-              >
-                <TrendIcon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
-                {trend.label}
-                <span className="truncate font-normal text-text-muted">{it.seriesLabel ?? "önceki döneme göre"}</span>
-              </span>
-            ) : it.hint ? (
-              <span className="truncate text-xs text-text-muted">{it.hint}</span>
-            ) : null}
-          </Link>
+            iconNode={it.icon}
+            tone={TONE_MAP[it.tone ?? "info"]}
+            trend={t ? toTrend(t) : undefined}
+            previousText={t ? (it.seriesLabel ?? "önceki döneme göre") : undefined}
+            hint={t ? undefined : it.hint}
+            attention={Boolean(it.attention) && !zero}
+            dim={zero && !it.attention}
+            series={series ?? undefined}
+            chart="bars"
+            seriesUnit={it.seriesLabel}
+            seriesLabel={series ? `${it.seriesLabel ?? "Seri"}: ${series.join(", ")}` : undefined}
+          />
         );
       })}
-    </nav>
+    </KpiGrid>
   );
 }

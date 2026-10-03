@@ -65,7 +65,7 @@ export function TableFrame({
           // çözülüp kolonları sola yığıyordu; min-width kabın (çerçeve) genişliğine bağlanır.
           className={
             minWidth
-              ? "w-max min-w-full sm:[min-width:var(--tbl-mw)] [&>table]:min-w-full"
+              ? "w-max min-w-full sm:[min-width:max(100%,var(--tbl-mw))] [&>table]:min-w-full"
               : "w-max min-w-full [&>table]:min-w-full"
           }
           style={minWidth ? ({ ["--tbl-mw"]: `${minWidth}px` } as CSSProperties) : undefined}

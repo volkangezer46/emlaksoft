@@ -35,10 +35,7 @@ function randomPassword() {
 /** Hero'daki "Ekip üyesi ekle" düğmesi: sayfa içi paneli açar/kapatır. */
 export function AddMemberTrigger() {
   return (
-    <InlinePanelTrigger
-      panelId={MEMBER_PANEL_ID}
-      className="btn-shine bg-white px-4 py-2.5 font-semibold text-ink-950 hover:bg-white/90"
-    >
+    <InlinePanelTrigger panelId={MEMBER_PANEL_ID}>
       <UserPlus className="h-4 w-4" /> Ekip üyesi ekle
     </InlinePanelTrigger>
   );

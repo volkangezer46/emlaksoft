@@ -11,6 +11,8 @@ import { TargetFormDialog, type TargetFormValues } from "./target-form-dialog";
 import { TargetCreatePanel, TargetCreateTrigger } from "./target-create-panel";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { KpiGrid } from "@/components/ui/dashboard-grid";
+import { KpiTile } from "@/components/ui/premium/kpi-card";
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 }
@@ -170,41 +172,17 @@ export default async function HedeflerPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Hedefler & Kota" eyebrow="Performans hedefleri" description="Danışman ve ofis bazında satış hedeflerini takip edin." actions={
-canCreate ? (
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2">
-<TargetCreateTrigger variant="hero" />
-</div>
-) : null
+canCreate ? <TargetCreateTrigger /> : null
 } />
 {canCreate ? <TargetCreatePanel members={memberList} /> : null}
-<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-500/25 blur-[80px]" />
-        
-        {targets.length > 0 ? (
-          <div className="relative mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[
-              { label: "Tanımlı hedef", value: targets.length, icon: Gauge, tone: "text-white", href: "#hedef-listesi" },
-              { label: "Tamamlanan", value: doneCount, icon: Rocket, tone: "text-mint-300", href: "#hedef-listesi" },
-              { label: "Yolunda", value: onTrackCount, icon: TrendingUp, tone: "text-cyan-300", href: "#hedef-listesi" },
-              { label: "Tempo geride", value: behindCount, icon: AlertTriangle, tone: "text-amber-300", href: "#hedef-listesi" },
-            ].map((k) => (
-              <Link
-                key={k.label}
-                href={k.href}
-                className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3.5 backdrop-blur transition hover:border-brand-300"
-              >
-                <div className="flex items-start justify-between">
-                  <k.icon className={`h-4 w-4 ${k.tone}`} />
-                  <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                </div>
-                <p className="numeric mt-2 font-display text-xl font-extrabold">{k.value}</p>
-                <p className="text-xs text-white/50">{k.label}</p>
-              </Link>
-            ))}
-          </div>
-        ) : null}
-      </section>
+{targets.length > 0 ? (
+        <KpiGrid count={4}>
+          <KpiTile label="Tanımlı hedef" value={targets.length} icon={Gauge} tone="brand" href="#hedef-listesi" />
+          <KpiTile label="Tamamlanan" value={doneCount} icon={Rocket} tone="success" href="#hedef-listesi" dim={doneCount === 0} />
+          <KpiTile label="Yolunda" value={onTrackCount} icon={TrendingUp} tone="brand" href="#hedef-listesi" dim={onTrackCount === 0} />
+          <KpiTile label="Tempo geride" value={behindCount} icon={AlertTriangle} tone="warn" href="#hedef-listesi" attention={behindCount > 0} dim={behindCount === 0} />
+        </KpiGrid>
+      ) : null}
 
       {/* Takım kıyası — aynı dönemdeki hedefler ilerlemeye göre yarış şeridinde */}
       {showRace ? (
@@ -264,7 +242,7 @@ canCreate ? (
           action={canCreate ? { node: <TargetCreateTrigger /> } : undefined}
         />
       ) : (
-        <div id="hedef-listesi" className="grid scroll-mt-24 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div id="hedef-listesi" className="grid scroll-mt-24 items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {enriched.map(({ t, dealPct, revPct, elapsed, progress, done, behind }) => {
             const period     = new Date(t.period_start).toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
             const prof       = Array.isArray(t.profile) ? t.profile[0] : t.profile;
