@@ -5,24 +5,19 @@ const W = 1000;
 const H = 560;
 const X0 = 214;
 
-function Rule({ x, y, w }: { x: number; y: number; w: number }) {
-  return <line x1={x} x2={x + w} y1={y} y2={y} stroke={C.line} />;
-}
-
 function Chips({ x, y, items, on = 0 }: { x: number; y: number; items: string[]; on?: number }) {
-  let cx = x;
+  const widths = items.map((t) => Math.round(t.length * 7.4 + 24));
   return (
     <g>
       {items.map((t, i) => {
-        const w = Math.round(t.length * 7.4 + 24);
-        const el = (
+        const w = widths[i];
+        const cx = x + widths.slice(0, i).reduce((a, b) => a + b + 8, 0);
+        return (
           <g key={t} transform={`translate(${cx} ${y})`}>
             <rect width={w} height={28} rx={14} fill={i === on ? C.ink : "#fff"} stroke={i === on ? C.ink : C.line} />
             <text x={w / 2} y={18.5} textAnchor="middle" fontSize="12.5" fontWeight="700" fill={i === on ? "#fff" : C.body}>{t}</text>
           </g>
         );
-        cx += w + 8;
-        return el;
       })}
     </g>
   );

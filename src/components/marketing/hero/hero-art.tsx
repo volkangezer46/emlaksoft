@@ -12,8 +12,8 @@ export function HeroDashboard() {
     <AppShell w={900} h={560} sw={170} active={0} title="Günaydın" sub="Bugün 6 göreviniz, 3 randevunuz ve yeni talepleriniz var." label="Örnek ekran: EmlakSoft ana ekranı; göstergeler, aylık performans grafiği, dağılım halkası ve son talepler">
       <Kpi x={194} y={84} w={166} label="Yeni talep" value="12" delta="bu hafta" tone="blue" icon={1} />
       <Kpi x={372} y={84} w={166} label="Aktif portföy" value="38" delta="3 teyit bekliyor" tone="violet" icon={2} />
-      <Kpi x={550} y={84} w={166} label="Bekleyen komisyon" value="₺ 184 bin" delta="" tone="green" icon={5} />
-      <Kpi x={728} y={84} w={160} label="Bugünkü randevu" value="3" delta="ilki 10:00" tone="amber" icon={4} />
+      <Kpi x={550} y={84} w={166} label="Komisyon" value="₺ 184 bin" delta="" tone="green" icon={5} />
+      <Kpi x={728} y={84} w={160} label="Randevu" value="3" delta="ilki 10:00" tone="amber" icon={4} />
       <Card x={194} y={190} w={380} h={206} title="Aylık performans" right="Son 9 ay">
         <Line x={20} y={52} w={340} h={110} vals={[30, 38, 34, 46, 52, 49, 62, 70, 84]} />
         <Bars x={20} y={52} w={340} h={110} vals={[18, 26, 22, 30, 34, 31, 40, 44, 52]} hl={8} />

@@ -18,7 +18,6 @@ import {
   Menu,
   Scale,
   ShieldAlert,
-  Sparkles,
   Briefcase,
   UserRound,
   Crown,
@@ -131,7 +130,7 @@ export function SiteHeader() {
             {GROUPS.map((g) => (
               <div key={g.id} className="mk-nav-item">
                 <Dropdown g={g} menu={menu} setMenu={setMenu} close={close} />
-                {g.id === "cozum" ? <a href="/#fiyat" className="mk-nav-link" onClick={close}>Fiyatlandırma</a> : null}
+                {g.id === "cozum" ? <Link href="/#fiyat" className="mk-nav-link" onClick={close}>Fiyatlandırma</Link> : null}
               </div>
             ))}
           </nav>
@@ -168,7 +167,7 @@ export function SiteHeader() {
                 </ul>
               </details>
             ))}
-            <a href="/#fiyat" className="mk-sheet-link" onClick={close}>Fiyatlandırma</a>
+            <Link href="/#fiyat" className="mk-sheet-link" onClick={close}>Fiyatlandırma</Link>
             <a href="/giris" className="mk-sheet-link" onClick={close}>Giriş yap</a>
           </div>
           <div className="mk-sheet-cta">

@@ -199,14 +199,12 @@ export function Line({ x, y, w, h, vals, color = C.blue, area = true }: { x: num
 export function Donut({ cx, cy, r, parts, center, sub }: { cx: number; cy: number; r: number; parts: [number, string][]; center: string; sub: string }) {
   const total = parts.reduce((s, p) => s + p[0], 0);
   const circ = 2 * Math.PI * r;
-  let acc = 0;
   return (
     <g>
       {parts.map(([v, color], i) => {
         const len = (v / total) * circ;
-        const el = <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={r * 0.34} strokeDasharray={`${Math.max(len - 3, 1)} ${circ}`} strokeDashoffset={-acc} transform={`rotate(-90 ${cx} ${cy})`} />;
-        acc += len;
-        return el;
+        const acc = parts.slice(0, i).reduce((a, q) => a + (q[0] / total) * circ, 0);
+        return <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={r * 0.34} strokeDasharray={`${Math.max(len - 3, 1)} ${circ}`} strokeDashoffset={-acc} transform={`rotate(-90 ${cx} ${cy})`} />;
       })}
       <text x={cx} y={cy + 2} textAnchor="middle" fontSize={r * 0.5} fontWeight="800" fill={C.ink}>{center}</text>
       <text x={cx} y={cy + r * 0.34 + 4} textAnchor="middle" fontSize={r * 0.2} fill={C.mute}>{sub}</text>
