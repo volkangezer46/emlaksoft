@@ -1,179 +1,157 @@
 "use client";
 
-import { useState, useTransition, useCallback } from "react";
-import { CheckSquare, Square, ChevronDown, Loader2, X } from "lucide-react";
+import { createContext, useCallback, useContext, useMemo, useState, useTransition } from "react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { bulkUpdatePropertyStatus } from "@/app/actions/bulk-property";
-import { propertyStatusLabel } from "@/lib/property-labels";
+import { BulkBar } from "@/components/ui/list-kit";
 
+/**
+ * Portföy listesinde toplu seçim + toplu durum güncelleme.
+ *
+ * Satırlar sunucuda çizilir (kapak, kapsüller, eylemler); seçim durumu istemci ister.
+ * Bu yüzden satıra gömülen küçük checkbox parçaları ile tablonun üstündeki çubuk,
+ * ortak bir Context üzerinden konuşur (müşteri listesiyle aynı desen).
+ * Eylem kapısı sunucuda `properties.edit`; sayfa da yalnız bu izinle çubuğu çizer.
+ */
 const STATUS_OPTIONS = [
-  { value: "live",      label: "Yayında" },
-  { value: "draft",     label: "Taslak" },
-  { value: "reserved",  label: "Rezerve" },
-  { value: "passive",   label: "Pasif" },
+  { value: "live", label: "Yayında" },
+  { value: "draft", label: "Taslak" },
+  { value: "reserved", label: "Rezerve" },
+  { value: "passive", label: "Pasif" },
   { value: "withdrawn", label: "Vazgeçildi" },
-  { value: "archived",  label: "Arşiv" },
+  { value: "archived", label: "Arşiv" },
 ];
 
-type PropertyItem = {
-  id:           string;
-  property_code: string;
-  title:        string | null;
-  status:       string;
+type Ctx = {
+  selected: Set<string>;
+  toggle: (id: string) => void;
+  setAll: (ids: string[], on: boolean) => void;
+  clear: () => void;
 };
+const SelectionCtx = createContext<Ctx | null>(null);
 
-export function PropertyBulkActions({
-  properties,
-}: {
-  properties: PropertyItem[];
-}) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [result, setResult] = useState<{ ok?: boolean; error?: string; updatedCount?: number } | null>(null);
-  const [pending, startTransition] = useTransition();
+function useSelection(): Ctx {
+  const ctx = useContext(SelectionCtx);
+  if (!ctx) throw new Error("PropertyBulkProvider içinde kullanılmalı");
+  return ctx;
+}
 
-  const allSelected = properties.length > 0 && selectedIds.size === properties.length;
-  const someSelected = selectedIds.size > 0 && !allSelected;
-
-  const toggleAll = useCallback(() => {
-    if (allSelected) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(properties.map((p) => p.id)));
-    }
-  }, [allSelected, properties]);
-
-  const toggleOne = useCallback((id: string) => {
-    setSelectedIds((prev) => {
+export function PropertyBulkProvider({ children }: { children: React.ReactNode }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const toggle = useCallback((id: string) => {
+    setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
   }, []);
+  const setAll = useCallback((ids: string[], on: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }, []);
+  const clear = useCallback(() => setSelected(new Set()), []);
+  const value = useMemo(() => ({ selected, toggle, setAll, clear }), [selected, toggle, setAll, clear]);
+  return <SelectionCtx.Provider value={value}>{children}</SelectionCtx.Provider>;
+}
 
-  const handleBulkStatus = (status: string) => {
-    setDropdownOpen(false);
-    if (!selectedIds.size) return;
+/** Başlık hücresi — sayfadaki tüm satırları seç/bırak. */
+export function PropertySelectAllCheckbox({ ids }: { ids: string[] }) {
+  const { selected, setAll } = useSelection();
+  const allSelected = ids.length > 0 && ids.every((id) => selected.has(id));
+  return (
+    <input
+      type="checkbox"
+      checked={allSelected}
+      disabled={ids.length === 0}
+      onChange={() => setAll(ids, !allSelected)}
+      aria-label={allSelected ? "Sayfadaki seçimi kaldır" : "Sayfadaki tüm portföyleri seç"}
+      className="h-4 w-4 cursor-pointer accent-brand-600"
+    />
+  );
+}
+
+/** Satır checkbox'ı — relative z-10: satırı kaplayan overlay linkin üstünde kalır. */
+export function PropertyRowCheckbox({ id, name }: { id: string; name: string }) {
+  const { selected, toggle } = useSelection();
+  return (
+    <input
+      type="checkbox"
+      checked={selected.has(id)}
+      onChange={() => toggle(id)}
+      aria-label={`${name} portföyünü seç`}
+      className="relative z-10 h-4 w-4 cursor-pointer accent-brand-600"
+    />
+  );
+}
+
+/** Seçim varken beliren toplu durum çubuğu. */
+export function PropertyBulkBar() {
+  const { selected, clear } = useSelection();
+  const [open, setOpen] = useState(false);
+  const [result, setResult] = useState<{ ok?: boolean; error?: string; updatedCount?: number } | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const apply = (status: string) => {
+    setOpen(false);
+    if (!selected.size) return;
     setResult(null);
     startTransition(async () => {
-      const res = await bulkUpdatePropertyStatus([...selectedIds], status);
+      const res = await bulkUpdatePropertyStatus([...selected], status);
       setResult(res);
-      if (res.ok) setSelectedIds(new Set());
+      if (res.ok) clear();
     });
   };
 
   return (
-    <div className="space-y-3">
-      {/* Toplu aksiyon araç çubuğu — seçim varken göster */}
-      {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-brand-300/40 bg-brand-600/[0.04] px-4 py-2.5">
-          <span className="text-sm font-semibold text-brand-700">
-            {selectedIds.size} portföy seçildi
-          </span>
+    <div className="space-y-2">
+      {selected.size > 0 ? (
+        <BulkBar count={selected.size} noun="portföy" onClear={clear}>
           <div className="relative">
             <button
               type="button"
-              onClick={() => setDropdownOpen((s) => !s)}
+              onClick={() => setOpen((s) => !s)}
               disabled={pending}
-              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+              aria-expanded={open}
+              className="focus-ring press inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
             >
-              {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              {pending ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : null}
               Durum değiştir
-              <ChevronDown className="h-3.5 w-3.5" />
+              <ChevronDown aria-hidden="true" className="h-4 w-4" />
             </button>
-            {dropdownOpen && (
-              <div className="absolute left-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-lg)]">
+            {open ? (
+              <div className="absolute left-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-lg)]">
                 {STATUS_OPTIONS.map((s) => (
                   <button
                     key={s.value}
                     type="button"
-                    onClick={() => handleBulkStatus(s.value)}
-                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-ink-950 transition hover:bg-canvas"
+                    onClick={() => apply(s.value)}
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-text transition hover:bg-canvas"
                   >
                     {s.label}
                   </button>
                 ))}
               </div>
-            )}
+            ) : null}
           </div>
-          <button
-            type="button"
-            onClick={() => setSelectedIds(new Set())}
-            className="ml-auto grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-line"
-            aria-label="Seçimi temizle"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Sonuç mesajı */}
-      {result?.ok && (
-        <div className="rounded-[var(--radius-control)] bg-mint-500/10 px-4 py-2 text-sm font-semibold text-mint-700">
-          ✓ {result.updatedCount} portföy güncellendi.
-        </div>
-      )}
-      {result?.error && (
-        <div className="rounded-[var(--radius-control)] bg-red-50 px-4 py-2 text-sm text-red-600">
+        </BulkBar>
+      ) : null}
+      {result?.ok ? (
+        <p role="status" className="tone-success rounded-[var(--radius-control)] px-4 py-2 text-sm font-semibold">
+          {result.updatedCount} portföy güncellendi.
+        </p>
+      ) : null}
+      {result?.error ? (
+        <p role="alert" className="tone-danger rounded-[var(--radius-control)] px-4 py-2 text-sm">
           {result.error}
-        </div>
-      )}
-
-      {/* Tablo başlığı — tümünü seç */}
-      <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
-        <div className="flex items-center gap-3 border-b border-line px-4 py-3">
-          <button
-            type="button"
-            onClick={toggleAll}
-            aria-label={allSelected ? "Tüm seçimi kaldır" : "Tümünü seç"}
-            className="text-brand-600"
-          >
-            {allSelected ? (
-              <CheckSquare className="h-4 w-4" />
-            ) : someSelected ? (
-              <CheckSquare className="h-4 w-4 opacity-50" />
-            ) : (
-              <Square className="h-4 w-4 text-text-faint" />
-            )}
-          </button>
-          <span className="text-xs text-text-muted">
-            {properties.length} portföy
-            {selectedIds.size > 0 && ` · ${selectedIds.size} seçili`}
-          </span>
-        </div>
-
-        {/* Portföy satırları */}
-        <div className="divide-y divide-line">
-          {properties.map((p) => {
-            const checked = selectedIds.has(p.id);
-            return (
-              <label
-                key={p.id}
-                className={`flex cursor-pointer items-center gap-3 px-4 py-3 transition hover:bg-canvas/60 ${checked ? "bg-brand-600/[0.03]" : ""}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => toggleOne(p.id)}
-                  className="sr-only"
-                />
-                <span className="shrink-0 text-brand-600">
-                  {checked ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4 text-text-faint" />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="truncate text-sm font-semibold text-ink-950">
-                    {p.title ?? p.property_code}
-                  </span>
-                  <span className="ml-2 text-xs text-text-faint">{p.property_code}</span>
-                </span>
-                <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-text-muted">
-                  {propertyStatusLabel(p.status)}
-                </span>
-              </label>
-            );
-          })}
-        </div>
-      </div>
+        </p>
+      ) : null}
     </div>
   );
 }

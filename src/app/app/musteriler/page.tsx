@@ -1,28 +1,20 @@
 import Link from "next/link";
-import { IntentLink } from "@/components/app/intent-link";
 import { redirect } from "next/navigation";
 import { daysAgoIso, msSince, now } from "@/lib/clock";
-import { Badge } from "@/components/ui/badge";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   ArrowDown,
   ArrowUp,
-  ArrowUpRight,
   Cake,
   ChevronLeft,
   ChevronRight,
   ChevronsUpDown,
-  Clock3,
   Copy,
   Flame,
   Gift,
-  Mail,
-  MapPin,
-  MessageCircle,
   Moon,
-  Phone,
   Plus,
   Search,
   Snowflake,
@@ -37,14 +29,7 @@ import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
-import { CustomerRowDelete } from "./customer-row-delete";
-import { CustomerPortalLinkButton } from "@/components/app/portal-link-dialog";
-import {
-  CustomerBulkBar,
-  CustomerBulkProvider,
-  CustomerRowCheckbox,
-  CustomerSelectAllCheckbox,
-} from "./customer-bulk-actions";
+import { CustomerBulkBar, CustomerBulkProvider } from "./customer-bulk-actions";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { computeLeadScore } from "@/lib/lead-score";
 import {
@@ -54,10 +39,22 @@ import {
   type CustomerHeat,
   type HeatSegment,
 } from "@/lib/customer-heat";
-import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/app/empty-state";
 import { ICONS } from "@/lib/icons";
-import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import {
+  CategoryChips,
+  FilterGrid,
+  FilterSelect,
+  KpiStrip,
+  ListToolbar,
+  PILL_TONE_CLASS,
+  StatusPill,
+  buildActiveChips,
+  densityOf,
+  type KpiItem,
+} from "@/components/ui/list-kit";
+import { CustomerMobileList, CustomerTable, type CustomerVM } from "./customer-rows";
+import { countCustomerTypes, heatTone, relativeFromDays } from "./customer-list-logic";
 import { fetchTenantTags } from "./tenant-tags";
 
 type LeadSignalRow = {
@@ -105,6 +102,8 @@ const PAGE_SIZE = 50;
  * pratikte filtre (danışman/tip/etiket) daraltıldığında havuz tamamı kapsar.
  */
 const HEAT_POOL_LIMIT = 500;
+/** Tip çipi sayaçları için taranan azami kayıt; aşılırsa sayaçlar gizlenir (yaklaşık sayı gösterilmez). */
+const TYPE_SCAN_LIMIT = 2000;
 
 const HEAT_SEGMENT_KEYS = ["sicak", "ilgili", "soguk", "uykuda"] as const;
 
@@ -209,6 +208,7 @@ export default async function CustomersPage({
     sirala?: string;
     yon?: string;
     sayfa?: string;
+    yogunluk?: string;
     yeni?: string;
   }>;
 }) {
@@ -234,6 +234,7 @@ export default async function CustomersPage({
   const toF      = ISO_DATE.test(sp.to ?? "")   ? sp.to!   : "";
   const assignedF = sp.assigned ?? "";
   const sortF    = sp.sort     ?? "";
+  const density  = densityOf(sp.yogunluk);
   // Sıcaklık segmenti filtresi — yalnız bilinen değerler
   const segmentF: HeatSegment | "" = (HEAT_SEGMENT_KEYS as readonly string[]).includes(sp.segment ?? "")
     ? (sp.segment as HeatSegment)
@@ -347,6 +348,7 @@ export default async function CustomersPage({
     { count: ownerCount },
     { data: occasionRows },
     { data: growthRows },
+    { data: typeScanRows },
     tenantTags,
     typeDefs,
     sourceDefs,
@@ -389,6 +391,8 @@ export default async function CustomersPage({
       .is("deleted_at", null)
       .gte("created_at", eightWeeksAgo)
       .limit(2000),
+    // Tip çipi sayaçları — hafif tek kolon taraması (TYPE_SCAN_LIMIT'i aşarsa sayaç gösterilmez).
+    supabase.from("customers").select("customer_types").is("deleted_at", null).limit(TYPE_SCAN_LIMIT),
     // Etiket filtresi + toplu etiketleme önerileri — tenant'taki distinct etiketler
     fetchTenantTags(supabase),
     getDefinitionsOrDefault("customer_type"),
@@ -523,7 +527,6 @@ export default async function CustomersPage({
   }
   occasions.sort((a, b) => a.days - b.days);
 
-  const activeFilters = [typeF, sourceF, etiketF, fromF, toF, assignedF, segmentF].filter(Boolean).length;
 
   // Büyüme grafiği — son 8 haftalık kayıtlar (gerçek toplam, sayfa dilimi değil)
   const weekMs = 7 * 86_400_000;
@@ -546,6 +549,7 @@ export default async function CustomersPage({
   if (sortF)     baseParams.sort = sortF;
   if (siralaF)   baseParams.sirala = siralaF;
   if (yonF)      baseParams.yon = yonF;
+  if (density === "kompakt") baseParams.yogunluk = "kompakt";
 
   const hrefWith = (overrides: Record<string, string | undefined>) => {
     const merged: Record<string, string | undefined> = { ...baseParams, ...overrides };
@@ -570,8 +574,112 @@ export default async function CustomersPage({
   const growthTotal = buckets.reduce((a, b) => a + b, 0);
   const growthFromDate = eightWeeksAgo.slice(0, 10);
 
+  // ---- Tip çipi sayaçları + haftalık yeni kayıt serisi (yalnız tarama kesilmediyse güvenilir) ----
+  const typeCounts = (typeScanRows ?? []).length >= TYPE_SCAN_LIMIT
+    ? null
+    : countCustomerTypes((typeScanRows ?? []) as { customer_types: string[] | null }[]);
+  const weeklySeries = ((growthRows ?? []) as unknown[]).length >= 2000 ? undefined : buckets;
+  const advisorName = new Map(advisorList.map((a) => [a.id, a.full_name]));
+  const sourceLabel = new Map<string, string>(sourceEntries);
+
+  // ---- Satır modelleri (tablo + mobil liste ortak veri) ----------------------
+  const viewModels: CustomerVM[] = displayRows.map((c) => {
+    const lead = leadMap.get(c.id);
+    const heat = heatMap.get(c.id);
+    const lastContactIso = heatSignalMap.get(c.id)?.last_contact ?? null;
+    const lastDays = lastContactIso && !Number.isNaN(new Date(lastContactIso).getTime())
+      ? Math.floor(msSince(lastContactIso) / 86_400_000)
+      : null;
+    return {
+      id: c.id,
+      name: c.full_name,
+      href: `/app/musteriler/${c.id}`,
+      types: c.customer_types ?? [],
+      tags: c.tags ?? [],
+      heat: heat
+        ? {
+            label: `${HEAT_SEGMENTS[heat.segment].label}${heat.segment === "uykuda" && heat.daysSinceContact !== null ? ` · ${heat.daysSinceContact} gün` : ""}`,
+            tone: heatTone(heat.segment),
+            title: heatTitle(heat),
+          }
+        : null,
+      lead: lead && !c.blacklist ? { score: lead.score, hot: lead.tier === "hot" } : null,
+      blacklist: Boolean(c.blacklist),
+      sourceLabel: c.source ? (sourceLabel.get(c.source) ?? c.source) : null,
+      phone: c.phone,
+      phoneDisplay: c.phone ? formatTurkishPhone(c.phone) : null,
+      telHref: c.phone ? toTelHref(c.phone) : null,
+      waHref: c.phone ? toWhatsAppLink(c.phone) : null,
+      email: c.email,
+      province: provinceName(c.province),
+      advisor: c.assigned_to ? (advisorName.get(c.assigned_to) ?? null) : null,
+      lastContact: lastDays !== null ? relativeFromDays(lastDays) : null,
+      addedLabel: relativeAdded(c.created_at),
+      createdLabel: formatDate(c.created_at),
+    };
+  });
+
+  // ---- KPI şeridi: yalnız gerçekten hesaplanan sayılar -----------------------
+  const kpis: KpiItem[] = [
+    { label: "Toplam kayıt", value: totalAll ?? 0, icon: <ICONS.musteri />, tone: "info", href: "/app/musteriler", hint: "kayıtlı müşteri" },
+    {
+      label: "Aktif alıcı",
+      value: buyerCount ?? 0,
+      icon: <UserCheck />,
+      tone: "success",
+      href: `/app/musteriler?type=${encodeURIComponent("Alıcı")}`,
+      hint: "alıcı tipinde",
+    },
+    {
+      label: "Mülk sahibi",
+      value: ownerCount ?? 0,
+      icon: <ICONS.portfoy />,
+      tone: "neutral",
+      href: `/app/musteriler?type=${encodeURIComponent("Mülk sahibi")}`,
+      hint: "portföy kaynağı",
+    },
+    {
+      label: "Yeni · son 8 hafta",
+      value: growthTotal,
+      icon: <TrendingUp />,
+      tone: "info",
+      href: `/app/musteriler?from=${growthFromDate}`,
+      series: weeklySeries,
+      showTrend: true,
+      seriesLabel: "önceki 4 haftaya göre",
+      hint: growthTotal === 0 ? "yeni müşteri eklenmedi" : undefined,
+    },
+    {
+      label: "Sıcak müşteri",
+      value: segmentCounts.sicak,
+      icon: <Flame />,
+      tone: "warning",
+      href: hrefWith({ segment: "sicak", sayfa: undefined }),
+      hint: poolLimited ? "yaklaşık (ilk 500 kayıt)" : "şu an en canlı",
+    },
+  ];
+
+  const chips = buildActiveChips("/app/musteriler", baseParams, [
+    { key: "q", label: "Arama" },
+    { key: "type", label: "Tip" },
+    { key: "source", label: "Kaynak", format: (v) => sourceLabel.get(v) ?? v },
+    { key: "etiket", label: "Etiket" },
+    { key: "assigned", label: "Danışman", format: (v) => advisorName.get(v) ?? v },
+    { key: "from", label: "Başlangıç" },
+    { key: "to", label: "Bitiş" },
+    { key: "segment", label: "Sıcaklık", format: (v) => HEAT_SEGMENTS[v as HeatSegment]?.label ?? v },
+    { key: "sort", label: "Sıralama", format: (v) => (v === "hot" ? "Sıcak önce" : v) },
+  ]);
+  const savedViewParams = Object.fromEntries(Object.entries(baseParams).filter(([k]) => k !== "yogunluk"));
+  const segmentCards = [
+    { key: "sicak" as const, icon: Flame },
+    { key: "ilgili" as const, icon: Sparkles },
+    { key: "soguk" as const, icon: Snowflake },
+    { key: "uykuda" as const, icon: Moon },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title="Müşteriler"
         description="Talep, iletişim ve müşteri yolculuğu tek ekranda."
@@ -586,31 +694,8 @@ export default async function CustomersPage({
         }
       />
 
-      {/* Kompakt KPI satırı. Linkler filtre formunun kendi parametreleriyle
-          listeye iner; sayılar head-count sorgularından gelir (gerçek toplam). */}
-      <Card className="grid grid-cols-2 divide-line sm:grid-cols-4 sm:divide-x">
-        {[
-          { label: "Toplam kayıt", value: totalAll ?? 0, icon: ICONS.musteri, href: "/app/musteriler" },
-          { label: "Aktif alıcı", value: buyerCount ?? 0, icon: UserCheck, href: `/app/musteriler?type=${encodeURIComponent("Alıcı")}` },
-          { label: "Mülk sahibi", value: ownerCount ?? 0, icon: ICONS.portfoy, href: `/app/musteriler?type=${encodeURIComponent("Mülk sahibi")}` },
-          { label: "Yeni · son 8 hafta", value: growthTotal, icon: TrendingUp, href: `/app/musteriler?from=${growthFromDate}` },
-        ].map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            className="focus-ring group flex items-center gap-3 px-4 py-3 transition hover:bg-canvas"
-          >
-            <item.icon aria-hidden="true" className="h-4 w-4 shrink-0 text-text-faint" />
-            <span className="min-w-0">
-              <span className="numeric block font-display text-lg font-bold text-ink-950">{item.value.toLocaleString("tr-TR")}</span>
-              <span className="block truncate text-xs text-text-muted">{item.label}</span>
-            </span>
-          </Link>
-        ))}
-      </Card>
-      {growthTotal === 0 && (totalAll ?? 0) > 0 ? (
-        <p className="-mt-3 text-xs text-text-faint">Son 8 haftada yeni müşteri eklenmedi.</p>
-      ) : null}
+      {/* KPI şeridi — hepsi tıklanabilir; çubuk/trend yalnız gerçek haftalık kayıt serisinden */}
+      <KpiStrip items={kpis} />
 
       {/* Yaklaşan doğum günü / yıldönümü hatırlatma */}
       {occasions.length > 0 ? (
@@ -636,9 +721,9 @@ export default async function CustomersPage({
                     <Gift aria-hidden="true" className="h-3.5 w-3.5 text-text-muted" />
                   )}
                   <span>{o.name}</span>
-                  <Badge size="sm" variant={o.days === 0 ? "warning" : "neutral"}>
+                  <StatusPill tone={o.days === 0 ? "warning" : "neutral"} dot={false}>
                     {o.kind === "birthday" ? "Doğum günü" : "Yıldönümü"} · {occasionLabel(o.days)}
-                  </Badge>
+                  </StatusPill>
                 </Link>
               </li>
             ))}
@@ -649,153 +734,114 @@ export default async function CustomersPage({
         </Card>
       ) : null}
 
-      {/* Filtre toolbar — form GET olduğu için sayfa 1'e döner; sıralama gizli
-          alanlarla korunur */}
-      <Card className="p-4">
-      <form className="space-y-3" action="/app/musteriler">
-        {siralaF ? <input type="hidden" name="sirala" value={siralaF} /> : null}
-        {yonF ? <input type="hidden" name="yon" value={yonF} /> : null}
-        {segmentF ? <input type="hidden" name="segment" value={segmentF} /> : null}
-        <div className="flex flex-wrap gap-3">
-          {/* Arama */}
-          <div className="relative min-w-[200px] flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-            <input
-              name="q"
-              defaultValue={q}
-              aria-label="Müşteri ara"
-              placeholder="Ad, telefon, e-posta ara…"
-              className="w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
-            />
-          </div>
-          {/* Müşteri tipi */}
-          <select
-            name="type"
-            defaultValue={typeF}
-            aria-label="Müşteri tipi filtresi"
-            className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
-          >
-            <option value="">Tüm tipler</option>
-            {customerTypes.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
-          {/* Kaynak */}
-          <select
-            name="source"
-            defaultValue={sourceF}
-            aria-label="Kaynak filtresi"
-            className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
-          >
-            <option value="">Tüm kaynaklar</option>
-            {sourceEntries.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-          {/* Etiket — tenant'taki distinct etiketler (URL'deki bayat değer de listelenir) */}
-          {(tenantTags.length > 0 || etiketF) && (
-            <select
-              name="etiket"
-              defaultValue={etiketF}
-              aria-label="Etiket filtresi"
-              className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
-            >
-              <option value="">Tüm etiketler</option>
-              {etiketF && !tenantTags.includes(etiketF) ? (
-                <option value={etiketF}>{etiketF}</option>
-              ) : null}
-              {tenantTags.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          )}
-          {/* Danışman */}
-          {advisorList.length > 0 && (
-            <select
-              name="assigned"
-              defaultValue={assignedF}
-              aria-label="Danışman filtresi"
-              className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
-            >
-              <option value="">Tüm danışmanlar</option>
-              {advisorList.map((a) => <option key={a.id} value={a.id}>{a.full_name}</option>)}
-            </select>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Tarih aralığı — mobilde sarar, native date input'lar viewport'u taşırmaz */}
-          <div className="flex flex-wrap items-center gap-2 text-sm text-text-muted">
-            <span className="text-xs font-medium">Eklenme:</span>
-            <input
-              name="from"
-              type="date"
-              defaultValue={fromF}
-              className="min-w-0 max-w-[150px] flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 sm:flex-none"
-            />
-            <span>—</span>
-            <input
-              name="to"
-              type="date"
-              defaultValue={toF}
-              className="min-w-0 max-w-[150px] flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 sm:flex-none"
-            />
-          </div>
-          <Button type="submit" size="sm">
-            Filtrele
-          </Button>
-          {(activeFilters > 0 || q || sortF || siralaF) && (
-            <Link href="/app/musteriler" className="text-xs font-semibold text-text-muted hover:text-danger-500">
-              Temizle
-            </Link>
-          )}
-          <button
-            type="submit"
-            name="sort"
-            value={sortF === "hot" ? "" : "hot"}
-            className={`focus-ring inline-flex items-center gap-1 rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold transition ${sortF === "hot" ? "bg-brand-600/10 text-brand-700 ring-1 ring-brand-600/25" : "border border-line text-text-muted hover:border-brand-300 hover:text-brand-700"}`}
-            title="Bu sayfadaki kayıtları lead skoruna göre sırala"
-          >
-            Sıcak önce{hotCount > 0 ? ` · ${hotCount}` : ""}
-          </button>
-          <Badge className="ml-auto">{totalFiltered.toLocaleString("tr-TR")} sonuç</Badge>
-        </div>
-      </form>
-      </Card>
-
-      {/* Kayıtlı görünümler — aktif filtre kombinasyonu adlandırılıp saklanır */}
-      <SavedViews route="/app/musteriler" views={savedViews} currentParams={baseParams} />
-
-      {/* Sıcaklık segmentleri — akıllı listeler (kart = filtre çipi, tıklanınca
-          ?segment= ile listeye iner; aktifken tekrar tıklamak filtreyi kaldırır) */}
-      {(totalAll ?? 0) > 0 ? (
-        <section aria-label="Müşteri sıcaklık segmentleri" className="space-y-2">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {(
-              [
-                { key: "sicak" as const, icon: Flame, tone: "neutral" as const },
-                { key: "ilgili" as const, icon: Sparkles, tone: "neutral" as const },
-                { key: "soguk" as const, icon: Snowflake, tone: "neutral" as const },
-                { key: "uykuda" as const, icon: Moon, tone: "neutral" as const },
-              ]
-            ).map((card) => (
-              <StatCard
-                key={card.key}
-                label={`${HEAT_SEGMENTS[card.key].emoji} ${HEAT_SEGMENTS[card.key].label}`}
-                value={segmentCounts[card.key]}
-                icon={card.icon}
-                tone={card.tone}
-                trend={segmentF === card.key ? "neutral" : undefined}
-                trendLabel={segmentF === card.key ? "Filtre aktif — kaldır" : undefined}
-                href={
-                  segmentF === card.key
-                    ? hrefWith({ segment: undefined, sayfa: undefined })
-                    : hrefWith({ segment: card.key, sayfa: undefined })
-                }
+      {/* Araç çubuğu: arama + filtre paneli (GET form → URL), yoğunluk, kayıtlı görünümler, aktif filtre çipleri */}
+      <ListToolbar
+        pathname="/app/musteriler"
+        params={baseParams}
+        searchPlaceholder="Ad, telefon, e-posta ara…"
+        searchLabel="Müşteri ara"
+        panelParamKeys={["source", "etiket", "assigned", "from", "to"]}
+        panel={
+          <>
+            <FilterGrid>
+              <FilterSelect
+                name="source"
+                label="Kaynak"
+                value={sourceF}
+                options={[{ value: "", label: "Tüm kaynaklar" }, ...sourceEntries.map(([v, l]) => ({ value: v, label: l }))]}
               />
-            ))}
-          </div>
-          {poolLimited ? (
-            <p className="text-xs text-text-faint">
-              Segment sayıları ve filtresi, filtrelenmiş listenin ilk{" "}
-              {HEAT_POOL_LIMIT.toLocaleString("tr-TR")} kaydı üzerinden hesaplanır (yaklaşık değerler).
-              Daha kesin sonuç için danışman, tip veya etiket filtresiyle listeyi daraltın.
-            </p>
-          ) : null}
-        </section>
+              {tenantTags.length > 0 || etiketF ? (
+                <FilterSelect
+                  name="etiket"
+                  label="Etiket"
+                  value={etiketF}
+                  options={[
+                    { value: "", label: "Tüm etiketler" },
+                    ...(etiketF && !tenantTags.includes(etiketF) ? [{ value: etiketF, label: etiketF }] : []),
+                    ...tenantTags.map((t) => ({ value: t, label: t })),
+                  ]}
+                />
+              ) : null}
+              {advisorList.length > 0 ? (
+                <FilterSelect
+                  name="assigned"
+                  label="Danışman"
+                  value={assignedF}
+                  options={[{ value: "", label: "Tüm danışmanlar" }, ...advisorList.map((a) => ({ value: a.id, label: a.full_name }))]}
+                />
+              ) : null}
+            </FilterGrid>
+            <FilterGrid>
+              <label className="grid gap-1 text-xs font-semibold text-text-muted">
+                Eklenme (başlangıç)
+                <input name="from" type="date" defaultValue={fromF} className="min-h-9 min-w-0 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-sm font-normal text-text outline-none focus:border-brand-400" />
+              </label>
+              <label className="grid gap-1 text-xs font-semibold text-text-muted">
+                Eklenme (bitiş)
+                <input name="to" type="date" defaultValue={toF} className="min-h-9 min-w-0 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-sm font-normal text-text outline-none focus:border-brand-400" />
+              </label>
+            </FilterGrid>
+          </>
+        }
+        sort={
+          <Link
+            href={hrefWith({ sort: sortF === "hot" ? undefined : "hot", sayfa: undefined })}
+            aria-pressed={sortF === "hot"}
+            title="Bu sayfadaki kayıtları lead skoruna göre sırala"
+            className={`focus-ring press inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] border px-3 text-sm font-semibold transition ${
+              sortF === "hot" ? "border-brand-300 bg-brand-600/10 text-brand-700" : "border-line bg-surface text-text-muted hover:text-text"
+            }`}
+          >
+            <Flame aria-hidden="true" className="h-4 w-4" />
+            Sıcak önce{hotCount > 0 ? <span className="numeric text-xs">· {hotCount}</span> : null}
+          </Link>
+        }
+        densityParam="yogunluk"
+        chips={chips}
+        resultCount={chips.length > 0 ? totalFiltered : undefined}
+        savedViews={<SavedViews route="/app/musteriler" views={savedViews} currentParams={savedViewParams} />}
+      />
+
+      {(totalAll ?? 0) > 0 ? (
+        <div className="space-y-2">
+          {/* Müşteri tipi çipleri (sunucu filtresi, ?type=) */}
+          <CategoryChips
+            options={customerTypes.map((t) => ({ value: t.value, label: t.label }))}
+            counts={typeCounts}
+            total={totalAll ?? 0}
+            active={typeF}
+            pathname="/app/musteriler"
+            params={baseParams}
+            paramName="type"
+            label="Müşteri tipi"
+          />
+
+          {/* Sıcaklık segmentleri — akıllı listeler (çip = filtre; aktifken tekrar tıklamak kaldırır) */}
+          <nav aria-label="Müşteri sıcaklık segmentleri" className="flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-xs font-semibold text-text-muted">Sıcaklık</span>
+            {segmentCards.map((card) => {
+              const on = segmentF === card.key;
+              return (
+                <Link
+                  key={card.key}
+                  href={on ? hrefWith({ segment: undefined, sayfa: undefined }) : hrefWith({ segment: card.key, sayfa: undefined })}
+                  aria-current={on ? "true" : undefined}
+                  title={on ? "Filtre aktif — kaldır" : `${HEAT_SEGMENTS[card.key].label} müşterileri göster`}
+                  className={`focus-ring press inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${PILL_TONE_CLASS[heatTone(card.key)]} ${on ? "ring-2 ring-brand-500" : "opacity-85 hover:opacity-100"}`}
+                >
+                  <card.icon aria-hidden="true" className="h-3.5 w-3.5" />
+                  {HEAT_SEGMENTS[card.key].label}
+                  <span className="numeric">{segmentCounts[card.key]}</span>
+                </Link>
+              );
+            })}
+            {poolLimited ? (
+              <span className="text-xs text-text-faint">
+                Sayılar filtrelenmiş listenin ilk {HEAT_POOL_LIMIT.toLocaleString("tr-TR")} kaydından hesaplanır (yaklaşık).
+              </span>
+            ) : null}
+          </nav>
+        </div>
       ) : null}
 
       {(totalAll ?? 0) === 0 ? (
@@ -817,7 +863,7 @@ export default async function CustomersPage({
           illustration="search"
           title="Eşleşen müşteri bulunamadı"
           description="Arama ifadenizi ya da filtreleri değiştirip tekrar deneyin."
-          secondary={{ href: "/app/musteriler", label: "Filtreleri temizle" }}
+          action={{ href: "/app/musteriler", label: "Filtreleri temizle" }}
         />
       ) : (
         /* key: sayfa/filtre değişince client seçim state'i sıfırlanır —
@@ -826,187 +872,25 @@ export default async function CustomersPage({
           {canBulk ? (
             <CustomerBulkBar advisors={advisorList} tagSuggestions={tenantTags} canEdit={canEdit} canDelete={canDelete} />
           ) : null}
-          <TableFrame minWidth={canBulk ? 800 : 760}>
-            <Table>
-              <THead>
-                <TR>
-                  {canBulk ? (
-                    <TH className="w-10">
-                      <CustomerSelectAllCheckbox ids={pageIds} />
-                    </TH>
-                  ) : null}
-                  <TH
-                    aria-sort={columnSortActive && sortKey === "ad" ? (sortDir === "asc" ? "ascending" : "descending") : undefined}
-                  >
-                    <SortHeaderLink
-                      href={sortHeaderHref("ad")}
-                      active={columnSortActive && sortKey === "ad"}
-                      dir={sortDir}
-                      label="Müşteri"
-                    />
-                  </TH>
-                  <TH className="hidden sm:table-cell">Tür</TH>
-                  <TH className="hidden sm:table-cell">İletişim</TH>
-                  <TH className="hidden sm:table-cell">Konum</TH>
-                  <TH
-                    className="hidden sm:table-cell"
-                    aria-sort={columnSortActive && sortKey === "tarih" ? (sortDir === "asc" ? "ascending" : "descending") : undefined}
-                  >
-                    <SortHeaderLink
-                      href={sortHeaderHref("tarih")}
-                      active={columnSortActive && sortKey === "tarih"}
-                      dir={sortDir}
-                      label="Kayıt tarihi"
-                    />
-                  </TH>
-                  <TH align="right" className="hidden sm:table-cell"><span className="sr-only">İşlemler</span></TH>
-                </TR>
-              </THead>
-              <TBody>
-                {displayRows.map((c) => {
-                  const lead = leadMap.get(c.id);
-                  const heat = heatMap.get(c.id);
-                  return (
-                  <TR key={c.id} interactive>
-                    {canBulk ? (
-                      <TD className="w-10">
-                        {/* checkbox relative z-10 — satır overlay linkiyle çakışmaz */}
-                        <CustomerRowCheckbox id={c.id} name={c.full_name} />
-                      </TD>
-                    ) : null}
-                    <TD>
-                      {/* Satır overlay'i YALNIZ sm+ (masaüstü/tablet). Mobilde
-                          `absolute` overlay tablo genişliğinde bir katman yaratıp iOS
-                          Safari'de tüm yatay-kaydırılabilir tablo içeriğini BELGE scroll
-                          katmanına promote ediyor (overlay'in varlığı yeter, genişliği
-                          değil) → sayfa yana kayıyordu. Mobilde tıklama için isim bloğu
-                          Link (aşağıda); tablo kendi kabında güvenle kaydırılır. */}
-                      {/* prefetch={false}: sayfa başına 50 satır × dinamik [id] rotası (loading.tsx
-                          sınırı) viewport girişinde 50 RSC isteği tetikliyor, networkidle'a
-                          ulaşılmıyordu. Tıklamada loading.tsx zaten anında açılır. */}
-                      <IntentLink href={`/app/musteriler/${c.id}`} className="absolute inset-0 hidden sm:block" aria-label={`${c.full_name} detayları`} />
-                      <IntentLink href={`/app/musteriler/${c.id}`} className="flex items-center gap-3 sm:pointer-events-none">
-                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[image:var(--grad-brand)] text-xs font-bold text-white shadow-[var(--shadow-xs)]">
-                          {c.full_name.split(/\s+/).map((part) => part[0] ?? "").join("").slice(0, 2).toUpperCase()}
-                        </span>
-                        <div>
-                          <p className="flex items-center gap-1.5 font-semibold text-ink-950">
-                            {c.full_name}
-                            {lead && !c.blacklist ? (
-                              <span title={`Lead skoru: ${lead.score}`}>
-                                <Badge size="sm" variant={lead.tier === "hot" ? "warning" : "neutral"} className="numeric">
-                                  {lead.score}
-                                </Badge>
-                              </span>
-                            ) : null}
-                            {/* Sıcaklık segmenti — title: skor dökümü (hangi bileşen kaç puan);
-                                uykudaysa temassız gün sayısı da başlıkta */}
-                            {heat ? (
-                              <span title={heatTitle(heat)}>
-                                <Badge
-                                  size="sm"
-                                  variant={heat.segment === "sicak" ? "warning" : heat.segment === "ilgili" ? "success" : "neutral"}
-                                >
-                                  {HEAT_SEGMENTS[heat.segment].label}
-                                  {heat.segment === "uykuda" && heat.daysSinceContact !== null
-                                    ? ` · ${heat.daysSinceContact} gün`
-                                    : ""}
-                                </Badge>
-                              </span>
-                            ) : null}
-                          </p>
-                          {c.blacklist ? (
-                            <p className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-danger-500"><span className="h-1.5 w-1.5 rounded-full bg-danger-500" /> Kara liste</p>
-                          ) : (
-                            <p className="mt-0.5 flex items-center gap-1 text-xs text-text-faint"><Clock3 className="h-3 w-3" /> {relativeAdded(c.created_at)}</p>
-                          )}
-                        </div>
-                      </IntentLink>
-                    </TD>
-                    <TD className="hidden sm:table-cell">
-                      {c.customer_types && c.customer_types.length > 0 ? (
-                        <Badge>{c.customer_types[0]}</Badge>
-                      ) : (
-                        <span className="text-text-faint">—</span>
-                      )}
-                      {/* Etiketler — ilk 2 chip + kalan sayısı */}
-                      {c.tags && c.tags.length > 0 ? (
-                        <span className="mt-1 flex flex-wrap items-center gap-1">
-                          {c.tags.slice(0, 2).map((t) => (
-                            <Badge key={t} size="sm" variant="outline">{t}</Badge>
-                          ))}
-                          {c.tags.length > 2 ? (
-                            <span className="text-xs font-semibold text-text-faint" title={c.tags.slice(2).join(", ")}>
-                              +{c.tags.length - 2}
-                            </span>
-                          ) : null}
-                        </span>
-                      ) : null}
-                    </TD>
-                    <TD className="hidden sm:table-cell">
-                      {/* tel/wa/mailto linkleri satır overlay'inin üstünde kalmalı → relative z-10 */}
-                      {c.phone ? (
-                        <span className="relative z-10 flex items-center gap-1.5">
-                          <a
-                            href={toTelHref(c.phone) ?? "#"}
-                            className="flex items-center gap-2 tabular-nums text-text-muted transition hover:text-brand-600"
-                            aria-label={`${c.full_name} numarasını ara`}
-                          >
-                            <Phone className="h-3.5 w-3.5 text-brand-600" />{formatTurkishPhone(c.phone)}
-                          </a>
-                          <a
-                            href={toWhatsAppLink(c.phone) ?? "#"}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label={`${c.full_name} ile WhatsApp görüşmesi`}
-                            className="grid h-6 w-6 min-h-9 min-w-9 place-items-center rounded-full text-mint-600 transition hover:bg-mint-500/10"
-                          >
-                            <MessageCircle className="h-3.5 w-3.5" />
-                          </a>
-                        </span>
-                      ) : (
-                        <p className="flex items-center gap-2 tabular-nums text-text-muted"><Phone className="h-3.5 w-3.5 text-brand-600" />—</p>
-                      )}
-                      {c.email ? (
-                        <a
-                          href={`mailto:${c.email}`}
-                          className="relative z-10 mt-1 flex w-fit items-center gap-2 text-xs text-text-faint transition hover:text-brand-600"
-                          aria-label={`${c.full_name} adresine e-posta gönder`}
-                        >
-                          <Mail className="h-3.5 w-3.5" />{c.email}
-                        </a>
-                      ) : null}
-                    </TD>
-                    <TD className="hidden text-text-muted sm:table-cell">
-                      <span className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-text-faint" />{provinceName(c.province)}</span>
-                    </TD>
-                    <TD className="hidden text-text-muted sm:table-cell">
-                      <span className="flex items-center gap-2"><Clock3 className="h-3.5 w-3.5 text-text-faint" />{formatDate(c.created_at)}</span>
-                    </TD>
-                    <TD className="hidden sm:table-cell">
-                      <div className="relative z-10 flex items-center justify-end gap-1">
-                        {/* Müşteri portalı linki — createCustomerPortalToken'ın
-                            tek girişi. Action customers.edit istiyor, buton da
-                            aynı kapıyla gösterilir. */}
-                        {canEdit ? (
-                          <CustomerPortalLinkButton
-                            customerId={c.id}
-                            customerName={c.full_name}
-                            phone={c.phone}
-                          />
-                        ) : null}
-                        {canDelete ? <CustomerRowDelete customerId={c.id} name={c.full_name} /> : null}
-                        <span className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600">
-                          <ArrowUpRight className="h-4 w-4" />
-                        </span>
-                      </div>
-                    </TD>
-                  </TR>
-                  );
-                })}
-              </TBody>
-            </Table>
-          </TableFrame>
+          <CustomerTable
+            rows={viewModels}
+            ids={pageIds}
+            canBulk={canBulk}
+            canEdit={canEdit}
+            canDelete={canDelete}
+            density={density}
+            sortHeader={{
+              name: (
+                <SortHeaderLink href={sortHeaderHref("ad")} active={columnSortActive && sortKey === "ad"} dir={sortDir} label="Müşteri" />
+              ),
+              created: (
+                <SortHeaderLink href={sortHeaderHref("tarih")} active={columnSortActive && sortKey === "tarih"} dir={sortDir} label="Kayıt tarihi" />
+              ),
+              nameSort: columnSortActive && sortKey === "ad" ? (sortDir === "asc" ? "ascending" : "descending") : undefined,
+              createdSort: columnSortActive && sortKey === "tarih" ? (sortDir === "asc" ? "ascending" : "descending") : undefined,
+            }}
+          />
+          <CustomerMobileList rows={viewModels} />
         </CustomerBulkProvider>
       )}
 

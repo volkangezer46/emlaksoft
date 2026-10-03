@@ -5,16 +5,19 @@ import Image from "next/image";
 import { inFilter, orIlike, safeLike } from "@/lib/pgrst";
 import {
   ArrowUpRight,
+  Banknote,
   Building2,
   ChevronLeft,
   ChevronRight,
   FileCheck2,
   Gauge,
   LayoutGrid,
+  List as ListIcon,
   Map as MapIcon,
   MapPin,
   Plus,
   Search,
+  Sparkles,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/server";
@@ -26,8 +29,10 @@ import { SavedViews } from "@/components/app/saved-views";
 import { CompareBar } from "@/components/public/compare-select";
 import type { CompareItem } from "@/components/public/compare-table";
 import { PropertyCompareShell } from "./compare-shell";
-import { PropertyBulkActions } from "./property-bulk-actions";
+import { PropertyBulkBar, PropertyBulkProvider } from "./property-bulk-actions";
 import { PropertySortSelect } from "./property-sort-select";
+import { PropertyMobileList, PropertyTable, type PropertyVM } from "./property-rows";
+import { compactTry, countByType, featureSummary, priceHealthPill, propertyStatusTone } from "./property-list-logic";
 import { OwnerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { EmptyState } from "@/components/app/empty-state";
@@ -36,8 +41,23 @@ import { ICONS } from "@/lib/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { DAY_MS, msSince, now } from "@/lib/clock";
+import {
+  CategoryChips,
+  FilterGrid,
+  FilterSelect,
+  KpiStrip,
+  ListToolbar,
+  WEEK_MS,
+  bucketByWeek,
+  buildActiveChips,
+  densityOf,
+  mergeResetPage,
+  type KpiItem,
+  type ViewOption,
+} from "@/components/ui/list-kit";
+import { buildHref } from "@/lib/ui/filter-params";
+import { DAY_MS, daysAgoIso, msSince, now } from "@/lib/clock";
+import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { fetchLatestRates, formatFx, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 
 // Harita ağır bir client komponenti ve yalnız ?gorunum=harita'da görünür —
@@ -95,12 +115,19 @@ function formatPrice(value: number | null, transaction: string) {
   return `${price} ₺${transaction === "rent" || transaction === "Kiralık" ? "/ay" : ""}`;
 }
 
+function formatDate(iso: string) {
+  return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
+}
+
 /** Sayfa başına kayıt — gerçek sunucu sayfalaması (200'lük dilim yerine). */
 const PAGE_SIZE = 50;
 /** Harita görünümü tek seferde en çok bu kadar konumlu portföy çizer. */
 const MAP_LIMIT = 1000;
-/** Toplam portföy değeri hesabında taranan azami kayıt (tek kolon, hafif). */
-const VALUE_SUM_LIMIT = 2000;
+/** Tek hafif tarama (değer toplamı, tip sayaçları, haftalık seri) azami kayıt sayısı. */
+const SCAN_LIMIT = 2000;
+const TREND_WEEKS = 8;
+/** ?eklenen= — son N günde eklenenler (KPI "Son 4 hafta" buraya iner). */
+const ADDED_WINDOWS = [7, 28, 90] as const;
 
 /** ?status= kontratı — değerler properties.status kolonuyla (İngilizce + Türkçe eşleri) eşlenir. */
 const STATUS_FILTERS = [
@@ -132,10 +159,7 @@ const SAGLIK_DB_VALUES: Record<SaglikValue, string[]> = {
 
 /** price_health kolonunu rozet etiketine çevirir (green/Yeşil → İyi vb.). */
 function healthLabel(health: string | null): string {
-  if (health === "green" || health === "Yeşil") return "İyi";
-  if (health === "yellow" || health === "Sarı") return "İzle";
-  if (health === "red" || health === "Kırmızı") return "Riskli";
-  return "Bekliyor";
+  return priceHealthPill(health)?.label ?? "Bekliyor";
 }
 
 const PAGER_BTN =
@@ -143,10 +167,24 @@ const PAGER_BTN =
 const PAGER_BTN_DISABLED =
   "inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
+const PATH = "/app/portfoyler";
+
 export default async function PropertiesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string; status?: string; saglik?: string; gorunum?: string; sayfa?: string; sirala?: string; yeni?: string; danisman?: string }>;
+  searchParams?: Promise<{
+    q?: string;
+    status?: string;
+    saglik?: string;
+    gorunum?: string;
+    sayfa?: string;
+    sirala?: string;
+    kategori?: string;
+    eklenen?: string;
+    yogunluk?: string;
+    yeni?: string;
+    danisman?: string;
+  }>;
 }) {
   const { perms } = await requireModulePage("properties");
   const canCreate = (perms.properties ?? []).includes("create");
@@ -156,7 +194,10 @@ export default async function PropertiesPage({
   const q = (params.q ?? "").trim();
   const statusFilter = STATUS_FILTERS.some((f) => f.value === params.status) ? params.status! : "all";
   const saglikFilter = SAGLIK_FILTERS.some((f) => f.value === params.saglik) ? (params.saglik as SaglikValue) : null;
-  const view = params.gorunum === "harita" ? "harita" : "liste";
+  const view: "liste" | "kart" | "harita" = params.gorunum === "harita" ? "harita" : params.gorunum === "kart" ? "kart" : "liste";
+  const kategoriF = (params.kategori ?? "").trim().slice(0, 60);
+  const eklenenDays = ADDED_WINDOWS.find((d) => String(d) === params.eklenen) ?? null;
+  const density = densityOf(params.yogunluk);
   // Kullanıcı sıralaması: ?sirala=eski|fiyat_yuksek|fiyat_dusuk (varsayılan: yeni=created_at desc)
   const siralaF = ["eski", "fiyat_yuksek", "fiyat_dusuk"].includes(params.sirala ?? "") ? (params.sirala as string) : "";
   const page = Math.max(1, Number.parseInt(params.sayfa ?? "", 10) || 1);
@@ -165,15 +206,23 @@ export default async function PropertiesPage({
   const offset = (page - 1) * PAGE_SIZE;
   const supabase = await createClient();
   // Bağımsız: sorgularla aynı turda beklenir (aşağıdaki Promise.all).
-  const savedViewsPromise = listSavedViews("/app/portfoyler");
-  // Kayıtlı görünümler için aktif filtre paramları (varsayılanlar hariç)
-  const savedViewParams: Record<string, string> = {};
-  if (q) savedViewParams.q = q;
-  if (statusFilter !== "all") savedViewParams.status = statusFilter;
-  if (saglikFilter) savedViewParams.saglik = saglikFilter;
-  if (danismanF) savedViewParams.danisman = danismanF;
-  if (siralaF) savedViewParams.sirala = siralaF;
-  if (view === "harita") savedViewParams.gorunum = "harita";
+  const savedViewsPromise = listSavedViews(PATH);
+
+  // Doğrulanmış URL durumu — toolbar, çipler, sayfalama ve kayıtlı görünümler TEK kaynaktan beslenir
+  // (geçersiz/bayat paramlar bağlantılara sızmaz).
+  const urlParams: Record<string, string> = {};
+  if (q) urlParams.q = q;
+  if (statusFilter !== "all") urlParams.status = statusFilter;
+  if (saglikFilter) urlParams.saglik = saglikFilter;
+  if (kategoriF) urlParams.kategori = kategoriF;
+  if (danismanF) urlParams.danisman = danismanF;
+  if (eklenenDays) urlParams.eklenen = String(eklenenDays);
+  if (siralaF) urlParams.sirala = siralaF;
+  if (view !== "liste") urlParams.gorunum = view;
+  if (density === "kompakt") urlParams.yogunluk = "kompakt";
+  const hrefWith = (patch: Record<string, string>) => buildHref(PATH, mergeResetPage(urlParams, patch));
+  // Kayıtlı görünümler: yoğunluk kişisel tercih, görünüm kaydına girmez.
+  const savedViewParams = Object.fromEntries(Object.entries(urlParams).filter(([k]) => k !== "yogunluk"));
 
   /*
    * BULUNAN HATA (sessiz veri kaybı): eskiden 200 kayıt çekilip status/sağlık
@@ -182,7 +231,7 @@ export default async function PropertiesPage({
    * kullanıcıya yanlışlıkla "sonuç yok" diyordu; ötesi hiç görünmüyordu.
    * Gerçek sayfalama da yoktu.
    *
-   * ÇÖZÜM: bütün kullanıcı filtreleri (durum, sağlık, arama + konum/portal)
+   * ÇÖZÜM: bütün kullanıcı filtreleri (durum, sağlık, kategori, eklenme, arama + konum/portal)
    * Supabase sorgusuna itildi; liste gerçek sayfalama ile (range + count)
    * geliyor. Konum ve portal adı önce ilgili tablolarda aranıp bulunan id'ler
    * or() koşuluna ekleniyor (name üzerinde trigram indeksi var, ucuz).
@@ -211,13 +260,16 @@ export default async function PropertiesPage({
 
   const statusValues = statusFilter !== "all" ? STATUS_DB_VALUES[statusFilter] : undefined;
   const saglikValues = saglikFilter ? SAGLIK_DB_VALUES[saglikFilter] : undefined;
+  const addedSince = eklenenDays ? daysAgoIso(eklenenDays) : null;
 
-  // Ortak filtre kurucu — deleted_at + durum + arama. Sağlık HARİÇ: sağlık
+  // Ortak filtre kurucu — deleted_at + durum + kategori + eklenme + arama. Sağlık HARİÇ: sağlık
   // dağılımı çipleri her sağlık değeri için ayrı sayıldığından temel sorguda
   // sağlık filtresi olmaz (aksi halde çip sayıları kendi filtresini yer).
   const buildBaseQuery = (select: string, opts?: { count: "exact"; head?: boolean }) => {
     let query = supabase.from("properties").select(select, opts).is("deleted_at", null);
     if (statusValues) query = query.in("status", statusValues);
+    if (kategoriF) query = query.eq("property_type", kategoriF);
+    if (addedSince) query = query.gte("created_at", addedSince);
     if (qOrClause) query = query.or(qOrClause);
     if (danismanF) query = query.eq("assigned_to", danismanF);
     return query;
@@ -228,15 +280,15 @@ export default async function PropertiesPage({
     return query;
   };
 
-  const filtersEmpty = !statusValues && !qOrClause && !saglikValues && !danismanF;
+  const filtersEmpty = !statusValues && !qOrClause && !saglikValues && !kategoriF && !addedSince && !danismanF;
 
   const LIST_COLS =
     "id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, published_at, province_id, district_id, lat, lng, province:geo_provinces(name), district:geo_districts(name), portal_listings!portal_listings_property_id_fkey(portal_name,status,last_confirmed_at)";
   const MAP_COLS = "id, property_code, title, transaction_type, list_price, lat, lng";
 
-  // Liste görünümü sunucu-sayfalı; harita görünümü tüm konumlu sonuçları (cap) çeker.
+  // Liste/Kart görünümleri sunucu-sayfalı; harita görünümü tüm konumlu sonuçları (cap) çeker.
   const listQuery =
-    view === "liste"
+    view !== "harita"
       ? (() => {
           const base = buildFilteredQuery(LIST_COLS);
           const ordered =
@@ -285,7 +337,9 @@ export default async function PropertiesPage({
     { count: greenCount },
     { count: yellowCount },
     { count: redCount },
-    { data: valueRows },
+    { count: recentCount },
+    { data: scanRows },
+    typeDefs,
     savedViews,
     coverRows,
   ] = await Promise.all([
@@ -308,8 +362,16 @@ export default async function PropertiesPage({
     buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.iyi),
     buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.izle),
     buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.riskli),
-    // Toplam portföy değeri — hafif tek kolon; sayfa dilimi değil (makul üst sınırla).
-    supabase.from("properties").select("list_price").is("deleted_at", null).limit(VALUE_SUM_LIMIT),
+    // Son 4 haftada eklenen (KPI) — ?eklenen=28 hedefiyle aynı koşul.
+    supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null).gte("created_at", daysAgoIso(28)),
+    // Tek hafif tarama: portföy değeri + tip sayaçları + haftalık seri (en yeni SCAN_LIMIT kayıt).
+    supabase
+      .from("properties")
+      .select("list_price, property_type, created_at")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(SCAN_LIMIT),
+    getDefinitionsOrDefault("property_type"),
     savedViewsPromise,
     coversP,
   ]);
@@ -319,15 +381,22 @@ export default async function PropertiesPage({
   const totalPages = Math.max(1, Math.ceil(totalFilteredCount / PAGE_SIZE));
   const rangeStart = totalFilteredCount === 0 ? 0 : offset + 1;
   const rangeEnd = Math.min(offset + rows.length, totalFilteredCount);
+  const nowMs = now();
 
   // Toplam portföy değeri + döviz karşılığı. Türk emlak piyasası fiilen
   // dolarize; ofis sahibi "kaç dolarlık portföyüm var" sorusunu soruyor.
-  const totalValueTry = (valueRows ?? []).reduce(
-    (sum, p) => sum + Number((p as { list_price: number | null }).list_price ?? 0),
-    0,
-  );
+  const scan = (scanRows ?? []) as { list_price: number | null; property_type: string | null; created_at: string }[];
+  const totalValueTry = scan.reduce((sum, p) => sum + Number(p.list_price ?? 0), 0);
   const totalValueFx = fxApproxLine(totalValueTry, fxRates);
   const fxTitle = fxRates ? `TCMB ${fxRates.rateDate} satış kuru — ${fxAgeLabel(fxRates.rateDate, now())}` : undefined;
+  // Tarama kesildiyse (SCAN_LIMIT) tip sayaçları ve eski haftalar eksik olur → göstermeyiz.
+  const scanTruncated = scan.length >= SCAN_LIMIT;
+  const oldestScanMs = scan.length ? new Date(scan[scan.length - 1]!.created_at).getTime() : nowMs;
+  const typeCounts = scanTruncated ? null : countByType(scan);
+  const weeklySeries =
+    !scanTruncated || oldestScanMs <= nowMs - TREND_WEEKS * WEEK_MS
+      ? bucketByWeek(scan.map((r) => r.created_at), nowMs, TREND_WEEKS)
+      : undefined;
 
   // Kapak görselleri — tek ek sorgu; property_id -> media id eşlemesi.
   // Görsel tenant/yetki kontrollü download ucu üzerinden servis edilir.
@@ -336,7 +405,6 @@ export default async function PropertiesPage({
     if (!coverByProperty.has(cover.property_id)) coverByProperty.set(cover.property_id, cover.id);
   }
 
-
   // Fiyat sağlığı dağılımı — head-count sorgularından (gerçek toplamlar).
   const greenN = greenCount ?? 0;
   const yellowN = yellowCount ?? 0;
@@ -344,47 +412,17 @@ export default async function PropertiesPage({
   const warningCount = yellowN + redN;
   const healthKnownTotal = greenN + yellowN + redN;
   const healthTotal = Math.max(1, healthKnownTotal);
-  const healthSegments: { label: string; param: SaglikValue; count: number; bar: string; dot: string; text: string; delay: string }[] = [
-    { label: "İyi", param: "iyi", count: greenN, bar: "bg-mint-500", dot: "bg-mint-400", text: "text-mint-400", delay: "0s" },
-    { label: "İzle", param: "izle", count: yellowN, bar: "bg-amber-400", dot: "bg-amber-400", text: "text-amber-300", delay: "0.12s" },
-    { label: "Riskli", param: "riskli", count: redN, bar: "bg-danger-500", dot: "bg-danger-500", text: "text-danger-400", delay: "0.24s" },
+  const healthSegments: { label: string; param: SaglikValue; count: number; bar: string; dot: string; delay: string }[] = [
+    { label: "İyi", param: "iyi", count: greenN, bar: "bg-mint-500", dot: "bg-mint-400", delay: "0s" },
+    { label: "İzle", param: "izle", count: yellowN, bar: "bg-amber-400", dot: "bg-amber-400", delay: "0.12s" },
+    { label: "Riskli", param: "riskli", count: redN, bar: "bg-danger-500", dot: "bg-danger-500", delay: "0.24s" },
   ];
-
-  // Mevcut q/status bağlamını koruyarak ?saglik= linki üret (kayip-kacak filterHref deseni).
-  const saglikHref = (value: SaglikValue) => {
-    const sp = new URLSearchParams();
-    if (q) sp.set("q", q);
-    if (statusFilter !== "all") sp.set("status", statusFilter);
-    if (danismanF) sp.set("danisman", danismanF);
-    sp.set("saglik", value);
-    if (view === "harita") sp.set("gorunum", "harita");
-    return `/app/portfoyler?${sp.toString()}`;
-  };
-
-  // Liste/Harita toggle linki — aktif filtreleri (q/status/saglik) koruyarak görünüm değiştirir.
-  const viewHref = (value: "liste" | "harita") => {
-    const sp = new URLSearchParams();
-    if (q) sp.set("q", q);
-    if (statusFilter !== "all") sp.set("status", statusFilter);
-    if (danismanF) sp.set("danisman", danismanF);
-    if (saglikFilter) sp.set("saglik", saglikFilter);
-    if (siralaF) sp.set("sirala", siralaF);
-    if (value === "harita") sp.set("gorunum", "harita");
-    const qs = sp.toString();
-    return qs ? `/app/portfoyler?${qs}` : "/app/portfoyler";
-  };
 
   // Sayfalama linki — aktif filtreleri koruyarak yalnız ?sayfa= değiştirir.
   const pageHref = (target: number) => {
-    const sp = new URLSearchParams();
-    if (q) sp.set("q", q);
-    if (statusFilter !== "all") sp.set("status", statusFilter);
-    if (danismanF) sp.set("danisman", danismanF);
-    if (saglikFilter) sp.set("saglik", saglikFilter);
-    if (siralaF) sp.set("sirala", siralaF);
+    const sp = mergeResetPage(urlParams, {});
     if (target > 1) sp.set("sayfa", String(target));
-    const qs = sp.toString();
-    return qs ? `/app/portfoyler?${qs}` : "/app/portfoyler";
+    return buildHref(PATH, sp);
   };
 
   // Harita görünümü verisi — konumlu sonuçlar (cap); konumsuz portföy sayısı bildirilir.
@@ -398,8 +436,125 @@ export default async function PropertiesPage({
   }));
   const missingCoordCount = Math.max(0, totalFilteredCount - (mapLocatedTotal ?? 0));
 
+  // ---- Satır modelleri (tablo + mobil liste + kart ortak veri) --------------
+  const viewModels: PropertyVM[] = rows.map((property) => {
+    const portals = property.portal_listings ?? [];
+    const coverId = coverByProperty.get(property.id);
+    const feat = (property.features ?? {}) as { rooms?: string; sqm?: number; floor?: number | string; building_age?: number | string };
+    const title = property.title ?? property.property_code;
+    const compareItem: CompareItem = {
+      id: property.id,
+      title: `${title} · Fiyat sağlığı: ${healthLabel(property.price_health)}`,
+      href: `/app/portfoyler/${property.id}`,
+      coverId: coverId ?? null,
+      coverSrc: coverId ? `/api/property-media/${coverId}/download` : null,
+      price: property.list_price != null ? Number(property.list_price) : null,
+      tx: property.transaction_type,
+      rooms: feat.rooms ?? null,
+      sqm: feat.sqm ?? null,
+      floor: feat.floor ?? null,
+      buildingAge: feat.building_age ?? null,
+      district: relName(property.district),
+    };
+    return {
+      id: property.id,
+      code: property.property_code,
+      title,
+      href: `/app/portfoyler/${property.id}`,
+      coverSrc: coverId ? `/api/property-media/${coverId}/download` : null,
+      subtitle: featureSummary(property.features),
+      tx: property.transaction_type,
+      type: property.property_type,
+      location: locationLabel(property),
+      price: formatPrice(property.list_price, property.transaction_type),
+      statusLabel: propertyStatusLabel(property.status),
+      statusTone: propertyStatusTone(property.status),
+      health: priceHealthPill(property.price_health),
+      portalsLive: portals.filter((p) => p.status === "live").length,
+      portalsTotal: portals.length,
+      createdLabel: formatDate(property.created_at),
+      // Son 7 günde yayına giren portföy — published_at gerçek yayın damgası (vitrindeki rozetle aynı kural)
+      isNew: property.published_at != null && msSince(property.published_at) < 7 * DAY_MS,
+      compareItem,
+    };
+  });
+  const pageIds = viewModels.map((v) => v.id);
+
+  // ---- KPI şeridi: yalnız gerçekten hesaplanan sayılar ----------------------
+  const total = totalCount ?? 0;
+  const kpis: KpiItem[] = [
+    {
+      label: "Toplam portföy",
+      value: total,
+      icon: <Building2 />,
+      tone: "info",
+      href: PATH,
+      series: weeklySeries,
+      showTrend: true,
+      seriesLabel: "önceki 4 haftaya göre",
+      hint: "kayıtlı portföy",
+    },
+    {
+      label: "Aktif portföy",
+      value: liveCount ?? 0,
+      icon: <FileCheck2 />,
+      tone: "success",
+      href: buildHref(PATH, new URLSearchParams({ ...(q ? { q } : {}), status: "live" })),
+      hint: total > 0 ? `toplamın %${Math.round(((liveCount ?? 0) / total) * 100)}'i` : undefined,
+    },
+    {
+      label: "Son 4 hafta eklenen",
+      value: recentCount ?? 0,
+      icon: <Sparkles />,
+      tone: "neutral",
+      href: buildHref(PATH, new URLSearchParams({ eklenen: "28" })),
+      hint: "yeni kayıt",
+    },
+    {
+      label: "Portföy değeri",
+      value: compactTry(totalValueTry),
+      icon: <Banknote />,
+      tone: "success",
+      href: buildHref(PATH, new URLSearchParams({ sirala: "fiyat_yuksek" })),
+      hint: totalValueFx ?? (scanTruncated ? `en yeni ${SCAN_LIMIT.toLocaleString("tr-TR")} kayıt` : undefined),
+      title: [formatFx(totalValueTry, "TRY"), fxTitle].filter(Boolean).join(" · ") || undefined,
+    },
+    {
+      label: "Fiyat uyarısı",
+      value: warningCount,
+      icon: <ICONS.alarm />,
+      tone: "warning",
+      attention: true,
+      href: hrefWith({ saglik: "riskli", gorunum: "", sayfa: "" }),
+      hint: `${yellowN} izle · ${redN} riskli`,
+    },
+    {
+      label: "Canlı portal",
+      value: portalCount ?? 0,
+      icon: <ICONS.portal />,
+      tone: "info",
+      href: "/app/portallar?durum=live",
+      hint: "yayındaki ilan",
+    },
+  ];
+
+  const views: ViewOption[] = [
+    { value: "liste", label: "Liste", icon: ListIcon, href: hrefWith({ gorunum: "", sayfa: "" }) },
+    { value: "kart", label: "Kart", icon: LayoutGrid, href: hrefWith({ gorunum: "kart", sayfa: "" }) },
+    { value: "harita", label: "Harita", icon: MapIcon, href: hrefWith({ gorunum: "harita", sayfa: "" }) },
+  ];
+
+  const chips = buildActiveChips(PATH, urlParams, [
+    { key: "q", label: "Arama" },
+    { key: "status", label: "Durum", format: (v) => STATUS_FILTERS.find((f) => f.value === v)?.label ?? v },
+    { key: "saglik", label: "Fiyat sağlığı", format: (v) => SAGLIK_FILTERS.find((f) => f.value === v)?.label ?? v },
+    { key: "kategori", label: "Tip" },
+    { key: "eklenen", label: "Eklenme", format: (v) => `son ${v} gün` },
+  ]);
+  const anyFilter = chips.length > 0;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title="Portföyler"
         description="Fiyat sağlığı, portal teyidi ve yetki durumu tek merkezde."
@@ -415,137 +570,96 @@ export default async function PropertiesPage({
         }
       />
 
-      {/* Görünüm seçici + ilgili ekranlar — ikincil gezinme */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center overflow-hidden rounded-[var(--radius-control)] border border-line bg-surface">
-          {(
-            [
-              { label: "Liste", value: "liste", icon: LayoutGrid },
-              { label: "Harita", value: "harita", icon: MapIcon },
-            ] as const
-          ).map((option) => (
-            <Link
-              key={option.value}
-              href={viewHref(option.value)}
-              aria-current={view === option.value ? "page" : undefined}
-              className={`focus-ring press inline-flex h-9 items-center gap-1.5 px-3.5 text-sm font-semibold transition ${
-                view === option.value ? "bg-brand-600/10 text-brand-600" : "text-text-muted hover:text-ink-950"
-              }`}
-            >
-              <option.icon className="h-4 w-4" />
-              {option.label}
-            </Link>
-          ))}
-        </div>
-        <span aria-hidden className="mx-1 hidden h-4 w-px bg-line sm:block" />
+      {/* İlgili ekranlar — ikincil gezinme */}
+      <div className="-mt-2 flex flex-wrap items-center gap-1">
         <ButtonLink href="/app/yabanci-satis" variant="ghost" size="sm">Yabancıya satış</ButtonLink>
         <ButtonLink href="/app/portfoyler/sunumlar" variant="ghost" size="sm">Sunumlar &amp; portallar</ButtonLink>
         <ButtonLink href="/app/portfoyler/anahtarlar" variant="ghost" size="sm">Anahtarlar</ButtonLink>
       </div>
 
-      {/* Kompakt, tıklanabilir özet — sıfır değerler sönük */}
-      <Card className="flex flex-wrap items-stretch gap-x-6 gap-y-3 p-4">
-        <p className="flex min-w-[10rem] flex-col justify-center text-sm text-text-muted" title={fxTitle}>
-          Toplam portföy değeri
-          <span className="font-display text-xl font-bold text-text">{formatFx(totalValueTry, "TRY")}</span>
-          {totalValueFx ? <span className="text-xs text-text-faint">{totalValueFx}</span> : null}
-        </p>
-        {[
-          // İkonografi: portal kavramının tek ikonu ICONS.portal.
-          { label: "Aktif portföy", value: liveCount ?? 0, icon: ICONS.portfoy, href: q ? `/app/portfoyler?q=${encodeURIComponent(q)}&status=live` : "/app/portfoyler?status=live" },
-          { label: "Canlı portal", value: portalCount ?? 0, icon: ICONS.portal, href: "/app/portallar?durum=live" },
-          { label: "Fiyat uyarısı", value: warningCount, icon: ICONS.alarm, href: saglikHref("riskli") },
-        ].map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            className={`focus-ring press group flex items-center gap-2.5 rounded-[var(--radius-control)] px-2 py-1 transition hover:bg-canvas ${item.value === 0 ? "opacity-55" : ""}`}
-          >
-            <item.icon className="h-4 w-4 text-brand-600" />
-            <span>
-              <span className="block font-display text-lg font-bold leading-tight text-text">{item.value.toLocaleString("tr-TR")}</span>
-              <span className="block text-xs text-text-muted">{item.label}</span>
-            </span>
-          </Link>
-        ))}
-        <div className="ml-auto min-w-[14rem] flex-1 sm:max-w-sm">
-          <div className="flex items-center justify-between">
-            <p className="flex items-center gap-1.5 text-xs font-semibold text-text-muted"><Gauge className="h-3.5 w-3.5 text-brand-600" /> Fiyat sağlığı</p>
-            <span className="text-xs text-text-faint">{healthKnownTotal} portföy</span>
-          </div>
-          <div className="mt-2 flex h-2 gap-0.5 overflow-hidden rounded-full bg-canvas">
-            {healthSegments.map((s) => (
-              <div key={s.label} className={`pipeline-fill h-full ${s.bar}`} style={{ width: `${(s.count / healthTotal) * 100}%`, animationDelay: s.delay }} />
-            ))}
-          </div>
-          <div className="mt-2 flex gap-1.5">
-            {healthSegments.map((s) => (
-              <Link
-                key={s.label}
-                href={saglikHref(s.param)}
-                aria-current={saglikFilter === s.param ? "true" : undefined}
-                className={`focus-ring press inline-flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border px-2 py-1 text-xs font-semibold transition hover:bg-canvas ${
-                  saglikFilter === s.param ? "border-brand-400 bg-brand-600/10 text-brand-600" : "border-line text-text-muted"
-                } ${s.count === 0 ? "opacity-55" : ""}`}
-              >
-                <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-                {s.label} <span className="numeric text-text">{s.count}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </Card>
+      {/* KPI şeridi — hepsi tıklanabilir; çubuk/trend yalnız gerçek haftalık kayıt serisinden */}
+      <KpiStrip items={kpis} />
 
-      <form className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)]" action="/app/portfoyler">
-        {/* Durum butonlarıyla submit edilince aktif sağlık filtresi kaybolmasın */}
-        {saglikFilter ? <input type="hidden" name="saglik" value={saglikFilter} /> : null}
-        {/* Arama/durum submit'inde aktif harita görünümü korunsun */}
-        {view === "harita" ? <input type="hidden" name="gorunum" value="harita" /> : null}
-        <div className="relative min-w-[240px] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-          <input
-            name="q"
-            defaultValue={q}
-            aria-label="Portföy ara"
-            placeholder="Kod, başlık, portal veya konum ara…"
-            className="w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
-          />
-        </div>
-        <div className="flex gap-2">
-          {STATUS_FILTERS.map((filter) => (
-            <button
-              key={filter.value}
-              type="submit"
+      <ListToolbar
+        pathname={PATH}
+        params={urlParams}
+        views={views}
+        activeView={view}
+        searchPlaceholder="Kod, başlık, portal veya konum ara…"
+        searchLabel="Portföy ara"
+        panelParamKeys={["status", "saglik", "eklenen"]}
+        panel={
+          <FilterGrid>
+            <FilterSelect
               name="status"
-              value={filter.value}
-              className={`hidden rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold transition sm:block ${statusFilter === filter.value ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"}`}
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>
-      </form>
+              label="Durum"
+              value={statusFilter === "all" ? "" : statusFilter}
+              options={STATUS_FILTERS.map((f) => ({ value: f.value === "all" ? "" : f.value, label: f.label }))}
+            />
+            <FilterSelect
+              name="saglik"
+              label="Fiyat sağlığı"
+              value={saglikFilter ?? ""}
+              options={[{ value: "", label: "Tümü" }, ...SAGLIK_FILTERS.map((f) => ({ value: f.value, label: f.label }))]}
+            />
+            <FilterSelect
+              name="eklenen"
+              label="Eklenme"
+              value={eklenenDays ? String(eklenenDays) : ""}
+              options={[{ value: "", label: "Tümü" }, ...ADDED_WINDOWS.map((d) => ({ value: String(d), label: `Son ${d} gün` }))]}
+            />
+          </FilterGrid>
+        }
+        sort={view !== "harita" && total > 0 ? <PropertySortSelect value={siralaF} /> : undefined}
+        densityParam={view === "liste" ? "yogunluk" : undefined}
+        chips={chips}
+        resultCount={anyFilter ? totalFilteredCount : undefined}
+        resultNoun="sonuç"
+        savedViews={<SavedViews route={PATH} views={savedViews} currentParams={savedViewParams} />}
+      />
 
-      {/* Kayıtlı görünümler — aktif filtre kombinasyonu adlandırılıp saklanır */}
-      <SavedViews route="/app/portfoyler" views={savedViews} currentParams={savedViewParams} />
-
-      {/* Sıralama — yalnız liste görünümünde ve portföy varken (harita created_at'te sabit) */}
-      {view === "liste" && (totalCount ?? 0) > 0 ? (
-        <div className="flex items-center justify-end">
-          <PropertySortSelect value={siralaF} />
+      {/* Tip çipleri (sunucu filtresi, ?kategori=) + fiyat sağlığı dağılımı */}
+      {total > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          <CategoryChips
+            className="min-w-0 max-w-full"
+            options={typeDefs.map((d) => ({ value: d.value, label: d.label }))}
+            counts={typeCounts}
+            total={total}
+            active={kategoriF}
+            pathname={PATH}
+            params={urlParams}
+            label="Portföy tipi"
+          />
+          {healthKnownTotal > 0 ? (
+            <div className="flex min-w-[15rem] items-center gap-3" aria-label="Fiyat sağlığı dağılımı">
+              <Gauge aria-hidden="true" className="h-4 w-4 shrink-0 text-brand-600" />
+              <div className="flex h-2 w-24 shrink-0 gap-0.5 overflow-hidden rounded-full bg-canvas">
+                {healthSegments.map((s) => (
+                  <div key={s.label} className={`pipeline-fill h-full ${s.bar}`} style={{ width: `${(s.count / healthTotal) * 100}%`, animationDelay: s.delay }} />
+                ))}
+              </div>
+              <div className="flex gap-1">
+                {healthSegments.map((s) => (
+                  <Link
+                    key={s.label}
+                    href={hrefWith({ saglik: saglikFilter === s.param ? "" : s.param, sayfa: "" })}
+                    aria-current={saglikFilter === s.param ? "true" : undefined}
+                    className={`focus-ring press inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition hover:bg-canvas ${
+                      saglikFilter === s.param ? "border-brand-400 bg-brand-600/10 text-brand-700" : "border-line text-text-muted"
+                    } ${s.count === 0 ? "opacity-55" : ""}`}
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+                    {s.label} <span className="numeric text-text">{s.count}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
-      {(q || statusFilter !== "all" || saglikFilter) && (
-        <p className="flex items-center gap-2 text-xs text-text-muted">
-          <span className="rounded-full bg-brand-600/10 px-2.5 py-1 font-semibold text-brand-600">{totalFilteredCount.toLocaleString("tr-TR")} sonuç</span>
-          {q && <span>“{q}” için filtrelendi</span>}
-          {saglikFilter && <span>Fiyat sağlığı: {SAGLIK_FILTERS.find((f) => f.value === saglikFilter)?.label}</span>}
-          <Link href="/app/portfoyler" className="font-semibold text-brand-600 hover:underline">Filtreyi temizle</Link>
-        </p>
-      )}
-
-      {(totalCount ?? 0) === 0 ? (
+      {total === 0 ? (
         <EmptyState
           icon={ICONS.portfoy}
           illustration="start"
@@ -568,7 +682,7 @@ export default async function PropertiesPage({
           illustration="search"
           title="Sonuç bulunamadı"
           description="Arama veya filtre kriterlerinize uyan portföy yok. Filtreyi temizleyip tekrar deneyin."
-          action={{ href: "/app/portfoyler", label: "Filtreyi temizle" }}
+          action={{ href: PATH, label: "Filtreyi temizle" }}
           secondary={{ href: "/app/talepler", label: "Talep havuzuna bak" }}
         />
       ) : view === "harita" ? (
@@ -578,163 +692,125 @@ export default async function PropertiesPage({
         </>
       ) : (
         <>
-        {/* Toplu düzenleme bölümü */}
-        <details className="group rounded-[var(--radius-card)] border border-line bg-surface">
-          <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-text-muted transition hover:text-ink-950 [&::-webkit-details-marker]:hidden">
-            <span>Toplu durum güncelle</span>
-            <span className="rounded-full bg-canvas px-2 py-0.5 text-xs text-text-faint group-open:hidden">{rows.length} portföy</span>
-            <span className="hidden rounded-full bg-brand-600/10 px-2 py-0.5 text-xs text-brand-600 group-open:block">Kapat</span>
-          </summary>
-          <div className="border-t border-line px-4 pb-4 pt-3">
-            <PropertyBulkActions
-              properties={rows.map((p) => ({
-                id: p.id,
-                property_code: p.property_code,
-                title: p.title,
-                status: p.status,
-              }))}
-            />
-          </div>
-        </details>
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {rows.map((property) => {
-            const portals = property.portal_listings ?? [];
-            const healthGood = property.price_health === "green" || property.price_health === "Yeşil";
-            const coverId = coverByProperty.get(property.id);
-            // Karşılaştırma verisi — kartta zaten yüklü alanlardan derlenir.
-            // Fiyat sağlığı CompareItem'da ayrı alan olmadığı için (public
-            // komponente dokunmuyoruz) rozet etiketi başlığa gömülür: tabloda
-            // kolon başlığında "… · Fiyat sağlığı: İyi" olarak görünür.
-            const feat = (property.features ?? {}) as {
-              rooms?: string;
-              sqm?: number;
-              floor?: number | string;
-              building_age?: number | string;
-            };
-            const compareItem: CompareItem = {
-              id: property.id,
-              title: `${property.title ?? property.property_code} · Fiyat sağlığı: ${healthLabel(property.price_health)}`,
-              href: `/app/portfoyler/${property.id}`,
-              coverId: coverId ?? null,
-              coverSrc: coverId ? `/api/property-media/${coverId}/download` : null,
-              price: property.list_price != null ? Number(property.list_price) : null,
-              tx: property.transaction_type,
-              rooms: feat.rooms ?? null,
-              sqm: feat.sqm ?? null,
-              floor: feat.floor ?? null,
-              buildingAge: feat.building_age ?? null,
-              district: relName(property.district),
-            };
-            return (
-              <PropertyCompareShell
-                key={property.id}
-                item={compareItem}
-                actions={
-                  /* Malik portalı linki — createOwnerPortalToken'ın tek girişi.
-                     Action properties.edit istiyor, buton da aynı kapıda. */
-                  canEditProperty ? (
-                    <OwnerPortalLinkButton
-                      propertyId={property.id}
-                      propertyLabel={property.title ?? property.property_code}
-                    />
-                  ) : null
-                }
-              >
-              <IntentLink
-                href={`/app/portfoyler/${property.id}`}
-                className="group overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)] transition hover:-translate-y-1 hover:border-brand-300 hover:shadow-[var(--shadow-card)]"
-              >
-                <div className="relative flex h-36 items-center justify-center overflow-hidden bg-[image:var(--grad-brand-soft)]">
-                  {coverId ? (
-                    <Image
-                      src={`/api/property-media/${coverId}/download`}
-                      alt={property.title ?? property.property_code}
-                      fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-                      className="object-cover transition duration-500 group-hover:scale-105"
-                      unoptimized
-                    />
-                  ) : (
-                    <>
-                      <div className="pointer-events-none absolute inset-0 dot-overlay opacity-60" />
-                      <Building2 className="h-12 w-12 text-brand-600/35 transition duration-500 group-hover:scale-110" />
-                    </>
-                  )}
-                  <span className="absolute left-3 top-3 flex max-w-[60%] items-center gap-1.5">
-                    <span className="truncate rounded-full bg-surface/90 px-2.5 py-1 text-xs font-bold text-ink-950 shadow-[var(--shadow-xs)] backdrop-blur">{property.property_code}</span>
-                    {/* Son 7 günde yayına giren portföy — published_at gerçek yayın damgası (vitrindeki rozetle aynı kural) */}
-                    {property.published_at != null && msSince(property.published_at) < 7 * DAY_MS ? (
-                      <span className="shrink-0 rounded-full bg-mint-500 px-2 py-0.5 text-xs font-bold text-white shadow-[var(--shadow-xs)]">Yeni</span>
-                    ) : null}
-                  </span>
-                  {/* Fiyat sağlığı — ham değer yerine Türkçe etiket, kesilmez; bilinmiyorsa gösterilmez */}
-                  {healthLabel(property.price_health) !== "Bekliyor" ? (
-                    <Badge
-                      variant={healthGood ? "success" : property.price_health === "red" || property.price_health === "Kırmızı" ? "danger" : "warning"}
-                      dot
-                      className="absolute right-3 top-3 whitespace-nowrap bg-surface/90 shadow-[var(--shadow-xs)]"
+          {view === "liste" ? (
+            /* key: sayfa/filtre değişince seçim sıfırlanır — bayat id'lerle toplu işlem yapılmasın */
+            <PropertyBulkProvider key={`${page}|${Object.values(urlParams).join("|")}`}>
+              {canEditProperty ? <PropertyBulkBar /> : null}
+              <PropertyTable rows={viewModels} ids={pageIds} canBulk={canEditProperty} canEdit={canEditProperty} density={density} />
+              <PropertyMobileList rows={viewModels} />
+            </PropertyBulkProvider>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {rows.map((property, i) => {
+                const vm = viewModels[i]!;
+                const portals = property.portal_listings ?? [];
+                const healthGood = property.price_health === "green" || property.price_health === "Yeşil";
+                return (
+                  <PropertyCompareShell
+                    key={property.id}
+                    item={vm.compareItem}
+                    actions={
+                      /* Malik portalı linki — createOwnerPortalToken'ın tek girişi.
+                         Action properties.edit istiyor, buton da aynı kapıda. */
+                      canEditProperty ? (
+                        <OwnerPortalLinkButton propertyId={property.id} propertyLabel={vm.title} />
+                      ) : null
+                    }
+                  >
+                    <IntentLink
+                      href={vm.href}
+                      className="group overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)] transition hover:-translate-y-1 hover:border-brand-300 hover:shadow-[var(--shadow-card)]"
                     >
-                      Fiyat: {healthLabel(property.price_health)}
-                    </Badge>
-                  ) : null}
-                </div>
-                <div className="p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">{property.transaction_type} · {property.property_type}</p>
-                      <h2 className="mt-1 font-display text-lg font-bold text-ink-950">{property.title ?? property.property_code}</h2>
-                      <p className="mt-1 flex items-center gap-1.5 text-xs text-text-muted"><MapPin className="h-3.5 w-3.5" />{locationLabel(property)}</p>
-                    </div>
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-canvas text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600" aria-hidden><ArrowUpRight className="h-4 w-4" /></span>
-                  </div>
-                  <p className="mt-4 font-display text-2xl font-extrabold text-ink-950">{formatPrice(property.list_price, property.transaction_type)}</p>
-                  <div className="mt-4 grid grid-cols-2 gap-2 border-t border-line pt-4">
-                    <span className="flex items-center gap-2 text-xs text-text-muted"><FileCheck2 className="h-4 w-4 text-mint-600" />{propertyStatusLabel(property.status)}</span>
-                    <span className="flex items-center justify-end gap-2 text-xs text-text-muted"><Gauge className="h-4 w-4 text-brand-600" />{portals.length} portal</span>
-                  </div>
-                </div>
-              </IntentLink>
-              </PropertyCompareShell>
-            );
-          })}
-        </div>
-
-        {/* Sayfalama — filtre parametreleri linklerde korunur */}
-        {totalFilteredCount > 0 ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-            <p className="numeric text-text-muted">
-              {rangeStart.toLocaleString("tr-TR")}–{rangeEnd.toLocaleString("tr-TR")} / Toplam{" "}
-              {totalFilteredCount.toLocaleString("tr-TR")}
-            </p>
-            <div className="flex items-center gap-1.5">
-              {page > 1 ? (
-                <Link href={pageHref(page - 1)} className={PAGER_BTN}>
-                  <ChevronLeft className="h-4 w-4" /> Önceki
-                </Link>
-              ) : (
-                <span className={PAGER_BTN_DISABLED} aria-disabled="true">
-                  <ChevronLeft className="h-4 w-4" /> Önceki
-                </span>
-              )}
-              <span className="numeric px-1 text-text-faint">
-                {Math.min(page, totalPages)} / {totalPages}
-              </span>
-              {page < totalPages ? (
-                <Link href={pageHref(page + 1)} className={PAGER_BTN}>
-                  Sonraki <ChevronRight className="h-4 w-4" />
-                </Link>
-              ) : (
-                <span className={PAGER_BTN_DISABLED} aria-disabled="true">
-                  Sonraki <ChevronRight className="h-4 w-4" />
-                </span>
-              )}
+                      <div className="relative flex h-36 items-center justify-center overflow-hidden bg-[image:var(--grad-brand-soft)]">
+                        {vm.coverSrc ? (
+                          <Image
+                            src={vm.coverSrc}
+                            alt={vm.title}
+                            fill
+                            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                            className="object-cover transition duration-500 group-hover:scale-105"
+                            unoptimized
+                          />
+                        ) : (
+                          <>
+                            <div className="pointer-events-none absolute inset-0 dot-overlay opacity-60" />
+                            <Building2 className="h-12 w-12 text-brand-600/35 transition duration-500 group-hover:scale-110" />
+                          </>
+                        )}
+                        <span className="absolute left-3 top-3 flex max-w-[60%] items-center gap-1.5">
+                          <span className="truncate rounded-full bg-surface/90 px-2.5 py-1 text-xs font-bold text-ink-950 shadow-[var(--shadow-xs)] backdrop-blur">{property.property_code}</span>
+                          {vm.isNew ? (
+                            <span className="shrink-0 rounded-full bg-mint-500 px-2 py-0.5 text-xs font-bold text-white shadow-[var(--shadow-xs)]">Yeni</span>
+                          ) : null}
+                        </span>
+                        {/* Fiyat sağlığı — ham değer yerine Türkçe etiket, kesilmez; bilinmiyorsa gösterilmez */}
+                        {vm.health ? (
+                          <Badge
+                            variant={healthGood ? "success" : vm.health.tone === "danger" ? "danger" : "warning"}
+                            dot
+                            className="absolute right-3 top-3 whitespace-nowrap bg-surface/90 shadow-[var(--shadow-xs)]"
+                          >
+                            Fiyat: {vm.health.label}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <div className="p-5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">{vm.tx} · {vm.type}</p>
+                            <h2 className="mt-1 font-display text-lg font-bold text-ink-950">{vm.title}</h2>
+                            <p className="mt-1 flex items-center gap-1.5 text-xs text-text-muted"><MapPin className="h-3.5 w-3.5" />{vm.location}</p>
+                          </div>
+                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-canvas text-text-faint transition group-hover:bg-brand-600/10 group-hover:text-brand-600" aria-hidden><ArrowUpRight className="h-4 w-4" /></span>
+                        </div>
+                        <p className="mt-4 font-display text-2xl font-extrabold text-ink-950">{vm.price}</p>
+                        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-line pt-4">
+                          <span className="flex items-center gap-2 text-xs text-text-muted"><FileCheck2 className="h-4 w-4 text-mint-600" />{vm.statusLabel}</span>
+                          <span className="flex items-center justify-end gap-2 text-xs text-text-muted"><Gauge className="h-4 w-4 text-brand-600" />{portals.length} portal</span>
+                        </div>
+                      </div>
+                    </IntentLink>
+                  </PropertyCompareShell>
+                );
+              })}
             </div>
-          </div>
-        ) : null}
+          )}
 
-        {/* Karşılaştırma alt çubuğu + tam ekran tablo — seçim varken görünür (oturumluk) */}
-        <CompareBar />
+          {/* Sayfalama — filtre parametreleri linklerde korunur */}
+          {totalFilteredCount > 0 ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+              <p className="numeric text-text-muted">
+                {rangeStart.toLocaleString("tr-TR")}–{rangeEnd.toLocaleString("tr-TR")} / Toplam{" "}
+                {totalFilteredCount.toLocaleString("tr-TR")}
+              </p>
+              <div className="flex items-center gap-1.5">
+                {page > 1 ? (
+                  <Link href={pageHref(page - 1)} className={PAGER_BTN}>
+                    <ChevronLeft className="h-4 w-4" /> Önceki
+                  </Link>
+                ) : (
+                  <span className={PAGER_BTN_DISABLED} aria-disabled="true">
+                    <ChevronLeft className="h-4 w-4" /> Önceki
+                  </span>
+                )}
+                <span className="numeric px-1 text-text-faint">
+                  {Math.min(page, totalPages)} / {totalPages}
+                </span>
+                {page < totalPages ? (
+                  <Link href={pageHref(page + 1)} className={PAGER_BTN}>
+                    Sonraki <ChevronRight className="h-4 w-4" />
+                  </Link>
+                ) : (
+                  <span className={PAGER_BTN_DISABLED} aria-disabled="true">
+                    Sonraki <ChevronRight className="h-4 w-4" />
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Karşılaştırma alt çubuğu + tam ekran tablo — seçim varken görünür (oturumluk) */}
+          <CompareBar />
         </>
       )}
     </div>
