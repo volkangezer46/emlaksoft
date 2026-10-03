@@ -149,7 +149,7 @@ export function AppSidebar({
           aria-current={active ? "page" : undefined}
           title={item.label}
           onClick={() => setOpen(false)}
-          className={`nav-row focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors lg:min-h-9 ${
+          className={`nav-row focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors lg:min-h-8 ${
             badge ? "pr-16" : "pr-9"
           } ${active ? "nav-pill font-semibold text-white" : "text-white/80 hover:bg-white/6 hover:text-white"}`}
         >
@@ -187,7 +187,7 @@ export function AppSidebar({
   };
 
   const groupHeader = (id: string, title: string, opts?: { collapsible?: boolean; expanded?: boolean }) => (
-    <div className="sb-eyebrow flex items-center gap-2 px-3 pb-0.5 pt-2.5 text-white/70">
+    <div className="sb-eyebrow flex items-center gap-2 px-3 pb-0.5 pt-1.5 text-white/70">
       {opts?.collapsible ? (
         <button
           type="button"
@@ -212,7 +212,7 @@ export function AppSidebar({
 
   const renderContent = (variant: "desktop" | "drawer") => (
     <>
-      <div className="sb-head flex min-h-12 shrink-0 items-center gap-3 border-b border-white/8 px-4">
+      <div className="sb-head flex min-h-11 shrink-0 items-center gap-3 border-b border-white/8 px-4">
         <Brand variant="mark" tone="dark" height={32} alt="" className="rounded-[var(--radius-card)] shadow-[0_12px_28px_-12px_rgba(34,211,238,.75)]" />
         <div className="sb-label min-w-0 flex-1">
           <p className="font-display text-base font-extrabold leading-5 text-white">EmlakSoft</p>
@@ -221,7 +221,7 @@ export function AppSidebar({
         <SidebarCollapseButton />
       </div>
 
-      <div className={`sb-pad px-3 pt-2${simple && variant === "desktop" ? " hidden" : ""}`}>
+      <div className={`sb-pad px-3 pt-1.5${simple && variant === "desktop" ? " hidden" : ""}`}>
         <button
           type="button"
           onClick={openPalette}
@@ -265,7 +265,7 @@ export function AppSidebar({
             );
           })}
           {more.length > 0 ? (
-            <div>
+            <>
               <div className="sb-eyebrow sticky bottom-0 z-[1] bg-[#0a111e] px-3 pb-0.5 pt-1 text-white/70 shadow-[0_-8px_12px_-8px_rgba(0,0,0,.6)]">
                 <button
                   type="button"
@@ -289,7 +289,7 @@ export function AppSidebar({
                   ))}
                 </div>
               ) : null}
-            </div>
+            </>
           ) : null}
         </div>
 
@@ -332,7 +332,7 @@ export function AppSidebar({
         </div>
       </NavScroller>
 
-      <div className="sb-pad space-y-1 border-t border-white/8 px-3 py-2">
+      <div className="sb-pad space-y-0.5 border-t border-white/8 px-3 py-1.5">
         <div
           className="sb-when-collapsed mx-auto h-10 w-10 place-items-center rounded-[var(--radius-control)] border border-white/10 bg-white/8 font-display text-sm font-extrabold text-[var(--gold-300)]"
           title={`${officeName} · ${plan}`}
@@ -342,14 +342,14 @@ export function AppSidebar({
           {officeName.trim().charAt(0).toLocaleUpperCase("tr-TR") || "E"}
         </div>
 
-        <div className="sb-label rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-1.5">
+        <div className="sb-label rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-0.5">
           <button
             type="button"
             onClick={() => toggleSection("kullanim-acik")}
             aria-expanded={usageOpen}
             aria-controls="sb-kullanim"
             title={`${officeName} · kullanım ayrıntısı`}
-            className="focus-ring flex min-h-9 w-full items-center justify-between gap-2 rounded-[var(--radius-control)] text-left"
+            className="focus-ring flex min-h-8 w-full items-center justify-between gap-2 rounded-[var(--radius-control)] text-left"
           >
             <span className="sb-eyebrow min-w-0 flex-1 truncate uppercase text-white/75">Kullanım</span>
             <span className="shrink-0 rounded-full border border-white/15 px-2 py-0.5 text-xs font-bold uppercase tracking-[0.06em] text-[var(--gold-300)]">
@@ -411,7 +411,7 @@ export function AppSidebar({
             target="_blank"
             rel="noopener noreferrer"
             title="Ofis vitrinini yeni sekmede aç"
-            className="focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-white/80 transition-colors hover:bg-white/6 hover:text-white lg:min-h-9"
+            className="focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-white/80 transition-colors hover:bg-white/6 hover:text-white lg:min-h-8"
           >
             <VitrinIcon className="h-[18px] w-[18px] shrink-0 text-white/65" aria-hidden />
             <span className="sb-label flex-1 truncate">Vitrini görüntüle</span>
@@ -471,7 +471,7 @@ export function AppSidebar({
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
                 onClick={() => setOpen(false)}
-                className={`flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-xs font-semibold transition ${
+                className={`flex min-h-14 flex-col items-center justify-center gap-1 whitespace-nowrap py-2 text-xs font-semibold transition ${
                   active ? "text-brand-600" : "text-text-faint hover:text-ink-950"
                 }`}
               >

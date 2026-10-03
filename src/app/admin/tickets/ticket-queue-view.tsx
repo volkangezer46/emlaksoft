@@ -262,7 +262,7 @@ export function TicketQueueView({
 
       <section aria-label="Destek kuyruğu" className="surface-card overflow-hidden rounded-[var(--radius-panel)]">
       {/* Geniş ekran: hizalı operasyon tablosu. */}
-      <div className="hidden max-w-full overflow-x-auto xl:block">
+      <div className="relative hidden max-w-full overflow-x-auto xl:block">
         <table className="w-full min-w-[1120px] table-fixed text-left text-xs">
           <caption className="sr-only">Seçilebilir destek talepleri; durum, SLA ve personel işlemleri</caption>
           <thead className="border-b border-hairline bg-canvas/75 text-xs font-bold uppercase tracking-[0.06em] text-text-faint">
