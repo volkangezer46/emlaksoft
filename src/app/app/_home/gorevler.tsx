@@ -71,7 +71,7 @@ export async function Gorevler({ ctx }: { ctx: HomeCtx }) {
 
   return (
     <Widget id="gorevler" className="h-full">
-      <section className="surface-card h-full rounded-[var(--radius-panel)] p-5">
+      <section className="pm-bx h-full p-5">
         <div className="flex items-center justify-between">
           <h2 className="font-display font-bold text-ink-950">Bugünkü görevler</h2>
           <span className="flex items-center gap-2">

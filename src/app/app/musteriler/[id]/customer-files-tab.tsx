@@ -156,7 +156,7 @@ export function CustomerFilesTab({ customerId, files }: { customerId: string; fi
                       <span>·</span>
                       <span>{uploaderName(f.uploader)}</span>
                       <span>·</span>
-                      <span>{new Date(f.created_at).toLocaleDateString("tr-TR")}</span>
+                      <span>{new Date(f.created_at).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" })}</span>
                     </div>
                   </div>
                 </div>

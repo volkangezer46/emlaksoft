@@ -1,0 +1,66 @@
+/* Konsol kabuğu (yan menü daraltma, üst çubuk, bento/tablo yardımcıları).
+   Yalnız /app ve /admin layout'ları içe aktarır. Hareket <=150ms, reduced-motion'da kapalı. */
+:root {
+  --sidebar-w: 248px;
+  --sidebar-w-collapsed: 64px;
+  --topbar-h: 3.5rem;
+  --row-h: 44px;
+  --row-h-dense: 36px;
+}
+
+/* ---- Yan menü: geniş 248 <-> ikon 64. Durum <html data-sidebar>; boot script
+   ilk boyamadan önce uygular, böylece SSR'da genişlik sıçraması olmaz. ---- */
+.shell-aside {
+  width: var(--sidebar-w);
+  transition: width 150ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+html[data-sidebar="collapsed"] .shell-aside { width: var(--sidebar-w-collapsed); }
+.shell-aside .sb-when-collapsed { display: none; }
+html[data-sidebar="collapsed"] .shell-aside .sb-when-collapsed { display: grid; }
+html[data-sidebar="collapsed"] .shell-aside .sb-label { display: none; }
+html[data-sidebar="collapsed"] .shell-aside .sb-row { justify-content: center; padding-inline: 0; gap: 0; }
+html[data-sidebar="collapsed"] .shell-aside .sb-head { flex-direction: column; height: auto; padding-block: 0.75rem; gap: 0.5rem; padding-inline: 0; justify-content: center; }
+html[data-sidebar="collapsed"] .shell-aside .sb-pad { padding-inline: 0.5rem; }
+html[data-sidebar="collapsed"] .shell-aside .sb-badge-dot { display: block; }
+.sb-toggle { display: none; }
+.shell-aside .sb-toggle { display: grid; }
+.sb-badge-dot { display: none; }
+@media (prefers-reduced-motion: reduce) { .shell-aside { transition: none; } }
+
+.sb-eyebrow { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* ---- Üst çubuk: platform ayrımı (altın üst çizgi) ---- */
+.topbar-platform { box-shadow: inset 0 2px 0 var(--gold-500); }
+
+/* ---- Bento ---- */
+.bx {
+  border-radius: var(--radius-panel);
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  box-shadow: var(--elev-1);
+  transition: box-shadow 140ms ease, border-color 140ms ease;
+}
+a.bx:hover, .bx-hover:hover { box-shadow: var(--elev-2); border-color: color-mix(in srgb, var(--accent) 30%, var(--hairline)); }
+.num { font-variant-numeric: tabular-nums; font-family: var(--font-manrope), system-ui, sans-serif; font-weight: 700; letter-spacing: -0.02em; }
+.bx-eyebrow { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
+
+/* Grafik girişi: 280ms scaleY, yalnız ilk yükleme */
+@keyframes con-bar-in { from { transform: scaleY(0.04); } to { transform: scaleY(1); } }
+.con-bar { transform-origin: bottom; transform-box: fill-box; animation: con-bar-in 280ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) { .con-bar { animation: none; } }
+
+/* ---- Tablo/liste standardı (kabuk ve admin) ---- */
+.qrow { display: flex; align-items: center; gap: 0.75rem; min-height: var(--row-h); padding-inline: 0.75rem; border-radius: var(--radius-control); transition: background-color 120ms ease; }
+.qrow:hover { background: var(--surface-sunken); }
+.table-std { font-variant-numeric: tabular-nums; }
+.table-std th { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); }
+.table-std td, .table-std th { height: var(--row-h); }
+.table-std[data-dense="true"] td, .table-std[data-dense="true"] th { height: var(--row-h-dense); }
+.table-std .num-col { text-align: right; font-variant-numeric: tabular-nums; }
+/* Mobil <640: tablo satırı kart-listeye döner (td[data-label] etiketi başa gelir). */
+@media (max-width: 639px) {
+  .table-cards thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .table-cards tr { display: grid; gap: 0.25rem; padding: 0.75rem 0; border-bottom: 1px solid var(--hairline); }
+  .table-cards td { display: flex; justify-content: space-between; gap: 1rem; height: auto; padding: 0; }
+  .table-cards td[data-label]::before { content: attr(data-label); color: var(--text-muted); font-size: 0.75rem; }
+}

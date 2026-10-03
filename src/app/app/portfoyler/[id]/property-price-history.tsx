@@ -19,7 +19,7 @@ import {
 
 const FIELD_TABS: PriceField[] = ["list_price", "min_price", "hidden_price"];
 
-const dateFmt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" });
+const dateFmt = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium" });
 
 function relDays(days: number) {
   if (days <= 0) return "bugün";

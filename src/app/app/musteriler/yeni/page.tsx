@@ -7,7 +7,7 @@ import { CustomerForm } from "./customer-form";
 export const metadata = { title: "Yeni müşteri" };
 
 export default async function NewCustomerPage() {
-  const { perms } = await requireModulePage("customers");
+  const { perms, userId } = await requireModulePage("customers");
   if (!(perms.customers ?? []).includes("create")) redirect("/app/musteriler");
 
   const supabase = await createClient();
@@ -22,6 +22,7 @@ export default async function NewCustomerPage() {
       provinces={provinces ?? []}
       branches={branches ?? []}
       types={typeDefs.map((t) => t.value)}
+      userId={userId}
     />
   );
 }

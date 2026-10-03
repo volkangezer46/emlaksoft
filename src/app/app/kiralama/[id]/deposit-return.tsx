@@ -31,7 +31,7 @@ export function DepositReturnControl({
 
   if (returned) {
     const dateLabel = returnedAt
-      ? new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(returnedAt))
+      ? new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "short", year: "numeric" }).format(new Date(returnedAt))
       : null;
     return (
       <span className="inline-flex items-center gap-1.5">

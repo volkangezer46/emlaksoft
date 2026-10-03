@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Check, Copy, ExternalLink, Search, UserRound, X } from "lucide-react";
+import { Check, Copy, ExternalLink, Files, Search, UserRound, X } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/button";
-import { FormActions, FormPage, FormSection } from "@/components/ui/form-page";
+import { FormActions, FormPage } from "@/components/ui/form-page";
+import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
 import { useToast } from "@/components/app/toast-provider";
 import { createPresentation } from "@/app/actions/presentations";
+import { PRESENTATION_TABS } from "./presentation-tabs";
 
 export type SelectableProperty = {
   id: string;
@@ -28,6 +30,17 @@ const MAX_SELECT = 5;
 const CUSTOMER_SUGGESTIONS = 6;
 
 const LIST_HREF = "/app/portfoyler/sunumlar";
+
+const TAB_ICONS = { bilgi: UserRound, portfoyler: Files } as const;
+const TABS: FormTab[] = PRESENTATION_TABS.map((t) => ({
+  id: t.id,
+  label: t.label,
+  description: t.description,
+  icon: TAB_ICONS[t.id],
+  fields: [...t.fields],
+  required: [...t.required],
+}));
+const FIELD_LABELS = { title: "Sunum başlığı", property_ids: "Portföy seçimi" };
 
 function money(n: number | null, tx: string) {
   if (n == null) return "Fiyat girilmedi";
@@ -194,177 +207,228 @@ export function PresentationForm({
     );
   }
 
-  return (
-    <form key={formKey} action={submit}>
-      {selected.map((id) => (
-        <input key={id} type="hidden" name="property_ids" value={id} />
-      ))}
-      <FormPage
-        title="Yeni portföy sunumu"
-        description="Müşteriniz için 1-5 portföylük şık bir sunum linki üretin."
-        breadcrumbs={breadcrumbs}
-      >
-        <FormSection title="Sunum bilgileri" description="Başlık, müşteri ve kapak notu.">
+
+  const tabPanels = {
+    bilgi: (
+      <>
+        <label className="block">
+          <span className="text-xs font-semibold text-text-muted">Sunum başlığı *</span>
+          <input
+            name="title"
+            required
+            maxLength={120}
+            placeholder="Örn. Kadıköy 3+1 seçkisi"
+            className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+          />
+        </label>
+        {/* Müşteri alanı: yazarken kayıtlı müşteriler önerilir; öneri seçilirse sunum Müşteri 360'ta görünür (customer_id). */}
+        <div className="relative">
           <label className="block">
-            <span className="text-xs font-semibold text-text-muted">Sunum başlığı *</span>
+            <span className="text-xs font-semibold text-text-muted">
+              Müşteri adı <span className="font-medium text-text-faint">(kayıtlıysa seçin)</span>
+            </span>
             <input
-              name="title"
-              required
+              name="customer_name"
+              autoComplete="off"
+              value={customerQuery}
+              onChange={(e) => {
+                setCustomerQuery(e.target.value);
+                // Ad elle değiştirildiyse bağ düşer — sessiz yanlış eşleşme olmasın.
+                if (pickedCustomer && e.target.value !== pickedCustomer.name) {
+                  setPickedCustomer(null);
+                }
+              }}
+              onFocus={() => setCustomerFocused(true)}
+              // blur'da hemen kapatmak öneriye tıklamayı yutar → küçük gecikme
+              onBlur={() => setTimeout(() => setCustomerFocused(false), 150)}
               maxLength={120}
-              placeholder="Örn. Kadıköy 3+1 seçkisi"
-              className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+              placeholder="Örn. Ayşe Yılmaz"
+              className={`mt-1 w-full rounded-[var(--radius-control)] border bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface ${
+                pickedCustomer ? "border-mint-500/50 pr-9" : "border-line"
+              }`}
             />
           </label>
-          {/* Müşteri alanı: yazarken kayıtlı müşteriler önerilir; öneri seçilirse sunum Müşteri 360'ta görünür (customer_id). */}
-          <div className="relative">
-            <label className="block">
-              <span className="text-xs font-semibold text-text-muted">
-                Müşteri adı <span className="font-medium text-text-faint">(kayıtlıysa seçin)</span>
-              </span>
-              <input
-                name="customer_name"
-                autoComplete="off"
-                value={customerQuery}
-                onChange={(e) => {
-                  setCustomerQuery(e.target.value);
-                  // Ad elle değiştirildiyse bağ düşer — sessiz yanlış eşleşme olmasın.
-                  if (pickedCustomer && e.target.value !== pickedCustomer.name) {
-                    setPickedCustomer(null);
-                  }
+          {pickedCustomer ? (
+            <>
+              <input type="hidden" name="customer_id" value={pickedCustomer.id} />
+              <button
+                type="button"
+                onClick={() => {
+                  setPickedCustomer(null);
+                  setCustomerQuery("");
                 }}
-                onFocus={() => setCustomerFocused(true)}
-                // blur'da hemen kapatmak öneriye tıklamayı yutar → küçük gecikme
-                onBlur={() => setTimeout(() => setCustomerFocused(false), 150)}
-                maxLength={120}
-                placeholder="Örn. Ayşe Yılmaz"
-                className={`mt-1 w-full rounded-[var(--radius-control)] border bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface ${
-                  pickedCustomer ? "border-mint-500/50 pr-9" : "border-line"
-                }`}
-              />
-            </label>
-            {pickedCustomer ? (
-              <>
-                <input type="hidden" name="customer_id" value={pickedCustomer.id} />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPickedCustomer(null);
-                    setCustomerQuery("");
-                  }}
-                  title="Müşteri bağını kaldır"
-                  aria-label="Müşteri bağını kaldır"
-                  className="focus-ring absolute right-2 top-[30px] grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950"
+                title="Müşteri bağını kaldır"
+                aria-label="Müşteri bağını kaldır"
+                className="focus-ring absolute right-2 top-[30px] grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+              <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-mint-600">
+                <Check className="h-3 w-3" /> Müşteri kartına bağlanacak
+              </p>
+            </>
+          ) : null}
+          {showSuggestions ? (
+            <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-lg)]">
+              {customerMatches.map((c) => (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setPickedCustomer(c);
+                      setCustomerQuery(c.name);
+                      setCustomerFocused(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-canvas"
+                  >
+                    <UserRound className="h-3.5 w-3.5 shrink-0 text-brand-600" />
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-950">{c.name}</span>
+                    {c.phone ? <span className="numeric shrink-0 text-xs text-text-faint">{c.phone}</span> : null}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+        <label className="block sm:col-span-2">
+          <span className="text-xs font-semibold text-text-muted">Not (sunumun kapağında görünür)</span>
+          <textarea
+            name="note"
+            rows={3}
+            maxLength={500}
+            placeholder="Örn. Görüşmemizde konuştuğumuz kriterlere uyan portföyleri sizin için derledim."
+            className="mt-1 w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+          />
+        </label>
+      </>
+    ),
+    portfoyler: (
+      <div className="sm:col-span-2">
+        {selected.map((id) => (
+          <input key={id} type="hidden" name="property_ids" value={id} />
+        ))}
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-text-muted">Portföyler (yayında olanlar)</span>
+          <span className={`text-xs font-bold ${selected.length >= MAX_SELECT ? "text-danger-600" : "text-brand-600"}`}>
+            {selected.length}/{MAX_SELECT} seçili
+          </span>
+        </div>
+        <div className="relative mt-1.5">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Portföy ara"
+            placeholder="Kod, başlık veya ilçe ara…"
+            className="w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+          />
+        </div>
+        <div className="mt-2 max-h-96 space-y-1 overflow-y-auto rounded-[var(--radius-card)] border border-line bg-canvas p-1.5">
+          {properties.length === 0 ? (
+            <p className="px-3 py-6 text-center text-sm text-text-muted">
+              Yayında portföy yok — sunuma eklemek için önce bir portföyü yayına alın.
+            </p>
+          ) : filtered.length === 0 ? (
+            <p className="px-3 py-6 text-center text-sm text-text-muted">Aramanıza uyan portföy yok.</p>
+          ) : (
+            filtered.map((p) => {
+              const checked = selected.includes(p.id);
+              const full = !checked && selected.length >= MAX_SELECT;
+              return (
+                <label
+                  key={p.id}
+                  className={`flex cursor-pointer items-center gap-3 rounded-[var(--radius-control)] px-3 py-2 transition ${
+                    checked ? "bg-brand-600/8 ring-1 ring-brand-300/60" : "hover:bg-surface"
+                  } ${full ? "cursor-not-allowed opacity-45" : ""}`}
                 >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-                <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-mint-600">
-                  <Check className="h-3 w-3" /> Müşteri kartına bağlanacak
-                </p>
-              </>
-            ) : null}
-            {showSuggestions ? (
-              <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-lg)]">
-                {customerMatches.map((c) => (
-                  <li key={c.id}>
-                    <button
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        setPickedCustomer(c);
-                        setCustomerQuery(c.name);
-                        setCustomerFocused(false);
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-canvas"
-                    >
-                      <UserRound className="h-3.5 w-3.5 shrink-0 text-brand-600" />
-                      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-950">{c.name}</span>
-                      {c.phone ? <span className="numeric shrink-0 text-xs text-text-faint">{c.phone}</span> : null}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-          <label className="block sm:col-span-2">
-            <span className="text-xs font-semibold text-text-muted">Not (sunumun kapağında görünür)</span>
-            <textarea
-              name="note"
-              rows={2}
-              maxLength={500}
-              placeholder="Örn. Görüşmemizde konuştuğumuz kriterlere uyan portföyleri sizin için derledim."
-              className="mt-1 w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
-            />
-          </label>
-        </FormSection>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={full}
+                    onChange={() => toggle(p.id)}
+                    className="h-4 w-4 shrink-0 accent-[#1463FF]"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-ink-950">{p.title ?? p.code}</span>
+                    <span className="block text-xs text-text-muted">
+                      {p.code}
+                      {p.district ? ` · ${p.district}` : ""} · {money(p.price, p.tx)}
+                    </span>
+                  </span>
+                  {checked ? <Check className="h-4 w-4 shrink-0 text-brand-600" /> : null}
+                </label>
+              );
+            })
+          )}
+        </div>
+      </div>
+    ),
+  };
 
-        <FormSection title="Portföyler" description="Yayında olan portföylerden en fazla 5 tanesini seçin.">
-          <div className="sm:col-span-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-text-muted">Portföyler (yayında olanlar)</span>
-              <span className={`text-xs font-bold ${selected.length >= MAX_SELECT ? "text-danger-600" : "text-brand-600"}`}>
-                {selected.length}/{MAX_SELECT} seçili
-              </span>
-            </div>
-            <div className="relative mt-1.5">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                aria-label="Portföy ara"
-                placeholder="Kod, başlık veya ilçe ara…"
-                className="w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
-              />
-            </div>
-            <div className="mt-2 max-h-96 space-y-1 overflow-y-auto rounded-[var(--radius-card)] border border-line bg-canvas p-1.5">
-              {properties.length === 0 ? (
-                <p className="px-3 py-6 text-center text-sm text-text-muted">
-                  Yayında portföy yok — sunuma eklemek için önce bir portföyü yayına alın.
-                </p>
-              ) : filtered.length === 0 ? (
-                <p className="px-3 py-6 text-center text-sm text-text-muted">Aramanıza uyan portföy yok.</p>
-              ) : (
-                filtered.map((p) => {
-                  const checked = selected.includes(p.id);
-                  const full = !checked && selected.length >= MAX_SELECT;
-                  return (
-                    <label
-                      key={p.id}
-                      className={`flex cursor-pointer items-center gap-3 rounded-[var(--radius-control)] px-3 py-2 transition ${
-                        checked ? "bg-brand-600/8 ring-1 ring-brand-300/60" : "hover:bg-surface"
-                      } ${full ? "cursor-not-allowed opacity-45" : ""}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        disabled={full}
-                        onChange={() => toggle(p.id)}
-                        className="h-4 w-4 shrink-0 accent-[#1463FF]"
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold text-ink-950">{p.title ?? p.code}</span>
-                        <span className="block text-xs text-text-muted">
-                          {p.code}
-                          {p.district ? ` · ${p.district}` : ""} · {money(p.price, p.tx)}
-                        </span>
-                      </span>
-                      {checked ? <Check className="h-4 w-4 shrink-0 text-brand-600" /> : null}
-                    </label>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </FormSection>
+  function renderSummary({ values }: TabbedSummaryContext) {
+    const title = (values.title ?? "").trim();
+    const customerName = (values.customer_name ?? "").trim();
+    const note = (values.note ?? "").trim();
+    const chosen = selected
+      .map((id) => properties.find((p) => p.id === id))
+      .filter((p): p is SelectableProperty => Boolean(p));
+    return (
+      <>
+        <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
+          <p className="truncate text-sm font-semibold text-ink-950">{title || "Başlık girilmedi"}</p>
+          <p className="mt-0.5 truncate text-xs text-text-muted">
+            {customerName ? `Hazırlanan: ${customerName}` : "Müşteri adı girilmedi"}
+          </p>
+          <p className="numeric mt-1.5 text-xs font-semibold text-brand-600">
+            {selected.length}/{MAX_SELECT} portföy seçili
+          </p>
+        </div>
+        <SummaryGroup title="Sunum bilgisi">
+          <SummaryRow label="Başlık" value={title || "Zorunlu"} muted={!title} tab="bilgi" field="title" />
+          <SummaryRow
+            label="Müşteri"
+            value={pickedCustomer ? "Müşteri kartına bağlı" : customerName ? "Serbest ad" : "Girilmedi"}
+            muted={!customerName}
+            tab="bilgi"
+            field="customer_name"
+          />
+          <SummaryRow label="Kapak notu" value={note ? "Girildi" : "Yok"} muted={!note} tab="bilgi" field="note" />
+        </SummaryGroup>
+        <SummaryGroup title="Seçilen portföyler">
+          {chosen.length === 0 ? (
+            <SummaryRow label="Portföy" value="Zorunlu (en az 1)" muted tab="portfoyler" />
+          ) : (
+            chosen.map((p) => (
+              <SummaryRow key={p.id} label={p.code} value={p.title ?? money(p.price, p.tx)} tab="portfoyler" />
+            ))
+          )}
+        </SummaryGroup>
+      </>
+    );
+  }
 
-        {error ? <p className="text-sm font-semibold text-danger-600" role="alert">{error}</p> : null}
-
-        <FormActions>
-          <ButtonLink href={LIST_HREF} variant="secondary">İptal</ButtonLink>
-          <Button type="submit" loading={pending} disabled={selected.length === 0}>
-            Sunumu oluştur
-          </Button>
-        </FormActions>
-      </FormPage>
-    </form>
+  return (
+    <TabbedFormShell
+      key={formKey}
+      title="Yeni portföy sunumu"
+      description="Müşteriniz için 1-5 portföylük şık bir sunum linki üretin."
+      breadcrumbs={breadcrumbs}
+      cancelHref={LIST_HREF}
+      submitLabel="Sunumu oluştur"
+      pendingLabel="Oluşturuluyor…"
+      submitDisabled={selected.length === 0}
+      pending={pending}
+      error={error}
+      // Sunucu action'ı FormData ile çağrılır; başarıda sayfa değişmez, link kartı gösterilir.
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit(new FormData(e.currentTarget));
+      }}
+      tabs={TABS}
+      tabPanels={tabPanels}
+      summary={renderSummary}
+      fieldLabels={FIELD_LABELS}
+    />
   );
 }

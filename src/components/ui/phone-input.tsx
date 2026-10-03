@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   capNational,
   formatTurkishPhone,
@@ -130,14 +130,25 @@ export function PhoneInput(props: PhoneInputProps) {
   const country = getPhoneCountry(entry.country) ?? PHONE_COUNTRIES[0];
   const isTr = entry.country === "TR";
   const effectivePlaceholder = isTr ? (placeholder ?? TR_MOBILE_PLACEHOLDER) : country.example;
-  const inputClassName = `${className ?? DEFAULT_INPUT_CLASS} min-w-0 flex-1`;
+  const showError = touched && invalid;
+  const hintId = `${useId()}-phone-err`;
+  const describedByIds = [ariaDescribedBy, showError ? hintId : undefined].filter(Boolean).join(" ") || undefined;
+  const inputClassName = `${className ?? DEFAULT_INPUT_CLASS} min-w-0 flex-1${
+    showError ? " border-danger-500! ring-1 ring-danger-500/25" : ""
+  }`;
 
   return (
+    <div>
     <div className="flex items-stretch gap-2">
       <label
         className="relative inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-sm text-ink transition focus-within:border-brand-400"
       >
-        <span aria-hidden="true">{country.flag}</span>
+        <span
+          aria-hidden="true"
+          className="rounded-[var(--radius-control)] bg-line/60 px-1.5 py-0.5 text-xs font-semibold leading-none tracking-wide text-ink"
+        >
+          {country.iso}
+        </span>
         <span className="tabular-nums">+{country.dial}</span>
         <span aria-hidden="true" className="text-xs text-muted">
           ▾
@@ -154,7 +165,7 @@ export function PhoneInput(props: PhoneInputProps) {
         >
           {PHONE_COUNTRIES.map((c) => (
             <option key={c.iso} value={c.iso}>
-              {c.flag} {c.ad} (+{c.dial})
+              {c.iso} · {c.ad} (+{c.dial})
             </option>
           ))}
         </select>
@@ -165,7 +176,7 @@ export function PhoneInput(props: PhoneInputProps) {
         type="tel"
         inputMode="tel"
         autoComplete={autoComplete}
-        aria-describedby={ariaDescribedBy}
+        aria-describedby={describedByIds}
         aria-invalid={ariaInvalid || (touched && invalid) || undefined}
         required={required}
         value={shown}
@@ -180,6 +191,12 @@ export function PhoneInput(props: PhoneInputProps) {
         className={inputClassName}
       />
       {name ? <input type="hidden" name={name} value={stored} /> : null}
+    </div>
+    {showError ? (
+      <p id={hintId} className="mt-1 text-xs font-medium text-danger-strong">
+        {PHONE_ERROR_MESSAGE}
+      </p>
+    ) : null}
     </div>
   );
 }

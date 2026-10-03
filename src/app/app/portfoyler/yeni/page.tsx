@@ -8,7 +8,7 @@ import { PropertyForm } from "./property-form";
 export const metadata = { title: "Yeni portföy" };
 
 export default async function NewPropertyPage() {
-  const { perms } = await requireModulePage("properties", "/app/portfoyler");
+  const { perms, userId } = await requireModulePage("properties", "/app/portfoyler");
   if (!(perms.properties ?? []).includes("create")) redirect("/app/portfoyler");
 
   const supabase = await createClient();
@@ -26,6 +26,7 @@ export default async function NewPropertyPage() {
       branches={branches ?? []}
       propertyTypes={propertyTypes.map((d) => d.value)}
       transactionTypes={transactionTypes.map((d) => d.value)}
+      userId={userId}
     />
   );
 }

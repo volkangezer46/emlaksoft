@@ -66,7 +66,7 @@ function relTime(iso: string) {
   if (mins < 60) return `${mins} dk önce`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs} sa önce`;
-  return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  return new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 }
 
 export function NotificationBell({ initial }: { initial: NotificationRow[] }) {

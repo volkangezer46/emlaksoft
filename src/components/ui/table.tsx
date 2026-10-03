@@ -57,7 +57,13 @@ export function TableFrame({
             sayfayı yatay kaydırılabilir yapıyordu (fixed alt-nav sabit kalsa da
             sayfa yana kayıyordu). sm+ okunabilirlik için min-width tabanı korunur. */}
         <div
-          className={minWidth ? "w-max min-w-full sm:[min-width:var(--tbl-mw)]" : "w-max min-w-full"}
+          // `[&>table]:min-w-full`: `w-max` kabı içinde `w-full` tablo max-content'e
+          // çözülüp kolonları sola yığıyordu; min-width kabın (çerçeve) genişliğine bağlanır.
+          className={
+            minWidth
+              ? "w-max min-w-full sm:[min-width:var(--tbl-mw)] [&>table]:min-w-full"
+              : "w-max min-w-full [&>table]:min-w-full"
+          }
           style={minWidth ? ({ ["--tbl-mw"]: `${minWidth}px` } as CSSProperties) : undefined}
         >
           {children}

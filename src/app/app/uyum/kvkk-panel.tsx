@@ -24,7 +24,7 @@ type LogRow = {
 };
 
 function tarih(iso: string) {
-  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+  return new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
 }
 
 /**

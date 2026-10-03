@@ -31,7 +31,7 @@ function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 }
 function monthLabel(iso: string) {
-  return new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(new Date(iso));
+  return new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", month: "long", year: "numeric" }).format(new Date(iso));
 }
 function propOf(p: Due["property"]) {
   return Array.isArray(p) ? p[0] : p;

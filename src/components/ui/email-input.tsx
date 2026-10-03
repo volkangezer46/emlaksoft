@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { ComponentProps } from "react";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { fieldClass } from "@/components/ui/form-controls";
@@ -19,8 +19,10 @@ export function EmailInput({
   onBlur,
   onChange,
   "aria-invalid": ariaInvalid,
+  "aria-describedby": describedBy,
   ...rest
 }: EmailInputProps) {
+  const hintId = useId();
   const ref = useRef<HTMLInputElement>(null);
   const [touched, setTouched] = useState(false);
   const [invalid, setInvalid] = useState(false);
@@ -40,7 +42,12 @@ export function EmailInput({
     setInvalid(bad);
   }, [rest.value]);
 
+  const showError = touched && invalid;
+  const describedByIds = [describedBy, showError ? hintId : undefined].filter(Boolean).join(" ") || undefined;
+  const baseClass = className ?? fieldClass;
+
   return (
+    <>
     <input
       {...rest}
       ref={ref}
@@ -49,8 +56,9 @@ export function EmailInput({
       autoComplete={autoComplete}
       autoCapitalize="none"
       spellCheck={false}
-      aria-invalid={ariaInvalid || (touched && invalid) || undefined}
-      className={className ?? fieldClass}
+      aria-invalid={ariaInvalid || showError || undefined}
+      aria-describedby={describedByIds}
+      className={showError ? `${baseClass} border-danger-500! ring-1 ring-danger-500/25` : baseClass}
       onChange={(event) => {
         validate(event.currentTarget);
         onChange?.(event);
@@ -68,5 +76,11 @@ export function EmailInput({
         onBlur?.(event);
       }}
     />
+    {showError ? (
+      <p id={hintId} className="mt-1 text-xs font-medium text-danger-strong">
+        {EMAIL_ERROR_MESSAGE}
+      </p>
+    ) : null}
+    </>
   );
 }

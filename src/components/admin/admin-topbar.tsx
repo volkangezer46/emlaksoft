@@ -3,19 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "@/app/actions/auth";
 import { CommandPalette } from "@/components/admin/command-palette";
 import { NotificationBell } from "@/components/admin/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { UserMenu } from "@/components/ui/console/user-menu";
+import { now } from "@/lib/clock";
 import {
   Building2,
   CreditCard,
   Handshake,
   LifeBuoy,
-  LogOut,
   MapPin,
   Plus,
-  Radio,
+  Undo2,
 } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
 
@@ -46,9 +47,11 @@ const QUICK: { label: string; href: string; icon: typeof Building2; module: Plat
 // başlık çubuğunda üçüncü satıra yer yok). Yanıltıcı API yerine kaldırıldı.
 export function AdminTopbar({
   roleLabel,
+  staffName,
   modules,
 }: {
   roleLabel: string;
+  staffName: string;
   modules: PlatformModule[];
 }) {
   const pathname = usePathname();
@@ -58,7 +61,7 @@ export function AdminTopbar({
 
   useEffect(() => {
     const tick = () =>
-      setClock(new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }));
+      setClock(new Date(now()).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }));
     tick();
     const id = setInterval(tick, 30_000);
     return () => clearInterval(id);
@@ -85,21 +88,15 @@ export function AdminTopbar({
   const quickItems = QUICK.filter((q) => modules.includes(q.module));
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-line/80 bg-surface/85 pl-16 pr-4 backdrop-blur-xl md:px-6">
-      {/* Sol: logo + başlık — sabit genişlik */}
-      <div className="hidden w-52 shrink-0 items-center gap-3 sm:flex">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-amber-400/15 text-amber-600">
-          <Radio className="h-4 w-4" />
-        </span>
-        <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.08em] text-amber-600">
-            EmlakSoft · {roleLabel}
-          </p>
-          <p className="truncate text-sm font-semibold text-ink-950">
-            {title}
-          </p>
-        </div>
-      </div>
+    <header className="glass-bar topbar-platform sticky top-0 z-40 flex h-14 items-center gap-3 pl-16 pr-4 md:px-6">
+      {/* Sol: platform konumu (süper admin ofis uygulamasından ayrışsın) */}
+      <Breadcrumb
+        className="hidden shrink-0 lg:block"
+        items={[
+          { label: `Platform · ${roleLabel}`, href: "/admin" },
+          { label: title },
+        ]}
+      />
 
       {/* Orta: arama — flex-1 ile tüm boş alanı kapla */}
       <div className="min-w-0 flex-1">
@@ -115,7 +112,7 @@ export function AdminTopbar({
               aria-expanded={quickOpen}
               aria-haspopup="menu"
               aria-controls="admin-quick-menu"
-              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] px-3 py-2 text-xs font-bold text-white shadow-[0_8px_20px_-8px_rgba(20,99,255,0.7)] transition hover:brightness-105"
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] px-3 py-2 text-xs font-bold text-white shadow-[0_8px_20px_-8px_rgba(20,99,255,0.7)] transition-[filter] hover:brightness-105"
             >
               <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Hızlı erişim</span>
             </button>
@@ -148,14 +145,12 @@ export function AdminTopbar({
 
         <NotificationBell />
 
-        <form action={signOut}>
-          <button
-            type="submit"
-            className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-danger-500/40 hover:text-danger-500"
-          >
-            <LogOut className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Çıkış</span>
-          </button>
-        </form>
+        <UserMenu
+          initials={staffName.split(/\s+/).map((p) => p[0] ?? "").join("").slice(0, 2).toLocaleUpperCase("tr-TR") || "P"}
+          name={staffName}
+          subtitle={roleLabel}
+          links={[{ href: "/app", label: "Ofis paneline dön", icon: Undo2 }]}
+        />
       </div>
     </header>
   );

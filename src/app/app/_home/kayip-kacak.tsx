@@ -12,7 +12,7 @@ export async function KayipKacak({ ctx }: { ctx: HomeCtx }) {
 
   return (
     <Widget id="kayip" className="h-full">
-      <section className="surface-card h-full rounded-[var(--radius-panel)] p-5">
+      <section className="pm-bx h-full p-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Radar className="h-4 w-4 text-danger-500" />

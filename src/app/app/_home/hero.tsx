@@ -39,7 +39,7 @@ function GlassIskelet() {
   return (
     <>
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="pm-glass h-[4.9rem] animate-pulse" aria-hidden="true" />
+        <div key={i} className="pm-glass animate-pulse" aria-hidden="true" />
       ))}
     </>
   );
