@@ -43,6 +43,7 @@ export const PLAN_GATES: readonly PlanGate[] = [
   // Profesyonel
   { href: "/app/kayip-kacak", title: "Kayıp-kaçak komisyon motoru", minPlan: "professional", pitch: "Portal ilanlarınızdan rakibe kapanan satışları otomatik bulur ve kaçan komisyonu tahmin eder." },
   { href: "/app/danisman-kpi", title: "Danışman KPI", minPlan: "professional", pitch: "Her danışmanın arama, randevu, teklif ve anlaşma performansı." },
+  { href: "/app/ekip/kiyas", title: "Danışman kıyası", minPlan: "professional", pitch: "Danışman karnesi: dönüşüm, aktif iş yükü, randevu ve hedef gerçekleşmesi tek tabloda." },
   { href: "/app/lig", title: "Ekip Ligi", minPlan: "professional", pitch: "Danışmanlar arası sıralama, rozetler ve motivasyon panosu." },
   { href: "/app/hedefler", title: "Hedefler", minPlan: "professional", pitch: "Ofis ve danışman bazlı aylık ciro ve anlaşma hedefleri, gerçekleşme takibi." },
   { href: "/app/bolge-analizi", title: "Bölge Analizi", minPlan: "professional", pitch: "Bölge bazlı fiyat trendi, satış süresi ve talep-arz dengesi." },

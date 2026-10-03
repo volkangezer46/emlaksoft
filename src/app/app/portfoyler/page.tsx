@@ -146,7 +146,7 @@ const PAGER_BTN_DISABLED =
 export default async function PropertiesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string; status?: string; saglik?: string; gorunum?: string; sayfa?: string; sirala?: string; yeni?: string }>;
+  searchParams?: Promise<{ q?: string; status?: string; saglik?: string; gorunum?: string; sayfa?: string; sirala?: string; yeni?: string; danisman?: string }>;
 }) {
   const { perms } = await requireModulePage("properties");
   const canCreate = (perms.properties ?? []).includes("create");
@@ -160,6 +160,8 @@ export default async function PropertiesPage({
   // Kullanıcı sıralaması: ?sirala=eski|fiyat_yuksek|fiyat_dusuk (varsayılan: yeni=created_at desc)
   const siralaF = ["eski", "fiyat_yuksek", "fiyat_dusuk"].includes(params.sirala ?? "") ? (params.sirala as string) : "";
   const page = Math.max(1, Number.parseInt(params.sayfa ?? "", 10) || 1);
+  // ?danisman=<profil id>: danışmana atanmış portföyler (Ekip Merkezi / Kıyas bağlantıları).
+  const danismanF = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.danisman ?? "") ? params.danisman! : "";
   const offset = (page - 1) * PAGE_SIZE;
   const supabase = await createClient();
   // Bağımsız: sorgularla aynı turda beklenir (aşağıdaki Promise.all).
@@ -169,6 +171,7 @@ export default async function PropertiesPage({
   if (q) savedViewParams.q = q;
   if (statusFilter !== "all") savedViewParams.status = statusFilter;
   if (saglikFilter) savedViewParams.saglik = saglikFilter;
+  if (danismanF) savedViewParams.danisman = danismanF;
   if (siralaF) savedViewParams.sirala = siralaF;
   if (view === "harita") savedViewParams.gorunum = "harita";
 
@@ -216,6 +219,7 @@ export default async function PropertiesPage({
     let query = supabase.from("properties").select(select, opts).is("deleted_at", null);
     if (statusValues) query = query.in("status", statusValues);
     if (qOrClause) query = query.or(qOrClause);
+    if (danismanF) query = query.eq("assigned_to", danismanF);
     return query;
   };
   const buildFilteredQuery = (select: string, opts?: { count: "exact"; head?: boolean }) => {
@@ -224,7 +228,7 @@ export default async function PropertiesPage({
     return query;
   };
 
-  const filtersEmpty = !statusValues && !qOrClause && !saglikValues;
+  const filtersEmpty = !statusValues && !qOrClause && !saglikValues && !danismanF;
 
   const LIST_COLS =
     "id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, published_at, province_id, district_id, lat, lng, province:geo_provinces(name), district:geo_districts(name), portal_listings!portal_listings_property_id_fkey(portal_name,status,last_confirmed_at)";
@@ -351,6 +355,7 @@ export default async function PropertiesPage({
     const sp = new URLSearchParams();
     if (q) sp.set("q", q);
     if (statusFilter !== "all") sp.set("status", statusFilter);
+    if (danismanF) sp.set("danisman", danismanF);
     sp.set("saglik", value);
     if (view === "harita") sp.set("gorunum", "harita");
     return `/app/portfoyler?${sp.toString()}`;
@@ -361,6 +366,7 @@ export default async function PropertiesPage({
     const sp = new URLSearchParams();
     if (q) sp.set("q", q);
     if (statusFilter !== "all") sp.set("status", statusFilter);
+    if (danismanF) sp.set("danisman", danismanF);
     if (saglikFilter) sp.set("saglik", saglikFilter);
     if (siralaF) sp.set("sirala", siralaF);
     if (value === "harita") sp.set("gorunum", "harita");
@@ -373,6 +379,7 @@ export default async function PropertiesPage({
     const sp = new URLSearchParams();
     if (q) sp.set("q", q);
     if (statusFilter !== "all") sp.set("status", statusFilter);
+    if (danismanF) sp.set("danisman", danismanF);
     if (saglikFilter) sp.set("saglik", saglikFilter);
     if (siralaF) sp.set("sirala", siralaF);
     if (target > 1) sp.set("sayfa", String(target));

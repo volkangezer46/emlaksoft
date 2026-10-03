@@ -49,6 +49,7 @@ const MODULES: AppModule[] = [
   "rentals",
   "projects",
   "network",
+  "earnings_all",
 ];
 
 export default async function RolePermissionsPage({

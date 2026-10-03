@@ -23,6 +23,9 @@
  */
 import {
   AlignLeft,
+  HandCoins,
+  Scale,
+  ArrowLeftRight,
   Award,
   BadgeCheck,
   Banknote,
@@ -146,6 +149,9 @@ export const ICONS = {
   komisyon: Wallet,
   /** Danışmanın kendi cüzdanı. */
   cuzdan: PiggyBank,
+  kiyas: Scale,
+  kazanc: HandCoins,
+  devir: ArrowLeftRight,
   /** Gider / fiş. */
   gider: Receipt,
   /** Aidat / dönemsel tahsilat. */

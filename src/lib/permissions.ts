@@ -35,7 +35,8 @@ export type AppModule =
   | "open_house"
   | "rentals"
   | "projects"
-  | "network";
+  | "network"
+  | "earnings_all";
 
 export type AppAction = "view" | "create" | "edit" | "delete";
 
@@ -81,6 +82,7 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
         "rentals",
         "projects",
         "network",
+        "earnings_all",
       ] as AppModule[]
     ).map((m) => [m, ALL]),
   ),
@@ -112,6 +114,8 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     rentals:      ALL,
     projects:     ALL,
     network:      ALL,
+    // Başkasının kazancını görme (belge 3e). DB permission_defaults seed: Faz 2 migration.
+    earnings_all: VIEW,
   },
   branch_manager: {
     dashboard:    VIEW,
@@ -192,6 +196,7 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     billing: CRUD_NO_DEL,
     reports: VIEW,
     support: VIEW,
+    earnings_all: VIEW,
   },
   readonly: {
     dashboard: VIEW,

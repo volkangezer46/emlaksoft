@@ -149,7 +149,6 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/lig", label: "Ekip Ligi", icon: ICONS.lig, module: "reports" },
         ],
       },
-      { href: "/app/hedefler", label: "Hedefler", icon: ICONS.hedef, module: "targets" },
       { href: "/app/bolge-analizi", label: "Bölge Analizi", icon: ICONS.bolge, module: "reports" },
       { href: "/app/kayip-satis", label: "Kayıp Satış", icon: ICONS.dusus, module: "customers" },
       { href: "/app/pano-tv", label: "Ofis Panosu (TV)", icon: ICONS.panoTv, module: "reports" },
@@ -171,7 +170,21 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     title: "Ofis",
     icon: ICONS.baslikOfis,
     items: [
-      { href: "/app/ekip", label: "Ekip", icon: ICONS.ekip, module: "team" },
+      {
+        // Ekip Merkezi: tek kabuk, mevcut sayfalar sekme olarak yeniden kullanılır
+        // (Hedefler eskiden Performans başlığındaydı; yolu değişmedi).
+        href: "/app/ekip",
+        label: "Ekip Merkezi",
+        icon: ICONS.ekip,
+        module: "team",
+        tabs: [
+          { href: "/app/ekip", label: "Genel", icon: ICONS.ekip, module: "team" },
+          { href: "/app/ekip/kiyas", label: "Kıyas", icon: ICONS.kiyas, module: "reports" },
+          { href: "/app/ekip/kazanc", label: "Kazanç", icon: ICONS.kazanc, module: "commissions" },
+          { href: "/app/hedefler", label: "Hedefler", icon: ICONS.hedef, module: "targets" },
+          { href: "/app/ekip/devir", label: "Devir / Atama", icon: ICONS.devir, module: "team" },
+        ],
+      },
       { href: "/app/otomasyonlar", label: "Otomasyonlar", icon: ICONS.otomasyon, module: "settings" },
       { href: "/app/ayarlar/is-akislari", label: "İş Akışları", icon: ICONS.isAkisi, module: "settings" },
       { href: "/app/uyum", label: "Uyum", icon: ICONS.uyum, module: "compliance" },

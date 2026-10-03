@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { buildCoachActions, type CoachAction } from "@/lib/advisor-coach";
 import { RevenueChart } from "./revenue-chart-lazy";
 import { CoachPanel, type CoachActionWithLink } from "./coach-panel";
@@ -145,7 +146,10 @@ export default async function DanismanKpiPage({
 }: {
   searchParams?: Promise<{ ay?: string }>;
 }) {
-  const { tenantId, userId } = await requireModulePage("reports", "/app/danisman-kpi");
+  const { tenantId, userId, perms } = await requireModulePage("reports", "/app/danisman-kpi");
+  // Kazanç gizliliği: başkasının geliri yalnız `earnings_all` izniyle görünür (kendi geliri her zaman).
+  const seeAllEarnings = canSeeAllEarnings(perms);
+  const showRevenue = (id: string) => seeAllEarnings || id === userId;
   const supabase = await createClient();
 
   // ?ay=YYYY-MM — dönem seçici. Geçersiz/gelecek değer bu aya düşer;
@@ -331,7 +335,7 @@ export default async function DanismanKpiPage({
     rozetler.push({ emoji: "🎯", ad: "Dönüşüm Ustası", sahip: donusumUstasi, aciklama: `${donusumUstasi.conversionRate} dönüşüm` });
   }
   const ciroLideri = [...advisors].sort((x, y) => y.revenue - x.revenue)[0];
-  if (ciroLideri && ciroLideri.revenue > 0) {
+  if (seeAllEarnings && ciroLideri && ciroLideri.revenue > 0) {
     rozetler.push({ emoji: "💰", ad: "Ciro Lideri", sahip: ciroLideri, aciklama: money(ciroLideri.revenue) });
   }
   const rozetByUid = new Map<string, Rozet[]>();
@@ -400,7 +404,7 @@ export default async function DanismanKpiPage({
   // Grafik verisi: geliri olan ilk 8 danışman (düz, serileştirilebilir dizi;
   // id → çubuğa tıklayınca /app/ekip/{id})
   const revenueChart = advisors
-    .filter((a) => a.revenue > 0)
+    .filter((a) => seeAllEarnings && a.revenue > 0)
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 8)
     .map((a) => ({ id: a.id, name: a.full_name, revenue: a.revenue }));
@@ -466,7 +470,9 @@ export default async function DanismanKpiPage({
           <div className="flex gap-3">
             {[
               { label: "Danışman", value: advisors.length, href: "/app/ekip" },
-              { label: "Toplam gelir", value: money(advisors.reduce((s, a) => s + a.revenue, 0)), href: "/app/komisyon" },
+              seeAllEarnings
+                ? { label: "Toplam gelir", value: money(advisors.reduce((s, a) => s + a.revenue, 0)), href: "/app/komisyon" }
+                : { label: "Gelirim", value: money(advisors.find((a) => a.id === userId)?.revenue ?? 0), href: "/app/cuzdan" },
               { label: "Toplam satış", value: advisors.reduce((s, a) => s + a.dealCount, 0), href: "/app/anlasmalar" },
             ].map((k) => (
               <Link
@@ -520,7 +526,7 @@ export default async function DanismanKpiPage({
                     </p>
                     <p className="text-xs text-text-muted">
                       Skor <span className="numeric font-bold text-ink-950">{a.score}</span>
-                      {a.revenue > 0 ? ` · ${money(a.revenue)}` : ""} · {a.dealCount} satış
+                      {a.revenue > 0 && showRevenue(a.id) ? ` · ${money(a.revenue)}` : ""} · {a.dealCount} satış
                     </p>
                     <div className={`mt-3 w-full rounded-t-[var(--radius-control)] ${stil.bar}`} aria-hidden="true" />
                   </Link>
@@ -741,7 +747,7 @@ export default async function DanismanKpiPage({
                   <TD align="right" className="font-semibold text-ink-950">{a.dealCount}</TD>
                   <TD align="right" className="text-text-muted">{a.conversionRate}</TD>
                   {/* mint-700 bu turda tanımlandı; öncesinde sınıf sessizce düşüyordu */}
-                  <TD align="right" className="font-bold text-mint-700">{a.revenue > 0 ? money(a.revenue) : "—"}</TD>
+                  <TD align="right" className="font-bold text-mint-700">{a.revenue > 0 && showRevenue(a.id) ? money(a.revenue) : "—"}</TD>
                   <TD>
                     <div className="flex items-center gap-2">
                       <div className="surface-sunken h-1.5 w-16 overflow-hidden rounded-full">

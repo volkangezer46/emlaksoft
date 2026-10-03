@@ -14,6 +14,7 @@ import {
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { formatTurkishPhone } from "@/lib/phone";
+import { canSeeEarningsOf } from "@/lib/team/earnings-scope";
 import { MemberHandoff } from "./member-handoff";
 import { ArrowLeftRight } from "lucide-react";
 
@@ -39,9 +40,11 @@ function initials(name: string) {
 }
 
 export default async function TeamMemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { perms } = await requireModulePage("team", "/app/ekip");
+  const { perms, userId } = await requireModulePage("team", "/app/ekip");
   const canHandoff = (perms.team ?? []).includes("edit");
   const { id } = await params;
+  // Kazanç gizliliği: başkasının kazancı yalnız `earnings_all` izniyle görünür.
+  const showEarnings = canSeeEarningsOf(perms, userId, id);
   const supabase = await createClient();
 
   const monthStart = new Date();
@@ -123,6 +126,7 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
           </span>
         }
         actions={
+          !showEarnings ? undefined : (
           <Link
             href="/app/komisyon"
             className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-surface px-5 py-3 text-center shadow-[var(--shadow-xs)] hover:border-brand-300"
@@ -133,6 +137,7 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
               <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
             </p>
           </Link>
+          )
         }
       />
 
