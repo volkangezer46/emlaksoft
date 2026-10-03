@@ -1,10 +1,12 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { lazy, Suspense, useSyncExternalStore } from "react";
 import { Monitor, Moon, Palette, Sun } from "lucide-react";
-import { AppearancePanel } from "@/components/appearance-panel";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { readThemePref, subscribeTheme, type ThemePref } from "@/lib/theme";
+
+// Panel gövdesi (renk paleti + mod seçici) popover ilk açılana kadar yüklenmez.
+const AppearancePanel = lazy(() => import("@/components/appearance-panel").then((m) => ({ default: m.AppearancePanel })));
 
 const ICONS: Record<ThemePref, typeof Sun> = { system: Monitor, light: Sun, dark: Moon };
 
@@ -22,7 +24,9 @@ export function ThemeToggle() {
         <Current className="h-4 w-4" aria-hidden />
       </PopoverTrigger>
       <PopoverContent align="end" aria-label="Görünüm">
-        <AppearancePanel />
+        <Suspense fallback={<div className="h-40 w-64" aria-hidden />}>
+          <AppearancePanel />
+        </Suspense>
       </PopoverContent>
     </Popover>
   );

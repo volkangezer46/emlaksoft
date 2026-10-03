@@ -1,13 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Building2, CalendarDays, ListChecks, LogOut, Phone, Plus, Shield, UserPlus } from "lucide-react";
+import { LogOut, Shield } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { QuickCreateMenu } from "@/components/app/quick-create-menu";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaffIdentity } from "@/lib/platform";
@@ -208,45 +203,7 @@ export default async function AppLayout({
             <div className="ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
               <ThemeToggle />
               {/* Hızlı eylem menüsü: en sık kullanılan kayıt akışlarına tek tıkla */}
-              {hasQuickCreate ? <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="focus-ring press inline-flex h-10 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 text-xs font-bold text-white transition hover:bg-brand-700"
-                    aria-label="Hızlı yeni kayıt menüsü"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span className="hidden sm:inline">Yeni</span>
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-52">
-                  {canCreateCustomer ? <DropdownMenuItem asChild>
-                    <Link href="/app/musteriler/yeni">
-                      <UserPlus /> Yeni müşteri
-                    </Link>
-                  </DropdownMenuItem> : null}
-                  {canCreateProperty ? <DropdownMenuItem asChild>
-                    <Link href="/app/portfoyler/yeni">
-                      <Building2 /> Yeni portföy
-                    </Link>
-                  </DropdownMenuItem> : null}
-                  {canCreateCall ? <DropdownMenuItem asChild>
-                    <Link href="/app/arama">
-                      <Phone /> Görüşme kaydet
-                    </Link>
-                  </DropdownMenuItem> : null}
-                  {canCreateAppointment ? <DropdownMenuItem asChild>
-                    <Link href="/app/randevular/yeni">
-                      <CalendarDays /> Randevu
-                    </Link>
-                  </DropdownMenuItem> : null}
-                  {canCreateTask ? <DropdownMenuItem asChild>
-                    <Link href="/app/gorevler/yeni">
-                      <ListChecks /> Görev
-                    </Link>
-                  </DropdownMenuItem> : null}
-                </DropdownMenuContent>
-              </DropdownMenu> : null}
+              {hasQuickCreate ? <QuickCreateMenu flags={{ customer: canCreateCustomer, property: canCreateProperty, call: canCreateCall, appointment: canCreateAppointment, task: canCreateTask }} /> : null}
               <Link
                 href="/app/raporlar"
                 title="Kural tabanlı ofis skoru (yapay zekâ değil): açık talepler, canlı portal ilanları, son 7 günün randevu ve aramaları ile son 30 günün kapanışları puan ekler; gecikmiş portal teyitleri puan düşürür. Başlangıç 42. Rapor merkezini açmak için tıklayın."

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { FileCheck2, Paperclip, ShieldCheck } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import {
   prepareTicketAttachmentUploadDescriptor,
   TICKET_ATTACHMENT_ACCEPT,
@@ -68,6 +67,8 @@ export async function uploadTicketFiles(input: {
       return { ok: false, uploaded: 0, error: sessionJson.error ?? "Güvenli dosya yükleme başlatılamadı." };
     }
 
+    // supabase-js (~240 KB) yalnız yükleme anında indirilir; sayfa açılışını şişirmez.
+    const { createClient } = await import("@/lib/supabase/client");
     const supabase = createClient();
     const uploadedSessionIds: string[] = [];
     let uploadError: string | undefined;
