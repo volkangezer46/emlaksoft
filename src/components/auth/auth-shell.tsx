@@ -51,19 +51,9 @@ export function AuthShell({
             </ul>
           </div>
 
-          <figure className="max-w-md rounded-[var(--radius-panel)] border border-white/10 bg-white/[0.05] p-5 backdrop-blur">
-            <blockquote className="text-sm leading-relaxed text-white/80">
-              &quot;Portal kapanışlarından kaçan komisyonu ilk ay gördük. Artık hangi ilanın nerede kapandığı ve
-              kimin araması gerektiği net.&quot;
-            </blockquote>
-            <figcaption className="mt-3 flex items-center gap-3">
-              <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-600 text-xs font-bold text-white">SD</span>
-              <div>
-                <p className="text-sm font-bold text-white">Serkan D.</p>
-                <p className="text-xs text-white/50">Ofis sahibi · İzmir</p>
-              </div>
-            </figcaption>
-          </figure>
+          <p className="max-w-md rounded-[var(--radius-panel)] border border-white/10 bg-white/[0.05] p-5 text-sm leading-relaxed text-white/80 backdrop-blur">
+            Portal ilanlarının nerede kapandığını, kaçan komisyonu ve kimin aranması gerektiğini tek ekranda görürsünüz.
+          </p>
         </div>
       </aside>
 

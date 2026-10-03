@@ -6,6 +6,7 @@ import {
   twoFactorBindingFromClaims,
 } from "@/lib/two-factor";
 import { resolveSupabasePublicKey } from "@/lib/supabase/keys";
+import { isPlatformMfaRequired } from "@/lib/platform-mfa";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -122,6 +123,7 @@ export async function updateSession(request: NextRequest) {
     }
 
     if (
+      isPlatformMfaRequired() &&
       isAdmin &&
       canonicalPlatformStaff &&
       claimsData?.claims?.aal !== "aal2"

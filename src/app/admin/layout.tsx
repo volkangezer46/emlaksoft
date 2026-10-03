@@ -4,6 +4,7 @@ import { requirePlatformStaff } from "@/lib/platform";
 import { PLATFORM_ROLE_LABELS, platformModulesFor } from "@/lib/platform-access";
 import { getAdminBadges } from "@/lib/admin-badges";
 import { ThemeController } from "@/components/theme-controller";
+import { isPlatformMfaRequired } from "@/lib/platform-mfa";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const staff = await requirePlatformStaff();
@@ -20,6 +21,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <AdminSidebar staffName={staff.full_name} role={staff.role} roleLabel={roleLabel} badges={badges} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopbar roleLabel={roleLabel} modules={modules} />
+        {!isPlatformMfaRequired() ? (
+          <p role="status" className="border-b border-amber-300/50 bg-amber-50 px-4 py-1.5 text-center text-xs font-semibold text-amber-800">
+            Geliştirme modu: platform iki adımlı doğrulaması (TOTP) kapalı. Yayın öncesi PLATFORM_MFA_ENFORCEMENT=on yapın.
+          </p>
+        ) : null}
         {/* grid + minmax(0,1fr): geniş tablolar kendi kaplarında kaydırılır,
             belgeyi şişirmez (iOS `overflow:clip` viewport'a propagate etmiyor). */}
         <main

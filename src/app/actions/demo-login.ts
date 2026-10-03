@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient, resolveSupabaseAdminKey } from "@/lib/supabase/admin";
 import { restoreImpersonationMetadata } from "@/lib/impersonation";
+import { isPlatformMfaRequired } from "@/lib/platform-mfa";
 import { isDemoLoginEnabled, isPlatformDemoPersonaAllowed } from "@/lib/demo-environment";
 import { getDemoPersona, type DemoPersona } from "@/lib/demo-personas";
 import { planAmountTry } from "@/lib/billing/plans";
@@ -222,7 +223,8 @@ export async function quickDemoLogin(personaId: string): Promise<DemoLoginResult
   // görememesine yol açıyordu (adres değişiyor, ekran giriş sayfasında kalıyor). Bu yüzden hedef
   // döndürülür ve istemci tarayıcı gezinmesiyle (yeni çerezlerle) doğrulama sayfasına gider.
   if (persona.kind === "platform") {
-    return { redirectTo: `/giris/mfa?next=${encodeURIComponent("/admin")}` };
+    // MFA kapalıyken (geliştirme) doğrudan panel; açıkken doğrulama sayfası.
+    return { redirectTo: isPlatformMfaRequired() ? `/giris/mfa?next=${encodeURIComponent("/admin")}` : "/admin" };
   }
   redirect("/app");
 }

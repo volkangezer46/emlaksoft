@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { isPlatformMfaRequired } from "@/lib/platform-mfa";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -105,6 +106,8 @@ export const getPlatformMfaCandidate = cache(async (): Promise<PlatformStaff | n
 export const getPlatformStaffIdentity = cache(async (): Promise<PlatformStaff | null> => {
   const staff = await getPlatformMfaCandidate();
   if (!staff) return null;
+  // Geliştirme sürecinde AAL2 şartı kapalı (bkz. src/lib/platform-mfa.ts).
+  if (!isPlatformMfaRequired()) return staff;
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();

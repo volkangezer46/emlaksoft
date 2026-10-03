@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getPlatformMfaCandidate } from "@/lib/platform";
+import { isPlatformMfaRequired } from "@/lib/platform-mfa";
 import { PlatformMfaForm } from "./platform-mfa-form";
 
 export const metadata = {
@@ -24,6 +25,9 @@ export default async function PlatformMfaPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect(`/giris?next=${encodeURIComponent(next)}`);
+
+  // Geliştirme sürecinde platform MFA kapalı: doğrulama sayfası gereksiz (bkz. src/lib/platform-mfa.ts).
+  if (!isPlatformMfaRequired()) redirect(next);
 
   const candidate = await getPlatformMfaCandidate();
   if (!candidate || user.app_metadata?.impersonating === true) redirect("/app");

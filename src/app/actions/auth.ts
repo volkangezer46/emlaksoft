@@ -1,6 +1,7 @@
 "use server";
 
 import { cookies, headers } from "next/headers";
+import { isPlatformMfaRequired } from "@/lib/platform-mfa";
 import { redirect } from "next/navigation";
 import { logLoginEvent } from "@/app/giris/_lib/login-events";
 import { sendSignerSms } from "@/app/imza/_lib/sms";
@@ -287,7 +288,7 @@ export async function signIn(
       redirect(`/giris/dogrulama?next=${encodeURIComponent(target)}`);
     }
 
-    if (isPlatformStaff) {
+    if (isPlatformStaff && isPlatformMfaRequired()) {
       const { data: assurance, error: assuranceError } =
         await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       if (assuranceError || assurance.currentLevel !== "aal2") {
