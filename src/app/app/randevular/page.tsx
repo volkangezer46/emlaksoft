@@ -16,6 +16,7 @@ import {
 import { redirect } from "next/navigation";
 import { ButtonLink } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
+import { resolveLazyTotal } from "@/lib/lazy-total";
 import { requireModulePage } from "@/lib/require-module-page";
 import { calendarDateToTrIso, formatTrTime, trDayKey, trTodayCalendarDate } from "@/lib/clock";
 import { setAppointmentStatus } from "@/app/actions/appointments";
@@ -179,20 +180,24 @@ export default async function AppointmentsPage({
     windowEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 3, 1);
   }
 
-  let apptQuery = supabase
-    .from("appointments")
-    // count: pencere içindeki gerçek toplam — 500'ü aşarsa ListLimitNotice uyarır.
-    .select(
-      "id, appointment_type, scheduled_at, duration_min, location, status, notes, confirm_token, customer_response, assigned_to, outcome, outcome_note, customer:customers!appointments_customer_id_fkey(id, full_name), property:properties!appointments_property_id_fkey(id, title, property_code, lat, lng)",
-      { count: "exact" },
-    )
-    .neq("status", "cancelled")
-    .gte("scheduled_at", toIso(windowStart))
-    .lt("scheduled_at", toIso(windowEnd));
-  if (tipF) apptQuery = apptQuery.eq("appointment_type", tipF);
-  if (durumF) apptQuery = apptQuery.eq("status", durumF);
-  if (customerF) apptQuery = apptQuery.eq("customer_id", customerF);
-  if (propertyF) apptQuery = apptQuery.eq("property_id", propertyF);
+  const APPT_LIMIT = 500;
+  // Liste ve (tavana dayanınca) head-count aynı filtre kurucusunu paylaşır.
+  const buildApptQuery = (select: string, opts?: { count: "exact"; head: true }) => {
+    let q = supabase
+      .from("appointments")
+      .select(select, opts)
+      .neq("status", "cancelled")
+      .gte("scheduled_at", toIso(windowStart))
+      .lt("scheduled_at", toIso(windowEnd));
+    if (tipF) q = q.eq("appointment_type", tipF);
+    if (durumF) q = q.eq("status", durumF);
+    if (customerF) q = q.eq("customer_id", customerF);
+    if (propertyF) q = q.eq("property_id", propertyF);
+    return q;
+  };
+  const apptQuery = buildApptQuery(
+    "id, appointment_type, scheduled_at, duration_min, location, status, notes, confirm_token, customer_response, assigned_to, outcome, outcome_note, customer:customers!appointments_customer_id_fkey(id, full_name), property:properties!appointments_property_id_fkey(id, title, property_code, lat, lng)",
+  );
 
   // Durum/tür sayaçları — pencereden bağımsız gerçek toplamlar (head-count);
   // iptaller hariç. Hero/panel çipleri bu sayıları filtreye çevirir.
@@ -233,7 +238,16 @@ export default async function AppointmentsPage({
 
   // Randevu listesi bir kez başlatılır; izin sorgusu liste biter bitmez DİĞER sorgularla
   // paralel koşar (eskiden tüm Promise.all'dan sonra seri çalışıyordu).
-  const apptP = Promise.resolve(apptQuery.order("scheduled_at", { ascending: true }).limit(500));
+  const apptP = Promise.resolve(apptQuery.order("scheduled_at", { ascending: true }).limit(APPT_LIMIT));
+  // Gerçek toplam yalnız liste 500 tavanına dayanırsa sayılır (ListLimitNotice);
+  // tavandan azsa toplam = satır sayısı kesindir — ek COUNT sorgusu yok.
+  const apptTotalP = apptP.then((res) =>
+    resolveLazyTotal({
+      rows: (res.data ?? []).length,
+      limit: APPT_LIMIT,
+      count: async () => (await buildApptQuery("id", { count: "exact", head: true })).count,
+    }),
+  );
   const leavesP = apptP.then(async (res) => {
     const list = (res.data ?? []) as unknown as AppointmentRow[];
     if (list.length === 0) return [] as LeaveLike[];
@@ -249,7 +263,8 @@ export default async function AppointmentsPage({
   });
 
   const [
-    { data: appts, count: apptTotal },
+    { data: appts },
+    apptTotal,
     apptTypeDefs,
     { data: filteredCustomer },
     { data: filteredProperty },
@@ -265,6 +280,7 @@ export default async function AppointmentsPage({
     leaveRows,
   ] = await Promise.all([
     apptP,
+    apptTotalP,
     // Bu iki sorgu SINIRSIZDI: sayfa her acildiginda ofisin TUM musteri ve
     // portfoy kayitlari cekiliyordu. Secici artik sunucu tarafinda arama
     // yaptigi icin buradaki liste yalnizca "son eklenenler" kisayolu —
@@ -312,7 +328,7 @@ export default async function AppointmentsPage({
   const calendarToken = (ownProfile?.calendar_token as string | null) ?? null;
   const appointmentTypeOptions = apptTypeDefs.length > 0 ? apptTypeDefs.map((t) => ({ value: t.value, label: t.label })) : undefined;
 
-  const rows = (appts ?? []) as AppointmentRow[];
+  const rows = (appts ?? []) as unknown as AppointmentRow[];
 
   /*
    * "Danışman izinde" ipucu — randevunun düştüğü günde atanan danışman

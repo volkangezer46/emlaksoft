@@ -46,6 +46,8 @@ export async function GET(
     limit: 240,
     windowSec: 60,
     failurePolicy: "deny",
+    // İmzalı, kısa ömürlü okuma: ilk 60 çağrı/isolate DB yazması yapmaz (üst sınır limit/4).
+    localAllowance: 60,
   });
   if (!rate.allowed) return notFoundResponse();
 

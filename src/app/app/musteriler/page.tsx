@@ -281,7 +281,10 @@ export default async function CustomersPage({
 
   // count: "exact" — sayfalama ("X-Y / Toplam Z") gerçek toplamı ister;
   // sayı aynı yanıtta gelir, ek gidiş-dönüş yok.
-  let listQuery = buildFilteredQuery(LIST_COLS, { count: "exact" });
+  // Filtresiz görünümde filtreli toplam = "Toplam kayıt" KPI'ı (totalAll, aynı
+  // koşul: deleted_at is null) — listeye ikinci bir COUNT bindirmeye gerek yok.
+  const unfilteredList = !typeF && !etiketF && !sourceF && !assignedF && !fromF && !toF && !term;
+  let listQuery = buildFilteredQuery(LIST_COLS, unfilteredList ? undefined : { count: "exact" });
   if (sortKey === "ad") {
     listQuery = listQuery
       .order("full_name", { ascending: sortDir === "asc" })
@@ -457,7 +460,7 @@ export default async function CustomersPage({
     }
   } else {
     rows = pageRowsRaw;
-    totalFiltered = customerTotal ?? rows.length;
+    totalFiltered = (unfilteredList ? totalAll : customerTotal) ?? rows.length;
   }
   const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
   const rangeStart = totalFiltered === 0 ? 0 : offset + 1;

@@ -13,7 +13,38 @@ export type RateLimitOptions = {
    * uçlar geriye uyumluluk için varsayılan `allow` davranışını koruyabilir.
    */
   failurePolicy?: RateLimitFailurePolicy;
+  /**
+   * YALNIZ okuma ağırlıklı, imzalı/düşük riskli uçlar için (ör. medya teslimi).
+   * Anahtar başına, isolate-yerel pencerede ilk N çağrı DB'ye inmeden geçer;
+   * sonrası normal DB sayımına düşer. Üst sınır: isolate sayısı × N aşım payı —
+   * bu yüzden N, `limit`in en fazla ~%25'i seçilmeli. Login/OTP/ödeme/yazma
+   * yollarında KULLANILMAZ (varsayılan 0 = her çağrı DB'de sayılır).
+   */
+  localAllowance?: number;
 };
+
+type LocalBucket = { count: number; resetAt: number };
+const localBuckets = new Map<string, LocalBucket>();
+const LOCAL_BUCKET_MAX = 5_000;
+
+/** İsolate-yerel pencerede muafiyet hakkı varsa tüketir ve true döner. */
+function consumeLocalAllowance(key: string, opts: RateLimitOptions): boolean {
+  const allowance = Math.min(opts.localAllowance ?? 0, Math.floor(opts.limit / 4));
+  if (allowance <= 0) return false;
+  const nowMs = Date.now();
+  if (localBuckets.size > LOCAL_BUCKET_MAX) {
+    for (const [k, b] of localBuckets) if (b.resetAt <= nowMs) localBuckets.delete(k);
+    if (localBuckets.size > LOCAL_BUCKET_MAX) localBuckets.clear();
+  }
+  const bucket = localBuckets.get(key);
+  if (!bucket || bucket.resetAt <= nowMs) {
+    localBuckets.set(key, { count: 1, resetAt: nowMs + opts.windowSec * 1000 });
+    return true;
+  }
+  if (bucket.count >= allowance) return false;
+  bucket.count += 1;
+  return true;
+}
 
 export type RateLimitResult = {
   allowed: boolean;
@@ -51,6 +82,7 @@ export async function checkRateLimit(
   key: string,
   opts: RateLimitOptions,
 ): Promise<RateLimitResult> {
+  if (opts.localAllowance && consumeLocalAllowance(key, opts)) return { allowed: true };
   try {
     const admin = createAdminClient();
     const { data, error } = await admin.rpc("check_rate_limit", {
