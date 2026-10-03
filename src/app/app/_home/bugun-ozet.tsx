@@ -121,6 +121,12 @@ export async function BugunOzet({ ctx }: { ctx: HomeCtx }) {
           <Suspense fallback={null}>
             <BriefingAiLine items={items} />
           </Suspense>
+          <Link
+            href="/app/brifing"
+            className="focus-ring mt-auto inline-flex items-center gap-1 self-start rounded-[var(--radius-control)] pt-4 text-sm font-semibold text-[var(--accent-text)]"
+          >
+            Günlük brifingin tamamı <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
         </>
       )}
     </section>

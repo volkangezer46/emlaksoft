@@ -144,7 +144,7 @@ export const loadTaskSummary = cache(async (ctx: HomeCtx) => {
     // Bugünün gerçek görevleri (gecikmiş dahil) — hover'da tek tıkla tamamlanır
     supabase.from("tasks").select("id, title, due_at, priority")
       .eq("status", "open").lt("due_at", ctx.dayEndIso)
-      .order("due_at", { ascending: true }).limit(3),
+      .order("due_at", { ascending: true }).limit(5),
   ]);
   assertQueryBatchSucceeded(results, ["tasks-due-today", "tasks-overdue", "open-tasks"], "Ana panel");
   const [due, overdue, open] = results;
@@ -383,6 +383,25 @@ export const loadRentalsAndProjects = cache(async (ctx: HomeCtx) => {
       units: { status: string }[] | null;
     }[],
   };
+});
+
+/**
+ * Müşteri kaynağı dağılımı: yalnız `source` kolonu. Satır sınırına çarparsa `null`
+ * döner (kırpık dağılım çizilmez — uydurma yüzde yok).
+ */
+const SOURCE_ROW_LIMIT = 2000;
+export const loadCustomerSources = cache(async () => {
+  const supabase = await createClient();
+  const result = await supabase.from("customers").select("source").is("deleted_at", null).limit(SOURCE_ROW_LIMIT);
+  assertQueryBatchSucceeded([result], ["customer-sources"], "Ana panel");
+  const rows = (result.data ?? []) as { source: string | null }[];
+  if (rows.length >= SOURCE_ROW_LIMIT) return null;
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    const key = r.source?.trim() || "";
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return { total: rows.length, counts: Object.fromEntries(counts) as Record<string, number> };
 });
 
 /* ------------------------------ Liste/akış bölümleri ------------------------- */

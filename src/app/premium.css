@@ -351,3 +351,12 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
 @media (prefers-reduced-motion: no-preference) {
   .tfs-panel:not([hidden]) { animation: tfs-in 150ms ease-out; }
 }
+
+/* ---- Hero KPI: dar ekranda 2x2 kompakt cam kutular (dikey yığın yerine) ---------- */
+@media (max-width: 639px) {
+  .pm-hero-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; margin-top: 1.1rem; }
+  .pm-glass { flex-direction: column; gap: 0.5rem; min-height: 0; padding: 0.8rem 0.85rem; }
+  .pm-glass-bars { top: 0.7rem; right: 0.75rem; }
+  .pm-glass[data-series="1"] .pm-glass-label { padding-right: 0; }
+  .pm-glass-value { font-size: 1.35rem; }
+}

@@ -23,7 +23,8 @@ import { DonemTrend } from "./_home/donem-trend";
 import { Huni } from "./_home/huni";
 import { PortalSagligi, Ekip } from "./_home/portal-ekip";
 import { CanliAkis } from "./_home/canli-akis";
-import { HizliAksiyonlar, SonMusteriler } from "./_home/musteriler-hizli";
+import { HizliAksiyonlar } from "./_home/musteriler-hizli";
+import { KaynakDagilimi } from "./_home/kaynak-dagilimi";
 
 /**
  * "Bugün" ana ekranı. Sayfa yalnız iskelet + yetki + bağlamı kurar; her bölüm
@@ -181,7 +182,7 @@ export default async function AppHomePage({
           </div>
           <div className="md:col-span-6 xl:col-span-4">
             <Suspense fallback={<PanelIskelet />}>
-              <SonMusteriler />
+              <KaynakDagilimi />
             </Suspense>
           </div>
           {!tvMode && (
