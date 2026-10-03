@@ -1,0 +1,47 @@
+import { Check, X } from "lucide-react";
+import { Em, SectionHeading } from "./section-heading";
+
+/**
+ * Dürüst karşılaştırma: rakip adı veya rakip iddiası YOK; yalnızca "Excel + WhatsApp + defter" gibi genel eski yöntemle kıyas.
+ * Sağ sütun yalnız ürünün bugün yaptığı şeyleri söyler (plans.ts ile uyumlu paket notları).
+ */
+const ROWS = [
+  { topic: "Müşteri ve talep", old: "Dosyalara ve sohbetlere dağılmış kayıtlar; talep unutulabilir.", now: "Tek müşteri kartı; talep ve portföy eşleşmesi aynı akışta." },
+  { topic: "Takip ve hatırlatma", old: "Hatırlatma sizin hafızanızda ve not defterinizde.", now: "Görev ve randevu hatırlatmaları otomatik görevlerle gelir." },
+  { topic: "Kaçan fırsat", old: "Bir ilanın neden kaybedildiği çoğu zaman bilinmez.", now: "Zorunlu kapanış formu ve kaçak karnesi (Profesyonel)." },
+  { topic: "Komisyon", old: "Elle hesap; bölüşümde ve hakedişte tartışma çıkar.", now: "Bölüşüm, hakediş ve onay durumu kayıt altında." },
+  { topic: "Ekip erişimi", old: "Dosyaya ulaşan herkes her şeyi görür.", now: "Rol ve izin matrisi; ofis verisi ayrı tutulur." },
+  { topic: "Sözleşme ve imza", old: "Kâğıt, fotoğraf ve mesajlaşma ile onay.", now: "SMS onaylı dijital imza akışı (Ofis ve üstü)." },
+];
+
+export function Why() {
+  return (
+    <section id="neden" className="mk-section mk-alt" aria-labelledby="neden-baslik">
+      <div className="mk-wrap">
+        <SectionHeading center eyebrow="Neden EmlakSoft" title={<span id="neden-baslik">Excel, WhatsApp ve defterle <Em>karşılaştırın.</Em></span>} text="Bugün işi nasıl yürütüyorsanız, aynı işin ürün içindeki karşılığı." />
+        <div className="mk-cmp-wrap mk-reveal">
+          <table className="mk-cmp">
+            <caption className="sr-only">Genel eski yöntemler ile EmlakSoft karşılaştırması</caption>
+            <thead>
+              <tr>
+                <th scope="col">Konu</th>
+                <th scope="col"><span className="mk-cmp-old"><X size={16} aria-hidden="true" />Excel + WhatsApp + defter</span></th>
+                <th scope="col"><span className="mk-cmp-new"><Check size={16} aria-hidden="true" />EmlakSoft</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {ROWS.map((r) => (
+                <tr key={r.topic}>
+                  <th scope="row">{r.topic}</th>
+                  <td data-label="Excel + WhatsApp + defter">{r.old}</td>
+                  <td data-label="EmlakSoft">{r.now}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mk-fine">Karşılaştırma genel çalışma alışkanlıklarını anlatır; belirli bir ürün veya firma ile kıyas değildir.</p>
+      </div>
+    </section>
+  );
+}

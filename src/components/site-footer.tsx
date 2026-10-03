@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, FileSignature, Scale, ShieldCheck } from "lucide-react";
 import { PLANS } from "@/lib/billing/plans";
 import { trParts } from "@/lib/clock";
 
@@ -12,7 +12,9 @@ const columns: { title: string; links: FooterLink[] }[] = [
       ["Özellikler", "/#ozellikler"],
       ["Ürün turu", "/#tur"],
       ["Kayıp-kaçak motoru", "/#kayip-kacak"],
-      ["Akıllı arama", "/#akilli-arama"],
+      ["Emsal bazlı değerleme", "/#degerleme"],
+      ["Portal kontrolü", "/#portal-kontrol"],
+      ["Dijital imza", "/#imza"],
       ["Güvenlik ve KVKK", "/#guvenlik"],
     ],
   },
@@ -23,6 +25,7 @@ const columns: { title: string; links: FooterLink[] }[] = [
   {
     title: "Kaynaklar",
     links: [
+      ["Neden EmlakSoft", "/#neden"],
       ["Nasıl çalışır", "/#nasil"],
       ["Sık sorulan sorular", "/#sss"],
       ["Giriş yap", "/giris"],
@@ -61,6 +64,11 @@ export function SiteFooter() {
             <p style={{ margin: "1rem 0 0", maxWidth: "18rem", fontSize: "0.9375rem", lineHeight: 1.6 }}>
               Emlak ofisleri için müşteri, portföy, anlaşma ve komisyon akışını tek panelde toplayan abonelikli yazılım.
             </p>
+            <ul className="mk-foot-badges" aria-label="Güven başlıkları">
+              <li><ShieldCheck size={15} aria-hidden="true" />Frankfurt veri bölgesi</li>
+              <li><Scale size={15} aria-hidden="true" />KVKK süreç araçları</li>
+              <li><FileSignature size={15} aria-hidden="true" />SMS onaylı imza</li>
+            </ul>
             <Link href="/kayit" className="mk-btn mk-btn-light" style={{ marginTop: "1.25rem", minHeight: "2.75rem", padding: "0.5rem 1rem", fontSize: "0.9375rem" }}>
               14 gün ücretsiz dene <ArrowRight size={16} aria-hidden="true" />
             </Link>
@@ -78,11 +86,11 @@ export function SiteFooter() {
         </div>
         <div className="mk-foot-bottom">
           <p style={{ margin: 0 }}>© {trParts().year} EmlakSoft. Tüm hakları saklıdır.</p>
-          <p style={{ margin: 0 }}>Ekran görüntüleri ve sayılar örnek veridir.</p>
+          <p style={{ margin: 0 }}>Ekran görüntüleri ve sayılar örnek veridir. Anılan portal adları yalnız takip içindir; resmi ortaklık iddiası yoktur.</p>
         </div>
       </div>
       <div className="mk-sticky-cta">
-        <Link href="/kayit" className="mk-btn mk-btn-primary">14 gün ücretsiz dene</Link>
+        <Link href="/kayit" className="mk-btn mk-btn-grad">14 gün ücretsiz dene</Link>
       </div>
     </footer>
   );
