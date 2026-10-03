@@ -28,5 +28,6 @@ export async function resolveErrorLog(id: string): Promise<ErrorLogResult> {
   if (error) return { error: "İşaretlenemedi." };
 
   revalidatePath("/admin/hatalar");
+  revalidatePath("/admin/sistem");
   return { ok: true };
 }

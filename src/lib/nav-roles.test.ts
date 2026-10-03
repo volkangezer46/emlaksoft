@@ -53,12 +53,12 @@ describe("sade görünüm: rol çekirdek eşlemesi", () => {
     }
   });
 
-  it("ofis sahibi çekirdeği 12 sayfa, muhasebe/sekreter kendi çekirdeğini görür", () => {
-    expect(coreHrefsFor("owner").size).toBe(12);
+  it("ofis sahibi çekirdeği 11 sayfa, muhasebe/sekreter kendi çekirdeğini görür", () => {
+    expect(coreHrefsFor("owner").size).toBe(11);
     const acc = hrefs(visibleSections(accessibleOf("accounting"), { mode: "simple", role: "accounting" }));
     expect(acc).toEqual(expect.arrayContaining(["/app/komisyon", "/app/abonelik", "/app/raporlar"]));
     const cc = hrefs(visibleSections(accessibleOf("call_center"), { mode: "simple", role: "call_center" }));
-    expect(cc).toEqual(expect.arrayContaining(["/app/arama", "/app/musteriler", "/app/randevular", "/app/gorevler"]));
+    expect(cc).toEqual(expect.arrayContaining(["/app/gelen-kutusu", "/app/musteriler", "/app/randevular", "/app/gorevler"]));
   });
 
   // Çekirdek listede olup rolün VARSAYILAN matrisinde modülü bulunmayan öğeler (ofis tenant override'ı

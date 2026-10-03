@@ -10,13 +10,12 @@ import type { AppRole } from "@/lib/permissions";
 
 const HOME = "/app";
 
-/** Ofis sahibi / genel müdür / şube müdürü: 12 çekirdek sayfa. */
+/** Ofis sahibi / genel müdür / şube müdürü: 11 çekirdek sayfa (Eşleşme, Talepler sekmesidir). */
 const MANAGER_CORE = [
   HOME,
   "/app/musteriler",
   "/app/talepler",
   "/app/portfoyler",
-  "/app/eslestirme",
   "/app/randevular",
   "/app/gorevler",
   "/app/anlasmalar",
@@ -32,7 +31,6 @@ const ADVISOR_CORE = [
   "/app/musteriler",
   "/app/talepler",
   "/app/portfoyler",
-  "/app/eslestirme",
   "/app/randevular",
   "/app/gorevler",
   "/app/anlasmalar",
@@ -49,7 +47,7 @@ export const NAV_CORE_BY_ROLE: Readonly<Record<AppRole, readonly string[]>> = {
   team_lead: [...ADVISOR_CORE, "/app/ekip"],
   advisor: ADVISOR_CORE,
   accounting: [HOME, "/app/giderler", "/app/aidat", "/app/komisyon", "/app/abonelik", "/app/raporlar"],
-  call_center: [HOME, "/app/arama", "/app/musteriler", "/app/randevular", "/app/gorevler"],
+  call_center: [HOME, "/app/gelen-kutusu", "/app/musteriler", "/app/randevular", "/app/gorevler"],
   readonly: [HOME, "/app/musteriler", "/app/talepler", "/app/portfoyler", "/app/randevular", "/app/raporlar"],
 };
 
@@ -63,7 +61,6 @@ export const MANAGEMENT_ROLES: readonly string[] = ["owner", "gm", "branch_manag
  */
 export const MANAGEMENT_ONLY_HREFS: readonly string[] = [
   "/app/otomasyonlar",
-  "/app/ayarlar/is-akislari",
   "/app/uyum",
   "/app/belgeler",
   "/app/denetim",

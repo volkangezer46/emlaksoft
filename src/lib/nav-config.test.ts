@@ -56,7 +56,8 @@ describe("menü yapısı", () => {
 
   it("tüm modüller en az bir başlıkta erişilebilir", () => {
     const used = new Set(NAV_SECTIONS.flatMap((s) => s.items.flatMap((i) => [i.module, ...(i.tabs?.map((t) => t.module) ?? [])])));
-    const missing = ALL_MODULES.filter((m) => !used.has(m) && m !== "dashboard");
+    // `matching`: Talepler sayfasının "Eşleşme" sekmesi (sayfa içi sekme, ?sekme=eslesme); kendi izniyle gizlenir.
+    const missing = ALL_MODULES.filter((m) => !used.has(m) && m !== "dashboard" && m !== "matching");
     expect(missing).toEqual([]);
   });
 
@@ -102,6 +103,18 @@ describe("sekmeli menü öğeleri", () => {
     expect(tabsOf(["rentals"], "/app/kiralama")).toEqual(["/app/kiralama"]);
     expect(tabsOf(["rentals", "valuation"], "/app/kiralama")).toEqual(["/app/kiralama", "/app/kira-artis"]);
     expect(tabsOf(["valuation"], "/app/kira-artis")).toEqual(["/app/kira-artis"]);
+  });
+
+  it("Raporlar ve Otomasyon tek öğe, yolları sabit sekmedir; arama/eşleştirme eski yol olarak durur", () => {
+    expect(tabsOf(ALL_MODULES, "/app/raporlar")).toEqual([
+      "/app/raporlar", "/app/bolge-analizi", "/app/raporlar/talep-arz", "/app/raporlar/memnuniyet", "/app/franchise",
+    ]);
+    expect(tabsOf(ALL_MODULES, "/app/otomasyonlar")).toEqual(["/app/otomasyonlar", "/app/ayarlar/is-akislari"]);
+    const menu = NAV_SECTIONS.flatMap((s) => s.items.map((i) => i.href));
+    for (const gone of ["/app/arama", "/app/eslestirme", "/app/bolge-analizi", "/app/ayarlar/is-akislari"]) {
+      expect(menu, gone).not.toContain(gone);
+      expect(ALL_NAV_HREFS, gone).toContain(gone);
+    }
   });
 
   it("sekme yolu sahibi menü öğesini etkin yapar", () => {

@@ -27,6 +27,8 @@ import {
   HandCoins,
   Scale,
   ArrowLeftRight,
+  ArrowUpDown,
+  Smile,
   Award,
   BadgeCheck,
   Banknote,
@@ -242,6 +244,9 @@ export const ICONS = {
   hesaplayici: Calculator,
   yabanciSatis: Globe,
   isAkisi: Workflow,
+  /** Raporlar sekmeleri: talep-arz dengesi, memnuniyet anketi. */
+  talepArz: ArrowUpDown,
+  memnuniyet: Smile,
 
   // --- Menü başlıkları (sayfa ikonlarından AYRI: başlık = kategori metaforu) -
   baslikBugun: Sun,

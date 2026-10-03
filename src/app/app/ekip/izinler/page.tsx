@@ -220,7 +220,7 @@ export default async function LeavesPage({
   return (
     <div className="space-y-6">
       {/* premium header */}
-      <PageHeader title="İzin takvimi" eyebrow="Ekip müsaitliği" description="Kim bugün sahada, kim izinde? Onaylanan izinlerde danışmanın online randevu linki o günler için otomatik kapanır — müşteri izinli güne randevu alamaz." actions={
+      <PageHeader title="Tatil ve izin takvimi" eyebrow="Ekip müsaitliği" description="Kim bugün sahada, kim izinde? Onaylanan izinlerde danışmanın online randevu linki o günler için otomatik kapanır — müşteri izinli güne randevu alamaz." actions={
 <div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex flex-wrap items-center gap-2">
               <Link
                 href="/app/ekip"

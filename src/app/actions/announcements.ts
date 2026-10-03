@@ -40,6 +40,7 @@ function parseAnnouncementForm(fd: FormData):
 
 function revalidateAnnouncements() {
   revalidatePath("/app/ayarlar/duyurular");
+  revalidatePath("/app/bildirimler");
   revalidatePath("/app");
 }
 
