@@ -309,7 +309,7 @@ export default async function KampanyalarPage({
 
       {/* Liste */}
       {campaigns.length === 0 ? (
-        <EmptyState
+        <EmptyState illustration="bildirim"
           icon={MessageSquare}
           title="Henüz kampanya yok"
           description="İlk kampanyanızı oluşturun. Müşteri listenizdeki herkese SMS veya WhatsApp gönderin."
@@ -317,7 +317,7 @@ export default async function KampanyalarPage({
           action={canCreate ? { label: "Yeni kampanya", href: "/app/kampanyalar/yeni" } : undefined}
         />
       ) : filtered.length === 0 ? (
-        <EmptyState
+        <EmptyState illustration="bildirim"
           icon={MessageSquare}
           title="Bu filtreyle eşleşen kampanya yok"
           description="Filtre seçimini değiştirin veya temizleyin."

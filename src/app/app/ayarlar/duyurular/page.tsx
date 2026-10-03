@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Users2 } from "lucide-react";
+import { ArrowLeft, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { isPast } from "@/lib/clock";
@@ -65,7 +65,7 @@ export default async function AnnouncementsSettingsPage() {
 
       <PageHeader title="Ofis içi duyurular" eyebrow="Duyuru panosu" description="Ekibinize toplantı, komisyon oranı veya kampanya duyurusu yayınlayın. Duyurular herkesin dashboard'unda görünür; kim okudu buradan takip edilir." actions={
 <div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-5 py-3">
-            <Users2 className="h-5 w-5 text-mint-300" />
+            <Users className="h-5 w-5 text-mint-300" />
             <div>
               <p className="font-display text-xl font-extrabold text-mint-300">{activeCount}</p>
               <p className="text-xs text-white/55">yayında duyuru</p>

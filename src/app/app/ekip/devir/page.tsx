@@ -88,7 +88,7 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
       ) : members.length === 0 ? (
         <EmptyState
           icon={UsersRound}
-          illustration="start"
+          illustration="ekip"
           title="Devredilecek ekip yok"
           description="Ofise danışman eklendiğinde iş yükü devri burada yapılır."
           action={{ href: "/app/ekip", label: "Ekibe danışman ekle" }}

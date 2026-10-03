@@ -401,7 +401,7 @@ export default async function LeavesPage({
 
           {listLeaves.length === 0 ? (
             <div className="p-4">
-              <EmptyState
+              <EmptyState illustration="ekip"
                 icon={PalmtreeIcon}
                 tone="mint"
                 title={gecmis ? "Geçmiş izin kaydı yok" : "Yaklaşan izin yok"}

@@ -207,7 +207,7 @@ export default async function ProjelerPage({
       ) : null}
 
       {filtered.length === 0 ? (
-        <EmptyState
+        <EmptyState illustration="portfoy"
           icon={Layers}
           title={projects.length === 0 ? "Henüz proje yok" : "Filtreye uyan proje yok"}
           description={

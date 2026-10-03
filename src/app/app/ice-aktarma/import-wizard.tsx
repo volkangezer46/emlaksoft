@@ -774,7 +774,7 @@ export function ImportWizard({
       {step === 4 && (
         <section className="dashboard-panel space-y-5 rounded-[var(--radius-panel)] border border-line bg-surface p-6">
           {!planned.length ? (
-            <EmptyState
+            <EmptyState illustration="belge"
               icon={XCircle}
               tone="danger"
               title="İçe aktarma başarısız"

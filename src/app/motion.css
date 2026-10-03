@@ -1,0 +1,99 @@
+/* ============================================================================
+   EmlakSoft — HAREKET SİSTEMİ (tek dosya). Kılavuz: docs/DESIGN_SYSTEM.md
+   "Hareket ve illüstrasyon".
+   Bütçe: yalnız transform / opacity (+ SVG stroke-dashoffset); CLS yok; ipucu
+   kullanılmaz. Her hareket `prefers-reduced-motion: no-preference` içindedir —
+   reduce'ta içerik doğrudan bitiş durumunda durağan görünür.
+   ========================================================================== */
+
+:root {
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 360ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-stagger: 40ms;
+}
+
+/* ---- Kart hover yükselme + düğme basma ---- */
+.hover-lift {
+  transition: transform var(--motion-base) var(--ease-out), box-shadow var(--motion-base) var(--ease-out);
+}
+.btn-press { transition: transform var(--motion-fast) var(--ease-out); }
+.btn-press:active { transform: scale(0.97); }
+
+@media (prefers-reduced-motion: no-preference) {
+  @media (hover: hover) {
+    .hover-lift:hover { transform: translateY(-2px); }
+  }
+
+  /* ---- Liste giriş: 40 ms aralık, en çok 12 öğe (sonrası anında) ---- */
+  @keyframes list-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+  }
+  .list-stagger > * { animation: list-in var(--motion-slow) var(--ease-out) both; }
+  .list-stagger > :nth-child(n + 13) { animation: none; }
+  .list-stagger > :nth-child(2) { animation-delay: calc(var(--motion-stagger) * 1); }
+  .list-stagger > :nth-child(3) { animation-delay: calc(var(--motion-stagger) * 2); }
+  .list-stagger > :nth-child(4) { animation-delay: calc(var(--motion-stagger) * 3); }
+  .list-stagger > :nth-child(5) { animation-delay: calc(var(--motion-stagger) * 4); }
+  .list-stagger > :nth-child(6) { animation-delay: calc(var(--motion-stagger) * 5); }
+  .list-stagger > :nth-child(7) { animation-delay: calc(var(--motion-stagger) * 6); }
+  .list-stagger > :nth-child(8) { animation-delay: calc(var(--motion-stagger) * 7); }
+  .list-stagger > :nth-child(9) { animation-delay: calc(var(--motion-stagger) * 8); }
+  .list-stagger > :nth-child(10) { animation-delay: calc(var(--motion-stagger) * 9); }
+  .list-stagger > :nth-child(11) { animation-delay: calc(var(--motion-stagger) * 10); }
+  .list-stagger > :nth-child(12) { animation-delay: calc(var(--motion-stagger) * 11); }
+
+  /* ---- İlerleme çubuğu dolumu (genişlik zaten doğru; yalnız ilk çizim) ---- */
+  @keyframes progress-fill { from { transform: scaleX(0); } to { transform: none; } }
+  .motion-progress-fill { transform-origin: left center; animation: progress-fill var(--motion-slow) var(--ease-out) both; }
+
+  /* ---- Başarı tiki ---- */
+  @keyframes tick-draw { from { stroke-dashoffset: 40; } to { stroke-dashoffset: 0; } }
+  .tick-draw { stroke-dasharray: 40; animation: tick-draw var(--motion-slow) var(--ease-out) 80ms both; }
+
+  /* ---- Sayfa geçişi: view transitions yoksa hafif fade (VT'de globals.css devralır) ---- */
+  @keyframes motion-fade { from { opacity: 0; } to { opacity: 1; } }
+  @supports not (view-transition-name: root) {
+    .motion-page { animation: motion-fade var(--motion-base) var(--ease-out) both; }
+  }
+
+  /* ---- İllüstrasyonlar ---- */
+  @keyframes ill-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  @keyframes ill-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @keyframes ill-swing { 0%, 70%, 100% { transform: rotate(0); } 78% { transform: rotate(8deg); } 86% { transform: rotate(-7deg); } 94% { transform: rotate(3deg); } }
+  @keyframes ill-draw { from { stroke-dashoffset: 200; } to { stroke-dashoffset: 0; } }
+  @keyframes ill-pop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: none; } }
+  .ill-float, .ill-swing, .ill-pop { transform-box: fill-box; transform-origin: center; }
+  .ill-swing { transform-origin: 50% 10%; }
+  .ill-float { animation: ill-float 4s ease-in-out infinite; }
+  .ill-pulse { animation: ill-pulse 2.4s ease-in-out infinite; }
+  .ill-swing { animation: ill-swing 3.6s ease-in-out infinite; }
+  .ill-pop { animation: ill-pop var(--motion-slow) var(--ease-out) both; }
+  .ill-draw { stroke-dasharray: 200; animation: ill-draw 900ms var(--ease-out) 150ms both; }
+  .ill-draw.ill-d2 { animation-delay: 450ms; }
+  .ill-check { animation-duration: 600ms; animation-delay: 250ms; }
+
+  /* ---- Kutlama konfetisi: CSS, 1.2 sn, bir kez ---- */
+  @keyframes confetti-burst {
+    0% { opacity: 1; transform: translate(0, 0) rotate(0) scale(0.6); }
+    100% { opacity: 0; transform: translate(var(--tx), var(--ty)) rotate(var(--rot)) scale(1); }
+  }
+  .confetti { position: absolute; left: 50%; top: 40%; width: 0; height: 0; pointer-events: none; }
+  .confetti > i {
+    --a: calc(var(--i) * 25.7deg);
+    --tx: calc(cos(var(--a)) * 96px);
+    --ty: calc(sin(var(--a)) * 72px + 24px);
+    --rot: calc(var(--i) * 70deg);
+    position: absolute; width: 7px; height: 11px; border-radius: 2px;
+    background: var(--brand-600);
+    animation: confetti-burst 1.2s var(--ease-out) 1 both;
+  }
+  .confetti > i:nth-child(3n + 1) { background: var(--mint-500); }
+  .confetti > i:nth-child(3n + 2) { background: var(--amber-400); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confetti { display: none; }
+}

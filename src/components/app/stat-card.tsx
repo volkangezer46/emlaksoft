@@ -3,6 +3,7 @@ import { ArrowRight, ArrowUpRight, TrendingDown, TrendingUp } from "lucide-react
 import type { LucideIcon } from "lucide-react";
 import { sparklineGeometry } from "@/lib/sparkline";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CountUp } from "@/components/ui/count-up";
 
 /**
  * StatCard — dashboard KPI kartı.
@@ -192,7 +193,7 @@ export function StatCard({
         </span>
       </div>
       <p className="mt-4 text-sm text-text-muted">{label}</p>
-      <p className="numeric mt-1 font-display text-2xl font-extrabold text-ink-950">{value}</p>
+      <p className="numeric mt-1 font-display text-2xl font-extrabold text-ink-950"><CountUp value={value} /></p>
       {normalized?.label ? (
         <p className="mt-1 text-xs text-text-faint">{normalized.label}</p>
       ) : null}

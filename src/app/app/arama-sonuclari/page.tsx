@@ -174,7 +174,7 @@ export default async function AramaSonuclariPage({
 
       {sections.length === 0 ? (
         <div className="space-y-4">
-          <EmptyState
+          <EmptyState illustration="aramaYok"
             icon={Search}
             title={q.length >= 2 ? (tur ? "Bu türde sonuç yok" : "Sonuç bulunamadı") : "Aramaya başlayın"}
             description={

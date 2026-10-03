@@ -124,7 +124,7 @@ export default async function LigPage({
   // ofis içi bir yarış, kiracısız bağlamda anlamı yok.
   if (!tenantId) {
     return (
-      <EmptyState
+      <EmptyState illustration="ekip"
         icon={Trophy}
         title="Lig tablosu ofis bağlamı ister"
         description="Platform hesabıyla giriş yaptınız. Bir ofisin lig tablosunu görmek için o ofise geçiş yapın."
@@ -406,7 +406,7 @@ export default async function LigPage({
 
       {!hasActivity ? (
         <>
-          <EmptyState
+          <EmptyState illustration="ekip"
             icon={Trophy}
             title="Bu dönemde henüz aktivite yok"
             description={`${range.label} döneminde puan üreten bir kayıt bulunamadı. Aşağıdaki kalemlerden herhangi biri puan getirir.`}

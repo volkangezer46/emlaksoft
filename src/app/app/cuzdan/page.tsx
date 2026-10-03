@@ -330,7 +330,7 @@ export default async function CuzdanPage() {
 
       {mine.length === 0 ? (
         <div className="no-print">
-          <EmptyState
+          <EmptyState illustration="komisyon"
             icon={HandCoins}
             title="Cüzdanın henüz boş"
             description="İlk anlaşman kapanınca hakedişin burada birikecek."

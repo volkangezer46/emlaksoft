@@ -847,7 +847,7 @@ export default async function CustomersPage({
       {(totalAll ?? 0) === 0 ? (
         <EmptyState
           icon={ICONS.musteri}
-          illustration="start"
+          illustration="musteri"
           title="Henüz müşteri yok"
           description="İlk müşterinizi ekleyin. Arayan, mülk sahibi ve yatırımcıları tek yerde toplayın; hiçbir talebi kaçırmayın."
           action={

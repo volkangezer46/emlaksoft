@@ -179,7 +179,7 @@ export function DuesClient({
       ) : null}
 
       {dues.length === 0 ? (
-        <EmptyState
+        <EmptyState illustration="komisyon"
           icon={Coins}
           title="Henüz aidat kaydı yok"
           description="Portföy bazlı aidat ve ortak gider kayıtlarınız burada listelenecek. Yukarıdan ilk kaydı ekleyin."

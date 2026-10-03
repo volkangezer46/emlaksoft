@@ -662,7 +662,7 @@ export default async function PropertiesPage({
       {total === 0 ? (
         <EmptyState
           icon={ICONS.portfoy}
-          illustration="start"
+          illustration="portfoy"
           title="Portföy merkezinizi kurun"
           description="İlk portföyünüzü ekleyin; fiyat sağlığı, portal teyidi ve yetki süresi otomatik izlenmeye başlasın."
           action={

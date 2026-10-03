@@ -247,7 +247,7 @@ export default async function KayipSatisPage() {
       ) : null}
 
       {risks.length === 0 ? (
-        <EmptyState
+        <EmptyState illustration="rapor"
           icon={Zap}
           tone="mint"
           title="Mükemmel! Risk yok"
@@ -301,7 +301,7 @@ export default async function KayipSatisPage() {
         </div>
 
         {lost.length === 0 ? (
-          <EmptyState
+          <EmptyState illustration="rapor"
             icon={Compass}
             tone="brand"
             title="Henüz kaybedilen anlaşma kaydı yok"

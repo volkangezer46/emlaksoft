@@ -271,7 +271,7 @@ export default async function KiralamaPage({
       />
 
       {rentals.length === 0 && rentalTotal === 0 ? (
-        <EmptyState
+        <EmptyState illustration="portfoy"
           icon={KeyRound}
           title="Henüz kira kaydı yok"
           description="Portföyünüzdeki kiralık mülkleri kiracısıyla eşleştirip aylık tahakkukları buradan takip edin."

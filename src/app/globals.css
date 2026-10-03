@@ -3,6 +3,7 @@
 @import "./theme-dark.css";
 @import "./themes.css";
 @import "./premium.css";
+@import "./motion.css";
 
 @keyframes float {
   0%, 100% { transform: translateY(0); }

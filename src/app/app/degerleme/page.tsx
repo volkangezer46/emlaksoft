@@ -402,7 +402,7 @@ export default async function ValuationPage({
 
         {yieldRows.length === 0 ? (
           <div className="mt-4">
-            <EmptyState
+            <EmptyState illustration="rapor"
               icon={PiggyBank}
               tone="mint"
               title="Getiri hesabı için veri eksik"
@@ -506,7 +506,7 @@ export default async function ValuationPage({
 
         {wonSamples.length === 0 ? (
           <div className="mt-4">
-            <EmptyState
+            <EmptyState illustration="rapor"
               icon={Hourglass}
               title="Henüz kapanmış anlaşma verisi yok"
               description="Anlaşmalar 'Kazanıldı' aşamasına taşındıkça satış süresi tahmini kendi verinizden burada oluşur."

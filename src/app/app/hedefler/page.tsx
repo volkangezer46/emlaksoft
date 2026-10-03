@@ -272,7 +272,7 @@ canCreate ? (
       ) : null}
 
       {targets.length === 0 ? (
-        <EmptyState
+        <EmptyState illustration="rapor"
           icon={TrendingUp}
           title="Henüz hedef tanımlanmamış"
           description="Danışman veya ofis geneli için aylık, çeyreklik ya da yıllık satış hedefi tanımlayın; ilerleme halkaları ve tempo takibi burada canlanır."

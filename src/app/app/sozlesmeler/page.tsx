@@ -267,7 +267,7 @@ export default async function SozlesmelerPage({
       />
 
       {totalAll === 0 ? (
-        <EmptyState
+        <EmptyState illustration="belge"
           icon={FileSignature}
           title="Henüz sözleşme yok"
           description="İlk sözleşme taslağınızı oluşturun, imzalayanları ekleyin ve dijital onay alın."

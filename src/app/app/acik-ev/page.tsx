@@ -231,7 +231,7 @@ export default async function AcikEvPage({
       ) : null}
 
       {filtered.length === 0 ? (
-        <EmptyState
+        <EmptyState illustration="portfoy"
           icon={DoorOpen}
           title={events.length === 0 ? "Henüz açık ev etkinliği yok" : "Filtreye uyan etkinlik yok"}
           description={

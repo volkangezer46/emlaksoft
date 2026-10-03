@@ -433,7 +433,7 @@ export default async function InboxPage({
 
       {/* Akış */}
       {pageItems.length === 0 ? (
-        <EmptyState
+        <EmptyState illustration="gelenKutusu"
           icon={Inbox}
           title={hasAnyFilter ? "Eşleşen kayıt bulunamadı" : "Gelen kutusu boş"}
           description={

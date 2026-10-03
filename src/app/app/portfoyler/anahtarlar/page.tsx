@@ -239,7 +239,7 @@ export default async function PropertyKeysBoardPage({
       </form>
 
       {baseTotal === 0 && !hasFilter ? (
-        <EmptyState
+        <EmptyState illustration="portfoy"
           icon={KeyRound}
           title="Henüz anahtar kaydı yok"
           description="Anahtarlar portföy detayındaki “Anahtar takibi” bölümünden eklenir. Ekledikçe kimde olduğu, iade vadesi ve gecikmeler burada toplanır."

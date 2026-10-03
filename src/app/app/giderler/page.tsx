@@ -375,7 +375,7 @@ export default async function GiderlerPage({
             </Link>
           </div>
         ) : (
-          <EmptyState
+          <EmptyState illustration="komisyon"
             icon={Receipt}
             title="Henüz gider kaydı yok"
             description="Ofis giderlerinizi kategorilere göre ekleyin. Kayıtlar burada listelenir."

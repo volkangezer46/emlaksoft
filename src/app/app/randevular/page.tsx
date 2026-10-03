@@ -827,7 +827,7 @@ export default async function AppointmentsPage({
         totalAppointments === 0 && !danismanF ? (
           <EmptyState
             icon={ICONS.randevu}
-            illustration="start"
+            illustration="randevu"
             title="Henüz randevu yok"
             description="İlk yer gösterme veya görüşmenizi planladığınızda tur planı burada oluşacak."
             tone="mint"
