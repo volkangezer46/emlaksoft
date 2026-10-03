@@ -1,6 +1,6 @@
 # EmlakSoft — Güncel Durum
 
-**Tarih:** 2026-10-02 · **Dal:** main (HEAD 25c83f1 + sonraki commitler). Yol haritası: `docs/ROADMAP.md`.
+**Tarih:** 2026-10-03 · **Dal:** main (HEAD 60446fe + sonraki commitler). Yol haritası: `docs/ROADMAP.md`.
 Bu sayılar bu tarihte dosya sisteminden/`package.json`'dan sayılmıştır; eskirler, gerektiğinde komutla yeniden sayın.
 
 ## Sürümler (package.json)
@@ -20,11 +20,11 @@ Bu sayılar bu tarihte dosya sisteminden/`package.json`'dan sayılmıştır; esk
 
 | Konu | Sayı | Nasıl sayıldı |
 |---|---|---|
-| Migration dosyası | 179 | `supabase/migrations/*.sql`; son: `20260813000300_expense_text_appointment_loose_definitions_system.sql` (repoda; canlı DB 178, 000300 bekliyor) |
+| Migration dosyası | 179 | `supabase/migrations/*.sql`; son: `20260813000300_expense_text_appointment_loose_definitions_system.sql` (canlı DB'de uygulandı, ledger 179/179) |
 | Canlıda uygulanmış migration | 176 (kullanıcı bildirimi — **doğrulanmadı**) | Kesin sonuç için `npm run check:migrations -- --database` |
 | `route.ts` dosyası | 51 | `src/app/**/route.ts` |
 | Cron route / `vercel.json` zamanlaması | 27 / 27 | `src/app/api/cron/*`, `vercel.json` |
-| `page.tsx` | 143 (hepsi `src/app` altında) | `src/app/**/page.tsx` |
+| `page.tsx` | 160 (hepsi `src/app` altında) | `src/app/**/page.tsx` |
 | Test dosyası | 154 | `*.test.ts(x)` (src, e2e, scripts) |
 | Test (case) sayısı | **doğrulanmadı** | `npm run test` çıktısından alınmalı |
 
@@ -51,5 +51,6 @@ Bu belge yazılırken `type-check`, `lint`, `test`, `build` çalıştırılmadı
 - Canlı ledger ile depo arasında 1 migration fark olabilir (177 dosya vs bildirilen 176) — doğrulanmalı.
 
 ## 2026-10-02/03 turu (yol haritası v2)
-Birleştirilen: tasarım disiplini (43 sayfada PageHeader, yasak sınıf temizliği, tek gölge ölçeği, AA kontrast), WhatsApp tek kaynak, app komut paleti (Git/Eylemler/Son görülenler), `talepler` ve `kayip-kacak` Suspense akışı, tanım listeleri tek kaynak (`src/lib/definition-defaults.ts`) + tanım ekranı (sıralama, renk, kullanım kontrolü, denetim), nightly CI, webhook davranış testleri, komisyon özellik testi, `/app/baslangic` menüde, komisyon simülatöründe tavan uyarısı.
-Bekleyen: migration `20260813000300` canlıya uygulanmadı (backup/PITR doğrulaması + onay); ham h1 kalan 13 sayfa; hız kazancı canlıda ölçülmedi; Preview ortamında Supabase env yok (preview build'leri hata veriyor, production etkilenmiyor). Ayrıntı: `docs/YOL_HARITASI_V2.md`.
+**Canlıda:** 16 oluşturma popup'ı tam sayfa forma (`…/yeni`, ortak `FormShell/FormField/useCreateForm`) + 7 ekleme akışı sayfa içi panele; 5 detay sayfası URL'e bağlı sekmeler (`?sekme=`); Faz 2 birleşmeleri (Hesaplayıcılar, Kiralama+Kira artışı, Komisyon+Cüzdan+Onaylar, Ekip performansı); premium DataTable (opt-in); tema sistemi (token katmanı, 5 vurgu × açık/koyu, Görünüm paneli); tanım listeleri tek kaynak (`definition-defaults.ts`) + tanım ekranı (sıralama, renk, kullanım kontrolü, denetim) ve migration 000300 (`definitions.is_system`); rapor önbelleği yazma action'larına bağlı (`revalidate.ts`); tam dışa aktarma (`/api/export/<varlık>`, akışlı CSV); ofis sahibi ilk-gün deneyimi (kurulum şeridi, 'Başlayalım' kartı, ilk anlaşma adımı); Türkiye saati yardımcıları (`clock.ts` TR) ve randevu yazma yolunda +03:00; istemci paketi ~%27 küçüldü (supabase-js ve komut paleti lazy); nightly CI, webhook davranış testleri; güvenlik: palet son görülenler ofis+kullanıcı kapsamlı.
+**Doğrulama (son tam tur):** tip temiz, 182 test dosyası / 1502 test, lint sıfır uyarı, check:links/cron/migrations, audit:actions/deps temiz, production build; canlıda Playwright denetimi (koyu hero kontrastı 15,76, #418 yok, TR gün tutarlı).
+**Açık:** randevu formundan girilmiş ESKİ kayıtlar UTC yorumlanmış olabilir (3 saat kayma; veri düzeltmesi onay bekliyor); 14 sayfada eski koyu hero bandı (ajan çalışıyor); anlaşma aşamaları/özel alan/etiket tasarımı; mevzuat parametreleri (süper admin + ofis override) tasarımı; yedek/restore provası ve Güven Merkezi; kalan e-imza hukuki metni (`on-bilgilendirme`); `/app/musteriler` ağ ön yüklemeleri normal Next davranışı. Ayrıntı: `docs/YOL_HARITASI_V2.md`.
