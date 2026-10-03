@@ -9,6 +9,7 @@ import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/tab
 import { EmptyState } from "@/components/app/empty-state";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
+import { OPEN_DEMAND_STATUSES, attentionReasons, untrackedCustomerIds } from "@/lib/team/advisor-360";
 import {
   SCORECARD_FILTERS,
   SCORECARD_SORTS,
@@ -29,6 +30,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 const SCORED_ROLES = Object.keys(ROLE_LABELS);
 const PROFILE_LIMIT = 200;
+const SCAN_LIMIT = 5000;
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -105,6 +107,57 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
     }
   }
 
+  // Aktif talep + öncül uyarılar: tek taramayla tüm danışmanlar (tavana dayanırsa gösterilmez, sahte sayı yok).
+  const [demandRes, taskRes] = await Promise.all([
+    supabase
+      .from("customer_demands")
+      .select("customer_id, customer:customers!customer_demands_customer_id_fkey!inner(assigned_to)")
+      .in("status", [...OPEN_DEMAND_STATUSES])
+      .not("customer.assigned_to", "is", null)
+      .limit(SCAN_LIMIT),
+    supabase
+      .from("tasks")
+      .select("assigned_to, customer_id, due_at")
+      .eq("status", "open")
+      .not("assigned_to", "is", null)
+      .limit(SCAN_LIMIT),
+  ]);
+  const demandRows = (demandRes.data ?? []) as unknown as {
+    customer_id: string | null;
+    customer: { assigned_to: string | null } | { assigned_to: string | null }[] | null;
+  }[];
+  const taskRows = (taskRes.data ?? []) as { assigned_to: string; customer_id: string | null; due_at: string | null }[];
+  const leadPartial = Boolean(
+    demandRes.error || taskRes.error || demandRows.length >= SCAN_LIMIT || taskRows.length >= SCAN_LIMIT,
+  );
+  const nowMs = now();
+  const demandsByAdvisor = new Map<string, (string | null)[]>();
+  for (const d of demandRows) {
+    const owner = (Array.isArray(d.customer) ? d.customer[0] : d.customer)?.assigned_to;
+    if (!owner) continue;
+    const list = demandsByAdvisor.get(owner) ?? [];
+    list.push(d.customer_id);
+    demandsByAdvisor.set(owner, list);
+  }
+  const tasksByAdvisor = new Map<string, { customer_id: string | null; due_at: string | null }[]>();
+  for (const t of taskRows) {
+    const list = tasksByAdvisor.get(t.assigned_to) ?? [];
+    list.push(t);
+    tasksByAdvisor.set(t.assigned_to, list);
+  }
+  const leadById = new Map<string, { activeDemands: number | null; overdue: number | null; untracked: number | null }>();
+  for (const p of profiles) {
+    const demands = demandsByAdvisor.get(p.id) ?? [];
+    const tasks = tasksByAdvisor.get(p.id) ?? [];
+    leadById.set(p.id, {
+      activeDemands: leadPartial ? null : demands.length,
+      overdue: leadPartial ? null : tasks.filter((t) => t.due_at && Date.parse(t.due_at) < nowMs).length,
+      untracked: leadPartial
+        ? null
+        : untrackedCustomerIds(demands, tasks.map((t) => t.customer_id)).length,
+    });
+  }
+
   const targetById = new Map<string, { deals: number; revenue: number }>();
   for (const t of (targetsRes.data ?? []) as { profile_id: string | null; target_deals: number; target_revenue: number }[]) {
     if (t.profile_id) targetById.set(t.profile_id, { deals: Number(t.target_deals) || 0, revenue: Number(t.target_revenue) || 0 });
@@ -148,6 +201,12 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
     portfoysuz: all.filter((r) => matchesScorecardFilter(r, "portfoysuz", elapsedPct)).length,
     hedefgeride: all.filter((r) => matchesScorecardFilter(r, "hedefgeride", elapsedPct)).length,
   };
+  const needAttention = all
+    .map((r) => {
+      const l = leadById.get(r.id);
+      return { r, reasons: attentionReasons({ overdueTasks: l?.overdue ?? null, untrackedDemands: l?.untracked ?? null }) };
+    })
+    .filter((x) => x.reasons.length > 0);
   const hasAnyActivity = all.some((r) => r.callCount + r.appointCount + r.offerCount + r.dealCount + r.activePropertyCount > 0);
 
   return (
@@ -204,6 +263,25 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
             }))}
           />
 
+          {needAttention.length > 0 ? (
+            <section aria-label="Takip uyarıları" className="rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/[0.05] p-4">
+              <h2 className="text-sm font-bold text-ink-950">Takip uyarısı: {needAttention.length} danışman ilgi bekliyor</h2>
+              <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                {needAttention.map(({ r, reasons }) => (
+                  <li key={r.id}>
+                    <Link
+                      href={`/app/ekip/${r.id}?sekme=oncul`}
+                      className="focus-ring flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm transition hover:border-brand-400"
+                    >
+                      <span className="font-semibold text-ink-950">{r.fullName}</span>
+                      <span className="text-xs text-danger-600">{reasons.join(" · ")}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
           <nav aria-label="Sıralama" className="flex flex-wrap items-center gap-2 text-xs">
             <span className="font-semibold text-text-muted">Sırala:</span>
             {SCORECARD_SORTS.filter((s) => s.value !== "kazanc" || seeAllEarnings).map((s) => (
@@ -244,7 +322,7 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
               action={{ href: href({ filtre: undefined }), label: "Filtreyi temizle" }}
             />
           ) : (
-            <TableFrame minWidth={880}>
+            <TableFrame minWidth={960}>
               <Table>
                 <THead>
                   <TR>
@@ -252,6 +330,7 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
                     <TH>Danışman</TH>
                     <TH align="right">Müşteri</TH>
                     <TH align="right">Yayında portföy</TH>
+                    <TH align="right">Aktif talep</TH>
                     <TH align="right">Randevu</TH>
                     <TH align="right">Teklif</TH>
                     <TH align="right">Anlaşma</TH>
@@ -286,17 +365,26 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
                         </Link>
                       </TD>
                       <TD align="right">
+                        {leadById.get(r.id)?.activeDemands == null ? (
+                          <span className="text-text-faint" title="Tarama sınırı aşıldı">—</span>
+                        ) : (
+                          <Link href={`/app/talepler?danisman=${r.id}`} className={LINK} aria-label={`${r.fullName} aktif talepleri`}>
+                            {leadById.get(r.id)?.activeDemands}
+                          </Link>
+                        )}
+                      </TD>
+                      <TD align="right">
                         <Link href={`/app/randevular?danisman=${r.id}`} className={LINK} aria-label={`${r.fullName} randevuları`}>
                           {r.appointCount}
                         </Link>
                       </TD>
                       <TD align="right">
-                        <Link href={`/app/ekip/${r.id}`} className={LINK} aria-label={`${r.fullName} ayrıntısı`}>
+                        <Link href={`/app/teklifler?danisman=${r.id}`} className={LINK} aria-label={`${r.fullName} teklifleri`}>
                           {r.offerCount}
                         </Link>
                       </TD>
                       <TD align="right" className="font-semibold text-ink-950">
-                        <Link href={`/app/ekip/${r.id}`} className={LINK} aria-label={`${r.fullName} ayrıntısı`}>
+                        <Link href={`/app/teklifler?danisman=${r.id}&durum=accepted`} className={LINK} aria-label={`${r.fullName} kabul edilen teklifleri`}>
                           {r.dealCount}
                         </Link>
                       </TD>
