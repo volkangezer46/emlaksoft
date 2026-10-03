@@ -21,7 +21,7 @@ export function SectionHeading({
   );
 }
 
-/** Başlıkta 1-2 kelimelik italik serif vurgu. */
+/** Başlıkta 1-3 kelimelik mavi→mor gradyan vurgu. */
 export function Em({ children }: { children: ReactNode }) {
-  return <em className="mk-serif">{children}</em>;
+  return <span className="mk-grad">{children}</span>;
 }
