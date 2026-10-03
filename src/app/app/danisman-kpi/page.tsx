@@ -9,16 +9,11 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { buildCoachActions, type CoachAction } from "@/lib/advisor-coach";
-import dynamic from "next/dynamic";
+import { RevenueChart } from "./revenue-chart-lazy";
 import { CoachPanel, type CoachActionWithLink } from "./coach-panel";
 import { PrintButton } from "./print-button";
 
-// Recharts ağır (~100 kB+ gzip) ve yalnız bu grafikte kullanılıyor — dynamic
-// import ile sayfanın ilk JS yükünden çıkarılır; ChartFrame yüksekliğini
-// dolduran iskelet gösterilir.
-const RevenueChart = dynamic(() => import("./revenue-chart").then((m) => m.RevenueChart), {
-  loading: () => <div className="h-full w-full animate-pulse rounded-[var(--radius-card)] bg-ink-950/8" />,
-});
+// Recharts (~400 KB) revenue-chart-lazy (istemci kapısı) ile ayrı parçaya taşınır.
 
 /**
  * Koç önerisini ilgili ekrana bağlar. `advisor-coach` paylaşılan bir lib

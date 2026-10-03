@@ -1,6 +1,5 @@
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
 import {
   DIRECT_FILE_UPLOAD_CONFIG,
   type DirectFileUploadTarget,
@@ -22,6 +21,8 @@ export async function uploadToDirectFileTarget(
     return { ok: false, error: "Dosya yükleme sınırını aşıyor." };
   }
 
+  // supabase-js (~240 KB) yalnız yükleme anında indirilir; sayfa açılışını şişirmez.
+  const { createClient } = await import("@/lib/supabase/client");
   const supabase = createClient();
   const { error } = await supabase.storage
     .from(target.bucket)
