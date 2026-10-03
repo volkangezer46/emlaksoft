@@ -9,7 +9,7 @@ import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { DashboardGrid, DashCell, DashboardStack, KpiGrid } from "@/components/ui/dashboard-grid";
 import { Skeleton } from "@/components/app/skeleton";
 import { loadShouldShowWelcome } from "@/lib/welcome-state";
-import { ProductTour } from "./product-tour";
+import { ProductTourLazy } from "./product-tour-lazy";
 import { DashboardWidgetProvider } from "./dashboard-widgets";
 import { buildHomeBounds, type HomeCtx } from "./_home/data";
 import { BlokIskelet, PanelIskelet } from "./_home/ortak";
@@ -237,7 +237,7 @@ export default async function AppHomePage({
     <DashboardWidgetProvider>
       <DashboardStack className={tvMode ? "tv-zoom" : undefined}>
         {/* İlk giriş ürün turu — TV modunda hiç mount edilmez (bileşen içinde de kontrol var) */}
-        {!tvMode && <ProductTour />}
+        {!tvMode && <ProductTourLazy />}
 
         {/* Rol bazlı ilk blok: yönetimde "Bugün karar bekleyenler", diğerlerinde "Sıradaki en iyi eylem". */}
         {!tvMode &&
