@@ -104,6 +104,8 @@ import {
   Trophy,
   UserRound,
   Users,
+  UserCog,
+  LockKeyhole,
   UsersRound,
   Wallet,
   Zap,
@@ -286,6 +288,8 @@ export const TAB_ICONS = {
   portfoyler: Files,
   sozlesme: FileSignature,
   kriter: SlidersHorizontal,
+  guvenlik: LockKeyhole,
+  rol: UserCog,
 } satisfies Record<string, LucideIcon>;
 
 /**

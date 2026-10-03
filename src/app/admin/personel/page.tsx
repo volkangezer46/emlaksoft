@@ -1,20 +1,22 @@
 "use client";
 
-import { useTransition, useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useTransition, useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   ChevronDown,
+  Clock,
   Loader2,
   Plus,
   Search,
   ShieldCheck,
+  UserCheck,
   UserMinus,
   UserPlus,
+  UserX,
   Users,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
-  addPlatformStaff,
   updateStaffRole,
   deactivateStaff,
   reactivateStaff,
@@ -23,14 +25,9 @@ import {
 import type { PlatformRole } from "@/lib/platform-access";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogHeader,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { EmailInput } from "@/components/ui/email-input";
+import { daysAgoIso } from "@/lib/clock";
+import { relativeTimeTR } from "@/lib/admin-format";
+import { staffKpi } from "./staff-model";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,7 +39,10 @@ type StaffRow = {
   role: PlatformRole;
   is_active: boolean;
   created_at: string;
+  last_sign_in_at?: string | null;
 };
+
+type StatusFilter = "all" | "active" | "passive" | "recent" | "never";
 
 // ---------------------------------------------------------------------------
 // Role badge colours
@@ -53,103 +53,6 @@ const roleCls: Record<PlatformRole, string> = {
   support: "bg-cyan-400/12 text-cyan-600",
   billing: "bg-mint-500/12 text-mint-600",
 };
-
-const field =
-  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400";
-
-// ---------------------------------------------------------------------------
-// Add staff dialog
-// ---------------------------------------------------------------------------
-function AddStaffDialog({ onDone }: { onDone: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
-
-  function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    setError(null);
-    setSuccess(false);
-    startTransition(async () => {
-      const res = await addPlatformStaff(fd);
-      if (res.error) { setError(res.error); return; }
-      setSuccess(true);
-      formRef.current?.reset();
-      setTimeout(() => { setOpen(false); setSuccess(false); onDone(); }, 1200);
-    });
-  }
-
-  return (
-    /* Radix Dialog: focus trap + Esc (öncesinde yoktu) + scroll lock + ARIA.
-       Ayrıca eski kapat butonunun aria-label'ı yoktu — DialogHeader'ınki var. */
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-amber-400 px-4 py-2.5 text-sm font-bold text-ink-950"
-        >
-          <Plus className="h-4 w-4" /> Personel ekle
-        </button>
-      </DialogTrigger>
-
-      <DialogContent size="sm">
-        <DialogHeader
-          icon={<UserPlus />}
-          title="Yeni personel ekle"
-          description="Auth’da kayıtlı e-posta varsa doğrudan eklenir; yoksa davet gönderilir."
-        />
-        <form ref={formRef} onSubmit={submit} className="grid gap-4 p-6">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="ps-email">
-                  E-posta <span className="text-danger-500">*</span>
-                </label>
-                <EmailInput id="ps-email" name="email" required className={field} placeholder="ornek@emlaksoft.com" />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="ps-name">
-                  Ad Soyad <span className="text-danger-500">*</span>
-                </label>
-                <input id="ps-name" name="full_name" required className={field} placeholder="Ahmet Yılmaz" />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="ps-role">Rol</label>
-                <div className="relative">
-                  <select id="ps-role" name="role" defaultValue="support" className={`${field} appearance-none pr-9`}>
-                    {(Object.entries(PLATFORM_ROLE_LABELS) as [PlatformRole, string][]).map(([v, l]) => (
-                      <option key={v} value={v}>{l}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-                </div>
-              </div>
-
-              {error ? (
-                <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">{error}</p>
-              ) : null}
-              {success ? (
-                <p className="rounded-[var(--radius-control)] bg-mint-500/10 px-3 py-2 text-sm font-semibold text-mint-700" role="status">
-                  Personel eklendi ✓
-                </p>
-              ) : null}
-
-              <div className="hairline-t flex justify-end gap-2 pt-4">
-                <DialogClose asChild>
-                  <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:bg-canvas">
-                    İptal
-                  </button>
-                </DialogClose>
-                <button type="submit" disabled={pending} className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
-                  {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-                  {pending ? "Ekleniyor…" : "Ekle"}
-                </button>
-              </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Staff row — inline role change + deactivate
@@ -195,8 +98,8 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => void }) 
     <TR>
       <TD>
         <Link
-          href="/admin/aktivite"
-          title="Platform aktivite kaydına git"
+          href={`/admin/personel/${member.id}`}
+          title="Personel detayı ve aktivitesi"
           className="font-semibold text-ink-950 transition hover:text-brand-600"
         >
           {member.full_name}
@@ -224,6 +127,9 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => void }) 
         <Badge variant={member.is_active ? "success" : "outline"} size="sm">
           {member.is_active ? "Aktif" : "Pasif"}
         </Badge>
+      </TD>
+      <TD align="right" className="text-xs text-text-muted">
+        {member.last_sign_in_at ? relativeTimeTR(member.last_sign_in_at) : "Hiç giriş yok"}
       </TD>
       <TD align="right" className="text-xs text-text-muted">
         {new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium" }).format(new Date(member.created_at))}
@@ -263,13 +169,14 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => void }) 
 /** İki tabloda (aktif/pasif) aynı başlıklar — tek yerde tutuluyor. */
 function StaffTable({ rows, onDone }: { rows: StaffRow[]; onDone: () => void }) {
   return (
-    <TableFrame minWidth={680} className="rounded-none border-0 shadow-none">
+    <TableFrame minWidth={780} className="rounded-none border-0 shadow-none">
       <Table>
         <THead>
           <TR>
             <TH>Personel</TH>
             <TH>Rol</TH>
             <TH>Durum</TH>
+            <TH align="right">Son giriş</TH>
             <TH align="right">Katılım</TH>
             <TH align="right">İşlem</TH>
           </TR>
@@ -314,6 +221,7 @@ export default function PersonelPage() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<PlatformRole | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const load = useCallback(() => {
     // Durum güncellemeleri bilinçli olarak `.then()` içinde: `async/await`
@@ -343,19 +251,27 @@ export default function PersonelPage() {
     [staff],
   );
 
+  // KPI'lar gerçek satırlardan; "son 30 gün" eşiği clock.ts'ten.
+  const since = useMemo(() => daysAgoIso(30), []);
+  const kpi = useMemo(() => staffKpi(staff, since), [staff, since]);
+
   const filtered = useMemo(() => {
     const needle = normalizeTr(query.trim());
     return staff.filter((s) => {
       if (roleFilter !== "all" && s.role !== roleFilter) return false;
+      if (statusFilter === "active" && !s.is_active) return false;
+      if (statusFilter === "passive" && s.is_active) return false;
+      if (statusFilter === "never" && (!s.is_active || s.last_sign_in_at)) return false;
+      if (statusFilter === "recent" && (!s.is_active || !s.last_sign_in_at || s.last_sign_in_at < since)) return false;
       if (!needle) return true;
       return normalizeTr(`${s.full_name} ${s.email}`).includes(needle);
     });
-  }, [staff, query, roleFilter]);
+  }, [staff, query, roleFilter, statusFilter, since]);
 
   const active = filtered.filter((s) => s.is_active);
   const passive = filtered.filter((s) => !s.is_active);
-  const totalActive = staff.filter((s) => s.is_active).length;
-  const searching = Boolean(query.trim()) || roleFilter !== "all";
+  const totalActive = kpi.active;
+  const searching = Boolean(query.trim()) || roleFilter !== "all" || statusFilter !== "all";
 
   return (
     <div className="space-y-6">
@@ -374,7 +290,12 @@ export default function PersonelPage() {
                 EmlakSoft çalışanları · departman rolü, erişim ve durum yönetimi.
               </p>
             </div>
-            <AddStaffDialog onDone={load} />
+            <Link
+              href="/admin/personel/yeni"
+              className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-amber-400 px-4 py-2.5 text-sm font-bold text-ink-950"
+            >
+              <Plus className="h-4 w-4" /> Personel ekle
+            </Link>
           </div>
 
           {/* Rol dağılımı — her kart o rolü filtreler */}
@@ -406,6 +327,37 @@ export default function PersonelPage() {
         </div>
       </section>
 
+      {/* KPI şeridi — her kart listeyi süzer */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {(
+          [
+            { key: "active", label: "Aktif personel", value: kpi.active, icon: UserCheck },
+            { key: "passive", label: "Pasif personel", value: kpi.passive, icon: UserX },
+            { key: "recent", label: "Son 30 günde giriş", value: kpi.recentLogin, icon: Clock },
+            { key: "never", label: "Hiç giriş yapmadı", value: kpi.neverLoggedIn, icon: UserPlus },
+          ] as const
+        ).map((k) => {
+          const on = statusFilter === k.key;
+          const Icon = k.icon;
+          return (
+            <button
+              key={k.key}
+              type="button"
+              onClick={() => setStatusFilter(on ? "all" : k.key)}
+              aria-pressed={on}
+              title={on ? "Filtreyi kaldır" : `${k.label}: listeyi süz`}
+              className={`focus-ring press rounded-[var(--radius-card)] border bg-surface p-4 text-left transition hover:border-brand-300 ${
+                on ? "border-brand-500 ring-2 ring-brand-500/25" : "border-line"
+              }`}
+            >
+              <Icon className="h-4 w-4 text-brand-600" />
+              <p className="numeric mt-2 font-display text-2xl font-extrabold tabular-nums text-ink-950">{loading ? "—" : k.value}</p>
+              <p className="text-xs text-text-muted">{k.label}</p>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Arama + filtre çubuğu */}
       <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3">
         <div className="relative w-full max-w-xs">
@@ -422,7 +374,7 @@ export default function PersonelPage() {
         {searching ? (
           <button
             type="button"
-            onClick={() => { setQuery(""); setRoleFilter("all"); }}
+            onClick={() => { setQuery(""); setRoleFilter("all"); setStatusFilter("all"); }}
             className="focus-ring press inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
           >
             Filtreleri temizle
@@ -450,7 +402,7 @@ export default function PersonelPage() {
             <p className="mt-1 text-xs text-text-muted">
               {searching
                 ? "Arama terimini değiştirin ya da rol filtresini kaldırın."
-                : "Sağ üstteki “Personel ekle” ile ilk EmlakSoft çalışanını davet edin."}
+                : "Sağ üstteki “Personel ekle” ile ilk EmlakSoft çalışanını ekleyin."}
             </p>
           </div>
         ) : (
