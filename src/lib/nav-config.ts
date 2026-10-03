@@ -33,6 +33,8 @@ export type NavItem = {
   module: AppModule;
   /** Birden çok sayfayı tek menü öğesinde toplar; ilk sekme öğenin girişidir. */
   tabs?: readonly NavTab[];
+  /** true: sekmelerin kendi modülü yetse de öğenin kendi `module`ü yoksa öğe hiç görünmez. */
+  needsItemModule?: boolean;
   /**
    * Sade görünümde çekirdek mi? "core" = en az bir rolün çekirdek menüsünde (rol eşlemesi
    * `nav-roles.ts`; uyum testi ikisini eşitler), "more" = yalnız "Daha fazla" altında.
@@ -133,7 +135,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "commissions",
         tabs: [
           { href: "/app/komisyon", label: "Komisyon", icon: ICONS.komisyon, module: "commissions" },
-          { href: "/app/cuzdan", label: "Cüzdanım", icon: ICONS.cuzdan, module: "commissions" },
+          { href: "/app/cuzdan", label: "Kazanç", icon: ICONS.cuzdan, module: "commissions" },
           { href: "/app/onaylar", label: "Onaylar", icon: ICONS.onay, module: "commissions" },
             ],
         tier: "core",
@@ -147,19 +149,10 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     title: "Performans",
     icon: ICONS.baslikPerformans,
     items: [
+      // Kişinin kendi karnesi, hedefi ve kazancı (danışman rolünde Ekip Merkezi yerine bu giriş vardır).
+      { href: "/app/performansim", label: "Performansım", icon: ICONS.rozet, module: "dashboard", tier: "core" },
       { href: "/app/raporlar", label: "Raporlar", icon: ICONS.rapor, module: "reports", tier: "core" },
       { href: "/app/kayip-kacak", label: "Kayıp-kaçak", icon: ICONS.alarm, module: "leak", tier: "more" },
-      {
-        href: "/app/danisman-kpi",
-        label: "Ekip performansı",
-        icon: ICONS.kpi,
-        module: "reports",
-        tabs: [
-          { href: "/app/danisman-kpi", label: "Danışman KPI", icon: ICONS.kpi, module: "reports" },
-          { href: "/app/lig", label: "Ekip Ligi", icon: ICONS.lig, module: "reports" },
-        ],
-        tier: "more",
-      },
       { href: "/app/bolge-analizi", label: "Bölge Analizi", icon: ICONS.bolge, module: "reports", tier: "more" },
       { href: "/app/kayip-satis", label: "Kayıp Satış", icon: ICONS.dusus, module: "customers", tier: "more" },
       { href: "/app/pano-tv", label: "Ofis Panosu (TV)", icon: ICONS.panoTv, module: "reports", tier: "more" },
@@ -190,11 +183,15 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "team",
         tabs: [
           { href: "/app/ekip", label: "Genel", icon: ICONS.ekip, module: "team" },
+          // Ekip performansı sekmeleri (eski Performans başlığındaki "Ekip performansı" girişi buraya birleşti).
           { href: "/app/ekip/kiyas", label: "Kıyas", icon: ICONS.kiyas, module: "reports" },
-          { href: "/app/ekip/kazanc", label: "Kazanç", icon: ICONS.kazanc, module: "commissions" },
+          { href: "/app/danisman-kpi", label: "Danışman KPI", icon: ICONS.kpi, module: "reports" },
+          { href: "/app/lig", label: "Ekip Ligi", icon: ICONS.lig, module: "reports" },
           { href: "/app/hedefler", label: "Hedefler", icon: ICONS.hedef, module: "targets" },
           { href: "/app/ekip/devir", label: "Devir / Atama", icon: ICONS.devir, module: "team" },
         ],
+        // Ekip Merkezi ekip modülü olanın girişidir; modülsüz rolde (danışman) yerine Performansım vardır.
+        needsItemModule: true,
         tier: "core",
       },
       { href: "/app/otomasyonlar", label: "Otomasyonlar", icon: ICONS.otomasyon, module: "settings", tier: "more" },
@@ -233,6 +230,7 @@ export const NAV_ALIASES: Readonly<Record<string, string>> = {
 /** Sekmeli öğeyi erişilebilir sekmelere indirger; hiç sekme kalmazsa null. */
 function visibleItem(item: NavItem, accessible: readonly AppModule[]): NavItem | null {
   if (!item.tabs) return accessible.includes(item.module) ? item : null;
+  if (item.needsItemModule && !accessible.includes(item.module)) return null;
   const tabs = item.tabs.filter((t) => accessible.includes(t.module));
   const first = tabs[0];
   if (!first) return null;

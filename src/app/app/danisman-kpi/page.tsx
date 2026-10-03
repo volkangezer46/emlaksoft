@@ -11,6 +11,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
+import { loadAdvisorMetrics, trMonthPeriod } from "@/lib/team/advisor-metrics";
 import { now, TR_OFFSET_MS, trParts } from "@/lib/clock";
 import { buildCoachActions, type CoachAction } from "@/lib/advisor-coach";
 import { RevenueChart } from "./revenue-chart-lazy";
@@ -46,87 +47,13 @@ function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 }
 
-function pct(a: number, b: number) {
-  if (!b) return "—";
-  return `%${Math.round((a / b) * 100)}`;
-}
-
-type KpiAgg = {
-  customer_count: number; call_count: number; appoint_count: number;
-  offer_count: number; deal_count: number; revenue: number;
-};
-
-/**
- * Geçmiş ay agregasyonu — mevcut `advisor_kpis` RPC'si yalnız `p_month_start`
- * alıp açık uçlu (>=) topladığından geçmiş bir ay için sonraki ayların
- * aktivitesini de sayardı. RPC'ye dokunmadan aynı toplamları kapalı aralıkla
- * ([start, end)) burada kuruyoruz: her tablodan yalnız kimlik/tutar kolonu
- * çekilir (dar select), RLS tenant kapsamını uygular. Müşteri sayısı RPC ile
- * aynı semantikte kalır: toplam atanmış müşteri, aya bağlı değil.
- */
-async function loadKpisForRange(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  startIso: string,
-  endIso: string,
-  opts: { scoreOnly?: boolean } = {},
-): Promise<Map<string, KpiAgg>> {
-  const [cust, { data: cal }, { data: appt }, { data: off }, { data: comm }] = await Promise.all([
-    // scoreOnly: geçen-ay kıyası yalnız skor bileşenlerini kullanır; skor
-    // formülünde müşteri sayısı yok — bu sorgu kıyas çağrısında atlanır.
-    opts.scoreOnly
-      ? Promise.resolve<Array<{ assigned_to: string | null }> | null>(null)
-      : supabase
-          .from("customers")
-          .select("assigned_to")
-          .is("deleted_at", null)
-          .not("assigned_to", "is", null)
-          .limit(5000)
-          .then((r) => r.data),
-    supabase.from("calls").select("handled_by").gte("started_at", startIso).lt("started_at", endIso).not("handled_by", "is", null).limit(5000),
-    supabase.from("appointments").select("assigned_to").gte("scheduled_at", startIso).lt("scheduled_at", endIso).not("assigned_to", "is", null).limit(5000),
-    supabase.from("offers").select("created_by, status").gte("created_at", startIso).lt("created_at", endIso).not("created_by", "is", null).limit(5000),
-    supabase
-      .from("commissions")
-      .select("gross_amount, deal:deals!commissions_deal_id_fkey(assigned_to)")
-      .gte("created_at", startIso)
-      .lt("created_at", endIso)
-      .in("status", ["paid", "collected"])
-      .limit(5000),
-  ]);
-
-  const map = new Map<string, KpiAgg>();
-  const get = (uid: string) => {
-    let k = map.get(uid);
-    if (!k) {
-      k = { customer_count: 0, call_count: 0, appoint_count: 0, offer_count: 0, deal_count: 0, revenue: 0 };
-      map.set(uid, k);
-    }
-    return k;
-  };
-  for (const r of cust ?? []) get(String(r.assigned_to)).customer_count += 1;
-  for (const r of cal ?? []) get(String(r.handled_by)).call_count += 1;
-  for (const r of appt ?? []) get(String(r.assigned_to)).appoint_count += 1;
-  for (const r of off ?? []) {
-    const k = get(String(r.created_by));
-    k.offer_count += 1;
-    if (r.status === "accepted") k.deal_count += 1;
-  }
-  for (const r of comm ?? []) {
-    const rel = r.deal as { assigned_to?: string | null } | { assigned_to?: string | null }[] | null;
-    const deal = Array.isArray(rel) ? rel[0] : rel;
-    if (!deal?.assigned_to) continue;
-    get(String(deal.assigned_to)).revenue += Number(r.gross_amount || 0);
-  }
-  return map;
-}
-
 /**
  * Skor formülü tek yerde — tablo, rozetler ve geçen-ay kıyası aynı formülü
  * kullanır: çağrı×1 + randevu×2 + teklif×3 + satış×10 + gelir/10000.
  */
-function scoreOf(k: Pick<KpiAgg, "call_count" | "appoint_count" | "offer_count" | "deal_count" | "revenue">) {
+function scoreOf(k: { callCount: number; appointCount: number; offerCount: number; dealCount: number; revenue: number | null }) {
   return Math.round(
-    k.call_count * 1 + k.appoint_count * 2 + k.offer_count * 3 + k.deal_count * 10 + k.revenue / 10_000,
+    k.callCount * 1 + k.appointCount * 2 + k.offerCount * 3 + k.dealCount * 10 + (k.revenue ?? 0) / 10_000,
   );
 }
 
@@ -139,6 +66,7 @@ type AdvisorKpi = {
   appointCount:   number;
   offerCount:     number;
   dealCount:      number;
+  /** Tahsil edilmiş danışman payı (tek kaynak: loadAdvisorMetrics). Görünmüyorsa 0. */
   revenue:        number;
   conversionRate: string;
   score:          number;
@@ -149,7 +77,7 @@ export default async function DanismanKpiPage({
 }: {
   searchParams?: Promise<{ ay?: string }>;
 }) {
-  const { tenantId, userId, perms } = await requireModulePage("reports", "/app/danisman-kpi");
+  const { tenantId, userId, perms, role } = await requireModulePage("reports", "/app/danisman-kpi");
   // Kazanç gizliliği: başkasının geliri yalnız `earnings_all` izniyle görünür (kendi geliri her zaman).
   const seeAllEarnings = canSeeAllEarnings(perms);
   const showRevenue = (id: string) => seeAllEarnings || id === userId;
@@ -164,7 +92,7 @@ export default async function DanismanKpiPage({
   const thisMonthStart = trMonth(trNow.year, trNow.month);
 
   let monthStart = thisMonthStart;
-  const ayMatch = /^(d{4})-(d{2})$/.exec(sp.ay ?? "");
+  const ayMatch = /^(\d{4})-(\d{2})$/.exec(sp.ay ?? "");
   if (ayMatch) {
     const requested = trMonth(Number(ayMatch[1]), Number(ayMatch[2]) - 1);
     if (!Number.isNaN(requested.getTime()) && requested.getTime() < thisMonthStart.getTime()) {
@@ -173,13 +101,13 @@ export default async function DanismanKpiPage({
   }
   const isCurrentMonth = monthStart.getTime() === thisMonthStart.getTime();
   const mp = trParts(monthStart);
-  const monthEnd = trMonth(mp.year, mp.month + 1);
 
   const ayParam = (d: Date) => {
     const p = trParts(d);
     return `${p.year}-${String(p.month + 1).padStart(2, "0")}`;
   };
   const prevMonth = trMonth(mp.year, mp.month - 1);
+  const prevMonthParts = trParts(prevMonth);
   const prevHref = `/app/danisman-kpi?ay=${ayParam(prevMonth)}`;
   const nextMonth = trMonth(mp.year, mp.month + 1);
   // Gelecek aya gezinme yok: sonraki ay linki yalnız geçmiş ay görüntülenirken.
@@ -197,42 +125,24 @@ export default async function DanismanKpiPage({
   const bugunISO = bugun.toISOString();
   const otuzGunOnce = new Date(bugun.getTime() - 30 * 86_400_000).toISOString();
 
-  // KPI toplamları: bu ay için mevcut RPC (açık uçlu >= bu ayla eşdeğer);
-  // geçmiş ay için kapalı aralıklı JS agregasyonu (loadKpisForRange).
-  const kpiPromise: PromiseLike<Map<string, KpiAgg>> = isCurrentMonth
-    ? supabase
-        .rpc("advisor_kpis", { p_tenant_id: tenantId, p_month_start: monthStart.toISOString() })
-        .then(({ data }) => {
-          const map = new Map<string, KpiAgg>();
-          for (const r of (data ?? []) as Array<Record<string, unknown>>) {
-            map.set(String(r.assigned_to), {
-              customer_count: Number(r.customer_count ?? 0),
-              call_count:     Number(r.call_count ?? 0),
-              appoint_count:  Number(r.appoint_count ?? 0),
-              offer_count:    Number(r.offer_count ?? 0),
-              deal_count:     Number(r.deal_count ?? 0),
-              revenue:        Number(r.revenue ?? 0),
-            });
-          }
-          return map;
-        })
-    : loadKpisForRange(supabase, monthStart.toISOString(), monthEnd.toISOString());
+  // KPI toplamları: TEK KAYNAK loadAdvisorMetrics (RPC kullanılmaz; gerekçe advisor-metrics.ts başlığında).
+  // Seçili ay ve önceki ay (kıyas) aynı kapalı aralıklı tanımla gelir.
+  const nowMs = now();
+  const period = trMonthPeriod(mp.year, mp.month);
+  const prevPeriod = trMonthPeriod(prevMonthParts.year, prevMonthParts.month);
+  const viewer = { userId, role, perms };
 
   const [
-    { data: profiles },
-    kpiByUid,
-    // Geçen ay kıyası (rozet şeridi + tablo ilerleme okları): kapalı aralık
-    // [önceki ay, seçili ay). scoreOnly — yalnız skor bileşenleri çekilir.
-    prevKpiByUid,
+    metrics,
+    prevMetrics,
     { count: yetkiBiten },
     { count: gecikmisGorev },
     { count: pahaliPortfoy },
     { count: soguyanMusteri },
     { data: office },
   ] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, role").order("full_name").limit(500),
-    kpiPromise,
-    loadKpisForRange(supabase, prevMonth.toISOString(), monthStart.toISOString(), { scoreOnly: true }),
+    loadAdvisorMetrics(supabase, { viewer, tenantId, period, nowMs }),
+    loadAdvisorMetrics(supabase, { viewer, tenantId, period: prevPeriod, nowMs }),
     supabase
       .from("properties")
       .select("id", { count: "exact", head: true })
@@ -274,36 +184,24 @@ export default async function DanismanKpiPage({
   // Danışman bazlı hesapla
   const advisorMap = new Map<string, AdvisorKpi>();
 
-  for (const p of profiles ?? []) {
-    if (!["advisor", "team_lead", "branch_manager", "gm", "owner"].includes(p.role)) continue;
-    const k = kpiByUid.get(p.id);
-    advisorMap.set(p.id, {
-      id:             p.id,
-      full_name:      p.full_name,
-      role:           p.role,
-      customerCount:  k?.customer_count ?? 0,
-      callCount:      k?.call_count ?? 0,
-      appointCount:   k?.appoint_count ?? 0,
-      offerCount:     k?.offer_count ?? 0,
-      dealCount:      k?.deal_count ?? 0,
-      revenue:        k?.revenue ?? 0,
-      conversionRate: "—",
+  for (const m of metrics.rows) {
+    advisorMap.set(m.id, {
+      id:             m.id,
+      full_name:      m.fullName,
+      role:           m.role,
+      customerCount:  m.customerCount,
+      callCount:      m.callCount,
+      appointCount:   m.appointCount,
+      offerCount:     m.offerCount,
+      dealCount:      m.dealCount,
+      revenue:        m.revenue ?? 0,
+      conversionRate: m.conversionPct === null ? "—" : `%${m.conversionPct}`,
       score:          0,
     });
   }
 
-  // Dönüşüm oranı + skor
-  for (const [, adv] of advisorMap) {
-    adv.conversionRate = pct(adv.dealCount, adv.offerCount);
-    // Skor: ağırlıklı formül — scoreOf (tablo/rozet/kıyas aynı formül)
-    adv.score = scoreOf({
-      call_count:    adv.callCount,
-      appoint_count: adv.appointCount,
-      offer_count:   adv.offerCount,
-      deal_count:    adv.dealCount,
-      revenue:       adv.revenue,
-    });
-  }
+  // Skor: ağırlıklı formül — scoreOf (tablo/rozet/kıyas aynı formül)
+  for (const [, adv] of advisorMap) adv.score = scoreOf(adv);
 
   const advisors = [...advisorMap.values()]
     .sort((a, b) => b.score - a.score);
@@ -315,7 +213,7 @@ export default async function DanismanKpiPage({
   // aktif ekip listesinde olmalı.
   const prevScoreByUid = new Map<string, number>();
   for (const a of advisors) {
-    const pk = prevKpiByUid.get(a.id);
+    const pk = prevMetrics.rows.find((r) => r.id === a.id);
     prevScoreByUid.set(a.id, pk ? scoreOf(pk) : 0);
   }
   const prevTop = advisors
@@ -354,8 +252,7 @@ export default async function DanismanKpiPage({
   const podium = advisors.filter((a) => a.score > 0).slice(0, 3);
 
   // ── Dönem kıyası metrik kartları: ekip toplamları, önceki aya karşı ───────
-  // prevKpiByUid scoreOnly çekildi — skor bileşenleri (çağrı/randevu/teklif/
-  // satış/gelir) mevcut; müşteri sayısı yok ve burada kullanılmıyor.
+  // Önceki ay aynı kaynaktan (loadAdvisorMetrics) gelir.
   const teamNow = { call: 0, appoint: 0, offer: 0, deal: 0 };
   const teamPrev = { call: 0, appoint: 0, offer: 0, deal: 0 };
   for (const a of advisors) {
@@ -363,12 +260,12 @@ export default async function DanismanKpiPage({
     teamNow.appoint += a.appointCount;
     teamNow.offer += a.offerCount;
     teamNow.deal += a.dealCount;
-    const pk = prevKpiByUid.get(a.id);
+    const pk = prevMetrics.rows.find((r) => r.id === a.id);
     if (pk) {
-      teamPrev.call += pk.call_count;
-      teamPrev.appoint += pk.appoint_count;
-      teamPrev.offer += pk.offer_count;
-      teamPrev.deal += pk.deal_count;
+      teamPrev.call += pk.callCount;
+      teamPrev.appoint += pk.appointCount;
+      teamPrev.offer += pk.offerCount;
+      teamPrev.deal += pk.dealCount;
     }
   }
   /** Önceki aya göre değişim → StatCard trend props'u. */
@@ -455,14 +352,17 @@ export default async function DanismanKpiPage({
         }
       />
 
-      <KpiGrid count={3} className="no-print" label="Dönem özeti">
+      <KpiGrid count={seeAllEarnings ? 4 : 3} className="no-print" label="Dönem özeti">
         <StatCard label="Danışman" value={advisors.length} icon={Users} href="/app/ekip" />
         {seeAllEarnings ? (
-          <StatCard label="Toplam gelir" value={money(advisors.reduce((s, a) => s + a.revenue, 0))} icon={Wallet} tone="success" href="/app/komisyon" />
+          <>
+            <StatCard label="Danışman gelirleri (komisyon payı)" value={money(advisors.reduce((s, a) => s + a.revenue, 0))} icon={Wallet} tone="success" href="/app/cuzdan?sekme=ofis" />
+            <StatCard label="Ofis komisyonu (brüt)" value={money(metrics.office.commissionGrossCollected ?? 0)} icon={Wallet} href="/app/komisyon?durum=tahsil" />
+          </>
         ) : (
-          <StatCard label="Gelirim" value={money(advisors.find((a) => a.id === userId)?.revenue ?? 0)} icon={Wallet} tone="success" href="/app/cuzdan" />
+          <StatCard label="Gelirim (komisyon payım)" value={money(advisors.find((a) => a.id === userId)?.revenue ?? 0)} icon={Wallet} tone="success" href="/app/cuzdan" />
         )}
-        <StatCard label="Toplam satış" value={advisors.reduce((s, a) => s + a.dealCount, 0)} icon={Handshake} href="/app/anlasmalar" />
+        <StatCard label="Toplam satış" value={advisors.reduce((s, a) => s + a.dealCount, 0)} icon={Handshake} href="/app/teklifler?durum=accepted" />
       </KpiGrid>
 
       {/* ── Liderlik podyumu: skoru olan ilk üç danışman (ekran, çıktı dışı) ── */}
@@ -650,7 +550,7 @@ export default async function DanismanKpiPage({
                 <TH align="right">Teklif</TH>
                 <TH align="right">Satış</TH>
                 <TH align="right">Dönüşüm</TH>
-                <TH align="right">Gelir</TH>
+                <TH align="right">Gelir (komisyon payı)</TH>
                 <TH>Skor</TH>
               </TR>
             </THead>

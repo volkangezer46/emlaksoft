@@ -26,9 +26,10 @@ const MANAGER_CORE = [
   "/app/ekip",
 ] as const;
 
-/** Danışman: Komisyon öğesi Cüzdanım sekmesini de taşır; Destek = Yardım. */
+/** Danışman: Komisyon öğesi Kazanç sekmesini de taşır; Performansım = kendi karnesi (Ekip Merkezi yerine); Destek = Yardım. */
 const ADVISOR_CORE = [
   HOME,
+  "/app/performansim",
   "/app/musteriler",
   "/app/talepler",
   "/app/portfoyler",
@@ -46,7 +47,7 @@ export const NAV_CORE_BY_ROLE: Readonly<Record<AppRole, readonly string[]>> = {
   owner: MANAGER_CORE,
   gm: MANAGER_CORE,
   branch_manager: MANAGER_CORE,
-  team_lead: [...ADVISOR_CORE, "/app/ekip"],
+  team_lead: ADVISOR_CORE,
   advisor: ADVISOR_CORE,
   accounting: [HOME, "/app/giderler", "/app/aidat", "/app/komisyon", "/app/abonelik", "/app/raporlar"],
   call_center: [HOME, "/app/arama", "/app/musteriler", "/app/randevular", "/app/gorevler"],

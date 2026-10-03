@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { daysAgoIso, now, trDayStartMs } from "@/lib/clock";
-import { OPEN_DEMAND_STATUSES, inRange, untrackedCustomerIds } from "@/lib/team/advisor-360";
+import { OPEN_DEMAND_STATUSES, untrackedCustomerIds } from "@/lib/team/advisor-360";
+import { currentMonthPeriod, loadAdvisorMetrics, type MetricsViewer } from "@/lib/team/advisor-metrics";
 
 /** Danışman 360 ortak veri okumaları (RLS ile tenant'a kilitli, istemci sunucu oturumundan gelir). */
 
@@ -88,32 +89,41 @@ export type MonthKpis = {
   callsCur: number;
 };
 
+export type MemberMonth = {
+  kpis: MonthKpis;
+  /** Tahsil edilen danışman payı (bu ay / önceki ay). `null` = görme hakkı yok. */
+  revenue: { cur: number | null; prev: number | null };
+  /** Atanmış müşteri (toplam) ve yayındaki portföy. */
+  customerTotal: number;
+  activePropertyCount: number;
+};
+
 /**
- * Bu ay / önceki ay: müşteri (atanmış, o ay açılan), randevu (planlanan), teklif (oluşturan),
- * anlaşma (kabul edilen teklif; hedef gerçekleşmesiyle aynı tanım), çağrı (yalnız bu ay).
- * Tarama tavanı 2000 satır/tablo; bir danışmanın iki aylık hacmi bunun çok altındadır.
+ * Bu ay / önceki ay: TEK KAYNAK `loadAdvisorMetrics` (Danışman KPI, Kıyas, Lig, Kazanç, Hedefler ile aynı tanım):
+ * yeni müşteri, randevu (iptalsiz), teklif, anlaşma (kabul edilen teklif), çağrı, gelir (komisyon payı, tahsil).
+ * Bu dosya artık kendi sorgusunu yazmaz.
  */
-export async function loadMonthKpis(
+export async function loadMemberMonth(
   supabase: SupabaseClient,
-  id: string,
-  r: { prevStartIso: string; thisStartIso: string; nextStartIso: string },
-): Promise<MonthKpis> {
-  const [cust, appt, offers, calls] = await Promise.all([
-    supabase.from("customers").select("created_at").eq("assigned_to", id).is("deleted_at", null).gte("created_at", r.prevStartIso).lt("created_at", r.nextStartIso).limit(2000),
-    supabase.from("appointments").select("scheduled_at").eq("assigned_to", id).neq("status", "cancelled").gte("scheduled_at", r.prevStartIso).lt("scheduled_at", r.nextStartIso).limit(2000),
-    supabase.from("offers").select("created_at, status").eq("created_by", id).gte("created_at", r.prevStartIso).lt("created_at", r.nextStartIso).limit(2000),
-    supabase.from("calls").select("id", { count: "exact", head: true }).eq("handled_by", id).gte("started_at", r.thisStartIso).lt("started_at", r.nextStartIso),
+  opts: { viewer: MetricsViewer; tenantId: string | null; id: string; nowMs: number },
+): Promise<MemberMonth> {
+  const { viewer, tenantId, id, nowMs } = opts;
+  const [cur, prev] = await Promise.all([
+    loadAdvisorMetrics(supabase, { viewer, tenantId, period: currentMonthPeriod(nowMs), nowMs, subjectIds: [id] }),
+    loadAdvisorMetrics(supabase, { viewer, tenantId, period: currentMonthPeriod(nowMs, -1), nowMs, subjectIds: [id] }),
   ]);
-  const split = (rows: { at: string }[]) => ({
-    cur: rows.filter((x) => inRange(x.at, r.thisStartIso, r.nextStartIso)).length,
-    prev: rows.filter((x) => inRange(x.at, r.prevStartIso, r.thisStartIso)).length,
-  });
-  const offerRows = (offers.data ?? []) as { created_at: string; status: string }[];
+  const c = cur.rows.find((r) => r.id === id);
+  const p = prev.rows.find((r) => r.id === id);
   return {
-    customers: split(((cust.data ?? []) as { created_at: string }[]).map((x) => ({ at: x.created_at }))),
-    appointments: split(((appt.data ?? []) as { scheduled_at: string }[]).map((x) => ({ at: x.scheduled_at }))),
-    offers: split(offerRows.map((x) => ({ at: x.created_at }))),
-    deals: split(offerRows.filter((x) => x.status === "accepted").map((x) => ({ at: x.created_at }))),
-    callsCur: calls.count ?? 0,
+    kpis: {
+      customers: { cur: c?.newCustomerCount ?? 0, prev: p?.newCustomerCount ?? 0 },
+      appointments: { cur: c?.appointCount ?? 0, prev: p?.appointCount ?? 0 },
+      offers: { cur: c?.offerCount ?? 0, prev: p?.offerCount ?? 0 },
+      deals: { cur: c?.dealCount ?? 0, prev: p?.dealCount ?? 0 },
+      callsCur: c?.callCount ?? 0,
+    },
+    revenue: { cur: c?.revenue ?? null, prev: p?.revenue ?? null },
+    customerTotal: c?.customerCount ?? 0,
+    activePropertyCount: c?.activePropertyCount ?? 0,
   };
 }

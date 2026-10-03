@@ -19,6 +19,7 @@ import {
   type AgentStats,
 } from "@/lib/gamification";
 import { loadLeagueData, periodOf, periodRange, previousPeriod } from "@/lib/gamification-query";
+import { loadAdvisorMetrics, trMonthPeriod } from "@/lib/team/advisor-metrics";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { podiumColumns } from "@/components/ui/dashboard-grid";
@@ -118,7 +119,7 @@ export default async function LigPage({
 }: {
   searchParams?: Promise<{ donem?: string; kapsam?: string; tv?: string }>;
 }) {
-  const { tenantId, userId } = await requireModulePage("reports", "/app/lig");
+  const { tenantId, userId, role, perms } = await requireModulePage("reports", "/app/lig");
   const sp = (await searchParams) ?? {};
   const tvMode = sp.tv === "1";
 
@@ -154,6 +155,22 @@ export default async function LigPage({
   const branchId = branches.some((b) => String(b.id) === sp.kapsam) ? sp.kapsam! : null;
 
   const league = await loadLeagueData(supabase, { period, tenantId, branchId, todayIso });
+
+  // Karne sayıları (Satış = kabul edilen teklif, Gelir = tahsil edilen komisyon payı): Danışman KPI, Kıyas ve
+  // Kazanç ile AYNI kaynak (loadAdvisorMetrics). Puan kalemleri (aşağıdaki kırılım) lig oyununun kendi
+  // ölçütüdür (kazanılan anlaşma kaydı, tamamlanan randevu...); iki tanım sütun başlıklarında ayrıdır.
+  // TV modunda karne sayısı gösterilmez, sorgu atlanır.
+  const metricsById = new Map<string, { dealCount: number; revenue: number | null }>();
+  if (!tvMode) {
+    const [py, pm] = period.split("-").map(Number);
+    const metrics = await loadAdvisorMetrics(supabase, {
+      viewer: { userId, role, perms },
+      tenantId,
+      period: trMonthPeriod(py, pm - 1),
+      nowMs: now(),
+    });
+    for (const m of metrics.rows) metricsById.set(m.id, { dealCount: m.dealCount, revenue: m.revenue });
+  }
 
   // Kazanılmış rozetler (DB) — dönemsel rozetler bu döneme, ömür boyu
   // rozetler period IS NULL satırına düşer. `or` ile tek sorguda.
@@ -461,17 +478,19 @@ export default async function LigPage({
           ) : null}
 
           {/* ── LİG TABLOSU ────────────────────────────────────────────── */}
-          <TableFrame minWidth={980}>
+          <TableFrame minWidth={1120}>
             <Table>
               <THead>
                 <TR>
                   <TH>#</TH>
                   <TH>Danışman</TH>
                   <TH align="right">Puan</TH>
-                  <TH align="right">{SCORE_RULE_LABELS.deal_won}</TH>
+                  <TH align="right">{SCORE_RULE_LABELS.deal_won} (puan)</TH>
                   <TH align="right">{SCORE_RULE_LABELS.property_new}</TH>
                   <TH align="right">{SCORE_RULE_LABELS.appointment_done}</TH>
                   <TH align="right">{SCORE_RULE_LABELS.nps_promoter}</TH>
+                  <TH align="right">Satış</TH>
+                  <TH align="right">Gelir (pay)</TH>
                   <TH align="right">Seri</TH>
                   <TH>Rozetler</TH>
                 </TR>
@@ -536,6 +555,31 @@ export default async function LigPage({
                         value={r.breakdown.nps_promoter.count}
                         label={`${r.agent!.fullName} NPS 9-10 anketleri`}
                       />
+                      <TD align="right" className="text-text-muted">
+                        {metricsById.has(r.staffId) ? (
+                          <Link
+                            href={`/app/teklifler?danisman=${r.staffId}&durum=accepted`}
+                            className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold hover:text-brand-600 hover:underline"
+                            aria-label={`${r.agent!.fullName} kabul edilen teklifleri`}
+                          >
+                            {metricsById.get(r.staffId)!.dealCount}
+                          </Link>
+                        ) : (
+                          "—"
+                        )}
+                      </TD>
+                      <TD align="right" className="font-semibold text-mint-700">
+                        {metricsById.get(r.staffId)?.revenue ? (
+                          <Link
+                            href={r.staffId === userId ? "/app/cuzdan" : "/app/cuzdan?sekme=ofis"}
+                            className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:underline"
+                          >
+                            {new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(metricsById.get(r.staffId)!.revenue!)}
+                          </Link>
+                        ) : (
+                          <span className="text-text-faint">—</span>
+                        )}
+                      </TD>
                       <TD align="right">
                         <span
                           className={`numeric text-xs font-bold ${r.streak > 0 ? "text-amber-600" : "text-text-faint"}`}

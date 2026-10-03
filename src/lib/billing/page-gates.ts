@@ -36,7 +36,9 @@ export const PLAN_GATES: readonly PlanGate[] = [
   { href: "/app/kampanyalar", title: "Kampanyalar", minPlan: "office", pitch: "İYS izinlerine uygun toplu SMS ve mesaj kampanyaları gönderin." },
   { href: "/app/giderler", title: "Giderler", minPlan: "office", pitch: "Ofis giderlerini kaydedin, kâr-zarar tablosunda komisyonla karşılaştırın." },
   { href: "/app/aidat", title: "Aidat", minPlan: "office", pitch: "Portföy aidat ve vergi ödemelerini vade ve durumla takip edin." },
-  { href: "/app/ekip", title: "Ekip yönetimi", minPlan: "office", pitch: "Danışman ekleyin, rol ve izinleri yönetin, izin takvimini tutun.", except: ["/app/ekip/kartvizitim"] },
+  // kazanc: eski yol, yalnız /app/cuzdan?sekme=ofis yönlendirmesi (Kazanç tek sayfa, Danışman paketinde de açık).
+  // [id]: kendi profili her pakette açık (Performansım ile ortak gövde); başkasının profili sayfa içinde aynı Ofis kapısından geçer.
+  { href: "/app/ekip", title: "Ekip yönetimi", minPlan: "office", pitch: "Danışman ekleyin, rol ve izinleri yönetin, izin takvimini tutun.", except: ["/app/ekip/kartvizitim", "/app/ekip/kazanc", "/app/ekip/[id]"] },  { href: "/app/yabanci-satis", title: "Yabancıya Satış", minPlan: "office", pitch: "Yabancı alıcı için vatandaşlık eşiği, belge ve süreç kontrol listesi." },
   { href: "/app/yabanci-satis", title: "Yabancıya Satış", minPlan: "office", pitch: "Yabancı alıcı için vatandaşlık eşiği, belge ve süreç kontrol listesi." },
   { href: "/app/denetim", title: "Denetim kaydı", minPlan: "office", pitch: "Kim ne zaman neyi değiştirdi veya indirdi, tam denetim izi." },
   { href: "/app/raporlar", title: "Raporlar", minPlan: "office", pitch: "Ofis performansı, kaynak ROI'si ve komisyon raporları." },

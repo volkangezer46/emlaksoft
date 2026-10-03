@@ -3,8 +3,8 @@ import { AlertTriangle, Gauge, Rocket, Trash2, TrendingUp, Users } from "lucide-
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now } from "@/lib/clock";
-import { canSeeAllEarnings, canSeeEarningsOf } from "@/lib/team/earnings-scope";
-import { computeTargetActuals, targetPeriodRange } from "@/lib/team/target-actuals";
+import { targetPeriodRange } from "@/lib/team/target-actuals";
+import { loadTargetActualsLive } from "@/lib/team/advisor-metrics";
 import { deleteTarget, listTargets } from "@/app/actions/targets-openhouse-sources";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/app/empty-state";
@@ -85,68 +85,31 @@ export default async function HedeflerPage() {
   const canEdit   = (ctx.perms.targets ?? []).includes("edit");
   const canDelete = (ctx.perms.targets ?? []).includes("delete");
 
-  const seeAllEarnings = canSeeAllEarnings(ctx.perms);
   const supabase = await createClient();
   const [rawTargets, { data: members }] = await Promise.all([
     listTargets(),
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
   ]);
 
-  // Gerçekleşme canlı veriden: `targets.actual_*` sütunlarını uygulama güncellemiyor (bkz. lib/team/target-actuals).
-  const rangeOf = rawTargets.map((t) => targetPeriodRange(t.period_start, t.period));
-  const minStart = rangeOf.length ? new Date(Math.min(...rangeOf.map((r) => r.start))).toISOString() : null;
-  const maxEnd = rangeOf.length ? new Date(Math.max(...rangeOf.map((r) => r.end))).toISOString() : null;
-  const [offerRes, commissionRes] =
-    minStart && maxEnd
-      ? await Promise.all([
-          supabase
-            .from("offers")
-            .select("created_by, created_at")
-            .eq("status", "accepted")
-            .gte("created_at", minStart)
-            .lt("created_at", maxEnd)
-            .limit(5000),
-          // B1: earnings_all yoksa yalnız kendi anlaşmalarının tahsil komisyonu okunur.
-          (seeAllEarnings
-            ? supabase
-                .from("commissions")
-                .select("gross_amount, created_at, deal:deals!commissions_deal_id_fkey(assigned_to)")
-            : supabase
-                .from("commissions")
-                .select("gross_amount, created_at, deal:deals!commissions_deal_id_fkey!inner(assigned_to)")
-                .eq("deal.assigned_to", ctx.userId)
-          )
-            .in("status", ["paid", "collected"])
-            .gte("created_at", minStart)
-            .lt("created_at", maxEnd)
-            .limit(5000),
-        ])
-      : [null, null];
-  const actuals = computeTargetActuals(
-    rawTargets.map((t) => {
-      const prof = Array.isArray(t.profile) ? t.profile[0] : t.profile;
-      return { id: t.id, period: t.period, period_start: t.period_start, profile_id: (prof as { id?: string } | null)?.id ?? null };
-    }),
-    (offerRes?.data ?? []) as { created_by: string | null; created_at: string }[],
-    ((commissionRes?.data ?? []) as unknown as {
-      gross_amount: number;
-      created_at: string;
-      deal: { assigned_to: string | null } | { assigned_to: string | null }[] | null;
-    }[]).map((c) => {
-      const deal = Array.isArray(c.deal) ? c.deal[0] : c.deal;
-      return { gross_amount: c.gross_amount, created_at: c.created_at, assigned_to: deal?.assigned_to ?? null };
-    }),
-  );
-  const targets = rawTargets.map((t) => {
+  // Gerçekleşme canlı veriden, TEK KAYNAK (advisor-metrics): anlaşma = kabul edilen teklif, kişi geliri = tahsil edilen
+  // komisyon payı, ofis geneli hedef = Ofis komisyonu (brüt). Danışman KPI / Kıyas / Kazanç ile aynı tanım.
+  const targetLikes = rawTargets.map((t) => {
     const prof = Array.isArray(t.profile) ? t.profile[0] : t.profile;
-    const profileId = (prof as { id?: string } | null)?.id ?? null;
-    // Ofis geneli hedef (profil yok) tüm ofisin cirosudur: yalnız earnings_all ile görünür.
-    const revVisible = profileId ? canSeeEarningsOf(ctx.perms, ctx.userId, profileId) : seeAllEarnings;
+    return { id: t.id, period: t.period, period_start: t.period_start, profile_id: (prof as { id?: string } | null)?.id ?? null };
+  });
+  const actuals = await loadTargetActualsLive(supabase, {
+    viewer: { userId: ctx.userId, role: ctx.role, perms: ctx.perms },
+    tenantId: ctx.tenantId,
+    targets: targetLikes,
+    names: new Map(((members ?? []) as { id: string; full_name: string }[]).map((m) => [m.id, m.full_name])),
+  });
+  const targets = rawTargets.map((t) => {
+    const a = actuals.get(t.id);
     return {
       ...t,
-      actual_deals: actuals.get(t.id)?.deals ?? 0,
-      actual_revenue: revVisible ? (actuals.get(t.id)?.revenue ?? 0) : 0,
-      revVisible,
+      actual_deals: a?.deals ?? 0,
+      actual_revenue: a?.revenueVisible ? a.revenue : 0,
+      revVisible: a?.revenueVisible ?? false,
     };
   });
   const memberList = (members ?? []) as { id: string; full_name: string }[];
@@ -324,7 +287,7 @@ canCreate ? <TargetCreateTrigger /> : null
                   <div>
                     <div className="mb-1 flex justify-between text-xs">
                       <span className="text-text-muted">Anlaşma</span>
-                      <Link href="/app/anlasmalar" className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-ink-950 hover:text-brand-600 hover:underline">
+                      <Link href="/app/teklifler?durum=accepted" className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-ink-950 hover:text-brand-600 hover:underline">
                         {t.actual_deals} / {t.target_deals}
                       </Link>
                     </div>
@@ -340,8 +303,8 @@ canCreate ? <TargetCreateTrigger /> : null
                   {/* Gelir hedefi */}
                   <div>
                     <div className="mb-1 flex justify-between text-xs">
-                      <span className="text-text-muted">Gelir</span>
-                      <Link href="/app/anlasmalar" className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-ink-950 hover:text-brand-600 hover:underline">
+                      <span className="text-text-muted">{(Array.isArray(t.profile) ? t.profile[0] : t.profile) ? "Gelir (komisyon payı)" : "Ofis komisyonu (brüt)"}</span>
+                      <Link href="/app/komisyon?durum=tahsil" className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-ink-950 hover:text-brand-600 hover:underline">
                         {t.revVisible ? money(Number(t.actual_revenue)) : "Gizli"} / {money(Number(t.target_revenue))}
                       </Link>
                     </div>

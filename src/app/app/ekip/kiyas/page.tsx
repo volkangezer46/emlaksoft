@@ -9,7 +9,8 @@ import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/tab
 import { EmptyState } from "@/components/app/empty-state";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
-import { OPEN_DEMAND_STATUSES, attentionReasons, untrackedCustomerIds } from "@/lib/team/advisor-360";
+import { attentionReasons } from "@/lib/team/advisor-360";
+import { currentMonthPeriod, loadAdvisorMetrics } from "@/lib/team/advisor-metrics";
 import {
   SCORECARD_FILTERS,
   SCORECARD_SORTS,
@@ -28,9 +29,6 @@ const ROLE_LABELS: Record<string, string> = {
   team_lead: "Takım lideri",
   advisor: "Danışman",
 };
-const SCORED_ROLES = Object.keys(ROLE_LABELS);
-const PROFILE_LIMIT = 200;
-const SCAN_LIMIT = 5000;
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -42,143 +40,46 @@ const LINK =
   "focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-brand-600 hover:underline";
 
 export default async function TeamBenchmarkPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
-  const { tenantId, userId, perms } = await requireModulePage("reports", "/app/ekip/kiyas");
+  const { tenantId, userId, perms, role } = await requireModulePage("reports", "/app/ekip/kiyas");
   const canHandoff = (perms.team ?? []).includes("edit");
   const seeAllEarnings = canSeeAllEarnings(perms);
   const sp = (await searchParams) ?? {};
   const sort = parseScorecardSort(sp.sirala, seeAllEarnings);
   const filter = parseScorecardFilter(sp.filtre);
 
-  const { monthKey, monthStartIso, elapsedPct } = trMonthContext(now());
+  const nowMs = now();
+  const { elapsedPct } = trMonthContext(nowMs);
   const supabase = await createClient();
 
-  const [profilesRes, kpiRes, targetsRes] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, full_name, role", { count: "exact" })
-      .eq("is_active", true)
-      .in("role", SCORED_ROLES)
-      .order("full_name")
-      .limit(PROFILE_LIMIT),
-    tenantId
-      ? supabase.rpc("advisor_kpis", { p_tenant_id: tenantId, p_month_start: monthStartIso })
-      : Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null }),
-    supabase
-      .from("targets")
-      .select("profile_id, target_deals, target_revenue")
-      .eq("period", "monthly")
-      .eq("period_start", monthKey)
-      .not("profile_id", "is", null),
-  ]);
-
-  const loadFailed = Boolean(profilesRes.error || kpiRes.error);
-  const profiles = (profilesRes.data ?? []) as { id: string; full_name: string; role: string }[];
-
-  const kpiById = new Map<string, Record<string, unknown>>();
-  for (const r of (kpiRes.data ?? []) as Array<Record<string, unknown>>) kpiById.set(String(r.assigned_to), r);
-
-  // Yayındaki portföy sayısı: eskiden 5000 satır çekilip bellekte sayılıyordu (yavaş sekme, QA #6).
-  // Ekip küçük/orta ise üye başına tek "head count" (satır taşımaz) paralel koşar; çok büyük ekipte tek taramaya düşer.
-  const propsById = new Map<string, number>();
-  const LIVE = ["live", "Yayında"];
-  if (profiles.length <= 80) {
-    const counts = await Promise.all(
-      profiles.map((p) =>
-        supabase
-          .from("properties")
-          .select("id", { count: "exact", head: true })
-          .is("deleted_at", null)
-          .in("status", LIVE)
-          .eq("assigned_to", p.id)
-          .then((r) => [p.id, r.count ?? 0] as const),
-      ),
-    );
-    for (const [id, n] of counts) if (n > 0) propsById.set(id, n);
-  } else {
-    const { data: propRows } = await supabase
-      .from("properties")
-      .select("assigned_to")
-      .is("deleted_at", null)
-      .in("status", LIVE)
-      .not("assigned_to", "is", null)
-      .limit(5000);
-    for (const r of (propRows ?? []) as { assigned_to: string | null }[]) {
-      if (r.assigned_to) propsById.set(r.assigned_to, (propsById.get(r.assigned_to) ?? 0) + 1);
-    }
-  }
-
-  // Aktif talep + öncül uyarılar: tek taramayla tüm danışmanlar (tavana dayanırsa gösterilmez, sahte sayı yok).
-  const [demandRes, taskRes] = await Promise.all([
-    supabase
-      .from("customer_demands")
-      .select("customer_id, customer:customers!customer_demands_customer_id_fkey!inner(assigned_to)")
-      .in("status", [...OPEN_DEMAND_STATUSES])
-      .not("customer.assigned_to", "is", null)
-      .limit(SCAN_LIMIT),
-    supabase
-      .from("tasks")
-      .select("assigned_to, customer_id, due_at")
-      .eq("status", "open")
-      .not("assigned_to", "is", null)
-      .limit(SCAN_LIMIT),
-  ]);
-  const demandRows = (demandRes.data ?? []) as unknown as {
-    customer_id: string | null;
-    customer: { assigned_to: string | null } | { assigned_to: string | null }[] | null;
-  }[];
-  const taskRows = (taskRes.data ?? []) as { assigned_to: string; customer_id: string | null; due_at: string | null }[];
-  const leadPartial = Boolean(
-    demandRes.error || taskRes.error || demandRows.length >= SCAN_LIMIT || taskRows.length >= SCAN_LIMIT,
-  );
-  const nowMs = now();
-  const demandsByAdvisor = new Map<string, (string | null)[]>();
-  for (const d of demandRows) {
-    const owner = (Array.isArray(d.customer) ? d.customer[0] : d.customer)?.assigned_to;
-    if (!owner) continue;
-    const list = demandsByAdvisor.get(owner) ?? [];
-    list.push(d.customer_id);
-    demandsByAdvisor.set(owner, list);
-  }
-  const tasksByAdvisor = new Map<string, { customer_id: string | null; due_at: string | null }[]>();
-  for (const t of taskRows) {
-    const list = tasksByAdvisor.get(t.assigned_to) ?? [];
-    list.push(t);
-    tasksByAdvisor.set(t.assigned_to, list);
-  }
-  const leadById = new Map<string, { activeDemands: number | null; overdue: number | null; untracked: number | null }>();
-  for (const p of profiles) {
-    const demands = demandsByAdvisor.get(p.id) ?? [];
-    const tasks = tasksByAdvisor.get(p.id) ?? [];
-    leadById.set(p.id, {
-      activeDemands: leadPartial ? null : demands.length,
-      overdue: leadPartial ? null : tasks.filter((t) => t.due_at && Date.parse(t.due_at) < nowMs).length,
-      untracked: leadPartial
-        ? null
-        : untrackedCustomerIds(demands, tasks.map((t) => t.customer_id)).length,
-    });
-  }
-
-  const targetById = new Map<string, { deals: number; revenue: number }>();
-  for (const t of (targetsRes.data ?? []) as { profile_id: string | null; target_deals: number; target_revenue: number }[]) {
-    if (t.profile_id) targetById.set(t.profile_id, { deals: Number(t.target_deals) || 0, revenue: Number(t.target_revenue) || 0 });
-  }
-
-  const inputs: ScorecardInput[] = profiles.map((p) => {
-    const k = kpiById.get(p.id);
-    return {
-      id: p.id,
-      fullName: p.full_name,
-      role: p.role,
-      customerCount: Number(k?.customer_count ?? 0),
-      activePropertyCount: propsById.get(p.id) ?? 0,
-      callCount: Number(k?.call_count ?? 0),
-      appointCount: Number(k?.appoint_count ?? 0),
-      offerCount: Number(k?.offer_count ?? 0),
-      dealCount: Number(k?.deal_count ?? 0),
-      revenue: Number(k?.revenue ?? 0),
-      target: targetById.get(p.id) ?? null,
-    };
+  // TEK KAYNAK: loadAdvisorMetrics (Danışman KPI, Lig, Kazanç, Hedefler ve Performansım ile aynı sayılar).
+  const metrics = await loadAdvisorMetrics(supabase, {
+    viewer: { userId, role, perms },
+    tenantId,
+    period: currentMonthPeriod(nowMs),
+    nowMs,
+    withTargets: true,
+    withLeadSignals: true,
   });
+  const loadFailed = metrics.failed;
+  const profiles = metrics.rows;
+
+  const leadById = new Map(
+    metrics.rows.map((m) => [m.id, { activeDemands: m.activeDemandCount, overdue: m.overdueTaskCount, untracked: m.untrackedDemandCount }]),
+  );
+
+  const inputs: ScorecardInput[] = metrics.rows.map((m) => ({
+    id: m.id,
+    fullName: m.fullName,
+    role: m.role,
+    customerCount: m.customerCount,
+    activePropertyCount: m.activePropertyCount,
+    callCount: m.callCount,
+    appointCount: m.appointCount,
+    offerCount: m.offerCount,
+    dealCount: m.dealCount,
+    revenue: m.revenue ?? 0,
+    target: m.target,
+  }));
 
   const includeRevenue = (id: string) => seeAllEarnings || id === userId;
   const all = buildScorecard(inputs, sort, { includeRevenueInTarget: includeRevenue });
@@ -305,7 +206,7 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
             ) : null}
           </nav>
 
-          <ListLimitNotice shown={profiles.length} total={profilesRes.count} hint="Şubeye göre daraltmak için Ekip sayfasını kullanın." />
+          <ListLimitNotice shown={profiles.length} total={metrics.profileTotal} hint="Şubeye göre daraltmak için Ekip sayfasını kullanın." />
 
           {!hasAnyActivity ? (
             <p className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-sm text-text-muted">
@@ -335,7 +236,7 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
                     <TH align="right">Teklif</TH>
                     <TH align="right">Anlaşma</TH>
                     <TH align="right">Dönüşüm</TH>
-                    <TH align="right">Kazanç</TH>
+                    <TH align="right">Gelir (komisyon payı)</TH>
                     <TH align="right">Hedef</TH>
                     {canHandoff ? <TH align="right">İşlem</TH> : null}
                   </TR>
