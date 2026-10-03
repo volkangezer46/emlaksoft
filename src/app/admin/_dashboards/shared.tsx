@@ -36,7 +36,7 @@ export function GlassSkeleton() {
 
 export function KpiGridSkeleton({ count = 8 }: { count?: number }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-hidden="true">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="pm-card h-36 animate-pulse" />
       ))}

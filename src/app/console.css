@@ -51,7 +51,7 @@ a.bx:hover, .bx-hover:hover { box-shadow: var(--elev-2); border-color: color-mix
 
 /* ---- Tablo/liste standardı (kabuk ve admin) ---- */
 .qrow { display: flex; align-items: center; gap: 0.75rem; min-height: var(--row-h); padding-inline: 0.75rem; border-radius: var(--radius-control); transition: background-color 120ms ease; }
-.qrow:hover { background: var(--canvas); }
+.qrow:hover { background: var(--surface-sunken); }
 .table-std { font-variant-numeric: tabular-nums; }
 .table-std th { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); }
 .table-std td, .table-std th { height: var(--row-h); }
