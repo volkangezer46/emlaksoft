@@ -29,6 +29,7 @@ export function matchesQuery(label: string, q: string): boolean {
 export type AppAction = PaletteEntry & { module: AppModule };
 
 export const APP_ACTIONS: readonly AppAction[] = [
+  { label: "Hızlı kayıt", href: "/app/hizli", icon: ICONS.hizli, module: "customers", shortcut: "n h" },
   { label: "Yeni müşteri", href: "/app/musteriler/yeni", icon: ICONS.musteri, module: "customers", shortcut: "n m" },
   { label: "Yeni talep", href: "/app/talepler/yeni", icon: ICONS.talep, module: "demands", shortcut: "n t" },
   { label: "Yeni portföy", href: "/app/portfoyler/yeni", icon: ICONS.portfoy, module: "properties", shortcut: "n p" },

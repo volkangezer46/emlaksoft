@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { ChevronDown, ExternalLink, Lock, Menu, Pin, PinOff, Search, X } from "lucide-react";
+import { ChevronDown, ExternalLink, Lock, Menu, Pin, PinOff, Plus, Search, X } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar `src/lib/icons.ts` sözlüğünden gelir.
 import { ICONS } from "@/lib/icons";
 import { findActiveNavigationHref } from "@/lib/navigation";
@@ -412,6 +412,9 @@ export function AppSidebar({
     { href: "/app/portfoyler", label: "Portföy", icon: ICONS.portfoy, module: "properties" as AppModule },
     { href: "/app/randevular", label: "Randevu", icon: ICONS.randevu, module: "appointments" as AppModule },
   ].filter((t) => accessibleModules.includes(t.module));
+  // "Yeni": sahada hızlı kayıt sayfası (müşteri / görüşme / randevu); en az birine create izni gerekir.
+  const showQuickNew = ["customers", "calls", "appointments"].some((m) => creatable.includes(m as AppModule));
+  const quickActive = pathname === "/app/hizli";
   const activeTabHref = findActiveNavigationHref(
     pathname,
     tabItems.map((item) => item.href),
@@ -441,7 +444,7 @@ export function AppSidebar({
         aria-label="Mobil hızlı gezinme"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-line/70 bg-surface/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
       >
-        <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}>
+        <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1 + (showQuickNew ? 1 : 0)}, minmax(0, 1fr))` }}>
           {tabItems.map((tab) => {
             const active = tab.href === activeTabHref;
             return (
@@ -461,6 +464,20 @@ export function AppSidebar({
               </Link>
             );
           })}
+          {showQuickNew ? (
+            <Link
+              href="/app/hizli"
+              aria-current={quickActive ? "page" : undefined}
+              aria-label="Yeni kayıt: hızlı kayıt"
+              onClick={() => setOpen(false)}
+              className="flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-xs font-semibold text-brand-600 transition"
+            >
+              <span className={`grid h-7 w-11 place-items-center rounded-full bg-brand-600 text-white ${quickActive ? "ring-2 ring-brand-300" : ""}`}>
+                <Plus className="h-[18px] w-[18px]" />
+              </span>
+              Yeni
+            </Link>
+          ) : null}
           <DialogTrigger asChild>
             <button type="button" className="flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-xs font-semibold text-text-faint transition hover:text-ink-950">
               <span className="relative grid h-7 w-11 place-items-center rounded-full">

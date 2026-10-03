@@ -12,10 +12,10 @@ const chip =
 /** Hızlı eylem çubuğu — veri çekmez, anında render edilir; komut paleti ipucunu taşır. */
 export function HizliAksiyonlar() {
   const actions = [
-    { href: "/app/musteriler/yeni", label: "Yeni müşteri", Icon: ICONS.musteri },
+    { href: "/app/hizli?sekme=musteri", label: "Yeni müşteri", Icon: ICONS.musteri },
     { href: "/app/portfoyler/yeni", label: "Yeni portföy", Icon: ICONS.portfoy },
-    { href: "/app/arama", label: "Arama kaydı", Icon: PhoneIncoming },
-    { href: "/app/randevular", label: "Randevu planla", Icon: Bell },
+    { href: "/app/hizli?sekme=gorusme", label: "Arama kaydı", Icon: PhoneIncoming },
+    { href: "/app/hizli?sekme=randevu", label: "Randevu planla", Icon: Bell },
   ];
   return (
     <Widget id="hizli" className="h-full">

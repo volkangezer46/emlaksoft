@@ -68,7 +68,7 @@ describe("palette-core: yeni eylemleri", () => {
 
   it("paket kilitli sayfalar Eylemler'den elenir", () => {
     const all = ["customers", "properties"] as const;
-    expect(getAppActions(all, "", ["/app/portfoyler"]).map((a) => a.href)).toEqual(["/app/musteriler/yeni"]);
+    expect(getAppActions(all, "", ["/app/portfoyler"]).map((a) => a.href)).toEqual(["/app/hizli", "/app/musteriler/yeni"]);
   });
 });
 

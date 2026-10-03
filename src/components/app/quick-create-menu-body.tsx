@@ -15,7 +15,7 @@ import type { AppModule } from "@/lib/permissions";
 
 /** Menü grupları: href → grup. Listede olmayan yeni eylem "Diğer"e düşer (kaybolmaz). */
 const GROUPS: { title: string; hrefs: string[] }[] = [
-  { title: "Kayıtlar", hrefs: ["/app/musteriler/yeni", "/app/talepler/yeni", "/app/portfoyler/yeni", "/app/projeler/yeni", "/app/kiralama/yeni"] },
+  { title: "Kayıtlar", hrefs: ["/app/hizli", "/app/musteriler/yeni", "/app/talepler/yeni", "/app/portfoyler/yeni", "/app/projeler/yeni", "/app/kiralama/yeni"] },
   { title: "Gün planı", hrefs: ["/app/randevular/yeni", "/app/gorevler/yeni", "/app/arama", "/app/acik-ev/yeni"] },
   { title: "Anlaşma", hrefs: ["/app/anlasmalar/yeni", "/app/teklifler/yeni", "/app/sozlesmeler/yeni", "/app/onaylar/yeni", "/app/portfoyler/sunumlar/yeni"] },
 ];
