@@ -36,6 +36,7 @@ import type { AppModule } from "@/lib/permissions";
 import { planLabel } from "@/lib/billing/plans";
 import { lockedHrefs } from "@/lib/billing/page-gates";
 import { getAppActions } from "@/lib/palette-core";
+import { parseUiPrefs, uiPrefCookieName, uiPrefsCss } from "@/lib/ui-prefs";
 
 const NAV_MODULES: AppModule[] = [
   "dashboard",
@@ -210,6 +211,10 @@ export default async function AppLayout({
 
   const jar = await cookies();
   const impersonationCookieMatches = jar.get(IMPERSONATE_COOKIE)?.value === tenantId;
+  // Arayüz tercihi (Sade görünüm + yazı boyutu): ofis+kullanıcı kapsamlı çerez, SSR'da uygulanır.
+  const uiPrefCookie = uiPrefCookieName(tenantId, user?.id);
+  const uiPrefs = parseUiPrefs(uiPrefCookie ? jar.get(uiPrefCookie)?.value : undefined);
+  const uiCss = uiPrefsCss(uiPrefs.font);
   const impName = impersonationCookieMatches
     ? (jar.get("es_impersonate_name")?.value ?? office?.name ?? "Hedef ofis")
     : (office?.name ?? "Hedef ofis");
@@ -217,6 +222,7 @@ export default async function AppLayout({
   return (
     <ToastProvider>
       <ThemeController />
+      {uiCss ? <style>{uiCss}</style> : null}
       <SidebarBoot />
       <ErrorBoundary>
         {brandColor ? (
@@ -242,6 +248,8 @@ export default async function AppLayout({
           canUpgrade={accessibleModules.includes("billing") && !platformStaffFullAccess && (office?.plan ?? "office") !== "enterprise"}
           vitrinHref={vitrinHref}
           storageScope={user && tenantId ? `${tenantId}:${user.id}` : undefined}
+          role={platformStaffFullAccess ? "owner" : effectiveRole}
+          simple={uiPrefs.simple}
         />
         <div className="flex min-w-0 flex-1 flex-col">
           {impersonating && platformStaff ? <OpsImpersonationBanner tenantName={impName || office?.name || "Ofis"} /> : null}
@@ -282,6 +290,7 @@ export default async function AppLayout({
                 name={fullName}
                 subtitle={`${planLabel(office?.plan ?? "office")} plan`}
                 links={accessibleModules.includes("settings") ? [{ href: "/app/ayarlar", label: "Ayarlar", iconName: "settings" as const }] : []}
+                viewPrefs={uiPrefCookie ? { cookieName: uiPrefCookie, initial: uiPrefs } : undefined}
               />
             </div>
           </header>

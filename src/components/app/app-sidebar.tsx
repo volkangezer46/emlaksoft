@@ -7,11 +7,12 @@ import { ChevronDown, ExternalLink, Lock, Menu, Pin, PinOff, Search, X } from "l
 // İkonografi tek kaynaktan: kavramsal ikonlar `src/lib/icons.ts` sözlüğünden gelir.
 import { ICONS } from "@/lib/icons";
 import { findActiveNavigationHref } from "@/lib/navigation";
-import { resolveActiveNav, visibleSections, type NavItem, type VisibleSection } from "@/lib/nav-config";
+import { moreSections, resolveActiveNav, visibleSections, type NavItem, type VisibleSection } from "@/lib/nav-config";
 import type { NavBadge, PlanUsageRow } from "@/lib/nav-badges";
 import { getHrefStore, MAX_RECENT_SHOWN, pushRecent, togglePin } from "@/lib/nav-memory";
 import { getAppActions, OPEN_PALETTE_EVENT } from "@/lib/palette-core";
 import type { AppModule } from "@/lib/permissions";
+import { ShortcutHint } from "@/components/app/shortcut-hint";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
 import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
@@ -38,6 +39,8 @@ export function AppSidebar({
   canUpgrade = false,
   vitrinHref = null,
   storageScope,
+  role = null,
+  simple = false,
 }: {
   officeName: string;
   plan: string;
@@ -56,15 +59,27 @@ export function AppSidebar({
   vitrinHref?: string | null;
   /** `${tenantId}:${userId}` — sabitlenen/son kullanılan/kapalı bölüm tercihlerinin yerel anahtarı. */
   storageScope?: string;
+  /** Etkin rol: sade görünümde rol çekirdek menüsünü belirler (yetkiyi değiştirmez). */
+  role?: string | null;
+  /** Sade görünüm: yalnız rol çekirdeği, gerisi "Daha fazla" altında. Tercih çerezden SSR'da gelir. */
+  simple?: boolean;
 }) {
   const pathname = usePathname();
   // Prefetch: next/link varsayılanı (görünür alanda + hover) yeterli; elle router.prefetch yağmuru kaldırıldı.
   const [open, setOpen] = useState(false);
 
   // Menü 9 iş başlığıdır (bkz. src/lib/nav-config.ts). Başlıkta izinli hiçbir sayfa yoksa gizlenir.
-  const sections = useMemo(() => visibleSections(accessibleModules), [accessibleModules]);
-  const { section: activeSection, href: activeHref } = resolveActiveNav(pathname, sections);
+  // Tam liste: etkin sayfa tespiti, sabitlenenler ve son kullanılanlar için (hiçbir sayfa kaybolmaz).
+  const allSections = useMemo(() => visibleSections(accessibleModules), [accessibleModules]);
+  // Sade görünümde ana liste yalnız çekirdek; çekirdek dışı "Daha fazla" altındadır.
+  const sections = useMemo(
+    () => (simple ? visibleSections(accessibleModules, { mode: "simple", role }) : allSections),
+    [simple, accessibleModules, role, allSections],
+  );
+  const more = useMemo(() => (simple ? moreSections(accessibleModules, { role }) : []), [simple, accessibleModules, role]);
+  const { section: activeSection, href: activeHref } = resolveActiveNav(pathname, allSections);
   const activeId = activeSection?.id ?? null;
+  const activeInMore = more.some((s) => s.items.some((i) => i.href === activeHref));
 
   const pinStore = getHrefStore("pins", storageScope);
   const recentStore = getHrefStore("recent", storageScope);
@@ -80,11 +95,11 @@ export function AppSidebar({
     if (cur[0] !== activeHref) recentStore.write(pushRecent(cur, activeHref));
   }, [activeHref, recentStore]);
 
-  const itemByHref = useMemo(() => new Map(sections.flatMap((s) => s.items).map((i) => [i.href, i])), [sections]);
+  const itemByHref = useMemo(() => new Map(allSections.flatMap((s) => s.items).map((i) => [i.href, i])), [allSections]);
   // Yetki süzgeci: bellekteki yol menüde (yetkili) yoksa görünmez.
   const pinnedItems = pins.flatMap((h) => itemByHref.get(h) ?? []);
   // Son kullanılanlar: tekil, sabitlenmiş/aktif olmayan, aktif başlığın zaten görünen öğeleri hariç; en çok 3 satır.
-  const activeSectionHrefs = new Set(activeSection?.items.map((i) => i.href) ?? []);
+  const activeSectionHrefs = new Set(sections.find((s) => s.id === activeId)?.items.map((i) => i.href) ?? []);
   const recentItems = [...new Set(recents)]
     .filter((h) => !pins.includes(h) && h !== activeHref && !activeSectionHrefs.has(h))
     .flatMap((h) => itemByHref.get(h) ?? [])
@@ -97,6 +112,14 @@ export function AppSidebar({
   };
 
   const totalBadges = badges.reduce((n, b) => n + b.count, 0);
+
+  // "Daha fazla": varsayılan kapalı; kullanıcı açtıysa ya da etkin sayfa içindeyse açık ("closed" deposunda
+  // bu kimlik AÇIK anlamına gelir).
+  const moreOpen = activeInMore || closed.includes("daha-fazla-acik");
+  const toggleMore = () => {
+    const cur = closedStore.read();
+    closedStore.write(cur.includes("daha-fazla-acik") ? cur.filter((x) => x !== "daha-fazla-acik") : [...cur, "daha-fazla-acik"]);
+  };
 
   const toggleSection = (id: string) => {
     const cur = closedStore.read();
@@ -194,17 +217,17 @@ export function AppSidebar({
         <SidebarCollapseButton />
       </div>
 
-      <div className="sb-pad px-3 pt-3">
+      <div className={`sb-pad px-3 pt-3${simple && variant === "desktop" ? " hidden" : ""}`}>
         <button
           type="button"
           onClick={openPalette}
-          aria-label="Ara ve komut paletini aç (Ctrl K)"
-          title="Ara (Ctrl K)"
+          aria-label="Ara: müşteri, portföy, ilan no veya sayfa"
+          title="Ara"
           className="nav-search focus-ring w-full text-left transition-colors hover:bg-white/10"
         >
           <Search className="h-4 w-4 shrink-0" aria-hidden />
-          <span className="sb-label flex-1 truncate text-sm text-white/75">Ara…</span>
-          <kbd className="sb-label rounded-md border border-white/15 bg-white/8 px-1.5 py-0.5 text-xs font-semibold text-white/80">⌘K</kbd>
+          <span className="sb-label flex-1 truncate text-sm text-white/75">Ad, telefon veya ilan no ara…</span>
+          <ShortcutHint className="sb-label rounded-md border border-white/15 bg-white/8 px-1.5 py-0.5 font-sans text-xs font-semibold text-white/80" />
         </button>
       </div>
 
@@ -235,6 +258,33 @@ export function AppSidebar({
               </div>
             );
           })}
+          {more.length > 0 ? (
+            <div>
+              <div className="sb-eyebrow px-3 pb-1 pt-4 text-white/70">
+                <button
+                  type="button"
+                  onClick={toggleMore}
+                  aria-expanded={moreOpen}
+                  aria-controls="sb-daha-fazla"
+                  className="focus-ring flex min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white"
+                >
+                  <span className="shrink-0">Daha fazla</span>
+                  <span className="h-px flex-1 bg-white/10" aria-hidden />
+                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${moreOpen ? "" : "-rotate-90"}`} aria-hidden />
+                </button>
+              </div>
+              {moreOpen ? (
+                <div id="sb-daha-fazla" className="space-y-0.5">
+                  {more.map((section) => (
+                    <div key={section.id}>
+                      <p className="px-3 pb-0.5 pt-2 text-xs font-semibold uppercase tracking-wide text-white/55">{section.title}</p>
+                      {section.items.map((i) => renderItem(i, { group: `more-${section.id}`, pinnable: true }))}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         {/* İkon modu (64px): başlık başına tek ikon; hover/odakta sağda alt menü + hızlı eylemler. */}

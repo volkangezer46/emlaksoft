@@ -12,6 +12,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ViewPrefs } from "@/components/ui/console/view-prefs";
+import type { UiPrefs } from "@/lib/ui-prefs";
 
 /**
  * `icon`: yalnız İSTEMCİ bileşenlerinden geçirilebilir (ikon bir fonksiyondur; sunucu bileşeninden
@@ -31,11 +33,14 @@ export function UserMenu({
   name,
   subtitle,
   links = [],
+  viewPrefs,
 }: {
   initials: string;
   name: string;
   subtitle: string;
   links?: UserMenuLink[];
+  /** Sade görünüm + yazı boyutu (çerez adı ofis+kullanıcı kapsamlı); yoksa bölüm gösterilmez. */
+  viewPrefs?: { cookieName: string; initial: UiPrefs };
 }) {
   return (
     <DropdownMenu>
@@ -52,7 +57,7 @@ export function UserMenu({
         </span>
         <ChevronDown className="hidden h-3.5 w-3.5 text-text-faint sm:block" aria-hidden />
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-60">
+      <DropdownMenuContent className="w-72">
         <DropdownMenuLabel>
           <span className="block truncate text-sm font-semibold text-text">{name}</span>
           <span className="block truncate text-xs font-normal text-text-muted">{subtitle}</span>
@@ -70,6 +75,12 @@ export function UserMenu({
           </DropdownMenuItem>
         ))}
         {links.length > 0 ? <DropdownMenuSeparator /> : null}
+        {viewPrefs ? (
+          <>
+            <ViewPrefs cookieName={viewPrefs.cookieName} initial={viewPrefs.initial} />
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         <form action={signOut}>
           <DropdownMenuItem asChild danger>
             <button type="submit" className="w-full">
