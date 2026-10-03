@@ -12,6 +12,7 @@ import {
   Users2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DAY_MS, msUntil } from "@/lib/clock";
 import { PLANS, getPlan, planAmountTry, planLabel, type BillingCycle } from "@/lib/billing/plans";
@@ -43,9 +44,7 @@ export default async function BillingPage({
   const supabase = await createClient();
   const configured = isIyzicoConfigured();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
   const tenantId = user?.app_metadata?.tenant_id as string | undefined;
 
   const [

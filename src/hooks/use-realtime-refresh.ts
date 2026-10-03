@@ -35,10 +35,25 @@ export function useRealtimeRefresh(opts: {
     let supabase: SupabaseClient | null = null;
     let channel: RealtimeChannel | null = null;
 
+    // Her router.refresh() sayfanın TÜM sunucu sorgularını yeniden koşturur.
+    // Sekme arka plandayken boşuna tetiklenmesin: değişiklik "bekliyor" işaretlenir,
+    // sekme görünür olunca tek seferde yenilenir (veri bayatlamaz, sunucu yükü düşer).
+    let pending = false;
     const bump = () => {
+      if (timer.current) clearTimeout(timer.current);
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        pending = true;
+        return;
+      }
+      timer.current = setTimeout(() => router.refresh(), debounceMs ?? 400);
+    };
+    const onVisible = () => {
+      if (document.visibilityState !== "visible" || !pending) return;
+      pending = false;
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => router.refresh(), debounceMs ?? 400);
     };
+    document.addEventListener("visibilitychange", onVisible);
 
     // supabase-js ilk boyamayı bloklamasın: istemci boşta/sonra ayrı parça olarak yüklenir.
     void import("@/lib/supabase/client").then(({ createClient }) => {
@@ -58,6 +73,7 @@ export function useRealtimeRefresh(opts: {
 
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
       if (timer.current) clearTimeout(timer.current);
       if (supabase && channel) void supabase.removeChannel(channel);
     };

@@ -21,6 +21,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
 import { clearSampleDataForm } from "@/app/actions/sample-data";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -74,8 +75,8 @@ export default async function SettingsPage() {
   await requireModulePage("settings");
   const supabase = await createClient();
 
-  const [{ data: { user } }, { data: tenantRow }, notifPrefs, { count: consentCount }, { count: activeConsentCount }, { count: auditCount }, { data: netgsmRow }, { data: whatsappRow }, netgsmPlatformConfigured] = await Promise.all([
-    supabase.auth.getUser(),
+  const [user, { data: tenantRow }, notifPrefs, { count: consentCount }, { count: activeConsentCount }, { count: auditCount }, { data: netgsmRow }, { data: whatsappRow }, netgsmPlatformConfigured] = await Promise.all([
+    getRequestUser(),
     supabase
       .from("tenants")
       .select("name, plan, tax_office, tax_number, license_no, brand_color, iban, phone, address_line, city, logo_url, website, sample_seeded_at, matching_weights")

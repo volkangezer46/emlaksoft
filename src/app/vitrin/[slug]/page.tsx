@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import { unstable_cache } from "next/cache";
 import { ArrowRight, Building2, Calculator, MapPin, Ruler, BedDouble, Search, ShieldCheck } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LeadForm } from "@/app/lead/[token]/lead-form";
@@ -119,44 +120,79 @@ export default async function VitrinPage({
   const oda = (sp.oda ?? "").trim();
   const sirala = sp.sirala === "fiyat-artan" || sp.sirala === "fiyat-azalan" ? sp.sirala : "";
 
-  let query = admin
-    .from("properties")
-    .select(
-      "id, title, property_code, transaction_type, property_type, list_price, address_line, features, published_at, province:geo_provinces(name), district:geo_districts(name)",
-    )
-    .eq("tenant_id", tenant.id)
-    .eq("status", "live")
-    .is("deleted_at", null);
-
-  if (q) {
-    // PostgREST or() sözdizimini bozan karakterler temizlenir
-    const safe = q.replace(/[,%()]/g, " ").trim();
-    if (safe) {
-      query = query.or(`title.ilike.%${safe}%,property_code.ilike.%${safe}%,address_line.ilike.%${safe}%`);
-    }
-  }
-  if (min != null) query = query.gte("list_price", min);
-  if (max != null) query = query.lte("list_price", max);
-  if (oda) query = query.eq("features->>rooms", oda);
-
-  // Fiyatsız ilanlar ("Fiyat için sorun") her sıralamada sona düşsün
-  if (sirala === "fiyat-artan") query = query.order("list_price", { ascending: true, nullsFirst: false });
-  else if (sirala === "fiyat-azalan") query = query.order("list_price", { ascending: false, nullsFirst: false });
-  else query = query.order("created_at", { ascending: false });
-
-  // Oda filtresi seçenekleri yayındaki gerçek değerlerden türetilir → ana sorguyla paralel
-  const [{ data: propsData }, { data: roomRows }, fxRates] = await Promise.all([
-    query.limit(60),
-    admin
+  // Vitrin listesi searchParams okuduğu için sayfa dinamik render olur ve `revalidate`
+  // devreye girmez; veri katmanı bu yüzden kısa TTL (60 sn) önbellektedir. Anahtar tenant.id +
+  // normalize filtreler; serbest metin araması (q) önbelleğe ALINMAZ (anahtar şişmesi yok).
+  // Tenant durumu (askı/iptal) önbelleğin DIŞINDA her istekte denetlenir. İlan yazma action'ları
+  // revalidatePath ile düşürür; en kötü bayatlık TTL kadardır (ISR ile aynı sözleşme).
+  const loadListing = async () => {
+    let query = admin
       .from("properties")
-      .select("features")
+      .select(
+        "id, title, property_code, transaction_type, property_type, list_price, address_line, features, published_at, province:geo_provinces(name), district:geo_districts(name)",
+      )
       .eq("tenant_id", tenant.id)
       .eq("status", "live")
-      .is("deleted_at", null)
-      .limit(200),
-    // Döviz karşılığı sunucuda hesaplanır — ISR (revalidate=120) korunur.
-    fetchLatestRates(admin),
-  ]);
+      .is("deleted_at", null);
+
+    if (q) {
+      // PostgREST or() sözdizimini bozan karakterler temizlenir
+      const safe = q.replace(/[,%()]/g, " ").trim();
+      if (safe) {
+        query = query.or(`title.ilike.%${safe}%,property_code.ilike.%${safe}%,address_line.ilike.%${safe}%`);
+      }
+    }
+    if (min != null) query = query.gte("list_price", min);
+    if (max != null) query = query.lte("list_price", max);
+    if (oda) query = query.eq("features->>rooms", oda);
+
+    // Fiyatsız ilanlar ("Fiyat için sorun") her sıralamada sona düşsün
+    if (sirala === "fiyat-artan") query = query.order("list_price", { ascending: true, nullsFirst: false });
+    else if (sirala === "fiyat-azalan") query = query.order("list_price", { ascending: false, nullsFirst: false });
+    else query = query.order("created_at", { ascending: false });
+
+    // Oda filtresi seçenekleri yayındaki gerçek değerlerden türetilir → ana sorguyla paralel
+    const [{ data: propsData }, { data: roomRows }, fxRates] = await Promise.all([
+      query.limit(60),
+      admin
+        .from("properties")
+        .select("features")
+        .eq("tenant_id", tenant.id)
+        .eq("status", "live")
+        .is("deleted_at", null)
+        .limit(200),
+      // Döviz karşılığı sunucuda hesaplanır — ISR (revalidate=120) korunur.
+      fetchLatestRates(admin),
+    ]);
+
+    // Kapak görselleri: çekilen tüm ilanlar için (tx süzmesi bellekte sonradan uygulanır).
+    const coverIds = (propsData ?? []).map((p) => p.id);
+    const coverEntries: [string, string][] = [];
+    if (coverIds.length) {
+      const { data: media } = await admin
+        .from("property_media")
+        .select("id, property_id, is_cover, sort_order")
+        .eq("kind", "image")
+        .in("property_id", coverIds)
+        .order("is_cover", { ascending: false })
+        .order("sort_order", { ascending: true });
+      const seen = new Set<string>();
+      for (const m of media ?? []) {
+        if (!seen.has(m.property_id)) {
+          seen.add(m.property_id);
+          coverEntries.push([m.property_id, m.id]);
+        }
+      }
+    }
+    return { propsData: propsData ?? [], roomRows: roomRows ?? [], fxRates, coverEntries };
+  };
+  const listing = q
+    ? await loadListing()
+    : await unstable_cache(loadListing, ["vitrin-listing-v1", tenant.id, String(min ?? ""), String(max ?? ""), oda, sirala], {
+        revalidate: 60,
+        tags: ["vitrin", `vitrin:${tenant.id}`],
+      })();
+  const { propsData, roomRows, fxRates } = listing;
 
   // Kur tarihi ipucu — kartlardaki döviz satırının `title` değeri.
   const fxTitle = fxRates ? `TCMB ${fxRates.rateDate} satış kuru — ${fxAgeLabel(fxRates.rateDate, now())}` : undefined;
@@ -193,20 +229,7 @@ export default async function VitrinPage({
     return `/vitrin/${slug}${s ? `?${s}` : ""}`;
   }
 
-  const propIds = properties.map((p) => p.id);
-  const coverMap = new Map<string, string>();
-  if (propIds.length) {
-    const { data: media } = await admin
-      .from("property_media")
-      .select("id, property_id, is_cover, sort_order")
-      .eq("kind", "image")
-      .in("property_id", propIds)
-      .order("is_cover", { ascending: false })
-      .order("sort_order", { ascending: true });
-    for (const m of media ?? []) {
-      if (!coverMap.has(m.property_id)) coverMap.set(m.property_id, m.id);
-    }
-  }
+  const coverMap = new Map<string, string>(listing.coverEntries);
 
   const fieldCls =
     "w-full rounded-[var(--radius-card)] border border-white/15 bg-white/[0.06] px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition focus:border-mint-400/50 focus:bg-white/[0.09]";
@@ -327,7 +350,7 @@ export default async function VitrinPage({
           </div>
         ) : (
           <>
-          <FavEmptyNotice slug={slug} ids={propIds} />
+          <FavEmptyNotice slug={slug} ids={properties.map((p) => p.id)} />
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {properties.map((p) => {
               const feat = (p.features ?? {}) as {

@@ -9,8 +9,10 @@ import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 export function RealtimeRefresh({ tenantId }: { tenantId: string | null }) {
   useRealtimeRefresh({
     tenantId,
-    tables: ["notifications", "deals", "commissions", "portal_listings", "customers"],
-    debounceMs: 600,
+    // notifications burada YOK: INSERT'ler aşağıdaki özel kanaldan zile akar; aynı tabloya
+    // ikinci bir "*" aboneliği (Realtime list_changes poller maliyeti) gereksizdi.
+    tables: ["deals", "commissions", "portal_listings", "customers"],
+    debounceMs: 1200,
   });
 
   // Bildirim INSERT'lerini anlık olarak zile köprüle. Kanal burada açılıyor

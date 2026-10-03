@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaff } from "@/lib/platform";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
@@ -29,9 +30,7 @@ const nf = new Intl.NumberFormat("tr-TR");
  */
 export default async function SuspendedPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
 
   const { data: profile } = user
     ? await supabase

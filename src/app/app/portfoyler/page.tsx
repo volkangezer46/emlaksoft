@@ -224,6 +224,8 @@ export default async function PropertiesPage({
     return query;
   };
 
+  const filtersEmpty = !statusValues && !qOrClause && !saglikValues;
+
   const LIST_COLS =
     "id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, published_at, province_id, district_id, lat, lng, province:geo_provinces(name), district:geo_districts(name), portal_listings!portal_listings_property_id_fkey(portal_name,status,last_confirmed_at)";
   const MAP_COLS = "id, property_code, title, transaction_type, list_price, lat, lng";
@@ -287,7 +289,10 @@ export default async function PropertiesPage({
     mapQuery,
     // Filtrelenmiş gerçek toplam — hem sayfalama ("X-Y / Toplam Z") hem de
     // harita görünümünde konumsuz portföy sayısı için tek doğruluk kaynağı.
-    buildFilteredQuery("id", { count: "exact", head: true }),
+    // Filtresizken sorgu "Toplam portföy" KPI'ı ile birebir aynıdır → tekrar sayılmaz.
+    filtersEmpty
+      ? Promise.resolve({ count: null as number | null })
+      : buildFilteredQuery("id", { count: "exact", head: true }),
     // TCMB kuru — yoksa null döner ve döviz satırı hiç basılmaz (uydurma kur yok).
     fetchLatestRates(supabase),
     // KPI sayıları — liste artık sayfalı olduğundan head-count sorgularıyla
@@ -306,7 +311,7 @@ export default async function PropertiesPage({
   ]);
 
   const rows = (data ?? []) as unknown as PropertyRow[];
-  const totalFilteredCount = filteredTotal ?? 0;
+  const totalFilteredCount = (filtersEmpty ? totalCount : filteredTotal) ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalFilteredCount / PAGE_SIZE));
   const rangeStart = totalFilteredCount === 0 ? 0 : offset + 1;
   const rangeEnd = Math.min(offset + rows.length, totalFilteredCount);
