@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, FilePlus2, FileSignature, FileText, ScrollText } from "lucide-react";
+import { ArrowLeft, FilePlus2, FileSignature } from "lucide-react";
+import { TAB_ICONS as TI } from "@/lib/icons";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { FormActions, FormPage } from "@/components/ui/form-page";
@@ -156,7 +157,7 @@ Danışman: ___________________________  Tarih: _______
 Müşteri:  ___________________________  Tarih: _______`,
 };
 
-const TAB_ICONS = { bilgiler: FileText, icerik: ScrollText } as const;
+const TAB_ICONS = { bilgiler: TI.sozlesme, icerik: TI.icerik } as const;
 const FIELD_LABELS = { title: "Sözleşme başlığı", body: "Sözleşme içeriği" };
 
 const init: ContractResult = {};

@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ClipboardList, Link2, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import { TAB_ICONS as TI } from "@/lib/icons";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
@@ -10,7 +11,7 @@ import { createApprovalRequest } from "@/app/actions/approvals";
 import { APPROVAL_KINDS, APPROVAL_KIND_META, type ApprovalKind } from "@/lib/approvals";
 import { APPROVAL_DRAFT_FIELDS, APPROVAL_FORM_ID, APPROVAL_TABS } from "./approval-tabs";
 
-const TAB_ICONS = { talep: ClipboardList, kayit: Link2 } as const;
+const TAB_ICONS = { talep: TI.onay, kayit: TI.kayit } as const;
 const FIELD_LABELS = { kind: "Talep türü", title: "Başlık" };
 
 /**

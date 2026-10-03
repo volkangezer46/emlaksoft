@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { FileText, Landmark, MapPin, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
+import { TAB_ICONS as TI } from "@/lib/icons";
 import { useCreateForm } from "@/components/app/use-create-form";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
@@ -10,7 +11,7 @@ import { DAY_MS, msUntil } from "@/lib/clock";
 import { detailOrList } from "@/lib/form-logic";
 import { PROJECT_DRAFT_FIELDS, PROJECT_FORM_ID, PROJECT_TABS } from "./project-tabs";
 
-const TAB_ICONS = { proje: Landmark, konum: MapPin, aciklama: FileText } as const;
+const TAB_ICONS = { proje: TI.proje, konum: TI.konum, aciklama: TI.aciklama } as const;
 const FIELD_LABELS = { name: "Proje adı" };
 const STATUS_LABELS: Record<string, string> = {
   planning: "Planlama",

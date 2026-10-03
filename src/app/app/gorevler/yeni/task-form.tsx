@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarClock, Check, ListChecks } from "lucide-react";
+import { Check } from "lucide-react";
+import { TAB_ICONS as TI } from "@/lib/icons";
 import { createTask } from "@/app/actions/tasks";
 import { searchCustomers } from "@/app/actions/lookup";
 import { useCreateForm } from "@/components/app/use-create-form";
@@ -36,8 +37,8 @@ const recurrenceOptions = [
 ];
 
 const TAB_ICONS = {
-  gorev: ListChecks,
-  zamanlama: CalendarClock,
+  gorev: TI.gorev,
+  zamanlama: TI.zaman,
 } as const;
 
 const FIELD_LABELS = { title: "Başlık" };

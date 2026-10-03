@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ClipboardList, Tag, Users } from "lucide-react";
+import { Tag } from "lucide-react";
+import { TAB_ICONS as TI } from "@/lib/icons";
 import { createOffer } from "@/app/actions/offers";
 import { useCreateForm } from "@/components/app/use-create-form";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
@@ -23,7 +24,7 @@ type CustomerOption = { id: string; full_name: string };
 
 const formatTl = (value: number) => new Intl.NumberFormat("tr-TR").format(value);
 
-const TAB_ICONS = { taraflar: Users, kosullar: ClipboardList } as const;
+const TAB_ICONS = { taraflar: TI.taraflar, kosullar: TI.kosullar } as const;
 
 const FIELD_LABELS = { property_id: "Portföy", amount: "Teklif tutarı" };
 

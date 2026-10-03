@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { CalendarHeart, MapPin, Save, StickyNote, UserRound } from "lucide-react";
+import { Save, UserRound } from "lucide-react";
+import { TAB_ICONS as TI } from "@/lib/icons";
 import { createCustomer } from "@/app/actions/customers";
 import { GeoSelect } from "@/components/app/geo-select";
 import { useCreateForm } from "@/components/app/use-create-form";
@@ -17,10 +18,10 @@ type Province = { id: string; name: string };
 type Branch = { id: string; name: string };
 
 const TAB_ICONS = {
-  kisi: UserRound,
-  iletisim: MapPin,
-  "ozel-gunler": CalendarHeart,
-  not: StickyNote,
+  kisi: TI.kisi,
+  iletisim: TI.iletisim,
+  "ozel-gunler": TI.ozelGunler,
+  not: TI.not,
 } as const;
 
 const FIELD_LABELS = { full_name: "Ad soyad" };

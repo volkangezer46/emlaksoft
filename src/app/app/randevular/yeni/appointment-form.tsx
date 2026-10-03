@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { CalendarClock, Check, ChevronsUpDown, MapPin, Sparkles, TriangleAlert, Users } from "lucide-react";
+import { Check, ChevronsUpDown, MapPin, Sparkles, TriangleAlert } from "lucide-react";
+import { TAB_ICONS as TI } from "@/lib/icons";
 import { createAppointment } from "@/app/actions/appointments";
 import { searchCustomers, searchProperties } from "@/app/actions/lookup";
 import { useCreateForm } from "@/components/app/use-create-form";
@@ -13,8 +14,8 @@ import { APPOINTMENT_DRAFT_FIELDS, APPOINTMENT_FORM_ID, APPOINTMENT_TABS } from 
 type Option = { id: string; label: string };
 
 const TAB_ICONS = {
-  zaman: CalendarClock,
-  katilimci: Users,
+  zaman: TI.zaman,
+  katilimci: TI.katilimci,
 } as const;
 
 const FIELD_LABELS = { appointment_type: "Randevu türü", date: "Tarih", time: "Saat" };

@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { MapPin, Save, SlidersHorizontal, UserRound } from "lucide-react";
+import { Save, UserRound } from "lucide-react";
+import { TAB_ICONS as TI } from "@/lib/icons";
 import { createDemand } from "@/app/actions/demands";
 import { GeoSelect } from "@/components/app/geo-select";
 import { useCreateForm } from "@/components/app/use-create-form";
@@ -24,9 +25,9 @@ type Province = { id: string; name: string };
 type CustomerOption = { id: string; full_name: string };
 
 const TAB_ICONS = {
-  musteri: UserRound,
-  kriter: SlidersHorizontal,
-  bolge: MapPin,
+  musteri: TI.kisi,
+  kriter: TI.kriter,
+  bolge: TI.bolge,
 } as const;
 
 const FIELD_LABELS = { customer_id: "Müşteri", transaction_type: "İşlem türü" };

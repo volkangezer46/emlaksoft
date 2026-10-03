@@ -12,38 +12,46 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { FormEventHandler, KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
-import { Check, ChevronLeft, ChevronRight, RotateCcw, Sparkles, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, PanelRightClose, PanelRightOpen, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { FormError } from "@/components/ui/form-controls";
 import { FormActions } from "@/components/ui/form-page";
+import { MorphTabs, type MorphTabItem } from "@/components/ui/morph-tabs";
 import { PageHeader } from "@/components/ui/page-header";
+import { usePersistedFlag } from "@/components/ui/use-persisted-flag";
 import type { BreadcrumbItem } from "@/components/ui/breadcrumb";
 import type { NextStep } from "@/lib/form-logic";
 import { useFormDraft, type FormDraftConfig } from "@/components/app/use-form-draft";
+import { useFormFields } from "@/components/app/use-form-fields";
 import { useFormValues } from "@/components/app/use-form-values";
 import { now } from "@/lib/clock";
 import {
   computeTabState,
   formatClock,
   formatDraftTime,
-  isTabNavKey,
   neighborTabId,
   nextTabId,
   progressSummary,
   resolveInitialTab,
+  slideDirection,
+  tabProgress,
   type FormValues,
+  type SlideDirection,
   type TabState,
 } from "@/lib/form-tabs";
+import { statusBadge } from "@/lib/morph-tabs";
 import { cn } from "@/lib/utils";
 
 /**
  * TabbedFormShell — "Yeni X" formlarının sekmeli masaüstü deneyimi
  * (şartname: docs/design/FORMS_SPEC.md, kullanım: docs/DESIGN_SYSTEM.md "Sekmeli formlar").
  *
- * Masaüstü (>=1024px): solda dikey sekme rayı, ortada aktif panel (+ Önceki/Sonraki),
- * >=1280px sağda yapışkan "Özet ve önizleme". Altta yapışkan eylem çubuğu.
- * Dar ekranda: yatay kaydırılan sekme şeridi, tek sütun, özet `<details>` içinde.
+ * Sekmeler MorphTabs'tır (büyüyen/küçülen; docs/DESIGN_SYSTEM.md "Sekmeler (MorphTabs)").
+ * Masaüstü (>=1024px): solda dikey, TAMAMEN daraltılabilir (ikon-only; rozetler görünür, üzerine gelince
+ * geçici açılır) sekme rayı, ortada aktif panel (+ Önceki/Sonraki, yönlü kayma), >=1280px sağda daraltılabilir
+ * yapışkan "Özet ve önizleme". Altta yapışkan eylem çubuğu (ilerleme çubuğu dahil).
+ * Dar ekranda: yatay MorphTabs şeridi (aktif etiketli, pasifler ikon), tek sütun, özet `<details>` içinde.
  *
  * Form bütünlüğü: TEK `<form>`; tüm paneller DOM'da kalır (pasifler `hidden`) ve gönderilir.
  * Gizli sekmedeki geçersiz/zorunlu alan: `invalid` olayı yakalanır, ilk bozuk sekme açılıp alana odaklanılır.
@@ -154,7 +162,6 @@ export function TabbedFormShell({
 }: TabbedFormShellProps) {
   const uid = useId();
   const formRef = useRef<HTMLFormElement>(null);
-  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const tabsRef = useRef(tabs);
   const ids = useMemo(() => tabs.map((t) => t.id), [tabs]);
   const tabbed = layout !== "single";
@@ -162,9 +169,11 @@ export function TabbedFormShell({
 
   const [active, setActive] = useState(() => resolveInitialTab(ids, initialTab));
   const [errorCounts, setErrorCounts] = useState<Record<string, number>>({});
+  const [dir, setDir] = useState<SlideDirection>("none");
+  const [railCollapsed, setRailCollapsed] = usePersistedFlag("emlaksoft:ui:form-rail-collapsed", false);
+  const [sideOpen, setSideOpen] = usePersistedFlag("emlaksoft:ui:form-side-open", true);
   const attemptedRef = useRef(false);
-  const mountedRef = useRef(false);
-  const selectRef = useRef<(id: string, o?: { focus?: "tab" | "field" | "none" }) => void>(() => {});
+  const selectRef = useRef<(id: string, o?: { focus?: "field" | "none" }) => void>(() => {});
   const activeRef = useRef(active);
 
   useEffect(() => {
@@ -180,6 +189,23 @@ export function TabbedFormShell({
     return out;
   }, [tabs, values]);
   const progress = useMemo(() => progressSummary(tabs, values), [tabs, values]);
+  const fieldInfo = useFormFields(formRef, fieldNames);
+  const morphItems = useMemo<MorphTabItem[]>(
+    () =>
+      tabs.map((t) => {
+        const st = tabStates[t.id];
+        const errors = (errorCounts[t.id] ?? 0) + (t.errorCount ?? 0);
+        return {
+          id: t.id,
+          label: t.label,
+          icon: t.icon,
+          description: t.description,
+          badge: statusBadge(st?.status, errors, st?.missing.length ?? 0),
+          progress: st && st.status !== "none" ? tabProgress(t, values) : null,
+        };
+      }),
+    [tabs, tabStates, errorCounts, values],
+  );
 
   const draftApi = useFormDraft(formRef, draft);
   const wasPending = useRef(false);
@@ -198,8 +224,9 @@ export function TabbedFormShell({
   }, []);
 
   const select = useCallback(
-    (id: string, opts?: { focus?: "tab" | "field" | "none" }) => {
+    (id: string, opts?: { focus?: "field" | "none" }) => {
       if (!ids.includes(id)) return;
+      setDir(slideDirection(ids, activeRef.current, id));
       setActive(id);
       try {
         const url = new URL(window.location.href);
@@ -209,8 +236,7 @@ export function TabbedFormShell({
       } catch {
         /* derin bağlantı yazılamadı — sessiz */
       }
-      if (opts?.focus === "tab") requestAnimationFrame(() => tabRefs.current[id]?.focus());
-      else if (opts?.focus === "field") focusFirstField(id);
+      if (opts?.focus === "field") focusFirstField(id);
     },
     [ids, focusFirstField],
   );
@@ -245,15 +271,6 @@ export function TabbedFormShell({
     // yalnız bağlanırken
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Dar ekranda aktif sekmeyi şeritte ortala.
-  useEffect(() => {
-    if (!mountedRef.current) {
-      mountedRef.current = true;
-      return;
-    }
-    if (!isDesktop) tabRefs.current[active]?.scrollIntoView({ inline: "center", block: "nearest" });
-  }, [active, isDesktop]);
 
   // Hata sayıları: yalnız ilk gönderim denemesinden sonra, DOM'daki :invalid alanlardan.
   useEffect(() => {
@@ -331,12 +348,6 @@ export function TabbedFormShell({
     }
   }
 
-  function onTabKeyDown(e: ReactKeyboardEvent<HTMLDivElement>) {
-    if (e.altKey || e.ctrlKey || e.metaKey || !isTabNavKey(e.key)) return;
-    e.preventDefault();
-    select(nextTabId(ids, activeRef.current, e.key), { focus: "tab" });
-  }
-
   // Özet fonksiyonu ayrı bileşende çağrılır (goToTab bağlamdan gelir): React Compiler "ref render'da okunuyor" uyarısını önler.
   const summaryNode =
     typeof summary === "function" ? (
@@ -373,6 +384,32 @@ export function TabbedFormShell({
         </div>
       ) : null}
       {summaryNode ? <div className="space-y-3">{summaryNode}</div> : null}
+      {tabs.some((t) => t.fields.some((f) => fieldInfo[f])) ? (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-ink-950">Girilen bilgiler</p>
+          {tabs.map((t) => {
+            const rows = t.fields.filter((f) => fieldInfo[f]);
+            if (rows.length === 0) return null;
+            return (
+              <SummaryGroup key={t.id} title={t.label}>
+                {rows.map((f) => {
+                  const info = fieldInfo[f];
+                  return (
+                    <SummaryRow
+                      key={f}
+                      label={fieldLabels?.[f] ?? info.label ?? f}
+                      value={info.text ?? "Girilmedi"}
+                      muted={info.text == null}
+                      tab={t.id}
+                      field={f}
+                    />
+                  );
+                })}
+              </SummaryGroup>
+            );
+          })}
+        </div>
+      ) : null}
       {missingList.length > 0 ? (
         <div>
           <p className="mb-1.5 text-xs font-semibold text-ink-950">Eksik zorunlu alanlar</p>
@@ -404,7 +441,7 @@ export function TabbedFormShell({
 
   return (
     <ShellContext.Provider value={{ goToTab }}>
-      <form ref={formRef} onSubmit={onSubmit} onKeyDown={onFormKeyDown} className="tfs-form">
+      <form ref={formRef} onSubmit={onSubmit} onKeyDown={onFormKeyDown} className="tfs-form" data-dir={dir}>
         <div className={cn("mx-auto w-full max-w-[80rem]", className)}>
           <PageHeader title={title} description={description} eyebrow={eyebrow} breadcrumbs={breadcrumbs} actions={headerActions} />
 
@@ -426,82 +463,37 @@ export function TabbedFormShell({
           ) : null}
 
           <div
-            className={cn(
-              tabbed && "lg:grid lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start lg:gap-6",
-              tabbed && hasSide && "xl:grid-cols-[14rem_minmax(0,1fr)_20rem]",
-            )}
+            className="tfs-layout"
+            data-tabbed={tabbed ? "1" : undefined}
+            data-rail={railCollapsed ? "collapsed" : "open"}
+            data-side={hasSide ? (sideOpen ? "open" : "closed") : "none"}
           >
             {tabbed ? (
               <div className="mb-4 lg:sticky lg:top-20 lg:mb-0 lg:self-start">
-                <div className="relative rounded-[var(--radius-card)] border border-line bg-surface p-2 shadow-[var(--elev-1)]">
-                  <p className="hidden px-2 pb-2 pt-1 text-xs font-semibold uppercase tracking-wide text-text-faint lg:block">Bölümler</p>
-                  <div
-                    role="tablist"
-                    aria-label="Form bölümleri"
-                    aria-orientation={isDesktop ? "vertical" : "horizontal"}
-                    onKeyDown={onTabKeyDown}
-                    className="flex snap-x gap-1 overflow-x-auto [scrollbar-width:none] lg:flex-col lg:overflow-visible [&::-webkit-scrollbar]:hidden"
-                  >
-                    {tabs.map((t) => {
-                      const selected = t.id === active;
-                      const st = tabStates[t.id];
-                      const errors = (errorCounts[t.id] ?? 0) + (t.errorCount ?? 0);
-                      const Icon = t.icon;
-                      const hint =
-                        errors > 0
-                          ? `${errors} hatalı alan`
-                          : st?.status === "missing"
-                            ? `${st.missing.length} zorunlu alan eksik`
-                            : st?.status === "complete"
-                              ? "Tamamlandı"
-                              : "";
-                      return (
-                        <button
-                          key={t.id}
-                          ref={(el) => {
-                            tabRefs.current[t.id] = el;
-                          }}
-                          type="button"
-                          role="tab"
-                          id={`${uid}-tab-${t.id}`}
-                          aria-selected={selected}
-                          aria-controls={`${uid}-panel-${t.id}`}
-                          aria-describedby={hint ? `${uid}-hint-${t.id}` : undefined}
-                          tabIndex={selected ? 0 : -1}
-                          onClick={() => select(t.id)}
-                          className="focus-ring relative flex min-h-11 shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-[var(--radius-control)] px-3 py-2 text-left text-sm font-medium text-text-muted transition-colors duration-150 hover:bg-canvas hover:text-ink-950 aria-selected:bg-brand-600/10 aria-selected:font-semibold aria-selected:text-brand-700 lg:w-full lg:whitespace-normal"
-                        >
-                          {selected ? (
-                            <span aria-hidden="true" className="absolute inset-y-2 left-0 hidden w-0.5 rounded-full bg-brand-600 lg:block" />
-                          ) : null}
-                          {Icon ? <Icon aria-hidden="true" className="h-4 w-4 shrink-0" /> : null}
-                          <span className="min-w-0 flex-1">{t.label}</span>
-                          {errors > 0 ? (
-                            <span aria-hidden="true" className="numeric min-w-5 rounded-full bg-danger-soft px-1.5 text-center text-xs font-semibold text-danger-strong">
-                              {errors}
-                            </span>
-                          ) : st?.status === "complete" ? (
-                            <span aria-hidden="true" className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-success-soft text-success-strong">
-                              <Check className="h-3 w-3" strokeWidth={3} />
-                            </span>
-                          ) : st?.status === "missing" ? (
-                            <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-warning-strong" />
-                          ) : null}
-                          {hint ? <span id={`${uid}-hint-${t.id}`} className="sr-only">{hint}</span> : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {progress.total > 0 ? (
-                    <p className="numeric px-2 pb-1 pt-2 text-xs text-text-muted" aria-live="polite">
-                      {progress.done}/{progress.total} bölüm tamam
-                    </p>
-                  ) : null}
-                  <span
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-y-2 right-2 w-6 rounded-r-[var(--radius-control)] bg-gradient-to-l from-surface to-transparent lg:hidden"
-                  />
-                </div>
+                <MorphTabs
+                  items={morphItems}
+                  activeId={active}
+                  onSelect={(id) => select(id)}
+                  orientation={isDesktop ? "vertical" : "horizontal"}
+                  label="Form bölümleri"
+                  idPrefix={uid}
+                  railCollapsed={railCollapsed}
+                  onToggleRail={() => setRailCollapsed(!railCollapsed)}
+                  footer={
+                    progress.total > 0 ? (
+                      <p className="numeric text-xs text-text-muted" aria-live="polite">
+                        {railCollapsed ? (
+                          <>
+                            <span aria-hidden="true">{progress.done}/{progress.total}</span>
+                            <span className="sr-only">{progress.done}/{progress.total} bölüm tamam</span>
+                          </>
+                        ) : (
+                          <>{progress.done}/{progress.total} bölüm tamam</>
+                        )}
+                      </p>
+                    ) : null
+                  }
+                />
               </div>
             ) : null}
 
@@ -572,12 +564,29 @@ export function TabbedFormShell({
             {tabbed && hasSide ? (
               <aside
                 aria-label="Özet ve önizleme"
-                className="hidden rounded-[var(--radius-card)] border border-line bg-surface p-4 text-sm shadow-[var(--elev-1)] xl:sticky xl:top-20 xl:block xl:self-start"
+                className={cn(
+                  "hidden rounded-[var(--radius-card)] border border-line bg-surface text-sm shadow-[var(--elev-1)] xl:sticky xl:top-20 xl:block xl:max-h-[calc(100vh-6rem)] xl:self-start xl:overflow-y-auto",
+                  sideOpen ? "p-4" : "p-0.5",
+                )}
               >
-                <h2 className="mb-3 flex items-center gap-2 font-display text-sm font-semibold text-ink-950">
-                  <Sparkles aria-hidden="true" className="h-4 w-4 text-brand-600" /> Özet ve önizleme
-                </h2>
-                {summaryBody}
+                <div className={cn("flex items-center gap-2", sideOpen && "mb-3")}>
+                  {sideOpen ? (
+                    <h2 className="flex min-w-0 flex-1 items-center gap-2 font-display text-sm font-semibold text-ink-950">
+                      <Sparkles aria-hidden="true" className="h-4 w-4 shrink-0 text-brand-600" /> Özet ve önizleme
+                    </h2>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setSideOpen(!sideOpen)}
+                    aria-expanded={sideOpen}
+                    aria-label={sideOpen ? "Özet panelini daralt" : "Özet panelini genişlet"}
+                    title={sideOpen ? "Daralt" : "Özet ve önizleme"}
+                    className="focus-ring grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition-colors duration-150 hover:bg-canvas hover:text-ink-950"
+                  >
+                    {sideOpen ? <PanelRightClose aria-hidden="true" className="h-4 w-4" /> : <PanelRightOpen aria-hidden="true" className="h-4 w-4" />}
+                  </button>
+                </div>
+                {sideOpen ? summaryBody : null}
               </aside>
             ) : null}
           </div>
@@ -590,6 +599,21 @@ export function TabbedFormShell({
           ) : null}
 
           <FormActions className="mt-4">
+            {tabbed && progress.total > 0 ? (
+              <div
+                role="progressbar"
+                aria-label="Form ilerlemesi"
+                aria-valuemin={0}
+                aria-valuemax={progress.total}
+                aria-valuenow={progress.done}
+                className="-mt-3 basis-full overflow-hidden"
+              >
+                <div
+                  className="h-0.5 bg-brand-600 transition-[width] duration-200 motion-reduce:transition-none"
+                  style={{ width: `${(progress.done / progress.total) * 100}%` }}
+                />
+              </div>
+            ) : null}
             <p aria-live="polite" className="mr-auto hidden min-w-0 truncate text-xs text-text-faint sm:block">
               {statusText ?? (
                 <>
