@@ -4,6 +4,10 @@ import { HeroSection } from "@/components/marketing/hero/hero-section";
 import { ProofStrip } from "@/components/marketing/proof-strip";
 import { BentoGrid } from "@/components/marketing/bento/bento-grid";
 import { HowItWorks } from "@/components/marketing/how-it-works";
+import { ProductTour } from "@/components/marketing/product-tour/product-tour";
+import { LossStory } from "@/components/marketing/loss-story";
+import { CommandPaletteArt } from "@/components/marketing/command-palette-art";
+import { SecurityBand } from "@/components/marketing/security-band";
 import { PricingSection } from "@/components/marketing/pricing-section";
 import { Faq } from "@/components/marketing/faq";
 import { FinalCta } from "@/components/marketing/final-cta";
@@ -24,6 +28,10 @@ export default function HomePage() {
         <ProofStrip />
         <BentoGrid />
         <HowItWorks />
+        <ProductTour />
+        <LossStory />
+        <CommandPaletteArt />
+        <SecurityBand />
         <PricingSection />
         <Faq />
         <FinalCta />
