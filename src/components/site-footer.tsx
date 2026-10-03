@@ -1,84 +1,88 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { PLANS } from "@/lib/billing/plans";
 import { trParts } from "@/lib/clock";
 
-const columns: { title: string; links: [string, string][] }[] = [
+type FooterLink = [label: string, href: string];
+
+const columns: { title: string; links: FooterLink[] }[] = [
   {
     title: "Ürün",
     links: [
       ["Özellikler", "/#ozellikler"],
+      ["Ürün turu", "/#tur"],
       ["Kayıp-kaçak motoru", "/#kayip-kacak"],
-      ["Akıllı Arama", "/#akilli-arama"],
-      ["Fiyatlandırma", "/#fiyat"],
+      ["Akıllı arama", "/#akilli-arama"],
+      ["Güvenlik ve KVKK", "/#guvenlik"],
     ],
   },
   {
-    title: "Başlayın",
+    title: "Paketler",
+    links: [...PLANS.map((p): FooterLink => [p.name, `/kayit?plan=${p.id}`]), ["Fiyatları karşılaştır", "/#fiyat"]],
+  },
+  {
+    title: "Kaynaklar",
     links: [
-      ["14 gün ücretsiz dene", "/kayit"],
-      ["Demo görüşmesi planla", "/demo"],
-      ["Giriş yap", "/giris"],
+      ["Nasıl çalışır", "/#nasil"],
       ["Sık sorulan sorular", "/#sss"],
+      ["Giriş yap", "/giris"],
     ],
   },
   {
-    title: "Güven",
+    title: "Yasal",
     links: [
-      ["Güvenlik ve uyum", "/#guvenlik"],
       ["KVKK Aydınlatma", "/kvkk-aydinlatma"],
       ["Gizlilik Politikası", "/gizlilik"],
       ["Çerez Politikası", "/cerez-politikasi"],
-    ],
-  },
-  {
-    title: "Sözleşmeler",
-    links: [
       ["Kullanım Şartları", "/kullanim-sartlari"],
       ["Mesafeli Satış Sözleşmesi", "/mesafeli-satis"],
       ["Ön Bilgilendirme", "/on-bilgilendirme"],
       ["İptal ve İade", "/iptal-iade"],
     ],
   },
+  {
+    title: "İletişim",
+    links: [
+      ["Demo görüşmesi planla", "/demo"],
+      ["destek@emlaksoft.com.tr", "mailto:destek@emlaksoft.com.tr"],
+    ],
+  },
 ];
 
 export function SiteFooter() {
   return (
-    <footer className="theme-dark border-t border-white/10 bg-[image:var(--grad-ink)] text-white">
-      <div className="mx-auto max-w-6xl px-4 py-12 md:py-14">
-        <div className="grid gap-10 lg:grid-cols-[1.3fr_2.7fr]">
-          <div>
-            <Link href="/" className="inline-flex items-center gap-2.5" aria-label="EmlakSoft ana sayfa">
-              <span className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-brand-600 font-display text-base font-extrabold text-white">E</span>
-              <span className="font-display text-lg font-extrabold">EmlakSoft</span>
+    <footer className="mk-foot">
+      <div className="mk-wrap" style={{ paddingBlock: "clamp(3rem, 2rem + 4vw, 5rem)" }}>
+        <div className="mk-foot-grid">
+          <div className="mk-foot-brand">
+            <Link href="/" className="mk-logo" style={{ color: "#fff" }} aria-label="EmlakSoft ana sayfa">
+              <i aria-hidden="true" style={{ background: "#1463ff" }}>E</i>EmlakSoft
             </Link>
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/70">
+            <p style={{ margin: "1rem 0 0", maxWidth: "18rem", fontSize: "0.9375rem", lineHeight: 1.6 }}>
               Emlak ofisleri için müşteri, portföy, anlaşma ve komisyon akışını tek panelde toplayan abonelikli yazılım.
             </p>
-            <Link href="/kayit" className="mt-5 inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-bold text-ink-950 transition hover:bg-white/90">
-              14 gün ücretsiz dene <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            <Link href="/kayit" className="mk-btn mk-btn-light" style={{ marginTop: "1.25rem", minHeight: "2.75rem", padding: "0.5rem 1rem", fontSize: "0.9375rem" }}>
+              14 gün ücretsiz dene <ArrowRight size={16} aria-hidden="true" />
             </Link>
           </div>
-
-          <nav aria-label="Alt bilgi bağlantıları" className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
-            {columns.map((col) => (
-              <div key={col.title}>
-                <h2 className="text-sm font-bold text-white">{col.title}</h2>
-                <ul className="mt-4 space-y-2.5 text-sm">
-                  {col.links.map(([label, href]) => (
-                    <li key={label}>
-                      <Link href={href} className="text-white/70 transition hover:text-white">{label}</Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </nav>
+          {columns.map((col) => (
+            <nav key={col.title} aria-label={col.title}>
+              <h2>{col.title}</h2>
+              <ul>
+                {col.links.map(([label, href]) => (
+                  <li key={label}><Link href={href}>{label}</Link></li>
+                ))}
+              </ul>
+            </nav>
+          ))}
         </div>
-
-        <div className="mt-12 flex flex-col gap-2 border-t border-white/10 pt-6 text-sm text-white/60 sm:flex-row sm:items-center sm:justify-between">
-          <p>© {trParts().year} EmlakSoft. Tüm hakları saklıdır.</p>
-          <a href="mailto:destek@emlaksoft.com.tr" className="transition hover:text-white">destek@emlaksoft.com.tr</a>
+        <div className="mk-foot-bottom">
+          <p style={{ margin: 0 }}>© {trParts().year} EmlakSoft. Tüm hakları saklıdır.</p>
+          <p style={{ margin: 0 }}>Ekran görüntüleri ve sayılar örnek veridir.</p>
         </div>
+      </div>
+      <div className="mk-sticky-cta">
+        <Link href="/kayit" className="mk-btn mk-btn-primary">14 gün ücretsiz dene</Link>
       </div>
     </footer>
   );

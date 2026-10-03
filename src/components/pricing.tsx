@@ -10,7 +10,6 @@ import {
   Check,
   Crown,
   ShieldCheck,
-  Sparkles,
   UserRound,
 } from "lucide-react";
 
@@ -89,10 +88,7 @@ export function Pricing() {
                     className="pointer-events-none absolute -inset-px -z-10 rounded-[var(--radius-panel)] opacity-70 blur-md"
                     style={{ background: "var(--grad-brand)" }}
                   />
-                  <span className="absolute right-5 top-5 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-xs font-bold text-ink-950">
-                    <Sparkles className="h-3 w-3" />
-                    Popüler
-                  </span>
+
                 </>
               ) : null}
 

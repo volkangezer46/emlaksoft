@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 function source(file: string): string {
@@ -63,7 +63,18 @@ describe("navigation accessibility contract", () => {
   });
 
   it("describes every landing demo link as a scheduled meeting", () => {
-    const home = source("src/app/page.tsx") + source("src/components/site-footer.tsx");
+    // Bölümler src/components/marketing altında ayrı dosyalardır: page + marketing/** + footer toplamı.
+    const marketingFiles = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? marketingFiles(`${dir}/${e.name}`) : /\.tsx$/.test(e.name) ? [`${dir}/${e.name}`] : [],
+      );
+    const home = [
+      "src/app/page.tsx",
+      ...marketingFiles("src/components/marketing"),
+      "src/components/site-footer.tsx",
+    ]
+      .map(source)
+      .join("\n");
 
     expect(home.match(/"\/demo"/g)?.length).toBeGreaterThanOrEqual(3);
     expect(home.match(/Demo görüşmesi planla/gi)?.length).toBeGreaterThanOrEqual(3);
