@@ -369,10 +369,10 @@ export default async function DanismanKpiPage({
 
       {/* ── Liderlik podyumu: skoru olan ilk üç danışman (ekran, çıktı dışı) ── */}
       {podium.length > 0 ? (
-        <section className="no-print dashboard-panel relative overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface p-6">
+        <section className={`no-print dashboard-panel relative overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface p-6 ${podium.length === 1 ? "mx-auto w-full max-w-md text-center" : ""}`}>
           <div className="pointer-events-none absolute -left-10 -top-16 h-48 w-48 rounded-full bg-amber-400/15 blur-[70px]" />
           <div className="relative">
-            <p className="flex items-center gap-2 text-xs font-semibold text-amber-600">
+            <p className={`flex items-center gap-2 text-xs font-semibold text-amber-600 ${podium.length === 1 ? "justify-center" : ""}`}>
               <Crown className="h-4 w-4" /> Liderlik podyumu
             </p>
             <h2 className="mt-1 font-display text-lg font-bold text-ink-950">

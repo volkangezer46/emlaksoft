@@ -30,6 +30,21 @@ import {
   type SplitRow,
 } from "./kapanis-model";
 
+const COMMISSION_STATUS_LABELS: Record<string, string> = {
+  pending: "Bekliyor",
+  calculated: "Hesaplandı",
+  approved: "Onaylandı",
+  paid: "Ödendi",
+  collected: "Tahsil edildi",
+  cancelled: "İptal edildi",
+  canceled: "İptal edildi",
+};
+
+function commissionStatusLabel(status: string | null | undefined): string {
+  if (!status) return "—";
+  return COMMISSION_STATUS_LABELS[status.toLowerCase()] ?? status;
+}
+
 export type KapanisProps = {
   dealId: string;
   stage: string;
@@ -441,7 +456,7 @@ function SplitsStep(p: BodyProps) {
       <dl className="grid gap-2 sm:grid-cols-3">
         <Stat label="Komisyon (KDV hariç)" value={money(commission.gross)} />
         <Stat label="KDV" value={money(commission.vat)} />
-        <Stat label="Durum" value={commission.status || "—"} />
+        <Stat label="Durum" value={commissionStatusLabel(commission.status)} />
       </dl>
       <p className="text-sm text-text-muted">Komisyonu taraflar arasında oranla bölüştürün (danışman payı dahil).</p>
       <div className="space-y-2">

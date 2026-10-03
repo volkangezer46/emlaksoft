@@ -374,6 +374,8 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
     `Merhaba, ${property.title || property.property_code} ilanı hakkında bilgi almak istiyorum. ${BASE_URL}/vitrin/${slug}/${id}`,
   );
 
+  const hasMobileBar = Boolean(advisorTel ?? officeTel) || Boolean(advisorWhatsApp ?? officeWhatsApp) || Boolean(bookingToken) || leadOpen;
+
   const coverId = images[0]?.id ?? null;
   const jsonLd = {
     "@context": "https://schema.org",
@@ -749,8 +751,9 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
           — Türkiye&apos;nin emlak işletim sistemi
         </p>
         {/* Mobilde ekrana yapışan aksiyon çubuğu — sayfa sonu dolgusu içeriği örtmesin */}
-        <div aria-hidden="true" className="h-20 lg:hidden" />
+        {hasMobileBar ? <div aria-hidden="true" className="h-20 lg:hidden" /> : null}
       </main>
+      {hasMobileBar ? (
       <nav
         aria-label="Hızlı iletişim"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:hidden"
@@ -777,6 +780,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
           ) : null}
         </div>
       </nav>
+      ) : null}
     </div>
   );
 }

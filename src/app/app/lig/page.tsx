@@ -441,14 +441,14 @@ export default async function LigPage({
         <>
           {/* ── PODYUM: ilk üç ─────────────────────────────────────────── */}
           {podium.length > 0 ? (
-            <section className="dashboard-panel relative overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface p-6">
+            <section className={`dashboard-panel relative overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface p-6 ${podium.length === 1 ? "mx-auto w-full max-w-md text-center" : ""}`}>
               <div className="pointer-events-none absolute -left-10 -top-16 h-48 w-48 rounded-full bg-amber-400/15 blur-[70px]" />
               <div className="relative">
-                <p className="flex items-center gap-2 text-xs font-semibold text-amber-600">
+                <p className={`flex items-center gap-2 text-xs font-semibold text-amber-600 ${podium.length === 1 ? "justify-center" : ""}`}>
                   <Crown className="h-4 w-4" /> Podyum
                 </p>
                 <h2 className="mt-1 font-display text-lg font-bold text-ink-950 first-letter:uppercase">
-                  {range.label} ilk üçü
+                  {podium.length === 1 ? `${range.label} lideri` : `${range.label} ilk üçü`}
                 </h2>
                 <div className={`mt-6 grid gap-3 sm:items-end ${podiumColumns(podium.length)}`}>
                   {podium.map((r, i) => {

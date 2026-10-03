@@ -18,6 +18,37 @@ const TOTAL_PROVINCES = 81;
 
 type Heartbeat = { job: string; last_run_at: string; last_status: string; last_detail: string | null };
 
+const DETAIL_KEYS: Record<string, string> = {
+  claimed: "alındı",
+  completed: "tamamlandı",
+  failed: "başarısız",
+  processed: "işlendi",
+  sent: "gönderildi",
+  skipped: "atlandı",
+  errors: "hata",
+  error: "hata",
+  retried: "yeniden denendi",
+  total: "toplam",
+  updated: "güncellendi",
+  inserted: "eklendi",
+  deleted: "silindi",
+};
+
+/** Cron ayrıntısı JSON ise okunur özet satırına çevirir ("alındı 0 · tamamlandı 0"); değilse olduğu gibi. */
+function formatCronDetail(detail: string): string {
+  const t = detail.trim();
+  if (!t.startsWith("{")) return detail;
+  try {
+    const obj = JSON.parse(t) as Record<string, unknown>;
+    const parts = Object.entries(obj)
+      .filter(([, v]) => typeof v === "number" || typeof v === "string" || typeof v === "boolean")
+      .map(([k, v]) => `${DETAIL_KEYS[k] ?? k.replace(/_/g, " ")} ${typeof v === "boolean" ? (v ? "evet" : "hayır") : v}`);
+    return parts.length > 0 ? parts.join(" · ") : detail;
+  } catch {
+    return detail;
+  }
+}
+
 function StatusPill({ ok, okLabel, badLabel }: { ok: boolean; okLabel: string; badLabel: string }) {
   return (
     <span
@@ -235,7 +266,7 @@ export async function SystemView() {
                     <p className="truncate text-xs text-text-faint">
                       <span className="numeric">{job}</span> · {cadenceLabel}
                       {hb ? ` · ${relativeTimeTR(hb.last_run_at)}` : " · hiç çalışmadı"}
-                      {hb?.last_detail ? ` · ${hb.last_detail}` : ""}
+                      {hb?.last_detail ? ` · ${formatCronDetail(hb.last_detail)}` : ""}
                     </p>
                   </div>
                   {failed ? (
