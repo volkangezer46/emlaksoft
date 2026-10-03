@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/server";
 import { daysAgoIso } from "@/lib/clock";
 import { ImportWizard } from "./import-wizard";
 import { IMPORT_ROW_LIMIT } from "./import-config";
+import { listRecentImports } from "@/app/actions/import-rollback";
 
 import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "İçe aktarma" };
@@ -36,6 +37,17 @@ const nf = new Intl.NumberFormat("tr-TR");
 export default async function ImportPage() {
   const { perms } = await requireModulePage("customers");
   const canImportProperties = effectiveHasPermission(perms, "properties", "create");
+  const canImportDemands = effectiveHasPermission(perms, "demands", "create");
+  const updateAllowed = {
+    customers: effectiveHasPermission(perms, "customers", "edit"),
+    properties: effectiveHasPermission(perms, "properties", "edit"),
+    demands: false,
+  };
+  const rollbackAllowed = {
+    customers: effectiveHasPermission(perms, "customers", "delete"),
+    properties: effectiveHasPermission(perms, "properties", "delete"),
+    demands: effectiveHasPermission(perms, "demands", "delete"),
+  };
   const supabase = await createClient();
   const since30 = daysAgoIso(30);
 
@@ -44,16 +56,26 @@ export default async function ImportPage() {
     { count: propertyCount },
     { count: newCustomers30 },
     { count: newProperties30 },
+    { data: teamRows },
+    recentImports,
   ] = await Promise.all([
     supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
-    supabase.from("properties").select("id", { count: "exact", head: true }),
+    supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null),
     supabase
       .from("customers")
       .select("id", { count: "exact", head: true })
       .is("deleted_at", null)
       .gte("created_at", since30),
-    supabase.from("properties").select("id", { count: "exact", head: true }).gte("created_at", since30),
+    supabase
+      .from("properties")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null)
+      .gte("created_at", since30),
+    supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name").limit(200),
+    listRecentImports(),
   ]);
+  const team = (teamRows ?? []).map((m) => ({ id: m.id as string, name: String(m.full_name ?? "") }));
+  const recent = recentImports.batches;
 
   const kpis = [
     {
@@ -94,13 +116,13 @@ export default async function ImportPage() {
     },
     {
       icon: Columns3,
-      title: "2 · Kolonları eşleyin",
-      desc: "Başlıklar Türkçe ipuçlarıyla otomatik tahmin edilir; dilerseniz elle düzeltirsiniz.",
+      title: "2 · Eşleyin ve önizleyin",
+      desc: "Başlıklar Türkçe eşanlamlılarla tahmin edilir; mükerrer politikasını (atla / güncelle / yeni oluştur) siz seçersiniz.",
     },
     {
       icon: CheckCircle2,
       title: "3 · Sonucu görün",
-      desc: "Eklenen, atlanan ve hatalı satırlar tek ekranda raporlanır — sürpriz yok.",
+      desc: "Önce yazmadan önizleme, sonra sonuç özeti; hatalı satırlar CSV olarak iner, tüm aktarma geri alınabilir.",
     },
   ];
 
@@ -108,7 +130,7 @@ export default async function ImportPage() {
     {
       icon: ShieldCheck,
       title: "Mükerrer koruması",
-      desc: "Telefonu zaten kayıtlı müşteriler otomatik atlanır; aynı listeyi iki kez yükleseniz bile kopya oluşmaz.",
+      desc: "Telefon veya e-postası kayıtlı müşteriler varsayılan olarak atlanır; isterseniz mevcut kaydı güncelleyebilir ya da yeni kayıt açabilirsiniz.",
       tone: "bg-mint-500/12 text-mint-600",
     },
     {
@@ -120,7 +142,7 @@ export default async function ImportPage() {
     {
       icon: Table2,
       title: `Tek seferde ${nf.format(IMPORT_ROW_LIMIT)} satır`,
-      desc: `Her yüklemede ${nf.format(IMPORT_ROW_LIMIT)} satıra kadar işlenir. Daha büyük listeleri parçalara bölerek art arda yükleyebilirsiniz.`,
+      desc: `Büyük dosyalar sunucuda parça parça işlenir. ${nf.format(IMPORT_ROW_LIMIT)} satırdan büyük listeleri bölerek art arda yükleyebilirsiniz.`,
       tone: "bg-amber-400/15 text-amber-600",
     },
   ];
@@ -134,7 +156,7 @@ export default async function ImportPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <PageHeader title="CSV içe aktarma" eyebrow="Veri taşıma" description="Eski programınızdan veya Excel'den aldığınız müşteri ve portföy listelerini üç adımda EmlakSoft'a taşıyın: dosya yükleyin, kolonları eşleyin, sonucu görün." />
+      <PageHeader title="CSV içe aktarma" eyebrow="Veri taşıma" description="Eski programınızdan veya Excel'den aldığınız müşteri, portföy ve talep listelerini EmlakSoft'a taşıyın: dosya yükleyin, eşleyin, önizleyin, aktarın; gerekirse geri alın." />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative"><p className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/70">
             <FileSpreadsheet className="h-3.5 w-3.5 text-mint-400" />
             Excel dosyanızı &quot;Farklı Kaydet → CSV&quot; ile kaydedin — .xlsx doğrudan desteklenmez.
@@ -181,7 +203,14 @@ export default async function ImportPage() {
         })}
       </section>
 
-      <ImportWizard canImportProperties={canImportProperties} />
+      <ImportWizard
+        canImportProperties={canImportProperties}
+        canImportDemands={canImportDemands}
+        updateAllowed={updateAllowed}
+        rollbackAllowed={rollbackAllowed}
+        team={team}
+        recent={recent}
+      />
 
       {/* Güvence kartları — aktarımın teknik garantileri */}
       <section className="grid gap-3 md:grid-cols-3">

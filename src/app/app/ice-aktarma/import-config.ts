@@ -8,43 +8,71 @@
  *    bozuk çıkarsa 1254'e düşülür (bkz. decodeCsvBuffer).
  */
 
-export const IMPORT_ROW_LIMIT = 1000;
+export const IMPORT_ROW_LIMIT = 5000;
+/** Sunucuya tek istekte gönderilen satır sayısı (parçalı işleme; server action body limiti 4 MB). */
+export const IMPORT_CHUNK_SIZE = 250;
 export const MAX_ERRORS_SHOWN = 50;
+export const PREVIEW_ROWS = 20;
 
-export type ImportTarget = "customers" | "properties";
+import type { ImportTarget } from "@/lib/import-rows";
+export type { ImportTarget };
 
 export type FieldDef = {
   key: string;
   label: string;
   required?: boolean;
-  /** Başlık otomatik tahmini: header (tr-küçük) bu parçalardan birini içeriyorsa eşle. */
+  /**
+   * Başlık otomatik tahmini için eşanlamlılar (aksan/büyük-küçük harf önemsiz).
+   * Tam eşleşme > bütün kelime olarak geçme > (uzun ipuçları için) içerme.
+   * Sıra önceliktir: önce gelen ipucu eşitlikte kazanır.
+   */
   hints: string[];
   /** Şablon CSV'deki örnek değer. */
   sample: string;
 };
 
 export const CUSTOMER_FIELDS: FieldDef[] = [
-  { key: "full_name", label: "Ad Soyad", required: true, hints: ["ad soyad", "adı", "isim", "ad", "müşteri", "musteri", "name"], sample: "Ayşe Yılmaz" },
-  { key: "phone", label: "Telefon", hints: ["telefon", "tel", "gsm", "cep", "phone"], sample: "0532 123 45 67" },
-  { key: "email", label: "E-posta", hints: ["e-posta", "eposta", "e-mail", "email", "mail", "posta"], sample: "ayse@example.com" },
-  { key: "customer_type", label: "Müşteri tipi", hints: ["tip", "tür", "tur", "type"], sample: "Alıcı" },
-  { key: "source", label: "Kaynak", hints: ["kaynak", "source"], sample: "Referans" },
-  { key: "notes", label: "Notlar", hints: ["not", "açıklama", "aciklama"], sample: "3+1 arıyor" },
+  { key: "full_name", label: "Ad Soyad", required: true, hints: ["ad soyad", "adi soyadi", "ad soyadi", "isim soyisim", "musteri adi", "musteri", "isim", "adi", "ad", "kisi", "name", "full name"], sample: "Ayşe Yılmaz" },
+  { key: "phone", label: "Telefon", hints: ["telefon", "cep telefonu", "cep tel", "cep", "gsm", "mobil", "tel no", "tel", "iletisim", "phone"], sample: "0532 123 45 67" },
+  { key: "email", label: "E-posta", hints: ["e posta", "eposta", "e mail", "email", "mail adresi", "mail", "posta"], sample: "ayse@example.com" },
+  { key: "customer_type", label: "Müşteri tipi", hints: ["musteri tipi", "musteri turu", "kisi tipi", "tip", "tur", "type"], sample: "Alıcı" },
+  { key: "source", label: "Kaynak", hints: ["kaynak", "nereden", "referans", "source"], sample: "Referans" },
+  { key: "notes", label: "Notlar", hints: ["notlar", "not", "aciklama", "yorum", "detay", "notes"], sample: "3+1 arıyor" },
 ];
 
 export const PROPERTY_FIELDS: FieldDef[] = [
-  { key: "title", label: "Başlık", required: true, hints: ["başlık", "baslik", "ilan", "title"], sample: "Kadıköy'de deniz manzaralı 3+1" },
-  { key: "transaction_type", label: "İşlem türü", hints: ["işlem", "islem", "satılık/kiralık", "satilik", "kategori"], sample: "Satılık" },
-  { key: "property_type", label: "Portföy türü", hints: ["portföy", "portfoy", "emlak", "cins", "tip", "tür", "tur"], sample: "Daire" },
-  { key: "list_price", label: "Liste fiyatı", hints: ["fiyat", "price", "tutar", "bedel"], sample: "4.500.000" },
-  { key: "rooms", label: "Oda sayısı", hints: ["oda"], sample: "3+1" },
-  { key: "sqm", label: "Metrekare", hints: ["m2", "m²", "metrekare", "alan", "brüt", "brut"], sample: "125" },
-  { key: "address_line", label: "Adres", hints: ["adres", "address", "mahalle"], sample: "Caferağa Mah. Moda Cad. No:12" },
+  { key: "title", label: "Başlık", required: true, hints: ["ilan basligi", "baslik", "ilan adi", "ilan", "title"], sample: "Kadıköy'de deniz manzaralı 3+1" },
+  { key: "transaction_type", label: "İşlem türü", hints: ["islem turu", "islem", "satilik kiralik", "satilik", "kategori"], sample: "Satılık" },
+  { key: "property_type", label: "Portföy türü", hints: ["emlak tipi", "emlak turu", "portfoy turu", "portfoy tipi", "konut tipi", "emlak", "cins", "tip", "tur"], sample: "Daire" },
+  { key: "list_price", label: "Liste fiyatı", hints: ["liste fiyati", "ilan fiyati", "satis fiyati", "fiyat", "tutar", "bedel", "price"], sample: "4.500.000" },
+  { key: "rooms", label: "Oda sayısı", hints: ["oda sayisi", "oda"], sample: "3+1" },
+  { key: "sqm", label: "Metrekare", hints: ["brut m2", "net m2", "m2", "metrekare", "alan", "brut", "net"], sample: "125" },
+  { key: "address_line", label: "Adres", hints: ["acik adres", "adres", "address", "mahalle"], sample: "Caferağa Mah. Moda Cad. No:12" },
+];
+
+export const DEMAND_FIELDS: FieldDef[] = [
+  { key: "customer_phone", label: "Müşteri telefonu", hints: ["musteri telefonu", "telefon", "cep telefonu", "cep", "gsm", "tel"], sample: "0532 123 45 67" },
+  { key: "customer_email", label: "Müşteri e-postası", hints: ["musteri e postasi", "e posta", "eposta", "email", "mail"], sample: "ayse@example.com" },
+  { key: "transaction_type", label: "İşlem türü", hints: ["islem turu", "talep turu", "islem", "satilik kiralik", "satilik"], sample: "Satılık" },
+  { key: "property_type", label: "Portföy türü", hints: ["emlak tipi", "emlak turu", "portfoy turu", "aranan tip", "tip", "tur"], sample: "Daire" },
+  { key: "budget_min", label: "Min. bütçe", hints: ["min butce", "butce min", "alt butce", "en az butce", "en az"], sample: "3.000.000" },
+  { key: "budget_max", label: "Maks. bütçe", hints: ["max butce", "maks butce", "butce max", "ust butce", "en fazla butce", "en fazla", "butce"], sample: "4.500.000" },
+  { key: "rooms", label: "Oda sayısı", hints: ["oda sayisi", "oda"], sample: "3+1" },
+  { key: "min_sqm", label: "Min. m²", hints: ["min m2", "en az m2", "m2", "metrekare"], sample: "100" },
+  { key: "urgency", label: "Aciliyet", hints: ["aciliyet", "oncelik"], sample: "Yüksek" },
 ];
 
 export function fieldsFor(target: ImportTarget): FieldDef[] {
-  return target === "customers" ? CUSTOMER_FIELDS : PROPERTY_FIELDS;
+  if (target === "customers") return CUSTOMER_FIELDS;
+  if (target === "properties") return PROPERTY_FIELDS;
+  return DEMAND_FIELDS;
 }
+
+export const TARGET_LABEL: Record<ImportTarget, string> = {
+  customers: "Müşteriler",
+  properties: "Portföyler",
+  demands: "Talepler",
+};
 
 // ---------------------------------------------------------------------------
 // CSV çözümleme
@@ -87,7 +115,7 @@ export type ParsedCsv = { headers: string[]; rows: string[][]; delimiter: "," | 
  * satır sonu, "" kaçışı, CRLF/LF karışımı. İlk satır başlık kabul edilir.
  */
 export function parseCsv(input: string): ParsedCsv {
-  const text = input.replace(/^\uFEFF/, ""); // BOM temizle
+  const text = input.replace(/^﻿/, ""); // BOM temizle
   const delimiter = detectDelimiter(text);
   const rows: string[][] = [];
   let field = "";
@@ -137,20 +165,59 @@ export function parseCsv(input: string): ParsedCsv {
   return { headers, rows, delimiter };
 }
 
-/** Başlıklardan hedef alanlara otomatik eşleme tahmini (tr-TR küçük harf, ilk isabet kazanır). */
+/** Başlık/ipucu karşılaştırması için aksan ve noktalama katlama (tr-TR). */
+function fold(input: string): string {
+  return input
+    .toLocaleLowerCase("tr-TR")
+    .replace(/ı/g, "i")
+    .replace(/ş/g, "s")
+    .replace(/ğ/g, "g")
+    .replace(/ü/g, "u")
+    .replace(/ö/g, "o")
+    .replace(/ç/g, "c")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/** 3 = tam eşleşme, 2 = ipucu başlıkta bütün kelime(ler) olarak geçiyor, 1 = uzun ipucu içeriliyor, 0 = yok. */
+function hintScore(header: string, hint: string): number {
+  if (!header || !hint) return 0;
+  if (header === hint) return 3;
+  if (` ${header} `.includes(` ${hint} `)) return 2;
+  // "ad" gibi kısa ipuçları "adres"in içinde sayılmasın.
+  if (hint.length >= 5 && header.includes(hint)) return 1;
+  return 0;
+}
+
+/**
+ * Başlıklardan hedef alanlara otomatik eşleme tahmini. Tüm (alan, başlık) çiftleri puanlanır;
+ * en yüksek puan önce atanır (aynı başlık iki alana, aynı alan iki başlığa gitmez). Eşitlikte
+ * ipucu sırası ve alan sırası belirler.
+ */
 export function guessMapping(headers: string[], fields: FieldDef[]): Record<string, number> {
-  const lowered = headers.map((h) => h.toLocaleLowerCase("tr-TR"));
+  const folded = headers.map(fold);
+  const candidates: { field: string; col: number; score: number; rank: number; order: number }[] = [];
+  fields.forEach((f, order) => {
+    folded.forEach((h, col) => {
+      let best = 0;
+      let rank = 0;
+      f.hints.forEach((hint, idx) => {
+        const sc = hintScore(h, fold(hint));
+        if (sc > best) {
+          best = sc;
+          rank = idx;
+        }
+      });
+      if (best > 0) candidates.push({ field: f.key, col, score: best, rank, order });
+    });
+  });
+  candidates.sort((a, b) => b.score - a.score || a.rank - b.rank || a.order - b.order || a.col - b.col);
   const mapping: Record<string, number> = {};
-  const used = new Set<number>();
-  for (const f of fields) {
-    for (const hint of f.hints) {
-      const idx = lowered.findIndex((h, i) => !used.has(i) && h.includes(hint));
-      if (idx !== -1) {
-        mapping[f.key] = idx;
-        used.add(idx);
-        break;
-      }
-    }
+  const usedCols = new Set<number>();
+  for (const c of candidates) {
+    if (c.field in mapping || usedCols.has(c.col)) continue;
+    mapping[c.field] = c.col;
+    usedCols.add(c.col);
   }
   return mapping;
 }
@@ -161,5 +228,5 @@ export function buildTemplateCsv(target: ImportTarget): string {
   const esc = (v: string) => (/[",;\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
   const header = fields.map((f) => esc(f.label)).join(";");
   const sample = fields.map((f) => esc(f.sample)).join(";");
-  return `\uFEFF${header}\n${sample}\n`;
+  return `﻿${header}\n${sample}\n`;
 }
