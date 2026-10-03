@@ -16,8 +16,8 @@ import {
  *
  * NASIL: Hedef elementin getBoundingClientRect'i ölçülür; tam ekran overlay
  * içinde hedef boyutunda şeffaf bir "delik" div'i konumlanır ve devasa bir
- * box-shadow (0 0 0 9999px) geri kalan her yeri karartır. Delik top/left/
- * width/height geçişiyle adımlar arasında yumuşakça kayar.
+ * box-shadow (0 0 0 9999px) geri kalan her yeri karartır. Konum transform ile
+ * verilir, adımlar arasında opacity geçişi vardır (CLS üretmez).
  *
  * KURALLAR:
  * - localStorage "emlaksoft:tour-done" → bir kez gösterilir (tur başlar
@@ -266,12 +266,14 @@ export function ProductTour() {
           }
         }}
       >
-      {/* Spotlight deliği — dev box-shadow geri kalanı karartır */}
+      {/* Spotlight deliği — dev box-shadow geri kalanı karartır. Konum yalnız
+          transform ile verilir (layout-shift sayılmaz); adım başına yeniden
+          bağlanır (key) ve opacity ile belirir, top/left/width/height animasyonu yok. */}
       <div
-        className="absolute rounded-[var(--radius-panel)] transition-[top,left,width,height] duration-300 ease-out"
+        key={`hole-${index}`}
+        className="tour-fade absolute left-0 top-0 rounded-[var(--radius-panel)]"
         style={{
-          top: hole.top,
-          left: hole.left,
+          transform: `translate(${hole.left}px, ${hole.top}px)`,
           width: hole.width,
           height: hole.height,
           boxShadow: "0 0 0 2px rgba(255,255,255,0.85), 0 0 0 9999px rgba(7,26,56,0.55)",
@@ -279,8 +281,9 @@ export function ProductTour() {
       />
       {/* Balon kart */}
       <div
-        className="popover-in absolute rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--elev-5)] transition-[top,left] duration-300 ease-out"
-        style={{ top: cardTop, left: cardLeft, width: mobile ? vw - 32 : CARD_W, maxWidth: "calc(100vw - 32px)" }}
+        key={`card-${index}`}
+        className="tour-fade absolute left-0 top-0 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--elev-5)]"
+        style={{ transform: `translate(${cardLeft}px, ${cardTop}px)`, width: mobile ? vw - 32 : CARD_W, maxWidth: "calc(100vw - 32px)" }}
       >
         <div className="flex items-start justify-between gap-3">
           <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold tabular-nums text-brand-600">
