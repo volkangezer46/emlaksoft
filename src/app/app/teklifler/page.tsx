@@ -128,7 +128,7 @@ export default async function TekliflerPage({
     // count: "exact" — sayfalama ("X-Y / Toplam Z") gerçek toplamı ister;
     // sayı aynı yanıtta gelir, ek gidiş-dönüş yok.
     .select(
-      "id, amount, counter_amount, status, created_at, property_id, customer_id, property:properties(id, property_code, title), customer:customers(id, full_name)",
+      "id, amount, counter_amount, status, created_at, property_id, customer_id, property:properties!offers_property_id_fkey(id, property_code, title), customer:customers!offers_customer_id_fkey(id, full_name)",
       { count: "exact" },
     )
     .order("created_at", { ascending: false })

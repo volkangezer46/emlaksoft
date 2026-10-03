@@ -100,7 +100,7 @@ export default async function TasksPage({
     // count: filtreye göre 100/200 sınırı var; hangi filtrede olursa olsun
     // kullanıcı kaç görevin listede olmadığını görebilmeli.
     .select(
-      "id, title, notes, kind, priority, status, due_at, assigned_to, customer_id, property_id, recurrence, created_at, assignee:profiles!tasks_assigned_to_fkey(full_name), customer:customers(full_name)",
+      "id, title, notes, kind, priority, status, due_at, assigned_to, customer_id, property_id, recurrence, created_at, assignee:profiles!tasks_assigned_to_fkey(full_name), customer:customers!tasks_customer_id_fkey(full_name)",
       { count: "exact" },
     )
     .eq("tenant_id", ctx.tenantId);

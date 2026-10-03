@@ -158,7 +158,7 @@ export default async function SozlesmelerPage({
     .from("contracts")
     // count: "exact" — sayfalama ("X-Y / Toplam Z") gerçek toplamı ister.
     .select(
-      "id, title, contract_type, status, created_at, signed_at, expires_at, property:properties(id, property_code, title), customer:customers(id, full_name)",
+      "id, title, contract_type, status, created_at, signed_at, expires_at, property:properties!contracts_property_id_fkey(id, property_code, title), customer:customers!contracts_customer_id_fkey(id, full_name)",
       { count: "exact" },
     );
   if (durum) contractQuery = contractQuery.eq("status", durum);

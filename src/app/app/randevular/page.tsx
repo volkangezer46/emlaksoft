@@ -183,7 +183,7 @@ export default async function AppointmentsPage({
     .from("appointments")
     // count: pencere içindeki gerçek toplam — 500'ü aşarsa ListLimitNotice uyarır.
     .select(
-      "id, appointment_type, scheduled_at, duration_min, location, status, notes, confirm_token, customer_response, assigned_to, outcome, outcome_note, customer:customers(id, full_name), property:properties(id, title, property_code, lat, lng)",
+      "id, appointment_type, scheduled_at, duration_min, location, status, notes, confirm_token, customer_response, assigned_to, outcome, outcome_note, customer:customers!appointments_customer_id_fkey(id, full_name), property:properties!appointments_property_id_fkey(id, title, property_code, lat, lng)",
       { count: "exact" },
     )
     .neq("status", "cancelled")

@@ -185,7 +185,7 @@ export default async function LeakShieldPage({
       supabase
         .from("portal_listings")
         // property id: teyit gecikmiş ilan kartlarından portföy detayına gidiş için
-        .select("id, portal_name, portal_listing_id, status, last_confirmed_at, property:properties(id, property_code, title)")
+        .select("id, portal_name, portal_listing_id, status, last_confirmed_at, property:properties!portal_listings_property_id_fkey(id, property_code, title)")
         .eq("status", "live")
         .limit(200),
     ).then((res) => (res.data ?? []) as unknown as Listing[]),
