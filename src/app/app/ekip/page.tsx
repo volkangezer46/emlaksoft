@@ -29,6 +29,8 @@ import type { CSSProperties } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { DashboardGrid, DashCell, DashCard, SectionHeader, KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
+
+export const metadata = { title: "Ekip Merkezi" };
 const RING_C = 2 * Math.PI * 42;
 
 type Rel = { name?: string } | { name?: string }[] | null;

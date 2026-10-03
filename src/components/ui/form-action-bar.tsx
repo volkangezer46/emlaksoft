@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { RefObject } from "react";
-import { AlertCircle, Check, CircleCheck, Loader2, Save, TriangleAlert } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, CircleCheck, Loader2, Save, TriangleAlert } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { isDirty, serializeEntries } from "@/lib/form-dirty";
@@ -135,6 +135,7 @@ export function FormActionBar({
 }: FormActionBarProps) {
   const keyboardOpen = useSyncExternalStore(subscribeKeyboard, getKeyboardOpen, () => false);
   const [confirming, setConfirming] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [okFlash, setOkFlash] = useState(false);
   const [shakeKey, setShakeKey] = useState(0);
   const wasPending = useRef(false);
@@ -200,6 +201,28 @@ export function FormActionBar({
 
   const submitCls = destructive ? "bg-danger-500 text-white hover:bg-danger-600" : undefined;
   const busy = pending;
+  const hasSecondary = Boolean(draft || saveAndNew);
+  // İkincil eylemler: geniş ekranda çubukta, mobilde "Daha fazla" ile satır içi açılır (popup değil).
+  const secondaryButtons = (
+    <>
+      {draft ? (
+        <Button type="button" variant="ghost" size="lg" icon={Save} disabled={busy || !dirty} onClick={draft.onSave}>
+          Taslak kaydet
+        </Button>
+      ) : null}
+      {saveAndNew ? (
+        <Button
+          type="submit"
+          variant="secondary"
+          size="lg"
+          disabled={busy || submitDisabled}
+          onClick={() => setSubmitIntent("new")}
+        >
+          Kaydet ve yenisini ekle
+        </Button>
+      ) : null}
+    </>
+  );
 
   return (
     <div
@@ -254,12 +277,12 @@ export function FormActionBar({
           ) : null}
         </div>
       ) : (
-        <div className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3 sm:px-4 sm:py-3">
+        <div className="flex flex-col gap-1.5 px-3 py-2 sm:flex-row sm:items-center sm:gap-3 sm:px-4 sm:py-3">
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:flex-1" aria-live="polite" aria-atomic="true">
             {badge ? (
               <span
                 key={badge.text}
-                className={cn("fab-fade inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", toneClass[badge.tone])}
+                className={cn("fab-fade inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold max-sm:py-0.5", toneClass[badge.tone])}
               >
                 <badge.icon aria-hidden="true" className={cn("h-3.5 w-3.5", badge.spin && "animate-spin")} />
                 {badge.text}
@@ -271,7 +294,7 @@ export function FormActionBar({
                   type="button"
                   onClick={() => missing[0]?.onGo()}
                   title={`İlk eksik alan: ${missing[0]?.label ?? ""}`}
-                  className="focus-ring inline-flex min-h-8 items-center gap-1.5 rounded-full px-2 text-xs font-semibold text-warning-strong underline-offset-2 hover:underline"
+                  className="focus-ring inline-flex min-h-8 items-center gap-1.5 rounded-full px-2 text-xs font-semibold text-warning-strong max-sm:min-h-6 underline-offset-2 hover:underline"
                 >
                   <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-warning-strong" />
                   {missingCount} zorunlu alan eksik
@@ -320,22 +343,20 @@ export function FormActionBar({
                 {cancelLabel}
               </ButtonLink>
             )}
-            {draft ? (
-              <Button type="button" variant="ghost" size="lg" icon={Save} disabled={busy || !dirty} onClick={draft.onSave}>
-                Taslak kaydet
-              </Button>
-            ) : null}
-            {saveAndNew ? (
+            {hasSecondary ? (
               <Button
-                type="submit"
+                type="button"
                 variant="secondary"
                 size="lg"
-                disabled={busy || submitDisabled}
-                onClick={() => setSubmitIntent("new")}
+                className="sm:hidden"
+                aria-expanded={moreOpen}
+                onClick={() => setMoreOpen((v) => !v)}
               >
-                Kaydet ve yenisini ekle
+                Daha fazla
+                <ChevronDown aria-hidden="true" className={cn("h-4 w-4 transition-transform duration-150 motion-reduce:transition-none", moreOpen && "rotate-180")} />
               </Button>
             ) : null}
+            <span className="contents max-sm:hidden">{secondaryButtons}</span>
             <span key={shakeKey} className={cn("inline-flex max-sm:flex-1", shakeKey > 0 && "fab-shake")}>
               <Button
                 type="submit"
@@ -351,6 +372,9 @@ export function FormActionBar({
               </Button>
             </span>
           </div>
+          {hasSecondary && moreOpen ? (
+            <div className="flex gap-2 sm:hidden max-sm:[&>*]:min-h-11 max-sm:[&>*]:flex-1">{secondaryButtons}</div>
+          ) : null}
         </div>
       )}
     </div>

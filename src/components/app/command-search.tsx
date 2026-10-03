@@ -23,6 +23,7 @@ function Trigger({ onOpen, onWarm }: { onOpen?: () => void; onWarm?: () => void 
         onPointerEnter={onWarm}
         onFocus={onWarm}
         aria-expanded={false}
+        data-tour="arama"
         aria-haspopup="listbox"
         aria-controls="app-command-results"
         aria-label="Müşteri, portföy, anlaşma, görev veya ilan ara"

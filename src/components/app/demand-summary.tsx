@@ -29,6 +29,7 @@ export function DemandSummaryGroups({
   urgencyOptions,
   tabs,
   display,
+  showPreview = true,
 }: {
   values: DemandFormValues;
   provinces: Province[];
@@ -36,6 +37,8 @@ export function DemandSummaryGroups({
   tabs: { ne: string; kriter: string; bolge: string };
   /** Kabuktan gelen ekran metinleri (il/ilçe/mahalle etiketi için). */
   display?: Record<string, string | null>;
+  /** false: eşleşme önizlemesi çizilmez (çağıran panelin en üstüne koyar). */
+  showPreview?: boolean;
 }) {
   const urgency = urgencyOptions.find((o) => o.value === values.urgency)?.label;
   const min = parseLooseNumber(values.budget_min);
@@ -104,7 +107,7 @@ export function DemandSummaryGroups({
         />
         <SummaryRow label="Ek bölge" value={extraCount > 0 ? `${extraCount} bölge` : "Yok"} muted={extraCount === 0} tab={tabs.bolge} />
       </SummaryGroup>
-      <DemandMatchPreview values={values} />
+      {showPreview ? <DemandMatchPreview values={values} /> : null}
     </>
   );
 }

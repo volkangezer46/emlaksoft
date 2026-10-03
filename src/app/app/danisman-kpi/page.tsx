@@ -18,6 +18,8 @@ import { RevenueChart } from "./revenue-chart-lazy";
 import { CoachPanel, type CoachActionWithLink } from "./coach-panel";
 import { PrintButton } from "./print-button";
 
+export const metadata = { title: "Danışman performansı" };
+
 // Recharts (~400 KB) revenue-chart-lazy (istemci kapısı) ile ayrı parçaya taşınır.
 
 /**

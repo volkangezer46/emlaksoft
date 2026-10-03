@@ -53,12 +53,12 @@ const STEPS: TourStep[] = [
   {
     selector: '[data-tour="aksiyonlar"]',
     title: "Görevleriniz",
-    desc: "Bir kaydın üzerine gelip görevi tamamlayabilir veya müşteriyi arayabilirsiniz.",
+    desc: "Bir kaydı açıp görevi tamamlayabilir veya müşteriyi arayabilirsiniz.",
   },
   {
-    selector: 'header button[aria-haspopup="dialog"]',
+    selector: '[data-tour="arama"]',
     title: "Arama kutusu",
-    desc: "Müşteri adı, ilan numarası veya görev yazın; hepsi tek kutudan bulunur. Klavyede Ctrl ve K tuşları da açar.",
+    desc: "Müşteri adı, ilan numarası veya görev yazın; hepsi tek kutudan bulunur. Bilgisayarda Ctrl+K kısayolu da açar.",
   },
   {
     selector: "aside",

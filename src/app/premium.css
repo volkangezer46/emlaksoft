@@ -102,7 +102,11 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--heading);
+  /* Tutar tek satırda kalır (₺ alt satıra düşmez); uzun değerde boyut küçülür. */
+  white-space: nowrap;
+  max-width: 100%;
 }
+.pm-value-long { font-size: clamp(1.25rem, 0.9rem + 1.6vw, 1.875rem); }
 .pm-sub { font-size: 0.8125rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .pm-chart { margin-top: auto; padding-top: 0.6rem; }
 

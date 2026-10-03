@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, ImageUp, Loader2, RotateCcw, Smartphone } from "lucide-react";
 import { resetBrandAsset, uploadBrandAsset } from "@/app/actions/platform-brand";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FileInput } from "@/components/ui/file-input";
 import {
   BRAND_MAX_BYTES,
   BRAND_SLOTS,
@@ -119,12 +120,11 @@ function SlotCard({ slot, meta }: { slot: BrandSlot; meta: BrandMeta }) {
       {localUrl ? <p className="mt-2 text-xs font-semibold text-amber-600">Seçilen dosyanın önizlemesi — henüz kaydedilmedi.</p> : null}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <input
+        <FileInput
           ref={inputRef}
-          type="file"
           accept=".svg,.png,image/svg+xml,image/png"
           aria-label={`${cfg.label} dosyası seç`}
-          className="block w-full max-w-xs text-xs text-text-muted file:mr-3 file:rounded-[var(--radius-control)] file:border-0 file:bg-brand-600/10 file:px-3 file:py-2 file:text-xs file:font-bold file:text-brand-700"
+          className="w-full max-w-xs"
           onChange={(e) => pick(e.target.files?.[0] ?? null)}
           disabled={pending}
         />

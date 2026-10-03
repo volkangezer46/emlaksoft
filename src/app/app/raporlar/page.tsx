@@ -25,6 +25,8 @@ import { ICONS } from "@/lib/icons";
 import { requireReportingData } from "@/lib/reporting/result";
 import { getTenantReportingAggregates } from "@/lib/reporting/cache";
 
+export const metadata = { title: "Raporlar" };
+
 type TenantReportingAggregate = {
   summary: {
     customers: number;

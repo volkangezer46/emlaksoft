@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { formatLeadSource } from "@/lib/lead-sources";
 import { exportCustomersCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { listSavedViews } from "@/app/actions/saved-views";
@@ -58,6 +59,8 @@ import { CustomerMobileList, CustomerTable, type CustomerVM } from "./customer-r
 import { countCustomerTypes, heatTone, relativeFromDays } from "./customer-list-logic";
 import { fetchTenantTags } from "./tenant-tags";
 import { formatDateTr } from "@/lib/format";
+
+export const metadata = { title: "Müşteriler" };
 
 type LeadSignalRow = {
   customer_id: string;
@@ -603,7 +606,7 @@ export default async function CustomersPage({
         : null,
       lead: lead && !c.blacklist ? { score: lead.score, hot: lead.tier === "hot" } : null,
       blacklist: Boolean(c.blacklist),
-      sourceLabel: c.source ? (sourceLabel.get(c.source) ?? c.source) : null,
+      sourceLabel: formatLeadSource(c.source, sourceLabel),
       phone: c.phone,
       phoneDisplay: c.phone ? formatTurkishPhone(c.phone) : null,
       telHref: c.phone ? toTelHref(c.phone) : null,
@@ -660,7 +663,7 @@ export default async function CustomersPage({
   const chips = buildActiveChips("/app/musteriler", baseParams, [
     { key: "q", label: "Arama" },
     { key: "type", label: "Tip" },
-    { key: "source", label: "Kaynak", format: (v) => sourceLabel.get(v) ?? v },
+    { key: "source", label: "Kaynak", format: (v) => formatLeadSource(v, sourceLabel) ?? v },
     { key: "etiket", label: "Etiket" },
     { key: "assigned", label: "Danışman", format: (v) => advisorName.get(v) ?? v },
     { key: "from", label: "Başlangıç" },

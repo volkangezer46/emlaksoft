@@ -7,14 +7,21 @@ import { cleanLabel, fieldDisplay, type FieldKind } from "@/lib/form-summary";
 /** Özet satırı için bir alanın DOM'dan çözülmüş etiketi ve gösterim metni. */
 export type FieldInfo = { label: string | null; text: string | null };
 
+/** Etiket metni; içindeki düğmeler (ör. "Tercih" rozeti) etikete yapışmasın diye atlanır. */
+function labelText(l: Element): string {
+  const c = l.cloneNode(true) as Element;
+  c.querySelectorAll("button").forEach((b) => b.remove());
+  return c.textContent ?? "";
+}
+
 function labelFor(form: HTMLFormElement, el: Element): string | null {
   const id = el.id;
   if (id) {
     const l = form.querySelector(`label[for="${CSS.escape(id)}"]`);
-    if (l) return cleanLabel(l.textContent);
+    if (l) return cleanLabel(labelText(l));
   }
   const wrapping = el.closest("label");
-  if (wrapping) return cleanLabel(wrapping.textContent);
+  if (wrapping) return cleanLabel(labelText(wrapping));
   return cleanLabel(el.getAttribute("aria-label"));
 }
 
