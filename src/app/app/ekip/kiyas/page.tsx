@@ -214,7 +214,7 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
       <PageHeader
         eyebrow="Ekip Merkezi"
         title="Danışman kıyası"
-        description={`${monthLabel} dönemi karnesi. Ölçümler mevcut çağrı, randevu, teklif, anlaşma, portföy ve hedef kayıtlarından gelir; uydurma skor yoktur.`}
+        description={`${monthLabel} dönemi karnesi. Ölçümler mevcut çağrı, randevu, teklif, anlaşma, portföy ve hedef kayıtlarınızdan gelir.`}
         actions={
           <>
             <Link

@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/ui/page-header";
+import { HelpTip } from "@/components/ui/help-tip";
 import { StatRow } from "@/components/ui/stat-row";
 import { ButtonLink } from "@/components/ui/button";
 import Link from "next/link";
@@ -111,9 +112,9 @@ export default async function OtomasyonlarPage({
     <div className="space-y-6">
       {/* Hero */}
       <PageHeader
-        eyebrow="Otomasyon motoru"
+        eyebrow="Otomatik işler"
         title="Otomasyonlar"
-        description="Tetikleyici → koşul → aksiyon zinciriyle tekrar eden işleri otomatikleştirin."
+        description={<>&quot;... olunca ... yap&quot; kurallarıyla tekrar eden işleri kendiliğinden yaptırın. <HelpTip topic="otomasyon" /></>}
         actions={canEdit ? <ButtonLink href="/app/otomasyonlar/yeni" icon={Plus}>Yeni otomasyon</ButtonLink> : undefined}
       />
       <StatRow

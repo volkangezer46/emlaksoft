@@ -28,6 +28,7 @@ import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 import { WaTemplateMenu } from "@/components/app/wa-template-menu";
 import { WhatsAppLink } from "@/components/app/whatsapp-link";
 import { MoreActions } from "@/components/app/more-actions";
+import { HelpTip } from "@/components/ui/help-tip";
 import { computeLeadScore, leadTierCls } from "@/lib/lead-score";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
 import { MatchedSection, MatchedSkeleton, SatisfactionSection } from "./sections";
@@ -425,6 +426,7 @@ export default async function CustomerDetailPage({
                     {lead.tier === "hot" ? "🔥" : lead.tier === "warm" ? "🌤️" : "❄️"} {lead.label} · {lead.score}
                   </span>
                 )}
+                {customer.blacklist ? null : <HelpTip topic="lead-skoru" label="Aday skoru" />}
                 {/* Yabancı uyruklu alıcı — evrak akışı farklı (bkz. /app/yabanci-satis) */}
                 {customer.is_foreign ? (
                   <Link

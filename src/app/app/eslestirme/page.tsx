@@ -33,6 +33,7 @@ import { SaveMatchButton } from "./save-match-button";
 import type { CSSProperties } from "react";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { HelpTip } from "@/components/ui/help-tip";
 const RING_C = 2 * Math.PI * 42;
 /** ?kriter= önizleme bağlantısının sanal talep kimliği (kayıtlı talep değildir). */
 const PREVIEW_DEMAND_ID = "onizleme";
@@ -233,7 +234,7 @@ export default async function MatchingPage({
           çıkmaz; talebi il/işlem türüne göre daraltın veya belirli bir portföyden başlatın.
         </p>
       ) : null}
-      <PageHeader title="Akıllı eşleşme motoru" eyebrow="Talep × Portföy eşleştirme" description="Müşteri taleplerini portföylerle bütçe, konum, oda ve işlem türüne göre skorlar. Scraping yok — kendi veriniz." actions={
+      <PageHeader title="Müşteriye uygun ilanlar" eyebrow="Talep ve portföy eşleştirme" description={<>Müşteri taleplerini ilanlarınızla bütçe, konum, oda ve işlem türüne göre puanlar. Yalnızca kendi kayıtlarınız kullanılır. <HelpTip topic="eslestirme" /></>} actions={
 <div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-5 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="relative grid h-28 w-28 place-items-center">
               <div

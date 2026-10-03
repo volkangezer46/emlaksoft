@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, LogOut, Settings, Undo2 } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { ChevronDown, LogOut, Map as MapIcon, Settings, Undo2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
+import { clearTourDone, TOUR_RESTART_HREF } from "@/lib/product-tour-storage";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +44,8 @@ export function UserMenu({
   /** Sade görünüm + yazı boyutu (çerez adı ofis+kullanıcı kapsamlı); yoksa bölüm gösterilmez. */
   viewPrefs?: { cookieName: string; initial: UiPrefs };
 }) {
+  // Ürün turu yalnız ofis panelinde (/app) vardır; yönetim konsolunda gösterilmez.
+  const inApp = (usePathname() ?? "").startsWith("/app");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -74,7 +78,18 @@ export function UserMenu({
             </Link>
           </DropdownMenuItem>
         ))}
-        {links.length > 0 ? <DropdownMenuSeparator /> : null}
+        {inApp ? (
+          <DropdownMenuItem
+            onSelect={() => {
+              clearTourDone();
+              window.location.assign(TOUR_RESTART_HREF);
+            }}
+          >
+            <MapIcon aria-hidden />
+            Turu yeniden başlat
+          </DropdownMenuItem>
+        ) : null}
+        {links.length > 0 || inApp ? <DropdownMenuSeparator /> : null}
         {viewPrefs ? (
           <>
             <ViewPrefs cookieName={viewPrefs.cookieName} initial={viewPrefs.initial} />

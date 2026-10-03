@@ -8,6 +8,7 @@ import { PLAYBOOK_TRIGGER_LABELS } from "@/lib/playbook-labels";
 import { PlaybooksManager, type PlaybookListRow, type StaffOption } from "./playbooks-manager";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { HelpTip } from "@/components/ui/help-tip";
 export const metadata = { title: "İş akışları" };
 
 type PlaybookRow = {
@@ -123,7 +124,7 @@ export default async function IsAkislariPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <PageHeader title="İş akışları" eyebrow="İş akışı şablonları" description="Otomasyonlar tek bir aksiyon üretir; iş akışları ise bir olay gerçekleşince sıralı ve vadeli bir görev listesini tek seferde açar. Örneğin yeni satılık portföy alındığında tapu, fotoğraf, portal, komşu ve fiyat kontrolü görevleri kendiliğinden takvime düşer." actions={
+      <PageHeader title="İş akışları" eyebrow="Hazır görev listeleri" description={<>Otomasyonlar tek bir iş yapar; iş akışları ise bir olay olunca sıralı ve tarihli bir görev listesini tek seferde açar. Örneğin yeni satılık portföy alındığında tapu, fotoğraf, portal, komşu ve fiyat kontrolü görevleri kendiliğinden takvime düşer. <HelpTip topic="playbook" label="İş akışı" /></>} actions={
 <div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex gap-3">
             <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-5 py-3 text-center">
               <p className="font-display text-xl font-extrabold text-mint-300">{activeCount}</p>

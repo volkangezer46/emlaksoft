@@ -21,6 +21,7 @@ import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/tab
 import { CheckoutButton } from "./checkout-button";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { HelpTip } from "@/components/ui/help-tip";
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
 }
@@ -113,9 +114,9 @@ export default async function BillingPage({
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <PageHeader title="Paket ve ödeme" eyebrow="Abonelik & iyzico" description={configured
-                ? "iyzico Checkout Form bağlı. Ödeme sonrası abonelik otomatik aktifleşir."
-                : "Sandbox anahtarı yok — demo ödeme ile paket yükseltmeyi yerel test edebilirsiniz."} actions={
+      <PageHeader title="Paket ve ödeme" eyebrow="Abonelik & iyzico" description={<>{configured
+                ? "Ödeme altyapısı (iyzico) bağlı. Ödeme sonrası aboneliğiniz otomatik başlar."
+                : "Ödeme altyapısı henüz bağlı değil; paket yükseltmeyi deneme amaçlı demo ödemeyle görebilirsiniz."} <HelpTip topic="paket-kota" /></>} actions={
 <div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-5 py-4 backdrop-blur">
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-white/45">Mevcut paket</p>
             <p className="mt-1 font-display text-2xl font-extrabold">{planLabel(currentPlan)}</p>
@@ -219,7 +220,7 @@ export default async function BillingPage({
         </Link>
         <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-text-muted">
           <ShieldCheck className="h-3.5 w-3.5 text-mint-600" />
-          {configured ? "iyzico sandbox/prod" : "Demo mod"}
+          {configured ? "Güvenli ödeme" : "Demo mod"}
         </span>
       </div>
 

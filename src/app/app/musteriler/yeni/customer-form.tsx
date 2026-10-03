@@ -80,6 +80,7 @@ export function CustomerForm({
         icon: TAB_ICONS[t.id],
         fields: [...t.fields],
         required: [...t.required],
+        passive: "passive" in t ? [...t.passive] : undefined,
       })),
     [],
   );

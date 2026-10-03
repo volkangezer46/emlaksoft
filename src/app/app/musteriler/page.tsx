@@ -4,6 +4,7 @@ import { daysAgoIso, msSince, now } from "@/lib/clock";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
+import { HelpTip } from "@/components/ui/help-tip";
 import {
   ArrowDown,
   ArrowUp,
@@ -679,7 +680,7 @@ export default async function CustomersPage({
     <div className="space-y-5">
       <PageHeader
         title="Müşteriler"
-        description="Talep, iletişim ve müşteri yolculuğu tek ekranda."
+        description={<>Talep, iletişim ve müşteri durumu tek ekranda. <HelpTip topic="sicaklik" label="Müşteri sıcaklığı" /></>}
         actions={
           <>
             <ButtonLink href="/app/musteriler/cift-kayit" variant="secondary" size="sm" icon={Copy}>

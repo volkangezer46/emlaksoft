@@ -268,7 +268,7 @@ export default async function SupportPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Talepleriniz" eyebrow="Destek merkezi" description="EmlakSoft ekibine fatura, kurulum ve teknik taleplerinizi iletin." actions={
+      <PageHeader title="Talepleriniz" eyebrow="Yardım ve Destek" description="EmlakSoft ekibine fatura, kurulum ve teknik taleplerinizi iletin." actions={
 <ButtonLink href="/app/destek/yeni" icon={LifeBuoy}>Yeni talep</ButtonLink>
 } />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">

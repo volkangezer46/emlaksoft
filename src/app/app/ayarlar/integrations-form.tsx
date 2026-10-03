@@ -1,4 +1,3 @@
-"use client";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -224,7 +223,7 @@ export function IntegrationsForm({
           label="Telefon numarası kimliği"
           htmlFor="whatsapp-phone-number-id"
           required
-          hint="Meta WhatsApp Manager'daki Phone number ID. Gelen webhook yönlendirmesi bu kimlikle ofise sabitlenir."
+          hint="Meta WhatsApp Manager'daki Phone number ID. Gelen mesajlar bu kimlikle yalnızca sizin ofisinize yönlendirilir."
         >
           <Input
             id="whatsapp-phone-number-id"

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, Sparkles, X } from "lucide-react";
+import { TOUR_PARAM, TOUR_STORAGE_KEY } from "@/lib/product-tour-storage";
 import {
   Dialog,
   DialogDescription,
@@ -21,16 +22,19 @@ import {
  * KURALLAR:
  * - localStorage "emlaksoft:tour-done" → bir kez gösterilir (tur başlar
  *   başlamaz yazılır; yarıda navigasyon olsa da tekrar rahatsız etmez).
- * - ?tv=1 (TV modu) ve prefers-reduced-motion'da hiç başlamaz.
+ * - /app?tur=1 → daha önce görülmüş olsa bile yeniden başlar (Yardım sayfası
+ *   ve kullanıcı menüsündeki "Turu yeniden başlat").
+ * - Dar ekranda (telefon) da çalışır: balon ekranın altına sabitlenir.
+ * - ?tv=1 (TV modu) ve prefers-reduced-motion'da (yeniden başlatma hariç) hiç başlamaz.
  * - SSR güvenli: yalnız effect sonrası (DOM ölçülebilirken) render edilir.
  * - Bulunamayan / görünmeyen hedefin adımı sessizce atlanır (ör. komut
  *   paleti butonu ya da brifing kartı o an DOM'da yoksa).
  */
 
-const STORAGE_KEY = "emlaksoft:tour-done";
+const STORAGE_KEY = TOUR_STORAGE_KEY;
 const PAD = 8; // delik ile hedef arası nefes payı (px)
 const CARD_W = 336; // balon kart genişliği (px)
-const CARD_H = 216; // yerleşim hesabı için tahmini kart yüksekliği (px)
+const CARD_H = 250; // yerleşim hesabı için tahmini kart yüksekliği (px)
 const GAP = 12; // delik ile kart arası boşluk (px)
 
 type TourStep = { selector: string; title: string; desc: string };
@@ -38,28 +42,28 @@ type TourStep = { selector: string; title: string; desc: string };
 const STEPS: TourStep[] = [
   {
     selector: '[data-tour="brifing"]',
-    title: "Günaydın brifingi",
-    desc: "Gününüz burada özetlenir — randevular, görevler ve sıcak fırsatlar tek bakışta.",
+    title: "Bugünkü işleriniz",
+    desc: "Bugün yapmanız gereken randevular, görevler ve aranacak müşteriler burada özetlenir.",
   },
   {
     selector: '[data-tour="kpi"]',
-    title: "Canlı KPI kartları",
-    desc: "Her sayı tıklanabilir — detaya iner. Trend rozetleri dönem karşılaştırması gösterir.",
+    title: "Ofisinizin rakamları",
+    desc: "Müşteri, talep ve komisyon sayılarını görürsünüz. Bir rakama dokunursanız o kayıtların listesi açılır.",
   },
   {
     selector: '[data-tour="aksiyonlar"]',
-    title: "Görevler ve hızlı aksiyonlar",
-    desc: "Kayıtların üzerine gelin, tek tıkla işlem yapın — görevi tamamlayın, müşteriyi arayın.",
+    title: "Görevleriniz",
+    desc: "Bir kaydın üzerine gelip görevi tamamlayabilir veya müşteriyi arayabilirsiniz.",
   },
   {
     selector: 'header button[aria-haspopup="dialog"]',
-    title: "Komut paleti",
-    desc: "Ctrl+K ile her şeye ulaşın — müşteri, portföy, anlaşma, görev… hepsi tek kutudan.",
+    title: "Arama kutusu",
+    desc: "Müşteri adı, ilan numarası veya görev yazın; hepsi tek kutudan bulunur. Klavyede Ctrl ve K tuşları da açar.",
   },
   {
     selector: "aside",
-    title: "Modüller",
-    desc: "Modüller solda gruplu — Kiralama ve Projeler yeni. İzinli olduğunuz her şey burada.",
+    title: "Menü",
+    desc: "Tüm sayfalar solda başlıklar altında durur. Yalnızca yetkiniz olan sayfalar görünür.",
   },
 ];
 
@@ -81,20 +85,23 @@ export function ProductTour() {
   const [activeSteps, setActiveSteps] = useState<TourStep[]>([]);
   const [index, setIndex] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
+  const [mobile, setMobile] = useState(false);
 
   // Başlatma koşulları — yalnız effect'te (SSR güvenli)
   useEffect(() => {
     let done = false;
-    try {
-      done = Boolean(window.localStorage.getItem(STORAGE_KEY));
-    } catch {
-      return; // localStorage yoksa "bir kez" garantisi verilemez → hiç gösterme
+    const params = new URLSearchParams(window.location.search);
+    const forced = params.get(TOUR_PARAM) === "1";
+    if (params.get("tv") === "1") return;
+    if (!forced) {
+      try {
+        done = Boolean(window.localStorage.getItem(STORAGE_KEY));
+      } catch {
+        return; // localStorage yoksa "bir kez" garantisi verilemez → hiç gösterme
+      }
+      if (done) return;
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     }
-    if (done) return;
-    if (new URLSearchParams(window.location.search).get("tv") === "1") return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    // Spotlight turu masaüstü deseni — dar ekranda balon içeriği örtüyor
-    if (window.innerWidth < 768) return;
 
     // Giriş animasyonları otursun, sayfa ölçülebilir olsun
     const t = window.setTimeout(() => {
@@ -105,6 +112,13 @@ export function ProductTour() {
       } catch {
         /* yazılamazsa yine de bu oturumda göster */
       }
+      if (forced) {
+        // Adres çubuğunda ?tur=1 kalmasın: sayfa yenilenince tur tekrar açılmasın.
+        params.delete(TOUR_PARAM);
+        const qs = params.toString();
+        window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`);
+      }
+      setMobile(window.innerWidth < 768);
       setActiveSteps(found);
       setIndex(0);
       setPhase("run");
@@ -141,7 +155,7 @@ export function ProductTour() {
       }, 0);
       return () => clearTimeout(skip);
     }
-    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.scrollIntoView({ block: mobile ? "start" : "center", behavior: "smooth" });
     const update = () => {
       const r = el.getBoundingClientRect();
       setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
@@ -159,7 +173,7 @@ export function ProductTour() {
       window.removeEventListener("resize", onMove);
       window.removeEventListener("scroll", onMove, true);
     };
-  }, [phase, index, activeSteps]);
+  }, [phase, index, activeSteps, mobile]);
 
   if (phase === "idle" || phase === "off") return null;
 
@@ -182,22 +196,15 @@ export function ProductTour() {
           </DialogTitle>
           <DialogDescription asChild>
             <p className="mt-1 text-sm text-text-muted">
-              Tur tamamlandı — panel artık canlı ofis verinizle çalışıyor.
+              Tur bitti. Takıldığınızda soldaki menüden Yardım ve Destek sayfasını açın; turu oradan istediğiniz zaman yeniden başlatabilirsiniz.
             </p>
           </DialogDescription>
-          <p className="mt-3 rounded-[var(--radius-control)] bg-canvas px-3 py-2 text-xs text-text-muted">
-            İstediğinde{" "}
-            <kbd className="rounded-[var(--radius-control)] border border-line bg-surface px-1.5 py-0.5 font-semibold text-ink-950">?</kbd>{" "}
-            klavye kısayollarını,{" "}
-            <kbd className="rounded-[var(--radius-control)] border border-line bg-surface px-1.5 py-0.5 font-semibold text-ink-950">Ctrl+K</kbd>{" "}
-            komut paletini açar.
-          </p>
           <button
             type="button"
             onClick={close}
-            className="focus-ring press mt-4 w-full rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700"
+            className="focus-ring press mt-4 min-h-11 w-full rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700"
           >
-            Panele başla
+            Başla
           </button>
         </div>
         </DialogFullscreenContent>
@@ -223,7 +230,11 @@ export function ProductTour() {
   // Balon yerleşimi: altta → üstte → sağda → viewport altına sabit
   let cardTop: number;
   let cardLeft: number;
-  if (vh - holeBottom >= CARD_H + GAP + 8) {
+  if (mobile) {
+    // Telefon: balon ekranın altına sabit, tam genişlik
+    cardTop = Math.max(16, vh - CARD_H - 16);
+    cardLeft = 16;
+  } else if (vh - holeBottom >= CARD_H + GAP + 8) {
     cardTop = holeBottom + GAP;
     cardLeft = hole.left;
   } else if (hole.top >= CARD_H + GAP + 8) {
@@ -236,7 +247,7 @@ export function ProductTour() {
     cardTop = vh - CARD_H - 16;
     cardLeft = hole.left;
   }
-  cardLeft = Math.max(16, Math.min(cardLeft, vw - CARD_W - 16));
+  cardLeft = mobile ? 16 : Math.max(16, Math.min(cardLeft, vw - CARD_W - 16));
   cardTop = Math.max(16, cardTop);
 
   return (
@@ -268,7 +279,7 @@ export function ProductTour() {
       {/* Balon kart */}
       <div
         className="popover-in absolute rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--elev-5)] transition-[top,left] duration-300 ease-out"
-        style={{ top: cardTop, left: cardLeft, width: CARD_W, maxWidth: "calc(100vw - 32px)" }}
+        style={{ top: cardTop, left: cardLeft, width: mobile ? vw - 32 : CARD_W, maxWidth: "calc(100vw - 32px)" }}
       >
         <div className="flex items-start justify-between gap-3">
           <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold tabular-nums text-brand-600">
@@ -278,7 +289,7 @@ export function ProductTour() {
             type="button"
             onClick={close}
             aria-label="Turu kapat"
-            className="focus-ring -mr-1 -mt-1 grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950"
+            className="focus-ring -mr-2 -mt-2 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950"
           >
             <X className="h-4 w-4" />
           </button>
@@ -293,7 +304,7 @@ export function ProductTour() {
           <button
             type="button"
             onClick={close}
-            className="focus-ring rounded-[var(--radius-control)] px-2 py-1.5 text-xs font-semibold text-text-faint transition hover:text-ink-950"
+            className="focus-ring min-h-11 rounded-[var(--radius-control)] px-3 py-1.5 text-sm font-semibold text-text-muted transition hover:text-ink-950"
           >
             Geç
           </button>
@@ -302,14 +313,14 @@ export function ProductTour() {
               type="button"
               onClick={prev}
               disabled={index === 0}
-              className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 disabled:cursor-not-allowed disabled:opacity-40"
+              className="focus-ring press inline-flex min-h-11 items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-1.5 text-sm font-semibold text-ink-950 transition hover:border-brand-300 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ArrowLeft className="h-3.5 w-3.5" /> Geri
             </button>
             <button
               type="button"
               onClick={next}
-              className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-700"
+              className="focus-ring press inline-flex min-h-11 items-center gap-1 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-1.5 text-sm font-bold text-white transition hover:bg-brand-700"
             >
               {index + 1 >= activeSteps.length ? "Bitir" : "İleri"} <ArrowRight className="h-3.5 w-3.5" />
             </button>
