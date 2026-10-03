@@ -12,7 +12,7 @@ export default async function NewRentalPage({
   searchParams?: Promise<{ portfoy?: string; musteri?: string; tutar?: string }>;
 }) {
   // Paket kilidi kilitli kök yol üzerinden uygulanır (/app/kiralama → page-gates).
-  const { perms } = await requireModulePage("rentals", "/app/kiralama");
+  const { perms, userId } = await requireModulePage("rentals", "/app/kiralama");
   if (!(perms.rentals ?? []).includes("create")) redirect("/app/kiralama");
 
   // Kazanılan kira anlaşması köprüsü: ?portfoy=&musteri=&tutar= ön dolgusu.
@@ -73,6 +73,7 @@ export default async function NewRentalPage({
       defaultCustomerId={validCustomer}
       defaultMonthlyRent={prefillRent}
       defaultStartDate={trDayKey()}
+      userId={userId}
     />
   );
 }

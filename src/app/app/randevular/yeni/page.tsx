@@ -65,6 +65,7 @@ export default async function NewAppointmentPage({
       defaultPropertyId={pickedProperty?.id}
       defaultDate={defaultDate}
       defaultTime={defaultTime}
+      userId={gate.userId}
     />
   );
 }
