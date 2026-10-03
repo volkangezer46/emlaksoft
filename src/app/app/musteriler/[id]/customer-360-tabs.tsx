@@ -8,10 +8,7 @@ import {
   Folder,
   Handshake,
   History,
-  LayoutDashboard,
-  ListChecks,
   MessageSquare,
-  PhoneCall,
   Plus,
   ShieldCheck,
   Sparkles,
@@ -25,7 +22,8 @@ import { DetailTabs, type DetailTabDef } from "@/components/app/detail-tabs";
 import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import { CustomerFilesTab } from "./customer-files-tab";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
-import { CustomerTimelineTab, type TimelineItem } from "./customer-timeline-tab";
+import { ActivityTimeline, type TimelineCategory, type TimelineEvent } from "@/components/ui/activity-timeline";
+import { APPT_STATUS_LABEL, APPT_TYPE_LABEL, CONTRACT_STATUS_LABEL, OFFER_STATUS_LABEL } from "@/lib/activity-timeline-sources";
 
 type Province = { id: string; name: string };
 
@@ -43,14 +41,6 @@ type Demand = {
   district_id: string | null;
   neighborhood_id: string | null;
   created_at: string;
-};
-
-type ActivityItem = {
-  key: string;
-  title: string;
-  sub: string;
-  time: string;
-  tone: string;
 };
 
 const demandStatus: Record<string, string> = {
@@ -78,21 +68,25 @@ function dateTime(iso: string) {
 
 /**
  * Sekme kimlikleri (URL: ?sekme=). Eski `?tab=` linkleri de çalışır:
- * "aktivite" → özet (aktivite akışı artık Özet'te).
+ * Eski kimlikler (ozet/aktivite/gecmis/gorevler/dosyalar) takma adla yeni sekmelere gider.
  */
 export const CUSTOMER_TAB_IDS = [
-  "ozet",
-  "talepler",
   "zaman",
-  "iletisim",
-  "gorevler",
+  "talepler",
   "anlasmalar",
-  "dosyalar",
+  "randevu",
+  "belgeler",
   "izinler",
+  "iletisim",
   "notlar",
-  "gecmis",
 ] as const;
-export const CUSTOMER_TAB_ALIASES: Record<string, string> = { aktivite: "ozet" };
+export const CUSTOMER_TAB_ALIASES: Record<string, string> = {
+  aktivite: "zaman",
+  ozet: "zaman",
+  gecmis: "zaman",
+  gorevler: "randevu",
+  dosyalar: "belgeler",
+};
 
 /** Aktif olmayan sekmenin içeriği (ve onun async bölümleri) hiç çizilmez. */
 function Pane({ id, active, children }: { id: string; active: string; children: ReactNode }) {
@@ -127,6 +121,10 @@ type CommRow = {
   created_by: { full_name?: string } | { full_name?: string }[] | null;
 };
 
+type ApptRow = { id: string; appointment_type: string; scheduled_at: string; location: string | null; status: string };
+type OfferRow = { id: string; amount: number | null; status: string; created_at: string };
+type ContractRow = { id: string; title: string; status: string; signed_at: string | null; created_at: string };
+
 type FileRow = {
   id: string;
   file_name: string;
@@ -142,14 +140,19 @@ export function Customer360Tabs({
   customerId,
   provinces,
   demands,
-  activity,
-  timeline = [],
+  events = [],
+  timelineCategories = [],
+  activeCategory = "",
+  timelineLimit = 40,
+  timelineLoadMoreHref,
+  appts = [],
+  offers = [],
+  contracts = [],
   tags,
   notes,
   source,
   sourceDetail = null,
   createdAt,
-  audit,
   deals = [],
   consents = [],
   files = [],
@@ -170,14 +173,20 @@ export function Customer360Tabs({
   propertyTypes?: string[];
   urgencyOptions?: { value: string; label: string }[];
   demands: Demand[];
-  activity: ActivityItem[];
-  timeline?: TimelineItem[];
+  /** Birleşik olay akışı (yalnız Zaman çizelgesi sekmesinde dolu); sunucuda kategoriye göre süzülmüş. */
+  events?: TimelineEvent[];
+  timelineCategories?: TimelineCategory[];
+  activeCategory?: string;
+  timelineLimit?: number;
+  timelineLoadMoreHref?: string;
+  appts?: ApptRow[];
+  offers?: OfferRow[];
+  contracts?: ContractRow[];
   tags: string[];
   notes: string | null;
   source: string | null;
   sourceDetail?: string | null;
   createdAt: string;
-  audit: { id: string; action: string; created_at: string }[];
   deals?: DealRow[];
   consents?: ConsentRow[];
   files?: FileRow[];
@@ -185,7 +194,7 @@ export function Customer360Tabs({
   canCreateComm?: boolean;
   /** Seçili sekme (sunucuda çözülür); yalnız bu sekmenin içeriği çizilir. */
   active: string;
-  counts: { demands: number; comms: number; tasks: number | null; deals: number; files: number; consents: number; audit: number };
+  counts: { demands: number; comms: number; tasks: number | null; deals: number; offers: number; appts: number; files: number; contracts: number; consents: number };
   showTasks?: boolean;
   /** Özet sekmesinin akan bölümleri (portföy önerileri + memnuniyet) — yalnız aktifken çizilir. */
   ozetSlot?: ReactNode;
@@ -202,16 +211,14 @@ export function Customer360Tabs({
   };
 
   const tabDefs: DetailTabDef[] = [
-    { id: "ozet", label: "Özet", icon: LayoutDashboard, count: activity.length },
-    { id: "talepler", label: "Talepler", icon: Target, count: counts.demands },
-    { id: "zaman", label: "Zaman tüneli", icon: History },
-    { id: "iletisim", label: "İletişim", icon: MessageSquare, count: counts.comms },
-    { id: "gorevler", label: "Görevler", icon: ListChecks, count: counts.tasks, hidden: !showTasks },
-    { id: "anlasmalar", label: "Anlaşmalar", icon: Handshake, count: counts.deals },
-    { id: "dosyalar", label: "Dosyalar", icon: Folder, count: counts.files },
-    { id: "izinler", label: "İYS", icon: ShieldCheck, count: counts.consents },
+    { id: "zaman", label: "Zaman çizelgesi", icon: History },
+    { id: "talepler", label: "Talepler ve eşleşmeler", icon: Target, count: counts.demands },
+    { id: "anlasmalar", label: "Teklifler ve anlaşmalar", icon: Handshake, count: counts.deals + counts.offers },
+    { id: "randevu", label: "Randevu ve görevler", icon: CalendarDays, count: counts.appts + (showTasks ? counts.tasks ?? 0 : 0) },
+    { id: "belgeler", label: "Belgeler ve imza", icon: Folder, count: counts.files + counts.contracts },
+    { id: "izinler", label: "İletişim tercihleri", icon: ShieldCheck, count: counts.consents },
+    { id: "iletisim", label: "İletişim kayıtları", icon: MessageSquare, count: counts.comms },
     { id: "notlar", label: "Notlar", icon: Sparkles },
-    { id: "gecmis", label: "Geçmiş", icon: FileText, count: counts.audit },
   ];
 
   return (
@@ -219,7 +226,18 @@ export function Customer360Tabs({
       <DetailTabs basePath={`/app/musteriler/${customerId}`} tabs={tabDefs} active={active} label="Müşteri sekmeleri" />
 
       <Pane id="zaman" active={active}>
-        <CustomerTimelineTab items={timeline} />
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <ActivityTimeline
+            events={events}
+            categories={timelineCategories}
+            activeCategory={activeCategory}
+            hrefForCategory={(k) => `/app/musteriler/${customerId}?sekme=zaman${k ? `&kategori=${k}` : ""}`}
+            pageSize={timelineLimit}
+            loadMoreHref={timelineLoadMoreHref}
+            emptyTitle={activeCategory ? "Bu kategoride kayıt yok." : "Bu müşteri için henüz olay kaydı yok."}
+            emptyHint="Görüşme, randevu, teklif ve portal hareketleri oluştukça burada günlere göre listelenir."
+          />
+        </section>
       </Pane>
 
       <Pane id="talepler" active={active}>
@@ -262,6 +280,7 @@ export function Customer360Tabs({
             </div>
           )}
         </section>
+        {ozetSlot}
       </Pane>
 
       <Pane id="anlasmalar" active={active}>
@@ -301,6 +320,33 @@ export function Customer360Tabs({
             </div>
           )}
         </section>
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+              <Tag className="h-4 w-4 text-amber-500" /> Teklifler
+            </h2>
+            <Link href="/app/teklifler" className="text-xs font-semibold text-brand-600 hover:underline">Teklifler →</Link>
+          </div>
+          {offers.length === 0 ? (
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı teklif yok." />
+          ) : (
+            <div className="mt-4 space-y-2">
+              {offers.map((o) => (
+                <Link
+                  key={o.id}
+                  href={`/app/teklifler/${o.id}`}
+                  className="focus-ring group flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-3 transition hover:border-brand-300"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-ink-950">{OFFER_STATUS_LABEL[o.status] ?? o.status}</p>
+                    <p className="text-xs text-text-muted">{dateTime(o.created_at)}</p>
+                  </div>
+                  <span className="font-display text-sm font-extrabold text-brand-600">{o.amount != null ? money(Number(o.amount)) : "—"}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
       </Pane>
 
       <Pane id="iletisim" active={active}>
@@ -311,7 +357,38 @@ export function Customer360Tabs({
         />
       </Pane>
 
-      <Pane id="dosyalar" active={active}><CustomerFilesTab customerId={customerId} files={files ?? []} /></Pane>
+      <Pane id="belgeler" active={active}>
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+              <FileText className="h-4 w-4 text-danger-500" /> Sözleşmeler ve imza
+            </h2>
+            <Link href="/app/sozlesmeler" className="text-xs font-semibold text-brand-600 hover:underline">Sözleşmeler →</Link>
+          </div>
+          {contracts.length === 0 ? (
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı sözleşme yok." />
+          ) : (
+            <div className="mt-4 space-y-2">
+              {contracts.map((c) => (
+                <Link
+                  key={c.id}
+                  href={`/app/sozlesmeler/${c.id}`}
+                  className="focus-ring group flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-3 transition hover:border-brand-300"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink-950">{c.title}</p>
+                    <p className="text-xs text-text-muted">
+                      {CONTRACT_STATUS_LABEL[c.status] ?? c.status} · {dateTime(c.signed_at ?? c.created_at)}
+                    </p>
+                  </div>
+                  <ArrowUpRight className="hover-action h-4 w-4 shrink-0 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+        <CustomerFilesTab customerId={customerId} files={files ?? []} />
+      </Pane>
 
       <Pane id="izinler" active={active}>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
@@ -351,34 +428,38 @@ export function Customer360Tabs({
         </section>
       </Pane>
 
-      <Pane id="ozet" active={active}>
+      <Pane id="randevu" active={active}>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-            <PhoneCall className="h-4 w-4 text-mint-600" /> Aktivite akışı
-          </h2>
-          {activity.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Henüz çağrı veya randevu kaydı yok." />
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+              <CalendarDays className="h-4 w-4 text-mint-600" /> Randevular
+            </h2>
+            <ButtonLink href={`/app/randevular?customer=${customerId}`} size="sm" icon={Plus}>Randevu ver</ButtonLink>
+          </div>
+          {appts.length === 0 ? (
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı randevu yok." />
           ) : (
-            <div className="mt-4 space-y-3">
-              {activity.map((a) => (
-                <div key={a.key} className="flex items-start gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-3">
-                  <span className={`mt-0.5 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] ${a.tone}`}>
-                    <CalendarDays className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-ink-950">{a.title}</p>
-                    <p className="text-xs text-text-muted">{a.sub}</p>
+            <div className="mt-4 space-y-2">
+              {appts.map((a) => (
+                <Link
+                  key={a.id}
+                  href={`/app/randevular?customer=${customerId}`}
+                  className="focus-ring group flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-3 transition hover:border-brand-300"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-ink-950">
+                      {APPT_TYPE_LABEL[a.appointment_type] ?? "Randevu"} · {APPT_STATUS_LABEL[a.status] ?? a.status}
+                    </p>
+                    <p className="truncate text-xs text-text-muted">{dateTime(a.scheduled_at)}{a.location ? ` · ${a.location}` : ""}</p>
                   </div>
-                  <span className="shrink-0 text-xs text-text-faint">{dateTime(a.time)}</span>
-                </div>
+                  <ArrowUpRight className="hover-action h-4 w-4 shrink-0 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                </Link>
               ))}
             </div>
           )}
         </section>
-      {ozetSlot}
+        {tasksSlot}
       </Pane>
-
-      <Pane id="gorevler" active={active}>{tasksSlot}</Pane>
 
       <Pane id="notlar" active={active}>
         <div className="space-y-4">
@@ -415,25 +496,6 @@ export function Customer360Tabs({
         </div>
       </Pane>
 
-      <Pane id="gecmis" active={active}>
-        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-            <FileText className="h-4 w-4 text-brand-600" /> İşlem geçmişi
-          </h2>
-          {audit.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Henüz denetim kaydı yok. Yeni düzenlemeler burada görünecek." />
-          ) : (
-            <div className="mt-4 space-y-2">
-              {audit.map((a) => (
-                <div key={a.id} className="flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-2.5 text-sm">
-                  <span className="font-medium text-ink-950">{a.action}</span>
-                  <span className="text-xs text-text-faint">{dateTime(a.created_at)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </Pane>
     </div>
   );
 }

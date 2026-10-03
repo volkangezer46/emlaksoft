@@ -70,11 +70,13 @@ import {
   PublishSection,
   PublishSkeleton,
   RelatedSkeleton,
-  StatusHistorySection,
-  StatusHistorySkeleton,
-  TimelineSection,
   TimelineSkeleton,
 } from "./sections";
+import { PropertyTimelineSection } from "./property-timeline-section";
+import { PROPERTY_TIMELINE_CATEGORIES } from "./property-events";
+import { resolveCategory } from "@/lib/activity-timeline";
+import { getStageLabels } from "@/lib/definitions";
+import { stageLabelMap } from "@/lib/deal-stage-labels";
 import type { CSSProperties } from "react";
 import { priceHealthLabel, propertyStatusLabel } from "@/lib/property-labels";
 
@@ -124,9 +126,9 @@ const statusOptions = [
  * gerçekten ihtiyaç duyduğu sorgular bekleniyor; ağır/ikincil bölümler
  * `./sections.tsx` içinde kendi `<Suspense>` sınırlarında akarak geliyor.
  */
-const PROPERTY_TAB_IDS = ["ozet", "medya", "fiyat", "portallar", "anahtarlar", "belgeler", "konum", "gecmis"] as const;
+const PROPERTY_TAB_IDS = ["ozet", "medya", "fiyat", "portallar", "anahtarlar", "belgeler", "konum", "zaman"] as const;
 // Eski çapa/sekme adları
-const PROPERTY_TAB_ALIASES: Record<string, string> = { saglik: "belgeler", harita: "konum" };
+const PROPERTY_TAB_ALIASES: Record<string, string> = { saglik: "belgeler", harita: "konum", gecmis: "zaman" };
 
 export default async function PropertyDetailPage({
   params,
@@ -140,7 +142,11 @@ export default async function PropertyDetailPage({
   const canDelete = (perms.properties ?? []).includes("delete");
   const { id } = await params;
   // Seçili sekme sunucuda çözülür; yalnız aktif sekmenin bölümleri (ve Suspense sorguları) çalışır
-  const tab = resolveTab(await searchParams, PROPERTY_TAB_IDS, "ozet", PROPERTY_TAB_ALIASES);
+  const sp = await searchParams;
+  const tab = resolveTab(sp, PROPERTY_TAB_IDS, "ozet", PROPERTY_TAB_ALIASES);
+  const timelineCategory = resolveCategory(sp.kategori, PROPERTY_TIMELINE_CATEGORIES.map((c) => c.key));
+  const rawLimit = Number(Array.isArray(sp.adet) ? sp.adet[0] : sp.adet);
+  const timelineLimit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 40), 400) : 40;
   const supabase = await createClient();
 
   // KÜNYE BATCH'İ — yalnız hero + üst kartların ihtiyacı. Hepsi `id`'ye bağlı,
@@ -336,7 +342,7 @@ export default async function PropertyDetailPage({
     { id: "anahtarlar", label: "Anahtarlar", icon: KeyRound },
     { id: "belgeler", label: "Belgeler & sağlık", icon: FileCheck2 },
     { id: "konum", label: "Konum", icon: MapPin },
-    { id: "gecmis", label: "Geçmiş", icon: History },
+    { id: "zaman", label: "Zaman çizelgesi", icon: History },
   ];
 
   return (
@@ -925,22 +931,15 @@ export default async function PropertyDetailPage({
             </div>
           ) : null}
 
-          {tab === "gecmis" ? (
-            <div className="space-y-4">
-          {/* Zaman tuneli: fiyat ve durum gecmisi ayri ayri dogruydu ama HIKAYEYI
-              anlatmiyorlardi. Portal yayini, teklif, randevu ve acik ev ise
-              hicbir kronolojide gorunmuyordu. */}
-          <div id="gecmis" className="scroll-mt-24">
+          {tab === "zaman" ? (
             <Suspense fallback={<TimelineSkeleton />}>
-              <TimelineSection propertyId={id} />
+              <PropertyTimelineSection
+                propertyId={id}
+                stageNames={stageLabelMap(await getStageLabels())}
+                category={timelineCategory}
+                limit={timelineLimit}
+              />
             </Suspense>
-          </div>
-
-          {/* Durum geçmişi */}
-          <Suspense fallback={<StatusHistorySkeleton />}>
-            <StatusHistorySection propertyId={id} />
-          </Suspense>
-            </div>
           ) : null}
         </div>
 

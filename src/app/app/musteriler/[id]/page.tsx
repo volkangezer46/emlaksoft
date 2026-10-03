@@ -31,8 +31,10 @@ import { MoreActions } from "@/components/app/more-actions";
 import { computeLeadScore, leadTierCls } from "@/lib/lead-score";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
 import { MatchedSection, MatchedSkeleton, SatisfactionSection } from "./sections";
-import type { TimelineItem } from "./customer-timeline-tab";
-import { COMM_CHANNELS } from "@/lib/comm-types";
+import { buildCustomerEvents, CUSTOMER_TIMELINE_CATEGORIES } from "./customer-events";
+import { countByCategory, filterByCategory, resolveCategory } from "@/lib/activity-timeline";
+import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
+import { Wallet } from "lucide-react";
 import { computeNextBestAction } from "./next-best-action";
 import { isPast, msSince, DAY_MS } from "@/lib/clock";
 import { getBaseUrl } from "@/lib/base-url";
@@ -88,53 +90,6 @@ function initials(name: string) {
   return name.split(/\s+/).map((p) => p[0] ?? "").join("").slice(0, 2).toUpperCase();
 }
 
-const apptTypeLabel: Record<string, string> = {
-  showing: "Yer gösterme",
-  office: "Ofis görüşmesi",
-  valuation: "Değerleme",
-  contract: "Sözleşme",
-};
-
-// Zaman tüneli özet etiketleri — ilgili modül sayfalarındaki karşılıklarla aynı
-const callDirLabel: Record<string, string> = { inbound: "Gelen", outbound: "Giden", missed: "Cevapsız" };
-const apptStatusLabel: Record<string, string> = {
-  pending: "Teyit bekliyor",
-  confirmed: "Onaylandı",
-  signature: "İmza eksik",
-  completed: "Tamamlandı",
-  cancelled: "İptal",
-};
-const offerStatusLabel: Record<string, string> = {
-  draft: "Taslak",
-  submitted: "Sunuldu",
-  countered: "Karşı teklif",
-  accepted: "Kabul edildi",
-  rejected: "Reddedildi",
-  withdrawn: "Geri çekildi",
-};
-const contractStatusLabel: Record<string, string> = {
-  draft: "Taslak",
-  sent: "Gönderildi",
-  signed: "İmzalandı",
-  rejected: "Reddedildi",
-  cancelled: "İptal",
-};
-const contractTypeLabel: Record<string, string> = {
-  satis: "Satış",
-  kira: "Kira",
-  sozlesme: "Sözleşme",
-  teklif: "Teklif",
-  diger: "Diğer",
-};
-
-function moneyTl(value: number) {
-  return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(value);
-}
-
-function shortDate(iso: string) {
-  return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
-}
-
 export default async function CustomerDetailPage({
   params,
   searchParams,
@@ -152,7 +107,11 @@ export default async function CustomerDetailPage({
   const canTaskView = (perms.tasks ?? []).includes("view");
   const { id } = await params;
   // Seçili sekme sunucuda çözülür; yalnız o sekmenin verisi çekilir (eski ?tab= linkleri de çalışır)
-  const tab = resolveTab(await searchParams, CUSTOMER_TAB_IDS, "ozet", CUSTOMER_TAB_ALIASES);
+  const sp = await searchParams;
+  const tab = resolveTab(sp, CUSTOMER_TAB_IDS, "zaman", CUSTOMER_TAB_ALIASES);
+  const activeCategory = resolveCategory(sp.kategori, CUSTOMER_TIMELINE_CATEGORIES.map((c) => c.key));
+  const rawLimit = Number(Array.isArray(sp.adet) ? sp.adet[0] : sp.adet);
+  const timelineLimit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 40), 400) : 40;
   const supabase = await createClient();
   const noRows = Promise.resolve({ data: null });
 
@@ -163,11 +122,10 @@ export default async function CustomerDetailPage({
     { data: callsData },
     { data: apptsData },
     { data: provinces },
-    { data: auditData },
     { data: dealsData },
     { data: consentsData },
     { data: filesData },
-    { count: auditCount },
+    { count: contractsCount },
     { count: filesCount },
     { data: tasksData },
     { data: commsData },
@@ -204,14 +162,6 @@ export default async function CustomerDetailPage({
       .order("scheduled_at", { ascending: false })
       .limit(50),
     supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
-    tab === "gecmis"
-      ? supabase
-          .from("audit_logs")
-          .select("id, action, created_at")
-          .eq("entity_id", id)
-          .order("created_at", { ascending: false })
-          .limit(40)
-      : noRows,
     supabase
       .from("deals")
       .select("id, stage, deal_type, deal_value, updated_at")
@@ -231,11 +181,11 @@ export default async function CustomerDetailPage({
           .order("created_at", { ascending: false })
       : noRows,
     // Sekme sayaçları — yalnız sayı (head), satır çekilmez
-    supabase.from("audit_logs").select("id", { count: "exact", head: true }).eq("entity_id", id),
+    supabase.from("contracts").select("id", { count: "exact", head: true }).eq("customer_id", id),
     supabase.from("customer_files").select("id", { count: "exact", head: true }).eq("customer_id", id),
     supabase
       .from("tasks")
-      .select("id, title, kind, priority, status, due_at, completed_at")
+      .select("id, title, kind, priority, status, due_at, completed_at, created_at")
       .eq("customer_id", id)
       .order("status", { ascending: true })
       .order("due_at", { ascending: true, nullsFirst: false })
@@ -253,7 +203,7 @@ export default async function CustomerDetailPage({
       .eq("customer_id", id)
       .order("created_at", { ascending: false })
       .limit(50),
-    tab === "zaman"
+    tab === "belgeler"
       ? supabase
           .from("contracts")
           .select("id, title, contract_type, status, signed_at, created_at")
@@ -302,7 +252,6 @@ export default async function CustomerDetailPage({
   const demands = (demandsData ?? []) as Demand[];
   const calls = (callsData ?? []) as Call[];
   const appts = (apptsData ?? []) as Appt[];
-  const audit = (auditData ?? []) as { id: string; action: string; created_at: string }[];
 
   // Memnuniyet & Paylaşımlar — public link tabanı sunum/anket sayfalarıyla aynı
   const publicBase = getBaseUrl();
@@ -395,114 +344,58 @@ export default async function CustomerDetailPage({
         customer.phone ? toTelHref(customer.phone) : null,
       );
 
-  type Activity = {
-    key: string;
-    title: string;
-    sub: string;
-    time: string;
-    tone: string;
-  };
+  // Zaman çizelgesi — yalnız o sekme açıkken derlenir; kategori süzgeci sunucuda uygulanır.
+  let events: Awaited<ReturnType<typeof buildCustomerEvents>> = [];
+  let allEvents: typeof events = [];
+  if (tab === "zaman") {
+    allEvents = await buildCustomerEvents(supabase, customer.id, customer.created_at as string, {
+      calls,
+      appts,
+      comms: (commsData ?? []) as Parameters<typeof buildCustomerEvents>[3]["comms"],
+      offers: (offersData ?? []) as Parameters<typeof buildCustomerEvents>[3]["offers"],
+      tasks: canTaskView ? ((tasksData ?? []) as Parameters<typeof buildCustomerEvents>[3]["tasks"]) : [],
+      deals: (dealsData ?? []) as Parameters<typeof buildCustomerEvents>[3]["deals"],
+      stageNames,
+    });
+    events = filterByCategory(allEvents, activeCategory);
+  }
+  const catCounts = countByCategory(allEvents);
+  const timelineCategories = CUSTOMER_TIMELINE_CATEGORIES.map((c) => ({
+    key: c.key,
+    label: c.label,
+    count: tab === "zaman" ? (catCounts[c.key] ?? 0) : undefined,
+  }));
+  const timelineLoadMoreHref = `/app/musteriler/${customer.id}?sekme=zaman${activeCategory ? `&kategori=${activeCategory}` : ""}&adet=${timelineLimit + 40}`;
 
-  const activity: Activity[] = [
-    ...calls.map((c): Activity => ({
-      key: `c-${c.id}`,
-      title: c.disposition ?? (c.direction === "missed" ? "Cevapsız çağrı" : "Çağrı"),
-      sub: `${formatTurkishPhone(c.phone)}${c.duration_sec ? ` · ${Math.floor(c.duration_sec / 60)}:${String(c.duration_sec % 60).padStart(2, "0")}` : ""}`,
-      time: c.started_at,
-      tone: c.direction === "missed" ? "bg-danger-500/10 text-danger-500" : "bg-brand-600/10 text-brand-600",
-    })),
-    ...appts.map((a): Activity => ({
-      key: `a-${a.id}`,
-      title: apptTypeLabel[a.appointment_type] ?? "Randevu",
-      sub: a.location ?? "Konum belirtilmedi",
-      time: a.scheduled_at,
-      tone: "bg-mint-500/12 text-mint-600",
-    })),
-  ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
-
-  /*
-   * Zaman tüneli — 4 sekmeye dağılan bilgiyi tek kronolojide birleştirir.
-   * Çağrı+randevu aktivite sekmesinin verisini, iletişim kayıtları iletişim
-   * sekmesinin verisini yeniden kullanır; yalnız teklif+sözleşme için dar
-   * sorgu eklendi. Görevlerden sadece tamamlananlar girer.
-   */
-  const commRows = (commsData ?? []) as {
-    id: string;
-    channel: string;
-    direction: string;
-    subject: string | null;
-    body: string | null;
-    created_at: string;
-  }[];
-  const doneTasks = ((tasksData ?? []) as (CustomerTaskRow & { completed_at?: string | null })[])
-    .filter((t) => t.status === "done" && (t.completed_at || t.due_at));
-  const timeline: TimelineItem[] = tab !== "zaman" ? [] : [
-    ...calls.map((c): TimelineItem => ({
-      key: `call-${c.id}`,
-      kind: "call",
-      title: `${callDirLabel[c.direction] ?? "Çağrı"} çağrı${c.disposition ? ` · ${c.disposition}` : ""}`,
-      sub: c.notes || null,
-      time: c.started_at,
-      href: null,
-    })),
-    ...appts.map((a): TimelineItem => ({
-      key: `appt-${a.id}`,
-      kind: "appointment",
-      title: `${apptTypeLabel[a.appointment_type] ?? "Randevu"} · ${apptStatusLabel[a.status] ?? a.status}`,
-      sub: a.location,
-      time: a.scheduled_at,
-      href: null,
-    })),
-    ...(offersData ?? []).map((o): TimelineItem => ({
-      key: `offer-${o.id}`,
-      kind: "offer",
-      title: `Teklif · ${o.amount != null ? moneyTl(Number(o.amount)) : "—"} · ${offerStatusLabel[o.status] ?? o.status}`,
-      sub: null,
-      time: o.created_at,
-      href: `/app/teklifler/${o.id}`,
-    })),
-    ...(contractsData ?? []).map((c): TimelineItem => ({
-      key: `contract-${c.id}`,
-      kind: "contract",
-      title: `${contractTypeLabel[c.contract_type] ?? "Sözleşme"} sözleşmesi · ${contractStatusLabel[c.status] ?? c.status}`,
-      sub: [c.title, c.signed_at ? `İmza: ${shortDate(c.signed_at)}` : null].filter(Boolean).join(" · ") || null,
-      time: c.created_at,
-      href: `/app/sozlesmeler/${c.id}`,
-    })),
-    ...doneTasks.map((t): TimelineItem => ({
-      key: `task-${t.id}`,
-      kind: "task",
-      title: `Görev tamamlandı · ${t.title}`,
-      sub: null,
-      time: (t.completed_at ?? t.due_at) as string,
-      href: null,
-    })),
-    ...commRows.map((c): TimelineItem => ({
-      key: `comm-${c.id}`,
-      kind: "comm",
-      title: `${COMM_CHANNELS.find((ch) => ch.value === c.channel)?.label ?? c.channel}${
-        c.direction === "inbound" ? " · Gelen" : c.direction === "outbound" ? " · Giden" : c.direction === "internal" ? " · İç not" : ""
-      }`,
-      sub: c.subject || c.body || null,
-      time: c.created_at,
-      href: null,
-    })),
-    {
-      key: "created",
-      kind: "created" as const,
-      title: "Müşteri kaydı açıldı",
-      sub: null,
-      time: customer.created_at as string,
-      href: null,
-    },
-  ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
-
-  // Her kutu ilgili sekmeyi açar (?tab= — Customer360Tabs URL'den okur).
-  // Çağrı ve randevu kayıtları aktivite akışında listelenir.
-  const stats = [
-    { label: "Talep", value: demands.length, icon: Target, tab: "talepler" },
-    { label: "Çağrı", value: calls.length, icon: PhoneCall, tab: "ozet" },
-    { label: "Randevu", value: appts.length, icon: CalendarDays, tab: "ozet" },
+  // KPI şeridi — yalnız gerçek veri; veri yoksa kart gösterilmez. Her kart ilgili sekmeye gider.
+  const base = `/app/musteriler/${customer.id}`;
+  const completedAppts = appts.filter((a) => a.status === "completed").length;
+  const openDeals = (dealsData ?? []).filter((d) => d.stage !== "won" && d.stage !== "lost");
+  const openDealSum = openDeals.reduce((n, d) => n + Number(d.deal_value ?? 0), 0);
+  const wonDealSum = (dealsData ?? []).filter((d) => d.stage === "won").reduce((n, d) => n + Number(d.deal_value ?? 0), 0);
+  const lastOffer = (offersData ?? [])[0] ?? null;
+  const tlFmt = (n: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
+  const amountKpi: { label: string; value: string; hint: string; href: string } | null =
+    openDealSum > 0
+      ? { label: "Açık anlaşma tutarı", value: tlFmt(openDealSum), hint: `${openDeals.length} açık anlaşma`, href: `${base}?sekme=anlasmalar` }
+      : wonDealSum > 0
+        ? { label: "Kazanılan tutar", value: tlFmt(wonDealSum), hint: "kapanan anlaşmalar", href: `${base}?sekme=anlasmalar` }
+        : lastOffer && lastOffer.amount != null
+          ? { label: "Son teklif", value: tlFmt(Number(lastOffer.amount)), hint: `${(offersData ?? []).length} teklif`, href: `${base}?sekme=anlasmalar` }
+          : null;
+  const lastDays = lastActivityAt ? Math.floor(msSince(lastActivityAt) / DAY_MS) : null;
+  const kpis: KpiItem[] = [
+    { label: "Açık talep", value: activeDemandCount, href: `${base}?sekme=talepler`, icon: <Target />, tone: "info", hint: `${demands.length} talep kaydı` },
+    ...(activeDemands.length > 0
+      ? [{ label: "Eşleşme adayı portföy", value: matchCandidateCount, href: `/app/eslestirme?customer=${customer.id}`, icon: <Sparkles />, tone: "success" as const, hint: "aktif portföy havuzu" }]
+      : []),
+    ...(appts.length > 0
+      ? [{ label: "Yapılan randevu", value: completedAppts, href: `${base}?sekme=randevu`, icon: <CalendarDays />, tone: "success" as const, hint: `${appts.length} randevu kaydı` }]
+      : []),
+    ...(amountKpi ? [{ label: amountKpi.label, value: amountKpi.value, href: amountKpi.href, icon: <Wallet />, tone: "warning" as const, hint: amountKpi.hint }] : []),
+    ...(lastDays != null
+      ? [{ label: "Son temas", value: lastDays === 0 ? "Bugün" : `${lastDays} gün önce`, href: `${base}?sekme=zaman&kategori=gorusme`, icon: <PhoneCall />, tone: (lastDays > 14 ? "danger" : "neutral") as "danger" | "neutral", hint: "çağrı, randevu ve iletişim kaydı" }]
+      : []),
   ];
 
   return (
@@ -675,25 +568,12 @@ export default async function CustomerDetailPage({
                 <p className="text-xs text-white/55">Müşteri skoru</p>
               </div>
             </div>
-            <div className="grid gap-2">
-              {stats.map((s) => (
-                <Link
-                  key={s.label}
-                  href={`/app/musteriler/${customer.id}?sekme=${s.tab}`}
-                  scroll={false}
-                  className="focus-ring press group flex items-center gap-2.5 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-2 backdrop-blur transition hover:border-brand-300 hover:bg-white/10"
-                >
-                  <s.icon className="h-4 w-4 text-mint-400" />
-                  <span className="font-display text-lg font-extrabold text-white">{s.value}</span>
-                  <span className="text-xs text-white/50">{s.label}</span>
-                  <ArrowUpRight className="hover-action ml-auto h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:opacity-100" />
-                </Link>
-              ))}
-            </div>
           </div>
         </div>
 
       </section>
+
+      <KpiStrip items={kpis} label="Müşteri özeti" />
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0">
@@ -706,14 +586,19 @@ export default async function CustomerDetailPage({
             propertyTypes={propertyTypeOptions}
             urgencyOptions={demandUrgencyOptions}
             demands={demands}
-            activity={activity}
-            timeline={timeline}
+            events={events}
+            timelineCategories={timelineCategories}
+            activeCategory={activeCategory}
+            timelineLimit={timelineLimit}
+            timelineLoadMoreHref={timelineLoadMoreHref}
+            appts={appts}
+            offers={(offersData ?? []) as { id: string; amount: number | null; status: string; created_at: string }[]}
+            contracts={(contractsData ?? []) as { id: string; title: string; status: string; signed_at: string | null; created_at: string }[]}
             tags={tags}
             notes={customer.notes}
             source={customer.source}
             sourceDetail={customer.lead_source_detail}
             createdAt={customer.created_at}
-            audit={audit}
             stageNames={stageNames}
             deals={(dealsData ?? []).map((d) => ({
               id: d.id,
@@ -733,9 +618,11 @@ export default async function CustomerDetailPage({
               comms: commsList.length,
               tasks: (tasksData ?? []).filter((t) => t.status === "open").length,
               deals: (dealsData ?? []).length,
+              offers: (offersData ?? []).length,
+              appts: appts.length,
               files: filesCount ?? 0,
+              contracts: contractsCount ?? 0,
               consents: (consentsData ?? []).length,
-              audit: auditCount ?? 0,
             }}
             ozetSlot={
               <>
