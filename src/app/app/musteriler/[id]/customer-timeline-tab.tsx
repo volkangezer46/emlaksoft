@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { DAY_MS, now, trDayStartMs } from "@/lib/clock";
 import {
   ArrowUpRight,
   CalendarDays,
@@ -52,8 +53,8 @@ const FILTERS = [
 type FilterId = (typeof FILTERS)[number]["id"];
 
 function relTime(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  if (diff < 0) return new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(new Date(iso));
+  const diff = now() -new Date(iso).getTime();
+  if (diff < 0) return new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "short", timeStyle: "short" }).format(new Date(iso));
   const m = Math.floor(diff / 60_000);
   if (m < 1)  return "az önce";
   if (m < 60) return `${m} dk önce`;
@@ -61,18 +62,16 @@ function relTime(iso: string) {
   if (h < 24) return `${h} sa önce`;
   const d = Math.floor(h / 24);
   if (d < 30) return `${d} gün önce`;
-  return new Date(iso).toLocaleDateString("tr-TR");
+  return new Date(iso).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" });
 }
 
 /** Gün ayırıcı etiketi: Bugün / Dün / "12 Mart 2026" */
 function dayLabel(iso: string) {
   const date = new Date(iso);
-  const today = new Date();
-  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const dayDiff = Math.round((startOf(today) - startOf(date)) / 86_400_000);
+  const dayDiff = Math.round((trDayStartMs(now()) - trDayStartMs(date)) / DAY_MS);
   if (dayDiff === 0) return "Bugün";
   if (dayDiff === 1) return "Dün";
-  return new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "long", year: "numeric" }).format(date);
+  return new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", day: "numeric", month: "long", year: "numeric" }).format(date);
 }
 
 const MAX_ITEMS = 100;

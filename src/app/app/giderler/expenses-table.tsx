@@ -28,7 +28,7 @@ const tryFormatter = new Intl.NumberFormat("tr-TR", {
 function formatDate(iso: string) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString("tr-TR", { day: "2-digit", month: "short", year: "numeric" });
+  return date.toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "short", year: "numeric" });
 }
 
 function normalize(value: string) {

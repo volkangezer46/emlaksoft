@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { restoreContractVersion, type ContractVersionRow } from "@/app/actions/contracts";
 
 function fmtDate(iso: string) {
-  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(
+  return new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium", timeStyle: "short" }).format(
     new Date(iso),
   );
 }

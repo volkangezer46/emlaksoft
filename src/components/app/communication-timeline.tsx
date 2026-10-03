@@ -64,7 +64,7 @@ function relTime(iso: string) {
   if (h < 24) return `${h} sa önce`;
   const d = Math.floor(h / 24);
   if (d < 30) return `${d} gün önce`;
-  return new Date(iso).toLocaleDateString("tr-TR");
+  return new Date(iso).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" });
 }
 
 function formatDuration(sec: number) {

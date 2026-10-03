@@ -34,7 +34,7 @@ const init: AnnouncementResult = {};
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "";
-  return new Date(iso).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(iso).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul", day: "numeric", month: "short", year: "numeric" });
 }
 
 /** ISO → datetime-local input değeri (yerel saat, dakika hassasiyeti). */

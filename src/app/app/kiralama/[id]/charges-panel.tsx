@@ -24,7 +24,7 @@ function monthLabel(iso: string) {
   return new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(new Date(`${iso}T00:00:00`));
 }
 function dateTimeLabel(iso: string) {
-  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(iso));
+  return new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium" }).format(new Date(iso));
 }
 
 const STATUS_BADGE: Record<string, { variant: "success" | "warning" | "danger"; label: string }> = {

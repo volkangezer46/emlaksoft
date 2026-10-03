@@ -8,6 +8,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { completeTask, deleteTask, reopenTask } from "@/app/actions/tasks";
 import { useToast } from "@/components/app/toast-provider";
+import { now as clockNow } from "@/lib/clock";
 import { TaskEditDialog } from "./task-edit-dialog";
 import { OptimisticDoneContext } from "./task-bulk-list";
 
@@ -53,10 +54,9 @@ function relName(v: Rel) {
 function dueInfo(due: string | null, done: boolean) {
   if (!due) return { text: "Tarihsiz", cls: "text-text-faint" };
   const d = new Date(due);
-  const now = new Date();
-  const fmt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(d);
+  const fmt = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium", timeStyle: "short" }).format(d);
   if (done) return { text: fmt, cls: "text-text-muted" };
-  if (d.getTime() < now.getTime()) return { text: `${fmt} · gecikti`, cls: "text-danger-500" };
+  if (d.getTime() < clockNow()) return { text: `${fmt} · gecikti`, cls: "text-danger-500" };
   return { text: fmt, cls: "text-text-muted" };
 }
 
@@ -84,7 +84,7 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
           const result = await completeTask(fd);
           // Tekrarlı görev: sonraki kopya action içinde üretildi — tarihi bildir.
           if (result?.nextDueAt) {
-            const fmt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(result.nextDueAt));
+            const fmt = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium", timeStyle: "short" }).format(new Date(result.nextDueAt));
             push(`Görev tamamlandı — sonraki oluşturuldu: ${fmt}`, "ok");
           }
         } else {

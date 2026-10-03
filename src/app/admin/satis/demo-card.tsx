@@ -36,7 +36,7 @@ function relTime(iso: string) {
   if (min < 60) return `${Math.max(1, min)} dk önce`;
   const hr = Math.floor(min / 60);
   if (hr < 24) return `${hr} sa önce`;
-  return new Date(iso).toLocaleDateString("tr-TR");
+  return new Date(iso).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" });
 }
 
 export function DemoCard({ row, staff }: { row: DemoRow; staff: { id: string; full_name: string }[] }) {
