@@ -80,6 +80,23 @@ html[data-theme="dark"][data-accent="graphite"] {
   --brand-50: rgba(148, 163, 184, 0.14);
 }
 
+/* ---- Gece Altın (navy + altın "premium konsol") ------------------------------
+   Dolgu #9a6700 üstünde beyaz 4.87:1; metin #7a5200 beyazda 6.92:1. Koyuda metin
+   açık altın (#f0c36a). Yan menü/hero zaten lacivert; bu tema düğme, bağlantı ve
+   odak halkasını altına çevirir. */
+html[data-accent="gold"] {
+  --brand-700: #7a5200;
+  --brand-600: #9a6700;
+  --brand-500: #b8820a;
+  --brand-400: #d4a24c;
+  --brand-300: #f0c36a;
+  --brand-50: #fdf6e3;
+}
+html[data-theme="dark"][data-accent="gold"] {
+  --brand-700: #f0c36a;
+  --brand-50: rgba(212, 162, 76, 0.16);
+}
+
 /* ---- Vurgu geçişi: yalnız renk, 150ms; hareket azaltmada anında ------------- */
 @media (prefers-reduced-motion: no-preference) {
   html[data-accent] body {

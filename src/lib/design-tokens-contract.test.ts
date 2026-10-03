@@ -116,8 +116,8 @@ describe("tema paleti", () => {
     }
   });
 
-  it("5 vurgu teması var ve varsayılan dışındakilerin CSS bloğu iki temada tanımlı", () => {
-    expect(ACCENTS.map((a) => a.value)).toEqual(["ocean", "emerald", "indigo", "amber", "graphite"]);
+  it("6 vurgu teması var ve varsayılan dışındakilerin CSS bloğu iki temada tanımlı", () => {
+    expect(ACCENTS.map((a) => a.value)).toEqual(["ocean", "emerald", "indigo", "amber", "graphite", "gold"]);
     for (const a of ACCENTS.filter((x) => x.value !== "ocean")) {
       const light = block(themesCss, `html[data-accent="${a.value}"]`);
       const dark = block(themesCss, `html[data-theme="dark"][data-accent="${a.value}"]`);
@@ -153,7 +153,7 @@ describe("tema paleti", () => {
 
   it("açılış script'i vurgu anahtarını okur, yalnız bilinen vurguları uygular", () => {
     expect(THEME_BOOT_SCRIPT).toContain("es-accent");
-    expect(THEME_BOOT_SCRIPT).toContain("emerald|indigo|amber|graphite");
+    expect(THEME_BOOT_SCRIPT).toContain("emerald|indigo|amber|graphite|gold");
   });
 
   it("themes.css ve theme-dark.css public sayfaya uygulanmaz: öznitelik yalnız tema script'iyle gelir", () => {
@@ -166,5 +166,70 @@ describe("tema paleti", () => {
     const css = read("src/app/globals.css");
     expect(css).toContain("@media (forced-colors: active)");
     expect(css).toContain("prefers-reduced-motion: no-preference");
+  });
+});
+
+// ---- Premium konsol (premium.css): hero, cam kutu, ton metinleri, hareket -----
+
+function mix(fg: string, bg: string, alpha: number): string {
+  const f = fg.replace("#", "");
+  const b = bg.replace("#", "");
+  const c = [0, 2, 4].map((i) => {
+    const v = Math.round(parseInt(f.slice(i, i + 2), 16) * alpha + parseInt(b.slice(i, i + 2), 16) * (1 - alpha));
+    return v.toString(16).padStart(2, "0");
+  });
+  return `#${c.join("")}`;
+}
+
+describe("premium konsol paleti", () => {
+  const premiumCss = read("src/app/premium.css");
+  const NAVY = ["#0a2247", "#071a38", "#050f24"];
+
+  it("premium.css globals.css'e bağlı ve hareket azaltmaya saygılı", () => {
+    expect(read("src/app/globals.css")).toContain('@import "./premium.css"');
+    expect(premiumCss).toContain("prefers-reduced-motion: no-preference");
+  });
+
+  it("hero: beyaz ve altın metin lacivert zeminde AA; cam kutu üstünde de", () => {
+    for (const bg of NAVY) {
+      expect(contrast("#ffffff", bg), `beyaz/${bg}`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(hex(premiumCss, "--gold-300"), bg), `altın/${bg}`).toBeGreaterThanOrEqual(4.5);
+      // Cam kutu: %7 beyaz katman; soluk yazı (%78 beyaz) bu zeminde
+      const glass = mix("#ffffff", bg, 0.07);
+      expect(contrast(mix("#ffffff", glass, 0.78), glass), `soluk beyaz/${glass}`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(hex(premiumCss, "--gold-300"), glass), `altın/${glass}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("altın aktif segment ve düğme: koyu yazı altın dolguda AA", () => {
+    for (const g of ["--gold-300", "--gold-400"]) expect(contrast("#1a1200", hex(premiumCss, g))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("yan menü aktif öğe: beyaz yazı altın-lacivert degrade zeminde AA", () => {
+    // gradient uçları: altın %30 / koyu altın %26, lacivert #071a38 üstünde
+    expect(contrast("#ffffff", mix("#f0c36a", "#071a38", 0.3))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast("#ffffff", mix("#9a6700", "#071a38", 0.26))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("ton metinleri (trend rozeti/ikon) açık ve koyu yüzeyde kendi yumuşak zeminlerinde AA", () => {
+    const lightSurface = hex(LIGHT, "--surface");
+    const darkSurface = hex(DARK, "--surface-raised");
+    const toneFill: Record<string, [string, string]> = {
+      success: ["#0d9373", "#34d3bd"],
+      warn: ["#c27803", "#fbbf24"],
+      danger: ["#dc3b3b", "#f87171"],
+    };
+    const alpha: Record<string, number> = { success: 0.13, warn: 0.14, danger: 0.12 };
+    const light = block(premiumCss, ":root");
+    const dark = block(premiumCss, 'html[data-theme="dark"]');
+    for (const [name, [lf, df]] of Object.entries(toneFill)) {
+      const t = hex(light, `--pm-${name}-text`);
+      const td = hex(dark, `--pm-${name}-text`);
+      expect(contrast(t, mix(lf, lightSurface, alpha[name])), `açık ${name}`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(td, mix(df, darkSurface, alpha[name])), `koyu ${name}`).toBeGreaterThanOrEqual(4.5);
+    }
+    // Altın metin tonu
+    expect(contrast(hex(light, "--pm-gold-text"), mix("#d4a24c", lightSurface, 0.18))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(hex(dark, "--pm-gold-text"), mix("#f0c36a", darkSurface, 0.18))).toBeGreaterThanOrEqual(4.5);
   });
 });

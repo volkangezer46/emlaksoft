@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
-import { ChevronRight, Lock, Menu, Sparkles, X } from "lucide-react";
+import { ChevronRight, Lock, Menu, Search, Sparkles, X } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar `src/lib/icons.ts` sözlüğünden gelir.
 import { ICONS } from "@/lib/icons";
 import { findActiveNavigationHref } from "@/lib/navigation";
@@ -31,11 +31,18 @@ export function AppSidebar({
   const pathname = usePathname();
   // Prefetch: next/link varsayılanı (görünür alanda + hover) yeterli; elle router.prefetch yağmuru kaldırıldı.
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
 
   // Menü 9 iş başlığına indirgendi (bkz. src/lib/nav-config.ts). Başlıkta izinli
   // hiçbir sayfa yoksa başlık gizlenir; giriş bağlantısı ilk izinli sayfadır.
   const sections = useMemo(() => visibleSections(accessibleModules), [accessibleModules]);
   const { section: activeSection, href: activeHref } = resolveActiveNav(pathname, sections);
+
+  // Menü araması: yalnız izinli sayfalar (sections zaten izinle süzülü) üzerinde, Türkçe-duyarlı.
+  const needle = query.trim().toLocaleLowerCase("tr-TR");
+  const matches = needle
+    ? sections.flatMap((s) => s.items).filter((i) => i.label.toLocaleLowerCase("tr-TR").includes(needle))
+    : null;
 
   const renderChild = (item: NavItem) => {
     const active = item.href === activeHref;
@@ -46,10 +53,10 @@ export function AppSidebar({
         aria-current={active ? "page" : undefined}
         onClick={() => setOpen(false)}
         className={`flex items-center gap-2.5 rounded-[var(--radius-control)] py-2 pl-3 pr-2 text-sm transition ${
-          active ? "bg-white/10 font-semibold text-white" : "text-white/75 hover:bg-white/6 hover:text-white"
+          active ? "nav-gold-active font-semibold" : "text-white/80 hover:bg-white/6 hover:text-white"
         }`}
       >
-        <item.icon className={`h-3.5 w-3.5 shrink-0 ${active ? "text-mint-400" : "text-white/45"}`} />
+        <item.icon className={`h-3.5 w-3.5 shrink-0 ${active ? "text-[var(--gold-300)]" : "text-white/60"}`} />
         <span className="flex-1 truncate">{item.label}</span>
         {lockedHrefs.some((h) => item.href === h || item.href.startsWith(`${h}/`)) ? (
           <Lock className="h-3 w-3 shrink-0 text-amber-400/80" aria-label="Paketinize dahil değil" />
@@ -68,15 +75,15 @@ export function AppSidebar({
           aria-expanded={active}
           onClick={() => setOpen(false)}
           className={`group relative flex items-center gap-3 overflow-hidden rounded-[var(--radius-control)] px-3 py-2.5 text-sm transition ${
-            active ? "bg-white/10 font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]" : "text-white/80 hover:bg-white/6 hover:text-white"
+            active ? "nav-gold-active font-semibold" : "text-white/80 hover:bg-white/6 hover:text-white"
           }`}
         >
-          {active ? <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-mint-400" /> : null}
-          <span className={`grid h-8 w-8 place-items-center rounded-[var(--radius-control)] transition ${active ? "bg-brand-600 text-white" : "bg-white/5 text-white/55 group-hover:bg-white/10 group-hover:text-cyan-400"}`}>
+          {active ? <span className="nav-gold-bar absolute inset-y-2 left-0 w-0.5 rounded-full" /> : null}
+          <span className={`grid h-8 w-8 place-items-center rounded-[var(--radius-control)] transition ${active ? "bg-[var(--gold-300)]/20 text-[var(--gold-300)]" : "bg-white/5 text-white/65 group-hover:bg-white/10 group-hover:text-white"}`}>
             <section.icon className="h-4 w-4" />
           </span>
           <span className="flex-1">{section.title}</span>
-          <ChevronRight className={`h-3.5 w-3.5 transition ${active ? "rotate-90 text-mint-400" : "text-white/15 group-hover:translate-x-0.5"}`} />
+          <ChevronRight className={`h-3.5 w-3.5 transition ${active ? "rotate-90 text-[var(--gold-300)]" : "text-white/30 group-hover:translate-x-0.5"}`} />
         </Link>
         {active && section.items.length > 1 ? (
           <div className="ml-6 mt-1 space-y-0.5 border-l border-white/10 pl-2">{section.items.map(renderChild)}</div>
@@ -95,8 +102,33 @@ export function AppSidebar({
         </div>
       </div>
 
+      <div className="px-3 pt-4">
+        <label className="nav-search">
+          <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Menülerde ara…"
+            aria-label="Menülerde ara"
+            autoComplete="off"
+          />
+        </label>
+      </div>
+
       <nav aria-label="Uygulama ana menüsü" className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {sections.map(renderSection)}
+        {matches ? (
+          matches.length > 0 ? (
+            <>
+              <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-[0.12em] text-white/70">Sonuçlar</p>
+              {matches.map(renderChild)}
+            </>
+          ) : (
+            <p className="px-3 py-2 text-sm text-white/75">“{query.trim()}” için menü bulunamadı.</p>
+          )
+        ) : (
+          sections.map(renderSection)
+        )}
       </nav>
 
       <div className="p-3">

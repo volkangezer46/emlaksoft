@@ -5,7 +5,7 @@
 // iki yer senkron kalmalı. Kalıcılık: localStorage + çerez yedeği (DB'siz).
 
 export type ThemePref = "system" | "light" | "dark";
-export type AccentPref = "ocean" | "emerald" | "indigo" | "amber" | "graphite";
+export type AccentPref = "ocean" | "emerald" | "indigo" | "amber" | "graphite" | "gold";
 
 /**
  * Vurgu temaları. fill/text renkleri themes.css ile senkron (örnek kartlar için);
@@ -25,6 +25,7 @@ export const ACCENTS: {
   { value: "indigo", label: "İndigo", hint: "Gece mavisi derinlik", fill: "#4350d6", text: "#3a46c0", fillDark: "#4350d6", textDark: "#a5b4fc" },
   { value: "amber", label: "Kehribar", hint: "Sıcak, altın vurgu", fill: "#b45309", text: "#92400e", fillDark: "#b45309", textDark: "#fbbf24" },
   { value: "graphite", label: "Grafit", hint: "Sade ve kurumsal", fill: "#334155", text: "#1e293b", fillDark: "#64748b", textDark: "#cbd5e1" },
+  { value: "gold", label: "Gece Altın", hint: "Lacivert zemin, altın vurgu", fill: "#9a6700", text: "#7a5200", fillDark: "#9a6700", textDark: "#f0c36a" },
 ];
 
 export const THEME_STORAGE_KEY = "es-theme";
@@ -126,4 +127,4 @@ export function clearTheme(): void {
  * (Çerez SSR'da okunmaz: kök layout'ta cookies() çağrısı tüm public sayfaları
  * dinamik yapardı. Bloklayıcı satır içi script aynı FOUC'suz sonucu verir.)
  */
-export const THEME_BOOT_SCRIPT = `(function(){try{if(!/^\\/(app|admin)(\\/|$)/.test(location.pathname))return;var g=function(k){var v=null;try{v=localStorage.getItem(k)}catch(e){}if(v===null){var m=document.cookie.match(new RegExp("(?:^|; )"+k+"=([^;]*)"));if(m)v=decodeURIComponent(m[1])}return v};var r=document.documentElement;var t=g("${THEME_STORAGE_KEY}");var d=t==="dark"||((t===null||t==="system")&&matchMedia("(prefers-color-scheme: dark)").matches);if(d)r.setAttribute("data-theme","dark");var a=g("${ACCENT_STORAGE_KEY}");if(a&&/^(emerald|indigo|amber|graphite)$/.test(a))r.setAttribute("data-accent",a)}catch(e){}})()`;
+export const THEME_BOOT_SCRIPT = `(function(){try{if(!/^\\/(app|admin)(\\/|$)/.test(location.pathname))return;var g=function(k){var v=null;try{v=localStorage.getItem(k)}catch(e){}if(v===null){var m=document.cookie.match(new RegExp("(?:^|; )"+k+"=([^;]*)"));if(m)v=decodeURIComponent(m[1])}return v};var r=document.documentElement;var t=g("${THEME_STORAGE_KEY}");var d=t==="dark"||((t===null||t==="system")&&matchMedia("(prefers-color-scheme: dark)").matches);if(d)r.setAttribute("data-theme","dark");var a=g("${ACCENT_STORAGE_KEY}");if(a&&/^(emerald|indigo|amber|graphite|gold)$/.test(a))r.setAttribute("data-accent",a)}catch(e){}})()`;

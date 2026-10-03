@@ -15,6 +15,7 @@ import {
   Megaphone,
   Menu,
   Radar,
+  Search,
   Shield,
   ShieldCheck,
   Sparkles,
@@ -102,15 +103,27 @@ export function AdminSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const allowed = platformModulesFor(role);
 
-  const sections = SECTIONS.map((s) => ({
+  const allSections = SECTIONS.map((s) => ({
     ...s,
     items: s.items.filter((i) => allowed.includes(i.module)),
   })).filter((s) => s.items.length > 0);
 
+  // Menü araması: yalnız izinli modüller üzerinde (etiket + ipucu), Türkçe-duyarlı.
+  const needle = query.trim().toLocaleLowerCase("tr-TR");
+  const sections = needle
+    ? allSections
+        .map((s) => ({
+          ...s,
+          items: s.items.filter((i) => `${i.label} ${i.hint}`.toLocaleLowerCase("tr-TR").includes(needle)),
+        }))
+        .filter((s) => s.items.length > 0)
+    : allSections;
+
   // Mobil alt gezinme: erişilebilir ilk dört rota + menü çekmecesi.
-  const tabItems = sections.flatMap((s) => s.items).slice(0, 4);
+  const tabItems = allSections.flatMap((s) => s.items).slice(0, 4);
 
   const content = (
     <aside className="flex h-full w-full flex-col bg-[linear-gradient(180deg,#0a1224_0%,#050b16_55%,#07101f_100%)]">
@@ -127,7 +140,24 @@ export function AdminSidebar({
         </div>
       </div>
 
+      <div className="px-3 pt-3">
+        <label className="nav-search">
+          <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Menülerde ara…"
+            aria-label="Menülerde ara"
+            autoComplete="off"
+          />
+        </label>
+      </div>
+
       <div className="mt-3 flex-1 space-y-4 overflow-y-auto px-3 pb-4">
+        {needle && sections.length === 0 ? (
+          <p className="px-3 py-2 text-sm text-white/75">“{query.trim()}” için menü bulunamadı.</p>
+        ) : null}
         {sections.map((section) => (
           <div key={section.title ?? "root"}>
             {section.title ? (
@@ -148,14 +178,14 @@ export function AdminSidebar({
                     onFocus={() => router.prefetch(item.href)}
                     className={`group relative flex items-center gap-3 overflow-hidden rounded-[var(--radius-card)] px-3 py-2.5 text-sm transition ${
                       active
-                        ? "bg-white/12 font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
+                        ? "nav-gold-active font-semibold"
                         : "text-white/85 hover:bg-white/8 hover:text-white"
                     }`}
                   >
-                    {active ? <span className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-amber-400" /> : null}
+                    {active ? <span className="nav-gold-bar absolute inset-y-2 left-0 w-[3px] rounded-r-full" /> : null}
                     <span
                       className={`grid h-8 w-8 place-items-center rounded-[var(--radius-control)] transition ${
-                        active ? "bg-amber-400/20 text-amber-300" : "bg-white/8 text-white/70 group-hover:text-white"
+                        active ? "bg-[var(--gold-300)]/20 text-[var(--gold-300)]" : "bg-white/8 text-white/70 group-hover:text-white"
                       }`}
                     >
                       <item.icon className="h-4 w-4" />
