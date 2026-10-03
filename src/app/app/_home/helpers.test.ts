@@ -9,6 +9,7 @@ import {
   lastSixMonthKeys,
   monthTotalsFor,
   pipelineStats,
+  sourceShares,
   teamLeaders,
   weekBuckets,
 } from "./helpers";
@@ -113,5 +114,21 @@ describe("commissionSummaryFromAggregate", () => {
   });
   it("boş veride sıfır döner", () => {
     expect(commissionSummaryFromAggregate(null)).toEqual({ paid: 0, pending: 0, monthTotals: [0, 0, 0, 0, 0, 0] });
+  });
+});
+
+describe("sourceShares", () => {
+  it("boşken boş döner", () => {
+    expect(sourceShares({}, new Map())).toEqual([]);
+  });
+  it("en kalabalık kaynaklar, diğer ve belirtilmemiş gerçek sayımdan", () => {
+    const r = sourceShares({ a: 5, b: 3, c: 1, d: 1, "": 2 }, new Map([["a", "Sahibinden"]]), 2);
+    expect(r.map((x) => [x.label, x.count])).toEqual([
+      ["Sahibinden", 5],
+      ["b", 3],
+      ["Diğer kaynaklar", 2],
+      ["Belirtilmemiş", 2],
+    ]);
+    expect(r[0].pct).toBe(42);
   });
 });

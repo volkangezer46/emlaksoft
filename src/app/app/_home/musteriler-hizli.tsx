@@ -6,41 +6,31 @@ import { loadLatestCustomers } from "./data";
 import { initials } from "./helpers";
 import { PanelLink } from "./ortak";
 
-const quickTile =
-  "focus-ring group flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-4 transition hover:border-brand-300 hover:bg-surface";
+const chip =
+  "focus-ring press group inline-flex min-h-10 items-center gap-2 rounded-full border border-[var(--hairline)] bg-[var(--surface)] px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition hover:border-[var(--hairline-strong)] hover:text-[var(--accent-text)]";
 
-/** Hızlı aksiyonlar — veri çekmez, anında render edilir. */
+/** Hızlı eylem çubuğu — veri çekmez, anında render edilir; komut paleti ipucunu taşır. */
 export function HizliAksiyonlar() {
+  const actions = [
+    { href: "/app/musteriler/yeni", label: "Yeni müşteri", Icon: ICONS.musteri },
+    { href: "/app/portfoyler/yeni", label: "Yeni portföy", Icon: ICONS.portfoy },
+    { href: "/app/arama", label: "Arama kaydı", Icon: PhoneIncoming },
+    { href: "/app/randevular", label: "Randevu planla", Icon: Bell },
+  ];
   return (
     <Widget id="hizli" className="h-full">
-      <section className="pm-bx h-full p-5">
-        <h2 className="font-display font-bold text-ink-950">Hızlı aksiyonlar</h2>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Link href="/app/musteriler/yeni" className={quickTile}>
-            <div className="grid h-10 w-10 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600 transition group-hover:bg-brand-600 group-hover:text-white">
-              <ICONS.musteri className="h-5 w-5" />
-            </div>
-            <span className="text-xs font-semibold text-ink-950">Müşteri</span>
+      <section className="pm-bx flex flex-wrap items-center gap-2 p-3 md:p-4" aria-label="Hızlı eylemler">
+        <span className="pm-bx-eyebrow mr-1 px-2">Hızlı eylem</span>
+        {actions.map(({ href, label, Icon }) => (
+          <Link key={href} href={href} className={chip}>
+            <Icon className="h-4 w-4 text-[var(--accent-text)]" aria-hidden="true" />
+            {label}
           </Link>
-          <Link href="/app/portfoyler/yeni" className={quickTile}>
-            <div className="grid h-10 w-10 place-items-center rounded-[var(--radius-control)] bg-mint-500/10 text-mint-600 transition group-hover:bg-mint-500 group-hover:text-white">
-              <ICONS.portfoy className="h-5 w-5" />
-            </div>
-            <span className="text-xs font-semibold text-ink-950">Portföy</span>
-          </Link>
-          <Link href="/app/arama" className={quickTile}>
-            <div className="grid h-10 w-10 place-items-center rounded-[var(--radius-control)] bg-cyan-500/10 text-cyan-600 transition group-hover:bg-cyan-500 group-hover:text-white">
-              <PhoneIncoming className="h-5 w-5" />
-            </div>
-            <span className="text-xs font-semibold text-ink-950">Arama</span>
-          </Link>
-          <Link href="/app/randevular" className={quickTile}>
-            <div className="grid h-10 w-10 place-items-center rounded-[var(--radius-control)] bg-amber-400/10 text-amber-600 transition group-hover:bg-amber-400 group-hover:text-white">
-              <Bell className="h-5 w-5" />
-            </div>
-            <span className="text-xs font-semibold text-ink-950">Randevu</span>
-          </Link>
-        </div>
+        ))}
+        <span className="ml-auto hidden items-center gap-2 text-xs text-[var(--text-muted)] md:inline-flex">
+          Her şeyi aramak için
+          <kbd className="rounded-md border border-[var(--hairline-strong)] bg-[var(--surface-sunken,transparent)] px-1.5 py-0.5 font-mono text-xs">Ctrl K</kbd>
+        </span>
       </section>
     </Widget>
   );

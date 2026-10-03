@@ -194,3 +194,25 @@ export function commissionSummaryFromAggregate(agg: CommissionAggregate | null |
   const accrued = monthTotals.reduce((s, v) => s + v, 0);
   return { paid, pending: accrued - paid, monthTotals };
 }
+
+export type SourceShare = { value: string; label: string; count: number; pct: number };
+
+/**
+ * Kaynak dağılımı: en kalabalık `max` kaynak + kalanlar "Diğer" + kaynağı boş olanlar
+ * "Belirtilmemiş" (hepsi gerçek sayımdan; yüzdeler toplam müşteriye göre).
+ */
+export function sourceShares(counts: Record<string, number>, labels: Map<string, string>, max = 5): SourceShare[] {
+  const total = Object.values(counts).reduce((s, n) => s + n, 0);
+  if (total === 0) return [];
+  const pct = (n: number) => Math.round((n / total) * 100);
+  const known = Object.entries(counts)
+    .filter(([k]) => k !== "")
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "tr"));
+  const top = known.slice(0, max).map(([value, count]) => ({ value, label: labels.get(value) ?? value, count, pct: pct(count) }));
+  const restCount = known.slice(max).reduce((s, [, n]) => s + n, 0);
+  const out: SourceShare[] = [...top];
+  if (restCount > 0) out.push({ value: "", label: "Diğer kaynaklar", count: restCount, pct: pct(restCount) });
+  const none = counts[""] ?? 0;
+  if (none > 0) out.push({ value: "", label: "Belirtilmemiş", count: none, pct: pct(none) });
+  return out;
+}

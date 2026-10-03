@@ -36,6 +36,8 @@ export type KpiCardProps = {
   /** Erişilebilir grafik özeti (verilmezse seriden üretilir). */
   seriesLabel?: string;
   className?: string;
+  /** "inline": ikon kapsülü solda, değer + trend ortada, mini çubuklar sağda (yoğun ana ekran düzeni). */
+  layout?: "stack" | "inline";
 };
 
 export function KpiCard({
@@ -53,8 +55,31 @@ export function KpiCard({
   seriesUnit,
   seriesLabel,
   className,
+  layout = "stack",
 }: KpiCardProps) {
   const drawChart = hasSeries(series);
+  if (layout === "inline") {
+    return (
+      <Link href={href} className={cn(`pm-card pm-card-inline pm-t-${tone} focus-ring group`, className)}>
+        <span className="pm-ico pm-ico-lg" aria-hidden="true">
+          <Icon />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="pm-card-title block truncate">{label}</span>
+          <span className="pm-value mt-0.5 block" style={attention ? { color: "var(--t-text)" } : undefined}>
+            {value}
+          </span>
+          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            {trend ? <TrendPill trend={trend} /> : null}
+            {previousText || hint ? <span className="pm-sub">{previousText ?? hint}</span> : null}
+          </span>
+        </span>
+        {drawChart ? (
+          <MiniBars data={series} tone={tone} unit={seriesUnit} label={seriesLabel} width={64} height={44} className="pm-card-bars" />
+        ) : null}
+      </Link>
+    );
+  }
   return (
     <Link href={href} className={cn(`pm-card pm-t-${tone} focus-ring group`, className)}>
       <span className="pm-card-head">

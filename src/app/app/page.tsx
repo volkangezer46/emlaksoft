@@ -23,7 +23,9 @@ import { DonemTrend } from "./_home/donem-trend";
 import { Huni } from "./_home/huni";
 import { PortalSagligi, Ekip } from "./_home/portal-ekip";
 import { CanliAkis } from "./_home/canli-akis";
-import { HizliAksiyonlar, SonMusteriler } from "./_home/musteriler-hizli";
+import { HizliAksiyonlar } from "./_home/musteriler-hizli";
+import { PortfoySeridi } from "./_home/portfoy-seridi";
+import { KaynakDagilimi } from "./_home/kaynak-dagilimi";
 
 /**
  * "Bugün" ana ekranı. Sayfa yalnız iskelet + yetki + bağlamı kurar; her bölüm
@@ -49,6 +51,7 @@ export default async function AppHomePage({
     // Kiralama/proje şeridi yalnız modülü görebilene sorulur.
     canSeeRentals: (perms.rentals ?? []).includes("view"),
     canSeeProjects: (perms.projects ?? []).includes("view"),
+    canSeeProperties: (perms.properties ?? []).includes("view"),
     period: parsePeriod(donem),
     fullName,
     firstName: fullName.split(" ")[0] || "hoş geldiniz",
@@ -154,6 +157,12 @@ export default async function AppHomePage({
 
           <div className="md:col-span-6 xl:col-span-12 empty:hidden">
             <Suspense fallback={null}>
+              <PortfoySeridi ctx={ctx} />
+            </Suspense>
+          </div>
+
+          <div className="md:col-span-6 xl:col-span-12 empty:hidden">
+            <Suspense fallback={null}>
               <KiralamaProje ctx={ctx} />
             </Suspense>
           </div>
@@ -181,7 +190,7 @@ export default async function AppHomePage({
           </div>
           <div className="md:col-span-6 xl:col-span-4">
             <Suspense fallback={<PanelIskelet />}>
-              <SonMusteriler />
+              <KaynakDagilimi />
             </Suspense>
           </div>
           {!tvMode && (
