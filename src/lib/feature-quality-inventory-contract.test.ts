@@ -19,7 +19,8 @@ describe("product feature quality inventory", () => {
 
     const unguarded = productPages.filter((file) => {
       const source = readFileSync(file, "utf8");
-      return !source.includes("requireModulePage(") && !source.includes("auth.getUser(");
+      // getRequestUser(): aynı oturum doğrulamasının istek-başı önbellekli sarmalayıcısı.
+      return !source.includes("requireModulePage(") && !source.includes("auth.getUser(") && !source.includes("getRequestUser(");
     });
 
     expect(unguarded.map((file) => relative(process.cwd(), file))).toEqual([]);

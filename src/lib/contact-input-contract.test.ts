@@ -16,8 +16,6 @@ import { describe, expect, it } from "vitest";
  * Yeni girdi eklemek yerine PhoneInput/EmailInput + ortak şemaları kullanın.
  */
 
-const ROLLOUT = "rollout bekliyor";
-
 /** dosya -> gerekçe. Anahtar: depo köküne göre '/' ayraçlı yol. */
 const ALLOWLIST: Record<string, string> = {
   // (a)/(b) ham telefon/e-posta input'ları
