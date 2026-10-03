@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react";
 import { registerOpenHouseVisitor } from "@/app/actions/targets-openhouse-sources";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { EmailInput } from "@/components/ui/email-input";
 
 /**
  * Açık ev ziyaretçi kaydı.
@@ -74,10 +75,9 @@ export function VisitorForm({ openHouseId }: { openHouseId: string }) {
         <label className="mb-1.5 block text-sm text-text-muted" htmlFor="visitor-email">
           E-posta
         </label>
-        <input
+        <EmailInput
           id="visitor-email"
           name="email"
-          type="email"
           autoComplete="off"
           className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400"
         />

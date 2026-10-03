@@ -8,6 +8,7 @@ import { FormField, FormInput, FormSelect, FormTextarea, fieldClass } from "@/co
 import { FormSection, FormShell } from "@/components/ui/form-page";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { detailOrList } from "@/lib/form-logic";
+import { EmailInput } from "@/components/ui/email-input";
 
 type Province = { id: string; name: string };
 type Branch = { id: string; name: string };
@@ -47,7 +48,7 @@ export function CustomerForm({
           <PhoneInput name="phone" className={fieldClass} />
         </FormField>
         <FormField label="E-posta" htmlFor="email">
-          <FormInput name="email" type="email" />
+          <EmailInput name="email" />
         </FormField>
         <FormField label="Müşteri türü" htmlFor="type">
           <FormSelect name="type" defaultValue="Alıcı">

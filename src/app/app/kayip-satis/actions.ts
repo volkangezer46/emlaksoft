@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
-import { isValidTurkishMobile, normalizeTurkishPhone } from "@/lib/phone";
+import { parsePhone } from "@/lib/phone";
 
 const DAY = 86_400_000;
 
@@ -65,7 +65,7 @@ export async function dismissLostSaleRisk(formData: FormData): Promise<void> {
   // yalnızca çağrı kaydı sessizce atlanır.
   const logCall = String(formData.get("log_call") ?? "") === "1";
   const rawPhone = String(formData.get("phone") ?? "").trim();
-  if (reason === "called" && logCall && rawPhone && isValidTurkishMobile(rawPhone)) {
+  if (reason === "called" && logCall && rawPhone && parsePhone(rawPhone).ok) {
     const callGate = await requirePermission("calls", "create");
     if (callGate.ok) {
       // Değerler arama sayfasıyla aynı sözlükten: direction 'outbound'
@@ -75,7 +75,7 @@ export async function dismissLostSaleRisk(formData: FormData): Promise<void> {
         tenant_id: callGate.tenantId,
         customer_id: customerId,
         direction: "outbound",
-        phone: normalizeTurkishPhone(rawPhone),
+        phone: parsePhone(rawPhone).stored,
         disposition: "Ulaşıldı",
         notes: "Kayıp satış dedektöründen arandı.",
         handled_by: callGate.userId,
@@ -90,7 +90,7 @@ export async function dismissLostSaleRisk(formData: FormData): Promise<void> {
           action: "call.create",
           entityType: "call",
           entityId: customerId,
-          newValue: { direction: "outbound", phone: normalizeTurkishPhone(rawPhone), disposition: "Ulaşıldı" },
+          newValue: { direction: "outbound", phone: parsePhone(rawPhone).stored, disposition: "Ulaşıldı" },
         });
         revalidatePath("/app/arama");
         revalidatePath(`/app/musteriler/${customerId}`);

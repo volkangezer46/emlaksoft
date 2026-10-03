@@ -5,7 +5,8 @@ import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
-import { isValidTurkishMobile, normalizeTurkishPhone } from "@/lib/phone";
+import { parsePhone } from "@/lib/phone";
+import { isValidEmail, normalizeEmail } from "@/lib/email";
 
 /**
  * CSV içe aktarma (X — /app/ice-aktarma sihirbazı, adım 3).
@@ -59,8 +60,6 @@ export type PropertyImportRow = {
   address_line?: string;
 };
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
 const clean = (v: string | undefined | null) => String(v ?? "").trim();
 
 /** "1.250.000,50" / "1250000.50" / "1 250 000 TL" → sayı; geçersizse null. */
@@ -104,20 +103,24 @@ export async function importCustomers(rows: CustomerImportRow[]): Promise<Import
   for (const r of rows) {
     const fullName = clean(r.full_name);
     const phoneRaw = clean(r.phone);
-    const email = clean(r.email);
+    const email = normalizeEmail(clean(r.email));
     if (!fullName) {
       errors.push({ row: r.row, reason: "Ad soyad boş." });
       continue;
     }
-    if (phoneRaw && !isValidTurkishMobile(phoneRaw)) {
-      errors.push({ row: r.row, reason: `Telefon geçersiz: "${phoneRaw}" (05XX XXX XX XX bekleniyor).` });
+    const parsedPhone = phoneRaw ? parsePhone(phoneRaw) : null;
+    if (parsedPhone && !parsedPhone.ok) {
+      errors.push({
+        row: r.row,
+        reason: `Telefon geçersiz: "${phoneRaw}" (${parsedPhone.error ?? "05XX XXX XX XX veya +<ülke kodu> numara bekleniyor"}).`,
+      });
       continue;
     }
-    if (email && !EMAIL_RE.test(email)) {
+    if (email && !isValidEmail(email)) {
       errors.push({ row: r.row, reason: `E-posta biçimi geçersiz: "${email}".` });
       continue;
     }
-    const phone = phoneRaw ? normalizeTurkishPhone(phoneRaw) : "";
+    const phone = parsedPhone?.stored ?? "";
     const type = clean(r.customer_type);
     valid.push({
       row: r.row,

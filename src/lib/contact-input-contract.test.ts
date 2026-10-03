@@ -21,24 +21,7 @@ const ROLLOUT = "rollout bekliyor";
 /** dosya -> gerekçe. Anahtar: depo köküne göre '/' ayraçlı yol. */
 const ALLOWLIST: Record<string, string> = {
   // (a)/(b) ham telefon/e-posta input'ları
-  "src/app/admin/personel/page.tsx": `${ROLLOUT}: ham email input`,
-  "src/app/app/acik-ev/[id]/visitor-form.tsx": `${ROLLOUT}: ham email input`,
-  "src/app/app/ayarlar/company-form.tsx": `${ROLLOUT}: ham tel input`,
-  "src/app/app/ayarlar/lead/lead-capture-panel.tsx": `${ROLLOUT}: ham telefon/e-posta (gömme kodu örnek metni olabilir; rollout kontrol etsin)`,
-  "src/app/app/baslangic/setup-wizard.tsx": `${ROLLOUT}: ham telefon input`,
-  "src/app/app/ekip/team-panels.tsx": `${ROLLOUT}: ham email input`,
-  "src/app/app/musteriler/[id]/edit-customer-dialog.tsx": `${ROLLOUT}: ham email input`,
-  "src/app/app/musteriler/yeni/customer-form.tsx": `${ROLLOUT}: ham email input`,
-  "src/app/app/portfoyler/[id]/property-keys-section.tsx": `${ROLLOUT}: ham holder_phone input`,
-  "src/app/app/sozlesmeler/[id]/contract-sign-panel.tsx": `${ROLLOUT}: ham tel + email input`,
-  // (c) ortak doğrulayıcı kullanmayan server action'lar
-  "src/app/actions/calls.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
-  "src/app/actions/customers.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
-  "src/app/actions/onboarding-setup.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
-  "src/app/actions/platform-staff.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
-  "src/app/actions/property-keys.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
-  "src/app/actions/settings.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
-  "src/app/actions/team.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
+  "src/app/app/ayarlar/lead/lead-capture-panel.tsx": "KALICI İSTİSNA: dışa kopyalanacak HTML gömme kodu örnek METNİ (template string); gerçek form alanı değil",
 };
 
 const PHONE_EMAIL_WORD = /(?:^|[^a-z])(?:phone|telefon|gsm|mobile|cep|e-?posta|email|mail)(?:[^a-z]|$)/;

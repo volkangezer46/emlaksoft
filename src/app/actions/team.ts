@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
-import { isValidOptionalTurkishMobile, normalizeTurkishPhone, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { getPlan } from "@/lib/billing/plans";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 
@@ -107,7 +108,7 @@ export async function createTeamMember(_prev: TeamResult, formData: FormData): P
   const { tenantId, role: actorRole } = ctx;
 
   const fullName = String(formData.get("full_name") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const email = normalizeEmail(String(formData.get("email") ?? ""));
   const phone = String(formData.get("phone") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const role = String(formData.get("role") ?? "advisor").trim() as Role;
@@ -118,11 +119,13 @@ export async function createTeamMember(_prev: TeamResult, formData: FormData): P
   }
 
   if (!fullName || !email) return { error: "Ad ve e-posta zorunlu." };
-  if (!isValidOptionalTurkishMobile(phone)) return { error: TR_MOBILE_ERROR_MESSAGE };
+  if (!isValidEmail(email)) return { error: EMAIL_ERROR_MESSAGE };
+  const parsedPhone = phone ? parsePhone(phone) : null;
+  if (parsedPhone && !parsedPhone.ok) return { error: parsedPhone.error ?? PHONE_ERROR_MESSAGE };
   if (!ASSIGNABLE_ROLES.includes(role)) return { error: "Geçerli bir rol seçin." };
   if (password.length < 8) return { error: "Geçici şifre en az 8 karakter olmalı." };
 
-  const normalizedPhone = phone ? normalizeTurkishPhone(phone) : "";
+  const normalizedPhone = parsedPhone?.stored ?? "";
   const admin = createAdminClient();
   const branch = await ensureBranchBelongsToTenant(admin, branchId, tenantId);
   if (!branch.ok) return { error: branch.error };

@@ -6,6 +6,7 @@ import { requirePlatformModule } from "@/lib/platform";
 import { PLATFORM_ROLE_LABELS, type PlatformRole } from "@/lib/platform-access";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { getBaseUrl } from "@/lib/base-url";
+import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 
 const VALID_ROLES: PlatformRole[] = ["super_admin", "ops", "support", "billing"];
 
@@ -19,12 +20,12 @@ export type StaffActionResult = { ok?: boolean; error?: string };
 export async function addPlatformStaff(fd: FormData): Promise<StaffActionResult> {
   const staff = await requirePlatformModule("personel");
 
-  const email = (fd.get("email") as string | null)?.trim().toLowerCase();
+  const email = normalizeEmail(fd.get("email") as string | null);
   const fullName = (fd.get("full_name") as string | null)?.trim();
   const role = (fd.get("role") as PlatformRole | null) ?? "support";
 
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { error: "Geçerli bir e-posta adresi girin." };
+  if (!email || !isValidEmail(email)) {
+    return { error: `${EMAIL_ERROR_MESSAGE}.` };
   }
   if (!fullName) return { error: "Ad Soyad zorunludur." };
   if (!VALID_ROLES.includes(role)) return { error: "Geçersiz rol." };

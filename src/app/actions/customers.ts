@@ -9,7 +9,8 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
-import { isValidOptionalTurkishMobile, normalizeTurkishPhone, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { daysFromNowIso } from "@/lib/clock";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 
@@ -38,7 +39,7 @@ export async function createCustomer(
 
   const fullName = String(formData.get("full_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim();
+  const email = normalizeEmail(String(formData.get("email") ?? ""));
   const type = String(formData.get("type") ?? "").trim();
   const provinceId = String(formData.get("province_id") ?? "").trim();
   const districtId = String(formData.get("district_id") ?? "").trim();
@@ -49,10 +50,12 @@ export async function createCustomer(
   const anniversaryNote = String(formData.get("anniversary_note") ?? "").trim();
 
   if (!fullName) return { error: "Ad soyad zorunlu." };
-  if (!isValidOptionalTurkishMobile(phone)) return { error: TR_MOBILE_ERROR_MESSAGE };
+  const parsedPhone = phone ? parsePhone(phone) : null;
+  if (parsedPhone && !parsedPhone.ok) return { error: parsedPhone.error ?? PHONE_ERROR_MESSAGE };
+  if (email && !isValidEmail(email)) return { error: EMAIL_ERROR_MESSAGE };
   if (!isValidOptionalDate(birthDate)) return { error: "Doğum tarihi geçersiz." };
   if (!isValidOptionalDate(anniversaryDate)) return { error: "Yıldönümü tarihi geçersiz." };
-  const normalizedPhone = phone ? normalizeTurkishPhone(phone) : "";
+  const normalizedPhone = parsedPhone?.stored ?? "";
 
   const { data, error } = await supabase
     .from("customers")
@@ -133,7 +136,7 @@ export async function updateCustomer(
   const id = String(formData.get("id") ?? "").trim();
   const fullName = String(formData.get("full_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim();
+  const email = normalizeEmail(String(formData.get("email") ?? ""));
   const type = String(formData.get("type") ?? "").trim();
   const provinceId = String(formData.get("province_id") ?? "").trim();
   const districtId = String(formData.get("district_id") ?? "").trim();
@@ -145,10 +148,12 @@ export async function updateCustomer(
 
   if (!id) return { error: "Müşteri bulunamadı." };
   if (!fullName) return { error: "Ad soyad zorunlu." };
-  if (!isValidOptionalTurkishMobile(phone)) return { error: TR_MOBILE_ERROR_MESSAGE };
+  const parsedPhone = phone ? parsePhone(phone) : null;
+  if (parsedPhone && !parsedPhone.ok) return { error: parsedPhone.error ?? PHONE_ERROR_MESSAGE };
+  if (email && !isValidEmail(email)) return { error: EMAIL_ERROR_MESSAGE };
   if (!isValidOptionalDate(birthDate)) return { error: "Doğum tarihi geçersiz." };
   if (!isValidOptionalDate(anniversaryDate)) return { error: "Yıldönümü tarihi geçersiz." };
-  const normalizedPhone = phone ? normalizeTurkishPhone(phone) : "";
+  const normalizedPhone = parsedPhone?.stored ?? "";
 
   const supabase = await createClient();
   const updatePatch: Record<string, unknown> = {

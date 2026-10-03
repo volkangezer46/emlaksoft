@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { saveOfficeProfile } from "@/app/actions/onboarding-setup";
 import { seedSampleData } from "@/app/actions/sample-data";
 import type { OnboardingStep, OnboardingStepId } from "@/lib/onboarding-checklist";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 type Props = {
   steps: OnboardingStep[];
@@ -119,7 +120,7 @@ export function SetupWizard({ steps, doneCount, total, percent, complete, canEdi
 
                       {!step.done && step.id === "profile" && canEdit ? (
                         <form action={submitProfile} className="mt-3 grid gap-2 sm:grid-cols-3">
-                          <input name="phone" defaultValue={profile.phone} placeholder="Telefon" aria-label="Telefon" className={inputCls} />
+                          <PhoneInput name="phone" defaultValue={profile.phone} className={inputCls} />
                           <input name="city" defaultValue={profile.city} placeholder="Şehir" aria-label="Şehir" className={inputCls} />
                           <input name="license_no" defaultValue={profile.licenseNo} placeholder="Ruhsat no" aria-label="Ruhsat numarası" className={inputCls} />
                           <div className="sm:col-span-3">
