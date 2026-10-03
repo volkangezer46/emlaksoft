@@ -6,7 +6,7 @@ import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { UserMenu } from "@/components/ui/console/user-menu";
 import { AppBreadcrumb } from "@/components/app/app-breadcrumb";
 import { QuickCreateMenu } from "@/components/app/quick-create-menu";
-import { getNavBadges, getPlanUsage } from "@/lib/nav-badges";
+import { filterNavBadgesByAccess, getNavBadges, getPlanUsage, tabCountsFromUsage } from "@/lib/nav-badges";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaffIdentity } from "@/lib/platform";
@@ -104,6 +104,21 @@ export default async function AppLayout({
         .maybeSingle()
     : Promise.resolve({ data: null });
 
+  // Spekülatif başlangıç: JWT claim'indeki rol/tenant, middleware'de profile ile
+  // birebir doğrulanıyor (canonicalTenantUser). İzin/skor/rozet sorgularını profil
+  // beklemeden BAŞLAT; profil gelince claim ile eşleşmezse sonuçlar atılıp eski
+  // (profil temelli) yoldan yeniden hesaplanır. Yetkisiz modül rozetleri aşağıda
+  // etkin izinle süzülür → yetki kapısı gevşemez.
+  const claimedRole = typeof user?.app_metadata?.role === "string" ? user.app_metadata.role.trim() : "";
+  const canSpeculate = Boolean(user && !impersonating && claimedTenantId && claimedRole);
+  const specPermsPromise = canSpeculate
+    ? getEffectivePermissions(claimedTenantId, claimedRole, user!.id)
+    : null;
+  const specScorePromise = canSpeculate ? getOfficeScoreCached(claimedTenantId!).catch(() => null) : null;
+  const specBadgesPromise = canSpeculate
+    ? getNavBadges({ supabase, tenantId: claimedTenantId, userId: user!.id, role: claimedRole, accessible: NAV_MODULES }).catch(() => [])
+    : null;
+
   // profile ve platformStaff ikisi de yalnız `user`'a bağlı, birbirine değil →
   // her navigasyonda seri iki round-trip yerine paralel (bootstrap hızlanır).
   const [{ data: profile }, platformStaff, { data: impersonatedTenant }] = await Promise.all([
@@ -141,20 +156,32 @@ export default async function AppLayout({
 
   const platformStaffFullAccess = Boolean(platformStaff && !impersonating);
 
-  // Etkin izinler yalnız profilden gelen tenant/rol'e bağlı: skor ile aynı anda
-  // başlat (önceden skor+bildirim beklendikten SONRA seri çalışıyordu).
+  // Spekülatif sonuçlar yalnız claim == profil ise kullanılır (aksi halde eski yol).
+  const speculationValid = Boolean(
+    canSpeculate && profile && profile.tenant_id === claimedTenantId && profile.role === claimedRole,
+  );
   const effectivePermsPromise = platformStaffFullAccess
     ? Promise.resolve(null)
     : impersonating
       ? Promise.resolve(immutableReadonlyPermissions())
-      : getEffectivePermissions(tenantId, effectiveRole, user?.id);
-  // Skor (navigasyonlar arası cache'li, 3 dk; anahtar tenantId içerir). Kenar çubuğu
-  // sayıyı prop olarak aldığı için bloklayıcı kalır ama izinlerle paralel.
+      : speculationValid && specPermsPromise
+        ? specPermsPromise
+        : getEffectivePermissions(tenantId, effectiveRole, user?.id);
+  // Skor (navigasyonlar arası cache'li, 3 dk; anahtar tenantId içerir).
   const scorePromise =
-    user && tenantId ? getOfficeScoreCached(tenantId).catch(() => null) : Promise.resolve(null);
-  // Plan kullanım kartı (gerçek head-count) yalnız tenant+plana bağlı: izinlerle paralel.
+    speculationValid && specScorePromise
+      ? specScorePromise
+      : user && tenantId
+        ? getOfficeScoreCached(tenantId).catch(() => null)
+        : Promise.resolve(null);
+  // Plan kullanım kartı (gerçek head-count) yalnız tenant+plana bağlı: profil gelir gelmez başlar.
   const usagePromise = user && tenantId && !platformStaffFullAccess ? getPlanUsage(supabase, tenantId, office?.plan).catch(() => []) : Promise.resolve([]);
-  const [effectivePerms, scoreComputed, planUsage] = await Promise.all([effectivePermsPromise, scorePromise, usagePromise]);
+  const [effectivePerms, scoreComputed, planUsage, specBadges] = await Promise.all([
+    effectivePermsPromise,
+    scorePromise,
+    usagePromise,
+    speculationValid && specBadgesPromise ? specBadgesPromise : Promise.resolve(null),
+  ]);
   const officeScore: number | null = scoreComputed ? scoreComputed.score : null;
   const officeScoreLabel = scoreComputed ? scoreComputed.label : "—";
   const showNotifications = Boolean(user && tenantId);
@@ -170,10 +197,15 @@ export default async function AppLayout({
   // Hızlı oluştur + komut paleti "Eylemler": yalnız "create" yetkili modüller.
   const creatableModules = NAV_MODULES.filter((mod) => accessibleModules.includes(mod) && canCreate(mod));
   const hasQuickCreate = getAppActions(creatableModules, "", lockedNavHrefs).length > 0;
-  // Menü sayı rozetleri: gerçek veri; hata olursa rozet çıkmaz.
+  // Menü sayı rozetleri: gerçek veri; hata olursa rozet çıkmaz. Spekülatif sorgu
+  // etkin izinle süzülür; geçersizse (claim != profil) eski sıralı yol çalışır.
   const navBadges = platformStaffFullAccess
     ? []
-    : await getNavBadges({ supabase, tenantId, userId: user?.id ?? null, role: effectiveRole, accessible: accessibleModules }).catch(() => []);
+    : specBadges
+      ? filterNavBadgesByAccess(specBadges, accessibleModules)
+      : await getNavBadges({ supabase, tenantId, userId: user?.id ?? null, role: effectiveRole, accessible: accessibleModules }).catch(() => []);
+  // Sekme sayaçları: yalnız mevcut head-count'lar (müşteri/portföy/ekip); sayı yoksa gösterilmez.
+  const tabCounts = tabCountsFromUsage(planUsage);
   const vitrinHref = office?.slug && !impersonating ? `/vitrin/${office.slug}` : null;
 
   const jar = await cookies();
@@ -262,7 +294,7 @@ export default async function AppLayout({
             id="main-content"
             className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1fr)] content-start overflow-x-clip p-4 pb-28 md:px-6 md:pt-6 lg:p-8"
           >
-            <SectionTabs accessibleModules={accessibleModules} lockedHrefs={lockedNavHrefs} />
+            <SectionTabs accessibleModules={accessibleModules} lockedHrefs={lockedNavHrefs} counts={tabCounts} />
             {children}
           </main>
         </div>

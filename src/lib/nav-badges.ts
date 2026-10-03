@@ -27,6 +27,30 @@ type Input = {
   accessible: readonly AppModule[];
 };
 
+/** Rozetin ait olduğu modül: spekülatif (izin beklemeden) hesaplanan rozetler bununla süzülür. */
+const BADGE_MODULE: Record<string, AppModule> = {
+  "/app/gorevler": "tasks",
+  "/app/onaylar": "commissions",
+};
+
+/** Etkin izin netleştikten sonra yetkisiz modülün rozetini düşürür (yetki kapısı korunur). */
+export function filterNavBadgesByAccess(badges: readonly NavBadge[], accessible: readonly AppModule[]): NavBadge[] {
+  return badges.filter((b) => {
+    const mod = BADGE_MODULE[b.itemHref];
+    return mod ? accessible.includes(mod) : false;
+  });
+}
+
+/**
+ * Menü sekmeleri için GERÇEK sayılar (zaten çekilen kullanım head-count'ları).
+ * Sayı yoksa anahtar hiç yazılmaz → sekmede sayaç gösterilmez.
+ */
+export function tabCountsFromUsage(usage: readonly PlanUsageRow[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const row of usage) out[row.href] = row.used;
+  return out;
+}
+
 export async function getNavBadges({ supabase, tenantId, userId, role, accessible }: Input): Promise<NavBadge[]> {
   if (!tenantId || !userId) return [];
   const nowIso = new Date(now()).toISOString();
