@@ -2,12 +2,14 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
-import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
+import { daysAgoIso, daysFromNowIso, trDayKey } from "@/lib/clock";
 import {
   mapAppointment, mapAudit, mapCommission, mapContract, mapCustomer, mapDealWith, mapDemand, mapDue, mapExpense,
   mapOffer, mapPortalListing, mapProject, mapProperty, mapReferral, relOne, toCsv,
 } from "@/lib/export-entities";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
+import { getEffectivePermissions } from "@/lib/permissions-effective";
+import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { getStageLabels } from "@/lib/definitions";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
 import { logActivity } from "@/lib/activity";
@@ -70,7 +72,7 @@ export async function exportCustomersCsv(): Promise<ExportResult> {
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
   const rows = (data ?? []).map((r) => mapCustomer(r));
-  return exportResult(gate, "musteriler", rows, `musteriler-${new Date().toISOString().slice(0, 10)}.csv`);
+  return exportResult(gate, "musteriler", rows, `musteriler-${trDayKey()}.csv`);
 }
 
 export async function exportCommissionsCsv(): Promise<ExportResult> {
@@ -84,14 +86,15 @@ export async function exportCommissionsCsv(): Promise<ExportResult> {
     .eq("deal.tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
     .limit(EXPORT_LIMIT);
-  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("deal.assigned_to", gate.userId);
+  const seeAll = canSeeAllEarnings(await getEffectivePermissions(gate.tenantId, gate.role, gate.userId));
+  if (!hasOfficeWideDataScope(gate.role) || !seeAll) q = q.eq("deal.assigned_to", gate.userId);
   const { data, error } = await q;
   if (error) {
     console.error("exportCommissionsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
   const rows = (data ?? []).map((r) => mapCommission(r));
-  return exportResult(gate, "komisyonlar", rows, `komisyonlar-${new Date().toISOString().slice(0, 10)}.csv`);
+  return exportResult(gate, "komisyonlar", rows, `komisyonlar-${trDayKey()}.csv`);
 }
 
 export async function exportAuditCsv(): Promise<ExportResult> {
@@ -104,7 +107,8 @@ export async function exportAuditCsv(): Promise<ExportResult> {
     .eq("tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
     .limit(EXPORT_LIMIT);
-  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("actor_id", gate.userId);
+  const seeAll = canSeeAllEarnings(await getEffectivePermissions(gate.tenantId, gate.role, gate.userId));
+  if (!hasOfficeWideDataScope(gate.role) || !seeAll) q = q.eq("actor_id", gate.userId);
   const { data, error } = await q;
   if (error) {
     console.error("exportAuditCsv", error);
@@ -123,7 +127,7 @@ export async function exportAuditCsv(): Promise<ExportResult> {
   }
 
   const rows = (data ?? []).map((r) => mapAudit(r, names));
-  return exportResult(gate, "denetim", rows, `denetim-${new Date().toISOString().slice(0, 10)}.csv`);
+  return exportResult(gate, "denetim", rows, `denetim-${trDayKey()}.csv`);
 }
 
 export async function exportPropertiesCsv(): Promise<ExportResult> {
@@ -158,7 +162,7 @@ export async function exportPropertiesCsv(): Promise<ExportResult> {
   }
 
   const rows = (data ?? []).map((r) => mapProperty(r, names));
-  return exportResult(gate, "portfoyler", rows, `portfoyler-${new Date().toISOString().slice(0, 10)}.csv`);
+  return exportResult(gate, "portfoyler", rows, `portfoyler-${trDayKey()}.csv`);
 }
 
 export async function exportExpensesCsv(): Promise<ExportResult> {
@@ -178,7 +182,7 @@ export async function exportExpensesCsv(): Promise<ExportResult> {
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
   const rows = (data ?? []).map((r) => mapExpense(r));
-  return exportResult(gate, "giderler", rows, `giderler-${new Date().toISOString().slice(0, 10)}.csv`);
+  return exportResult(gate, "giderler", rows, `giderler-${trDayKey()}.csv`);
 }
 
 export async function exportOffersCsv(): Promise<ExportResult> {
@@ -202,7 +206,7 @@ export async function exportOffersCsv(): Promise<ExportResult> {
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
   const rows = (data ?? []).map((r) => mapOffer(r));
-  return exportResult(gate, "teklifler", rows, `teklifler-${new Date().toISOString().slice(0, 10)}.csv`);
+  return exportResult(gate, "teklifler", rows, `teklifler-${trDayKey()}.csv`);
 }
 
 export async function exportPortalListingsCsv(): Promise<ExportResult> {
@@ -225,10 +229,10 @@ export async function exportPortalListingsCsv(): Promise<ExportResult> {
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
   const rows = (data ?? []).map((r) => mapPortalListing(r));
-  return exportResult(gate, "portal-ilanlari", rows, `portal-ilanlari-${new Date().toISOString().slice(0, 10)}.csv`);
+  return exportResult(gate, "portal-ilanlari", rows, `portal-ilanlari-${trDayKey()}.csv`);
 }
 
-const today10 = () => new Date().toISOString().slice(0, 10);
+const today10 = () => trDayKey();
 
 // ── Talepler (müşteri talepleri) — ekranın aktif filtresini uygular ──────────
 const DEMAND_URGENCY_TR: Record<string, string> = { low: "Düşük", normal: "Normal", high: "Yüksek", urgent: "Acil" };

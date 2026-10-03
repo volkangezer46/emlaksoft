@@ -19,7 +19,7 @@ export type MatchPreviewItem = {
 };
 
 export type MatchPreviewResult =
-  | { ok: true; count: number; top: MatchPreviewItem[]; href: string; scanned: number }
+  | { ok: true; count: number; top: MatchPreviewItem[]; href: string; scanned: number; truncated: boolean }
   | { ok: false; error: string };
 
 /**
@@ -45,10 +45,13 @@ export async function previewDemandMatches(input: unknown): Promise<MatchPreview
     criteria: parsed.criteria,
   };
 
-  const [properties, weights] = await Promise.all([
+  const [candidates, weights] = await Promise.all([
     fetchMatchCandidateProperties(supabase, { demands: [demand], tenantId: gate.tenantId }),
     fetchTenantMatchingWeights(supabase, gate.tenantId),
   ]);
+
+  if (candidates.error) return { ok: false, error: candidates.error };
+  const properties = candidates.properties;
 
   const scored = properties
     .map((p) => ({ p, r: scoreDemandProperty(demand, p, weights) }))
@@ -59,6 +62,7 @@ export async function previewDemandMatches(input: unknown): Promise<MatchPreview
     ok: true,
     count: scored.length,
     scanned: properties.length,
+    truncated: candidates.truncated,
     top: scored.slice(0, 3).map(({ p, r }) => ({
       id: p.id,
       code: p.property_code,

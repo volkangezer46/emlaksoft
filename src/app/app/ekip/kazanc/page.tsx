@@ -9,7 +9,7 @@ import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/tab
 import { EmptyState } from "@/components/app/empty-state";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
-import { summarizeAdvisorEarning, type ShareRow } from "@/lib/team/advisor-share";
+import { findAmbiguousNames, summarizeAdvisorEarning, type ShareRow } from "@/lib/team/advisor-share";
 import { trMonthContext } from "@/lib/team/scorecard";
 
 const ROW_LIMIT = 2000;
@@ -50,14 +50,16 @@ export default async function TeamEarningsPage() {
   const commissions = (commissionsRes.data ?? []) as unknown as ShareRow[];
   const profiles = (profilesRes.data ?? []) as { id: string; full_name: string; role: string }[];
 
+  const ambiguousNames = findAmbiguousNames(profiles.map((p) => p.full_name));
   const mine = summarizeAdvisorEarning(
     commissions,
     profiles.find((p) => p.id === userId)?.full_name ?? null,
     userId,
+    { ambiguousNames },
   );
   const table = seeAll
     ? profiles
-        .map((p) => ({ p, e: summarizeAdvisorEarning(commissions, p.full_name, p.id) }))
+        .map((p) => ({ p, e: summarizeAdvisorEarning(commissions, p.full_name, p.id, { ambiguousNames }) }))
         .sort((a, b) => b.e.collected + b.e.pending - (a.e.collected + a.e.pending) || a.p.full_name.localeCompare(b.p.full_name, "tr"))
     : [];
   const anyEarning = table.some(({ e }) => e.count > 0);

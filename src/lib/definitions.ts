@@ -112,6 +112,26 @@ export async function getLossReasonOptions(): Promise<DefinitionItem[]> {
   return mergeLossReasonDefaults(await getDefinitionsOrDefault("loss_reason"));
 }
 
+/**
+ * Kayıp nedeni seçenekleri — ÖNBELLEKSİZ (doğrulama yolu için, B9). Yeni eklenen neden hemen kabul edilir,
+ * gizlenen neden hemen reddedilir; bayat önbellek yüzünden "Geçersiz kayıp nedeni" çıkmaz.
+ * `tenantId` oturumdan (requirePermission) gelen kanonik ofis kimliğidir.
+ */
+export async function getLossReasonOptionsFresh(tenantId: string): Promise<DefinitionItem[]> {
+  let items: DefinitionItem[] = [];
+  if (UUID_RE.test(tenantId)) {
+    try {
+      items = await loadDefinitions(tenantId, "loss_reason");
+    } catch {
+      items = [];
+    }
+  }
+  if (items.length === 0) {
+    items = DEFAULT_DEFINITIONS.loss_reason.map((d) => ({ value: d.value, label: d.label, color: null }));
+  }
+  return mergeLossReasonDefaults(items);
+}
+
 /** Anlaşma aşaması görünen ad/renkleri (ofis tanımı + varsayılan; her zaman 5 aşama döner). */
 export async function getStageLabels(): Promise<StageLabels> {
   let items: DefinitionItem[] = [];

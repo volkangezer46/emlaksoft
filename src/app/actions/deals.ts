@@ -12,7 +12,7 @@ import { checkAuthorityShield } from "@/lib/authority-shield";
 import { notifyTenant } from "@/lib/notify";
 import { validateTenantReferences } from "@/lib/tenant-references";
 import { parseMoneyInput } from "@/lib/money-input";
-import { getLossReasonOptions } from "@/lib/definitions";
+import { getLossReasonOptionsFresh } from "@/lib/definitions";
 import { validateLossReason } from "@/lib/loss-reason";
 import {
   DEAL_STAGES as WORKFLOW_DEAL_STAGES,
@@ -112,7 +112,7 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
     const check = validateLossReason(
       String(formData.get("loss_reason") ?? ""),
       String(formData.get("loss_note") ?? ""),
-      await getLossReasonOptions(),
+      await getLossReasonOptionsFresh(gate.tenantId),
     );
     if (!check.ok) return { error: check.error };
     lossReason = check.stored;

@@ -28,7 +28,7 @@ import {
 import { moneyTry } from "@/lib/leak-shield";
 import { requireModulePage } from "@/lib/require-module-page";
 import { decodeDemandPreviewParam, parseDemandValues } from "@/lib/demand-criteria";
-import { fetchMatchCandidateProperties } from "@/lib/match-candidates";
+import { fetchMatchCandidateProperties, MATCH_CANDIDATE_LIMIT } from "@/lib/match-candidates";
 import { SaveMatchButton } from "./save-match-button";
 import type { CSSProperties } from "react";
 
@@ -129,10 +129,11 @@ export default async function MatchingPage({
   // ── Aday portföyler ───────────────────────────────────────────────────────
   // Form içi önizleme ile AYNI sorgu (src/lib/match-candidates.ts): talepler il/işlem
   // türü kümesine göre TEK sorguda daraltılır, skor bellekte hesaplanır.
-  const properties = await fetchMatchCandidateProperties(supabase, {
+  const candidates = await fetchMatchCandidateProperties(supabase, {
     demands,
     propertyId: sp.property ?? null,
   });
+  const properties = candidates.properties;
 
   // ── Geri bildirimden öğrenme (v1) ─────────────────────────────────────────
   // Portal geri bildirimi TEK toplu sorguyla çekilir (sayfadaki müşteri
@@ -221,6 +222,17 @@ export default async function MatchingPage({
 
   return (
     <div className="space-y-6">
+      {candidates.error ? (
+        <p role="alert" className="rounded-[var(--radius-card)] border border-danger-500/40 bg-danger-500/10 px-4 py-3 text-sm text-ink-950">
+          {candidates.error} Aşağıdaki boş liste &quot;eşleşme yok&quot; anlamına gelmez.
+        </p>
+      ) : null}
+      {candidates.truncated ? (
+        <p role="status" className="rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-ink-950">
+          Aday portföy sayısı çok yüksek: yalnızca en yeni {MATCH_CANDIDATE_LIMIT} portföy taranıyor. Daha eski portföyler bu listede
+          çıkmaz; talebi il/işlem türüne göre daraltın veya belirli bir portföyden başlatın.
+        </p>
+      ) : null}
       <PageHeader title="Akıllı eşleşme motoru" eyebrow="Talep × Portföy eşleştirme" description="Müşteri taleplerini portföylerle bütçe, konum, oda ve işlem türüne göre skorlar. Scraping yok — kendi veriniz." actions={
 <div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-5 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="relative grid h-28 w-28 place-items-center">
