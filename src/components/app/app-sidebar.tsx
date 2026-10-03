@@ -117,6 +117,9 @@ export function AppSidebar({
   // "Daha fazla": varsayılan kapalı; kullanıcı açtıysa ya da etkin sayfa içindeyse açık ("closed" deposunda
   // bu kimlik AÇIK anlamına gelir).
   const moreOpen = activeInMore || closed.includes("daha-fazla-acik");
+  // "Son kullanılanlar" ve "Kullanım" kartı da varsayılan KAPALI; kimlik depoda varsa AÇIK (aynı desen).
+  const recentOpen = closed.includes("son-acik");
+  const usageOpen = closed.includes("kullanim-acik");
   const toggleMore = () => {
     const cur = closedStore.read();
     closedStore.write(cur.includes("daha-fazla-acik") ? cur.filter((x) => x !== "daha-fazla-acik") : [...cur, "daha-fazla-acik"]);
@@ -146,7 +149,7 @@ export function AppSidebar({
           aria-current={active ? "page" : undefined}
           title={item.label}
           onClick={() => setOpen(false)}
-          className={`nav-row focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors lg:min-h-10 ${
+          className={`nav-row focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors lg:min-h-9 ${
             badge ? "pr-16" : "pr-9"
           } ${active ? "nav-pill font-semibold text-white" : "text-white/80 hover:bg-white/6 hover:text-white"}`}
         >
@@ -184,7 +187,7 @@ export function AppSidebar({
   };
 
   const groupHeader = (id: string, title: string, opts?: { collapsible?: boolean; expanded?: boolean }) => (
-    <div className="sb-eyebrow flex items-center gap-2 px-3 pb-1 pt-4 text-white/70">
+    <div className="sb-eyebrow flex items-center gap-2 px-3 pb-0.5 pt-2.5 text-white/70">
       {opts?.collapsible ? (
         <button
           type="button"
@@ -209,8 +212,8 @@ export function AppSidebar({
 
   const renderContent = (variant: "desktop" | "drawer") => (
     <>
-      <div className="sb-head flex min-h-14 shrink-0 items-center gap-3 border-b border-white/8 px-4">
-        <Brand variant="mark" tone="dark" height={36} alt="" className="rounded-[var(--radius-card)] shadow-[0_12px_28px_-12px_rgba(34,211,238,.75)]" />
+      <div className="sb-head flex min-h-12 shrink-0 items-center gap-3 border-b border-white/8 px-4">
+        <Brand variant="mark" tone="dark" height={32} alt="" className="rounded-[var(--radius-card)] shadow-[0_12px_28px_-12px_rgba(34,211,238,.75)]" />
         <div className="sb-label min-w-0 flex-1">
           <p className="font-display text-base font-extrabold leading-5 text-white">EmlakSoft</p>
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold-300)]">Ofis konsolu</p>
@@ -218,7 +221,7 @@ export function AppSidebar({
         <SidebarCollapseButton />
       </div>
 
-      <div className={`sb-pad px-3 pt-3${simple && variant === "desktop" ? " hidden" : ""}`}>
+      <div className={`sb-pad px-3 pt-2${simple && variant === "desktop" ? " hidden" : ""}`}>
         <button
           type="button"
           onClick={openPalette}
@@ -242,8 +245,10 @@ export function AppSidebar({
           ) : null}
           {recentItems.length > 0 ? (
             <div>
-              {groupHeader("son", "Son kullanılanlar")}
-              <div className="space-y-0.5">{recentItems.map((i) => renderItem(i, { group: "recent", pinnable: true }))}</div>
+              {groupHeader("son-acik", "Son kullanılanlar", { collapsible: true, expanded: recentOpen })}
+              {recentOpen ? (
+                <div id="sb-son-acik" className="space-y-0.5">{recentItems.map((i) => renderItem(i, { group: "recent", pinnable: true }))}</div>
+              ) : null}
             </div>
           ) : null}
           {sections.map((section) => {
@@ -261,7 +266,7 @@ export function AppSidebar({
           })}
           {more.length > 0 ? (
             <div>
-              <div className="sb-eyebrow px-3 pb-1 pt-4 text-white/70">
+              <div className="sb-eyebrow sticky bottom-0 z-[1] bg-[#0a111e] px-3 pb-0.5 pt-1 text-white/70 shadow-[0_-8px_12px_-8px_rgba(0,0,0,.6)]">
                 <button
                   type="button"
                   onClick={toggleMore}
@@ -327,7 +332,7 @@ export function AppSidebar({
         </div>
       </NavScroller>
 
-      <div className="sb-pad space-y-2 border-t border-white/8 p-3">
+      <div className="sb-pad space-y-1 border-t border-white/8 px-3 py-2">
         <div
           className="sb-when-collapsed mx-auto h-10 w-10 place-items-center rounded-[var(--radius-control)] border border-white/10 bg-white/8 font-display text-sm font-extrabold text-[var(--gold-300)]"
           title={`${officeName} · ${plan}`}
@@ -337,13 +342,23 @@ export function AppSidebar({
           {officeName.trim().charAt(0).toLocaleUpperCase("tr-TR") || "E"}
         </div>
 
-        <div className="sb-label rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="sb-eyebrow uppercase text-white/75">Kullanım</span>
-            <span className="rounded-full border border-white/15 px-2 py-0.5 text-xs font-bold uppercase tracking-[0.06em] text-[var(--gold-300)]">
+        <div className="sb-label rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-1.5">
+          <button
+            type="button"
+            onClick={() => toggleSection("kullanim-acik")}
+            aria-expanded={usageOpen}
+            aria-controls="sb-kullanim"
+            title={`${officeName} · kullanım ayrıntısı`}
+            className="focus-ring flex min-h-9 w-full items-center justify-between gap-2 rounded-[var(--radius-control)] text-left"
+          >
+            <span className="sb-eyebrow min-w-0 flex-1 truncate uppercase text-white/75">Kullanım</span>
+            <span className="shrink-0 rounded-full border border-white/15 px-2 py-0.5 text-xs font-bold uppercase tracking-[0.06em] text-[var(--gold-300)]">
               {trial ? "Deneme" : plan}
             </span>
-          </div>
+            <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-white/70 transition-transform ${usageOpen ? "" : "-rotate-90"}`} aria-hidden />
+          </button>
+          {usageOpen ? (
+          <div id="sb-kullanim" className="pb-1.5">
           <p className="mt-1 truncate text-sm font-semibold text-white">{officeName}</p>
           {usage.length > 0 ? (
             <ul className="mt-2 space-y-2">
@@ -386,6 +401,8 @@ export function AppSidebar({
               Paketi yükselt
             </Link>
           ) : null}
+          </div>
+          ) : null}
         </div>
 
         {vitrinHref ? (
@@ -394,7 +411,7 @@ export function AppSidebar({
             target="_blank"
             rel="noopener noreferrer"
             title="Ofis vitrinini yeni sekmede aç"
-            className="focus-ring flex min-h-10 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-white/80 transition-colors hover:bg-white/6 hover:text-white"
+            className="focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-white/80 transition-colors hover:bg-white/6 hover:text-white lg:min-h-9"
           >
             <VitrinIcon className="h-[18px] w-[18px] shrink-0 text-white/65" aria-hidden />
             <span className="sb-label flex-1 truncate">Vitrini görüntüle</span>

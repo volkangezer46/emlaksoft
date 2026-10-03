@@ -88,12 +88,13 @@ export function PriceAlertForm({ slug, propertyId }: { slug: string; propertyId:
           className="absolute left-[-9999px] h-0 w-0 opacity-0"
         />
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
+        {/* Tek sütun: dar yan kolonda PhoneInput (ülke seçici + numara) tam genişlik alsın. */}
+        <div className="grid grid-cols-1 gap-3">
+          <div className="min-w-0">
             <label htmlFor="price-alert-name" className="sr-only">Ad soyad (opsiyonel)</label>
             <input id="price-alert-name" name="name" autoComplete="name" placeholder="Ad soyad (opsiyonel)" className={inputCls} />
           </div>
-          <div>
+          <div className="min-w-0 w-full">
             <label htmlFor="price-alert-phone" className="sr-only">Cep telefonu</label>
             <PhoneInput id="price-alert-phone" name="phone" required autoComplete="tel" aria-describedby="price-alert-consent" className={inputCls} placeholder="Cep telefonu (05XX XXX XX XX) *" />
           </div>

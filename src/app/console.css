@@ -1,7 +1,8 @@
 /* Konsol kabuğu (yan menü daraltma, üst çubuk, bento/tablo yardımcıları).
    Yalnız /app ve /admin layout'ları içe aktarır. Hareket <=150ms, reduced-motion'da kapalı. */
 :root {
-  --sidebar-w: 248px;
+  /* rem tabanlı: Büyük/Çok büyük yazıda menü genişliği orantılı artar (rozet/etiket taşmaz). */
+  --sidebar-w: 15.5rem;
   --sidebar-w-collapsed: 64px;
   --topbar-h: 3.5rem;
   --row-h: 44px;
@@ -86,12 +87,16 @@ a.bx:hover, .bx-hover:hover { box-shadow: var(--elev-2); border-color: color-mix
   display: inline-grid; place-items: center; min-width: 1.25rem; height: 1.25rem; padding-inline: 0.3rem;
   border-radius: 9999px; font-size: 0.75rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
   color: #fff; transition: transform 120ms ease;
+  flex-shrink: 0; white-space: nowrap; width: max-content; max-width: 3.25rem; overflow: hidden; text-overflow: clip;
 }
 .nav-badge:hover { transform: scale(1.08); }
 .nav-badge.is-danger { background: #b4232f; }
 .nav-badge.is-warn { background: #a35a00; }
 .nav-badge:focus-visible { outline: 2px solid var(--gold-300); outline-offset: 2px; }
 html[data-sidebar="collapsed"] .shell-aside .nav-badge-inline { display: none; }
+
+/* Dokunmatik işaretleyici: masaüstü yoğun satır (36px) yerine 44px hedef. */
+@media (pointer: coarse) { html .nav-row { min-height: 44px; } }
 
 .nav-pin { opacity: 0; transition: opacity 120ms ease, background-color 120ms ease; }
 .nav-item:hover .nav-pin, .nav-item:focus-within .nav-pin, .nav-pin[aria-pressed="true"] { opacity: 1; }

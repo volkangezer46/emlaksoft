@@ -8,7 +8,7 @@
 export const MAX_PINS = 6;
 export const MAX_NAV_RECENTS = 5;
 /** Menüde en çok kaç "son kullanılan" satırı görünür (liste kısa kalsın, aktif öğe itilmesin). */
-export const MAX_RECENT_SHOWN = 3;
+export const MAX_RECENT_SHOWN = 2;
 
 const NO_HREFS: string[] = [];
 

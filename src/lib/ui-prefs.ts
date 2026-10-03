@@ -54,7 +54,7 @@ export function uiPrefsCss(font: UiFont): string {
   const pct = UI_FONTS.find((f) => f.value === font)?.percent ?? 100;
   return [
     `html{font-size:${pct}%}`,
-    `.nav-row{min-height:44px}`,
+    `html .nav-row{min-height:44px}`,
     `.nav-pin{min-width:44px;min-height:44px}`,
     `.pm-seg a{display:inline-flex;align-items:center;justify-content:center;min-height:44px}`,
     `[role="menuitem"],[role="menuitemradio"],[role="menuitemcheckbox"]{min-height:44px}`,
