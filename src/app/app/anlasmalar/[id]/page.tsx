@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { getLossReasonOptions, getStageLabels } from "@/lib/definitions";
+import { formatLossReason, lossReasonLabels } from "@/lib/loss-reason";
 import { now } from "@/lib/clock";
 import { Badge } from "@/components/ui/badge";
 import { ContactActions, DetailTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
@@ -44,13 +46,13 @@ import { CopySurveyLinkButton, CreateSurveyButton } from "../../raporlar/memnuni
 import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Anlaşma detayı" };
 
-/** Pipeline aşamaları — deal-board ile aynı sıra ve etiketler. */
+/** Pipeline aşamaları — deal-board ile aynı sıra; görünen ad/renk ofis tanımından (getStageLabels). */
 const STAGES = [
-  { key: "new", label: "Yeni" },
-  { key: "qualified", label: "Nitelikli" },
-  { key: "negotiation", label: "Müzakere" },
-  { key: "won", label: "Kazanıldı" },
-  { key: "lost", label: "Kaybedildi" },
+  { key: "new" },
+  { key: "qualified" },
+  { key: "negotiation" },
+  { key: "won" },
+  { key: "lost" },
 ] as const;
 
 function money(n: number | null | undefined) {
@@ -96,6 +98,7 @@ export default async function DealDetailPage({
   // Seçili sekme sunucuda çözülür; yalnız aktif sekmenin bölümleri çizilir
   const tab = resolveTab(await searchParams, DEAL_TAB_IDS, "ozet", { gorev: "gorevler" });
   const supabase = await createClient();
+  const [stageLabels, lossOptions] = await Promise.all([getStageLabels(), getLossReasonOptions()]);
 
   const { data: deal } = await supabase
     .from("deals")
@@ -342,7 +345,9 @@ export default async function DealDetailPage({
                         : "border-white/12 bg-white/[0.04] text-white/45"
                   }`}
                 >
-                  {s.label}
+                  <span style={aktif && stageLabels[s.key].color ? { color: stageLabels[s.key].color ?? undefined } : undefined}>
+                    {stageLabels[s.key].label}
+                  </span>
                 </li>
               );
             })}
@@ -388,7 +393,7 @@ export default async function DealDetailPage({
           className="flex items-start gap-2 rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 px-4 py-3 text-sm text-danger-600"
           role="status"
         >
-          <span className="font-bold">Kayıp nedeni:</span> {deal.loss_reason}
+          <span className="font-bold">Kayıp nedeni:</span> {formatLossReason(deal.loss_reason, lossReasonLabels(lossOptions))}
         </p>
       ) : null}
 

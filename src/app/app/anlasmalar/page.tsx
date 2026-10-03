@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AlarmClock, ArrowUpRight, Filter, Handshake, Plus, Target, TrendingUp, Trophy, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { getLossReasonOptions, getStageLabels } from "@/lib/definitions";
 import { DAY_MS, msSince, daysAgoIso } from "@/lib/clock";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { DealBoard, type BoardDeal } from "./deal-board";
@@ -21,11 +22,11 @@ function money(n: number) {
  * Satış hunisi görselleştirmesi — aşama sırası deal-board ile aynı; renkler de
  * sütun tonlarını izler (renk varlığı takip eder). Her satır ilgili sütuna iner.
  */
-const FUNNEL_STAGES: { key: string; label: string; bar: string; text: string }[] = [
-  { key: "new", label: "Yeni", bar: "bg-cyan-500", text: "text-cyan-600" },
-  { key: "qualified", label: "Nitelikli", bar: "bg-brand-600", text: "text-brand-600" },
-  { key: "negotiation", label: "Müzakere", bar: "bg-amber-400", text: "text-amber-600" },
-  { key: "won", label: "Kazanıldı", bar: "bg-mint-500", text: "text-mint-600" },
+const FUNNEL_STAGES: { key: "new" | "qualified" | "negotiation" | "won"; bar: string; text: string }[] = [
+  { key: "new", bar: "bg-cyan-500", text: "text-cyan-600" },
+  { key: "qualified", bar: "bg-brand-600", text: "text-brand-600" },
+  { key: "negotiation", bar: "bg-amber-400", text: "text-amber-600" },
+  { key: "won", bar: "bg-mint-500", text: "text-mint-600" },
 ];
 
 export default async function DealsPage({ searchParams }: { searchParams?: Promise<{ yeni?: string }> }) {
@@ -81,11 +82,15 @@ export default async function DealsPage({ searchParams }: { searchParams?: Promi
     { data: dealsRaw, count: dealTotal },
     { data: members },
     [{ data: smsConsents }, { data: checklistRows }],
+    stageLabels,
+    lossReasons,
   ] = await Promise.all([
     dealsP,
 
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
     relatedP,
+    getStageLabels(),
+    getLossReasonOptions(),
   ]);
 
   const smsGranted = new Set(
@@ -153,7 +158,7 @@ export default async function DealsPage({ searchParams }: { searchParams?: Promi
   // arası geri dönüş yok); mevcut dağılım + bir sonraki aşamaya oran gösterilir.
   const funnel = FUNNEL_STAGES.map((s) => {
     const rows = s.key === "won" ? won : open.filter((d) => d.stage === s.key);
-    return { ...s, count: rows.length, value: rows.reduce((t, d) => t + (d.deal_value || 0), 0) };
+    return { ...s, label: stageLabels[s.key].label, count: rows.length, value: rows.reduce((t, d) => t + (d.deal_value || 0), 0) };
   });
   const funnelMax = Math.max(1, ...funnel.map((f) => f.count));
   const lostValue = lost.reduce((s, d) => s + (d.deal_value || 0), 0);
@@ -179,7 +184,7 @@ export default async function DealsPage({ searchParams }: { searchParams?: Promi
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Anlaşma tahtası" eyebrow="Anlaşma hattı" description="Yeni → nitelikli → müzakere → kazan/kayıp. Kazanıldığında komisyon otomatik üretilir." actions={
+      <PageHeader title="Anlaşma tahtası" eyebrow="Anlaşma hattı" description={`${stageLabels.new.label} → ${stageLabels.qualified.label} → ${stageLabels.negotiation.label} → ${stageLabels.won.label}/${stageLabels.lost.label}. Kazanıldığında komisyon otomatik üretilir.`} actions={
 <>
             <ExportCsvButton
               label="Dışa aktar"
@@ -377,7 +382,7 @@ export default async function DealsPage({ searchParams }: { searchParams?: Promi
             href="/app/raporlar"
             hrefLabel="Raporlar"
           />
-          <DealBoard deals={deals} canEdit={canEdit} members={members ?? []} />
+          <DealBoard deals={deals} canEdit={canEdit} members={members ?? []} lossReasons={lossReasons.map(({ value, label }) => ({ value, label }))} stageLabels={stageLabels} />
         </>
       )}
     </div>

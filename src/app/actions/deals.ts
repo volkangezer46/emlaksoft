@@ -12,6 +12,8 @@ import { checkAuthorityShield } from "@/lib/authority-shield";
 import { notifyTenant } from "@/lib/notify";
 import { validateTenantReferences } from "@/lib/tenant-references";
 import { parseMoneyInput } from "@/lib/money-input";
+import { getLossReasonOptions } from "@/lib/definitions";
+import { validateLossReason } from "@/lib/loss-reason";
 import {
   DEAL_STAGES as WORKFLOW_DEAL_STAGES,
   isDealStage,
@@ -104,8 +106,17 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
     return { error: "Geçersiz aşama." };
   }
   const stage = stageRaw as DealStage;
-  const lossReason = String(formData.get("loss_reason") ?? "").trim() || null;
-  if (stage === "lost" && !lossReason) return { error: "Kayıp nedeni zorunludur." };
+  // Kayıp nedeni: tanım listesinden seçim zorunlu ("diger" için not zorunlu); saklama: "<value>" veya "<value> | not".
+  let lossReason: string | null = null;
+  if (stage === "lost") {
+    const check = validateLossReason(
+      String(formData.get("loss_reason") ?? ""),
+      String(formData.get("loss_note") ?? ""),
+      await getLossReasonOptions(),
+    );
+    if (!check.ok) return { error: check.error };
+    lossReason = check.stored;
+  }
 
   const admin = createAdminClient();
   const { data: existing, error: loadError } = await admin

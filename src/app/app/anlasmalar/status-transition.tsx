@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Workflow } from "lucide-react";
 import { updateDealStage, type DealStage } from "@/app/actions/deals";
 import { useToast } from "@/components/app/toast-provider";
+import { defaultStageLabels, type StageLabels } from "@/lib/deal-stage-labels";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,19 +14,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const FLOW: { from: DealStage; to: DealStage; label: string; tone: string }[] = [
-  { from: "new", to: "qualified", label: "Nitelikli yap", tone: "bg-brand-600" },
-  { from: "qualified", to: "negotiation", label: "Müzakereye al", tone: "bg-amber-500" },
-  { from: "negotiation", to: "won", label: "Kazanıldı + komisyon", tone: "bg-mint-600" },
-  { from: "negotiation", to: "lost", label: "Kaybedildi", tone: "bg-danger-500" },
-  { from: "qualified", to: "lost", label: "Kaybedildi", tone: "bg-danger-500" },
-  { from: "new", to: "lost", label: "Kaybedildi", tone: "bg-danger-500" },
+type FlowItem = { from: DealStage; to: DealStage; label: (n: (s: DealStage) => string) => string; tone: string };
+
+// Düğme metinleri ofisin aşama adlarından türer (aşama anahtarları sabit).
+const FLOW: FlowItem[] = [
+  { from: "new", to: "qualified", label: (n) => `${n("qualified")} yap`, tone: "bg-brand-600" },
+  { from: "qualified", to: "negotiation", label: (n) => `${n("negotiation")} aşamasına al`, tone: "bg-amber-500" },
+  { from: "negotiation", to: "won", label: (n) => `${n("won")} + komisyon`, tone: "bg-mint-600" },
+  { from: "negotiation", to: "lost", label: (n) => n("lost"), tone: "bg-danger-500" },
+  { from: "qualified", to: "lost", label: (n) => n("lost"), tone: "bg-danger-500" },
+  { from: "new", to: "lost", label: (n) => n("lost"), tone: "bg-danger-500" },
   // Geri alma (C.6) — yanlış işaretlenen kazanma/kayıp müzakereye döndürülür.
   // Kazanmayı geri alınca tahsil edilmemiş otomatik komisyon silinir ve portföy
   // durumu 'active'e döner (bkz. actions/deals.ts updateDealStage). Tahsil edilmiş
   // komisyon varsa action engeller.
-  { from: "won", to: "negotiation", label: "Kazanmayı geri al", tone: "bg-amber-500" },
-  { from: "lost", to: "negotiation", label: "Yeniden aç", tone: "bg-amber-500" },
+  { from: "won", to: "negotiation", label: (n) => `${n("won")} durumunu geri al`, tone: "bg-amber-500" },
+  { from: "lost", to: "negotiation", label: () => "Yeniden aç", tone: "bg-amber-500" },
 ];
 
 /** Tahta DnD'si de aynı kuralları izlesin diye tek kaynak: butonlarda hangi
@@ -39,9 +43,15 @@ export function StatusTransitionBar({
   stage,
   onWonStart,
   onWonError,
+  stageLabels = defaultStageLabels(),
+  onLossRequest,
 }: {
   dealId: string;
   stage: string;
+  /** Ofisin görünen aşama adları. */
+  stageLabels?: StageLabels;
+  /** Kayıp geçişi neden seçimi gerektirir: verilirse diyalog çağırana aittir (tetikleyen düğme odağı için verilir). */
+  onLossRequest?: (trigger: HTMLElement | null) => void;
   /** Won geçişi başlarken (server onayı beklenmeden) — kutlama sihirbazını açar; verildiğinde won toast'ı atlanır. */
   onWonStart?: () => void;
   /** Won geçişi hata verirse — sihirbaz kapatılır (mevcut geri sarma korunur). */
@@ -56,14 +66,22 @@ export function StatusTransitionBar({
 
   if (options.length === 0) return null;
 
+  const nameOf = (s: DealStage) => stageLabels[s].label;
+
   function run(to: DealStage) {
+    // Kayıp: neden seçilmeden geçiş yapılmaz (eski sabit "Durum geçişi" metni kaldırıldı).
+    if (to === "lost") {
+      if (!onLossRequest) return;
+      setOpen(false);
+      onLossRequest(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+      return;
+    }
     // Kutlama sihirbazı optimistic açılır — server onayı beklenmez
     if (to === "won") onWonStart?.();
     startTransition(async () => {
       const fd = new FormData();
       fd.set("deal_id", dealId);
       fd.set("stage", to);
-      if (to === "lost") fd.set("loss_reason", "Durum geçişi");
       const res = await updateDealStage(fd);
       if (res.error) {
         push(res.error, "err");
@@ -104,7 +122,7 @@ export function StatusTransitionBar({
             className="text-xs font-semibold"
           >
             <span className={`h-2 w-2 rounded-full ${option.tone}`} aria-hidden="true" />
-            {option.label}
+            {option.label(nameOf)}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

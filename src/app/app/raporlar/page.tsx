@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import { createClient } from "@/lib/supabase/server";
-import { getDefinitionsOrDefault, toLabelMap } from "@/lib/definitions";
+import { getDefinitionsOrDefault, getLossReasonOptions, toLabelMap } from "@/lib/definitions";
+import { lossReasonGroupLabel, lossReasonLabels } from "@/lib/loss-reason";
 import { defaultLabelMap } from "@/lib/definition-defaults";
 import { requireModulePage } from "@/lib/require-module-page";
 import { InteractiveChart } from "@/components/app/interactive-chart";
@@ -107,9 +108,10 @@ export default async function ReportsPage() {
   // Tanımlar RPC ile paralel başlar (eskiden RPC'den SONRA seri bekleniyordu).
   const sourceDefsPromise = getDefinitionsOrDefault("customer_source");
   // Ağır toplulaştırma: kısa TTL tenant-tag cache (src/lib/reporting/cache.ts).
-  const [aggregateResult, sourceDefs] = await Promise.all([
+  const [aggregateResult, sourceDefs, lossOptions] = await Promise.all([
     getTenantReportingAggregates(supabase, tenantId, clockNow()),
     sourceDefsPromise,
+    getLossReasonOptions(),
   ]);
   const aggregate = requireReportingData(
     "tenant-reporting-aggregates",
@@ -164,11 +166,18 @@ export default async function ReportsPage() {
   const sourceMax = Math.max(1, ...sourceBars.map((b) => b.count));
 
   // Kayıp nedeni raporu — neden × adet + kaybedilen toplam değer
-  const allLossRows = aggregate.loss_reasons.map((row) => ({
-    reason: row.reason,
-    count: Number(row.deal_count),
-    value: Number(row.deal_value),
-  }));
+  // Nedenler `loss_reason` tanımına bağlanır: "<değer>" ve "<değer> | not" aynı etiket altında toplanır;
+  // eski serbest metin kayıtlar kendi adıyla ayrı satırda görünmeye devam eder.
+  const lossLabels = lossReasonLabels(lossOptions);
+  const lossGroups = new Map<string, { reason: string; count: number; value: number }>();
+  for (const row of aggregate.loss_reasons) {
+    const reason = lossReasonGroupLabel(row.reason, lossLabels);
+    const g = lossGroups.get(reason) ?? { reason, count: 0, value: 0 };
+    g.count += Number(row.deal_count);
+    g.value += Number(row.deal_value);
+    lossGroups.set(reason, g);
+  }
+  const allLossRows = [...lossGroups.values()];
   const lostCount = allLossRows.reduce((sum, row) => sum + row.count, 0);
   const lostValue = allLossRows.reduce((sum, row) => sum + row.value, 0);
   const lossRows = allLossRows
