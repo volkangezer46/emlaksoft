@@ -58,7 +58,7 @@ export function PropertyTable({
 }) {
   return (
     <div className="hidden md:block">
-      <TableFrame minWidth={canBulk ? 980 : 940} density={density} maxHeight="75vh">
+      <TableFrame minWidth={canBulk ? 1040 : 1000} density={density} maxHeight="75vh">
         <Table>
           <THead sticky>
             <TR>
@@ -72,7 +72,7 @@ export function PropertyTable({
               <TH className="hidden xl:table-cell">Konum</TH>
               <TH align="right">Fiyat</TH>
               <TH>Durum</TH>
-              <TH className="hidden xl:table-cell">Fiyat sağlığı</TH>
+              <TH className="hidden min-w-[9.5rem] xl:table-cell">Fiyat sağlığı</TH>
               <TH className="hidden 2xl:table-cell">Portal</TH>
               <TH className="hidden 2xl:table-cell">Eklenme</TH>
               <TH align="right">

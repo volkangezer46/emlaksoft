@@ -13,6 +13,8 @@ export type AdminHealth = {
   ok: boolean;
   cronTotal: number | null;
   cronErrors: number | null;
+  /** Son çalışması hatalı biten cron işlerinin adları (en çok 3): kart hangi iş olduğunu söyler. */
+  failedJobs?: string[];
   lastCronAt: string | null;
 };
 
@@ -31,7 +33,7 @@ const cachedBadges = unstable_cache(
       admin.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress", "waiting"]),
       admin.from("tenants").select("id", { count: "exact", head: true }).in("status", ["past_due", "suspended"]),
       admin.from("demo_requests").select("id", { count: "exact", head: true }).eq("status", "new"),
-      admin.from("cron_heartbeats").select("last_status, last_run_at"),
+      admin.from("cron_heartbeats").select("job, last_status, last_run_at"),
     ]);
     const dbMs = Math.max(0, now() - t0);
     const cronRows = cronRes.error ? null : (cronRes.data ?? []);
@@ -44,11 +46,12 @@ const cachedBadges = unstable_cache(
         ok: !ticketRes.error && !riskRes.error && !salesRes.error,
         cronTotal: cronRows ? cronRows.length : null,
         cronErrors: cronRows ? cronRows.filter((r) => r.last_status === "error").length : null,
+        failedJobs: cronRows ? cronRows.filter((r) => r.last_status === "error").map((r) => String(r.job)).slice(0, 3) : [],
         lastCronAt: cronRows && cronRows.length ? cronRows.map((r) => String(r.last_run_at)).sort().at(-1) ?? null : null,
       },
     };
   },
-  ["admin-sidebar-badges-v2"],
+  ["admin-sidebar-badges-v3"],
   { revalidate: 30, tags: ["admin-badges"] },
 );
 

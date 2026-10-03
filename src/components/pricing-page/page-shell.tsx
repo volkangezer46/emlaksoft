@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { SiteHeader } from "@/components/site-header";
+import "@/app/marketing.css";
+import "@/app/marketing-sections.css";
 
 /**
- * /fiyatlar için sade üst bar ve alt bilgi (sunucu bileşeni, istemci JS yok).
- * Ana sayfanın başlığı sayfa-içi bağlantılar kullandığından burada kullanılmaz.
+ * /fiyatlar için ortak üst menü (SiteHeader, ana sayfayla aynı) ve alt bilgi.
  */
 export function PricingShell({ children }: { children: ReactNode }) {
   return (
@@ -14,24 +16,10 @@ export function PricingShell({ children }: { children: ReactNode }) {
       >
         İçeriğe geç
       </a>
-      <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
-          <Link href="/" aria-label="EmlakSoft ana sayfa" className="font-display text-lg font-extrabold text-ink-950">
-            EmlakSoft
-          </Link>
-          <nav aria-label="Fiyat sayfası" className="flex items-center gap-1 text-sm font-semibold">
-            <Link href="/giris" className="inline-flex min-h-11 items-center rounded-[var(--radius-control)] px-3 text-ink-950 hover:bg-surface-2">
-              Giriş
-            </Link>
-            <Link
-              href="/demo"
-              className="hidden min-h-11 items-center rounded-[var(--radius-control)] px-3 text-ink-950 hover:bg-surface-2 sm:inline-flex"
-            >
-              Demo talep et
-            </Link>
-          </nav>
-        </div>
-      </header>
+      {/* Ana sayfayla AYNI üst menü (ortak SiteHeader); .mk yalnız başlığın stil kapsamıdır. */}
+      <div className="mk">
+        <SiteHeader />
+      </div>
       <main id="icerik">{children}</main>
       <footer className="border-t border-line bg-surface-2">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-text-muted sm:px-6">

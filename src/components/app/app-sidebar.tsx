@@ -9,7 +9,7 @@ import { ICONS } from "@/lib/icons";
 import { findActiveNavigationHref } from "@/lib/navigation";
 import { resolveActiveNav, visibleSections, type NavItem, type VisibleSection } from "@/lib/nav-config";
 import type { NavBadge, PlanUsageRow } from "@/lib/nav-badges";
-import { getHrefStore, pushRecent, togglePin } from "@/lib/nav-memory";
+import { getHrefStore, MAX_RECENT_SHOWN, pushRecent, togglePin } from "@/lib/nav-memory";
 import { getAppActions, OPEN_PALETTE_EVENT } from "@/lib/palette-core";
 import type { AppModule } from "@/lib/permissions";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
@@ -83,7 +83,12 @@ export function AppSidebar({
   const itemByHref = useMemo(() => new Map(sections.flatMap((s) => s.items).map((i) => [i.href, i])), [sections]);
   // Yetki süzgeci: bellekteki yol menüde (yetkili) yoksa görünmez.
   const pinnedItems = pins.flatMap((h) => itemByHref.get(h) ?? []);
-  const recentItems = recents.filter((h) => !pins.includes(h) && h !== activeHref).flatMap((h) => itemByHref.get(h) ?? []).slice(0, 4);
+  // Son kullanılanlar: tekil, sabitlenmiş/aktif olmayan, aktif başlığın zaten görünen öğeleri hariç; en çok 3 satır.
+  const activeSectionHrefs = new Set(activeSection?.items.map((i) => i.href) ?? []);
+  const recentItems = [...new Set(recents)]
+    .filter((h) => !pins.includes(h) && h !== activeHref && !activeSectionHrefs.has(h))
+    .flatMap((h) => itemByHref.get(h) ?? [])
+    .slice(0, MAX_RECENT_SHOWN);
 
   const creatable = creatableModules ?? accessibleModules;
   const actionsFor = (section: VisibleSection) => {
@@ -180,7 +185,7 @@ export function AppSidebar({
 
   const renderContent = (variant: "desktop" | "drawer") => (
     <>
-      <div className="sb-head flex h-14 items-center gap-3 border-b border-white/8 px-4">
+      <div className="sb-head flex min-h-14 shrink-0 items-center gap-3 border-b border-white/8 px-4">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-card)] bg-[image:var(--grad-brand)] font-display text-base font-extrabold text-white shadow-[0_12px_28px_-12px_rgba(34,211,238,.75)]">E</span>
         <div className="sb-label min-w-0 flex-1">
           <p className="font-display text-base font-extrabold leading-5 text-white">EmlakSoft</p>

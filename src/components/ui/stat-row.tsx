@@ -48,7 +48,7 @@ export function StatRow({
             key={`${it.label}-${it.href}`}
             href={it.href}
             className={cn(
-              "focus-ring flex min-h-12 flex-col justify-center rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 transition hover:border-brand-400 hover:bg-surface-2",
+              "focus-ring flex min-h-12 min-w-0 flex-col justify-center rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 transition hover:border-brand-400 hover:bg-surface-2",
               zero && "opacity-60 hover:opacity-100",
             )}
           >
@@ -58,7 +58,7 @@ export function StatRow({
                   {it.icon}
                 </span>
               ) : null}
-              <span className="truncate">{it.label}</span>
+              <span className="line-clamp-2 min-w-0 break-words" title={it.label}>{it.label}</span>
             </span>
             <span className="flex items-baseline gap-1.5">
               <span
@@ -69,7 +69,7 @@ export function StatRow({
               >
                 {shown}
               </span>
-              {it.hint ? <span className="truncate text-xs text-text-muted">{it.hint}</span> : null}
+              {it.hint ? <span className="line-clamp-2 min-w-0 text-xs text-text-muted" title={it.hint}>{it.hint}</span> : null}
             </span>
           </Link>
         );
