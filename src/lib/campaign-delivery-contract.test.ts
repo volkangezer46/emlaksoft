@@ -277,3 +277,26 @@ describe("campaign worker operational contract", () => {
     expect(stored).not.toContain("secret-value");
   });
 });
+
+describe("legacy WhatsApp campaign claim (23514) regression", () => {
+  const fix = read("supabase/migrations/20260816001100_campaign_claim_legacy_whatsapp_fix.sql");
+
+  it("relaxes the template check for terminal states and quarantines invalid campaigns before claiming", () => {
+    expect(fix).toMatch(/status::text in \('failed', 'done'\)/);
+    expect(fix.indexOf("last_error = 'whatsapp_template_invalid'")).toBeGreaterThan(-1);
+    expect(fix.indexOf("whatsapp_template_invalid")).toBeLessThan(fix.indexOf("for update skip locked"));
+  });
+
+  it("detects template-contract violations on the client", async () => {
+    const { isCampaignViolatingTemplateContract: bad } = await import("@/lib/campaign-delivery");
+    expect(bad({ channel: "whatsapp", message: "x", whatsapp_template_name: null, whatsapp_template_language: null })).toBe(true);
+    expect(bad({ channel: "whatsapp", message: "x", whatsapp_template_name: "hos_geldin", whatsapp_template_language: "tr" })).toBe(false);
+    expect(bad({ channel: "whatsapp", message: "x".repeat(613), whatsapp_template_name: "a", whatsapp_template_language: "tr" })).toBe(true);
+    expect(bad({ channel: "sms", message: "x", whatsapp_template_name: null, whatsapp_template_language: null })).toBe(false);
+  });
+
+  it("worker survives a check violation instead of throwing every tick", () => {
+    expect(worker).toContain("claimAroundInvalidCampaigns");
+    expect(worker).toContain("quarantinedCampaigns");
+  });
+});

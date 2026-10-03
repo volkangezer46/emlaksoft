@@ -56,6 +56,8 @@ export type CampaignDeliveryWorkerSummary = {
   campaignFailures: number;
   /** Başarısız kampanya parti hatalarının kısa nedenleri (en çok 3; heartbeat ayrıntısında görünür). */
   failureReasons?: string[];
+  /** Şablon sözleşmesine uymadığı için atlanan eski WhatsApp kampanyaları (migration 20260816001100 bunları 'failed' yapar). */
+  quarantinedCampaigns?: number;
   recipientsClaimed: number;
   sent: number;
   blocked: number;
@@ -419,6 +421,76 @@ async function processClaimedCampaign(
   return result;
 }
 
+const CHECK_VIOLATION_CODE = "23514";
+const WHATSAPP_TEMPLATE_NAME_RE = /^[a-z0-9_]{1,512}$/;
+const WHATSAPP_TEMPLATE_LANGUAGE_RE = /^[a-z]{2,3}(_[A-Z]{2})?$/;
+
+/** campaigns_whatsapp_template_contract kısıtının aktif satırlar için istemci tarafı karşılığı. */
+export function isCampaignViolatingTemplateContract(row: {
+  channel: string;
+  message: string | null;
+  whatsapp_template_name: string | null;
+  whatsapp_template_language: string | null;
+}): boolean {
+  if (row.channel === "whatsapp") {
+    return !(
+      row.whatsapp_template_name &&
+      WHATSAPP_TEMPLATE_NAME_RE.test(row.whatsapp_template_name) &&
+      row.whatsapp_template_language &&
+      WHATSAPP_TEMPLATE_LANGUAGE_RE.test(row.whatsapp_template_language) &&
+      (row.message ?? "").length <= 612
+    );
+  }
+  return Boolean(row.whatsapp_template_name || row.whatsapp_template_language);
+}
+
+type CampaignCandidateRow = {
+  id: string;
+  channel: string;
+  message: string | null;
+  whatsapp_template_name: string | null;
+  whatsapp_template_language: string | null;
+};
+
+/**
+ * Genel claim 23514 verdiğinde: bekleyen kampanyaları listeler, kısıtı ihlal edenleri atlar ve
+ * geçerli ilk kampanyayı kimliğiyle claim eder. Böylece tek bozuk kampanya tüm teslimatı durdurmaz.
+ */
+async function claimAroundInvalidCampaigns(
+  admin: ReturnType<typeof createAdminClient>,
+): Promise<{ claim: unknown; quarantined: string[]; error: string | null }> {
+  const quarantined: string[] = [];
+  const { data, error } = await admin
+    .from("campaigns")
+    .select("id, channel, message, whatsapp_template_name, whatsapp_template_language")
+    .in("status", ["sending", "scheduled"])
+    .order("created_at", { ascending: true })
+    .limit(50);
+  if (error) return { claim: null, quarantined, error: error.code ?? "candidate_query" };
+
+  for (const row of (data ?? []) as CampaignCandidateRow[]) {
+    if (isCampaignViolatingTemplateContract(row)) {
+      quarantined.push(row.id);
+      continue;
+    }
+    const { data: claimData, error: claimError } = await admin.rpc("claim_campaign_delivery", {
+      p_campaign_id: row.id,
+      p_tenant_id: null,
+      p_force: false,
+      p_lease_seconds: CAMPAIGN_LEASE_SECONDS,
+    });
+    if (claimError) {
+      if (claimError.code === CHECK_VIOLATION_CODE) {
+        quarantined.push(row.id);
+        continue;
+      }
+      return { claim: null, quarantined, error: claimError.code ?? "unknown" };
+    }
+    if (claimData) return { claim: claimData, quarantined, error: null };
+  }
+  return { claim: null, quarantined, error: null };
+}
+
 /**
  * Claims and processes bounded campaign/recipient batches. The existing
  * claim_campaign_delivery RPC owns campaign concurrency; recipient RPCs own
@@ -455,9 +527,28 @@ export async function runCampaignDeliveryWorker(options?: {
       p_force: false,
       p_lease_seconds: CAMPAIGN_LEASE_SECONDS,
     });
-    if (claimError) throw new Error(`campaign_claim_failed:${claimError.code ?? "unknown"}`);
+    let claimResult: unknown = claimData;
+    if (claimError) {
+      // 23514: eski (şablonsuz) WhatsApp kampanyası claim UPDATE'inde kısıta takılıyor.
+      // Migration uygulanana dek bozuk kampanyayı atlayıp geçerli kampanyaları işle.
+      if (claimError.code !== CHECK_VIOLATION_CODE) {
+        throw new Error(`campaign_claim_failed:${claimError.code ?? "unknown"}`);
+      }
+      const fallback = await claimAroundInvalidCampaigns(admin);
+      summary.quarantinedCampaigns = (summary.quarantinedCampaigns ?? 0) + fallback.quarantined.length;
+      if (fallback.quarantined.length > 0 && (summary.failureReasons ?? []).length < 3) {
+        summary.failureReasons = [
+          ...(summary.failureReasons ?? []),
+          `campaign_claim_check_violation:atlanan=${fallback.quarantined.slice(0, 3).join(",")}`,
+        ];
+      }
+      if (fallback.error) {
+        throw new Error(`campaign_claim_failed:${fallback.error}`);
+      }
+      claimResult = fallback.claim;
+    }
 
-    const campaign = parseCampaignClaim(claimData);
+    const campaign = parseCampaignClaim(claimResult);
     if (!campaign) break;
     summary.campaignsClaimed += 1;
 

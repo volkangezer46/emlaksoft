@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const healthy = summary.campaignFailures === 0;
     await recordHeartbeat(
       "campaign-delivery",
-      healthy ? "ok" : "error",
+      healthy && !summary.quarantinedCampaigns ? "ok" : "error",
       JSON.stringify(summary),
     );
     return NextResponse.json(
