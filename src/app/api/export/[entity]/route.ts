@@ -6,6 +6,8 @@ import { logActivity } from "@/lib/activity";
 import { EXPORT_ENTITIES, isFullExportEntity } from "@/lib/export-entities";
 import { EXPORT_QUERIES, openFullCsvStream } from "@/lib/export-full";
 import { daysAgoIso } from "@/lib/clock";
+import { getEffectivePermissions } from "@/lib/permissions-effective";
+import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 
 // Tam dışa aktarma akışı: sayfa sayfa okur, en fazla ~50 sn sürer.
 export const maxDuration = 60;
@@ -42,11 +44,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ entity:
     });
   }
 
+  // B1: komisyon/denetim akışı yalnız earnings_all sahibine ofis geneli açılır.
+  const seeAllEarnings =
+    !gate.impersonating &&
+    canSeeAllEarnings(await getEffectivePermissions(gate.tenantId, gate.role, gate.userId));
+
   const filename = `${def.filenameBase}-tam-${daysAgoIso(0).slice(0, 10)}.csv`;
   const supabase = await createClient();
   const opened = await openFullCsvStream({
     supabase,
-    gate: { tenantId: gate.tenantId, userId: gate.userId, role: gate.role },
+    gate: { tenantId: gate.tenantId, userId: gate.userId, role: gate.role, seeAllEarnings },
     def,
     buildQuery: EXPORT_QUERIES[entity]!,
     onDone: async (summary) => {
