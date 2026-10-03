@@ -288,14 +288,15 @@ export const loadDeals = cache(async () => {
     .from("deals")
     .select("stage, deal_value, assigned_to, updated_at")
     .gte("updated_at", daysAgoIso(90))
-    .limit(100);
+    .order("updated_at", { ascending: false }) // kırpma belirleyici: en yeni anlaşmalar
+    .limit(1000);
   assertQueryBatchSucceeded([result], ["deals"], "Ana panel");
   return (result.data ?? []) as DealRow[];
 });
 
 export const loadProfiles = cache(async () => {
   const supabase = await createClient();
-  const result = await supabase.from("profiles").select("id, full_name, role").limit(50);
+  const result = await supabase.from("profiles").select("id, full_name, role").order("full_name").limit(500);
   assertQueryBatchSucceeded([result], ["profiles"], "Ana panel");
   return result.data ?? [];
 });

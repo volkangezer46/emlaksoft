@@ -5,6 +5,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatRow } from "@/components/ui/stat-row";
 import { EmptyState } from "@/components/app/empty-state";
+import { handoffEditableScopes } from "@/lib/team/handoff";
 import { MemberHandoff } from "../[id]/member-handoff";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -23,6 +24,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export default async function TeamHandoffPage({ searchParams }: { searchParams?: Promise<{ from?: string }> }) {
   const { tenantId, perms } = await requireModulePage("team", "/app/ekip");
   const canHandoff = (perms.team ?? []).includes("edit");
+  const editableScopes = handoffEditableScopes(perms);
   const sp = (await searchParams) ?? {};
   const fromParam = UUID_RE.test(sp.from ?? "") ? sp.from! : "";
 
@@ -74,7 +76,7 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
       <PageHeader
         eyebrow="Ekip Merkezi"
         title="Devir ve atama"
-        description="Bir danışmanın müşteri ve portföylerini başka bir danışmana devredin. Her devir denetim kaydına yazılır."
+        description="Bir danışmanın müşteri, portföy, açık anlaşma, görev ve randevularını başka bir danışmana devredin. Her devir denetim kaydına yazılır."
       />
 
       {failed ? (
@@ -161,8 +163,7 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
                           fromId={m.id}
                           fromName={m.full_name}
                           advisors={others}
-                          customerCount={c}
-                          propertyCount={p}
+                          editableScopes={editableScopes}
                         />
                       </div>
                     ) : null}
@@ -173,8 +174,8 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
           </ul>
 
           <p className="text-xs text-text-faint">
-            Devir kapsamı: aktif müşteriler ve portföyler. Talep, görev, randevu ve açık anlaşmalar bugün devredilmez; bunlar ilgili
-            kayıttan tek tek yeniden atanır.
+            Devir kapsamı panelde seçilir: müşteri (açık talepler dahil), portföy, açık anlaşma, açık görev ve yaklaşan randevu. Her kalem için ilgili
+            modülde düzenleme yetkisi gerekir; gerekçe zorunludur ve denetim kaydına yazılır.
           </p>
         </>
       )}

@@ -55,6 +55,7 @@ import {
   type KpiItem,
   type ViewOption,
 } from "@/components/ui/list-kit";
+import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
 import { AppointmentMobileList, AppointmentTable, type AppointmentVM } from "./appointment-rows";
 import {
   APPOINTMENT_STATUS_LABELS,
@@ -157,8 +158,7 @@ export default async function AppointmentsPage({
     sp.gorunum === "hafta" || sp.gorunum === "gun" || sp.gorunum === "rota" ? sp.gorunum : "ay";
   // Rota görünümü: ?gun=bugun|yarin (varsayılan bugün), ?danisman= yönetici filtresi
   const rotaGun: "bugun" | "yarin" = sp.gun === "yarin" ? "yarin" : "bugun";
-  const YONETICI_ROLES = ["owner", "gm", "branch_manager", "team_lead"];
-  const isYonetici = YONETICI_ROLES.includes(gate.role);
+  const isYonetici = MANAGEMENT_TIER_ROLES.includes(gate.role as TeamRole);
   // Danışman filtresi (Ekip Merkezi / Kıyas bağlantıları): yalnız yönetici rolleri; doğrulanmış uuid.
   const danismanF = isYonetici ? uuidParam(sp.danisman) : "";
   const tarihMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(sp.tarih ?? "");

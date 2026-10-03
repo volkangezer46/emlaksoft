@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getEffectivePermissions } from "@/lib/permissions-effective";
 import type { AppModule, AppRole } from "@/lib/permissions";
+import { PERMISSION_EDITOR_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
 import { MODULE_LABELS, RolePermissionsMatrix } from "./role-permissions-matrix";
 import { UserExceptions, type ExceptionMember, type OverrideRow } from "./user-exceptions";
 
@@ -61,7 +62,7 @@ export default async function RolePermissionsPage({
   const params = (await searchParams) ?? {};
   const activeTab = params.tab === "istisnalar" ? "istisnalar" : "roller";
   const selectedRole = (ROLES.some((r) => r.value === params.role) ? params.role : "advisor") as AppRole;
-  const isManager = ctx.role === "owner" || ctx.role === "gm";
+  const isManager = PERMISSION_EDITOR_ROLES.includes(ctx.role as TeamRole);
   const isOwnerRole = selectedRole === "owner";
 
   const supabase = await createClient();

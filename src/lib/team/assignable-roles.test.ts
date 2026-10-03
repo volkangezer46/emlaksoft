@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignableRolesFor, canManageRole } from "./assignable-roles";
+import { MANAGEMENT_TIER_ROLES, OFFICE_WIDE_ROLES, assignableRolesFor, canManageRole } from "./assignable-roles";
 
 describe("rol atama kuralı", () => {
   it("owner hiç kimse tarafından atanamaz", () => {
@@ -16,5 +16,10 @@ describe("rol atama kuralı", () => {
   it("yönetici olmayan rol atayamaz", () => {
     expect(assignableRolesFor("advisor")).toEqual([]);
     expect(canManageRole("team_lead", "advisor")).toBe(false);
+  });
+  it("rol kümeleri tek kaynaktan: ofis geneli yönetim kademesinin alt kümesi", () => {
+    for (const r of OFFICE_WIDE_ROLES) expect(MANAGEMENT_TIER_ROLES).toContain(r);
+    expect(MANAGEMENT_TIER_ROLES).toContain("team_lead");
+    expect(OFFICE_WIDE_ROLES).not.toContain("team_lead");
   });
 });

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { ArrowLeftRight, ArrowUpRight, Building2, CalendarDays, FileText, PhoneCall, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatTurkishPhone } from "@/lib/phone";
-import { now } from "@/lib/clock";
+import { now, trDayKey } from "@/lib/clock";
 import { StatRow, type StatRowItem } from "@/components/ui/stat-row";
 import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import { getStageLabels } from "@/lib/definitions";
@@ -22,6 +22,7 @@ import {
 } from "@/lib/team/advisor-360";
 import { loadLeadData, loadMonthKpis } from "./advisor-data";
 import { MemberHandoff } from "./member-handoff";
+import type { HandoffScope } from "@/lib/team/handoff";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -84,7 +85,7 @@ function monthEarnings(rows: CommissionRow[], fullName: string, id: string, star
 /* Özet                                                                        */
 /* -------------------------------------------------------------------------- */
 
-export async function OverviewTab({ ctx, canHandoff }: { ctx: Ctx; canHandoff: boolean }) {
+export async function OverviewTab({ ctx, canHandoff, editableScopes }: { ctx: Ctx; canHandoff: boolean; editableScopes: HandoffScope[] }) {
   const { supabase, id, fullName, showEarnings, commissions } = ctx;
   const ranges = monthRanges(now());
 
@@ -138,9 +139,9 @@ export async function OverviewTab({ ctx, canHandoff }: { ctx: Ctx; canHandoff: b
       {canHandoff ? (
         <Section title="İş yükünü devret" icon={<ArrowLeftRight className="h-4 w-4 text-brand-600" />}>
           <p className="mb-3 text-xs text-text-muted">
-            {fullName} ekipten ayrılıyorsa müşteri ve portföylerini başka bir danışmana aktarın; hiçbir kayıt sahipsiz kalmasın.
+            {fullName} ekipten ayrılıyorsa müşteri, portföy, açık anlaşma, görev ve randevularını başka bir danışmana aktarın; hiçbir kayıt sahipsiz kalmasın.
           </p>
-          <MemberHandoff fromId={id} fromName={fullName} advisors={advisors} customerCount={customerCount} propertyCount={propertyCount} />
+          <MemberHandoff fromId={id} fromName={fullName} advisors={advisors} editableScopes={editableScopes} />
         </Section>
       ) : null}
 
@@ -545,8 +546,8 @@ export async function CoachTab({ ctx }: { ctx: Ctx }) {
       .select("id", { count: "exact", head: true })
       .eq("assigned_to", id)
       .is("deleted_at", null)
-      .gte("authorization_end", todayIso.slice(0, 10))
-      .lte("authorization_end", new Date(now() + 15 * 86_400_000).toISOString().slice(0, 10)),
+      .gte("authorization_end", trDayKey(todayIso))
+      .lte("authorization_end", trDayKey(now() + 15 * 86_400_000)),
   ]);
   const actions: CoachActionWithLink[] = buildCoachActions({
     customerCount: customerCountRes.count ?? 0,

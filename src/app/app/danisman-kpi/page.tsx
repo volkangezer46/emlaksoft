@@ -228,7 +228,7 @@ export default async function DanismanKpiPage({
     { count: soguyanMusteri },
     { data: office },
   ] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, role").limit(50),
+    supabase.from("profiles").select("id, full_name, role").order("full_name").limit(500),
     kpiPromise,
     loadKpisForRange(supabase, prevMonth.toISOString(), monthStart.toISOString(), { scoreOnly: true }),
     supabase

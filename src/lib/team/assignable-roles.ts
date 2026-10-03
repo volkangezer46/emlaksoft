@@ -12,7 +12,16 @@ export type TeamRole =
   | "accounting"
   | "readonly";
 
+/**
+ * Rol kümeleri — TEK kaynak (denetim B14). Başka yerde elle rol listesi yazma:
+ *  - MANAGER_ROLES / OFFICE_WIDE_ROLES: ofis geneli veri kapsamı + rol atama yetkisi (owner, gm, branch_manager).
+ *  - MANAGEMENT_TIER_ROLES: yönetim kademesi = ofis geneli + team_lead (onay kararı, randevu danışman filtresi).
+ */
 export const MANAGER_ROLES: readonly TeamRole[] = ["owner", "gm", "branch_manager"];
+export const OFFICE_WIDE_ROLES: readonly TeamRole[] = MANAGER_ROLES;
+export const MANAGEMENT_TIER_ROLES: readonly TeamRole[] = [...MANAGER_ROLES, "team_lead"];
+/** İzin matrisini/istisnalarını düzenleyebilen roller (owner, gm). */
+export const PERMISSION_EDITOR_ROLES: readonly TeamRole[] = ["owner", "gm"];
 
 export const ASSIGNABLE_ROLES: readonly TeamRole[] = [
   "gm",

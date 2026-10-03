@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CalendarClock, ListChecks, ShieldAlert, Flame, ArrowUpRight, MapPin, Clock3 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
-import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
+import { daysAgoIso, daysFromNowIso, trDayKey } from "@/lib/clock";
 
 import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Günlük Brifing" };
@@ -39,8 +39,8 @@ export default async function BrifingPage() {
     .select("id, property_code, title, authorization_end")
     .eq("status", "live")
     .not("authorization_end", "is", null)
-    .gte("authorization_end", daysAgoIso(0).slice(0, 10))
-    .lte("authorization_end", daysFromNowIso(14).slice(0, 10))
+    .gte("authorization_end", trDayKey())
+    .lte("authorization_end", trDayKey(daysFromNowIso(14)))
     .order("authorization_end", { ascending: true })
     .limit(12);
   if (!officeWide) {

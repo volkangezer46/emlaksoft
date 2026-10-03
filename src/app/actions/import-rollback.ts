@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { logActivity } from "@/lib/activity";
 import type { ImportTarget } from "@/lib/import-rows";
 import {
@@ -166,6 +167,9 @@ export async function rollbackImport(batchId: string): Promise<RollbackResult> {
   // Hedefi bilmeden yetki kontrolü yapılamaz: önce görüntüleme kapısı, sonra hedefe özel silme kapısı.
   const base = await requirePermission("customers", "view");
   if (!base.ok) return { error: base.error };
+  // Hız sınırı: çift tık / döngüyle tekrar geri alma denemelerini keser.
+  const rate = await checkRateLimit(`import-rollback:${base.userId}`, { limit: 10, windowSec: 10 * 60, failurePolicy: "deny" });
+  if (!rate.allowed) return { error: "Çok fazla geri alma isteği gönderildi. Birkaç dakika sonra tekrar deneyin." };
   const supabase = await createClient();
 
   const readLogs = () =>

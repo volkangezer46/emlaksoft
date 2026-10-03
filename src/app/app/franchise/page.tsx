@@ -15,7 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { computeOfficeScore, loadOfficeScoreInputs } from "@/lib/office-score";
 import { moneyTry } from "@/lib/leak-shield";
-import { daysAgoIso } from "@/lib/clock";
+import { trDayKey } from "@/lib/clock";
 import { StatCard } from "@/components/app/stat-card";
 import { ChartFrame, BarCompare } from "@/app/app/_ui/lazy-chart";
 import { Table, TableFrame, TBody, TD, TFoot, TH, THead, TR } from "@/components/ui/table";
@@ -63,7 +63,7 @@ export default async function FranchiseBiPage({
   const toIso = toF ? `${toF}T23:59:59.999` : null;
 
   // Hızlı çipler — clock.ts üzerinden bugünün ISO'su; render'da Date kurulmaz.
-  const today = daysAgoIso(0).slice(0, 10);
+  const today = trDayKey();
   const yil = today.slice(0, 4);
   const ayNo = Number(today.slice(5, 7));
   const ceyrekAy = String(Math.floor((ayNo - 1) / 3) * 3 + 1).padStart(2, "0");
