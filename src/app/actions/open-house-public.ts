@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { isPast } from "@/lib/clock";
 import { notifyTenant } from "@/lib/notify";
-import { isValidTurkishMobile, normalizeTurkishPhone, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 
 export type PublicCheckinResult = {
@@ -42,7 +42,8 @@ export async function registerOpenHouseVisitorByToken(fd: FormData): Promise<Pub
 
   if (!UUID_RE.test(token)) return { error: "Geçersiz bağlantı." };
   if (!fullName || fullName.length > 160) return { error: "Geçerli bir ad soyad girin." };
-  if (!isValidTurkishMobile(phoneRaw)) return { error: TR_MOBILE_ERROR_MESSAGE };
+  const phoneParsed = parsePhone(phoneRaw);
+  if (!phoneParsed.ok) return { error: phoneParsed.error ?? PHONE_ERROR_MESSAGE };
   if (!kvkk) return { error: "Devam etmek için KVKK onayı gereklidir." };
 
   // Token tahmini / spam koruması — IP başına dakikada 10 kayıt denemesi.
@@ -94,7 +95,7 @@ export async function registerOpenHouseVisitorByToken(fd: FormData): Promise<Pub
     return { error: "Bu açık ev etkinliği sona erdi." };
   }
 
-  const phone = normalizeTurkishPhone(phoneRaw);
+  const phone = phoneParsed.stored;
 
   // Mükerrer kayıt engeli (etkinlik + telefon): aynı ziyaretçi QR'ı ikinci kez
   // okutursa yeni satır ve yeni bildirim üretme — teşekkür ekranını yine göster.

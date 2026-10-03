@@ -1,7 +1,8 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isValidOptionalTurkishMobile, normalizeTurkishPhone } from "@/lib/phone";
+import { EMAIL_ERROR_MESSAGE, isValidOptionalEmail, normalizeEmail } from "@/lib/email";
+import { parsePhone } from "@/lib/phone";
 import { notifyTenant } from "@/lib/notify";
 import { buildLeadCommunication } from "@/lib/lead-message";
 import { isPublicTenantActive } from "@/lib/public-tenant";
@@ -87,8 +88,13 @@ async function pickAssignee(
 export async function intakeLead(token: string, input: LeadInput): Promise<LeadResult> {
   const fullName = input.fullName?.trim();
   if (!fullName) return { ok: false, error: "Ad soyad zorunlu.", status: 400 };
-  if (input.phone && !isValidOptionalTurkishMobile(input.phone)) {
+  // customers.phone DB'de yalnız TR cep (05XXXXXXXXX) kabul eder; yabancı numara için migration gerekir.
+  const phoneParsed = input.phone?.trim() ? parsePhone(input.phone) : null;
+  if (phoneParsed && (!phoneParsed.ok || phoneParsed.country !== "TR" || phoneParsed.kind !== "mobile")) {
     return { ok: false, error: "Geçerli bir Türk cep telefonu girin.", status: 400 };
+  }
+  if (!isValidOptionalEmail(input.email)) {
+    return { ok: false, error: EMAIL_ERROR_MESSAGE, status: 400 };
   }
 
   const admin = createAdminClient();
@@ -107,7 +113,7 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
   }
 
   const tenantId = tenant.id as string;
-  const phone = input.phone ? normalizeTurkishPhone(input.phone) : "";
+  const phone = phoneParsed?.stored ?? "";
   const channel = (input.channel || "web_form").slice(0, 40);
   const source = (input.source || channel).slice(0, 80);
 
@@ -140,7 +146,7 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
         tenant_id: tenantId,
         full_name: fullName,
         phone: phone || null,
-        email: input.email?.trim() || null,
+        email: normalizeEmail(input.email) || null,
         customer_types: input.customer_types?.length ? input.customer_types : ["alici"],
         province_id: input.provinceId || null,
         source,

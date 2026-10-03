@@ -14,11 +14,8 @@ import {
 import { restoreImpersonationMetadata } from "@/lib/impersonation";
 import { bootstrapPlatformStaffIfAllowed } from "@/lib/platform";
 import { sendSms } from "@/lib/messaging/netgsm";
-import {
-  isValidOptionalTurkishMobile,
-  normalizeTurkishPhone,
-  TR_MOBILE_ERROR_MESSAGE,
-} from "@/lib/phone";
+import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
+import { parsePhone, PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -49,12 +46,15 @@ export async function signIn(
   _prev: AuthResult,
   formData: FormData,
 ): Promise<AuthResult> {
-  const email = String(formData.get("email") ?? "").trim();
+  const email = normalizeEmail(String(formData.get("email") ?? ""));
   const password = String(formData.get("password") ?? "");
   const next = String(formData.get("next") ?? "/app");
 
   if (!email || !password) {
     return { error: "E-posta ve şifre gerekli." };
+  }
+  if (!isValidEmail(email)) {
+    return { error: EMAIL_ERROR_MESSAGE };
   }
 
   const ip = await clientIp();
@@ -310,7 +310,7 @@ export async function signUp(
 ): Promise<AuthResult> {
   const fullName = String(formData.get("name") ?? "").trim();
   const rawPhone = String(formData.get("phone") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const email = normalizeEmail(String(formData.get("email") ?? ""));
   const password = String(formData.get("password") ?? "");
   const company = String(formData.get("company") ?? "").trim();
   const requestedTeamSize = String(formData.get("agents") ?? "2-10");
@@ -337,11 +337,18 @@ export async function signUp(
   if (!allowed) {
     return { error: "Çok fazla kayıt denemesi. Lütfen bir süre sonra tekrar deneyin." };
   }
-  if (!isValidOptionalTurkishMobile(rawPhone)) {
-    return { error: TR_MOBILE_ERROR_MESSAGE };
+  if (!isValidEmail(email)) {
+    return { error: EMAIL_ERROR_MESSAGE };
   }
-
-  const phone = rawPhone ? normalizeTurkishPhone(rawPhone) : "";
+  // profiles.phone şu an DB'de yalnız TR cep (05XXXXXXXXX) kabul eder (profiles_phone_tr_format);
+  // 2FA SMS'i de Netgsm (yalnız TR) ile gider. Yabancı numara için migration gerekir.
+  let phone = "";
+  if (rawPhone) {
+    const parsed = parsePhone(rawPhone);
+    if (!parsed.ok) return { error: parsed.error ?? PHONE_ERROR_MESSAGE };
+    if (parsed.country !== "TR" || parsed.kind !== "mobile") return { error: TR_MOBILE_ERROR_MESSAGE };
+    phone = parsed.stored;
+  }
   const teamSize = normalizeRegistrationTeamSize(requestedTeamSize);
   const plan = registrationPlanForTeamSize(requestedPlan, teamSize);
   const billingCycle = normalizeBillingCycle(requestedCycle);

@@ -5,6 +5,7 @@ import { useActionState, useState } from "react";
 import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
 import { signIn, type AuthResult } from "@/app/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { EmailInput } from "@/components/ui/email-input";
 import { DemoQuickLogin } from "./demo-quick-login";
 
 const initial: AuthResult = {};
@@ -33,10 +34,9 @@ export function LoginForm({ next, demoEnabled }: { next: string; demoEnabled: bo
             </label>
             <div className="relative">
               <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-              <input
+              <EmailInput
                 id="email"
                 name="email"
-                type="email"
                 required
                 autoComplete="email"
                 autoFocus

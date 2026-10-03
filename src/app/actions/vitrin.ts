@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { notifyTenant } from "@/lib/notify";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
-import { isValidTurkishMobile, normalizeTurkishPhone, formatTurkishPhone } from "@/lib/phone";
+import { formatPhoneDisplay, parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { isPast } from "@/lib/clock";
 
 /**
@@ -47,13 +47,14 @@ export async function createVitrinSavedSearch(input: SavedSearchInput): Promise<
 
   const slug = (input.slug ?? "").trim();
   const txType = input.txType === "kiralik" ? "kiralik" : input.txType === "satilik" ? "satilik" : null;
-  const phone = normalizeTurkishPhone(input.phone);
+  const phoneParsed = parsePhone(input.phone);
+  const phone = phoneParsed.stored;
 
   if (!slug || !txType || !input.provinceId) {
     return { ok: false, error: "Lütfen işlem türü ve il seçin." };
   }
-  if (!isValidTurkishMobile(phone)) {
-    return { ok: false, error: "Geçerli bir cep telefonu girin (05XX XXX XX XX)." };
+  if (!phoneParsed.ok) {
+    return { ok: false, error: phoneParsed.error ?? PHONE_ERROR_MESSAGE };
   }
 
   const ip = await clientIp();
@@ -128,7 +129,7 @@ export async function createVitrinSavedSearch(input: SavedSearchInput): Promise<
   await notifyTenant({
     tenantId: tenant.id,
     title: "Kayıtlı arama bırakıldı",
-    body: `${name ?? "Bir ziyaretçi"} vitrinde arama kaydetti (${criteria}). Telefon: ${formatTurkishPhone(phone)}`,
+    body: `${name ?? "Bir ziyaretçi"} vitrinde arama kaydetti (${criteria}). Telefon: ${formatPhoneDisplay(phone)}`,
     href: "/app/talepler",
     kind: "info",
     prefKey: "savedSearch",

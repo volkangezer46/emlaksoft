@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { CheckCircle2, Loader2, UserPlus } from "lucide-react";
 import { registerOpenHouseVisitorByToken } from "@/app/actions/open-house-public";
-import { sanitizeTurkishPhoneInput, TR_MOBILE_PLACEHOLDER } from "@/lib/phone";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 const inputCls =
   "w-full rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-3 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400";
@@ -13,9 +13,8 @@ const inputCls =
  * Açık ev self check-in formu + teşekkür ekranı.
  *
  * NEDEN CLIENT: server action sonucu sayfa yenilenmeden gösterilir
- * (confirm-buttons deseni). Telefonda basit maske: sadece rakam, 11 hane,
- * 0 ile başlar (sanitizeTurkishPhoneInput) — public sayfada ağır PhoneInput
- * bileşenine gerek yok.
+ * (confirm-buttons deseni). Telefon: uluslararası PhoneInput (varsayılan Türkiye);
+ * yabancı numara için ülke seçici.
  *
  * KİOSK MODU (?kiosk=1): tablet kapıda sabit durur; teşekkür ekranından 4 sn
  * sonra form otomatik sıfırlanır ki sıradaki ziyaretçi kaydolabilsin.
@@ -103,16 +102,13 @@ export function CheckinForm({ token, kiosk }: { token: string; kiosk: boolean })
         <label htmlFor="checkin-phone" className="mb-1.5 block text-xs font-semibold text-text-muted">
           Cep telefonu *
         </label>
-        <input
+        <PhoneInput
           id="checkin-phone"
           name="phone"
           required
-          type="tel"
-          inputMode="numeric"
           autoComplete="tel-national"
-          placeholder={TR_MOBILE_PLACEHOLDER}
           value={phone}
-          onChange={(e) => setPhone(sanitizeTurkishPhoneInput(e.target.value))}
+          onValueChange={setPhone}
           className={`${inputCls} numeric`}
         />
       </div>

@@ -54,4 +54,18 @@ describe("checkout buyer validation", () => {
     };
     expect(() => validateCheckoutBuyer(input)).toThrow();
   });
+
+  it("accepts a valid international phone as E.164 and rejects garbage", () => {
+    const base = {
+      id: "buyer-2",
+      fullName: "Hans Müller",
+      email: "hans@example.de",
+      identityNumber: "10000000146",
+      address: "Bağdat Caddesi No: 42",
+      city: "İstanbul",
+      ip: "203.0.113.9",
+    };
+    expect(validateCheckoutBuyer({ ...base, phone: "+49 151 23456789" }).buyer.gsmNumber).toBe("+4915123456789");
+    expect(() => validateCheckoutBuyer({ ...base, phone: "abc" })).toThrow("telefon");
+  });
 });

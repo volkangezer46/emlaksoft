@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { notifyTenant } from "@/lib/notify";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
-import { isValidTurkishMobile, normalizeTurkishPhone, formatTurkishPhone } from "@/lib/phone";
+import { formatPhoneDisplay, parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
 
 /**
  * Vitrin fiyat alarmı — "Fiyat düşünce haber ver".
@@ -39,10 +39,11 @@ export async function createVitrinPriceAlert(input: PriceAlertInput): Promise<Pr
   const propertyId = (input.propertyId ?? "").trim();
   if (!slug || !UUID_RE.test(propertyId)) return { ok: false, error: "Geçersiz ilan." };
 
-  const phone = normalizeTurkishPhone(input.phone);
-  if (!isValidTurkishMobile(phone)) {
-    return { ok: false, error: "Geçerli bir cep telefonu girin (05XX XXX XX XX)." };
+  const phoneParsed = parsePhone(input.phone);
+  if (!phoneParsed.ok) {
+    return { ok: false, error: phoneParsed.error ?? PHONE_ERROR_MESSAGE };
   }
+  const phone = phoneParsed.stored;
 
   const ip = await clientIp();
   const { allowed } = await checkRateLimit(`vitrin-price-alert:${ip}`, {
@@ -102,7 +103,7 @@ export async function createVitrinPriceAlert(input: PriceAlertInput): Promise<Pr
   await notifyTenant({
     tenantId: tenant.id,
     title: `Fiyat alarmı: ${label} için ${name ?? "bir ziyaretçi"}`,
-    body: `Vitrinde fiyat düşüş alarmı kuruldu (baz: ${new Intl.NumberFormat("tr-TR").format(price)} ₺). Telefon: ${formatTurkishPhone(phone)}`,
+    body: `Vitrinde fiyat düşüş alarmı kuruldu (baz: ${new Intl.NumberFormat("tr-TR").format(price)} ₺). Telefon: ${formatPhoneDisplay(phone)}`,
     href: `/app/portfoyler/${property.id}`,
     kind: "info",
     prefKey: "priceDrop",
