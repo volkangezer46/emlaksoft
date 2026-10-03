@@ -19,6 +19,7 @@ import { KpiSatiri } from "./_home/kpi-satiri";
 import { HedefKarti } from "./_home/hedef-karti";
 import { KiralamaProje } from "./_home/kiralama-proje";
 import { KomisyonAkisi } from "./_home/komisyon-akisi";
+import { DonemTrend } from "./_home/donem-trend";
 import { Huni } from "./_home/huni";
 import { PortalSagligi, Ekip } from "./_home/portal-ekip";
 import { CanliAkis } from "./_home/canli-akis";
@@ -92,82 +93,103 @@ export default async function AppHomePage({
         {/* Müşteri + portföy yokken tüm dolu bloklar yerine tek "Başlayalım" kartı */}
         <Suspense fallback={<PanelIskelet rows={2} />}>
           <BosOfisKapisi ctx={ctx}>
-        {/* Ürün turu hedefi: bugünün işleri */}
-        <div data-tour="brifing">
-          <Suspense fallback={<PanelIskelet rows={2} />}>
-            <BugunOzet ctx={ctx} />
-          </Suspense>
-        </div>
+        {/* BENTO (xl 12 sütun / md 6 / mobil 1). Sıra önem sırasıdır: bugün kuyruğu → para →
+            KPI → trend/hedef → çalışma blokları → hat/akış → ekip/müşteri. */}
+        <div className="pm-bento">
+          {/* Ürün turu hedefi: bugünün işleri */}
+          <div data-tour="brifing" className="md:col-span-6 xl:col-span-5">
+            <Suspense fallback={<BlokIskelet className="h-[24rem]" />}>
+              <BugunOzet ctx={ctx} />
+            </Suspense>
+          </div>
+          <div className="md:col-span-6 xl:col-span-7">
+            <Suspense fallback={<BlokIskelet className="h-[24rem]" />}>
+              <KomisyonAkisi ctx={ctx} />
+            </Suspense>
+          </div>
 
-        {/* Çalışma verisi: görev + randevu + kayıp-kaçak (ilk ekran) */}
-        <div data-tour="aksiyonlar" className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-          <Suspense fallback={<PanelIskelet />}>
-            <Gorevler ctx={ctx} />
-          </Suspense>
-          <Suspense fallback={<PanelIskelet />}>
-            <Randevular ctx={ctx} />
-          </Suspense>
-          <Suspense fallback={<PanelIskelet />}>
-            <KayipKacak ctx={ctx} />
-          </Suspense>
-        </div>
+          <div data-tour="kpi" className="md:col-span-6 xl:col-span-12">
+            <Suspense
+              fallback={
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <SkeletonCard key={i} />
+                  ))}
+                </div>
+              }
+            >
+              <KpiSatiri ctx={ctx} />
+            </Suspense>
+          </div>
 
-        <div data-tour="kpi">
-          <Suspense
-            fallback={
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <SkeletonCard key={i} />
-                ))}
-              </div>
-            }
-          >
-            <KpiSatiri ctx={ctx} />
-          </Suspense>
-        </div>
+          <div className="md:col-span-6 xl:col-span-8">
+            <Suspense fallback={<BlokIskelet className="h-[21rem]" />}>
+              <DonemTrend ctx={ctx} />
+            </Suspense>
+          </div>
+          <div className="md:col-span-6 xl:col-span-4">
+            <Suspense fallback={<BlokIskelet className="h-[21rem]" />}>
+              <HedefKarti ctx={ctx} />
+            </Suspense>
+          </div>
 
-        <Suspense fallback={null}>
-          <HedefKarti ctx={ctx} />
-        </Suspense>
+          {/* Çalışma verisi: randevu + görev + kayıp-kaçak */}
+          <>
+            <div data-tour="aksiyonlar" className="md:col-span-3 xl:col-span-4">
+              <Suspense fallback={<PanelIskelet />}>
+                <Randevular ctx={ctx} />
+              </Suspense>
+            </div>
+            <div className="md:col-span-3 xl:col-span-4">
+              <Suspense fallback={<PanelIskelet />}>
+                <Gorevler ctx={ctx} />
+              </Suspense>
+            </div>
+            <div className="md:col-span-6 xl:col-span-4">
+              <Suspense fallback={<PanelIskelet />}>
+                <KayipKacak ctx={ctx} />
+              </Suspense>
+            </div>
+          </>
 
-        <Suspense fallback={null}>
-          <KiralamaProje ctx={ctx} />
-        </Suspense>
+          <div className="md:col-span-6 xl:col-span-12 empty:hidden">
+            <Suspense fallback={null}>
+              <KiralamaProje ctx={ctx} />
+            </Suspense>
+          </div>
 
-        <div className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
-          <Suspense fallback={<BlokIskelet className="h-80" />}>
-            <KomisyonAkisi ctx={ctx} />
-          </Suspense>
-          <Suspense fallback={<BlokIskelet className="h-80" />}>
-            <Huni />
-          </Suspense>
-        </div>
+          <div className="md:col-span-6 xl:col-span-5">
+            <Suspense fallback={<BlokIskelet className="h-80" />}>
+              <Huni />
+            </Suspense>
+          </div>
+          <div className="md:col-span-6 xl:col-span-7">
+            <Suspense fallback={<BlokIskelet className="h-80" />}>
+              <CanliAkis ctx={ctx} />
+            </Suspense>
+          </div>
 
-        <div className="grid gap-4 xl:grid-cols-3">
-          <Suspense fallback={<PanelIskelet />}>
-            <PortalSagligi />
-          </Suspense>
-          <Suspense fallback={<PanelIskelet />}>
-            <Ekip ctx={ctx} />
-          </Suspense>
-          <Suspense fallback={<PanelIskelet />}>
-            <CanliAkis ctx={ctx} />
-          </Suspense>
-        </div>
-
-        {!tvMode && (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="md:col-span-3 xl:col-span-4">
+            <Suspense fallback={<PanelIskelet />}>
+              <PortalSagligi />
+            </Suspense>
+          </div>
+          <div className="md:col-span-3 xl:col-span-4">
+            <Suspense fallback={<PanelIskelet />}>
+              <Ekip ctx={ctx} />
+            </Suspense>
+          </div>
+          <div className="md:col-span-6 xl:col-span-4">
             <Suspense fallback={<PanelIskelet />}>
               <SonMusteriler />
             </Suspense>
-            <HizliAksiyonlar />
           </div>
-        )}
-        {tvMode && (
-          <Suspense fallback={<PanelIskelet />}>
-            <SonMusteriler />
-          </Suspense>
-        )}
+          {!tvMode && (
+            <div className="md:col-span-6 xl:col-span-12">
+              <HizliAksiyonlar />
+            </div>
+          )}
+        </div>
           </BosOfisKapisi>
         </Suspense>
       </div>

@@ -5,8 +5,10 @@ import { hasSeries } from "./premium-math";
 
 /**
  * GlassKpi — HeroBanner içinde cam efektli KPI kutusu (yarı saydam + backdrop-blur).
- * `href` ZORUNLU (sıfır çıkmaz metrik). Sağdaki MiniBars yalnız GERÇEK seri verilirse
- * çizilir. `subTone`: alt satır dikkat tonu ("danger" kırmızımsı, "warn" altın).
+ * `href` ZORUNLU (sıfır çıkmaz metrik). Sağ üstteki MiniBars yalnız GERÇEK seri
+ * verilirse çizilir; yoksa yalnız ikon + değer. Etiket ve değer KISALMAZ: etiket
+ * satır kırar, değer akıcı yazı boyutuyla kutuya sığar. `subTone`: alt satır dikkat
+ * tonu ("danger" kırmızımsı, "warn" altın). Kutu sabit min-yükseklikte (CLS yok).
  */
 export function GlassKpi({
   label,
@@ -29,22 +31,23 @@ export function GlassKpi({
   seriesUnit?: string;
   seriesLabel?: string;
 }) {
+  const drawBars = hasSeries(series);
   return (
-    <Link href={href} className="pm-glass focus-ring">
+    <Link href={href} className="pm-glass focus-ring" data-series={drawBars ? "1" : undefined}>
       <span className="pm-glass-ico" aria-hidden="true">
         <Icon />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="pm-glass-label line-clamp-2 block" title={typeof label === "string" ? label : undefined}>{label}</span>
-        <span className="pm-glass-value block whitespace-nowrap">{value}</span>
+        <span className="pm-glass-label block">{label}</span>
+        <span className="pm-glass-value block">{value}</span>
         {sub ? (
-          <span className="pm-glass-sub line-clamp-2 block" data-tone={subTone}>
+          <span className="pm-glass-sub block" data-tone={subTone}>
             {sub}
           </span>
         ) : null}
       </span>
-      {hasSeries(series) ? (
-        <MiniBars data={series} onDark unit={seriesUnit} label={seriesLabel} width={52} height={34} className="hidden xl:block" />
+      {drawBars ? (
+        <MiniBars data={series} onDark unit={seriesUnit} label={seriesLabel} width={48} height={26} className="pm-glass-bars" />
       ) : null}
     </Link>
   );

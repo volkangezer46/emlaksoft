@@ -64,7 +64,7 @@ export async function CanliAkis({ ctx }: { ctx: HomeCtx }) {
 
   return (
     <Widget id="akis" className="h-full">
-      <section className="dashboard-panel surface-card h-full rounded-[var(--radius-panel)] p-5">
+      <section className="pm-bx h-full p-5">
         <div className="flex items-center justify-between">
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
