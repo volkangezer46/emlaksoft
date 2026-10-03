@@ -2,16 +2,10 @@
 
 import { formatTrTime, trDayKey } from "@/lib/clock";
 import { useState, useTransition } from "react";
-import { CalendarClock, TriangleAlert } from "lucide-react";
+import { CalendarClock, MapPin, TriangleAlert } from "lucide-react";
 import { updateAppointment } from "@/app/actions/appointments";
 import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogHeader,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 
 type TypeOption = { value: string; label: string };
 type Appointment = {
@@ -47,7 +41,7 @@ export function AppointmentEditDialog({
   const types = typeOptions && typeOptions.length > 0 ? typeOptions : DEFAULT_TYPES;
   const { date, time } = localParts(appointment.scheduled_at);
 
-  function onSubmit(fd: FormData) {
+  function submit(fd: FormData) {
     setError(null);
     startTransition(async () => {
       const res = await updateAppointment(fd);
@@ -61,120 +55,88 @@ export function AppointmentEditDialog({
     });
   }
 
-  /*
-   * Radix Dialog'a taşındı. Elle kurulum Esc'i hallediyordu ama FOCUS TRAP ve
-   * SCROLL LOCK yoktu. createPortal + useEffect + dialogRef üçlüsü de artık
-   * gereksiz — Radix hepsini kendisi yapıyor.
-   */
+  const fieldClass =
+    "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300";
+  /* Popup yok: sayfa içi sekme alanı. onSubmit kipi: hatada/çakışmada girilen değerler korunur. */
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <InlineTabbedPanel
+      open={open}
+      onOpenChange={setOpen}
+      title="Randevuyu ertele / düzenle"
+      icon={<CalendarClock />}
+      onSubmit={submit}
+      pending={pending}
+      error={error}
+      submitLabelOverride={conflictWarning ? "Yine de kaydet" : undefined}
+      hiddenFields={<input type="hidden" name="id" value={appointment.id} />}
+      fieldLabels={{ appointment_type: "Tür", date: "Tarih", time: "Saat", duration_min: "Süre (dk)", location: "Konum", notes: "Not" }}
+      trigger={({ onClick, ...aria }) => (
         <button
           type="button"
+          onClick={onClick}
+          {...aria}
           className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-canvas px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300"
         >
           <CalendarClock className="h-3 w-3" /> Ertele
         </button>
-      </DialogTrigger>
-
-      <DialogContent size="sm">
-        <DialogHeader icon={<CalendarClock />} title="Randevuyu ertele / düzenle" />
-        <form action={onSubmit} className="grid gap-3 p-4 md:p-6">
-                <input type="hidden" name="id" value={appointment.id} />
-                <select
-                  name="appointment_type"
-                  defaultValue={appointment.appointment_type}
-                  className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
-                >
-                  {types.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="text-xs font-semibold text-text-muted">
-                    Tarih
-                    <input
-                      name="date"
-                      type="date"
-                      required
-                      defaultValue={date}
-                      className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
-                    />
-                  </label>
-                  <label className="text-xs font-semibold text-text-muted">
-                    Saat
-                    <input
-                      name="time"
-                      type="time"
-                      required
-                      defaultValue={time}
-                      className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
-                    />
-                  </label>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    name="duration_min"
-                    type="number"
-                    min="0"
-                    step="5"
-                    defaultValue={appointment.duration_min ?? ""}
-                    placeholder="Süre (dk)"
-                    className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
-                  />
-                  <input
-                    name="location"
-                    defaultValue={appointment.location ?? ""}
-                    placeholder="Konum"
-                    className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
-                  />
-                </div>
-                <textarea
-                  name="notes"
-                  rows={2}
-                  defaultValue={appointment.notes ?? ""}
-                  placeholder="Not (opsiyonel)"
-                  className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
-                />
-          {/* Çakışma freni bandı — kayıt yapılmadı, ikinci gönderim confirm_conflict ile geçer */}
-          {conflictWarning && (
-            <div
-              className="flex items-start gap-2.5 rounded-[var(--radius-card)] border border-amber-400/50 bg-amber-400/10 px-4 py-3 text-xs font-medium leading-relaxed text-amber-700"
-              role="alert"
-            >
-              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-              <span>
-                <strong>{conflictWarning}</strong> Değişiklik henüz kaydedilmedi — yine de istiyorsanız
-                &quot;Yine de kaydet&quot; ile devam edin.
-              </span>
-              <input type="hidden" name="confirm_conflict" value="1" />
-            </div>
-          )}
-          {/* Palet dışı red-600 → danger-600, role="alert" eklendi */}
-          {error && (
-            <p className="text-xs font-semibold text-danger-600" role="alert">{error}</p>
-          )}
-          <div className="hairline-t mt-1 flex justify-end gap-2 pt-4">
-            <DialogClose asChild>
-              <button
-                type="button"
-                className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
-              >
-                Vazgeç
-              </button>
-            </DialogClose>
-            <button
-              type="submit"
-              disabled={pending}
-              className="btn-shine focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
-            >
-              {pending ? "Kaydediliyor…" : conflictWarning ? "Yine de kaydet" : "Kaydet"}
-            </button>
+      )}
+      notice={
+        conflictWarning ? (
+          <div
+            className="mt-4 flex items-start gap-2.5 rounded-[var(--radius-card)] border border-amber-400/50 bg-amber-400/10 px-4 py-3 text-xs font-medium leading-relaxed text-amber-700"
+            role="alert"
+          >
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+            <span>
+              <strong>{conflictWarning}</strong> Değişiklik henüz kaydedilmedi — yine de istiyorsanız
+              &quot;Yine de kaydet&quot; ile devam edin.
+            </span>
+            <input type="hidden" name="confirm_conflict" value="1" />
           </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+        ) : null
+      }
+      tabs={[
+        { id: "zaman", label: "Zaman", icon: CalendarClock, fields: ["appointment_type", "date", "time", "duration_min"] },
+        { id: "detay", label: "Konum ve not", icon: MapPin, fields: ["location", "notes"] },
+      ]}
+      panels={{
+        zaman: (
+          <>
+            <label className="text-xs font-semibold text-text-muted sm:col-span-2">
+              Tür
+              <select name="appointment_type" defaultValue={appointment.appointment_type} className={`mt-1 ${fieldClass}`}>
+                {types.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-text-muted">
+              Tarih
+              <input name="date" type="date" required defaultValue={date} className={`mt-1 ${fieldClass}`} />
+            </label>
+            <label className="text-xs font-semibold text-text-muted">
+              Saat
+              <input name="time" type="time" required defaultValue={time} className={`mt-1 ${fieldClass}`} />
+            </label>
+            <label className="text-xs font-semibold text-text-muted">
+              Süre (dk)
+              <input name="duration_min" type="number" min="0" step="5" defaultValue={appointment.duration_min ?? ""} className={`mt-1 ${fieldClass}`} />
+            </label>
+          </>
+        ),
+        detay: (
+          <>
+            <label className="text-xs font-semibold text-text-muted sm:col-span-2">
+              Konum
+              <input name="location" defaultValue={appointment.location ?? ""} className={`mt-1 ${fieldClass}`} />
+            </label>
+            <label className="text-xs font-semibold text-text-muted sm:col-span-2">
+              Not
+              <textarea name="notes" rows={3} defaultValue={appointment.notes ?? ""} placeholder="Not (opsiyonel)" className={`mt-1 ${fieldClass}`} />
+            </label>
+          </>
+        ),
+      }}
+    />
   );
 }

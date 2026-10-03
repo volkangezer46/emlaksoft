@@ -97,3 +97,32 @@ describe("accessible sales and operations dialog contract", () => {
     expect(dialog).toContain("<DialogPrimitive.Content");
   });
 });
+
+const inlinePanelFlows = [
+  "src/app/app/gorevler/task-edit-dialog.tsx",
+  "src/app/app/randevular/appointment-edit-dialog.tsx",
+  "src/app/app/musteriler/[id]/edit-customer-dialog.tsx",
+  "src/app/app/musteriler/[id]/edit-demand-dialog.tsx",
+  "src/app/app/portfoyler/[id]/edit-property-dialog.tsx",
+  "src/app/app/giderler/expense-edit-dialog.tsx",
+  "src/app/app/teklifler/[id]/offer-edit-dialog.tsx",
+  "src/app/app/hedefler/target-form-dialog.tsx",
+] as const;
+
+describe("inline panel (popup yerine sayfa içi sekme alanı) sözleşmesi", () => {
+  it.each(inlinePanelFlows)("%s popup değil InlineTabbedPanel kullanır", (file) => {
+    const content = source(file);
+    expect(content).toContain("<InlineTabbedPanel");
+    expect(content).not.toContain("@/components/ui/dialog");
+    expect(content).not.toContain("<DialogContent");
+    expect(content).not.toContain("createPortal");
+  });
+
+  it("panel modal değildir ve layout'ta yuvası vardır", () => {
+    const panel = source("src/components/ui/inline-tabbed-panel.tsx");
+    expect(panel).not.toContain("@radix-ui/react-dialog");
+    expect(panel).not.toContain("aria-modal");
+    expect(panel).toContain("Ctrl/⌘+Enter");
+    expect(source("src/app/app/layout.tsx")).toContain('id="inline-panel-host"');
+  });
+});

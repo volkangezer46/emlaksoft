@@ -2,15 +2,9 @@
 
 import { useActionState, useState } from "react";
 import { toTrLocalInput } from "@/lib/clock";
-import { Pencil } from "lucide-react";
+import { CalendarClock, ListTodo, Pencil } from "lucide-react";
 import { updateTask, type TaskResult } from "@/app/actions/tasks";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogHeader,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 
 type Task = {
   id: string;
@@ -72,122 +66,104 @@ export function TaskEditDialog({
     },
     {},
   );
-  /*
-   * Radix Dialog'a taşındı. Elle kurulum Esc'i hallediyordu ama FOCUS TRAP ve
-   * SCROLL LOCK yoktu. createPortal + useEffect + dialogRef üçlüsü de artık
-   * gereksiz — Radix hepsini kendisi yapıyor.
-   */
+  const fieldClass =
+    "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300";
+  /* Popup yok: sayfa içi sekme alanı (InlineTabbedPanel). Action ve alan adları değişmedi. */
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {variant === "overlay" ? (
+    <InlineTabbedPanel
+      open={open}
+      onOpenChange={setOpen}
+      title="Görevi düzenle"
+      description={task.title}
+      icon={<Pencil />}
+      action={action}
+      pending={pending}
+      error={state.error}
+      hiddenFields={<input type="hidden" name="id" value={task.id} />}
+      fieldLabels={{ title: "Başlık", kind: "Tür", priority: "Öncelik", due_at: "Son tarih", recurrence: "Tekrar", notes: "Not" }}
+      trigger={({ onClick, ...aria }) =>
+        variant === "overlay" ? (
           <button
             type="button"
+            onClick={onClick}
+            {...aria}
             aria-label={`${task.title} görevini düzenle`}
             className="focus-ring absolute inset-0 cursor-pointer rounded-[var(--radius-card)]"
           />
         ) : (
           <button
             type="button"
+            onClick={onClick}
+            {...aria}
             aria-label="Görevi düzenle"
             className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline text-text-muted transition hover:border-brand-300"
           >
             <Pencil className="h-4 w-4" />
           </button>
-        )}
-      </DialogTrigger>
-
-      <DialogContent size="sm">
-        <DialogHeader icon={<Pencil />} title="Görevi düzenle" />
-        <form action={action} className="grid gap-3 p-6">
-                <input type="hidden" name="id" value={task.id} />
-                <input
-                  name="title"
-                  required
-                  defaultValue={task.title}
-                  placeholder="Görev başlığı"
-                  className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <select
-                    name="kind"
-                    defaultValue={task.kind}
-                    className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
-                  >
-                    {KINDS.map((k) => (
-                      <option key={k.value} value={k.value}>
-                        {k.label}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    name="priority"
-                    defaultValue={task.priority}
-                    className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
-                  >
-                    {PRIORITIES.map((p) => (
-                      <option key={p.value} value={p.value}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <label className="text-xs font-semibold text-text-muted">
-                  Son tarih
-                  <input
-                    name="due_at"
-                    type="datetime-local"
-                    value={due}
-                    onChange={(e) => setDue(e.target.value)}
-                    className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
-                  />
-                </label>
-                <label className="text-xs font-semibold text-text-muted">
-                  Tekrar
-                  <select
-                    name="recurrence"
-                    defaultValue={task.recurrence ?? ""}
-                    disabled={!due}
-                    className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {RECURRENCES.map((r) => (
-                      <option key={r.value} value={r.value}>
-                        {r.label}
-                      </option>
-                    ))}
-                  </select>
-                  {!due ? <span className="mt-1 block font-normal text-text-faint">Tekrar için önce son tarih seçin.</span> : null}
-                </label>
-                <textarea
-                  name="notes"
-                  rows={2}
-                  defaultValue={task.notes ?? ""}
-                  placeholder="Not (opsiyonel)"
-                  className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
-                />
-                {/* Palet disi red-600 -> danger-600, role="alert" eklendi */}
-                {state.error && (
-                  <p className="text-xs font-semibold text-danger-600" role="alert">{state.error}</p>
-                )}
-                <div className="hairline-t mt-1 flex justify-end gap-2 pt-4">
-                  <DialogClose asChild>
-                    <button
-                      type="button"
-                      className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
-                    >
-                      Vazgeç
-                    </button>
-                  </DialogClose>
-                  <button
-                    type="submit"
-                    disabled={pending}
-                    className="btn-shine focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
-                  >
-                    {pending ? "Kaydediliyor…" : "Kaydet"}
-                  </button>
-                </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+        )
+      }
+      tabs={[
+        { id: "genel", label: "Genel", icon: ListTodo, fields: ["title", "kind", "priority", "notes"] },
+        { id: "zaman", label: "Zamanlama", icon: CalendarClock, fields: ["due_at", "recurrence"] },
+      ]}
+      panels={{
+        genel: (
+          <>
+            <label className="text-xs font-semibold text-text-muted sm:col-span-2">
+              Başlık
+              <input name="title" required defaultValue={task.title} placeholder="Görev başlığı" className={`mt-1 ${fieldClass}`} />
+            </label>
+            <label className="text-xs font-semibold text-text-muted">
+              Tür
+              <select name="kind" defaultValue={task.kind} className={`mt-1 ${fieldClass}`}>
+                {KINDS.map((k) => (
+                  <option key={k.value} value={k.value}>{k.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-text-muted">
+              Öncelik
+              <select name="priority" defaultValue={task.priority} className={`mt-1 ${fieldClass}`}>
+                {PRIORITIES.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-text-muted sm:col-span-2">
+              Not
+              <textarea name="notes" rows={3} defaultValue={task.notes ?? ""} placeholder="Not (opsiyonel)" className={`mt-1 ${fieldClass}`} />
+            </label>
+          </>
+        ),
+        zaman: (
+          <>
+            <label className="text-xs font-semibold text-text-muted">
+              Son tarih
+              <input
+                name="due_at"
+                type="datetime-local"
+                value={due}
+                onChange={(e) => setDue(e.target.value)}
+                className={`mt-1 ${fieldClass}`}
+              />
+            </label>
+            <label className="text-xs font-semibold text-text-muted">
+              Tekrar
+              <select
+                name="recurrence"
+                defaultValue={task.recurrence ?? ""}
+                disabled={!due}
+                className={`mt-1 ${fieldClass} disabled:cursor-not-allowed disabled:opacity-60`}
+              >
+                {RECURRENCES.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+              {!due ? <span className="mt-1 block font-normal text-text-faint">Tekrar için önce son tarih seçin.</span> : null}
+            </label>
+          </>
+        ),
+      }}
+    />
   );
 }
