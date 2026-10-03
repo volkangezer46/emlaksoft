@@ -33,7 +33,7 @@ export function Pricing() {
       <div className="mx-auto mt-8 flex w-fit items-center gap-1 rounded-[var(--radius-card)] border border-line bg-surface p-1.5 shadow-[var(--shadow-sm)]">
         <span
           className={`rounded-[var(--radius-control)] px-3 py-2 text-sm font-semibold transition ${
-            yearly ? "text-text-muted" : "bg-ink-950 text-white shadow-[var(--shadow-xs)]"
+            yearly ? "text-text-muted" : "bg-[var(--ink-950)] text-white shadow-[var(--shadow-xs)]"
           }`}
         >
           Aylık
