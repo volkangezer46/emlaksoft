@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -173,65 +174,57 @@ export default async function ContractDetailPage({
       </Link>
 
       {/* Hero */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="relative flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-brand-300">
-              <FileSignature className="h-3.5 w-3.5" />
-              {TYPE_LABELS[contract.contract_type] ?? contract.contract_type}
-            </p>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">{contract.title}</h1>
-            <p className="mt-2 text-sm text-white/60">Oluşturuldu: {relDate(contract.created_at)}</p>
-          </div>
+      <PageHeader
+        eyebrow={TYPE_LABELS[contract.contract_type] ?? contract.contract_type}
+        title={contract.title}
+        description={`Oluşturuldu: ${relDate(contract.created_at)}`}
+        meta={
           <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${statusInfo.cls}`}>
             {statusInfo.icon} {statusInfo.label}
           </span>
-        </div>
-
-        {/* Meta */}
-        <div className="relative mt-5 flex flex-wrap gap-4">
-          {customerName && (
-            <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-2 text-sm">
-              <User className="h-4 w-4 text-mint-400" />
-              <span className="text-white/80">Müşteri:</span>
-              <span className="font-semibold text-white">
-                {customerRel?.id ? (
-                  <Link href={`/app/musteriler/${customerRel.id}`} className="focus-ring rounded-[var(--radius-control)] hover:underline">
-                    {customerName}
-                  </Link>
-                ) : (
-                  customerName
-                )}
-              </span>
-            </div>
-          )}
-          {propertyName && (
-            <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-2 text-sm">
-              <Building2 className="h-4 w-4 text-cyan-400" />
-              <span className="text-white/80">Portföy:</span>
-              <span className="font-semibold text-white">
-                {propertyRel?.id ? (
-                  <Link href={`/app/portfoyler/${propertyRel.id}`} className="focus-ring rounded-[var(--radius-control)] hover:underline">
-                    {propertyName}
-                  </Link>
-                ) : (
-                  propertyName
-                )}
-              </span>
-            </div>
-          )}
-          {contract.expires_at && (
-            <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-2 text-sm">
-              <Clock className="h-4 w-4 text-amber-400" />
-              <span className="text-white/80">Son geçerlilik:</span>
-              <span className="font-semibold text-white">
-                {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(contract.expires_at))}
-              </span>
-            </div>
-          )}
-        </div>
-      </section>
+        }
+      />
+      <div className="mb-6 flex flex-wrap gap-3">
+        {customerName && (
+          <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-3 py-2 text-sm shadow-[var(--shadow-xs)]">
+            <User className="h-4 w-4 text-mint-700" />
+            <span className="text-text-muted">Müşteri:</span>
+            <span className="font-semibold text-text">
+              {customerRel?.id ? (
+                <Link href={`/app/musteriler/${customerRel.id}`} className="focus-ring rounded-[var(--radius-control)] hover:underline">
+                  {customerName}
+                </Link>
+              ) : (
+                customerName
+              )}
+            </span>
+          </div>
+        )}
+        {propertyName && (
+          <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-3 py-2 text-sm shadow-[var(--shadow-xs)]">
+            <Building2 className="h-4 w-4 text-brand-700" />
+            <span className="text-text-muted">Portföy:</span>
+            <span className="font-semibold text-text">
+              {propertyRel?.id ? (
+                <Link href={`/app/portfoyler/${propertyRel.id}`} className="focus-ring rounded-[var(--radius-control)] hover:underline">
+                  {propertyName}
+                </Link>
+              ) : (
+                propertyName
+              )}
+            </span>
+          </div>
+        )}
+        {contract.expires_at && (
+          <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-3 py-2 text-sm shadow-[var(--shadow-xs)]">
+            <Clock className="h-4 w-4 text-amber-700" />
+            <span className="text-text-muted">Son geçerlilik:</span>
+            <span className="font-semibold text-text">
+              {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(contract.expires_at))}
+            </span>
+          </div>
+        )}
+      </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-4">

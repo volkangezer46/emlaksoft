@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AlarmClock, ArrowUpRight, CalendarRange, ChevronLeft, ChevronRight, FileSignature, PenLine, Plus } from "lucide-react";
@@ -232,57 +233,46 @@ export default async function SozlesmelerPage({
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-14 h-52 w-52 rounded-full bg-brand-500/25 blur-[90px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-brand-300">
-              <FileSignature className="h-4 w-4" /> Sözleşmeler
+      <PageHeader
+        eyebrow="Sözleşmeler"
+        title="Sözleşme &amp; E-İmza"
+        description="Kira, satış ve diğer sözleşme taslakları oluşturun. İmza linki ile dijital onay alın."
+      />
+      {/* KPI'lar durum filtresine bağlı (tarih aralığı korunur) */}
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          { label: "Toplam", value: total, href: href({ durum: null, yenileme: false }), active: durum === null && !yenileme },
+          { label: "İmzalandı", value: signed, href: href({ durum: "signed" }), active: durum === "signed" },
+          { label: "İmza bekliyor", value: pending, href: href({ durum: "sent" }), active: durum === "sent" },
+          { label: "Süresi yaklaşan", value: expiring.length, href: href({ durum: null, yenileme: true }), active: yenileme },
+        ].map((k) => (
+          <Link
+            key={k.label}
+            href={k.href}
+            aria-current={k.active ? "true" : undefined}
+            className={`focus-ring press lift group block rounded-[var(--radius-card)] border bg-surface p-3 shadow-[var(--shadow-xs)] transition hover:border-brand-400 ${
+              k.active ? "border-brand-400" : "border-line"
+            }`}
+          >
+            <span className="flex items-center justify-between gap-2">
+              <span className="numeric font-display text-2xl font-extrabold text-text">{k.value}</span>
+              <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
             </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">
-              Sözleşme &amp; E-İmza
-            </h1>
-            <p className="mt-1 max-w-lg text-sm text-white/75">
-              Kira, satış ve diğer sözleşme taslakları oluşturun. İmza linki ile dijital onay alın.
-            </p>
+            <p className="text-xs text-text-muted">{k.label}</p>
+          </Link>
+        ))}
+      </div>
+      {signRate != null ? (
+        <div className="mb-6 max-w-md">
+          <div className="flex items-center justify-between text-xs text-text-muted">
+            <span className="flex items-center gap-1.5"><PenLine className="h-3.5 w-3.5 text-mint-700" /> İmza oranı (gönderilen + imzalanan)</span>
+            <span className="numeric font-bold text-text">%{signRate}</span>
           </div>
-          <div className="flex flex-wrap gap-3">
-            {/* KPI'lar durum filtresine bağlı (tarih aralığı korunur) */}
-            {[
-              { label: "Toplam", value: total, href: href({ durum: null, yenileme: false }), active: durum === null && !yenileme },
-              { label: "İmzalandı", value: signed, href: href({ durum: "signed" }), active: durum === "signed" },
-              { label: "İmza bekliyor", value: pending, href: href({ durum: "sent" }), active: durum === "sent" },
-              { label: "Süresi yaklaşan", value: expiring.length, href: href({ durum: null, yenileme: true }), active: yenileme },
-            ].map((k) => (
-              <Link
-                key={k.label}
-                href={k.href}
-                className={`focus-ring press lift group block rounded-[var(--radius-card)] border p-3 transition hover:border-brand-300 ${
-                  k.active ? "border-white/35 bg-white/15" : "border-white/12 bg-white/8"
-                }`}
-              >
-                <span className="flex items-center justify-between gap-2">
-                  <span className="font-display text-2xl font-extrabold text-white">{k.value}</span>
-                  <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                </span>
-                <p className="text-xs text-white/70">{k.label}</p>
-              </Link>
-            ))}
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-2">
+            <div className="h-full rounded-full bg-mint-500 transition-all" style={{ width: `${signRate}%` }} />
           </div>
         </div>
-        {signRate != null ? (
-          <div className="relative mt-5 max-w-md">
-            <div className="flex items-center justify-between text-xs text-white/60">
-              <span className="flex items-center gap-1.5"><PenLine className="h-3.5 w-3.5 text-mint-400" /> İmza oranı (gönderilen + imzalanan)</span>
-              <span className="numeric font-bold text-white">%{signRate}</span>
-            </div>
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
-              <div className="h-full rounded-full bg-mint-500 transition-all" style={{ width: `${signRate}%` }} />
-            </div>
-          </div>
-        ) : null}
-      </section>
+      ) : null}
 
       {/* Yaklaşan süre sonu uyarı şeridi — tıklayınca ?yenileme=1 filtresine iner */}
       {expiring.length > 0 ? (

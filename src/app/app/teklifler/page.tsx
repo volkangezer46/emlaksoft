@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, Banknote, CalendarRange, CheckCircle2, ChevronLeft, ChevronRight, Percent, Plus, Tag, Timer } from "lucide-react";
@@ -199,46 +200,40 @@ export default async function TekliflerPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-brand-300">
-              <Tag className="h-4 w-4" /> Teklif takibi
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Teklifler</h1>
-            <p className="mt-1 text-sm text-white/75">Portföylere gelen teklifleri ve durumlarını izleyin.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            {/* KPI'lar filtreye bağlı: Bekliyor → submitted, Kabul → accepted (tarih aralığı korunur) */}
-            {[
-              { label: "Toplam", value: totalCount, href: href({ durum: null }), active: durum === null },
-              { label: "Bekliyor", value: pending, href: href({ durum: "submitted" }), active: durum === "submitted" },
-              { label: "Kabul edildi", value: accepted, href: href({ durum: "accepted" }), active: durum === "accepted" },
-            ].map((k) => (
-              <Link
-                key={k.label}
-                href={k.href}
-                className={`focus-ring press lift group block rounded-[var(--radius-card)] border p-3 text-center transition hover:border-brand-300 ${
-                  k.active ? "border-white/35 bg-white/15" : "border-white/12 bg-white/8"
-                }`}
-              >
-                <span className="flex items-center justify-between gap-2">
-                  <span className="font-display text-2xl font-extrabold text-white">{k.value}</span>
-                  <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                </span>
-                <p className="text-left text-xs text-white/70">{k.label}</p>
-              </Link>
-            ))}
-            <ExportCsvButton
-              action={exportOffersCsv}
-              label="Dışa aktar"
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
-            />
+      <PageHeader
+        eyebrow="Teklif takibi"
+        title="Teklifler"
+        description="Portföylere gelen teklifleri ve durumlarını izleyin."
+        actions={
+          <>
+            <ExportCsvButton action={exportOffersCsv} label="Dışa aktar" />
             {canCreate ? <ButtonLink href="/app/teklifler/yeni" icon={Plus}>Yeni teklif</ButtonLink> : null}
-          </div>
-        </div>
-      </section>
+          </>
+        }
+      />
+      {/* KPI'lar filtreye bağlı: Bekliyor → submitted, Kabul → accepted (tarih aralığı korunur) */}
+      <div className="mb-6 grid grid-cols-3 gap-3">
+        {[
+          { label: "Toplam", value: totalCount, href: href({ durum: null }), active: durum === null },
+          { label: "Bekliyor", value: pending, href: href({ durum: "submitted" }), active: durum === "submitted" },
+          { label: "Kabul edildi", value: accepted, href: href({ durum: "accepted" }), active: durum === "accepted" },
+        ].map((k) => (
+          <Link
+            key={k.label}
+            href={k.href}
+            aria-current={k.active ? "true" : undefined}
+            className={`focus-ring press lift group block rounded-[var(--radius-card)] border bg-surface p-3 shadow-[var(--shadow-xs)] transition hover:border-brand-400 ${
+              k.active ? "border-brand-400" : "border-line"
+            }`}
+          >
+            <span className="flex items-center justify-between gap-2">
+              <span className="numeric font-display text-2xl font-extrabold text-text">{k.value}</span>
+              <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+            </span>
+            <p className="text-xs text-text-muted">{k.label}</p>
+          </Link>
+        ))}
+      </div>
 
       {totalCount > 0 ? (
         <>

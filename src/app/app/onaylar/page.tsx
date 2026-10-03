@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -216,23 +217,13 @@ export default async function OnaylarPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-mint-500/20 blur-[80px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-mint-400">
-              <ShieldCheck className="h-4 w-4" /> Onay merkezi
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Onaylar</h1>
-            <p className="mt-1 max-w-xl text-sm text-white/60">
-              Müdür onayı gereken işler — komisyon indirimi, olağandışı gider, fiyat değişikliği.
-              Talep, karar ve gerekçe kayıt altında.
-            </p>
-          </div>
-          <ButtonLink href="/app/onaylar/yeni" icon={Plus}>Yeni onay talebi</ButtonLink>
-        </div>
-      </section>
+      <PageHeader
+        eyebrow="Onay merkezi"
+        title="Onaylar"
+        icon={<span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-mint-500/12 text-mint-700"><ShieldCheck className="h-5 w-5" /></span>}
+        description="Müdür onayı gereken işler — komisyon indirimi, olağandışı gider, fiyat değişikliği. Talep, karar ve gerekçe kayıt altında."
+        actions={<ButtonLink href="/app/onaylar/yeni" icon={Plus}>Yeni onay talebi</ButtonLink>}
+      />
 
       {/* KPI şeridi — her kart filtrelenmiş listeye gider */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

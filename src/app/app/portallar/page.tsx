@@ -1,3 +1,5 @@
+import { PageHeader } from "@/components/ui/page-header";
+import { ButtonLink } from "@/components/ui/button";
 import Link from "next/link";
 import { daysAgoIso, msSince, msUntil, DAY_MS } from "@/lib/clock";
 import {
@@ -195,48 +197,39 @@ export default async function PortalsPage({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-cyan-400/20 blur-[80px]" />
-        <div className="relative flex flex-wrap items-center justify-between gap-5">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-mint-400"><span className="status-pulse h-2 w-2 rounded-full bg-mint-400" /> Yayın ağı izleniyor</span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Portal kontrol merkezi</h1>
-            <p className="mt-1 text-sm text-white/60">Teyit, kapanış ve kayıp-kaçak sinyalleri tek operasyon akışında.</p>
-            <Link href="/app/kayip-kacak" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-amber-300 hover:text-amber-200">
-              Kayıp-kaçak panosu <ArrowUpRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-          <div className="flex items-center gap-2">
-            <ExportCsvButton
-              action={exportPortalListingsCsv}
-              label="Dışa aktar"
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
-            />
-            <NewPortalTrigger disabled={propertyOptions.length === 0} />
-          </div>
-        </div>
-        <div className="relative mt-6 grid grid-cols-3 gap-3">
-          {[
-            { label: "Canlı ilan", value: live, icon: RadioTower, tone: "text-mint-400", durum: "live" },
-            { label: "Teyit bekleyen", value: overdue, icon: Clock3, tone: "text-amber-400", durum: "teyit" },
-            { label: "Kapanan", value: removed, icon: Siren, tone: "text-danger-500", durum: "kapali" },
-          ].map((item) => (
-            <Link
-              key={item.label}
-              href={portalHref(item.durum, portal, undefined, propertyF)}
-              className={`focus-ring press group relative block rounded-[var(--radius-card)] border bg-white/5 p-3 backdrop-blur transition hover:border-white/30 ${
-                durum === item.durum ? "border-white/40" : "border-white/10"
-              }`}
-            >
-              <ArrowUpRight className="hover-action absolute right-2 top-2 h-3.5 w-3.5 text-white/50 opacity-0 transition group-hover:opacity-100" />
-              <item.icon className={`h-4 w-4 ${item.tone}`} />
-              <p className="mt-2 font-display text-xl font-extrabold text-white">{item.value}</p>
-              <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
+      <PageHeader
+        eyebrow="Yayın ağı izleniyor"
+        title="Portal kontrol merkezi"
+        description="Teyit, kapanış ve kayıp-kaçak sinyalleri tek operasyon akışında."
+        actions={
+          <>
+            <ButtonLink href="/app/kayip-kacak" variant="secondary" iconRight={ArrowUpRight}>Kayıp-kaçak panosu</ButtonLink>
+            <ExportCsvButton action={exportPortalListingsCsv} label="Dışa aktar" />
+            <NewPortalTrigger variant="solid" disabled={propertyOptions.length === 0} />
+          </>
+        }
+      />
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {[
+          { label: "Canlı ilan", value: live, icon: RadioTower, tone: "text-mint-700", durum: "live" },
+          { label: "Teyit bekleyen", value: overdue, icon: Clock3, tone: "text-amber-700", durum: "teyit" },
+          { label: "Kapanan", value: removed, icon: Siren, tone: "text-danger-500", durum: "kapali" },
+        ].map((item) => (
+          <Link
+            key={item.label}
+            href={portalHref(item.durum, portal, undefined, propertyF)}
+            aria-current={durum === item.durum ? "true" : undefined}
+            className={`focus-ring press group relative block rounded-[var(--radius-card)] border bg-surface p-3 shadow-[var(--shadow-xs)] transition hover:border-brand-400 ${
+              durum === item.durum ? "border-brand-400" : "border-line"
+            }`}
+          >
+            <ArrowUpRight className="hover-action absolute right-2 top-2 h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:opacity-100" />
+            <item.icon className={`h-4 w-4 ${item.tone}`} />
+            <p className="numeric mt-2 font-display text-xl font-extrabold text-text">{item.value}</p>
+            <p className="text-xs text-text-muted">{item.label}</p>
+          </Link>
+        ))}
+      </div>
 
       {propertyOptions.length > 0 ? <NewPortalPanel properties={propertyOptions} /> : null}
 

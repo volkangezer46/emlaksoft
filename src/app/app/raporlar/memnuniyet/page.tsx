@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -127,73 +128,66 @@ export default async function SatisfactionReportPage() {
     .slice(0, 25);
 
   const base = appUrl();
-  const npsTone = nps === null ? "text-white/70" : nps >= 30 ? "text-mint-400" : nps >= 0 ? "text-amber-300" : "text-danger-400";
+  const npsTone = nps === null ? "text-text-muted" : nps >= 30 ? "text-mint-700" : nps >= 0 ? "text-amber-700" : "text-danger-500";
 
   return (
     <div className="space-y-6">
       {/* Hero — rapor merkezi deseni (koyu bant + KPI kartları) */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="relative">
-          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-cyan-400">
-            <Smile className="h-3.5 w-3.5" /> Rapor merkezi · Memnuniyet
-          </p>
-          <h1 className="mt-2 font-display text-3xl font-extrabold">Müşteri memnuniyeti (NPS)</h1>
-          <p className="mt-2 text-sm text-white/60">
-            Kapanış sonrası 0-10 puan anketi · NPS = %destekleyen (9-10) − %kötüleyen (0-6)
-          </p>
-        </div>
-        <div className="relative mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            {
-              label: "NPS skoru",
-              value: nps === null ? "—" : String(nps),
-              sub: nps === null ? "Henüz yanıt yok" : `${promoters} destekleyen · ${passives} pasif · ${detractors} kötüleyen`,
-              icon: Gauge,
-              tone: npsTone,
-              href: "#danisman",
-            },
-            {
-              label: "Yanıt oranı",
-              value: responseRate === null ? "—" : `%${responseRate}`,
-              sub: `${answered.length} yanıt / ${rows.length} anket`,
-              icon: Send,
-              tone: "text-cyan-400",
-              href: "#bekleyen",
-            },
-            {
-              label: "Ortalama puan",
-              value: avg === null ? "—" : avg.toLocaleString("tr-TR"),
-              sub: "0-10 ölçeği",
-              icon: Star,
-              tone: "text-amber-300",
-              href: "#yorumlar",
-            },
-            {
-              label: "Bekleyen anket",
-              value: String(pending.length),
-              sub: "Linki iletilmeyi bekliyor",
-              icon: Hourglass,
-              tone: "text-mint-300",
-              href: "#bekleyen",
-            },
-          ].map((k) => (
-            <a
-              key={k.label}
-              href={k.href}
-              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-4 hover:border-white/30"
-            >
-              <span className="flex items-start justify-between">
-                <k.icon className={`h-4 w-4 ${k.tone}`} />
-                <ArrowUpRight className="hover-action h-4 w-4 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
-              </span>
-              <p className={`mt-2 font-display text-xl font-extrabold ${k.label === "NPS skoru" ? k.tone : ""}`}>{k.value}</p>
-              <p className="text-xs text-white/45">{k.label}</p>
-              <p className="mt-0.5 text-xs text-white/35">{k.sub}</p>
-            </a>
-          ))}
-        </div>
-      </section>
+      <PageHeader
+        eyebrow="Rapor merkezi · Memnuniyet"
+        title="Müşteri memnuniyeti (NPS)"
+        description="Kapanış sonrası 0-10 puan anketi · NPS = %destekleyen (9-10) − %kötüleyen (0-6)"
+      />
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          {
+            label: "NPS skoru",
+            value: nps === null ? "—" : String(nps),
+            sub: nps === null ? "Henüz yanıt yok" : `${promoters} destekleyen · ${passives} pasif · ${detractors} kötüleyen`,
+            icon: Gauge,
+            tone: npsTone,
+            href: "#danisman",
+          },
+          {
+            label: "Yanıt oranı",
+            value: responseRate === null ? "—" : `%${responseRate}`,
+            sub: `${answered.length} yanıt / ${rows.length} anket`,
+            icon: Send,
+            tone: "text-brand-700",
+            href: "#bekleyen",
+          },
+          {
+            label: "Ortalama puan",
+            value: avg === null ? "—" : avg.toLocaleString("tr-TR"),
+            sub: "0-10 ölçeği",
+            icon: Star,
+            tone: "text-amber-700",
+            href: "#yorumlar",
+          },
+          {
+            label: "Bekleyen anket",
+            value: String(pending.length),
+            sub: "Linki iletilmeyi bekliyor",
+            icon: Hourglass,
+            tone: "text-mint-700",
+            href: "#bekleyen",
+          },
+        ].map((k) => (
+          <a
+            key={k.label}
+            href={k.href}
+            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] transition hover:border-brand-400"
+          >
+            <span className="flex items-start justify-between">
+              <k.icon className={`h-4 w-4 ${k.tone}`} />
+              <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+            </span>
+            <p className={`numeric mt-2 font-display text-xl font-extrabold ${k.label === "NPS skoru" ? k.tone : "text-text"}`}>{k.value}</p>
+            <p className="text-xs font-medium text-text-muted">{k.label}</p>
+            <p className="mt-0.5 text-xs text-text-faint">{k.sub}</p>
+          </a>
+        ))}
+      </div>
 
       {/* Anket oluştur — kapanan ve anketi olmayan anlaşmalar */}
       <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
