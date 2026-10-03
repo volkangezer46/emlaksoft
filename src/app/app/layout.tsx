@@ -1,7 +1,10 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { LogOut, Shield } from "lucide-react";
-import { signOut } from "@/app/actions/auth";
+import { Settings, Shield } from "lucide-react";
+import "@/app/console.css";
+import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
+import { UserMenu } from "@/components/ui/console/user-menu";
+import { AppBreadcrumb } from "@/components/app/app-breadcrumb";
 import { QuickCreateMenu } from "@/components/app/quick-create-menu";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
@@ -176,6 +179,7 @@ export default async function AppLayout({
   return (
     <ToastProvider>
       <ThemeController />
+      <SidebarBoot />
       <ErrorBoundary>
         {brandColor ? (
           <style>{`.brand-scope{--brand-600:${brandColor};--brand-700:color-mix(in srgb,${brandColor} 80%,#000);--brand-500:color-mix(in srgb,${brandColor} 86%,#fff);--brand-400:color-mix(in srgb,${brandColor} 68%,#fff);--brand-300:color-mix(in srgb,${brandColor} 42%,#fff);--grad-brand:linear-gradient(120deg,${brandColor},var(--cyan-400) 55%,var(--mint-500));--shadow-glow-brand:0 20px 50px -18px color-mix(in srgb,${brandColor} 55%,transparent);}`}</style>
@@ -198,7 +202,8 @@ export default async function AppLayout({
         />
         <div className="flex min-w-0 flex-1 flex-col">
           {impersonating && platformStaff ? <OpsImpersonationBanner tenantName={impName || office?.name || "Ofis"} /> : null}
-          <header className="sticky top-0 z-30 flex h-17 items-center justify-between border-b border-line/80 bg-surface/90 px-4 pl-16 backdrop-blur-xl lg:px-6">
+          <header className="glass-bar sticky top-0 z-30 flex h-14 items-center justify-between gap-3 px-4 pl-16 lg:px-6">
+            <AppBreadcrumb accessibleModules={accessibleModules} />
             <CommandSearch accessibleModules={accessibleModules} storageScope={user && tenantId ? `${tenantId}:${user.id}` : undefined} />
             <div className="ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
               <ThemeToggle />
@@ -207,7 +212,7 @@ export default async function AppLayout({
               <Link
                 href="/app/raporlar"
                 title="Kural tabanlı ofis skoru (yapay zekâ değil): açık talepler, canlı portal ilanları, son 7 günün randevu ve aramaları ile son 30 günün kapanışları puan ekler; gecikmiş portal teyitleri puan düşürür. Başlangıç 42. Rapor merkezini açmak için tıklayın."
-                className="focus-ring hidden items-center gap-2 rounded-full border border-mint-500/20 bg-mint-500/10 px-3 py-1.5 text-xs font-semibold text-mint-600 transition hover:border-mint-500/45 hover:bg-mint-500/15 lg:flex"
+                className="focus-ring hidden items-center gap-2 rounded-full border border-mint-500/20 bg-mint-500/10 px-3 py-1.5 text-xs font-semibold text-mint-600 transition hover:border-mint-500/45 hover:bg-mint-500/15 xl:flex"
               >
                 <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-500" />
                 {officeScore != null ? `Ofis skoru ${officeScore} · ${officeScoreLabel}` : "Ofis skoru —"}
@@ -229,27 +234,12 @@ export default async function AppLayout({
               ) : (
                 <NotificationBell initial={[]} />
               )}
-              <Link href="/app/ayarlar" className="flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface p-1.5 sm:pr-3 transition hover:border-brand-300">
-                <div
-                  className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] text-xs font-bold text-white"
-                  title={profile?.full_name ?? ""}
-                >
-                  {initials}
-                </div>
-                <div className="hidden text-left xl:block">
-                  <p className="max-w-28 truncate text-xs font-semibold text-ink-950">{fullName}</p>
-                  <p className="text-xs text-text-faint">{planLabel(office?.plan ?? "office")} plan</p>
-                </div>
-              </Link>
-              <form action={signOut}>
-                <button
-                  type="submit"
-                  className="grid h-10 w-10 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-500"
-                  aria-label="Çıkış yap"
-                >
-                  <LogOut className="h-4 w-4" />
-                </button>
-              </form>
+              <UserMenu
+                initials={initials}
+                name={fullName}
+                subtitle={`${planLabel(office?.plan ?? "office")} plan`}
+                links={accessibleModules.includes("settings") ? [{ href: "/app/ayarlar", label: "Ayarlar", icon: Settings }] : []}
+              />
             </div>
           </header>
           {/* grid + minmax(0,1fr): her doğrudan çocuk (SectionTabs + sayfa)
