@@ -327,7 +327,7 @@ export function ImportWizard({
     }
     setStepError("");
     setRolledBack(
-      `Geri alındı: ${nf.format(res.removed ?? 0)} kayıt kaldırıldı${res.restored ? `, ${nf.format(res.restored)} kayıt eski haline döndü` : ""}.`,
+      `Geri alındı: ${nf.format(res.removed ?? 0)} kayıt kaldırıldı${res.restored ? `, ${nf.format(res.restored)} kayıt eski haline döndü` : ""}.${res.warning ? ` ${res.warning}` : ""}`,
     );
     router.refresh();
   };
@@ -915,7 +915,7 @@ function ImportJournal({
     setConfirmId("");
     if (res.error) setError(res.error);
     else {
-      setMessage(`Geri alındı: ${nf.format(res.removed ?? 0)} kayıt kaldırıldı${res.restored ? `, ${nf.format(res.restored)} kayıt eski haline döndü` : ""}.`);
+      setMessage(`Geri alındı: ${nf.format(res.removed ?? 0)} kayıt kaldırıldı${res.restored ? `, ${nf.format(res.restored)} kayıt eski haline döndü` : ""}.${res.warning ? ` ${res.warning}` : ""}`);
       router.refresh();
     }
   };

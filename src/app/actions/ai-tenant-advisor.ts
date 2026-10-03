@@ -8,6 +8,10 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { externalErrorMetadata } from "@/lib/external-fetch";
 import { getOpenAiChatModel, openAiChat } from "@/lib/ai/openai-client";
 import { createTask } from "@/app/actions/tasks";
+import { getEffectivePermissions } from "@/lib/permissions-effective";
+import { buildAdvisorScope, gated, type AdvisorScope } from "@/lib/ai/advisor-scope";
+import { DAY_MS, now, trDayStartMs } from "@/lib/clock";
+import { trMonthContext } from "@/lib/team/scorecard";
 
 // ---------------------------------------------------------------------------
 // Ofis (tenant) yapay zeka asistanı — admin danışman deseninin tenant uyarlaması.
@@ -55,6 +59,11 @@ async function advisorRateLimited(userId: string): Promise<boolean> {
   return !allowed;
 }
 
+async function advisorScopeFor(gate: { tenantId: string; userId: string; role: string }): Promise<AdvisorScope> {
+  const perms = await getEffectivePermissions(gate.tenantId, gate.role, gate.userId);
+  return buildAdvisorScope(perms, gate.role, gate.userId);
+}
+
 const money = (n: number) => `₺${Math.round(n).toLocaleString("tr-TR")}`;
 
 // ---------------------------------------------------------------------------
@@ -65,6 +74,7 @@ type HotLead = { id: string; name: string; score: number };
 type OverpricedProperty = { id: string; label: string; price: number | null };
 
 type TenantAdvisorContext = {
+  scope: AdvisorScope;
   customers: number;
   properties: number;
   activeDeals: number;
@@ -92,16 +102,17 @@ type LeadSignalRow = {
   last_activity: string | null;
 };
 
-async function buildTenantContext(tenantId: string): Promise<TenantAdvisorContext> {
+async function buildTenantContext(tenantId: string, scope: AdvisorScope): Promise<TenantAdvisorContext> {
   const supabase = await createClient();
 
-  const dayStart = new Date();
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
+  // B8: gün/ay sınırları Türkiye takvimine göre (sunucu UTC olabilir).
+  const dayStartMs = trDayStartMs();
+  const dayStartIso = new Date(dayStartMs).toISOString();
+  const dayEndIso = new Date(dayStartMs + DAY_MS).toISOString();
+  const monthStartIso = trMonthContext(now()).monthStartIso;
+  // B3: ofis geneli kapsam dışındaki roller yalnız kendi atandıkları kayıtları görür.
+  const mine = <Q,>(q: Q): Q =>
+    scope.officeWide ? q : (q as unknown as { eq: (c: string, v: string) => Q }).eq("assigned_to", scope.userId);
 
   const [
     { count: customers },
@@ -118,59 +129,96 @@ async function buildTenantContext(tenantId: string): Promise<TenantAdvisorContex
     { data: leadSignals },
     { data: redProperties, count: overpricedCount },
   ] = await Promise.all([
-    supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
-    supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null),
-    supabase
-      .from("deals")
-      .select("id", { count: "exact", head: true })
-      .not("stage", "in", "(won,lost)"),
-    supabase
-      .from("deals")
-      .select("deal_value")
-      .eq("stage", "won")
-      .gte("updated_at", monthStart.toISOString())
-      .limit(200),
-    supabase
-      .from("customer_demands")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "new"),
-    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("status", "open"),
-    supabase
-      .from("tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "open")
-      .lt("due_at", dayStart.toISOString()),
-    supabase
-      .from("tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "open")
-      .gte("due_at", dayStart.toISOString())
-      .lt("due_at", dayEnd.toISOString()),
-    supabase
-      .from("appointments")
-      .select("id", { count: "exact", head: true })
-      .gte("scheduled_at", dayStart.toISOString())
-      .lt("scheduled_at", dayEnd.toISOString())
-      .neq("status", "cancelled"),
-    supabase
-      .from("commissions")
-      .select("gross_amount, status")
-      .not("status", "in", "(paid,collected)")
-      .limit(500),
-    // Sıcak lead hesabı — dashboard/musteriler'deki lead-score deseni
-    supabase
-      .from("customers")
-      .select("id, full_name, phone, email, source, blacklist, created_at")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(200),
-    supabase.rpc("customer_lead_signals", { p_tenant_id: tenantId }),
-    supabase
-      .from("properties")
-      .select("id, title, property_code, list_price", { count: "exact" })
-      .is("deleted_at", null)
-      .in("price_health", ["red", "Kırmızı"])
-      .limit(5),
+    gated(scope.customers, () =>
+      mine(supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null)),
+    ),
+    gated(scope.properties, () =>
+      mine(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)),
+    ),
+    gated(scope.deals, () =>
+      mine(supabase.from("deals").select("id", { count: "exact", head: true }).not("stage", "in", "(won,lost)")),
+    ),
+    gated(scope.deals, () =>
+      mine(
+        supabase
+          .from("deals")
+          .select("deal_value")
+          .eq("stage", "won")
+          .gte("updated_at", monthStartIso)
+          .limit(200),
+      ),
+    ),
+    gated(scope.demands, () =>
+      scope.officeWide
+        ? supabase.from("customer_demands").select("id", { count: "exact", head: true }).eq("status", "new")
+        : supabase
+            .from("customer_demands")
+            .select("id, customer:customers!customer_demands_customer_id_fkey!inner(assigned_to)", { count: "exact", head: true })
+            .eq("status", "new")
+            .eq("customer.assigned_to", scope.userId),
+    ),
+    gated(scope.tasks, () =>
+      mine(supabase.from("tasks").select("id", { count: "exact", head: true }).eq("status", "open")),
+    ),
+    gated(scope.tasks, () =>
+      mine(
+        supabase
+          .from("tasks")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "open")
+          .lt("due_at", dayStartIso),
+      ),
+    ),
+    gated(scope.tasks, () =>
+      mine(
+        supabase
+          .from("tasks")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "open")
+          .gte("due_at", dayStartIso)
+          .lt("due_at", dayEndIso),
+      ),
+    ),
+    gated(scope.appointments, () =>
+      mine(
+        supabase
+          .from("appointments")
+          .select("id", { count: "exact", head: true })
+          .gte("scheduled_at", dayStartIso)
+          .lt("scheduled_at", dayEndIso)
+          .neq("status", "cancelled"),
+      ),
+    ),
+    // B3: bekleyen komisyon toplamı yalnız earnings_all sahibine.
+    gated(scope.commissionTotal, () =>
+      supabase
+        .from("commissions")
+        .select("gross_amount, status")
+        .not("status", "in", "(paid,collected)")
+        .limit(500),
+    ),
+    // Sıcak lead hesabı — dashboard/musteriler'deki lead-score deseni (ad yalnız customers izniyle)
+    gated(scope.customers, () =>
+      mine(
+        supabase
+          .from("customers")
+          .select("id, full_name, phone, email, source, blacklist, created_at")
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false })
+          .limit(200),
+      ),
+    ),
+    gated(scope.customers, () => supabase.rpc("customer_lead_signals", { p_tenant_id: tenantId })),
+    gated(scope.properties, () =>
+      mine(
+        supabase
+          .from("properties")
+          .select("id, title, property_code, list_price", { count: "exact" })
+          .is("deleted_at", null)
+          .in("price_health", ["red", "Kırmızı"])
+          .limit(5),
+      ),
+    ),
   ]);
 
   const signalMap = new Map<string, LeadSignalRow>(
@@ -206,6 +254,7 @@ async function buildTenantContext(tenantId: string): Promise<TenantAdvisorContex
   );
 
   return {
+    scope,
     customers: customers ?? 0,
     properties: properties ?? 0,
     activeDeals: activeDeals ?? 0,
@@ -228,28 +277,46 @@ async function buildTenantContext(tenantId: string): Promise<TenantAdvisorContex
   };
 }
 
+/** Kapsam dışı kümeler bağlam metninden tümüyle çıkarılır (model "0" diye yanlış yorumlamasın, veri sızmasın). */
 function contextToText(c: TenantAdvisorContext): string {
-  return [
-    `Toplam müşteri: ${c.customers} (liste: /app/musteriler)`,
-    `Sıcak müşteri (öncelikli aranacaklar): ${c.hotLeadCount} (liste: /app/musteriler?sort=hot)`,
-    ...c.hotLeads.map(
-      (l) => `- Sıcak müşteri: ${l.name} (skor ${l.score}, detay: /app/musteriler/${l.id})`,
-    ),
-    `Toplam portföy: ${c.properties} (liste: /app/portfoyler)`,
-    `Fiyatı piyasaya göre yüksek (riskli) portföy: ${c.overpricedCount} (liste: /app/portfoyler?saglik=riskli)`,
-    ...c.overpriced.map(
-      (p) =>
-        `- Riskli fiyatlı portföy: ${p.label}${p.price != null ? ` (${money(p.price)})` : ""} (detay: /app/portfoyler/${p.id})`,
-    ),
-    `Devam eden anlaşma: ${c.activeDeals} (liste: /app/anlasmalar)`,
-    `Bu ay kazanılan anlaşma: ${c.wonThisMonth} (toplam değer ${money(c.wonValueThisMonth)})`,
-    `Yeni (işlenmemiş) talep: ${c.newDemands} (liste: /app/talepler)`,
-    `Açık görev: ${c.openTasks} (liste: /app/gorevler)`,
-    `Gecikmiş görev: ${c.tasksOverdue} (liste: /app/gorevler?filter=overdue)`,
-    `Bugün vadesi gelen görev: ${c.tasksDueToday} (liste: /app/gorevler?filter=today)`,
-    `Bugünkü randevu: ${c.todayAppointments} (liste: /app/randevular)`,
-    `Tahsilat bekleyen komisyon: ${money(c.pendingCommission)} (liste: /app/komisyon?durum=bekleyen)`,
-  ].join("\n");
+  const s = c.scope;
+  const lines: string[] = [];
+  if (s.customers) {
+    lines.push(
+      `Toplam müşteri: ${c.customers} (liste: /app/musteriler)`,
+      `Sıcak müşteri (öncelikli aranacaklar): ${c.hotLeadCount} (liste: /app/musteriler?sort=hot)`,
+      ...c.hotLeads.map((l) => `- Sıcak müşteri: ${l.name} (skor ${l.score}, detay: /app/musteriler/${l.id})`),
+    );
+  }
+  if (s.properties) {
+    lines.push(
+      `Toplam portföy: ${c.properties} (liste: /app/portfoyler)`,
+      `Fiyatı piyasaya göre yüksek (riskli) portföy: ${c.overpricedCount} (liste: /app/portfoyler?saglik=riskli)`,
+      ...c.overpriced.map(
+        (p) =>
+          `- Riskli fiyatlı portföy: ${p.label}${p.price != null ? ` (${money(p.price)})` : ""} (detay: /app/portfoyler/${p.id})`,
+      ),
+    );
+  }
+  if (s.deals) {
+    lines.push(
+      `Devam eden anlaşma: ${c.activeDeals} (liste: /app/anlasmalar)`,
+      `Bu ay kazanılan anlaşma: ${c.wonThisMonth} (toplam değer ${money(c.wonValueThisMonth)})`,
+    );
+  }
+  if (s.demands) lines.push(`Yeni (işlenmemiş) talep: ${c.newDemands} (liste: /app/talepler)`);
+  if (s.tasks) {
+    lines.push(
+      `Açık görev: ${c.openTasks} (liste: /app/gorevler)`,
+      `Gecikmiş görev: ${c.tasksOverdue} (liste: /app/gorevler?filter=overdue)`,
+      `Bugün vadesi gelen görev: ${c.tasksDueToday} (liste: /app/gorevler?filter=today)`,
+    );
+  }
+  if (s.appointments) lines.push(`Bugünkü randevu: ${c.todayAppointments} (liste: /app/randevular)`);
+  if (s.commissionTotal) {
+    lines.push(`Tahsilat bekleyen komisyon: ${money(c.pendingCommission)} (liste: /app/komisyon?durum=bekleyen)`);
+  }
+  return lines.length ? lines.join("\n") : "Bu kullanıcının erişebildiği veri kümesi yok.";
 }
 
 // ---------------------------------------------------------------------------
@@ -489,7 +556,7 @@ export async function askTenantAdvisor(
     return { reply: RATE_LIMIT_ERROR, usedAI: false, sessionId: sessionId ?? "" };
   }
 
-  const context = await buildTenantContext(gate.tenantId);
+  const context = await buildTenantContext(gate.tenantId, await advisorScopeFor(gate));
   const apiKey = await getOpenAiKey();
 
   let result: TenantAdvisorResult;
@@ -549,7 +616,7 @@ export async function prepareTenantAdvisorTurn(
     return { ok: false, error: RATE_LIMIT_ERROR, rateLimited: true };
   }
 
-  const context = await buildTenantContext(gate.tenantId);
+  const context = await buildTenantContext(gate.tenantId, await advisorScopeFor(gate));
   return {
     ok: true,
     tenantId: gate.tenantId,
@@ -667,7 +734,7 @@ export async function getTenantAdvisorSnapshot(): Promise<TenantAdvisorSnapshot 
   const gate = await requirePermission("dashboard", "view");
   if (!gate.ok) return null;
 
-  const c = await buildTenantContext(gate.tenantId);
+  const c = await buildTenantContext(gate.tenantId, await advisorScopeFor(gate));
   return {
     customers: c.customers,
     properties: c.properties,

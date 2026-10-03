@@ -14,7 +14,7 @@ import { FormField, FormInput, FormSelect, FormTextarea, fieldClass } from "@/co
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { detailOrList } from "@/lib/form-logic";
-import { parsePhone } from "@/lib/phone";
+import { formatPhoneDisplay, parsePhone } from "@/lib/phone";
 import { EmailInput } from "@/components/ui/email-input";
 import { CUSTOMER_DRAFT_FIELDS, CUSTOMER_FORM_ID, CUSTOMER_TABS } from "./customer-tabs";
 
@@ -206,12 +206,12 @@ export function CustomerForm({
           {branches.length > 0 ? <SummaryRow label="Şube" value={branch ?? "Atanmadı"} muted={!branch} tab="kisi" field="branch_id" /> : null}
           <SummaryRow
             label="Telefon"
-            value={!phone ? "Girilmedi" : phone.ok ? (phone.kind === "mobile" ? "Cep · biçim geçerli" : "Sabit/yurt dışı · biçim geçerli") : "Biçim hatalı"}
+            value={!phone ? "Girilmedi" : phone.ok ? formatPhoneDisplay(values.phone ?? "") || String(values.phone) : `${String(values.phone)} · biçim hatalı`}
             muted={!phone}
             tab="iletisim"
             field="phone"
           />
-          <SummaryRow label="E-posta" value={email ? "Girildi" : "Girilmedi"} muted={!email} tab="iletisim" field="email" />
+          <SummaryRow label="E-posta" value={email ? String(values.email ?? email) : "Girilmedi"} muted={!email} tab="iletisim" field="email" />
           <SummaryRow label="İl" value={province ?? "Seçilmedi"} muted={!province} tab="iletisim" />
           <SummaryRow
             label="Hatırlatma"

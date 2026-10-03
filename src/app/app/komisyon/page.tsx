@@ -126,7 +126,7 @@ export default async function CommissionPage({
 }: {
   searchParams?: Promise<{ durum?: string; from?: string; to?: string; sayfa?: string }>;
 }) {
-  const { perms } = await requireModulePage("commissions");
+  const { perms, userId } = await requireModulePage("commissions");
   const canEdit = (perms.commissions ?? []).includes("edit");
   // Kazanç gizliliği: danışman bazlı pay dağılımı ve split etiketleri başkasının kazancını gösterir.
   const seeAllEarnings = canSeeAllEarnings(perms);
@@ -157,14 +157,17 @@ export default async function CommissionPage({
   if (durum) savedViewParams.durum = durum;
   if (from) savedViewParams.from = from;
   if (to) savedViewParams.to = to;
+  // B1: earnings_all yoksa defter yalnız kendi anlaşmalarının komisyonlarıdır (inner join + atanan filtresi).
+  const dealJoin = seeAllEarnings ? "deals!commissions_deal_id_fkey" : "deals!commissions_deal_id_fkey!inner";
   let ledgerQuery = supabase
     .from("commissions")
     .select(
-      "id, gross_amount, vat_amount, status, splits, created_at, deal_id, deal:deals!commissions_deal_id_fkey(id,deal_value,stage,property:properties!deals_property_id_fkey(id,property_code,title))",
+      `id, gross_amount, vat_amount, status, splits, created_at, deal_id, deal:${dealJoin}(id,deal_value,stage,property:properties!deals_property_id_fkey(id,property_code,title))`,
       { count: "exact" },
     )
     .order("created_at", { ascending: false })
     .range((sayfa - 1) * PAGE_SIZE, sayfa * PAGE_SIZE - 1);
+  if (!seeAllEarnings) ledgerQuery = ledgerQuery.eq("deal.assigned_to", userId);
   if (durum === "tahsil") ledgerQuery = ledgerQuery.in("status", ["paid", "collected"]);
   else if (durum === "bekleyen") ledgerQuery = ledgerQuery.not("status", "in", "(paid,collected)");
   if (from) ledgerQuery = ledgerQuery.gte("created_at", from);

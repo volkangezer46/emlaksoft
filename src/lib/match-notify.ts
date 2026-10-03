@@ -2,6 +2,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyTenant } from "@/lib/notify";
 import { fetchTenantMatchingWeights, scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
 
+/** Bildirim taramasında en fazla talep; aşılırsa en yeni talepler (created_at desc) taranır. */
+export const MATCH_NOTIFY_DEMAND_LIMIT = 500;
+
 type MatchCustomer = { full_name?: string; assigned_to?: string | null };
 
 /**
@@ -20,14 +23,22 @@ export async function notifyMatchingDemandsForProperty(
     const admin = createAdminClient();
     // Ofise özel ağırlıklar — döngü DIŞINDA tek sorgu; tanımsızsa varsayılan davranış.
     const weightsPromise = fetchTenantMatchingWeights(admin, tenantId);
-    const { data: demands } = await admin
+    const { data: demands, error: demandsError } = await admin
       .from("customer_demands")
       .select("id, transaction_type, property_type, province_id, district_id, neighborhood_id, budget_min, budget_max, rooms, min_sqm, urgency, status, criteria, customer:customers!customer_demands_customer_id_fkey(full_name, assigned_to)")
       .eq("tenant_id", tenantId)
       .in("status", ["new", "active", "matched"])
-      .limit(500);
+      .order("created_at", { ascending: false }) // B15: kırpma belirleyici (en yeni talepler) — rastgele değil
+      .limit(MATCH_NOTIFY_DEMAND_LIMIT);
 
+    if (demandsError) {
+      console.error("notifyMatchingDemandsForProperty demands", demandsError);
+      return 0;
+    }
     if (!demands?.length) return 0;
+    if (demands.length >= MATCH_NOTIFY_DEMAND_LIMIT) {
+      console.warn(`notifyMatchingDemandsForProperty: talep sayısı ${MATCH_NOTIFY_DEMAND_LIMIT} sınırına ulaştı; yalnız en yeni talepler eşleştirildi`, { tenantId });
+    }
 
     const weights = await weightsPromise;
     const MATCH_THRESHOLD = 60; // "iyi/güçlü" eşleşme

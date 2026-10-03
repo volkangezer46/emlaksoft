@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
@@ -21,8 +21,9 @@ type OwnRow = { id: string; category: string; value: string; label: string; colo
 
 function invalidate(tenantId: string) {
   revalidatePath("/app/ayarlar/tanimlar");
-  revalidateTag(`definitions:${tenantId}`, "max");
-  revalidateTag("definitions", "max");
+  // B9: updateTag = anında sona erdirir (read-your-writes); revalidateTag("max") bayat içerik sunardı.
+  updateTag(`definitions:${tenantId}`);
+  updateTag("definitions");
 }
 
 /** Ofise ait tek tanım satırı (tenant filtresiyle). */

@@ -9,7 +9,14 @@ import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
 import { parseMoneyInput } from "@/lib/money-input";
 import { isDemandStatus } from "@/lib/workflow-state";
-import { demandValuesFromFormData, parseDemandValues } from "@/lib/demand-criteria";
+import {
+  DEMAND_FIELD_NAMES,
+  demandValuesFromFormData,
+  parseDemandCriteria,
+  parseDemandValues,
+  type DemandCriteria,
+} from "@/lib/demand-criteria";
+import { pruneRequiredKeys, validateGeoChain } from "@/lib/demand-geo";
 
 export type DemandResult = { error?: string; ok?: boolean; id?: string };
 
@@ -39,6 +46,13 @@ export async function createDemand(
   const propertyType = columns.property_type ?? "";
 
   const supabase = await createClient();
+
+  const geoError = await validateGeoChain(supabase, {
+    province_id: columns.province_id,
+    district_id: columns.district_id,
+    neighborhood_id: columns.neighborhood_id,
+  });
+  if (geoError) return { error: geoError };
 
   const { data: customer } = await supabase
     .from("customers")
@@ -142,19 +156,81 @@ export async function updateDemand(
   }
 
   const supabase = await createClient();
+
+  // Mevcut kayıt: gönderilmeyen alanlar (bölge, kriterler) SİLİNMEZ, olduğu gibi korunur (B13).
+  const { data: existing } = await supabase
+    .from("customer_demands")
+    .select("id, province_id, district_id, neighborhood_id, criteria")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!existing) return { error: "Talep bulunamadı veya başka bir ofise ait." };
+
+  const posted = (...names: string[]) => names.find((n) => formData.has(n));
+  const pick = (current: string | null, ...names: string[]) => {
+    const name = posted(...names);
+    return name ? String(formData.get(name) ?? "").trim() || null : current;
+  };
+  const geo = {
+    province_id: pick(existing.province_id, "demand_province_id", "province_id") ?? (provinceId || null),
+    district_id: pick(existing.district_id, "demand_district_id", "district_id") ?? (districtId || null),
+    neighborhood_id: pick(existing.neighborhood_id, "demand_neighborhood_id", "neighborhood_id") ?? (neighborhoodId || null),
+  };
+  // il/ilçe/mahalle gerçek hiyerarşiye uymalı (yalnız biçim değil)
+  const geoChanged =
+    geo.province_id !== existing.province_id ||
+    geo.district_id !== existing.district_id ||
+    geo.neighborhood_id !== existing.neighborhood_id;
+  if (geoChanged) {
+    const geoError = await validateGeoChain(supabase, geo);
+    if (geoError) return { error: geoError };
+  }
+
+  // Kriter alanları (ek bölge, kat, ısıtma, olmazsa olmaz...) gönderildiyse tam parse; aksi halde mevcut
+  // kriterler korunur ve değeri kalmayan "zorunlu" anahtarlar düşürülür.
+  const criteriaOnly = DEMAND_FIELD_NAMES.filter(
+    (n) => !["transaction_type", "property_type", "urgency", "budget_min", "budget_max", "rooms", "min_sqm"].includes(n),
+  );
+  const criteriaPosted = criteriaOnly.some((n) => formData.has(n));
+  let criteriaUpdate: DemandCriteria | undefined;
+  let columnOverride: Record<string, unknown> | undefined;
+  if (criteriaPosted) {
+    const values = demandValuesFromFormData(formData);
+    values.demand_province_id = geo.province_id ?? "";
+    values.demand_district_id = geo.district_id ?? "";
+    values.demand_neighborhood_id = geo.neighborhood_id ?? "";
+    const parsed = parseDemandValues(values);
+    if (!parsed.ok) return { error: parsed.error };
+    const { transaction_type: _t, ...cols } = parsed.columns;
+    void _t;
+    columnOverride = cols;
+    criteriaUpdate = parsed.criteria;
+  } else {
+    criteriaUpdate = pruneRequiredKeys(parseDemandCriteria(existing.criteria), {
+      property_type: propertyType || null,
+      budget_min: budgetMin,
+      budget_max: budgetMax,
+      rooms: rooms || null,
+      min_sqm: minSqm != null && Number.isFinite(minSqm) ? minSqm : null,
+      ...geo,
+    });
+  }
+
   const { data: updated, error } = await supabase
     .from("customer_demands")
     .update({
       transaction_type: transactionType,
       property_type: propertyType || null,
-      province_id: provinceId || null,
-      district_id: districtId || null,
-      neighborhood_id: neighborhoodId || null,
+      province_id: geo.province_id,
+      district_id: geo.district_id,
+      neighborhood_id: geo.neighborhood_id,
       budget_min: budgetMin,
       budget_max: budgetMax,
       rooms: rooms || null,
       min_sqm: minSqm != null && Number.isFinite(minSqm) ? minSqm : null,
       urgency: urgency || null,
+      ...columnOverride,
+      criteria: criteriaUpdate,
       ...(status ? { status } : {}),
     })
     .eq("id", id)

@@ -16,7 +16,13 @@ export const FULL_EXPORT_MAX_ROWS = 200_000;
 /** Güvenlik üst sınırı: tek indirmenin en fazla süresi (ms). */
 export const FULL_EXPORT_MAX_MS = 50_000; // route maxDuration = 60 sn'nin altında
 
-export type ExportGate = { tenantId: string; userId: string; role: string };
+export type ExportGate = {
+  tenantId: string;
+  userId: string;
+  role: string;
+  /** `earnings_all` izni: yoksa komisyon/denetim dışa aktarması yalnız kendi kapsamıdır (B1). */
+  seeAllEarnings?: boolean;
+};
 
 type PageResult = PromiseLike<{ data: unknown[] | null; error: unknown }>;
 /** `.range()` çağrılabilir sorgu (PostgREST builder). */
@@ -46,7 +52,7 @@ export const EXPORT_QUERIES: Record<string, Builder> = {
       .eq("deal.tenant_id", gate.tenantId)
       .order("created_at", { ascending: false })
       .order("id", ID_ORDER);
-    if (!hasOfficeWideDataScope(gate.role)) q = q.eq("deal.assigned_to", gate.userId);
+    if (!hasOfficeWideDataScope(gate.role) || !gate.seeAllEarnings) q = q.eq("deal.assigned_to", gate.userId);
     return q;
   },
   denetim: (sb, gate) => {
@@ -56,7 +62,7 @@ export const EXPORT_QUERIES: Record<string, Builder> = {
       .eq("tenant_id", gate.tenantId)
       .order("created_at", { ascending: false })
       .order("id", ID_ORDER);
-    if (!hasOfficeWideDataScope(gate.role)) q = q.eq("actor_id", gate.userId);
+    if (!hasOfficeWideDataScope(gate.role) || !gate.seeAllEarnings) q = q.eq("actor_id", gate.userId);
     return q;
   },
   portfoyler: (sb, gate) => {
