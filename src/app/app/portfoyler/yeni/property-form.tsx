@@ -1,27 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown, Sparkles } from "lucide-react";
+import { Check, ChevronDown, FileText, Home, ListChecks, MapPin, Wallet } from "lucide-react";
 import { createProperty } from "@/app/actions/properties";
-import { Button, ButtonLink } from "@/components/ui/button";
-import { FormActions, FormPage, FormSection } from "@/components/ui/form-page";
-import { FormError, FormField, FormInput, FormSelect, fieldClass } from "@/components/ui/form-controls";
+import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
+import { FormField, FormInput, FormSelect, fieldClass } from "@/components/ui/form-controls";
 import { LatLngPicker } from "@/components/app/lat-lng-picker";
 import { GeoSelect } from "@/components/app/geo-select";
 import { useToast } from "@/components/app/toast-provider";
+import { clearFormDraft } from "@/components/app/use-form-draft";
+import { commissionSummary, parseLooseNumber } from "@/lib/form-tabs";
+import { formatTry } from "@/lib/utils";
 import { FACADE_OPTIONS, HEATING_OPTIONS } from "./property-options";
+import { PROPERTY_DRAFT_FIELDS, PROPERTY_FORM_ID, PROPERTY_TABS } from "./property-tabs";
 
 type Province = { id: string; name: string };
 type Branch = { id: string; name: string };
 
-const SECTIONS = [
-  { id: "temel", label: "Temel bilgi" },
-  { id: "konum", label: "Konum" },
-  { id: "fiyat", label: "Fiyat ve komisyon" },
-  { id: "ozellikler", label: "Özellikler" },
-  { id: "not", label: "Ek bilgi" },
-] as const;
+const TAB_ICONS = {
+  temel: Home,
+  konum: MapPin,
+  fiyat: Wallet,
+  ozellikler: ListChecks,
+  ek: FileText,
+} as const;
+
+const FIELD_LABELS = {
+  title: "Portföy başlığı",
+  transaction_type: "İşlem türü",
+  property_type: "Portföy türü",
+  list_price: "Liste fiyatı",
+  commission_rate: "Komisyon oranı",
+};
 
 function SelectField({
   id,
@@ -52,16 +64,20 @@ function SelectField({
   );
 }
 
+const formatNumber = (n: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(n);
+
 export function PropertyForm({
   provinces,
   branches,
   propertyTypes,
   transactionTypes,
+  userId,
 }: {
   provinces: Province[];
   branches: Branch[];
   propertyTypes: string[];
   transactionTypes: string[];
+  userId: string;
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -73,6 +89,7 @@ export function PropertyForm({
     setError(null);
     const result = await createProperty(formData);
     if (result.ok) {
+      clearFormDraft(userId, PROPERTY_FORM_ID);
       push("Portföy taslak olarak oluşturuldu", "ok");
       router.push("/app/portfoyler");
       return;
@@ -81,115 +98,167 @@ export function PropertyForm({
     setError(result.error ?? "Portföy eklenemedi.");
   }
 
-  return (
-    <form action={submit}>
-      <FormPage
-        title="Yeni portföy oluştur"
-        description="Temel bilgilerle taslak portföy açın."
-        breadcrumbs={[{ label: "Portföyler", href: "/app/portfoyler" }, { label: "Yeni" }]}
-      >
-        <nav aria-label="Form bölümleri" className="flex flex-wrap gap-2">
-          {SECTIONS.map((s, i) => (
-            <a
-              key={s.id}
-              href={`#${s.id}`}
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:bg-canvas hover:text-ink-950"
-            >
-              <span className="numeric text-brand-600">{i + 1}</span> {s.label}
-            </a>
+  // `<form action>` başarısızlıkta alanları sıfırlıyordu; onSubmit kullanıcının yazdıklarını korur.
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void submit(new FormData(event.currentTarget));
+  }
+
+  const tabs: FormTab[] = useMemo(
+    () =>
+      PROPERTY_TABS.map((t) => ({
+        id: t.id,
+        label: t.label,
+        description: t.description,
+        icon: TAB_ICONS[t.id],
+        fields: [...t.fields],
+        required: [...t.required],
+      })),
+    [],
+  );
+
+  const tabPanels = {
+    temel: (
+      <>
+        <FormField label="Portföy başlığı" htmlFor="property-title" required className="sm:col-span-2">
+          <FormInput name="title" required placeholder="Örn. Onikişubat Tekerek 4+1" />
+        </FormField>
+        <SelectField id="transaction-type" name="transaction_type" label="İşlem türü" required defaultValue="Satılık">
+          {transactionTypes.map((type) => <option key={type}>{type}</option>)}
+        </SelectField>
+        <SelectField id="property-type" name="property_type" label="Portföy türü" required defaultValue="Daire">
+          {propertyTypes.map((type) => <option key={type}>{type}</option>)}
+        </SelectField>
+        <FormField label="Oda" htmlFor="rooms">
+          <FormInput name="rooms" placeholder="4+1" />
+        </FormField>
+        <FormField label="Brüt m²" htmlFor="sqm">
+          <FormInput name="sqm" inputMode="decimal" placeholder="185" />
+        </FormField>
+        {branches.length > 0 ? (
+          <SelectField id="property-branch" name="branch_id" label="Şube" defaultValue="" className="sm:col-span-2">
+            <option value="">Şube atanmadı</option>
+            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </SelectField>
+        ) : null}
+      </>
+    ),
+    konum: (
+      <>
+        {/* İl/İlçe/Mahalle: emsal motoru (find_comparables) ilçe üzerinden çalışır. */}
+        <GeoSelect provinces={provinces} className="sm:col-span-2" />
+        <FormField label="Adres özeti" htmlFor="address-line" className="sm:col-span-2">
+          <FormInput name="address_line" placeholder="Cadde, sokak, kapı no…" />
+        </FormField>
+        <LatLngPicker fieldClass={fieldClass} />
+      </>
+    ),
+    fiyat: (
+      <>
+        <FormField label="Liste fiyatı" htmlFor="list-price" required>
+          <FormInput name="list_price" required inputMode="decimal" placeholder="6.750.000" />
+        </FormField>
+        <FormField label="Komisyon oranı (%)" htmlFor="commission-rate" required>
+          <FormInput name="commission_rate" required inputMode="decimal" min="0.01" max="100" step="0.01" placeholder="3" />
+        </FormField>
+      </>
+    ),
+    ozellikler: (
+      <>
+        {/* features jsonb'ye portal/broşürle AYNI anahtarlarla yazılır (floor, heating, building_age, facade) + tapu ada/parsel. */}
+        <FormField label="Bulunduğu kat" htmlFor="floor">
+          <FormInput name="floor" inputMode="numeric" placeholder="Örn. 3 (bodrum için -1)" />
+        </FormField>
+        <SelectField id="heating" name="heating" label="Isınma" defaultValue="">
+          <option value="">Seçilmedi</option>
+          {HEATING_OPTIONS.map((h) => <option key={h}>{h}</option>)}
+        </SelectField>
+        <FormField label="Bina yaşı" htmlFor="building-age">
+          <FormInput name="building_age" inputMode="numeric" placeholder="Örn. 5" />
+        </FormField>
+        <SelectField id="facade" name="facade" label="Cephe (ops.)" defaultValue="">
+          <option value="">Seçilmedi</option>
+          {FACADE_OPTIONS.map((f) => <option key={f}>{f}</option>)}
+        </SelectField>
+        <FormField label="Tapu — Ada" htmlFor="parcel-block">
+          <FormInput name="parcel_block" placeholder="Örn. 1234" />
+        </FormField>
+        <FormField label="Tapu — Parsel" htmlFor="parcel-lot">
+          <FormInput name="parcel_lot" placeholder="Örn. 56" />
+        </FormField>
+      </>
+    ),
+    ek: (
+      <div className="sm:col-span-2">
+        <p className="text-sm text-text-muted">
+          Portföy <strong className="font-semibold text-ink-950">taslak</strong> olarak açılır. Kaydettikten sonra detay sayfasında şunları tamamlarsınız:
+        </p>
+        <ul className="mt-3 space-y-2 text-sm text-ink-950">
+          {["Fotoğraflar ve ilan açıklaması", "Fiyat sağlığı (emsal karşılaştırması)", "Portal ve vitrin yayını"].map((item) => (
+            <li key={item} className="flex items-center gap-2">
+              <span aria-hidden="true" className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand-600/10 text-brand-700">
+                <Check className="h-3 w-3" strokeWidth={3} />
+              </span>
+              {item}
+            </li>
           ))}
-        </nav>
+        </ul>
+      </div>
+    ),
+  };
 
-        <div id="temel" className="scroll-mt-24">
-          <FormSection title="Temel bilgi" description="İlanın başlığı ve türü.">
-            <FormField label="Portföy başlığı" htmlFor="property-title" required className="sm:col-span-2">
-              <FormInput name="title" required placeholder="Örn. Onikişubat Tekerek 4+1" />
-            </FormField>
-            <SelectField id="transaction-type" name="transaction_type" label="İşlem türü" required defaultValue="Satılık">
-              {transactionTypes.map((type) => <option key={type}>{type}</option>)}
-            </SelectField>
-            <SelectField id="property-type" name="property_type" label="Portföy türü" required defaultValue="Daire">
-              {propertyTypes.map((type) => <option key={type}>{type}</option>)}
-            </SelectField>
-            <FormField label="Oda" htmlFor="rooms">
-              <FormInput name="rooms" placeholder="4+1" />
-            </FormField>
-            <FormField label="Brüt m²" htmlFor="sqm">
-              <FormInput name="sqm" inputMode="decimal" placeholder="185" />
-            </FormField>
-            {branches.length > 0 ? (
-              <SelectField id="property-branch" name="branch_id" label="Şube" defaultValue="" className="sm:col-span-2">
-                <option value="">Şube atanmadı</option>
-                {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </SelectField>
-            ) : null}
-          </FormSection>
+  function renderSummary({ values }: TabbedSummaryContext) {
+    const title = (values.title ?? "").trim();
+    const price = parseLooseNumber(values.list_price);
+    const rate = parseLooseNumber(values.commission_rate);
+    const sqm = parseLooseNumber(values.sqm);
+    const calc = commissionSummary(values.list_price, values.commission_rate, values.sqm);
+    const province = provinces.find((p) => p.id === values.province_id)?.name;
+    const branch = branches.find((b) => b.id === values.branch_id)?.name;
+    const chips = [values.transaction_type, values.property_type, (values.rooms ?? "").trim(), sqm ? `${formatNumber(sqm)} m²` : ""].filter(Boolean);
+    return (
+      <>
+        <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
+          <p className="line-clamp-2 text-sm font-semibold text-ink-950">{title || "Portföy başlığı girilmedi"}</p>
+          {chips.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {chips.map((c) => (
+                <span key={c} className="rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-medium text-brand-700">{c}</span>
+              ))}
+            </div>
+          ) : null}
+          <p className="numeric mt-3 text-lg font-semibold text-ink-950">{price != null && price > 0 ? formatTry(price) : "Fiyat girilmedi"}</p>
         </div>
+        <SummaryGroup title="Fiyat ve komisyon">
+          <SummaryRow label="Liste fiyatı" value={price != null && price > 0 ? formatTry(price) : "Zorunlu"} muted={!(price != null && price > 0)} tab="fiyat" field="list_price" />
+          <SummaryRow label="Komisyon oranı" value={rate != null && rate > 0 ? `%${formatNumber(rate)}` : "Zorunlu"} muted={!(rate != null && rate > 0)} tab="fiyat" field="commission_rate" />
+          <SummaryRow label="Tahmini komisyon" value={calc ? formatTry(calc.amount) : "Fiyat ve oran girilince"} muted={!calc} tab="fiyat" field="list_price" />
+          <SummaryRow label="m² birim fiyatı" value={calc?.perSqm ? formatTry(calc.perSqm) : "Fiyat ve m² girilince"} muted={!calc?.perSqm} tab="temel" field="sqm" />
+        </SummaryGroup>
+        <SummaryGroup title="Konum">
+          <SummaryRow label="İl" value={province ?? "Seçilmedi"} muted={!province} tab="konum" />
+          {branches.length > 0 ? <SummaryRow label="Şube" value={branch ?? "Atanmadı"} muted={!branch} tab="temel" field="branch_id" /> : null}
+        </SummaryGroup>
+      </>
+    );
+  }
 
-        <div id="konum" className="scroll-mt-24">
-          {/* İl/İlçe/Mahalle: emsal motoru (find_comparables) ilçe üzerinden çalışır. */}
-          <FormSection title="Konum" description="İl, ilçe, mahalle ve harita noktası emsal analizini besler.">
-            <GeoSelect provinces={provinces} className="sm:col-span-2" />
-            <FormField label="Adres özeti" htmlFor="address-line" className="sm:col-span-2">
-              <FormInput name="address_line" placeholder="Cadde, sokak, kapı no…" />
-            </FormField>
-            <LatLngPicker fieldClass={fieldClass} />
-          </FormSection>
-        </div>
-
-        <div id="fiyat" className="scroll-mt-24">
-          <FormSection title="Fiyat ve komisyon">
-            <FormField label="Liste fiyatı" htmlFor="list-price" required>
-              <FormInput name="list_price" required inputMode="decimal" placeholder="6.750.000" />
-            </FormField>
-            <FormField label="Komisyon oranı (%)" htmlFor="commission-rate" required>
-              <FormInput name="commission_rate" required inputMode="decimal" min="0.01" max="100" step="0.01" placeholder="3" />
-            </FormField>
-          </FormSection>
-        </div>
-
-        <div id="ozellikler" className="scroll-mt-24">
-          {/* features jsonb'ye portal/broşürle AYNI anahtarlarla yazılır (floor, heating, building_age, facade) + tapu ada/parsel. */}
-          <FormSection title="Özellikler" description="Kat, ısınma, bina yaşı ve tapu bilgileri (isteğe bağlı).">
-            <FormField label="Bulunduğu kat" htmlFor="floor">
-              <FormInput name="floor" inputMode="numeric" placeholder="Örn. 3 (bodrum için -1)" />
-            </FormField>
-            <SelectField id="heating" name="heating" label="Isınma" defaultValue="">
-              <option value="">Seçilmedi</option>
-              {HEATING_OPTIONS.map((h) => <option key={h}>{h}</option>)}
-            </SelectField>
-            <FormField label="Bina yaşı" htmlFor="building-age">
-              <FormInput name="building_age" inputMode="numeric" placeholder="Örn. 5" />
-            </FormField>
-            <SelectField id="facade" name="facade" label="Cephe (ops.)" defaultValue="">
-              <option value="">Seçilmedi</option>
-              {FACADE_OPTIONS.map((f) => <option key={f}>{f}</option>)}
-            </SelectField>
-            <FormField label="Tapu — Ada" htmlFor="parcel-block">
-              <FormInput name="parcel_block" placeholder="Örn. 1234" />
-            </FormField>
-            <FormField label="Tapu — Parsel" htmlFor="parcel-lot">
-              <FormInput name="parcel_lot" placeholder="Örn. 56" />
-            </FormField>
-          </FormSection>
-        </div>
-
-        <div id="not" className="scroll-mt-24 rounded-[var(--radius-card)] border border-brand-300/40 bg-brand-600/5 px-4 py-3">
-          <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
-            <Sparkles className="h-4 w-4" /> Portföy taslak olarak açılır; fotoğraf, açıklama, fiyat sağlığı ve portal akışı sonraki adımda detay sayfasında tamamlanır.
-          </p>
-        </div>
-
-        <FormError error={error} />
-
-        <FormActions>
-          <ButtonLink href="/app/portfoyler" variant="secondary">İptal</ButtonLink>
-          <Button type="submit" loading={pending}>
-            {pending ? null : <Check className="h-4 w-4" />} Portföyü oluştur
-          </Button>
-        </FormActions>
-      </FormPage>
-    </form>
+  return (
+    <TabbedFormShell
+      title="Yeni portföy oluştur"
+      description="Temel bilgilerle taslak portföy açın."
+      breadcrumbs={[{ label: "Portföyler", href: "/app/portfoyler" }, { label: "Yeni" }]}
+      cancelHref="/app/portfoyler"
+      submitLabel="Portföyü oluştur"
+      submitIcon={Check}
+      pending={pending}
+      error={error}
+      onSubmit={onSubmit}
+      tabs={tabs}
+      tabPanels={tabPanels}
+      summary={renderSummary}
+      fieldLabels={FIELD_LABELS}
+      draft={{ userId, formId: PROPERTY_FORM_ID, fields: [...PROPERTY_DRAFT_FIELDS] }}
+    />
   );
 }
-
