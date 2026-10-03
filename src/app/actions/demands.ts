@@ -17,6 +17,7 @@ import {
   type DemandCriteria,
 } from "@/lib/demand-criteria";
 import { pruneRequiredKeys, validateGeoChain } from "@/lib/demand-geo";
+import { findSimilarOpenDemands } from "@/lib/duplicate-finders";
 
 export type DemandResult = { error?: string; ok?: boolean; id?: string };
 
@@ -63,6 +64,27 @@ export async function createDemand(
     .maybeSingle();
 
   if (!customer) return { error: "Müşteri bu ofise ait değil." };
+
+  // Giriş anı mükerrer kontrolü: aynı müşterinin benzer açık talebi varsa kasıtlı onay (allow_duplicate=1) gerekir.
+  if (String(formData.get("allow_duplicate") ?? "") !== "1") {
+    const dups = await findSimilarOpenDemands(
+      supabase,
+      {
+        tenantId: gate.tenantId,
+        customerId,
+        transactionType,
+        propertyType,
+        districtId: columns.district_id ?? "",
+      },
+      { userId: gate.userId, officeWide: false },
+    );
+    if (dups.length > 0) {
+      return {
+        error:
+          "Bu müşterinin benzer bir açık talebi var. Formdaki uyarıyı inceleyin; yine de yeni talep açmak için \"Yine de yeni talep\" seçin.",
+      };
+    }
+  }
 
   const { data, error } = await supabase
     .from("customer_demands")

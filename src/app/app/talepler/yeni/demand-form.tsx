@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Save, UserRound } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { createDemand } from "@/app/actions/demands";
+import { DuplicateHint } from "@/components/app/duplicate-hint";
 import { DemandSummaryGroups } from "@/components/app/demand-summary";
 import { StructuredDemandFields, useDemandRequired } from "@/components/app/structured-demand-fields";
 import { useCreateForm } from "@/components/app/use-create-form";
@@ -177,6 +178,7 @@ export function DemandForm({
       submitIcon={Save}
       pending={pending}
       error={error}
+      notice={<DuplicateHint kind="demand" />}
       onSubmit={onSubmit}
       tabs={tabs}
       tabPanels={tabPanels}

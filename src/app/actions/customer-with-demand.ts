@@ -13,6 +13,7 @@ import {
 } from "@/lib/demand-criteria";
 import { createCustomer } from "@/app/actions/customers";
 import { createDemand } from "@/app/actions/demands";
+import { findCustomerDuplicates } from "@/lib/duplicate-finders";
 
 export type CustomerWithDemandResult = {
   error?: string;
@@ -82,6 +83,28 @@ export async function createCustomerWithDemand(
   // oluşturduğu müşteri varsa yenisi açılmaz, mevcut kayıt döndürülür (idempotent).
   const recent = await findRecentDuplicateCustomer(formData);
   if (recent) return { ok: true, id: recent };
+
+  // Giriş anı mükerrer kontrolü: aynı telefon/e-posta ofiste varsa kasıtlı onay (allow_duplicate=1) olmadan kaydedilmez.
+  if (String(formData.get("allow_duplicate") ?? "") !== "1") {
+    const gate = await requirePermission("customers", "create");
+    if (gate.ok) {
+      const dups = await findCustomerDuplicates(
+        await createClient(),
+        {
+          tenantId: gate.tenantId,
+          phone: String(formData.get("phone") ?? ""),
+          email: String(formData.get("email") ?? ""),
+        },
+        { userId: gate.userId, officeWide: false },
+      );
+      if (dups.length > 0) {
+        return {
+          error:
+            "Bu telefon/e-posta ile ofiste kayıt var. Formdaki uyarıyı inceleyin; yine de yeni kayıt açmak için \"Yine de yeni kayıt\" seçin.",
+        };
+      }
+    }
+  }
 
   const customer = await createCustomer({}, formData);
   if (!customer.ok || !customer.id) return { error: customer.error ?? "Müşteri eklenemedi." };
