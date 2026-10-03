@@ -9,6 +9,7 @@ import {
   LifeBuoy,
   MapPin,
   Radar,
+  Palette,
   Search,
   User,
   Users,
@@ -42,6 +43,7 @@ const ALL_NAV: NavCmd[] = [
   { label: "Raporlar", href: "/admin/raporlar", icon: BarChart3, module: "reports" },
   { label: "Coğrafya", href: "/admin/geo", icon: MapPin, module: "geo" },
   { label: "Sistem sağlığı", href: "/admin/sistem", icon: Radar, module: "sistem" },
+  { label: "Marka (logo ve favicon)", href: "/admin/marka", icon: Palette, module: "marka" },
 ];
 
 // Yalnız yetkili sayfalar kaydedilir ve gösterilir (kayıt içeriği KVKK gereği saklanmaz).

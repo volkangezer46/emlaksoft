@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="EmlakSoft"><defs>
+<linearGradient id="m-t" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1b3a78"/><stop offset="1" stop-color="#071a38"/></linearGradient>
+<linearGradient id="m-b" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b82ff"/><stop offset="1" stop-color="#1463ff"/></linearGradient>
+<linearGradient id="m-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6d27a"/><stop offset="1" stop-color="#d9a441"/></linearGradient>
+</defs><rect width="64" height="64" rx="15" fill="url(#m-b)"/><rect x=".5" y=".5" width="63" height="63" rx="14.5" fill="none" stroke="#ffffff" stroke-opacity=".22"/><path d="M9 29 32 9.5 55 29" fill="none" stroke="url(#m-g)" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round"/>
+<g fill="#ffffff"><rect x="19" y="32" width="6.4" height="22.5" rx="2.2"/><rect x="19" y="32" width="26" height="6.2" rx="2.2"/><rect x="19" y="48.3" width="26" height="6.2" rx="2.2"/></g>
+<rect x="19" y="40.1" width="20" height="6.2" rx="2.2" fill="#cfe0ff"/></svg>

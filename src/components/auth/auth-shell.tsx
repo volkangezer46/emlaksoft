@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Brand } from "@/components/brand/brand";
 import { Building2, ShieldCheck, Sparkles, TrendingUp, Wallet } from "lucide-react";
 
 /**
@@ -23,8 +24,8 @@ export function AuthShell({
         <div className="pointer-events-none absolute -right-16 bottom-[-8%] h-[360px] w-[360px] rounded-full bg-cyan-400/20 blur-[90px]" />
 
         <div className="relative flex flex-1 flex-col justify-between p-10 xl:p-14">
-          <Link href="/" className="font-display text-xl font-extrabold text-white">
-            EmlakSoft
+          <Link href="/" aria-label="EmlakSoft ana sayfa" className="inline-flex">
+            <Brand variant="horizontal" tone="dark" height={40} alt="" />
           </Link>
 
           <div className="max-w-md">
@@ -60,8 +61,8 @@ export function AuthShell({
       {/* Sağ: form alanı */}
       <main id="main-content" className="flex items-center justify-center px-4 py-10 sm:px-8">
         <div className="w-full max-w-md">
-          <Link href="/" className="font-display text-lg font-extrabold text-ink-950 lg:hidden">
-            EmlakSoft
+          <Link href="/" aria-label="EmlakSoft ana sayfa" className="inline-flex lg:hidden">
+            <Brand variant="horizontal" tone="light" height={34} alt="" />
           </Link>
           {children}
         </div>

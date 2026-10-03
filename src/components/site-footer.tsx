@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Brand } from "@/components/brand/brand";
 import { ArrowRight, FileSignature, Scale, ShieldCheck } from "lucide-react";
 import { PLANS } from "@/lib/billing/plans";
 import { trParts } from "@/lib/clock";
@@ -59,7 +60,7 @@ export function SiteFooter() {
         <div className="mk-foot-grid">
           <div className="mk-foot-brand">
             <Link href="/" className="mk-logo" style={{ color: "#fff" }} aria-label="EmlakSoft ana sayfa">
-              <i aria-hidden="true" style={{ background: "#1463ff" }}>E</i>EmlakSoft
+              <Brand variant="horizontal" tone="dark" height={36} alt="" />
             </Link>
             <p style={{ margin: "1rem 0 0", maxWidth: "18rem", fontSize: "0.9375rem", lineHeight: 1.6 }}>
               Emlak ofisleri için müşteri, portföy, anlaşma ve komisyon akışını tek panelde toplayan abonelikli yazılım.

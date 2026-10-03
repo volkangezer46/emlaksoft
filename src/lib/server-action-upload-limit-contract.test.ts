@@ -42,6 +42,7 @@ describe("Server Action binary body limit", () => {
   it("allows binary Server Action bodies only in the bounded logo/photo actions", () => {
     expect(binaryActionFiles).toEqual([
       "src/app/actions/agent-profile.ts",
+      "src/app/actions/platform-brand.ts",
       "src/app/actions/tenant-logo.ts",
     ]);
 
@@ -51,6 +52,7 @@ describe("Server Action binary body limit", () => {
     expect(logo).toContain("file.size > MAX_SIZE");
     expect(profile).toContain("const PHOTO_MAX_SIZE = 3 * 1024 * 1024");
     expect(profile).toContain("file.size > PHOTO_MAX_SIZE");
+    expect(source("src/app/actions/platform-brand.ts")).toContain("file.size > HARD_FILE_LIMIT");
   });
 
   it("keeps larger customer/property files on the signed direct-upload path", () => {
