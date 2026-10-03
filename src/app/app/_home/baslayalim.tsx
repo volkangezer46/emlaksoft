@@ -16,7 +16,7 @@ export async function KurulumSeridi({ ctx }: { ctx: HomeCtx }) {
   return (
     <Link
       href="/app/baslangic"
-      className="focus-ring surface-card group flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[var(--radius-card)] px-4 py-3 transition hover:border-brand-300"
+      className="focus-ring pm-bx group flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition hover:border-brand-300"
     >
       <span className="text-sm font-bold text-ink-950">Kurulum %{state.percent}</span>
       <Progress value={state.percent} label="Kurulum ilerlemesi" className="min-w-24 flex-1" />
@@ -41,7 +41,7 @@ export async function BosOfisKapisi({ ctx, children }: { ctx: HomeCtx; children:
 
 function Baslayalim() {
   return (
-    <section className="surface-card rounded-[var(--radius-panel)] border border-brand-300/60 bg-brand-600/[0.04] p-6">
+    <section className="pm-bx border border-brand-300/60 bg-brand-600/[0.04] p-6">
       <div className="flex items-start gap-3">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
           <Rocket className="h-5 w-5" aria-hidden />

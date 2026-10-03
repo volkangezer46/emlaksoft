@@ -12,7 +12,7 @@ export async function PortalSagligi() {
 
   return (
     <Widget id="portal" className="h-full">
-      <section className="dashboard-panel surface-card h-full rounded-[var(--radius-panel)] p-5">
+      <section className="pm-bx h-full p-5">
         <div className="flex items-center justify-between">
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
@@ -70,7 +70,7 @@ export async function Ekip({ ctx }: { ctx: HomeCtx }) {
 
   return (
     <Widget id="ekip" className="h-full">
-      <section className="dashboard-panel surface-card h-full rounded-[var(--radius-panel)] p-5">
+      <section className="pm-bx h-full p-5">
         <div className="flex items-center justify-between">
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-amber-500">

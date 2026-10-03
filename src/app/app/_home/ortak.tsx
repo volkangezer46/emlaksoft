@@ -84,7 +84,7 @@ export function PanelIskelet({ rows = 3, className = "" }: { rows?: number; clas
     <div
       role="status"
       aria-busy="true"
-      className={`space-y-2.5 rounded-[var(--radius-panel)] border border-line bg-surface p-5 ${className}`}
+      className={`space-y-2.5 rounded-[var(--pm-r)] border border-line bg-surface p-5 ${className}`}
     >
       <span className="sr-only">Yükleniyor</span>
       <Skeleton className="h-4 w-1/2" />
@@ -99,7 +99,7 @@ export function BlokIskelet({ className = "h-56" }: { className?: string }) {
   return (
     <div role="status" aria-busy="true">
       <span className="sr-only">Yükleniyor</span>
-      <Skeleton className={`${className} rounded-[var(--radius-panel)]`} />
+      <Skeleton className={`${className} rounded-[var(--pm-r)]`} />
     </div>
   );
 }

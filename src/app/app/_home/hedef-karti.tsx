@@ -2,9 +2,14 @@ import Link from "next/link";
 import { Trophy } from "lucide-react";
 import { moneyTry } from "@/lib/leak-shield";
 import { TR_OFFSET_MS, msSince, trParts } from "@/lib/clock";
+import { EmptyArt, Ring } from "@/components/ui/premium";
 import { loadCommissionSummary, loadDeals, loadOfficeTarget, type HomeCtx } from "./data";
 
-/** Aylık ofis hedefi — targets (profile_id null, bu ay); tanımlı hedef yoksa gizli. */
+/**
+ * Aylık ofis hedefi — targets (profile_id null, bu ay). Halka ilerlemesi GERÇEK orandır
+ * (gelir hedefi varsa gelir, yoksa anlaşma); tanımsızsa yüzde uydurulmaz, tek eylem
+ * satırı gösterilir.
+ */
 export async function HedefKarti({ ctx }: { ctx: HomeCtx }) {
   const [officeTarget, commissionSummary, deals] = await Promise.all([
     loadOfficeTarget(ctx),
@@ -14,7 +19,16 @@ export async function HedefKarti({ ctx }: { ctx: HomeCtx }) {
 
   const targetRevenue = Number(officeTarget?.target_revenue ?? 0);
   const targetDeals = Number(officeTarget?.target_deals ?? 0);
-  if (!officeTarget || (targetRevenue <= 0 && targetDeals <= 0)) return null;
+  if (!officeTarget || (targetRevenue <= 0 && targetDeals <= 0)) {
+    return (
+      <Link href="/app/hedefler" className="pm-bx focus-ring pm-empty block h-full p-5">
+        <EmptyArt kind="chart" className="mx-auto" />
+        <p className="mt-2 font-semibold text-[var(--text)]">Aylık hedef belirlenmemiş</p>
+        <p className="mt-1">Hedef koyunca ilerleme halkası burada görünür.</p>
+        <span className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent-text)]">Aylık hedef belirle</span>
+      </Link>
+    );
+  }
 
   // Gerçekleşen gelir: bu ay oluşan komisyon toplamı; anlaşma: bu ay won'a geçen kartlar
   // (deals.updated_at yaklaşımı — won sonrası güncelleme nadir).
@@ -30,72 +44,57 @@ export async function HedefKarti({ ctx }: { ctx: HomeCtx }) {
     0,
     Math.min(100, Math.round((msSince(monthStart) / (monthEnd.getTime() - monthStart.getTime())) * 100)),
   );
-  // Tempo: /app/hedefler ile aynı 10 puanlık tolerans — geride kalınca amber
+  // Tempo: /app/hedefler ile aynı 10 puanlık tolerans
   const targetProgress = Math.max(targetRevenuePct, targetDealsPct);
   const targetBehind = monthElapsedPct < 100 && targetProgress < monthElapsedPct - 10;
   const targetExceeded = targetRevenue > 0 && targetRevenuePct >= 100;
+  const mainPct = targetRevenue > 0 ? targetRevenuePct : targetDealsPct;
 
   return (
-    <Link
-      href="/app/hedefler"
-      className="surface-card focus-ring group block rounded-[var(--radius-panel)] p-5 transition hover:border-brand-300"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
-          <Trophy className="h-4 w-4" /> Aylık hedef
-          <span className="font-medium text-text-faint">· ofis geneli · ayın %{monthElapsedPct}&apos;i geçti</span>
+    <Link href="/app/hedefler" className="pm-bx focus-ring group block h-full p-5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="pm-bx-eyebrow flex items-center gap-1.5">
+          <Trophy className="h-4 w-4" aria-hidden="true" /> Aylık hedef
         </p>
-        {targetExceeded ? (
-          <span className="rounded-full bg-mint-500/12 px-2.5 py-1 text-xs font-bold text-mint-600">Hedef aşıldı 🎉</span>
-        ) : (
-          <span
-            className={`rounded-full px-2.5 py-1 text-xs font-bold tabular-nums ${
-              targetBehind ? "bg-amber-400/15 text-amber-600" : "bg-brand-600/10 text-brand-600"
+        <span className="text-xs text-[var(--text-muted)]">Ayın %{monthElapsedPct}&apos;i geçti</span>
+      </div>
+      <div className="mt-4 flex items-center gap-4">
+        <Ring
+          pct={mainPct}
+          size={104}
+          stroke={10}
+          tone={targetExceeded ? "success" : "gold"}
+          ariaLabel={`Aylık hedef ilerlemesi yüzde ${mainPct}${mainPct > 100 ? " (hedef aşıldı)" : ""}`}
+        >
+          <span className="pm-num text-xl leading-none">%{mainPct}</span>
+        </Ring>
+        <div className="min-w-0 flex-1 space-y-3 text-sm">
+          {targetRevenue > 0 && (
+            <div>
+              <p className="text-xs text-[var(--text-muted)]">Komisyon geliri</p>
+              <p className="pm-num text-base">
+                <span className="pm-money">{moneyTry(monthCommission)}</span>
+                <span className="font-medium text-[var(--text-muted)]"> / {moneyTry(targetRevenue)}</span>
+              </p>
+            </div>
+          )}
+          {targetDeals > 0 && (
+            <div>
+              <p className="text-xs text-[var(--text-muted)]">Anlaşma</p>
+              <p className="pm-num text-base">
+                {wonThisMonth}
+                <span className="font-medium text-[var(--text-muted)]"> / {targetDeals}</span>
+              </p>
+            </div>
+          )}
+          <p
+            className={`text-xs font-semibold ${
+              targetExceeded ? "text-[var(--pm-success-text)]" : targetBehind ? "text-[var(--pm-warn-text)]" : "text-[var(--text-muted)]"
             }`}
           >
-            %{targetRevenue > 0 ? targetRevenuePct : targetDealsPct}
-          </span>
-        )}
-      </div>
-      <div className="mt-3 grid gap-x-5 gap-y-3 sm:grid-cols-[1.6fr_1fr]">
-        {targetRevenue > 0 && (
-          <div>
-            <div className="mb-1 flex items-center justify-between text-xs">
-              <span className="text-text-muted">Komisyon geliri</span>
-              <span className="font-semibold tabular-nums text-ink-950">
-                {moneyTry(monthCommission)} / {moneyTry(targetRevenue)}
-              </span>
-            </div>
-            <div className="relative h-2 overflow-hidden rounded-full bg-canvas">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  targetExceeded ? "bg-mint-500" : targetBehind ? "bg-amber-400" : "bg-[image:var(--grad-brand)]"
-                }`}
-                style={{ width: `${Math.min(100, targetRevenuePct)}%` }}
-              />
-              {/* Ayın geçen yüzdesi referans çizgisi (bkz. /app/hedefler tempo çubuğu) */}
-              <div className="absolute inset-y-0 w-0.5 bg-ink-950/30" style={{ left: `${monthElapsedPct}%` }} />
-            </div>
-          </div>
-        )}
-        {targetDeals > 0 && (
-          <div>
-            <div className="mb-1 flex items-center justify-between text-xs">
-              <span className="text-text-muted">Anlaşma</span>
-              <span className="font-semibold tabular-nums text-ink-950">
-                {wonThisMonth} / {targetDeals}
-              </span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-canvas">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  targetDealsPct >= 100 ? "bg-mint-500" : targetBehind ? "bg-amber-400" : "bg-brand-600"
-                }`}
-                style={{ width: `${Math.min(100, targetDealsPct)}%` }}
-              />
-            </div>
-          </div>
-        )}
+            {targetExceeded ? "Hedef aşıldı" : targetBehind ? "Tempo geride" : "Tempo yolunda"}
+          </p>
+        </div>
       </div>
     </Link>
   );

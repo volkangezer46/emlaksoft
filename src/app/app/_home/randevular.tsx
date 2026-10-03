@@ -23,7 +23,7 @@ export async function Randevular({ ctx }: { ctx: HomeCtx }) {
 
   return (
     <Widget id="randevular" className="h-full">
-      <section className="surface-card h-full rounded-[var(--radius-panel)] p-5">
+      <section className="pm-bx h-full p-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-amber-500" />

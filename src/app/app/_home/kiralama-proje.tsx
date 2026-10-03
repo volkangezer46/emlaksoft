@@ -33,7 +33,7 @@ export async function KiralamaProje({ ctx }: { ctx: HomeCtx }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {showRentalCard && (
-        <section className="surface-card rounded-[var(--radius-panel)] p-5">
+        <section className="pm-bx p-5">
           <div className="flex items-center justify-between">
             <p className="flex items-center gap-2 text-xs font-semibold text-cyan-600">
               <KeyRound className="h-4 w-4" /> Kiralama
@@ -75,7 +75,7 @@ export async function KiralamaProje({ ctx }: { ctx: HomeCtx }) {
       )}
 
       {showProjectCard && (
-        <section className="surface-card rounded-[var(--radius-panel)] p-5">
+        <section className="pm-bx p-5">
           <div className="flex items-center justify-between">
             <p className="flex items-center gap-2 text-xs font-semibold text-mint-600">
               <Layers className="h-4 w-4" /> Projeler
