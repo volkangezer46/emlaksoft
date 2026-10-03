@@ -118,7 +118,7 @@ export function RoiCalculator({ plans, defaultPlanId }: { plans: RoiPlanOption[]
                   <Row dt="Kaçan komisyon / paket bedeli" dd={`${formatNum(result.coverage)} kat`} />
                 ) : null}
                 {result.breakEvenDeals !== null ? (
-                  <Row dt="Paket bedelini çıkarmak için gereken kapanış" dd={`ayda ${formatNum(result.breakEvenDeals)} satış`} />
+                  <Row dt="Paket bedelini çıkarmak için gereken kapanış" dd={`ayda ${formatNum(result.breakEvenDeals, 2)} satış`} />
                 ) : null}
                 <Row dt="Fark (kaçan komisyon - paket bedeli)" dd={formatTry(result.netMonthly)} />
               </dl>

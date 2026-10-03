@@ -115,6 +115,6 @@ const NUM = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 });
 export function formatTry(n: number): string {
   return TRY.format(Number.isFinite(n) ? n : 0);
 }
-export function formatNum(n: number): string {
-  return NUM.format(Number.isFinite(n) ? n : 0);
+export function formatNum(n: number, digits = 1): string {
+  return (digits === 1 ? NUM : new Intl.NumberFormat("tr-TR", { maximumFractionDigits: digits })).format(Number.isFinite(n) ? n : 0);
 }

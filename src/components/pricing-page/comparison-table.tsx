@@ -7,7 +7,7 @@ export function ComparisonTable() {
   const groups = buildComparison();
   return (
     <div
-      className="overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-sm)]"
+      className="relative overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-sm)]"
       role="region"
       aria-label="Paket karşılaştırma tablosu, yatay kaydırılabilir"
       tabIndex={0}
