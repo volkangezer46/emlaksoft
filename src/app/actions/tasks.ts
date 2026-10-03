@@ -109,6 +109,8 @@ export async function createTask(_prev: TaskResult, formData: FormData): Promise
   const assignedTo = String(formData.get("assigned_to") ?? "").trim();
   const customerId = String(formData.get("customer_id") ?? "").trim();
   const propertyId = String(formData.get("property_id") ?? "").trim();
+  // İsteğe bağlı anlaşma bağı (anlaşma kapanış sihirbazı): yalnız aynı ofisin anlaşması kabul edilir.
+  const dealId = String(formData.get("deal_id") ?? "").trim();
   const recurrenceRaw = String(formData.get("recurrence") ?? "").trim();
 
   if (!title) return { error: "Görev başlığı zorunlu." };
@@ -126,6 +128,15 @@ export async function createTask(_prev: TaskResult, formData: FormData): Promise
   if (!references.ok) return { error: references.error };
 
   const supabase = await createClient();
+  if (dealId) {
+    const { data: ownDeal } = await supabase
+      .from("deals")
+      .select("id")
+      .eq("id", dealId)
+      .eq("tenant_id", gate.tenantId)
+      .maybeSingle();
+    if (!ownDeal) return { error: "Anlaşma bulunamadı." };
+  }
   const { data, error } = await supabase
     .from("tasks")
     .insert({
@@ -135,6 +146,7 @@ export async function createTask(_prev: TaskResult, formData: FormData): Promise
       kind,
       priority,
       status: "open",
+      deal_id: dealId || null,
       due_at: dueRaw ? (parseTrLocalDateTime(dueRaw)?.toISOString() ?? null) : null,
       assigned_to: assignedTo || gate.userId,
       customer_id: customerId || null,
@@ -173,6 +185,7 @@ export async function createTask(_prev: TaskResult, formData: FormData): Promise
 
   revalidatePath("/app/gorevler");
   if (customerId) revalidatePath(`/app/musteriler/${customerId}`);
+  if (dealId) revalidatePath(`/app/anlasmalar/${dealId}`);
   return { ok: true, id: data.id };
 }
 

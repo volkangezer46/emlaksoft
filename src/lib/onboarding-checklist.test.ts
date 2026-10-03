@@ -1,22 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { buildOnboarding, isProfileComplete, type OnboardingCounts } from "./onboarding-checklist";
+import {
+  buildOnboarding,
+  isProfileComplete,
+  resolveWizardStep,
+  wizardNeighbors,
+  type OnboardingCounts,
+} from "./onboarding-checklist";
 
 const empty: OnboardingCounts = {
   profileFilled: { phone: false, city: false, licenseNo: false },
   customers: 0,
   properties: 0,
-  wonDeals: 0,
   members: 1,
   activeIntegrations: 0,
+  customDefinitions: 0,
+  publishedProperties: 0,
 };
 
 describe("onboarding-checklist", () => {
-  it("boş ofis: %0, ilk adım profil", () => {
+  it("boş ofis: %0, ilk adım ofis bilgileri", () => {
     const s = buildOnboarding(empty);
     expect(s.percent).toBe(0);
-    expect(s.nextId).toBe("profile");
+    expect(s.nextId).toBe("office");
     expect(s.total).toBe(6);
     expect(s.complete).toBe(false);
+    expect(s.settled).toBe(false);
   });
 
   it("profil için en az iki alan gerekir", () => {
@@ -24,7 +32,7 @@ describe("onboarding-checklist", () => {
     expect(isProfileComplete({ phone: true, city: true, licenseNo: false })).toBe(true);
   });
 
-  it("yüzde ve sonraki adım ilerlemeyi izler", () => {
+  it("yüzde ve sonraki adım gerçek veriden hesaplanır", () => {
     const s = buildOnboarding({
       ...empty,
       customers: 3,
@@ -33,38 +41,48 @@ describe("onboarding-checklist", () => {
     });
     expect(s.doneCount).toBe(3);
     expect(s.percent).toBe(50);
-    expect(s.nextId).toBe("deal");
+    expect(s.nextId).toBe("team");
   });
 
   it("atlanan adım sonraki adım seçilmez ama tamamlanmış sayılmaz", () => {
-    const s = buildOnboarding(empty, ["profile"]);
-    expect(s.nextId).toBe("customer");
+    const s = buildOnboarding(empty, ["office"]);
+    expect(s.nextId).toBe("team");
     expect(s.steps[0].done).toBe(false);
+    expect(s.doneCount).toBe(0);
   });
 
-  it("hepsi bitince complete ve nextId null", () => {
+  it("hepsi atlanınca settled, complete değil", () => {
+    const s = buildOnboarding(empty, ["office", "team", "data", "property", "defs", "portals"]);
+    expect(s.nextId).toBeNull();
+    expect(s.settled).toBe(true);
+    expect(s.complete).toBe(false);
+  });
+
+  it("tüm adımlar dolu: complete", () => {
     const s = buildOnboarding({
       profileFilled: { phone: true, city: true, licenseNo: true },
       customers: 1,
       properties: 1,
-      wonDeals: 1,
       members: 2,
-      activeIntegrations: 1,
+      activeIntegrations: 0,
+      customDefinitions: 2,
+      publishedProperties: 1,
     });
     expect(s.complete).toBe(true);
     expect(s.percent).toBe(100);
-    expect(s.nextId).toBeNull();
+    expect(resolveWizardStep(undefined, s)).toBe("bitis");
   });
 
-  it("komisyon adımı kazanılmış anlaşmaya bağlıdır, elle komisyon yoktur", () => {
-    const open = buildOnboarding(empty).steps.find((x) => x.id === "deal")!;
-    expect(open.done).toBe(false);
-    expect(open.href).toBe("/app/anlasmalar/yeni");
-    const won = buildOnboarding({ ...empty, wonDeals: 1 }).steps.find((x) => x.id === "deal")!;
-    expect(won.done).toBe(true);
+  it("adım çözümü: geçerli istek kazanır, geçersiz sıradakine düşer", () => {
+    const s = buildOnboarding(empty);
+    expect(resolveWizardStep("data", s)).toBe("data");
+    expect(resolveWizardStep("bitis", s)).toBe("bitis");
+    expect(resolveWizardStep("yok", s)).toBe("office");
   });
 
-  it("her adımın hedefi /app ile başlar", () => {
-    for (const st of buildOnboarding(empty).steps) expect(st.href.startsWith("/app/")).toBe(true);
+  it("geri/ileri komşuları", () => {
+    expect(wizardNeighbors("office")).toEqual({ prev: null, next: "team" });
+    expect(wizardNeighbors("portals")).toEqual({ prev: "defs", next: "bitis" });
+    expect(wizardNeighbors("bitis")).toEqual({ prev: "portals", next: null });
   });
 });
