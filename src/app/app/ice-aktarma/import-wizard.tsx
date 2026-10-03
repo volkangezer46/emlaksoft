@@ -44,6 +44,7 @@ import {
   fieldsFor,
   guessMapping,
   IMPORT_CHUNK_SIZE,
+  IMPORT_MAX_FILE_BYTES,
   IMPORT_ROW_LIMIT,
   MAX_ERRORS_SHOWN,
   parseCsv,
@@ -201,6 +202,10 @@ export function ImportWizard({
       setFileError(
         "Excel dosyaları (.xlsx/.xls) doğrudan desteklenmiyor. Excel'de \"Dosya → Farklı Kaydet → CSV (Virgülle ayrılmış)\" ile kaydedip CSV'yi yükleyin.",
       );
+      return;
+    }
+    if (file.size > IMPORT_MAX_FILE_BYTES) {
+      setFileError(`Dosya çok büyük (en fazla ${Math.round(IMPORT_MAX_FILE_BYTES / 1024 / 1024)} MB). Dosyayı bölüp ayrı ayrı yükleyin.`);
       return;
     }
     const reader = new FileReader();

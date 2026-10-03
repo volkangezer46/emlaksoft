@@ -9,6 +9,8 @@
  */
 
 export const IMPORT_ROW_LIMIT = 5000;
+/** İstemci tarafı dosya boyutu sınırı (bellekte ArrayBuffer olarak okunur). */
+export const IMPORT_MAX_FILE_BYTES = 10 * 1024 * 1024;
 /** Sunucuya tek istekte gönderilen satır sayısı (parçalı işleme; server action body limiti 4 MB). */
 export const IMPORT_CHUNK_SIZE = 250;
 export const MAX_ERRORS_SHOWN = 50;

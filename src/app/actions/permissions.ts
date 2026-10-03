@@ -3,11 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
+import { PERMISSION_EDITOR_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
 import type { AppAction, AppModule, AppRole } from "@/lib/permissions";
 
 export type PermissionActionResult = { error?: string; ok?: boolean };
 
-const MANAGER_ROLES: AppRole[] = ["owner", "gm"];
 // owner rolü daima tam yetkilidir — bu ekrandan düzenlenemez, kendini kilitleme riskine karşı.
 const EDITABLE_ROLES: AppRole[] = [
   "gm",
@@ -22,7 +22,7 @@ const EDITABLE_ROLES: AppRole[] = [
 async function requireRoleManager() {
   const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return { error: gate.error } as const;
-  if (!MANAGER_ROLES.includes(gate.role as AppRole)) {
+  if (!PERMISSION_EDITOR_ROLES.includes(gate.role as TeamRole)) {
     return { error: "Bu işlem için yetkiniz yok. Sadece ofis sahibi ve genel müdür izin matrisini düzenleyebilir." } as const;
   }
   return { tenantId: gate.tenantId, userId: gate.userId } as const;

@@ -437,12 +437,12 @@ export async function exportRentalsCsv(filters: RentalExportFilters = {}): Promi
   }
 
   const rentals = rentalData ?? [];
-  const today = daysAgoIso(0).slice(0, 10);
+  const today = trDayKey();
   const curMonth = today.slice(0, 7);
   const curPeriodPrefix = `${curMonth}-01`;
-  const in30 = daysFromNowIso(30).slice(0, 10);
-  const in60 = daysFromNowIso(60).slice(0, 10);
-  const yeni90 = daysAgoIso(90).slice(0, 10);
+  const in30 = trDayKey(daysFromNowIso(30));
+  const in60 = trDayKey(daysFromNowIso(60));
+  const yeni90 = trDayKey(daysAgoIso(90));
 
   const curMonthByRental = new Map<string, string>();
   const overdueRentals = new Set<string>();

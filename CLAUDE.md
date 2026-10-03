@@ -61,8 +61,9 @@ Oturumlu E2E yalnız izole test DB'de, açık `E2E_MUTATION_ALLOWED=true` ve ben
 - **service_role:** `createAdminClient` kullanımı `src/lib/admin-client-allowlist.ts` kabul listesindedir; yeni kullanım
   testi kırar (`npx tsx scripts/audit-admin-client.ts --write` ile envanter ve kabul listesi yenilenir). Envanter: `docs/security/`.
 - **İletişim alanları:** her telefon girişi `PhoneInput` (`src/components/ui/phone-input.tsx`, ülke seçici, varsayılan TR,
-  saklama: TR `05XXXXXXXXX`, yabancı `+<E.164>`), her e-posta girişi `EmailInput` olmak zorundadır; sunucuda `src/lib/validation/contact.ts`
-  (`phoneSchema`/`emailSchema`) veya `parsePhone`/`normalizeEmail` ile doğrulanır. Ham `<input type="tel|email">` yazma;
+  saklama: TR `05XXXXXXXXX`, yabancı `+<E.164>`), her e-posta girişi `EmailInput` olmak zorundadır; sunucuda server action içinde `parsePhone` (`src/lib/phone.ts`) ve `normalizeEmail`/`isValidEmail` (`src/lib/email.ts`) ile
+  doğrulanıp normalize edilir (üretimdeki gerçek yol budur). `src/lib/validation/contact.ts` (zod `phoneSchema`/`emailSchema`) aynı
+  yardımcıları saran hazır şemadır ama bugün üretimde import EDİLMİYOR; zod ile doğrulanan yeni action'larda kullanılabilir. Ham `<input type="tel|email">` yazma;
   `src/lib/contact-input-contract.test.ts` yeni ihlalde kırılır.
 - **PostgREST gömmeleri:** `properties`/`customers` gibi iki FK'lı tablolara gömme her zaman FK adıyla yazılır
   (`alias:properties!<tablo>_property_id_fkey(...)`); ipucusuz gömme listeyi sessizce boş bırakır

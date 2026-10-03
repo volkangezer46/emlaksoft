@@ -12,6 +12,7 @@ import { FavNavBadge } from "./fav-nav-badge";
 import { CompareBar } from "@/components/public/compare-select";
 import { DAY_MS, msSince, now } from "@/lib/clock";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
+import { orIlike, safeLike } from "@/lib/pgrst";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 
 /** Son 7 günde yayına giren ilan "Yeni" rozeti alır (published_at gerçek yayın damgası). */
@@ -136,10 +137,9 @@ export default async function VitrinPage({
       .is("deleted_at", null);
 
     if (q) {
-      // PostgREST or() sözdizimini bozan karakterler temizlenir
-      const safe = q.replace(/[,%()]/g, " ").trim();
-      if (safe) {
-        query = query.or(`title.ilike.%${safe}%,property_code.ilike.%${safe}%,address_line.ilike.%${safe}%`);
+      // Tek yerde temizleme: PostgREST gramerini bozan karakterler ve LIKE jokerleri safeLike/orIlike ile atılır, uzunluk sınırlıdır.
+      if (safeLike(q) !== "%%") {
+        query = query.or(orIlike(["title", "property_code", "address_line"], q));
       }
     }
     if (min != null) query = query.gte("list_price", min);

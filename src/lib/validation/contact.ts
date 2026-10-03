@@ -4,8 +4,9 @@ import { DEFAULT_PHONE_COUNTRY } from "@/lib/phone-countries";
 import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
 
 /**
- * Sunucu tarafı ortak iletişim doğrulayıcıları. Server action'lar telefon/e-posta alanlarını
- * BUNLARLA doğrular (sözleşme testi: src/lib/contact-input-contract.test.ts).
+ * Zod sarmalayıcıları (parsePhone / normalizeEmail üstünde). NOT: mevcut server action'lar bugün doğrudan
+ * `parsePhone` / `normalizeEmail` + `isValidEmail` kullanır; bu şemalar henüz üretimde import edilmiyor
+ * (zod ile doğrulanan yeni action'larda kullanılabilir). Sözleşme testi: src/lib/contact-input-contract.test.ts.
  *
  * - phoneSchema: zorunlu; çıktı SAKLAMA BİÇİMİ (05XXXXXXXXX / 0XXXXXXXXXX / +<E.164>).
  * - optionalPhoneSchema: boş/null/undefined -> null; doluysa geçerli olmalı.

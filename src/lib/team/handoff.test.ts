@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { parseHandoffInput, LEGACY_HANDOFF_REASON } from "./handoff";
+import { parseHandoffInput, handoffEditableScopes } from "./handoff";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
@@ -27,18 +27,31 @@ describe("parseHandoffInput (B5)", () => {
     const none = parseHandoffInput(form({ from: A, to: B, reason: "ekipten ayrıldı", scope_customers: "0" }));
     expect(none.ok).toBe(false);
   });
-  it("eski form (alan yok): tüm kapsamlar + varsayılan gerekçe", () => {
-    const r = parseHandoffInput(form({ from: A, to: B }));
-    expect(r.ok && r.input.reason).toBe(LEGACY_HANDOFF_REASON);
-    expect(r.ok && r.input.scopes).toHaveLength(5);
+  it("eski form toleransı yok: gerekçe veya kapsam alanı yoksa reddedilir", () => {
+    expect(parseHandoffInput(form({ from: A, to: B })).ok).toBe(false);
+    expect(parseHandoffInput(form({ from: A, to: B, scope_customers: "1" })).ok).toBe(false);
+    expect(parseHandoffInput(form({ from: A, to: B, reason: "ekipten ayrıldı" })).ok).toBe(false);
+  });
+  it("gerekçe 300 karakteri aşamaz", () => {
+    expect(parseHandoffInput(form({ from: A, to: B, reason: "x".repeat(301), scope_tasks: "1" })).ok).toBe(false);
+    expect(parseHandoffInput(form({ from: A, to: B, reason: "x".repeat(300), scope_tasks: "1" })).ok).toBe(true);
+  });
+});
+
+describe("handoffEditableScopes", () => {
+  it("yalnız edit izni olan modüllerin kapsamlarını verir", () => {
+    expect(handoffEditableScopes({ customers: ["view", "edit"], commissions: ["view"], tasks: ["edit"] })).toEqual(["customers", "tasks"]);
+    expect(handoffEditableScopes({})).toEqual([]);
   });
 });
 
 describe("handoffMemberWorkload sözleşmesi (B5)", () => {
   const src = readFileSync("src/app/actions/team.ts", "utf8");
-  const fn = src.slice(src.indexOf("export async function handoffMemberWorkload"));
+  const start = src.indexOf("export async function handoffMemberWorkload");
+  const fn = src.slice(start, src.indexOf("export async function getHandoffCounts"));
   it("seçili kalem başına modül düzenleme yetkisi, audit ve geri çevirme içerir", () => {
     expect(fn).toContain("HANDOFF_PERMISSION[scope]");
+    expect(src).toContain("export async function getHandoffCounts");
     expect(fn).toContain('"edit"');
     expect(fn).toContain('"team.handoff.failed"');
     expect(fn).toContain(".update({ assigned_to: from })");

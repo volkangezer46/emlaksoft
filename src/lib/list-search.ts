@@ -20,7 +20,7 @@ export async function relatedSearchClause(
   if (!term) return { clause: null, empty: false };
   const [customers, properties] = await Promise.all([
     spec.customerColumn
-      ? supabase.from("customers").select("id").ilike("full_name", safeLike(term)).is("deleted_at", null).limit(100)
+      ? supabase.from("customers").select("id").ilike("full_name", safeLike(term)).is("deleted_at", null).order("created_at", { ascending: false }).limit(200)
       : Promise.resolve({ data: null }),
     spec.propertyColumn
       ? supabase
@@ -28,7 +28,8 @@ export async function relatedSearchClause(
           .select("id")
           .or(orIlike(["title", "property_code"], term))
           .is("deleted_at", null)
-          .limit(100)
+          .order("created_at", { ascending: false })
+          .limit(200)
       : Promise.resolve({ data: null }),
   ]);
   const parts: string[] = [];

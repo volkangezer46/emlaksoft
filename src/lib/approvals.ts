@@ -9,6 +9,7 @@
  * çağırmak render saflığını bozardı (bkz. `src/lib/clock.ts` başlığı); çağıran
  * `now()` ile okur, buraya geçirir.
  */
+import { MANAGEMENT_TIER_ROLES } from "@/lib/team/assignable-roles";
 
 export const APPROVAL_KINDS = [
   "komisyon_indirimi",
@@ -110,10 +111,10 @@ export const APPROVAL_STATUS_LABEL: Record<ApprovalStatus, string> = {
  * vermez; bu yüzden listede yok. Yetki kapısı ayrıca `commissions:edit` ister,
  * yani rol listesi TEK başına yetmez (bkz. actions/approvals.ts).
  */
-export const MANAGER_ROLES = ["owner", "gm", "branch_manager", "team_lead"] as const;
+export const MANAGER_ROLES: readonly string[] = MANAGEMENT_TIER_ROLES;
 
 export function isManagerRole(role: string | null | undefined): boolean {
-  return (MANAGER_ROLES as readonly string[]).includes(String(role ?? ""));
+  return MANAGER_ROLES.includes(String(role ?? ""));
 }
 
 /**

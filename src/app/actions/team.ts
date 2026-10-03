@@ -6,8 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
-import type { AppModule } from "@/lib/permissions";
 import {
+  HANDOFF_PERMISSION,
   HANDOFF_SCOPES,
   HANDOFF_SCOPE_LABELS,
   parseHandoffInput,
@@ -368,18 +368,12 @@ export async function deleteBranchAction(formData: FormData): Promise<void> {
  * aynı kimlik kümesiyle geri çevrilir; geri çevirme de başarısız olursa kısmi durum açıkça raporlanır ve
  * denetim kaydına yazılır.
  */
-const HANDOFF_PERMISSION: Record<HandoffScope, AppModule> = {
-  customers: "customers",
-  properties: "properties",
-  deals: "commissions",
-  tasks: "tasks",
-  appointments: "appointments",
-};
-
 export type HandoffResult = TeamResult & {
   counts?: Partial<Record<HandoffScope, number>>;
   /** Hata sonrası geri çevrilemeyen adımlar (varsa kısmi durum). */
   partial?: HandoffScope[];
+  /** Seçili olup devredilecek kayıt bulunmayan (0 adet) kapsamlar. */
+  skipped?: HandoffScope[];
 };
 
 export async function handoffMemberWorkload(formData: FormData): Promise<HandoffResult> {
@@ -551,5 +545,42 @@ export async function handoffMemberWorkload(formData: FormData): Promise<Handoff
   revalidatePath("/app/randevular");
   revalidatePath(`/app/ekip/${from}`);
   revalidatePath(`/app/ekip/${to}`);
-  return { ok: true, counts };
+  const skipped = scopes.filter((sc) => !counts[sc]);
+  return { ok: true, counts, skipped };
+}
+
+/**
+ * Devir paneli için GERÇEK sayımlar (devir adımlarındaki süzgeçlerle aynı): müşteri, portföy, açık anlaşma,
+ * açık görev, yaklaşan randevu. `team:view` yeter; satır sayısı taşımaz (head count).
+ */
+export async function getHandoffCounts(fromId: string): Promise<{ counts?: Record<HandoffScope, number>; error?: string }> {
+  const gate = await requirePermission("team", "view");
+  if (!gate.ok) return { error: gate.error };
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(fromId)) return { error: "Danışman kimliği geçersiz." };
+  const supabase = await createClient();
+  const nowIso = new Date(now()).toISOString();
+  const head = { count: "exact", head: true } as const;
+  const [c, p, d, t, a] = await Promise.all([
+    supabase.from("customers").select("id", head).eq("tenant_id", gate.tenantId).eq("assigned_to", fromId).is("deleted_at", null),
+    supabase.from("properties").select("id", head).eq("tenant_id", gate.tenantId).eq("assigned_to", fromId).is("deleted_at", null),
+    supabase.from("deals").select("id", head).eq("tenant_id", gate.tenantId).eq("assigned_to", fromId).not("stage", "in", "(won,lost)"),
+    supabase.from("tasks").select("id", head).eq("tenant_id", gate.tenantId).eq("assigned_to", fromId).eq("status", "open"),
+    supabase
+      .from("appointments")
+      .select("id", head)
+      .eq("tenant_id", gate.tenantId)
+      .eq("assigned_to", fromId)
+      .in("status", ["pending", "confirmed", "signature"])
+      .gte("scheduled_at", nowIso),
+  ]);
+  if (c.error || p.error || d.error || t.error || a.error) return { error: "Sayımlar okunamadı." };
+  return {
+    counts: {
+      customers: c.count ?? 0,
+      properties: p.count ?? 0,
+      deals: d.count ?? 0,
+      tasks: t.count ?? 0,
+      appointments: a.count ?? 0,
+    },
+  };
 }

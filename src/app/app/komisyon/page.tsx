@@ -14,6 +14,8 @@ import { createClient } from "@/lib/supabase/server";
 import { now as nowMs } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
+import { summarizeAdvisorEarning, type ShareRow } from "@/lib/team/advisor-share";
+import { trMonthContext } from "@/lib/team/scorecard";
 import { ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { exportCommissionsCsv } from "@/app/actions/export";
@@ -81,6 +83,8 @@ const DURUM_FILTERS = ["bekleyen", "tahsil"] as const;
 type DurumFilter = (typeof DURUM_FILTERS)[number];
 
 const PAGE_SIZE = 50;
+/** Kendi payım toplamı için okunan en fazla satır (aşılırsa uyarı gösterilir). */
+const OWN_ROWS_LIMIT = 2000;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // UTC getter'lar kullanılır: bu yardımcı yalnız aşağıdaki istanbulMonthUtc/istanbulTodayUtc
@@ -171,26 +175,68 @@ export default async function CommissionPage({
   if (!seeAllEarnings) ledgerQuery = ledgerQuery.eq("deal.assigned_to", userId);
   if (durum === "tahsil") ledgerQuery = ledgerQuery.in("status", ["paid", "collected"]);
   else if (durum === "bekleyen") ledgerQuery = ledgerQuery.not("status", "in", "(paid,collected)");
-  if (from) ledgerQuery = ledgerQuery.gte("created_at", from);
-  if (to) ledgerQuery = ledgerQuery.lt("created_at", nextDay(to));
+  // Gün sınırları Türkiye saatiyle (sunucu UTC: ham tarih dizgesi 3 saat kayar).
+  if (from) ledgerQuery = ledgerQuery.gte("created_at", `${from}T00:00:00+03:00`);
+  if (to) ledgerQuery = ledgerQuery.lt("created_at", `${nextDay(to)}T00:00:00+03:00`);
 
-  const [ledgerResult, aggregateResult, memberResult, approvalResult] = await Promise.all([
+  // Kazanç gizliliği: ofis geneli toplam (RPC) yalnız earnings_all ile okunur; diğer roller kendi paylarını görür.
+  const ownRowsQuery = seeAllEarnings
+    ? null
+    : supabase
+        .from("commissions")
+        .select("gross_amount, status, splits, created_at, deal:deals!commissions_deal_id_fkey!inner(assigned_to)")
+        .eq("deal.assigned_to", userId)
+        .order("created_at", { ascending: false })
+        .limit(OWN_ROWS_LIMIT);
+  const [ledgerResult, aggregateResult, memberResult, approvalResult, ownRowsResult] = await Promise.all([
     ledgerQuery,
     // Sayfalama dışı KPI, dağılım ve aylık seri tam kapsamlı SQL aggregate'tir.
-    supabase.rpc("tenant_commission_aggregates", { p_as_of: now.toISOString() }),
+    seeAllEarnings ? supabase.rpc("tenant_commission_aggregates", { p_as_of: now.toISOString() }) : Promise.resolve(null),
     // Split etiketini danışman profiline bağlamak için ad → id eşlemesi.
     supabase.from("profiles").select("id, full_name").eq("is_active", true),
     supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("status", "bekliyor"),
+    ownRowsQuery ?? Promise.resolve(null),
   ]);
 
   const rows = requireReportingData("commission-ledger", ledgerResult) as CommissionRow[];
   const commissionTotal = requireReportingCount("commission-ledger-count", ledgerResult);
-  const aggregate = requireReportingData("tenant-commission-aggregates", aggregateResult) as unknown as CommissionAggregate;
   const memberRows = requireReportingData("commission-members", memberResult);
   const bekleyenOnay = requireReportingCount("pending-approvals", approvalResult);
+
+  // Üst KPI kaynağı: earnings_all varsa ofis toplamı (RPC); yoksa yalnız kendi payım (advisor-share.ts).
+  let aggregate: CommissionAggregate;
+  let ownTruncated = false;
+  if (seeAllEarnings && aggregateResult) {
+    aggregate = requireReportingData("tenant-commission-aggregates", aggregateResult) as unknown as CommissionAggregate;
+  } else {
+    const ownRows = (requireReportingData("commission-own-rows", ownRowsResult!) ?? []) as unknown as (ShareRow & { created_at: string })[];
+    ownTruncated = ownRows.length >= OWN_ROWS_LIMIT;
+    const myName = (memberRows ?? []).find((m) => m.id === userId)?.full_name ?? null;
+    const monthStartMs = Date.parse(trMonthContext(nowMs()).monthStartIso);
+    const all = summarizeAdvisorEarning(ownRows, myName, userId);
+    const month = summarizeAdvisorEarning(
+      ownRows.filter((r) => Date.parse(r.created_at) >= monthStartMs),
+      myName,
+      userId,
+    );
+    aggregate = {
+      total: all.collected + all.pending,
+      paid: all.collected,
+      pending: all.pending,
+      record_count: all.count,
+      month_total: month.collected + month.pending,
+      month_paid: month.collected,
+      month_pending: month.pending,
+      month_record_count: month.count,
+      monthly: [],
+      advisors: [],
+    };
+  }
   const total = Number(aggregate.total);
   const paid = Number(aggregate.paid);
   const pending = Number(aggregate.pending);
+  const kpiScopeLabel = seeAllEarnings ? "Ofis geneli" : "Yalnız sizin payınız";
+  const kpiEmpty = !seeAllEarnings && aggregate.record_count === 0;
 
   // Dönem (bu ay) KPI şeridi — filtrelerden bağımsız, ayın 1'inden bugüne (İstanbul takvimi)
   const donemLabel = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric", timeZone: "Europe/Istanbul" }).format(now);
@@ -273,10 +319,20 @@ export default async function CommissionPage({
           </Link>
         }
       />
-<KpiGrid count={3} label="Toplam komisyon göstergeleri">
+<p className="text-xs font-semibold text-text-muted">{kpiScopeLabel}</p>
+      {kpiEmpty ? (
+        <p className="rounded-[var(--radius-card)] border border-line bg-surface p-4 text-sm text-text-muted">
+          Size atanmış bir anlaşmadan doğan komisyon kaydı henüz yok. Anlaşmanız tahsile ulaştığında payınız burada görünür.
+        </p>
+      ) : null}
+      {ownTruncated ? (
+        <p className="text-xs text-amber-700">Son {OWN_ROWS_LIMIT} kayıt üzerinden hesaplandı; daha eski kayıtlar toplamda yoktur.</p>
+      ) : null}
+      <div className={kpiEmpty ? "hidden" : undefined}>
+      <KpiGrid count={3} label="Toplam komisyon göstergeleri">
         {/* KPI kartları defter filtresine bağlı: tıklayınca ?durum= uygulanır (tarih aralığı korunur) */}
         {[
-          { label: "Toplam komisyon", value: <MoneyValue amount={total} />, icon: Wallet, tone: "brand" as const, href: filterHref({ durum: null }), active: durum === null },
+          { label: seeAllEarnings ? "Toplam komisyon" : "Payım (toplam)", value: <MoneyValue amount={total} />, icon: Wallet, tone: "brand" as const, href: filterHref({ durum: null }), active: durum === null },
           { label: "Tahsil edilen", value: <MoneyValue amount={paid} />, icon: CheckCircle2, tone: "success" as const, href: filterHref({ durum: "tahsil" }), active: durum === "tahsil" },
           { label: "Bekleyen", value: <MoneyValue amount={pending} />, icon: Clock3, tone: "warn" as const, href: filterHref({ durum: "bekleyen" }), active: durum === "bekleyen" },
         ].map((item) => (
@@ -291,11 +347,13 @@ export default async function CommissionPage({
           />
         ))}
       </KpiGrid>
+      </div>
 
       {/* Dönem KPI şeridi — bu ayın tahakkuk/tahsilat özeti; kartlar defteri
           ilgili tarih aralığı + durumla süzer (?from/?to/?durum). */}
       <DashCard>
-        <SectionHeader as="h2" title={`Dönem özeti · ${donemLabel}`} icon={<CalendarRange />} />
+        <SectionHeader as="h2" title={`Dönem özeti · ${donemLabel} · ${kpiScopeLabel}`} icon={<CalendarRange />} />
+        <div className={kpiEmpty ? "hidden" : undefined}>
         <KpiGrid count={4} label="Dönem özeti göstergeleri">
           {[
             { label: "Dönem komisyonu", value: <MoneyValue amount={donemToplam} />, href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "brand" as const },
@@ -306,6 +364,7 @@ export default async function CommissionPage({
             <KpiTile key={k.label} label={k.label} value={k.value} href={k.href} tone={k.tone} className="!shadow-none" />
           ))}
         </KpiGrid>
+        </div>
         {donemToplam > 0 ? (
           <div className="mt-3">
             <div className="flex items-center justify-between text-xs font-semibold text-text-muted">

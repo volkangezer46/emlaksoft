@@ -8,6 +8,7 @@ import { formatTurkishPhone } from "@/lib/phone";
 import { now } from "@/lib/clock";
 import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
+import { handoffEditableScopes } from "@/lib/team/handoff";
 import { canSeeEarningsOf } from "@/lib/team/earnings-scope";
 import { summarizeAdvisorEarning } from "@/lib/team/advisor-share";
 import { monthRanges } from "@/lib/team/advisor-360";
@@ -158,7 +159,7 @@ export default async function TeamMemberDetailPage({
 
       <DetailTabs basePath={`/app/ekip/${id}`} tabs={tabs} active={active} label="Danışman 360 sekmeleri" />
 
-      {active === "ozet" ? <OverviewTab ctx={ctx} canHandoff={canHandoff} /> : null}
+      {active === "ozet" ? <OverviewTab ctx={ctx} canHandoff={canHandoff} editableScopes={handoffEditableScopes(perms)} /> : null}
       {active === "aktivite" ? <ActivityTab ctx={ctx} /> : null}
       {active === "oncul" ? <LeadTab ctx={ctx} /> : null}
       {active === "pipeline" ? <PipelineTab ctx={ctx} /> : null}

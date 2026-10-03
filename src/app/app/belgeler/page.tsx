@@ -17,6 +17,7 @@ import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/app/empty-state";
 import { inFilter, orIlike, safeLike } from "@/lib/pgrst";
 import { now } from "@/lib/clock";
+import { trMonthContext } from "@/lib/team/scorecard";
 import {
   DOC_KINDS,
   DOC_SOURCES,
@@ -73,8 +74,7 @@ function safeDate(value: string | undefined) {
 
 /** İçinde bulunulan ayın ilk günü (YYYY-MM-01) — `?from=` linki için. */
 function monthStart(): string {
-  const d = new Date(now());
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  return trMonthContext(now()).monthKey;
 }
 
 /**
