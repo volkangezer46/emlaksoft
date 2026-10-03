@@ -37,7 +37,7 @@ import { SupportHome } from "./_dashboards/support-home";
 import { GlassSkeleton, KpiGridSkeleton, adminEyebrow, adminGreeting, firstNameOf } from "./_dashboards/shared";
 import { auditActionLabel, moneyTRY, relativeTimeTR } from "@/lib/admin-format";
 import { planLabel as catalogPlanLabel, PLANS } from "@/lib/billing/plans";
-import { exactMrr, exactTrendMrr, type PlatformReportingAggregate } from "@/lib/reporting/platform";
+import { exactMrr, exactTrendMrr, monthlyPrice, type PlatformReportingAggregate } from "@/lib/reporting/platform";
 import { requireReportingCount, requireReportingData } from "@/lib/reporting/result";
 
 /**
@@ -347,6 +347,20 @@ async function Details({ period }: { period: Period }) {
   }));
   const hasPlans = planCounts.some((p) => p.value > 0);
 
+  // Plan bazında MRR: gerçek abonelik MRR'ı + aboneliği eksik aktif ofisler için katalog fiyatı (exactMrr ile aynı kural).
+  const planMrr = PLANS.map((plan) => {
+    const row = aggregate.plan_stats.find((r) => r.plan === plan.id);
+    const missing = row ? Math.max(0, Number(row.active_count) - Number(row.subscription_count)) : 0;
+    return {
+      id: plan.id,
+      label: plan.name,
+      mrr: row ? Math.round(Number(row.subscription_mrr) + missing * monthlyPrice(plan.id)) : 0,
+      offices: row ? Number(row.tenant_count) : 0,
+    };
+  });
+  const planMrrTotal = planMrr.reduce((n, p) => n + p.mrr, 0);
+  const activeSeries = aggregate.weekly.map((row) => ({ label: weekLabel(row.week_start), value: Number(row.active_subscriptions) }));
+
   const funnel = [
     { label: "Toplam kayıt", href: "/admin/tenants", value: d.totalTenants, tone: "bg-brand-500" },
     { label: "Deneme", href: "/admin/tenants?durum=trial", value: d.trial, tone: "bg-cyan-400" },
@@ -395,6 +409,38 @@ async function Details({ period }: { period: Period }) {
           <BarChart data={planCounts} ariaLabel="Plana göre ofis sayısı" height={110} highlightLast={false} />
         ) : (
           <EmptyStateV3 variant="compact" title="Henüz planlı ofis yok" description="Ofisler paket seçtikçe dağılım burada görünür." />
+        )}
+      </Bx>
+
+      <Bx className="md:col-span-6 xl:col-span-6" eyebrow="Gelir kompozisyonu" icon={Wallet} title="Plan bazında MRR" href="/admin/billing">
+        {planMrrTotal > 0 ? (
+          <ul className="space-y-3">
+            {planMrr.map((p) => (
+              <li key={p.id}>
+                <Link href={`/admin/tenants?plan=${p.id}`} className="focus-ring group block rounded-[var(--radius-control)]">
+                  <span className="flex items-center justify-between gap-3 text-sm">
+                    <span className="font-semibold text-text transition-colors group-hover:text-accent-text">
+                      {p.label} <span className="font-normal text-text-muted">· {p.offices} ofis</span>
+                    </span>
+                    <span className="num text-text">{moneyTRY(p.mrr)}</span>
+                  </span>
+                  <span className="mt-1.5 block h-2 overflow-hidden rounded-full bg-[var(--surface-sunken)]">
+                    <span className="bar-live block h-full rounded-full bg-brand-500" style={{ width: `${Math.max((p.mrr / planMrrTotal) * 100, p.mrr > 0 ? 3 : 0)}%` }} />
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyStateV3 variant="compact" title="Henüz gelir getiren plan yok" description="Aktif abonelikler oluştukça plan bazında dağılım burada görünür." />
+        )}
+      </Bx>
+
+      <Bx className="md:col-span-6 xl:col-span-6" eyebrow="Abonelik ivmesi · 8 hafta" icon={TrendingUp} title="Haftalık yeni aktif abonelik" href="/admin/tenants?durum=active">
+        {activeSeries.length >= 2 ? (
+          <AreaChart id="adminActiveArea" tone="accent" data={activeSeries} ariaLabel={`Son ${activeSeries.length} hafta yeni aktif abonelik sayısı`} />
+        ) : (
+          <EmptyStateV3 variant="compact" title="Henüz haftalık seri yok" description="Yeni abonelikler geldikçe eğri burada çizilir." />
         )}
       </Bx>
 

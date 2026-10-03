@@ -10,7 +10,8 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
  * Kısayol: `[` (yazı alanında çalışmaz).
  */
 const KEY = "es-sidebar";
-const EVENT = "es-sidebar-change";
+export const SIDEBAR_EVENT = "es-sidebar-change";
+const EVENT = SIDEBAR_EVENT;
 
 function subscribe(cb: () => void) {
   window.addEventListener(EVENT, cb);
@@ -27,6 +28,11 @@ function setCollapsed(next: boolean) {
     // localStorage kapalı: tercih yalnız bu oturumda kalır.
   }
   window.dispatchEvent(new Event(EVENT));
+}
+
+/** Masaüstü yan menü ikon modunda mı? (flyout/tooltip yalnız bu modda çıkar) */
+export function useSidebarCollapsed(): boolean {
+  return useSyncExternalStore(subscribe, read, () => false);
 }
 
 export function SidebarCollapseButton({ className = "" }: { className?: string }) {

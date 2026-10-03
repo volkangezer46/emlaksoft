@@ -1,4 +1,4 @@
-import { Building2, CalendarDays, ListChecks, UserPlus } from "lucide-react";
+import { ICONS } from "@/lib/icons";
 import { visibleSections, type NavIcon } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
 
@@ -9,7 +9,10 @@ import type { AppModule } from "@/lib/permissions";
  * veri ve davranış burada tek yerdedir.
  */
 
-export type PaletteEntry = { label: string; href: string; icon: NavIcon };
+/** Yan menüdeki arama düğmesi komut paletini bu olayla açar (ikinci bir arama kutusu YOK). */
+export const OPEN_PALETTE_EVENT = "es-open-palette";
+
+export type PaletteEntry = { label: string; href: string; icon: NavIcon; shortcut?: string };
 
 /** Türkçe duyarlı (İ/ı) büyük-küçük harf bağımsız içerme kontrolü. */
 export function matchesQuery(label: string, q: string): boolean {
@@ -18,20 +21,45 @@ export function matchesQuery(label: string, q: string): boolean {
   return label.toLocaleLowerCase("tr-TR").includes(needle);
 }
 
-const APP_ACTIONS: (PaletteEntry & { module: AppModule })[] = [
-  { label: "Yeni müşteri", href: "/app/musteriler/yeni", icon: UserPlus, module: "customers" },
-  { label: "Yeni portföy", href: "/app/portfoyler/yeni", icon: Building2, module: "properties" },
-  { label: "Yeni randevu", href: "/app/randevular/yeni", icon: CalendarDays, module: "appointments" },
-  { label: "Yeni görev", href: "/app/gorevler/yeni", icon: ListChecks, module: "tasks" },
+/**
+ * Üst çubuk "Yeni" menüsü ve komut paleti "Eylemler" grubunun TEK kaynağı: her `/yeni`
+ * sayfası (16) + görüşme kaydı. `shortcut`, keyboard-shortcuts.tsx'teki `n` önekli
+ * dizilerle birebir aynıdır (kısayol sözleşme testi bunu doğrular).
+ */
+export type AppAction = PaletteEntry & { module: AppModule };
+
+export const APP_ACTIONS: readonly AppAction[] = [
+  { label: "Yeni müşteri", href: "/app/musteriler/yeni", icon: ICONS.musteri, module: "customers", shortcut: "n m" },
+  { label: "Yeni talep", href: "/app/talepler/yeni", icon: ICONS.talep, module: "demands", shortcut: "n t" },
+  { label: "Yeni portföy", href: "/app/portfoyler/yeni", icon: ICONS.portfoy, module: "properties", shortcut: "n p" },
+  { label: "Yeni randevu", href: "/app/randevular/yeni", icon: ICONS.randevu, module: "appointments", shortcut: "n r" },
+  { label: "Yeni görev", href: "/app/gorevler/yeni", icon: ICONS.gorev, module: "tasks", shortcut: "n g" },
+  { label: "Yeni anlaşma", href: "/app/anlasmalar/yeni", icon: ICONS.anlasma, module: "commissions", shortcut: "n a" },
+  { label: "Yeni teklif", href: "/app/teklifler/yeni", icon: ICONS.teklif, module: "offers" },
+  { label: "Yeni sözleşme", href: "/app/sozlesmeler/yeni", icon: ICONS.sozlesme, module: "contracts" },
+  { label: "Yeni kiralama", href: "/app/kiralama/yeni", icon: ICONS.anahtar, module: "rentals" },
+  { label: "Yeni proje", href: "/app/projeler/yeni", icon: ICONS.proje, module: "projects" },
+  { label: "Yeni açık ev", href: "/app/acik-ev/yeni", icon: ICONS.acikEv, module: "open_house" },
+  { label: "Yeni sunum", href: "/app/portfoyler/sunumlar/yeni", icon: ICONS.sunum, module: "properties" },
+  { label: "Yeni kampanya", href: "/app/kampanyalar/yeni", icon: ICONS.mesaj, module: "campaigns" },
+  { label: "Yeni onay talebi", href: "/app/onaylar/yeni", icon: ICONS.onay, module: "commissions" },
+  { label: "Yeni otomasyon", href: "/app/otomasyonlar/yeni", icon: ICONS.otomasyon, module: "settings" },
+  { label: "Yeni destek talebi", href: "/app/destek/yeni", icon: ICONS.destek, module: "support" },
+  { label: "Görüşme kaydet", href: "/app/arama", icon: ICONS.telefon, module: "calls" },
 ];
 
-/** "Eylemler" grubu: kullanıcının erişebildiği modüllerin hızlı oluşturma bağlantıları. */
-export function getAppActions(accessible: readonly AppModule[], q = ""): PaletteEntry[] {
-  return APP_ACTIONS.filter((a) => accessible.includes(a.module) && matchesQuery(a.label, q)).map(
-    ({ label, href, icon }) => ({ label, href, icon }),
-  );
+/**
+ * "Eylemler" grubu: erişilebilen modüllerin hızlı oluşturma bağlantıları.
+ * `locked`: pakete dahil olmayan sayfalar (yükseltme sayfasına düşmesin diye elenir).
+ */
+export function getAppActions(accessible: readonly AppModule[], q = "", locked: readonly string[] = []): PaletteEntry[] {
+  return APP_ACTIONS.filter(
+    (a) =>
+      accessible.includes(a.module) &&
+      !locked.some((l) => a.href === l || a.href.startsWith(`${l}/`)) &&
+      matchesQuery(a.label, q),
+  ).map(({ label, href, icon, shortcut }) => ({ label, href, icon, shortcut }));
 }
-
 /** "Git" grubu: nav-config'teki yetkili sayfalar (menüyle birebir aynı süzgeç). */
 export function getAppGoItems(accessible: readonly AppModule[], q = ""): PaletteEntry[] {
   return visibleSections(accessible)

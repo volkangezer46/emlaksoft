@@ -109,3 +109,19 @@ describe("sekmeli menü öğeleri", () => {
     expect(resolveActiveNav("/app/hesaplayici", sections).href).toBe("/app/hesaplayici");
   });
 });
+
+describe("menü ikonları", () => {
+  it("başlık ve sayfa ikonlarının hiçbiri çakışmaz (sekmeler sahibi öğeyle aynı ikonu paylaşabilir)", () => {
+    const labelsByIcon = new Map<unknown, string[]>();
+    const add = (icon: unknown, label: string) => labelsByIcon.set(icon, [...(labelsByIcon.get(icon) ?? []), label]);
+    for (const s of NAV_SECTIONS) {
+      add(s.icon, `başlık:${s.title}`);
+      for (const i of s.items) {
+        add(i.icon, i.label);
+        for (const t of i.tabs ?? []) if (t.icon !== i.icon) add(t.icon, `sekme:${t.label}`);
+      }
+    }
+    const clashes = [...labelsByIcon.values()].filter((l) => l.length > 1);
+    expect(clashes).toEqual([]);
+  });
+});

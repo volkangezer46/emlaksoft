@@ -19,7 +19,7 @@ import {
   Loader2,
 } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
-import { createRecentsStore, matchesQuery } from "@/lib/palette-core";
+import { createRecentsStore, matchesQuery, OPEN_PALETTE_EVENT } from "@/lib/palette-core";
 
 type Hit = {
   id: string;
@@ -101,8 +101,13 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
       }
       if (e.key === "Escape") close();
     };
+    const onOpen = () => setOpen(true);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener(OPEN_PALETTE_EVENT, onOpen);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener(OPEN_PALETTE_EVENT, onOpen);
+    };
   }, [close, open]);
 
   useEffect(() => {

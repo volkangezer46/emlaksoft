@@ -6,6 +6,7 @@ import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { UserMenu } from "@/components/ui/console/user-menu";
 import { AppBreadcrumb } from "@/components/app/app-breadcrumb";
 import { QuickCreateMenu } from "@/components/app/quick-create-menu";
+import { getNavBadges, getPlanUsage } from "@/lib/nav-badges";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaffIdentity } from "@/lib/platform";
@@ -34,6 +35,7 @@ import {
 import type { AppModule } from "@/lib/permissions";
 import { planLabel } from "@/lib/billing/plans";
 import { lockedHrefs } from "@/lib/billing/page-gates";
+import { getAppActions } from "@/lib/palette-core";
 
 const NAV_MODULES: AppModule[] = [
   "dashboard",
@@ -73,6 +75,7 @@ type OfficeSummary = {
   status?: string;
   brand_color?: string | null;
   created_at?: string | null;
+  slug?: string | null;
 };
 
 /** Bildirim listesi (requireActiveTenant zinciri) Suspense içinde akar. */
@@ -96,7 +99,7 @@ export default async function AppLayout({
   const impersonatedTenantPromise = user && impersonating && claimedTenantId
     ? supabase
         .from("tenants")
-        .select("name, plan, status, brand_color, created_at")
+        .select("name, plan, status, brand_color, created_at, slug")
         .eq("id", claimedTenantId)
         .maybeSingle()
     : Promise.resolve({ data: null });
@@ -107,7 +110,7 @@ export default async function AppLayout({
     user
       ? supabase
           .from("profiles")
-          .select("full_name, role, tenant_id, tenants(name, plan, status, brand_color, created_at)")
+          .select("full_name, role, tenant_id, tenants(name, plan, status, brand_color, created_at, slug)")
           .eq("id", user.id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -149,7 +152,9 @@ export default async function AppLayout({
   // sayıyı prop olarak aldığı için bloklayıcı kalır ama izinlerle paralel.
   const scorePromise =
     user && tenantId ? getOfficeScoreCached(tenantId).catch(() => null) : Promise.resolve(null);
-  const [effectivePerms, scoreComputed] = await Promise.all([effectivePermsPromise, scorePromise]);
+  // Plan kullanım kartı (gerçek head-count) yalnız tenant+plana bağlı: izinlerle paralel.
+  const usagePromise = user && tenantId && !platformStaffFullAccess ? getPlanUsage(supabase, tenantId, office?.plan).catch(() => []) : Promise.resolve([]);
+  const [effectivePerms, scoreComputed, planUsage] = await Promise.all([effectivePermsPromise, scorePromise, usagePromise]);
   const officeScore: number | null = scoreComputed ? scoreComputed.score : null;
   const officeScoreLabel = scoreComputed ? scoreComputed.label : "—";
   const showNotifications = Boolean(user && tenantId);
@@ -162,13 +167,14 @@ export default async function AppLayout({
     : NAV_MODULES.filter((mod) => effectiveCanAccessModule(effectivePerms ?? {}, mod));
   const canCreate = (mod: AppModule) =>
     platformStaffFullAccess || effectiveHasPermission(effectivePerms ?? {}, mod, "create");
-  const canCreateCustomer = canCreate("customers");
-  const canCreateProperty = canCreate("properties");
-  const canCreateCall = canCreate("calls");
-  const canCreateAppointment = canCreate("appointments");
-  const canCreateTask = canCreate("tasks");
-  const hasQuickCreate =
-    canCreateCustomer || canCreateProperty || canCreateCall || canCreateAppointment || canCreateTask;
+  // Hızlı oluştur + komut paleti "Eylemler": yalnız "create" yetkili modüller.
+  const creatableModules = NAV_MODULES.filter((mod) => accessibleModules.includes(mod) && canCreate(mod));
+  const hasQuickCreate = getAppActions(creatableModules, "", lockedNavHrefs).length > 0;
+  // Menü sayı rozetleri: gerçek veri; hata olursa rozet çıkmaz.
+  const navBadges = platformStaffFullAccess
+    ? []
+    : await getNavBadges({ supabase, tenantId, userId: user?.id ?? null, role: effectiveRole, accessible: accessibleModules }).catch(() => []);
+  const vitrinHref = office?.slug && !impersonating ? `/vitrin/${office.slug}` : null;
 
   const jar = await cookies();
   const impersonationCookieMatches = jar.get(IMPERSONATE_COOKIE)?.value === tenantId;
@@ -196,19 +202,24 @@ export default async function AppLayout({
           officeName={office?.name ?? "EmlakSoft Ofis"}
           plan={planLabel(office?.plan ?? "office")}
           trial={office?.status === "trial"}
-          officeScore={officeScore}
           accessibleModules={accessibleModules}
+          creatableModules={creatableModules}
           lockedHrefs={lockedNavHrefs}
+          badges={navBadges}
+          usage={planUsage}
+          canUpgrade={accessibleModules.includes("billing") && !platformStaffFullAccess && (office?.plan ?? "office") !== "enterprise"}
+          vitrinHref={vitrinHref}
+          storageScope={user && tenantId ? `${tenantId}:${user.id}` : undefined}
         />
         <div className="flex min-w-0 flex-1 flex-col">
           {impersonating && platformStaff ? <OpsImpersonationBanner tenantName={impName || office?.name || "Ofis"} /> : null}
           <header className="glass-bar sticky top-0 z-30 flex h-14 items-center justify-between gap-3 px-4 pl-16 lg:px-6">
             <AppBreadcrumb accessibleModules={accessibleModules} />
-            <CommandSearch accessibleModules={accessibleModules} storageScope={user && tenantId ? `${tenantId}:${user.id}` : undefined} />
+            <CommandSearch accessibleModules={accessibleModules} creatableModules={creatableModules} lockedHrefs={lockedNavHrefs} storageScope={user && tenantId ? `${tenantId}:${user.id}` : undefined} />
             <div className="ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
               <ThemeToggle />
               {/* Hızlı eylem menüsü: en sık kullanılan kayıt akışlarına tek tıkla */}
-              {hasQuickCreate ? <QuickCreateMenu flags={{ customer: canCreateCustomer, property: canCreateProperty, call: canCreateCall, appointment: canCreateAppointment, task: canCreateTask }} /> : null}
+              {hasQuickCreate ? <QuickCreateMenu creatableModules={creatableModules} lockedHrefs={lockedNavHrefs} /> : null}
               <Link
                 href="/app/raporlar"
                 title="Kural tabanlı ofis skoru (yapay zekâ değil): açık talepler, canlı portal ilanları, son 7 günün randevu ve aramaları ile son 30 günün kapanışları puan ekler; gecikmiş portal teyitleri puan düşürür. Başlangıç 42. Rapor merkezini açmak için tıklayın."

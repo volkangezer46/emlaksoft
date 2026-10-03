@@ -2,7 +2,7 @@ import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { requirePlatformStaff } from "@/lib/platform";
 import { PLATFORM_ROLE_LABELS, platformModulesFor } from "@/lib/platform-access";
-import { getAdminBadges } from "@/lib/admin-badges";
+import { getAdminBadges, getAdminHealth } from "@/lib/admin-badges";
 import "@/app/console.css";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { ThemeController } from "@/components/theme-controller";
@@ -15,13 +15,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   // Sidebar rozet sayıları — 30 sn önbellekli (bkz. admin-badges.ts); her
   // gezinmede 3 count sorgusu koşmasın.
-  const badges = await getAdminBadges(modules);
+  const [badges, health] = await Promise.all([
+    getAdminBadges(modules),
+    modules.includes("sistem") ? getAdminHealth().catch(() => null) : Promise.resolve(null),
+  ]);
 
   return (
     <div className="flex min-h-screen bg-canvas">
       <ThemeController />
       <SidebarBoot />
-      <AdminSidebar staffName={staff.full_name} role={staff.role} roleLabel={roleLabel} badges={badges} />
+      <AdminSidebar staffName={staff.full_name} role={staff.role} roleLabel={roleLabel} badges={badges} health={health} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopbar roleLabel={roleLabel} staffName={staff.full_name} modules={modules} />
         {!isPlatformMfaRequired() ? (

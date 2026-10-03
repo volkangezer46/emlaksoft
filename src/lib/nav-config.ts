@@ -1,17 +1,4 @@
-import {
-  BadgeCheck,
-  Calculator,
-  Globe,
-  KeySquare,
-  LayoutDashboard,
-  ListFilter,
-  ListChecks,
-  Presentation,
-  Sunrise,
-  Trophy,
-  Tv,
-  Workflow,
-} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { ICONS } from "@/lib/icons";
 import { findActiveNavigationHref } from "@/lib/navigation";
 import type { AppModule } from "@/lib/permissions";
@@ -24,7 +11,7 @@ import type { AppModule } from "@/lib/permissions";
  * /app/ayarlar/filigran, /app/ekip/izinler) bağlı oldukları öğenin içindedir
  * ve o öğe etkin görünür (en uzun yol eşleşmesi).
  */
-export type NavIcon = typeof LayoutDashboard;
+export type NavIcon = LucideIcon;
 
 /**
  * Menüde tek öğeye indirgenen sayfalar için sekme. Her sekme KENDİ modül
@@ -58,30 +45,30 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   {
     id: "bugun",
     title: "Bugün",
-    icon: ICONS.dashboard,
+    icon: ICONS.baslikBugun,
     items: [
       { href: "/app", label: "Ana ekran", icon: ICONS.dashboard, module: "dashboard" },
-      { href: "/app/brifing", label: "Günlük Brifing", icon: Sunrise, module: "dashboard" },
-      { href: "/app/baslangic", label: "Ofis kurulumu", icon: ListChecks, module: "dashboard" },
+      { href: "/app/brifing", label: "Günlük Brifing", icon: ICONS.briefing, module: "dashboard" },
+      { href: "/app/baslangic", label: "Ofis kurulumu", icon: ICONS.kurulum, module: "dashboard" },
       { href: "/app/asistan", label: "AI Asistan", icon: ICONS.ai, module: "dashboard" },
     ],
   },
   {
     id: "musteriler",
     title: "Müşteriler",
-    icon: ICONS.musteri,
+    icon: ICONS.baslikMusteri,
     items: [
       { href: "/app/musteriler", label: "Müşteriler", icon: ICONS.musteri, module: "customers" },
       { href: "/app/talepler", label: "Talepler", icon: ICONS.talep, module: "demands" },
       { href: "/app/eslestirme", label: "Eşleştirme", icon: ICONS.eslestirme, module: "matching" },
-      { href: "/app/akilli-listeler", label: "Akıllı Listeler", icon: ListFilter, module: "customers" },
+      { href: "/app/akilli-listeler", label: "Akıllı Listeler", icon: ICONS.akilliListe, module: "customers" },
       { href: "/app/tavsiyeler", label: "Tavsiyeler", icon: ICONS.tavsiye, module: "customers" },
     ],
   },
   {
     id: "portfoy",
     title: "Portföy",
-    icon: ICONS.portfoy,
+    icon: ICONS.baslikPortfoy,
     items: [
       { href: "/app/portfoyler", label: "Portföyler", icon: ICONS.portfoy, module: "properties" },
       {
@@ -98,15 +85,15 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { href: "/app/projeler", label: "Projeler", icon: ICONS.proje, module: "projects" },
       { href: "/app/acik-ev", label: "Açık Ev", icon: ICONS.acikEv, module: "open_house" },
       { href: "/app/portallar", label: "Portal Kontrol", icon: ICONS.portal, module: "portals" },
-      { href: "/app/portfoyler/anahtarlar", label: "Anahtar Takibi", icon: KeySquare, module: "properties" },
-      { href: "/app/portfoyler/sunumlar", label: "Sunumlar", icon: Presentation, module: "properties" },
+      { href: "/app/portfoyler/anahtarlar", label: "Anahtar Takibi", icon: ICONS.anahtarTakip, module: "properties" },
+      { href: "/app/portfoyler/sunumlar", label: "Sunumlar", icon: ICONS.sunum, module: "properties" },
       { href: "/app/ag", label: "Ofisler Arası Ağ", icon: ICONS.ag, module: "network" },
     ],
   },
   {
     id: "anlasmalar",
     title: "Anlaşmalar",
-    icon: ICONS.anlasma,
+    icon: ICONS.baslikAnlasma,
     items: [
       { href: "/app/anlasmalar", label: "Anlaşmalar", icon: ICONS.anlasma, module: "commissions" },
       { href: "/app/teklifler", label: "Teklifler", icon: ICONS.teklif, module: "offers" },
@@ -116,7 +103,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   {
     id: "iletisim",
     title: "İletişim",
-    icon: ICONS.gelenKutusu,
+    icon: ICONS.baslikIletisim,
     items: [
       { href: "/app/gelen-kutusu", label: "Gelen Kutusu", icon: ICONS.gelenKutusu, module: "calls" },
       { href: "/app/arama", label: "Akıllı Arama", icon: ICONS.telefon, module: "calls" },
@@ -128,7 +115,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   {
     id: "finans",
     title: "Finans",
-    icon: ICONS.komisyon,
+    icon: ICONS.baslikFinans,
     items: [
       {
         href: "/app/komisyon",
@@ -138,7 +125,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         tabs: [
           { href: "/app/komisyon", label: "Komisyon", icon: ICONS.komisyon, module: "commissions" },
           { href: "/app/cuzdan", label: "Cüzdanım", icon: ICONS.cuzdan, module: "commissions" },
-          { href: "/app/onaylar", label: "Onaylar", icon: BadgeCheck, module: "commissions" },
+          { href: "/app/onaylar", label: "Onaylar", icon: ICONS.onay, module: "commissions" },
             ],
       },
       { href: "/app/giderler", label: "Giderler", icon: ICONS.gider, module: "expenses" },
@@ -148,7 +135,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   {
     id: "performans",
     title: "Performans",
-    icon: ICONS.rapor,
+    icon: ICONS.baslikPerformans,
     items: [
       { href: "/app/raporlar", label: "Raporlar", icon: ICONS.rapor, module: "reports" },
       { href: "/app/kayip-kacak", label: "Kayıp-kaçak", icon: ICONS.alarm, module: "leak" },
@@ -159,34 +146,34 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "reports",
         tabs: [
           { href: "/app/danisman-kpi", label: "Danışman KPI", icon: ICONS.kpi, module: "reports" },
-          { href: "/app/lig", label: "Ekip Ligi", icon: Trophy, module: "reports" },
+          { href: "/app/lig", label: "Ekip Ligi", icon: ICONS.lig, module: "reports" },
         ],
       },
       { href: "/app/hedefler", label: "Hedefler", icon: ICONS.hedef, module: "targets" },
       { href: "/app/bolge-analizi", label: "Bölge Analizi", icon: ICONS.bolge, module: "reports" },
       { href: "/app/kayip-satis", label: "Kayıp Satış", icon: ICONS.dusus, module: "customers" },
-      { href: "/app/pano-tv", label: "Ofis Panosu (TV)", icon: Tv, module: "reports" },
+      { href: "/app/pano-tv", label: "Ofis Panosu (TV)", icon: ICONS.panoTv, module: "reports" },
     ],
   },
   {
     id: "araclar",
     title: "Araçlar",
-    icon: ICONS.skor,
+    icon: ICONS.baslikArac,
     items: [
       { href: "/app/degerleme", label: "Değerleme", icon: ICONS.skor, module: "valuation" },
       // Alım maliyeti + yatırım getirisi: tek sayfa, ?sekme= ile iki sekme.
-      { href: "/app/hesaplayici", label: "Hesaplayıcılar", icon: Calculator, module: "valuation" },
-      { href: "/app/yabanci-satis", label: "Yabancıya Satış", icon: Globe, module: "properties" },
+      { href: "/app/hesaplayici", label: "Hesaplayıcılar", icon: ICONS.hesaplayici, module: "valuation" },
+      { href: "/app/yabanci-satis", label: "Yabancıya Satış", icon: ICONS.yabanciSatis, module: "properties" },
     ],
   },
   {
     id: "ofis",
     title: "Ofis",
-    icon: ICONS.ayar,
+    icon: ICONS.baslikOfis,
     items: [
       { href: "/app/ekip", label: "Ekip", icon: ICONS.ekip, module: "team" },
       { href: "/app/otomasyonlar", label: "Otomasyonlar", icon: ICONS.otomasyon, module: "settings" },
-      { href: "/app/ayarlar/is-akislari", label: "İş Akışları", icon: Workflow, module: "settings" },
+      { href: "/app/ayarlar/is-akislari", label: "İş Akışları", icon: ICONS.isAkisi, module: "settings" },
       { href: "/app/uyum", label: "Uyum", icon: ICONS.uyum, module: "compliance" },
       { href: "/app/belgeler", label: "Belge Merkezi", icon: ICONS.belge, module: "settings" },
       { href: "/app/denetim", label: "Denetim", icon: ICONS.denetim, module: "settings" },

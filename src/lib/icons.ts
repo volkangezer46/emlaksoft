@@ -23,6 +23,26 @@
  */
 import {
   Award,
+  BadgeCheck,
+  Banknote,
+  BriefcaseBusiness,
+  Calculator,
+  ChartNoAxesCombined,
+  ContactRound,
+  Globe,
+  House,
+  KeySquare,
+  Landmark,
+  ListFilter,
+  Medal,
+  MessagesSquare,
+  Presentation,
+  Rocket,
+  Sun,
+  Sunrise,
+  Tv,
+  Workflow,
+  Wrench,
   BarChart3,
   Bell,
   Building2,
@@ -183,6 +203,30 @@ export const ICONS = {
   destek: LifeBuoy,
   /** Ayarlar. TEK doğru: Settings (Settings2 DEĞİL). */
   ayar: Settings,
+
+  // --- Menü sayfaları (her biri menüde BENZERSİZ) ---------------------------
+  briefing: Sunrise,
+  kurulum: Rocket,
+  akilliListe: ListFilter,
+  anahtarTakip: KeySquare,
+  sunum: Presentation,
+  onay: BadgeCheck,
+  lig: Medal,
+  panoTv: Tv,
+  hesaplayici: Calculator,
+  yabanciSatis: Globe,
+  isAkisi: Workflow,
+
+  // --- Menü başlıkları (sayfa ikonlarından AYRI: başlık = kategori metaforu) -
+  baslikBugun: Sun,
+  baslikMusteri: ContactRound,
+  baslikPortfoy: House,
+  baslikAnlasma: BriefcaseBusiness,
+  baslikIletisim: MessagesSquare,
+  baslikFinans: Banknote,
+  baslikPerformans: ChartNoAxesCombined,
+  baslikArac: Wrench,
+  baslikOfis: Landmark,
 } satisfies Record<string, LucideIcon>;
 
 /**
