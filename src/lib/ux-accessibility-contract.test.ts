@@ -84,7 +84,7 @@ describe("navigation accessibility contract", () => {
   });
 
   it("uses keyboard-managed primitives for dense application popovers", () => {
-    const notifications = source("src/components/app/notification-bell.tsx");
+    const notifications = source("src/components/app/notification-bell-panel.tsx");
     const transition = source("src/app/app/anlasmalar/status-transition.tsx");
 
     expect(notifications).toContain('from "@/components/ui/popover"');

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { runWhenIdle } from "@/lib/idle";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { emitNotificationInsert, type NotificationInsertRow } from "@/lib/realtime";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
@@ -29,7 +30,8 @@ export function RealtimeRefresh({ tenantId }: { tenantId: string | null }) {
     // Kullanıcıya özel bildirimleri (user_id dolu) başka kullanıcıya
     // sızdırmamak için önce oturumdaki user id okunur; abonelik sonra kurulur.
     // supabase-js ilk yükleme paketine girmesin diye ayrı parçadan, gerektiğinde indirilir.
-    void import("@/lib/supabase/client").then(async ({ createClient }) => {
+    // İlk render'ı beklemesin: boşta (requestIdleCallback / 1500 ms) başlatılır.
+    const cancelIdle = runWhenIdle(() => void import("@/lib/supabase/client").then(async ({ createClient }) => {
       if (cancelled) return;
       const client = createClient();
       supabase = client;
@@ -49,10 +51,11 @@ export function RealtimeRefresh({ tenantId }: { tenantId: string | null }) {
           },
         )
         .subscribe();
-    });
+    }));
 
     return () => {
       cancelled = true;
+      cancelIdle();
       if (supabase && channel) void supabase.removeChannel(channel);
     };
   }, [tenantId]);

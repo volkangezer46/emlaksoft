@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { runWhenIdle } from "@/lib/idle";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -56,7 +57,7 @@ export function useRealtimeRefresh(opts: {
     document.addEventListener("visibilitychange", onVisible);
 
     // supabase-js ilk boyamayı bloklamasın: istemci boşta/sonra ayrı parça olarak yüklenir.
-    void import("@/lib/supabase/client").then(({ createClient }) => {
+    const cancelIdle = runWhenIdle(() => void import("@/lib/supabase/client").then(({ createClient }) => {
       if (cancelled) return;
       supabase = createClient();
       let ch = supabase.channel(channelName);
@@ -69,10 +70,11 @@ export function useRealtimeRefresh(opts: {
       }
       ch.subscribe();
       channel = ch;
-    });
+    }));
 
     return () => {
       cancelled = true;
+      cancelIdle();
       document.removeEventListener("visibilitychange", onVisible);
       if (timer.current) clearTimeout(timer.current);
       if (supabase && channel) void supabase.removeChannel(channel);

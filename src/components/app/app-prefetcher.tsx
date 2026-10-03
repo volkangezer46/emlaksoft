@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { prefetchAppApi } from "@/hooks/use-app-api";
+import { runWhenIdle } from "@/lib/idle";
 
 const CRITICAL = ["/api/app/bootstrap"];
 
@@ -20,12 +21,19 @@ export function AppPrefetcher({ tenantId }: { tenantId: string | null }) {
 
   useEffect(() => {
     if (!tenantId) return;
-    for (const url of CRITICAL) void prefetchAppApi(tenantId, url, 20_000);
+    // İlk boyama/JS ile yarışmasın: boşta başlat.
     const extra = PAGE_MAP[pathname] ?? [];
-    const t = window.setTimeout(() => {
-      for (const url of extra) void prefetchAppApi(tenantId, url, 45_000);
-    }, 200);
-    return () => clearTimeout(t);
+    let t: number | undefined;
+    const cancelIdle = runWhenIdle(() => {
+      for (const url of CRITICAL) void prefetchAppApi(tenantId, url, 20_000);
+      t = window.setTimeout(() => {
+        for (const url of extra) void prefetchAppApi(tenantId, url, 45_000);
+      }, 200);
+    });
+    return () => {
+      cancelIdle();
+      if (t !== undefined) clearTimeout(t);
+    };
   }, [tenantId, pathname]);
 
   return null;

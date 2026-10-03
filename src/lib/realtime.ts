@@ -14,6 +14,7 @@
  */
 
 import type { RealtimePostgresInsertPayload } from "@supabase/supabase-js";
+import { runWhenIdle } from "@/lib/idle";
 
 export function subscribeToInserts<T extends Record<string, unknown>>(opts: {
   /** Kanal adı benzersiz olmalı (ör. `es-rt-ticket:${id}`). */
@@ -27,7 +28,7 @@ export function subscribeToInserts<T extends Record<string, unknown>>(opts: {
   // modülü import eden zil gibi bileşenler paketi şişirmez.
   let cancelled = false;
   let cleanup: (() => void) | null = null;
-  void import("@/lib/supabase/client").then(({ createClient }) => {
+  const cancelIdle = runWhenIdle(() => void import("@/lib/supabase/client").then(({ createClient }) => {
     if (cancelled) return;
     const supabase = createClient();
     const channel = supabase
@@ -46,9 +47,10 @@ export function subscribeToInserts<T extends Record<string, unknown>>(opts: {
     cleanup = () => {
       void supabase.removeChannel(channel);
     };
-  });
+  }));
   return () => {
     cancelled = true;
+    cancelIdle();
     cleanup?.();
   };
 }
