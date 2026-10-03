@@ -51,7 +51,7 @@ describe("menü yapısı", () => {
   });
 
   it("tüm modüller en az bir başlıkta erişilebilir", () => {
-    const used = new Set(NAV_SECTIONS.flatMap((s) => s.items.map((i) => i.module)));
+    const used = new Set(NAV_SECTIONS.flatMap((s) => s.items.flatMap((i) => [i.module, ...(i.tabs?.map((t) => t.module) ?? [])])));
     const missing = ALL_MODULES.filter((m) => !used.has(m) && m !== "dashboard");
     expect(missing).toEqual([]);
   });

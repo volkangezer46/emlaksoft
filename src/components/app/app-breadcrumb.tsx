@@ -20,9 +20,20 @@ export function AppBreadcrumb({ accessibleModules }: { accessibleModules: AppMod
   const items: BreadcrumbItem[] = [];
   if (section.id !== "bugun") items.push({ label: "Bugün", href: "/app" });
   const sectionHref = sections.find((s) => s.id === section.id)?.href;
-  const isDetail = pathname !== href && !pathname.startsWith(`${href}?`) && pathname.length > href.length;
+  // Sekmeli öğede sekme sayfasının kendisi (ör. /app/hedefler) "Ayrıntı" değil sekme adıyla görünür.
+  const activeTab = (item.tabs ?? [])
+    .filter((t) => pathname === t.href || pathname.startsWith(`${t.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0];
+  const isTabRoot = Boolean(activeTab && pathname === activeTab.href);
+  const isDetail =
+    !isTabRoot && pathname !== href && !pathname.startsWith(`${href}?`) && pathname.length > href.length;
   items.push({ label: section.title, href: sectionHref });
-  items.push({ label: item.label, href: isDetail ? href : undefined });
+  if (activeTab && activeTab.href !== href) {
+    items.push({ label: item.label, href });
+    items.push({ label: activeTab.label, href: isDetail ? activeTab.href : undefined });
+  } else {
+    items.push({ label: item.label, href: isDetail ? href : undefined });
+  }
   if (isDetail) {
     // Son segment: /yeni → "Yeni kayıt", diğer her şey (kimlik) → "Ayrıntı".
     const last = pathname.replace(/\/+$/, "").split("/").pop();

@@ -147,4 +147,40 @@ Not: `permissions.ts` matrisinde branch_manager ve team_lead için `commissions`
 - `customer_demands.criteria` ya kullanılmalı ya kaldırılmalı (ölü sütun).
 - `ayarlar` içindeki eşleştirme ağırlıkları, atama kuralları ve komisyon planı "Ekip ve kurallar" altında gruplanabilir.
 - Ölçek: `danisman-kpi` `profiles.limit(50)` ve cüzdan `limit(1000)` büyük ofiste sessiz keser (`ListLimitNotice` bu amaçla var).
-- Doğrulanmayanlar (Faz 1 başında kontrol edilecek): görev/randevu `assigned_to`, `targets.actual_*` doldurma yolu, portföy toplu atama kapsamı, ortalama kapanış süresi kaynağı.
+- Doğrulanmayanlar (Faz 1 başında kontrol edilecek): görev/randevu `assigned_to`, `targets.actual_*` doldurma yolu, portföy toplu atama kapsamı, ortalama kapanış süresi kaynağı. (Faz 1B'de doğrulandı: bkz. bölüm 6.)
+
+## 6. Doğrulama notları (Faz 1B, kod okuması)
+
+Belgenin "doğrulanmayanlar" listesindeki dört nokta kodda kontrol edildi:
+
+| Konu | Sonuç | Kanıt |
+|---|---|---|
+| Görev / randevu `assigned_to` | VAR. `tasks.assigned_to` (`20260722000022_tasks.sql:13`) ve `appointments.assigned_to` (`20260721000004_appointments.sql:19`) profiles'a bağlı; sayfalar kullanıyor (`randevular?danisman=`, `danisman-kpi` görev sayımı). Devir kapsamında YOK. | migration + `randevular/page.tsx` |
+| `targets.actual_deals / actual_revenue` doldurma yolu | **YOK.** Sütunlar yalnız `20260723000031` ile tanımlı ve `scripts/seed-demo.ts` yazıyor; uygulama kodunda, RPC'de, trigger'da veya cron'da güncelleyen yer yok. Gerçek ofiste `/app/hedefler` gerçekleşmeyi hep 0 gösteriyordu. Düzeltme: gerçekleşme canlı veriden hesaplanır (`src/lib/team/target-actuals.ts`: anlaşma = kabul edilen teklif, ciro = tahsil edilmiş brüt komisyon; `advisor_kpis` ile aynı tanım). Sütunlar yerinde duruyor ama okunmuyor. | grep + hedefler sayfası |
+| Portföy toplu atama kapsamı | Toplu danışman ataması YOK. `bulkUpdatePropertyStatus` yalnız durum değiştirir; `reassignProperty` tekil; portföy devri yalnız `handoffMemberWorkload` ile (üyenin TÜM aktif müşteri + portföyü, tek hedefe, seçmeli değil, gerekçesiz). Talep, görev, randevu, açık anlaşma devri yok. | `actions/bulk-property.ts`, `actions/team.ts:383` |
+| Ort. kapanış süresi kaynağı | Danışman bazında YOK. Yalnız bölge/ilçe düzeyinde `avg_days_listed` (`bolge-analizi`, piyasa özeti). Karneye kapanış süresi eklenmedi; eklenecekse `deals` kapanış zamanı ve portföy yayın tarihi ile tanım ayrıca kararlaştırılmalı. | `bolge-analizi/page.tsx` |
+
+Ek bulgular:
+- `commissions.splits` payı hâlâ ad etiketine bağlı; Ekip Merkezi / Kazanç ve Cüzdanım aynı hesabı kullanır (`src/lib/team/advisor-share.ts`, eskiden cüzdana gömülüydü). Ad değişince pay eşleşmesi kırılır (kalıcı çözüm Faz 2 `profile_id`).
+- Etkin izin hesabı `DEFAULT_MATRIX` (kod) + `tenant_role_permissions` + `user_permission_overrides` birleşimidir; `permission_defaults` tablosu çalışma zamanında okunmaz. Bu yüzden yeni izin anahtarı için migration olmadan kod tarafı çalışır.
+
+## 7. Faz 1B uygulaması (Ekip Merkezi) ve Faz 2 gereksinimleri
+
+**Yapılan (migration yok):**
+- Menü: `Ekip` öğesi `Ekip Merkezi` oldu; sekmeler Genel (`/app/ekip`), Kıyas (`/app/ekip/kiyas`), Kazanç (`/app/ekip/kazanc`), Hedefler (`/app/hedefler`, eski Performans başlığından taşındı, yolu aynı), Devir / Atama (`/app/ekip/devir`). Tek kaynak `nav-config.ts`; `Danışman KPI` ve `Ekip Ligi` Performans'ta kaldı, Kıyas'tan bağlantılıdır. Sekmeli breadcrumb düzeltildi (sekme sayfası "Ayrıntı" yerine sekme adıyla görünür).
+- Paket kilidi: `/app/ekip/kiyas` Profesyonel (KPI ile aynı), diğer ekip sekmeleri Ofis.
+- Kıyas: danışman karnesi (müşteri, yayında portföy, randevu, teklif, anlaşma, dönüşüm, kazanç, hedef gerçekleşmesi). Sıralama ve "dikkat gerektiren" filtreleri URL'de (`?sirala=`, `?filtre=`). Sayılar filtreli hedefe gider (`musteriler?assigned=`, `portfoyler?status=live&danisman=` [yeni filtre], `randevular?danisman=`, üye sayfası). Teklif/anlaşma sayıları üye sayfasına gider: `teklifler` ve `anlasmalar` listelerinde danışman filtresi yok. Bu ay kapsamlıdır; geçmiş aylar `danisman-kpi`'de.
+- Devir / Atama: üye başına iş yükü, mevcut `MemberHandoff` / `handoffMemberWorkload` yeniden kullanıldı; Kıyas satırındaki "Devret" bağlantısı ilgili üyeyi açar. Toplu müşteri atama `/app/musteriler`'e bağlıdır.
+- Kazanç gizliliği: yeni izin anahtarı `earnings_all` (yalnız "view" anlamlı). Varsayılan: owner, gm, accounting. branch_manager, team_lead, advisor GÖRMEZ. Uygulandığı yerler: `danisman-kpi` (gelir sütunu, gelir grafiği, Ciro Lideri rozeti, toplam gelir), `komisyon` (danışman pay dağılımı, split etiketleri, split editörü), `ekip/[id]` (bu ay komisyon kartı), `ekip/kiyas`, `ekip/kazanc`. Kendi kazancı her zaman görünür (`/app/cuzdan` yalnız oturum sahibinin payını gösterir). Sahibi `Ayarlar > Roller` ekranında rol bazında açabilir; kullanıcı istisnası ekranıyla TEK danışman için de açılıp kapatılabilir (danışman bazlı görünürlük ayarı mevcut şemayla bu yolla yapılır).
+- Danışman bazlı hedef: `Hedefler` sekmesi mevcut `targets` (profile_id) şemasıyla çalışır (anlaşma + ciro).
+
+**Faz 2 migration / sonraki iş gereksinimleri:**
+1. `permission_defaults` seed: `earnings_all` için owner (view/create/edit/delete), gm (view), accounting (view). Çalışma zamanı kodda; DB kopyası denetim uyumu içindir.
+2. RLS: `commissions` SELECT bugün tenant genelinde açık; kazanç gizliliği şu an yalnız sayfa/sunucu katmanındadır. Veritabanında kapatmak için `commissions` okuma politikası (veya danışman payı için ayrı görünüm/RPC: `deal.assigned_to = auth.uid()` ya da `earnings_all`) gerekir; `advisor_kpis` RPC'si tüm danışmanların ciro sütununu döndürmeye devam eder (arayüzde gizlenir).
+3. `commissions.splits` satırlarına `profile_id`, `advisor_commission_plans`, `commission_payouts` (hakediş).
+4. `targets` genişletme: randevu / portföy / talep hedefi (Kıyas şu an yalnız anlaşma ve ciro hedefini gösterir). `actual_*` sütunlarının kaldırılması veya trigger ile doldurulması kararı.
+5. `profiles.title`, `visibility_scope`. Takım/şube kapsamlı kıyas (team_lead, branch_manager yalnız kendi ekip/şubesi) ekip ilişkisi şeması olmadan yapılamaz.
+6. Liste filtreleri: `teklifler?danisman=`, `anlasmalar?danisman=`, `talepler?danisman=` (talepler eklendiğinde Kıyas'a "aktif talep" sütunu eklenir).
+7. Devir genişlemesi: talep, görev, randevu, açık anlaşma; seçmeli devir, zorunlu gerekçe (şu an tüm müşteri+portföy, gerekçesiz). Portföy toplu danışman atama aksiyonu.
+8. Ortalama kapanış süresi (danışman bazlı): tanım ve veri kaynağı kararı.
+9. Atama kuralları ayarı (`assignment_rules`), danışman kapasite/uygunluk.

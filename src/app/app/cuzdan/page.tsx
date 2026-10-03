@@ -17,8 +17,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { PrintButton } from "./print-button";
-
-type SplitEntry = { label?: string; amount?: number; rate?: number };
+import { advisorShare, dealOf, isPaid, type SplitEntry } from "@/lib/team/advisor-share";
 
 type CommissionRow = {
   id: string;
@@ -44,60 +43,6 @@ function money(value: number) {
     currency: "TRY",
     maximumFractionDigits: 0,
   }).format(value);
-}
-
-function dealOf(value: CommissionRow["deal"]) {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function isPaid(status: string) {
-  return status === "paid" || status === "collected";
-}
-
-/**
- * Danışman payı hesabı — şema kararı:
- *
- * `commissions.splits` jsonb `[{label, rate}]` taşır; satırlarda danışman
- * PROFİL ID'Sİ YOK, taraflar serbest metin etiket (split editörü böyle
- * kaydediyor). Bu yüzden pay üç kademede belirlenir:
- *
- * 1. Etiketi kullanıcının tam adıyla birebir eşleşen split satır(lar)ı varsa
- *    pay = brüt × oran (adına yazılmış paylaşım en güvenilir kaynak).
- * 2. Ad eşleşmesi yoksa ama bağlı anlaşma kullanıcıya atanmışsa
- *    (`deals.assigned_to`), jenerik "Danışman" etiketli satırın oranı kullanılır
- *    (editörün varsayılan şablonu bu etiketi üretir).
- * 3. Paylaşım hiç tanımlanmamışsa ve anlaşma kullanıcıya atanmışsa brüt tutarın
- *    tamamı "paylaşım bekliyor" notuyla gösterilir.
- *
- * Bunların hiçbiri tutmayan kayıtlar bu cüzdana girmez.
- */
-function advisorShare(
-  row: CommissionRow,
-  fullName: string | null,
-  userId: string,
-): { amount: number; note: string } | null {
-  const gross = Number(row.gross_amount) || 0;
-  const assignedToMe = dealOf(row.deal)?.assigned_to === userId;
-  const splits = Array.isArray(row.splits) ? row.splits : [];
-
-  if (splits.length > 0) {
-    const named = fullName ? splits.filter((s) => s.label === fullName) : [];
-    if (named.length > 0) {
-      const rate = named.reduce((sum, s) => sum + (Number(s.rate) || 0), 0);
-      return { amount: Math.round(gross * (rate / 100)), note: `%${rate} pay` };
-    }
-    if (assignedToMe) {
-      const generic = splits.find((s) => s.label === "Danışman");
-      if (generic) {
-        const rate = Number(generic.rate) || 0;
-        return { amount: Math.round(gross * (rate / 100)), note: `%${rate} pay (Danışman)` };
-      }
-    }
-    return null;
-  }
-
-  if (assignedToMe) return { amount: gross, note: "Paylaşım tanımsız · brüt" };
-  return null;
 }
 
 const MONTH_LABELS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];

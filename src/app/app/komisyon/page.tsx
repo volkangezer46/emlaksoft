@@ -13,6 +13,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { now as nowMs } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
+import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { exportCommissionsCsv } from "@/app/actions/export";
@@ -126,6 +127,8 @@ export default async function CommissionPage({
 }) {
   const { perms } = await requireModulePage("commissions");
   const canEdit = (perms.commissions ?? []).includes("edit");
+  // Kazanç gizliliği: danışman bazlı pay dağılımı ve split etiketleri başkasının kazancını gösterir.
+  const seeAllEarnings = canSeeAllEarnings(perms);
   const params = (await searchParams) ?? {};
   const durum: DurumFilter | null = DURUM_FILTERS.includes(params.durum as DurumFilter)
     ? (params.durum as DurumFilter)
@@ -191,7 +194,7 @@ export default async function CommissionPage({
   const donemBekleyen = Number(aggregate.month_pending);
 
   // Danışman bazlı dağılım — split etiketlerine göre pay (brüt × oran)
-  const advisorDist = aggregate.advisors.map((row) => ({
+  const advisorDist = (seeAllEarnings ? aggregate.advisors : []).map((row) => ({
     label: row.label,
     pay: Number(row.pay),
     adet: Number(row.record_count),
@@ -545,7 +548,7 @@ export default async function CommissionPage({
                     <div>
                       <p className="text-xs text-text-faint">Brüt komisyon</p>
                       <p className="font-display text-sm font-bold text-ink-950">{money(Number(row.gross_amount))}</p>
-                      {Array.isArray(row.splits) && row.splits.length > 0 ? (
+                      {seeAllEarnings && Array.isArray(row.splits) && row.splits.length > 0 ? (
                         <p className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-text-muted">
                           {row.splits.map((s, i) => {
                             const memberId = s.label ? memberIdByName.get(s.label) : undefined;
@@ -571,7 +574,9 @@ export default async function CommissionPage({
                     <div><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${rowPaid ? "bg-mint-500/10 text-mint-600" : "bg-amber-400/15 text-amber-500"}`}>{rowPaid ? "Tahsil edildi" : "Hesaplandı"}</span></div>
                     {canEdit ? (
                       <div className="relative z-10 flex flex-col items-end gap-1.5">
-                        <CommissionSplitEditor commissionId={row.id} gross={Number(row.gross_amount)} initial={row.splits} />
+                        {seeAllEarnings ? (
+                          <CommissionSplitEditor commissionId={row.id} gross={Number(row.gross_amount)} initial={row.splits} />
+                        ) : null}
                         <CommissionActions commissionId={row.id} amount={Number(row.gross_amount)} status={row.status} />
                       </div>
                     ) : null}
