@@ -10,6 +10,7 @@ export { EntityThumb } from "./entity-thumb";
 export { RowActions, RowActionLink, RowActionAnchor } from "./row-actions";
 export { ViewSwitcher, type ViewOption } from "./view-switcher";
 export { BulkBar } from "./bulk-bar";
+export { FilterSelect, FilterGrid } from "./filter-field";
 export {
   bucketByWeek,
   trendOf,
@@ -19,6 +20,7 @@ export {
   buildActiveChips,
   densityOf,
   hiddenFields,
+  mergeResetPage,
   WEEK_MS,
   type Trend,
   type CategoryOption,

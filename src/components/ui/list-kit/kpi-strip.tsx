@@ -28,6 +28,8 @@ export type KpiItem = {
   /** Seri/trend etiketi için pencere açıklaması ("son 4 hafta"). */
   seriesLabel?: string;
   attention?: boolean;
+  /** Fare üstü açıklaması (ör. döviz karşılığı kaynağı). */
+  title?: string;
 };
 
 const TONE_CLASS: Record<PillTone, string> = {
@@ -64,6 +66,7 @@ export function KpiStrip({ items, label = "Özet göstergeler", className }: { i
           <Link
             key={`${it.label}-${it.href}`}
             href={it.href}
+            title={it.title}
             className={cn(
               "focus-ring press group flex min-h-[5.5rem] items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3.5 shadow-[var(--elev-1)] transition hover:border-brand-300 hover:shadow-[var(--shadow-card)]",
               zero && !it.attention && "opacity-70 hover:opacity-100",
