@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight, Gauge, Trophy } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { moneyTry } from "@/lib/leak-shield";
 import { Widget } from "../dashboard-widgets";
 import { loadDeals, loadLiveListings, loadProfiles, type HomeCtx } from "./data";
@@ -82,9 +83,13 @@ export async function Ekip({ ctx }: { ctx: HomeCtx }) {
         </div>
         <div className="mt-5 space-y-3">
           {team.length === 0 ? (
-            <p className="rounded-[var(--radius-card)] border border-dashed border-line-strong px-3 py-8 text-center text-sm text-text-muted">
-              Atanmış anlaşma yok — satış hattından anlaşma ekleyin.
-            </p>
+            <EmptyState
+              variant="compact"
+              illustration="ekip"
+              title="Atanmış anlaşma yok"
+              description="Satış hattından anlaşma ekleyin."
+              action={{ href: "/app/anlasmalar", label: "Anlaşmalara git" }}
+            />
           ) : (
             team.map((member, index) => (
               <div

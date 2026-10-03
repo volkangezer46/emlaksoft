@@ -80,9 +80,9 @@ export async function OrnekVeri({ ctx }: { ctx: HomeCtx }) {
   return null;
 }
 
-/** Yetki belgesi uyarı kartı — sadece yaklaşan kayıt varsa görünür. */
-export async function YetkiUyari() {
-  const { data: expiringList } = await loadExpiringAuthority();
+/** Yetki belgesi uyarı kartı (kaynak: properties.authorization_end) — sadece yaklaşan kayıt varsa görünür. */
+export async function YetkiUyari({ ctx }: { ctx: HomeCtx }) {
+  const { data: expiringList } = await loadExpiringAuthority(ctx);
   if (expiringList.length === 0) return null;
   return (
     <div className="flex flex-wrap items-start gap-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/[0.06] p-4">

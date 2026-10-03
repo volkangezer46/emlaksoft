@@ -11,7 +11,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { computeLeadScore } from "@/lib/lead-score";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
-import { TR_OFFSET_MS, daysAgoIso, now, trParts } from "@/lib/clock";
+import { TR_OFFSET_MS, daysAgoIso, daysFromNowIso, now, trDayKey, trParts } from "@/lib/clock";
 import type { Period } from "@/components/ui/premium";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
 import {
@@ -20,10 +20,21 @@ import {
   type DealRow,
   type DemandCounts,
   type ListingRow,
+  lastSixMonthKeys,
 } from "./helpers";
 
 export type HomeCtx = {
   tenantId: string | null;
+  /** Oturumdaki kullanıcı (görev/randevu/müşteri `assigned_to` süzgeci için). */
+  userId: string;
+  role: string;
+  /** Yönetim rolü (owner/gm/branch_manager): "Bugün karar bekleyenler" + Ofis görünümü anahtarı. */
+  isManagement: boolean;
+  /** true → görev/randevu/müşteri/portföy sorguları `assigned_to = ben` ile daralır (varsayılan). */
+  scopeMine: boolean;
+  /** Başkasının kazancını görme hakkı (`earnings_all`); yoksa komisyon yalnız kendi anlaşmalarıdır. */
+  seeAllEarnings: boolean;
+  canSeeCommissions: boolean;
   tvMode: boolean;
   canSeeRentals: boolean;
   canSeeProjects: boolean;
@@ -135,18 +146,23 @@ export const loadPeriodStats = cache(async (ctx: HomeCtx) => {
 
 export const loadTaskSummary = cache(async (ctx: HomeCtx) => {
   const supabase = await createClient();
-  const results = await Promise.all([
-    // Bugün vadesi gelen açık görevler (yalnız sayaç)
-    supabase.from("tasks").select("id", { count: "exact", head: true })
-      .eq("status", "open").gte("due_at", ctx.dayStartIso).lt("due_at", ctx.dayEndIso),
-    // Vadesi geçmiş (bugünden önce) açık görevler (yalnız sayaç)
-    supabase.from("tasks").select("id", { count: "exact", head: true })
-      .eq("status", "open").lt("due_at", ctx.dayStartIso),
-    // Bugünün gerçek görevleri (gecikmiş dahil) — hover'da tek tıkla tamamlanır
-    supabase.from("tasks").select("id, title, due_at, priority")
-      .eq("status", "open").lt("due_at", ctx.dayEndIso)
-      .order("due_at", { ascending: true }).limit(5),
-  ]);
+  // Danışman kapsamı: yalnız bana atanan görevler (ofis görünümünde süzgeç yok).
+  // Bugün vadesi gelen açık görevler (yalnız sayaç)
+  let dueQ = supabase.from("tasks").select("id", { count: "exact", head: true })
+    .eq("status", "open").gte("due_at", ctx.dayStartIso).lt("due_at", ctx.dayEndIso);
+  // Vadesi geçmiş (bugünden önce) açık görevler (yalnız sayaç)
+  let overdueQ = supabase.from("tasks").select("id", { count: "exact", head: true })
+    .eq("status", "open").lt("due_at", ctx.dayStartIso);
+  // Bugünün gerçek görevleri (gecikmiş dahil) — hover'da tek tıkla tamamlanır
+  let openQ = supabase.from("tasks").select("id, title, due_at, priority")
+    .eq("status", "open").lt("due_at", ctx.dayEndIso)
+    .order("due_at", { ascending: true }).limit(5);
+  if (ctx.scopeMine) {
+    dueQ = dueQ.eq("assigned_to", ctx.userId);
+    overdueQ = overdueQ.eq("assigned_to", ctx.userId);
+    openQ = openQ.eq("assigned_to", ctx.userId);
+  }
+  const results = await Promise.all([dueQ, overdueQ, openQ]);
   assertQueryBatchSucceeded(results, ["tasks-due-today", "tasks-overdue", "open-tasks"], "Ana panel");
   const [due, overdue, open] = results;
   return {
@@ -159,20 +175,30 @@ export const loadTaskSummary = cache(async (ctx: HomeCtx) => {
 export const loadTodayAppointments = cache(async (ctx: HomeCtx) => {
   const supabase = await createClient();
   // count: brifingde gerçek toplam gerekir. Açık ilişki adı ipucu korunur.
-  const result = await supabase
+  let apptQ = supabase
     .from("appointments")
     .select("id, appointment_type, scheduled_at, status, customer:customers!appointments_customer_id_fkey(full_name, phone)", { count: "exact" })
     .gte("scheduled_at", ctx.dayStartIso).lt("scheduled_at", ctx.dayEndIso)
     .order("scheduled_at", { ascending: true }).limit(5);
+  if (ctx.scopeMine) apptQ = apptQ.eq("assigned_to", ctx.userId);
+  const result = await apptQ;
   assertQueryBatchSucceeded([result], ["today-appointments"], "Ana panel");
   return { rows: result.data ?? [], total: result.count ?? 0 };
 });
 
-export const loadHotLeadCount = cache(async (ctx: HomeCtx) => {
+export type HotLead = { id: string; fullName: string; phone: string | null; score: number };
+
+/**
+ * Sıcak (hot) müşteriler, puana göre azalan. Danışman kapsamında yalnız bana atanan müşteriler.
+ * Hem "Bugün kuyruğu" sayacı hem "Bugün aranacaklar" listesi bunu paylaşır (tek sorgu).
+ */
+export const loadHotLeads = cache(async (ctx: HomeCtx): Promise<HotLead[]> => {
   const supabase = await createClient();
+  let custQ = supabase.from("customers").select("id, full_name, phone, email, source, blacklist, created_at")
+    .is("deleted_at", null).order("created_at", { ascending: false }).limit(200);
+  if (ctx.scopeMine) custQ = custQ.eq("assigned_to", ctx.userId);
   const results = await Promise.all([
-    supabase.from("customers").select("id, phone, email, source, blacklist, created_at")
-      .is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
+    custQ,
     ctx.tenantId
       ? supabase.rpc("customer_lead_signals", { p_tenant_id: ctx.tenantId })
       : Promise.resolve({ data: [] as LeadSignalRow[] }),
@@ -181,44 +207,78 @@ export const loadHotLeadCount = cache(async (ctx: HomeCtx) => {
   const [{ data: customers }, { data: signals }] = results;
   const signalMap = new Map<string, LeadSignalRow>();
   for (const s of (signals ?? []) as LeadSignalRow[]) signalMap.set(s.customer_id, s);
-  return (customers ?? []).filter((c) => {
+  const hot: HotLead[] = [];
+  for (const c of customers ?? []) {
     const s = signalMap.get(c.id);
-    return (
-      computeLeadScore({
-        hasPhone: Boolean(c.phone),
-        hasEmail: Boolean(c.email),
-        source: c.source,
-        activeDemands: s?.active_demands ?? 0,
-        communications: s?.comms ?? 0,
-        appointments: s?.appts ?? 0,
-        calls: s?.calls ?? 0,
-        lastActivityAt: s?.last_activity ?? null,
-        createdAt: c.created_at,
-        blacklist: Boolean(c.blacklist),
-      }).tier === "hot"
-    );
-  }).length;
+    const lead = computeLeadScore({
+      hasPhone: Boolean(c.phone),
+      hasEmail: Boolean(c.email),
+      source: c.source,
+      activeDemands: s?.active_demands ?? 0,
+      communications: s?.comms ?? 0,
+      appointments: s?.appts ?? 0,
+      calls: s?.calls ?? 0,
+      lastActivityAt: s?.last_activity ?? null,
+      createdAt: c.created_at,
+      blacklist: Boolean(c.blacklist),
+    });
+    if (lead.tier === "hot") hot.push({ id: c.id, fullName: c.full_name ?? "Müşteri", phone: c.phone ?? null, score: lead.score });
+  }
+  return hot.sort((a, b) => b.score - a.score);
 });
 
-/** Yetki belgesi 15 gün içinde dolacak portföyler.
- * NOT: `properties.authority_expires_at` kolonu veritabanında YOK (hiçbir migration eklemedi,
- * hiçbir form yazmıyor); sorgu 42703 verip ana paneli düşürüyordu. Yetki belgesi takibi
- * (yol haritası A2) kolonu eklediğinde bu sorgu geri bağlanacak; o zamana kadar boş döner. */
-export const loadExpiringAuthority = cache(async () => ({
-  data: [] as { id: string; property_code: string | null; title: string | null; authority_expires_at: string | null }[],
-}));
+export const loadHotLeadCount = cache(async (ctx: HomeCtx) => (await loadHotLeads(ctx)).length);
+
+export type ExpiringAuthority = { id: string; property_code: string | null; title: string | null; authority_expires_at: string };
+
+/**
+ * Yetki belgesi 15 gün içinde dolacak yayındaki portföyler. Kaynak kolon
+ * `properties.authorization_end` (date; `authority_expires_at` kolonu YOKTUR — eski sorgu 42703 verirdi).
+ * Danışman kapsamında yalnız bana atanan portföyler.
+ */
+export const loadExpiringAuthority = cache(async (ctx: HomeCtx) => {
+  const supabase = await createClient();
+  let q = supabase
+    .from("properties")
+    .select("id, property_code, title, authorization_end")
+    .eq("status", "live")
+    .is("deleted_at", null)
+    .not("authorization_end", "is", null)
+    .gte("authorization_end", trDayKey())
+    .lte("authorization_end", trDayKey(daysFromNowIso(15)))
+    .order("authorization_end", { ascending: true })
+    .limit(12);
+  if (ctx.scopeMine) q = q.eq("assigned_to", ctx.userId);
+  const result = await q;
+  assertQueryBatchSucceeded([result], ["expiring-authority"], "Ana panel");
+  const data: ExpiringAuthority[] = (result.data ?? []).map((r) => ({
+    id: r.id as string,
+    property_code: (r.property_code as string | null) ?? null,
+    title: (r.title as string | null) ?? null,
+    authority_expires_at: r.authorization_end as string,
+  }));
+  return { data };
+});
 
 /* ------------------------------- Ortak kümeler ------------------------------ */
 
-export const loadLiveListings = cache(async () => {
+/** `ctx` verilir ve danışman kapsamındaysa yalnız bana atanan portföylerin ilanları (inner join). */
+export const loadLiveListings = cache(async (ctx?: HomeCtx) => {
   const supabase = await createClient();
-  const result = await supabase
+  const mine = Boolean(ctx?.scopeMine);
+  let q = supabase
     .from("portal_listings")
-    .select("id, portal_name, portal_listing_id, last_confirmed_at")
+    .select(
+      mine
+        ? "id, portal_name, portal_listing_id, last_confirmed_at, property:properties!portal_listings_property_id_fkey!inner(assigned_to)"
+        : "id, portal_name, portal_listing_id, last_confirmed_at",
+    )
     .eq("status", "live")
     .limit(100);
+  if (mine && ctx) q = q.eq("property.assigned_to", ctx.userId);
+  const result = await q;
   assertQueryBatchSucceeded([result], ["live-listings"], "Ana panel");
-  return (result.data ?? []) as ListingRow[];
+  return (result.data ?? []) as unknown as ListingRow[];
 });
 
 /**
@@ -229,8 +289,29 @@ export const loadLiveListings = cache(async () => {
  * döner; RLS altında eski sorgu boş dönüyordu → aynı şekilde sıfır özet.
  */
 export const loadCommissionSummary = cache(async (ctx: HomeCtx) => {
-  void ctx; // cache anahtarı: aynı istek bağlamı
   const supabase = await createClient();
+  // Kazanç gizliliği: ofis geneli toplam (RPC) yalnız `earnings_all` ile; diğer roller yalnız
+  // kendi anlaşmalarının komisyonunu görür (bkz. /app/komisyon, earnings-bypass-contract).
+  if (!ctx.seeAllEarnings) {
+    const own = await supabase
+      .from("commissions")
+      .select("gross_amount, status, created_at, deal:deals!commissions_deal_id_fkey!inner(assigned_to)")
+      .eq("deal.assigned_to", ctx.userId)
+      .gte("created_at", ctx.sixMonthsAgoIso)
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (own.error?.code === "42501") return commissionSummaryFromAggregate(null);
+    assertQueryBatchSucceeded([own], ["own-commissions"], "Ana panel");
+    const monthly = lastSixMonthKeys(now()).map((key) => {
+      const rows = (own.data ?? []).filter((r) => trDayKey(r.created_at as string).slice(0, 7) === key);
+      const accrued = rows.reduce((t, r) => t + Number(r.gross_amount ?? 0), 0);
+      const paid = rows
+        .filter((r) => r.status === "paid" || r.status === "collected")
+        .reduce((t, r) => t + Number(r.gross_amount ?? 0), 0);
+      return { month_start: `${key}-01`, accrued, paid };
+    });
+    return commissionSummaryFromAggregate({ monthly });
+  }
   const result = await supabase.rpc("tenant_commission_aggregates", { p_as_of: new Date(now()).toISOString() });
   if (result.error?.code === "42501") return commissionSummaryFromAggregate(null);
   assertQueryBatchSucceeded([result], ["commission-aggregates"], "Ana panel");
@@ -529,4 +610,49 @@ export const loadOnboardingState = cache(async (ctx: HomeCtx) => {
   if (!ctx.tenantId) return null;
   const snap = await loadOnboardingSnapshot(ctx.tenantId);
   return snap?.state ?? null;
+});
+
+/* ------------------------- Yönetim: bugün karar bekleyenler ------------------------- */
+
+const PASSIVE_DAYS = 30;
+const DEALS_LIMIT = 1000;
+
+/**
+ * Yönetim rolleri için "Bugün karar bekleyenler". Hepsi gerçek sayım; sorgu hatası ya da
+ * yetki yoksa ilgili alan `null` (gösterilmez — sahte sıfır yok).
+ * - approvals: bana yönelik bekleyen onay talepleri (kendi talebim hariç; nav rozetiyle aynı kural)
+ * - lostThisMonth: bu ay kapanan ilanlarda tahmini kaçan komisyon (yalnız `earnings_all` ile)
+ * - overdueRent: gecikmiş kira tahsilatı sayısı (kiralama modülünü görebilene)
+ * - passiveAdvisors: son 30 günde anlaşma hareketi olmayan aktif danışman (yalnız anlaşma satırları
+ *   kırpılmadıysa hesaplanır; 30 günden yeni kaydolanlar sayılmaz)
+ */
+export const loadDecisions = cache(async (ctx: HomeCtx) => {
+  const supabase = await createClient();
+  let approvalsQ = supabase
+    .from("approval_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "bekliyor")
+    .neq("requested_by", ctx.userId);
+  if (ctx.tenantId) approvalsQ = approvalsQ.eq("tenant_id", ctx.tenantId);
+  const [approvals, advisors, deals, closures, rentals] = await Promise.all([
+    ctx.canSeeCommissions ? approvalsQ : Promise.resolve(null),
+    supabase.from("profiles").select("id, created_at").eq("is_active", true).in("role", ["advisor", "team_lead"]).limit(200),
+    loadDeals(),
+    ctx.seeAllEarnings ? loadClosures(ctx) : Promise.resolve(null),
+    ctx.canSeeRentals ? loadRentalsAndProjects(ctx) : Promise.resolve(null),
+  ]);
+  const cutoff = daysAgoIso(PASSIVE_DAYS);
+  let passiveAdvisors: number | null = null;
+  if (!advisors.error && deals.length < DEALS_LIMIT) {
+    const active = new Set(deals.filter((d) => (d.updated_at ?? "") >= cutoff).map((d) => d.assigned_to));
+    passiveAdvisors = (advisors.data ?? []).filter((a) => (a.created_at as string) < cutoff && !active.has(a.id as string)).length;
+  }
+  const lost = closures ? closures.thisMonth.reduce((t, r) => t + Number(r.estimated_lost_commission || 0), 0) : null;
+  return {
+    approvals: approvals && !approvals.error ? (approvals.count ?? 0) : null,
+    lostThisMonth: lost,
+    overdueRent: rentals ? rentals.rentCharges.filter((c) => c.status === "overdue").length : null,
+    passiveAdvisors,
+    passiveDays: PASSIVE_DAYS,
+  };
 });

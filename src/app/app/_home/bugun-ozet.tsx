@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { ChevronRight, Plus, Sparkles } from "lucide-react";
+import { ChevronRight, Sparkles } from "lucide-react";
 import { buildDailyBriefing, type BriefingItem, type BriefingTone } from "@/lib/briefing";
 import { generateBriefingSummary } from "@/lib/ai/briefing-summary";
 import { formatTrTime } from "@/lib/clock";
-import { EmptyArt } from "@/components/ui/premium";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   loadCommissionSummary,
   loadExpiringAuthority,
@@ -28,6 +28,10 @@ const QUEUE_TONE: Record<BriefingTone, string> = {
 
 /** Kuyruğun görünür satır üst sınırı (şartname: en çok 6). */
 const QUEUE_MAX = 6;
+
+/** "YYYY-AA-GG" (date kolonu) → "05 Eki". */
+const dayLabel = (key: string) =>
+  new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", timeZone: "UTC" }).format(new Date(`${key}T00:00:00Z`));
 
 /**
  * Opsiyonel AI özet satırı — Suspense içinde ayrı stream edilir, sayfanın
@@ -54,9 +58,9 @@ export async function BugunOzet({ ctx }: { ctx: HomeCtx }) {
     loadTaskSummary(ctx),
     loadTodayAppointments(ctx),
     loadHotLeadCount(ctx),
-    loadLiveListings(),
+    loadLiveListings(ctx),
     loadCommissionSummary(ctx),
-    loadExpiringAuthority(),
+    loadExpiringAuthority(ctx),
   ]);
 
   const first = appts.rows[0];
@@ -92,14 +96,15 @@ export async function BugunOzet({ ctx }: { ctx: HomeCtx }) {
       </div>
 
       {items.length === 0 ? (
-        <div className="pm-empty flex-1">
-          <EmptyArt kind="check" />
-          <p className="font-semibold text-[var(--text)]">Bugün için acil iş yok</p>
-          <p>Gecikmiş görev, bekleyen randevu ya da sıcak müşteri görünmüyor.</p>
-          <Link href="/app/talepler" className="focus-ring mt-1 inline-flex items-center gap-1 rounded-[var(--radius-control)] text-sm font-semibold text-[var(--accent-text)]">
-            <Plus className="h-4 w-4" aria-hidden="true" /> Talepleri aç
-          </Link>
-        </div>
+        <EmptyState
+          variant="compact"
+          illustration="basari"
+          tone="mint"
+          className="flex-1 justify-center"
+          title="Bugün için acil iş yok"
+          description="Gecikmiş görev, bekleyen randevu ya da sıcak müşteri görünmüyor."
+          action={{ href: "/app/talepler", label: "Talepleri aç" }}
+        />
       ) : (
         <>
           <ul className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-1">
@@ -121,11 +126,27 @@ export async function BugunOzet({ ctx }: { ctx: HomeCtx }) {
           <Suspense fallback={null}>
             <BriefingAiLine items={items} />
           </Suspense>
+          {expiring.data.length > 0 ? (
+            <div className="mt-4 border-t border-line pt-3">
+              <p className="pm-bx-eyebrow mb-1.5">Yetkisi dolan portföyler · 15 gün</p>
+              <ul className="space-y-1">
+                {expiring.data.slice(0, 3).map((p) => (
+                  <li key={p.id}>
+                    <Link href={`/app/portfoyler/${p.id}`} className="pm-row focus-ring group pm-t-warn">
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--text)]">{p.title ?? p.property_code}</span>
+                      <span className="shrink-0 text-xs text-[var(--text-muted)]">{dayLabel(p.authority_expires_at)}</span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-faint)] group-hover:text-[var(--t-text)]" aria-hidden="true" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <Link
-            href="/app/brifing"
+            href="/app/akilli-listeler"
             className="focus-ring mt-auto inline-flex items-center gap-1 self-start rounded-[var(--radius-control)] pt-4 text-sm font-semibold text-[var(--accent-text)]"
           >
-            Günlük brifingin tamamı <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            Aranacak müşteriler: Akıllı Listeler <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </>
       )}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight, CalendarDays, Phone } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { AppointmentConfirmButton } from "../dashboard-quick-actions";
 import { Widget } from "../dashboard-widgets";
 import { loadTodayAppointments, type HomeCtx } from "./data";
@@ -34,9 +35,14 @@ export async function Randevular({ ctx }: { ctx: HomeCtx }) {
           </PanelLink>
         </div>
         {todayAppointments.length === 0 ? (
-          <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-3 py-6 text-center text-sm text-text-muted">
-            Bugün planlı randevu yok.
-          </p>
+          <EmptyState
+            variant="compact"
+            illustration="randevu"
+            tone="amber"
+            title="Bugün planlı randevu yok"
+            description="Müşteri görüşmesi ya da gösterim planlayın."
+            action={{ href: "/app/hizli?sekme=randevu", label: "Randevu planla" }}
+          />
         ) : (
           <ul className="mt-4 space-y-2.5">
             {todayAppointments.map((appt) => (

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
-import { EmptyArt } from "@/components/ui/premium";
+import { EmptyState } from "@/components/ui/empty-state";
 import { DAY_MS } from "@/lib/clock";
 import { TaskQuickRow } from "../dashboard-quick-actions";
 import { Widget } from "../dashboard-widgets";
@@ -47,13 +47,14 @@ export async function Gorevler({ ctx }: { ctx: HomeCtx }) {
           </span>
         </div>
         {dueTasks.length === 0 ? (
-          <div className="pm-empty mt-2">
-            <EmptyArt kind="check" />
-            <p className="font-semibold text-[var(--text)]">Bugün için açık görev yok</p>
-            <Link href="/app/gorevler" className="focus-ring text-sm font-semibold text-[var(--accent-text)]">
-              Görev ekle
-            </Link>
-          </div>
+          <EmptyState
+            variant="compact"
+            illustration="gorev"
+            tone="mint"
+            title="Bugün için açık görev yok"
+            description="Yeni görev ekleyerek günü planlayın."
+            action={{ href: "/app/gorevler", label: "Görev ekle" }}
+          />
         ) : (
         <ul className="mt-4 space-y-2.5">
           {/* Gerçek görev kayıtları — hover'da tek tıkla "Tamamla" */}

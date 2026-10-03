@@ -56,7 +56,6 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     icon: ICONS.baslikBugun,
     items: [
       { href: "/app", label: "Ana ekran", icon: ICONS.dashboard, module: "dashboard", tier: "core" },
-      { href: "/app/brifing", label: "Günlük Brifing", icon: ICONS.briefing, module: "dashboard", tier: "more" },
       { href: "/app/baslangic", label: "Ofis kurulumu", icon: ICONS.kurulum, module: "dashboard", tier: "more" },
       { href: "/app/asistan", label: "AI Asistan", icon: ICONS.ai, module: "dashboard", tier: "more" },
     ],
