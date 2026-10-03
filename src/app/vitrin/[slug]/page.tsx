@@ -14,6 +14,7 @@ import { DAY_MS, msSince, now } from "@/lib/clock";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import { orIlike, safeLike } from "@/lib/pgrst";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { getBaseUrl } from "@/lib/base-url";
 
 /** Son 7 günde yayına giren ilan "Yeni" rozeti alır (published_at gerçek yayın damgası). */
 function isNewListing(publishedAt: string | null): boolean {
@@ -50,6 +51,7 @@ type VitrinSearchParams = {
   max?: string;
   oda?: string;
   sirala?: string;
+  tur?: string;
 };
 
 export async function generateMetadata({
@@ -88,7 +90,7 @@ export async function generateMetadata({
       description,
       url: `/vitrin/${slug}`,
     },
-    twitter: { card: "summary", title, description },
+    twitter: { card: "summary_large_image", title, description },
   };
 }
 
@@ -107,7 +109,7 @@ export default async function VitrinPage({
   const [{ data: tenant }, { data: provinces }] = await Promise.all([
     admin
       .from("tenants")
-      .select("id, name, status, brand_color, lead_capture_token, lead_capture_enabled")
+      .select("id, name, status, brand_color, logo_url, phone, lead_capture_token, lead_capture_enabled")
       .eq("slug", slug)
       .maybeSingle(),
     admin.from("geo_provinces").select("id, name").eq("is_active", true).order("name"),
@@ -119,6 +121,7 @@ export default async function VitrinPage({
   const min = parseMoneyParam(sp.min);
   const max = parseMoneyParam(sp.max);
   const oda = (sp.oda ?? "").trim();
+  const tur = (sp.tur ?? "").trim().slice(0, 40);
   const sirala = sp.sirala === "fiyat-artan" || sp.sirala === "fiyat-azalan" ? sp.sirala : "";
 
   // Vitrin listesi searchParams okuduğu için sayfa dinamik render olur ve `revalidate`
@@ -145,6 +148,7 @@ export default async function VitrinPage({
     if (min != null) query = query.gte("list_price", min);
     if (max != null) query = query.lte("list_price", max);
     if (oda) query = query.eq("features->>rooms", oda);
+    if (tur) query = query.eq("property_type", tur);
 
     // Fiyatsız ilanlar ("Fiyat için sorun") her sıralamada sona düşsün
     if (sirala === "fiyat-artan") query = query.order("list_price", { ascending: true, nullsFirst: false });
@@ -156,7 +160,7 @@ export default async function VitrinPage({
       query.limit(60),
       admin
         .from("properties")
-        .select("features")
+        .select("features, property_type")
         .eq("tenant_id", tenant.id)
         .eq("status", "live")
         .is("deleted_at", null)
@@ -188,7 +192,7 @@ export default async function VitrinPage({
   };
   const listing = q
     ? await loadListing()
-    : await unstable_cache(loadListing, ["vitrin-listing-v1", tenant.id, String(min ?? ""), String(max ?? ""), oda, sirala], {
+    : await unstable_cache(loadListing, ["vitrin-listing-v1", tenant.id, String(min ?? ""), String(max ?? ""), oda, sirala, tur], {
         revalidate: 60,
         tags: ["vitrin", `vitrin:${tenant.id}`],
       })();
@@ -212,9 +216,15 @@ export default async function VitrinPage({
     const r = ((row.features ?? {}) as { rooms?: string }).rooms;
     if (r) roomSet.add(r);
   }
+  const typeSet = new Set<string>();
+  for (const row of roomRows ?? []) {
+    const t = (row as { property_type?: string | null }).property_type;
+    if (t) typeSet.add(t);
+  }
+  const typeOptions = [...typeSet].sort((a, b) => a.localeCompare(b, "tr"));
   const roomOptions = [...roomSet].sort((a, b) => a.localeCompare(b, "tr"));
 
-  const hasFilter = Boolean(q || min != null || max != null || oda || sirala || sp.tx);
+  const hasFilter = Boolean(q || min != null || max != null || oda || sirala || tur || sp.tx);
 
   // tx sekmeleri diğer filtreleri korur
   function txHref(txKey: string) {
@@ -225,17 +235,59 @@ export default async function VitrinPage({
     if (sp.max) p.set("max", sp.max);
     if (oda) p.set("oda", oda);
     if (sirala) p.set("sirala", sirala);
+    if (tur) p.set("tur", tur);
+    const s = p.toString();
+    return `/vitrin/${slug}${s ? `?${s}` : ""}`;
+  }
+  // Kategori çipleri (emlak türü) tx/q/fiyat/oda/sıralama filtrelerini korur
+  function turHref(t: string) {
+    const p = new URLSearchParams();
+    if (sp.tx) p.set("tx", sp.tx);
+    if (q) p.set("q", q);
+    if (sp.min) p.set("min", sp.min);
+    if (sp.max) p.set("max", sp.max);
+    if (oda) p.set("oda", oda);
+    if (sirala) p.set("sirala", sirala);
+    if (t) p.set("tur", t);
     const s = p.toString();
     return `/vitrin/${slug}${s ? `?${s}` : ""}`;
   }
 
   const coverMap = new Map<string, string>(listing.coverEntries);
 
+  // JSON-LD: ofis (RealEstateAgent) + ilan listesi (ItemList) — yalnız doğrulanabilir alanlar.
+  const siteUrl = getBaseUrl();
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "RealEstateAgent",
+        name: tenant.name,
+        url: `${siteUrl}/vitrin/${slug}`,
+        ...(tenant.logo_url ? { logo: tenant.logo_url } : {}),
+        ...(tenant.phone ? { telephone: tenant.phone } : {}),
+      },
+      {
+        "@type": "ItemList",
+        itemListElement: properties.slice(0, 20).map((p, i) => ({
+          "@type": "ListItem",
+          position: i + 1,
+          url: `${siteUrl}/vitrin/${slug}/${p.id}`,
+          name: p.title || p.property_code,
+        })),
+      },
+    ],
+  };
+
   const fieldCls =
     "w-full rounded-[var(--radius-card)] border border-white/15 bg-white/[0.06] px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition focus:border-mint-400/50 focus:bg-white/[0.09]";
 
   return (
     <div className="min-h-screen bg-canvas">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
       {/* Hero */}
       <header className="theme-dark relative overflow-hidden bg-[image:var(--grad-ink)] text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
@@ -245,12 +297,17 @@ export default async function VitrinPage({
             href={`/vitrin/${slug}`}
             className="focus-ring flex w-fit items-center gap-3 rounded-[var(--radius-card)] transition hover:opacity-90"
           >
-            <span
-              className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] text-base font-extrabold text-white"
-              style={{ background: tenant.brand_color || "var(--grad-brand)" }}
-            >
-              {tenant.name ? tenant.name[0] : "E"}
-            </span>
+            {tenant.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element -- kiracı logosu keyfi Storage URL'i
+              <img src={tenant.logo_url} alt="" width={44} height={44} className="h-11 w-11 rounded-[var(--radius-card)] bg-white object-contain" />
+            ) : (
+              <span
+                className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] text-base font-extrabold text-white"
+                style={{ background: tenant.brand_color || "var(--grad-brand)" }}
+              >
+                {tenant.name ? tenant.name[0] : "E"}
+              </span>
+            )}
             <span>
               <span className="block font-display text-lg font-extrabold">{tenant.name}</span>
               <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-mint-400">
@@ -289,6 +346,26 @@ export default async function VitrinPage({
             <FavNavBadge slug={slug} variant="dark" />
           </div>
 
+          {typeOptions.length > 1 ? (
+            <nav aria-label="Emlak türü" className="mt-3 -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
+              {["", ...typeOptions].map((t) => {
+                const active = tur === t;
+                return (
+                  <Link
+                    key={t || "tum"}
+                    href={turHref(t)}
+                    aria-current={active ? "true" : undefined}
+                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                      active ? "bg-mint-500 text-ink-950" : "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10"
+                    }`}
+                  >
+                    {t || "Tüm türler"}
+                  </Link>
+                );
+              })}
+            </nav>
+          ) : null}
+
           {/* Sunucu filtreleri — GET formu, JS gerektirmez */}
           <form
             method="get"
@@ -296,6 +373,7 @@ export default async function VitrinPage({
             className="mt-5 grid max-w-4xl gap-2 sm:grid-cols-2 lg:grid-cols-[1.8fr_1fr_1fr_1.1fr_1.2fr_auto]"
           >
             {sp.tx ? <input type="hidden" name="tx" value={sp.tx} /> : null}
+            {tur ? <input type="hidden" name="tur" value={tur} /> : null}
             <input name="q" defaultValue={q} placeholder="Başlık, kod veya adres ara" className={fieldCls} aria-label="Metin arama" />
             <input name="min" defaultValue={sp.min ?? ""} inputMode="numeric" placeholder="Min ₺" className={fieldCls} aria-label="Minimum fiyat" />
             <input name="max" defaultValue={sp.max ?? ""} inputMode="numeric" placeholder="Max ₺" className={fieldCls} aria-label="Maksimum fiyat" />
@@ -352,7 +430,7 @@ export default async function VitrinPage({
           <>
           <FavEmptyNotice slug={slug} ids={properties.map((p) => p.id)} />
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {properties.map((p) => {
+            {properties.map((p, idx) => {
               const feat = (p.features ?? {}) as {
                 rooms?: string;
                 sqm?: number;
@@ -389,6 +467,7 @@ export default async function VitrinPage({
                         src={`/api/property-media/${coverId}`}
                         alt={p.title || "Portföy"}
                         fill
+                        priority={idx < 3}
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                         unoptimized
                         className="object-cover transition group-hover:scale-105"

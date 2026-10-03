@@ -45,6 +45,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       });
     }
 
+    // Yayındaki (status=live) ilan detayları — yalnız aktif ofislerin; token'lı portallar HARİÇ.
+    const tenantSlug = new Map<string, string>();
+    for (const t of tenants ?? []) if (t.slug) tenantSlug.set(t.id, t.slug);
+    const { data: listings } = await admin
+      .from("properties")
+      .select("id, tenant_id, updated_at")
+      .eq("status", "live")
+      .is("deleted_at", null)
+      .order("updated_at", { ascending: false })
+      .limit(10000);
+    for (const l of listings ?? []) {
+      const sl = tenantSlug.get(l.tenant_id);
+      if (!sl) continue;
+      entries.push({
+        url: `${BASE_URL}/vitrin/${sl}/${l.id}`,
+        lastModified: l.updated_at ? new Date(l.updated_at) : new Date(),
+        changeFrequency: "weekly",
+        priority: 0.6,
+      });
+    }
+
     // Danışman dijital kartvizitleri (/danisman/[slug]) — yalnız yayına alınmış
     // ve aktif profiller. Bu sayfalar bilerek indekslenebilir (bkz. sayfa başlığı
     // yorumu): danışmanın adıyla bulunabilirliği ürünün amacı.

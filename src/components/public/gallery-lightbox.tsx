@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Expand, X } from "lucide-react";
 import {
   Dialog,
@@ -13,6 +13,38 @@ import {
 export type GalleryImage = { id: string; alt?: string | null; src?: string };
 
 const MAX_THUMBS = 10;
+const SWIPE_PX = 40;
+
+/** Yatay kaydırma (swipe) — dokunmatikte önceki/sonraki fotoğraf; küçük hareket tıklama sayılır. */
+function useSwipe(onPrev: () => void, onNext: () => void) {
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const swiped = useRef(false);
+  return {
+    onTouchStart: (e: React.TouchEvent) => {
+      const t = e.touches[0];
+      start.current = { x: t.clientX, y: t.clientY };
+      swiped.current = false;
+    },
+    onTouchEnd: (e: React.TouchEvent) => {
+      const s = start.current;
+      start.current = null;
+      if (!s) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - s.x;
+      if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(t.clientY - s.y)) {
+        swiped.current = true;
+        if (dx < 0) onNext();
+        else onPrev();
+      }
+    },
+    /** Swipe sonrası tetiklenen click'i (lightbox açılması) yutar. */
+    consumeSwipe: () => {
+      const v = swiped.current;
+      swiped.current = false;
+      return v;
+    },
+  };
+}
 
 type GalleryLightboxProps = {
   images: GalleryImage[];
@@ -48,6 +80,8 @@ export function GalleryLightbox({
   const prev = useCallback(() => setIndex((i) => (i - 1 + count) % count), [count]);
   const next = useCallback(() => setIndex((i) => (i + 1) % count), [count]);
 
+  const swipe = useSwipe(prev, next);
+
   if (count === 0) return null;
   const current = images[Math.min(index, count - 1)];
   const srcOf = (img: GalleryImage) => img.src ?? `/api/property-media/${img.id}`;
@@ -56,8 +90,12 @@ export function GalleryLightbox({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        className={`block w-full cursor-zoom-in ${mainClassName}`}
+        onClick={() => {
+          if (!swipe.consumeSwipe()) setOpen(true);
+        }}
+        onTouchStart={swipe.onTouchStart}
+        onTouchEnd={swipe.onTouchEnd}
+        className={`block w-full cursor-zoom-in touch-pan-y ${mainClassName}`}
         aria-label="Fotoğrafı tam ekran aç"
       >
         <Image
@@ -148,7 +186,11 @@ export function GalleryLightbox({
                 </button>
               </div>
 
-              <div className="relative flex-1">
+              <div
+                className="relative flex-1 touch-pan-y"
+                onTouchStart={swipe.onTouchStart}
+                onTouchEnd={swipe.onTouchEnd}
+              >
                 <Image
                   key={current.id}
                   src={srcOf(current)}
