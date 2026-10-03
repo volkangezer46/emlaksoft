@@ -1,4 +1,4 @@
-
+"use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, MessageCircle, MessageSquareText, Save, Trash2 } from "lucide-react";
