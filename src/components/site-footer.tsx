@@ -20,7 +20,7 @@ const columns: { title: string; links: FooterLink[] }[] = [
   },
   {
     title: "Paketler",
-    links: [...PLANS.map((p): FooterLink => [p.name, `/kayit?plan=${p.id}`]), ["Fiyatları karşılaştır", "/#fiyat"]],
+    links: [...PLANS.map((p): FooterLink => [p.name, `/kayit?plan=${p.id}`]), ["Fiyatları karşılaştır", "/fiyatlar"]],
   },
   {
     title: "Kaynaklar",

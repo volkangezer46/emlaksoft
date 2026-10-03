@@ -57,7 +57,7 @@ const GROUPS: Group[] = [
       { label: "Emlak ofisi", text: "Ofis paketi", href: "/kayit?plan=office", icon: Building2 },
       { label: "Büyüyen ekip", text: "Profesyonel paketi", href: "/kayit?plan=professional", icon: Briefcase },
       { label: "Çok şubeli yapı", text: "Kurumsal paketi", href: "/kayit?plan=enterprise", icon: Crown },
-      { label: "Paketleri karşılaştır", text: "Fiyat ve limitler", href: "/#fiyat", icon: BadgeCheck },
+      { label: "Paketleri karşılaştır", text: "Fiyat ve limitler", href: "/fiyatlar", icon: BadgeCheck },
     ],
   },
   {
@@ -130,7 +130,7 @@ export function SiteHeader() {
             {GROUPS.map((g) => (
               <div key={g.id} className="mk-nav-item">
                 <Dropdown g={g} menu={menu} setMenu={setMenu} close={close} />
-                {g.id === "cozum" ? <Link href="/#fiyat" className="mk-nav-link" onClick={close}>Fiyatlandırma</Link> : null}
+                {g.id === "cozum" ? <Link href="/fiyatlar" className="mk-nav-link" onClick={close}>Fiyatlandırma</Link> : null}
               </div>
             ))}
           </nav>
@@ -167,7 +167,7 @@ export function SiteHeader() {
                 </ul>
               </details>
             ))}
-            <Link href="/#fiyat" className="mk-sheet-link" onClick={close}>Fiyatlandırma</Link>
+            <Link href="/fiyatlar" className="mk-sheet-link" onClick={close}>Fiyatlandırma</Link>
             <a href="/giris" className="mk-sheet-link" onClick={close}>Giriş yap</a>
           </div>
           <div className="mk-sheet-cta">
