@@ -1,4 +1,5 @@
 import { calculateCommission } from "@/lib/commission";
+import { formatTrySafe } from "@/lib/format";
 
 /**
  * "Kaçan komisyon" hesaplayıcısı — saf mantık.
@@ -109,12 +110,9 @@ export function calculateRoi(raw: RoiRaw, plan: RoiPlanRef): RoiResult {
   };
 }
 
-const TRY = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
 const NUM = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 });
 
-export function formatTry(n: number): string {
-  return TRY.format(Number.isFinite(n) ? n : 0);
-}
+export const formatTry: (n: number) => string = formatTrySafe; // tek kaynak: `@/lib/format`
 export function formatNum(n: number, digits = 1): string {
   return (digits === 1 ? NUM : new Intl.NumberFormat("tr-TR", { maximumFractionDigits: digits })).format(Number.isFinite(n) ? n : 0);
 }

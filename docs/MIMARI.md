@@ -50,3 +50,4 @@ SQL tarafı `current_tenant_id()` JWT claim'i ile RLS (migration 002, role-aware
 
 Portal scrape yok · tam Türkçe UI · dark mode yok · sahte metrik yok (her sayı tıklanabilir) ·
 `Date.now()` bileşende yasak → `src/lib/clock.ts` · multi-tenant izolasyon her katmanda.
+Para/tarih biçimi tek kaynak: `src/lib/format.ts` (TR saat dilimi, hidrasyon güvenli); ortak durum etiketleri `src/lib/status-labels.ts`.

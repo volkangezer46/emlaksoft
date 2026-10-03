@@ -4,11 +4,10 @@ import { useState, useTransition } from "react";
 import { History, RotateCcw } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { restoreContractVersion, type ContractVersionRow } from "@/app/actions/contracts";
+import { formatDateTimeTr } from "@/lib/format";
 
 function fmtDate(iso: string) {
-  return new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium", timeStyle: "short" }).format(
-    new Date(iso),
-  );
+  return formatDateTimeTr(iso);
 }
 
 /**

@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getNetgsmConfig } from "@/lib/messaging/netgsm";
-import { getTenantNetgsmConfig } from "@/app/imza/_lib/sms";
+import { getTenantNetgsmConfig } from "@/lib/messaging/tenant-providers";
 import { TWO_FACTOR_COOKIE } from "@/lib/two-factor";
 import { requireActiveTenant } from "@/lib/tenant-guard";
 

@@ -23,14 +23,11 @@ import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportProjectsCsv } from "@/app/actions/export";
+import { PROJECT_STATUS_LABELS } from "@/lib/status-labels";
 
 export const metadata = { title: "Projeler" };
 
-const STATUS_LABELS: Record<string, string> = {
-  planning:  "Planlama",
-  selling:   "Satışta",
-  delivered: "Teslim edildi",
-};
+const STATUS_LABELS = PROJECT_STATUS_LABELS;
 
 const STATUS_VARIANT: Record<string, BadgeVariant> = {
   planning:  "info",

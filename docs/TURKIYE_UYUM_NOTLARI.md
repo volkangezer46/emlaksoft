@@ -10,8 +10,8 @@ hukukçu / mali müşavir / resmî kaynakla doğrulanmalıdır.
 |---|---|
 | `src/lib/commission-cap.ts` | Komisyon üst sınırı kontrolü, aşan kısım, alıcı/satıcı bölüşüm önerisi |
 | `src/components/app/commission-cap-notice.tsx` | Tavan aşılınca `Alert tone="warning"`; aşılmazsa görünmez |
-| `src/lib/rent-increase.ts` | Verilen TÜFE ortalamasıyla en yüksek yeni kira, bir sonraki artış tarihi |
-| `src/lib/tapu-cost.ts` | Parametrik tapu harcı (alıcı + satıcı), düşük beyan uyarısı |
+| `src/lib/tufe.ts` | 12 aylık ortalama TÜFE tablosu, yasal tavanla yeni kira (`computeLegalIncrease`); tek kira artışı kaynağı |
+| `src/lib/purchase-costs.ts` | Tapu harcı dahil alım masrafları (tek kaynak) |
 
 ## Parametre / doğrulama tablosu
 
@@ -30,8 +30,8 @@ hukukçu / mali müşavir / resmî kaynakla doğrulanmalıdır.
 
 - Tavan KDV HARİÇ toplam bedel (taraflar toplamı) üzerinden değerlendirilir; bu yorum doğrulanmalıdır.
 - Tüm tutarlar kuruşa yuvarlanır; NaN/negatif/sıfır girdide `valid: false` ve Türkçe `reason` döner.
-- `rent-increase.ts` saftır; "bugün" `src/lib/clock.ts` ile çağıran tarafından verilir (`YYYY-MM-DD`).
-- Artış tarihi, başlangıçtan itibaren 12 aylık yıldönümlerinin bugüne eşit/sonraki ilkidir (29 Şubat ay sonuna çekilir).
+- Not: yalnız testten import edilen eski `rent-increase.ts` ve `tapu-cost.ts` kaldırıldı (canlı kod `tufe.ts` ve `purchase-costs.ts`). Eski kira modülü kuruşa, canlı `tufe.ts` tam liraya yuvarlıyordu; tavan mantığı (12 aylık ort. TÜFE) ikisinde de aynıydı.
+- KARAR GEREKİR: `tufe.ts` TÜFE tablosunun (2024-2025) ve 2026 ayları için elle oran girişinin resmi TÜİK verisiyle doğrulanması hukukçu/mali müşavir kararıdır; kod değiştirilmedi.
 
 ## Entegrasyon önerisi
 

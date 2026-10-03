@@ -6,6 +6,7 @@ import { PrintButton } from "./print-button";
 import { isPast } from "@/lib/clock";
 import { isSignerSmsAvailable, maskPhone } from "../_lib/sms";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { formatDateTimeTr } from "@/lib/format";
 
 export const metadata = {
   title: "Sözleşme imzası",
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 function formatDate(iso: string | null) {
   if (!iso) return "—";
-  return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  return formatDateTimeTr(iso, { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 type SignerRow = { id: string; full_name: string; status: string; signed_at: string | null; verified_at: string | null };

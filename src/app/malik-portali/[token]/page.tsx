@@ -15,6 +15,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { OfferActions } from "./offer-actions";
 import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
+import { formatDateTr, formatDateTimeTr } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -51,13 +52,11 @@ function money(n: number | null) {
 }
 
 function formatDate(iso: string) {
-  return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(iso));
+  return formatDateTr(iso, { day: "2-digit", month: "long", year: "numeric" });
 }
 
 function formatDateTime(iso: string) {
-  return new Intl.DateTimeFormat("tr-TR", {
-    day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
-  }).format(new Date(iso));
+  return formatDateTimeTr(iso, { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 type Advisor = { full_name?: string; phone?: string | null } | null;

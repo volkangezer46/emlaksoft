@@ -5,10 +5,5 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatTry(amount: number) {
-  return new Intl.NumberFormat("tr-TR", {
-    style: "currency",
-    currency: "TRY",
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
+// Geriye uyumlu ad: tek kaynak `@/lib/format`.
+export { formatTry } from "@/lib/format";

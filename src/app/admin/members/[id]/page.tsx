@@ -16,6 +16,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { formatTurkishPhone } from "@/lib/phone";
 import { auditActionLabel, relativeTimeTR } from "@/lib/admin-format";
+import { formatDateTimeTr } from "@/lib/format";
 
 const roleLabel: Record<string, string> = {
   owner: "Ofis sahibi",
@@ -46,13 +47,7 @@ const LOGIN_RESULT_LABEL: Record<string, { label: string; ok: boolean }> = {
 type AuditRow = { id: string; action: string; entity_type: string | null; created_at: string };
 
 function fmtDateTime(iso: string) {
-  return new Date(iso).toLocaleString("tr-TR", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTimeTr(iso, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 export default async function AdminMemberDetailPage({ params }: { params: Promise<{ id: string }> }) {

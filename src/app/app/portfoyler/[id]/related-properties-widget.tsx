@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, Building2, MapPin } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { formatListingPrice } from "@/lib/format";
 
 type RelatedProperty = {
   id: string;
@@ -13,11 +14,7 @@ type RelatedProperty = {
   province: { name: string } | { name: string }[] | null;
 };
 
-function formatPrice(value: number | null, transaction: string) {
-  if (value === null) return "Fiyat yok";
-  const price = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(value);
-  return `${price} ₺${transaction === "rent" || transaction === "Kiralık" ? "/ay" : ""}`;
-}
+const formatPrice = (value: number | null, transaction: string) => formatListingPrice(value, transaction, "Fiyat yok");
 
 function provinceName(value: RelatedProperty["province"]) {
   if (!value) return null;

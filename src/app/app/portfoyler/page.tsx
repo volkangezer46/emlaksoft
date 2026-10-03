@@ -59,6 +59,8 @@ import { buildHref } from "@/lib/ui/filter-params";
 import { DAY_MS, daysAgoIso, msSince, now } from "@/lib/clock";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { fetchLatestRates, formatFx, fxAgeLabel, fxApproxLine } from "@/lib/fx";
+import { formatListingPrice } from "@/lib/format";
+import { formatDateTr } from "@/lib/format";
 
 // Harita ağır bir client komponenti ve yalnız ?gorunum=harita'da görünür —
 // dynamic import ile liste görünümünün ilk yükünden çıkarılır (ayrı chunk).
@@ -109,14 +111,10 @@ function locationLabel(row: PropertyRow): string {
   return parts.length ? parts.join(" / ") : "Konum belirtilmedi";
 }
 
-function formatPrice(value: number | null, transaction: string) {
-  if (value === null) return "Fiyat girilmedi";
-  const price = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(value);
-  return `${price} ₺${transaction === "rent" || transaction === "Kiralık" ? "/ay" : ""}`;
-}
+const formatPrice = formatListingPrice;
 
 function formatDate(iso: string) {
-  return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
+  return formatDateTr(iso);
 }
 
 /** Sayfa başına kayıt — gerçek sunucu sayfalaması (200'lük dilim yerine). */

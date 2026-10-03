@@ -20,14 +20,10 @@ import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { OPEN_HOUSE_STATUS_LABELS } from "@/lib/status-labels";
 export const metadata = { title: "Açık Ev Takibi" };
 
-const STATUS_LABELS: Record<string, string> = {
-  planned:   "Planlandı",
-  active:    "Devam ediyor",
-  completed: "Tamamlandı",
-  cancelled: "İptal",
-};
+const STATUS_LABELS = OPEN_HOUSE_STATUS_LABELS;
 
 type PropertyRel = { id: string; property_code: string; title: string | null } | { id: string; property_code: string; title: string | null }[] | null;
 

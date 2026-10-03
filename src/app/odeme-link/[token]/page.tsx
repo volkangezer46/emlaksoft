@@ -6,6 +6,7 @@ import { PayButtons } from "./pay-buttons";
 import { isPast, msUntil, DAY_MS } from "@/lib/clock";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { formatDateTimeTr } from "@/lib/format";
 
 export const metadata = {
   title: "Güvenli Ödeme",
@@ -22,9 +23,7 @@ function money(n: number) {
 }
 
 function formatDateTime(iso: string) {
-  return new Intl.DateTimeFormat("tr-TR", {
-    day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
-  }).format(new Date(iso));
+  return formatDateTimeTr(iso, { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 type TenantRel =

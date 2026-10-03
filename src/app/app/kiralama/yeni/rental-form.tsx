@@ -11,6 +11,7 @@ import { FormField, FormInput, FormTextarea } from "@/components/ui/form-control
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
 import { parseLooseNumber } from "@/lib/form-tabs";
 import { RENTAL_DRAFT_FIELDS, RENTAL_FORM_ID, RENTAL_TABS } from "./rental-tabs";
+import { formatTryDecimal } from "@/lib/format";
 
 type Property = { id: string; property_code: string; title: string | null };
 type Customer = { id: string; full_name: string | null; phone: string | null };
@@ -29,7 +30,7 @@ const FIELD_LABELS = {
   start_date: "Başlangıç tarihi",
 };
 
-const formatTry = (n: number) => `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(n)} ₺`;
+const formatTry = (n: number) => formatTryDecimal(n);
 
 /** "YYYY-MM-DD" -> "GG.AA.YYYY" (yalnız biçim). */
 function dayLabel(value: string | undefined): string | null {

@@ -8,6 +8,7 @@ import { Table, TableEmptyRow, TableFrame, TBody, TD, TFoot, TH, THead, TR } fro
 import { ExpenseEditDialog, type Expense } from "./expense-edit-dialog";
 import { deleteExpense } from "@/app/actions/expenses";
 import { useToast } from "@/components/app/toast-provider";
+import { formatDateTr } from "@/lib/format";
 
 /**
  * Gider listesi — satıra tıklayınca düzenleme diyaloğu açılır.
@@ -28,7 +29,7 @@ const tryFormatter = new Intl.NumberFormat("tr-TR", {
 function formatDate(iso: string) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "short", year: "numeric" });
+  return formatDateTr(date);
 }
 
 function normalize(value: string) {
