@@ -100,6 +100,29 @@ export function progressSummary(tabs: readonly TabDef[], values: FormValues): { 
   return { done, total };
 }
 
+/**
+ * Sekme ilerlemesi 0..1 (ikon halkası): zorunlu varsa dolu zorunlu/zorunlu; yoksa
+ * en az bir alan doluysa 1 ("tamam" ile tutarlı). Bilgi sekmesi (alan yok) 0.
+ */
+export function tabProgress(tab: Pick<TabDef, "fields" | "required">, values: FormValues): number {
+  const required = tab.required ?? [];
+  if (required.length > 0) {
+    return required.filter((n) => isFilled(values[n])).length / required.length;
+  }
+  if (tab.fields.length === 0) return 0;
+  return tab.fields.some((n) => isFilled(values[n])) ? 1 : 0;
+}
+
+export type SlideDirection = "next" | "prev" | "none";
+
+/** Panel geçişinin yönü (CSS `data-dir`): sıradaki sekmeye ileri, öncekine geri. */
+export function slideDirection(ids: readonly string[], from: string, to: string): SlideDirection {
+  const a = ids.indexOf(from);
+  const b = ids.indexOf(to);
+  if (a < 0 || b < 0 || a === b) return "none";
+  return b > a ? "next" : "prev";
+}
+
 /** Alan name'inin ait olduğu sekme (yoksa null). */
 export function tabForField(tabs: readonly TabDef[], fieldName: string): string | null {
   return tabs.find((t) => t.fields.includes(fieldName))?.id ?? null;
