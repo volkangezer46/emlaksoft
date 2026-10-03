@@ -1,22 +1,85 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { ArrowRight, Menu, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Bot,
+  Building2,
+  ChevronDown,
+  CircleHelp,
+  FileSignature,
+  Globe,
+  LayoutDashboard,
+  Link2,
+  Lock,
+  Mail,
+  Menu,
+  Scale,
+  ShieldAlert,
+  Briefcase,
+  UserRound,
+  Crown,
+  Workflow,
+  X,
+  CalendarCheck,
+  Route,
+  Calculator,
+  type LucideIcon,
+} from "lucide-react";
 
-const LINKS = [
-  { label: "Ürün", id: "ozellikler" },
-  { label: "Nasıl çalışır", id: "nasil" },
-  { label: "Güvenlik", id: "guvenlik" },
-  { label: "Fiyat", id: "fiyat" },
-  { label: "SSS", id: "sss" },
-] as const;
+type Item = { label: string; text: string; href: string; icon: LucideIcon };
+type Group = { id: string; label: string; wide?: boolean; items: Item[] };
 
-/** Sticky üst bar: başta saydam, kaydırınca buzlu cam + alt çizgi; aktif bölüm alt çizgiyle işaretlenir. */
+/** Yalnız var olan rotalar ve ana sayfa bölüm bağlantıları (ölü bağlantı yok; Blog sayfası olmadığı için menüde yoktur). */
+const GROUPS: Group[] = [
+  {
+    id: "urun",
+    label: "Ürün",
+    wide: true,
+    items: [
+      { label: "Ürün turu", text: "Bugün, müşteriler, portföy ve daha fazlası", href: "/#tur", icon: LayoutDashboard },
+      { label: "Kayıp-kaçak kalkanı", text: "Kaçan komisyonu rakama dökün", href: "/#kayip-kacak", icon: ShieldAlert },
+      { label: "Emsal bazlı değerleme", text: "Fiyat aralığı sinyali", href: "/#degerleme", icon: Calculator },
+      { label: "Otomasyonlar", text: "27 otomatik görev", href: "/#otomasyon", icon: Workflow },
+      { label: "Portal kontrolü", text: "İlan takibi ve teyit", href: "/#portal-kontrol", icon: Link2 },
+      { label: "Dijital imza", text: "SMS onaylı sözleşme akışı", href: "/#imza", icon: FileSignature },
+      { label: "AI asistan", text: "Kişisel veri maskeli", href: "/#ai-asistan", icon: Bot },
+      { label: "Vitrin ve portallar", text: "Ofis vitrini, token’lı portallar", href: "/#vitrin", icon: Globe },
+    ],
+  },
+  {
+    id: "cozum",
+    label: "Çözümler",
+    items: [
+      { label: "Bağımsız danışman", text: "Danışman paketi", href: "/kayit?plan=advisor", icon: UserRound },
+      { label: "Emlak ofisi", text: "Ofis paketi", href: "/kayit?plan=office", icon: Building2 },
+      { label: "Büyüyen ekip", text: "Profesyonel paketi", href: "/kayit?plan=professional", icon: Briefcase },
+      { label: "Çok şubeli yapı", text: "Kurumsal paketi", href: "/kayit?plan=enterprise", icon: Crown },
+      { label: "Paketleri karşılaştır", text: "Fiyat ve limitler", href: "/#fiyat", icon: BadgeCheck },
+    ],
+  },
+  {
+    id: "kaynak",
+    label: "Kaynaklar",
+    items: [
+      { label: "Nasıl çalışır", text: "Üç adımda başlangıç", href: "/#nasil", icon: Route },
+      { label: "Sık sorulan sorular", text: "Net cevaplar", href: "/#sss", icon: CircleHelp },
+      { label: "Güvenlik ve KVKK", text: "Süreç ve altyapı", href: "/#guvenlik", icon: Lock },
+      { label: "KVKK aydınlatma metni", text: "Yasal metin", href: "/kvkk-aydinlatma", icon: Scale },
+      { label: "Demo görüşmesi planla", text: "Ürünü birlikte gezelim", href: "/demo", icon: CalendarCheck },
+      { label: "Destek", text: "destek@emlaksoft.com.tr", href: "mailto:destek@emlaksoft.com.tr", icon: Mail },
+    ],
+  },
+];
+
+/** Üst bar: beyaz buzlu cam; açılır menüler (tıklama/klavye/fare), mobilde tam ekran menü. */
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const [menu, setMenu] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
-  const [current, setCurrent] = useState<string | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -26,43 +89,55 @@ export function SiteHeader() {
   }, []);
 
   useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) if (e.isIntersecting) setCurrent(e.target.id);
-      },
-      { rootMargin: "-45% 0px -50% 0px" },
-    );
-    for (const l of LINKS) {
-      const el = document.getElementById(l.id);
-      if (el) io.observe(el);
-    }
-    return () => io.disconnect();
-  }, []);
+    if (!open && !menu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        setMenu(null);
+      }
+    };
+    const onDown = (e: MouseEvent) => {
+      if (menu && rootRef.current && !rootRef.current.contains(e.target as Node)) setMenu(null);
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [open, menu]);
 
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.documentElement.style.overflow = open ? "hidden" : "";
+    return () => {
+      document.documentElement.style.overflow = "";
+    };
   }, [open]);
 
+  const close = () => {
+    setOpen(false);
+    setMenu(null);
+  };
+
   return (
-    <div className="mk-nav" data-scrolled={scrolled} data-open={open}>
+    <div className="mk-nav" data-scrolled={scrolled} data-open={open} ref={rootRef}>
       <header>
-        <div className="mk-wrap mk-nav-row">
-          <Link href="/" className="mk-logo" aria-label="EmlakSoft ana sayfa">
+        <div className="mk-wrap mk-wrap-wide mk-nav-row">
+          <Link href="/" className="mk-logo" aria-label="EmlakSoft ana sayfa" onClick={close}>
             <i aria-hidden="true">E</i>EmlakSoft
           </Link>
           <nav aria-label="Ana site navigasyonu" className="mk-nav-links">
-            {LINKS.map((l) => (
-              <a key={l.id} href={`/#${l.id}`} aria-current={current === l.id ? "true" : undefined}>{l.label}</a>
+            {GROUPS.map((g) => (
+              <div key={g.id} className="mk-nav-item">
+                <Dropdown g={g} menu={menu} setMenu={setMenu} close={close} />
+                {g.id === "cozum" ? <Link href="/#fiyat" className="mk-nav-link" onClick={close}>Fiyatlandırma</Link> : null}
+              </div>
             ))}
           </nav>
           <div className="mk-nav-cta">
-            <Link href="/giris" className="mk-login">Giriş</Link>
-            <Link href="/kayit" className="mk-btn mk-btn-primary">
-              14 gün ücretsiz dene <ArrowRight size={16} aria-hidden="true" />
+            <Link href="/giris" className="mk-btn mk-btn-line mk-login">Giriş yap</Link>
+            <Link href="/kayit" className="mk-btn mk-btn-primary mk-nav-trial">
+              <span className="mk-long">14 gün ücretsiz dene</span><span className="mk-short">Ücretsiz dene</span> <ArrowRight size={16} aria-hidden="true" />
             </Link>
             <button
               type="button"
@@ -72,22 +147,63 @@ export function SiteHeader() {
               aria-controls="mobile-site-navigation"
               onClick={() => setOpen((v) => !v)}
             >
-              {open ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
+              {open ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
             </button>
           </div>
         </div>
       </header>
       {open ? (
         <nav id="mobile-site-navigation" aria-label="Mobil site navigasyonu" className="mk-sheet">
-          {LINKS.map((l) => (
-            <a key={l.id} href={`/#${l.id}`} className="mk-sheet-link" onClick={() => setOpen(false)}>{l.label}</a>
-          ))}
-          <a href="/giris" className="mk-sheet-link" onClick={() => setOpen(false)}>Giriş</a>
+          <div className="mk-sheet-scroll">
+            {GROUPS.map((g) => (
+              <details key={g.id} className="mk-sheet-group">
+                <summary>{g.label}<ChevronDown size={18} aria-hidden="true" /></summary>
+                <ul>
+                  {g.items.map((it) => (
+                    <li key={it.label}>
+                      <a href={it.href} onClick={close}><it.icon size={18} aria-hidden="true" /><span><b>{it.label}</b><small>{it.text}</small></span></a>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ))}
+            <Link href="/#fiyat" className="mk-sheet-link" onClick={close}>Fiyatlandırma</Link>
+            <a href="/giris" className="mk-sheet-link" onClick={close}>Giriş yap</a>
+          </div>
           <div className="mk-sheet-cta">
-            <Link href="/kayit" className="mk-btn mk-btn-primary" onClick={() => setOpen(false)}>14 gün ücretsiz dene</Link>
+            <Link href="/kayit" className="mk-btn mk-btn-grad" onClick={close}>14 gün ücretsiz dene <ArrowRight size={18} aria-hidden="true" /></Link>
+            <Link href="/demo" className="mk-btn mk-btn-line" onClick={close}>Demo görüşmesi planla</Link>
           </div>
         </nav>
       ) : null}
+    </div>
+  );
+}
+
+function Dropdown({ g, menu, setMenu, close }: { g: Group; menu: string | null; setMenu: (v: string | null) => void; close: () => void }) {
+  const isOpen = menu === g.id;
+  return (
+    <div
+      className="mk-dd"
+      data-open={isOpen}
+      onPointerEnter={(e) => e.pointerType === "mouse" && setMenu(g.id)}
+      onPointerLeave={(e) => e.pointerType === "mouse" && setMenu(null)}
+    >
+      <button type="button" className="mk-nav-link" aria-expanded={isOpen} aria-controls={`dd-${g.id}`} onClick={() => setMenu(isOpen ? null : g.id)}>
+        {g.label}<ChevronDown size={15} aria-hidden="true" />
+      </button>
+      <div id={`dd-${g.id}`} className={`mk-panel${g.wide ? " mk-panel-wide" : ""}`} hidden={!isOpen}>
+        <ul>
+          {g.items.map((it) => (
+            <li key={it.label}>
+              <a href={it.href} onClick={close}>
+                <span className="mk-panel-ico"><it.icon size={18} aria-hidden="true" /></span>
+                <span><b>{it.label}</b><small>{it.text}</small></span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

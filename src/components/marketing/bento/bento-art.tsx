@@ -1,104 +1,126 @@
-/* Bento kartı illüstrasyonları: saf SVG, dekoratif (aria-hidden). Sayılar ve isimler örnek veridir. */
-const common = { "aria-hidden": true, focusable: false } as const;
+import Image from "next/image";
+import { Check, Clock, FileSignature, Sparkles, Trophy } from "lucide-react";
 
-export function MatchArt() {
-  const left = ["3+1 talep", "Arsa talebi", "Kiralık talep", "Dükkan talebi"];
-  const right = ["Daire", "Arsa", "Daire", "Ofis"];
-  const links: [number, number, boolean][] = [[0, 0, true], [0, 2, false], [1, 1, true], [2, 2, false], [3, 3, true], [2, 0, false]];
+/* Bento kartlarının illüstrasyonları. Sunucu bileşenleri; tüm içerik ÖRNEKTİR (sayı/isim uydurma yok). */
+
+const STOPS = [
+  { x: 50, label: "Talep" },
+  { x: 160, label: "Gösterim" },
+  { x: 270, label: "Teklif" },
+  { x: 380, label: "Kapanış" },
+];
+
+export function LeakArt() {
   return (
-    <svg viewBox="0 0 560 300" {...common}>
-      {links.map(([a, b, on], i) => (
-        <path key={i} d={`M190 ${46 + a * 66} C290 ${46 + a * 66} 290 ${46 + b * 66} 370 ${46 + b * 66}`} fill="none" stroke={on ? "#0e9f8c" : "#c4cfe3"} strokeWidth={on ? 3 : 2} strokeDasharray={on ? undefined : "4 6"} strokeLinecap="round" />
-      ))}
-      {left.map((t, i) => (
-        <g key={t}>
-          <rect x="10" y={22 + i * 66} width="180" height="48" rx="12" fill="#fff" stroke="#e7e3da" />
-          <circle cx="34" cy={46 + i * 66} r="7" fill="#1463ff" />
-          <text x="52" y={53 + i * 66} fontSize="18" fontWeight="600" fill="#071a38">{t}</text>
+    <svg className="mk-svg" viewBox="0 0 440 210" role="img" aria-label="Örnek anlaşma zaman çizgisi: talep, gösterim, teklif ve kapanış durakları; teklif aşamasından ayrılan kırmızı kesik yol komisyon kayıp riskini gösterir">
+      <path d="M50 70 H380" stroke="#6f8bc0" strokeWidth="3" strokeLinecap="round" />
+      <path className="mk-draw" d="M270 70 C305 70 305 150 340 150" fill="none" stroke="#ff7a7f" strokeWidth="3" strokeLinecap="round" strokeDasharray="5 6" />
+      <g transform="translate(340 150)">
+        <circle r="13" fill="#e5484d" />
+        <path d="M-4.5 -4.5 L4.5 4.5 M4.5 -4.5 L-4.5 4.5" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
+      </g>
+      <rect x="222" y="168" width="196" height="30" rx="15" fill="rgba(229,72,77,.2)" stroke="#ff7a7f" strokeOpacity="0.6" />
+      <text x="320" y="188" textAnchor="middle" fontSize="13" fontWeight="700" fill="#ffd0d2">Komisyon kayıp riski</text>
+      {STOPS.map((s, i) => (
+        <g key={s.label}>
+          <circle cx={s.x} cy="70" r="15" fill="#0b2152" stroke={i === 3 ? "#7be0c8" : "#9db9ff"} strokeWidth="3" />
+          <circle cx={s.x} cy="70" r="5.5" fill={i === 3 ? "#7be0c8" : "#9db9ff"} />
+          <text x={s.x} y="34" textAnchor="middle" fontSize="14" fontWeight="700" fill="#fff">{s.label}</text>
         </g>
       ))}
-      {right.map((t, i) => (
-        <g key={i}>
-          <rect x="370" y={22 + i * 66} width="180" height="48" rx="12" fill="#fff" stroke="#e7e3da" />
-          <circle cx="394" cy={46 + i * 66} r="7" fill="#0e9f8c" />
-          <text x="412" y={53 + i * 66} fontSize="18" fontWeight="600" fill="#071a38">{t}</text>
-        </g>
-      ))}
-      <rect x="225" y="268" width="110" height="28" rx="14" fill="#e3f6f2" />
-      <text x="280" y="288" textAnchor="middle" fontSize="15" fontWeight="600" fill="#0b8172">Eşleşme</text>
-    </svg>
-  );
-}
-
-export function CalendarArt() {
-  const on = new Set([2, 5, 9, 12, 16, 19]);
-  return (
-    <svg viewBox="0 0 400 150" {...common}>
-      {Array.from({ length: 28 }, (_, i) => {
-        const x = 8 + (i % 7) * 40;
-        const y = 8 + Math.floor(i / 7) * 32;
-        return <rect key={i} x={x} y={y} width="34" height="26" rx="7" fill={i === 12 ? "#1463ff" : on.has(i) ? "#dbe7ff" : "#fff"} stroke="#e7e3da" />;
-      })}
-      <rect x="296" y="42" width="96" height="36" rx="12" fill="#fff" stroke="#e7e3da" style={{ filter: "drop-shadow(0 6px 10px rgba(10,34,71,.12))" }} />
-      <text x="344" y="65" textAnchor="middle" fontSize="14" fontWeight="700" fill="#071a38">14:30</text>
-    </svg>
-  );
-}
-
-export function CommissionArt() {
-  const cols = [[34, 20, 12], [44, 26, 14], [38, 30, 18], [56, 28, 16], [66, 34, 20]];
-  return (
-    <svg viewBox="0 0 400 150" {...common}>
-      <line x1="10" x2="390" y1="132" y2="132" stroke="#e7e3da" />
-      {cols.map(([a, b, c], i) => {
-        const x = 24 + i * 74;
-        return (
-          <g key={i}>
-            <rect x={x} y={132 - a} width="44" height={a} rx="4" fill="#1463ff" />
-            <rect x={x} y={132 - a - b - 2} width="44" height={b} rx="4" fill="#0e9f8c" />
-            <rect x={x} y={132 - a - b - c - 4} width="44" height={c} rx="4" fill="#e0a53a" />
-          </g>
-        );
-      })}
     </svg>
   );
 }
 
 export function ValuationArt() {
-  const dots = [[40, 96], [62, 80], [88, 90], [110, 62], [136, 74], [160, 54], [188, 66], [214, 46], [240, 58], [270, 40], [300, 52], [330, 36]];
+  const dots = [[40, 78], [74, 56], [104, 92], [138, 64], [172, 84], [204, 48], [236, 74], [268, 58], [300, 88]];
   return (
-    <svg viewBox="0 0 400 150" {...common}>
-      <rect x="10" y="40" width="380" height="50" rx="10" fill="#dbe7ff" opacity="0.55" />
-      <path d="M10 104 L390 28" stroke="#1463ff" strokeWidth="2" strokeDasharray="5 6" />
-      {dots.map(([x, y], i) => <circle key={i} cx={x} cy={y} r="6" fill={i === 7 ? "#0e9f8c" : "#1463ff"} opacity={i === 7 ? 1 : 0.8} />)}
-      <text x="22" y="140" fontSize="14" fill="#5b6577">Emsal dağılımı ve aralık</text>
+    <svg className="mk-svg" viewBox="0 0 340 150" role="img" aria-label="Örnek emsal dağılımı: noktalar emsal portföyleri, vurgulu bant fiyat aralığı sinyalini gösterir">
+      <rect x="86" y="24" width="170" height="104" rx="12" fill="rgba(29,92,255,.1)" stroke="#1d5cff" strokeOpacity="0.35" strokeDasharray="4 5" />
+      {dots.map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y + 14} r={i === 4 ? 7 : 5} fill={i === 4 ? "#7a3cf0" : "#7fa3f5"} />
+      ))}
+      <path d="M20 118 L320 118" stroke="#d6dcea" />
+      <text x="86" y="144" fontSize="12" fontWeight="700" fill="#55627b">alt sınır</text>
+      <text x="171" y="144" textAnchor="middle" fontSize="12" fontWeight="800" fill="#6428d8">orta</text>
+      <text x="256" y="144" textAnchor="end" fontSize="12" fontWeight="700" fill="#55627b">üst sınır</text>
     </svg>
+  );
+}
+
+const JOBS = ["Görev hatırlatma", "Randevu hatırlatma", "Portal teyit", "Günlük özet", "Haftalık özet", "Kira tahakkuku"];
+export function AutomationArt() {
+  return (
+    <ul className="mk-jobs" aria-label="Örnek zamanlanmış görevler">
+      {JOBS.map((j) => (
+        <li key={j}><Clock size={14} aria-hidden="true" />{j}<Check size={14} aria-hidden="true" /></li>
+      ))}
+    </ul>
+  );
+}
+
+export function AssistantArt() {
+  return (
+    <div className="mk-chat" role="img" aria-label="Örnek AI asistan sohbeti">
+      <p className="mk-bubble mk-bubble-user">Bu hafta teklif bekleyen müşterilerim kimler?</p>
+      <p className="mk-bubble mk-bubble-ai"><Sparkles size={14} aria-hidden="true" />Teklif aşamasında bekleyen anlaşmalarınızı listeledim. İsterseniz her biri için hatırlatma görevi oluşturayım.</p>
+      <p className="mk-chat-note">Telefon, TC, e-posta ve IBAN gibi kişisel veriler yapay zekaya gitmeden maskelenir.</p>
+    </div>
+  );
+}
+
+export function PortalArt() {
+  const rows: [string, string, string][] = [["İlan no ekleyin", "veya bağlantı yapıştırın", "ekle"], ["3+1 Daire · Merkez", "Periyodik teyit", "ok"], ["Villa · Sahil", "Teyit bekliyor", "wait"], ["Dükkan · Çarşı", "İlan kapandı · form açıldı", "closed"]];
+  return (
+    <ul className="mk-prow" aria-label="Örnek portal kontrol listesi">
+      {rows.map(([a, b, t]) => (
+        <li key={a} data-t={t}>
+          <span><b>{a}</b><small>{b}</small></span>
+          <i>{t === "ekle" ? "+" : t === "ok" ? "Teyitli" : t === "wait" ? "Bekliyor" : "Kapandı"}</i>
+        </li>
+      ))}
+    </ul>
   );
 }
 
 export function SignatureArt() {
-  const code = ["4", "8", "2", "9", "1", "7"];
   return (
-    <svg viewBox="0 0 400 150" {...common}>
-      {code.map((d, i) => (
-        <g key={i}>
-          <rect x={12 + i * 63} y="34" width="52" height="64" rx="12" fill="#fff" stroke={i === 5 ? "#1463ff" : "#e7e3da"} strokeWidth={i === 5 ? 2 : 1} />
-          <text x={38 + i * 63} y="76" textAnchor="middle" fontSize="28" fontWeight="700" fill="#071a38" fontFamily="var(--font-geist-mono), monospace">{d}</text>
-        </g>
-      ))}
-      <text x="12" y="132" fontSize="14" fill="#5b6577">SMS ile gelen 6 haneli doğrulama kodu</text>
-    </svg>
+    <div className="mk-sign" role="img" aria-label="Örnek dijital imza akışı: SMS doğrulama kodu ve imza alanı">
+      <div className="mk-sms"><FileSignature size={16} aria-hidden="true" /><span>SMS doğrulama kodu gönderildi</span></div>
+      <div className="mk-sign-code" aria-hidden="true"><i>4</i><i>8</i><i>2</i><i>1</i><i>7</i><i>•</i></div>
+      <svg viewBox="0 0 220 56" aria-hidden="true" focusable="false">
+        <path d="M8 40 C 22 8, 36 8, 40 30 S 58 44, 70 20 S 98 8, 104 32 S 130 44, 150 18 S 180 30, 212 24" fill="none" stroke="#1d5cff" strokeWidth="3" strokeLinecap="round" />
+        <line x1="8" x2="212" y1="50" y2="50" stroke="#c9d3ea" />
+      </svg>
+      <p className="mk-chat-note">SMS ile doğrulanan dijital imza; nitelikli e-imza değildir.</p>
+    </div>
   );
 }
 
-export function AutomationArt() {
-  const pts = [10, 24, 38, 56, 66, 88, 104, 130, 150, 168, 196, 214, 240, 262, 290, 318, 340, 366];
+export function ShowcaseArt() {
   return (
-    <svg viewBox="0 0 400 150" {...common}>
-      <line x1="10" x2="390" y1="70" y2="70" stroke="#d6dcea" strokeWidth="2" />
-      {pts.map((x, i) => <circle key={i} cx={x + 8} cy="70" r={i % 5 === 0 ? 7 : 4.5} fill={i % 5 === 0 ? "#1463ff" : "#9db6e8"} />)}
-      {["00:00", "06:00", "12:00", "18:00"].map((t, i) => <text key={t} x={10 + i * 112} y="112" fontSize="14" fill="#5b6577">{t}</text>)}
-      <text x="10" y="40" fontSize="14" fontWeight="700" fill="#071a38" className="mk-m">Gün boyu arka planda</text>
-    </svg>
+    <div className="mk-showcase">
+      <Image src="/listing-bosphorus-villa.png" alt="" fill sizes="(min-width: 1024px) 380px, 90vw" className="mk-showcase-img" />
+      <div className="mk-showcase-card" aria-hidden="true">
+        <b>Ofis vitrini</b>
+        <small>Portföyleriniz kendi adresinizde</small>
+      </div>
+      <span className="mk-tag mk-example mk-showcase-tag">Dekoratif örnek görsel</span>
+    </div>
+  );
+}
+
+export function TeamArt() {
+  const rows: [string, number][] = [["Danışman A", 92], ["Danışman B", 74], ["Danışman C", 58], ["Danışman D", 41]];
+  return (
+    <div className="mk-team" role="img" aria-label="Örnek ekip ligi sıralaması">
+      {rows.map(([n, v], i) => (
+        <div key={n} className="mk-team-row">
+          <span className="mk-team-rank">{i === 0 ? <Trophy size={14} aria-hidden="true" /> : i + 1}</span>
+          <b>{n}</b>
+          <span className="mk-meter"><i style={{ width: `${v}%` }} /></span>
+        </div>
+      ))}
+    </div>
   );
 }

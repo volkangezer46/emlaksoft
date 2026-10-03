@@ -1,9 +1,10 @@
-import { Lock, Scale, Users } from "lucide-react";
+import { KeyRound, Lock, Scale, Users } from "lucide-react";
 import { Em } from "./section-heading";
 
 /* Garanti dili YOK: "süreç desteği". Maddeler ürün/mimari gerçeklerinden: RLS, rol-izin matrisi, KVKK akışları. */
 const ITEMS = [
   { icon: Lock, title: "Ofisinizin verisi ayrı tutulur", text: "Her kayıt ofisinize bağlıdır; veritabanı satır düzeyinde güvenlik (RLS) ile ofisler arası erişimi sınırlar. Ana veritabanı Frankfurt (eu-central-1) bölgesindedir." },
+  { icon: KeyRound, title: "Her işlem yetki kapısından geçer", text: "Sayfalar ve işlemler izin kontrolünden geçer; yetkisiz kullanıcı ilgili ekranı ve işlemi göremez." },
   { icon: Users, title: "Rol ve izin matrisi", text: "Danışman, muhasebe ve yönetici erişimi ayrı ayrı tanımlanır; kullanıcı bazlı istisnalar eklenebilir." },
   { icon: Scale, title: "KVKK süreç desteği", text: "Aydınlatma, rıza, dışa aktarım ve silme akışları ile İYS/EİDS hazırlık adımları ürünün içindedir." },
 ];
@@ -32,6 +33,9 @@ export function SecurityBand() {
           <div className="mk-reveal">
             <p className="mk-eyebrow">Güvenlik ve KVKK</p>
             <h2 id="guvenlik-baslik" className="mk-h2" style={{ marginTop: "1rem" }}>Verinizi korumak, <Em>süreçle</Em> desteklenir.</h2>
+            <ul className="mk-chips mk-chips-dark" aria-label="Güvenlik başlıkları">
+              {["Frankfurt (eu-central-1)", "Satır düzeyinde güvenlik", "Rol-izin matrisi", "KVKK süreç araçları", "İYS/EİDS hazırlık"].map((c) => <li key={c}>{c}</li>)}
+            </ul>
             <ul className="mk-sec-items">
               {ITEMS.map((it) => (
                 <li key={it.title}>
