@@ -312,6 +312,11 @@ export function AdminSidebar({
                 Hatalı: {health.failedJobs.join(", ")}
               </span>
             ) : null}
+            {health.unknownJobs && health.unknownJobs.length > 0 ? (
+              <span className="mt-1 block truncate text-xs text-white/50" title={health.unknownJobs.join(", ")}>
+                Tanımsız iş (eski kayıt): {health.unknownJobs.join(", ")}
+              </span>
+            ) : null}
           </Link>
         ) : null}
 
