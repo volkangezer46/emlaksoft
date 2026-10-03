@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, MapPin, Sparkles, TriangleAlert } from "lucide-react";
+import { Check, ChevronsUpDown, MapPin, Sparkles, TriangleAlert } from "lucide-react";
 import { createAppointment } from "@/app/actions/appointments";
 import { searchCustomers, searchProperties } from "@/app/actions/lookup";
 import { useCreateForm } from "@/components/app/use-create-form";
@@ -69,12 +69,23 @@ export function AppointmentForm({
       }
     >
       <FormSection title="Zaman" description="Randevunun türü, günü ve süresi.">
-        <FormField label="Randevu türü" htmlFor="appointment-type" required>
-          <FormSelect name="appointment_type" required defaultValue="showing">
-            {typeOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </FormSelect>
+        {/* Kısa liste: yerel seçici kalır (mobilde OS seçicisi); görünümü Combobox tetikleyicisiyle aynı. */}
+        <FormField label="Randevu türü" htmlFor="appointment-type" required inject={false}>
+          <div className="relative">
+            <FormSelect
+              id="appointment-type"
+              name="appointment_type"
+              required
+              aria-required="true"
+              defaultValue="showing"
+              className="focus-ring cursor-pointer appearance-none pr-9 hover:border-brand-300"
+            >
+              {typeOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </FormSelect>
+            <ChevronsUpDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" aria-hidden />
+          </div>
         </FormField>
         <FormField label="Süre (dk)" htmlFor="appointment-duration">
           <FormInput name="duration_min" inputMode="numeric" placeholder="45" />

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatTrTime, trParts, trDayKey, trTodayCalendarDate } from "@/lib/clock";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
 /**
  * Hafta / gün görünümü — ?gorunum=hafta|gun (ay: mevcut AppointmentCalendar).
@@ -72,6 +72,7 @@ export function AppointmentWeekView({
   prevHref,
   nextHref,
   todayHref,
+  newHref = null,
 }: {
   mode: "hafta" | "gun";
   /** Seçili gün (yerel saat, gün başı). */
@@ -80,6 +81,8 @@ export function AppointmentWeekView({
   prevHref: string;
   nextHref: string;
   todayHref: string;
+  /** Randevu oluşturma yetkisi varsa yeni randevu sayfası adresi; yoksa null (boş saat bağlantıları çizilmez). */
+  newHref?: string | null;
 }) {
   const today = trTodayCalendarDate();
 
@@ -180,6 +183,25 @@ export function AppointmentWeekView({
                       aria-hidden
                     />
                   ))}
+                  {/* Boş saat dilimi → yeni randevu (tarih + saat ön dolgulu). Randevu blokları üstte kalır. */}
+                  {newHref
+                    ? hours.map((h) => {
+                        const hh = String(h).padStart(2, "0");
+                        const sep = newHref.includes("?") ? "&" : "?";
+                        return (
+                          <Link
+                            key={h}
+                            href={`${newHref}${sep}tarih=${dayKeyOf(d)}&saat=${hh}:00`}
+                            aria-label={`${d.toLocaleDateString("tr-TR", { day: "numeric", month: "long" })} saat ${hh}:00 için randevu ekle`}
+                            title={`${hh}:00 için randevu ekle`}
+                            className="focus-ring group absolute inset-x-0 z-0 flex items-center justify-center text-brand-600 opacity-0 transition hover:bg-brand-600/[0.06] hover:opacity-100 focus-visible:opacity-100"
+                            style={{ top: (h - HOUR_START) * HOUR_PX, height: HOUR_PX }}
+                          >
+                            <Plus className="h-4 w-4" aria-hidden />
+                          </Link>
+                        );
+                      })
+                    : null}
                   {dayAppts.map((a) => {
                     const startLabel = formatTrTime(a.scheduled_at);
                     const { top, height } = blockPos(a.scheduled_at, a.duration_min);
@@ -191,7 +213,7 @@ export function AppointmentWeekView({
                         key={a.id}
                         href={`#randevu-${a.id}`}
                         title={`${startLabel} · ${TYPE_LABEL[a.appointment_type] ?? a.appointment_type}${a.customerName ? ` · ${a.customerName}` : ""}`}
-                        className={`focus-ring absolute inset-x-1 overflow-hidden rounded-[var(--radius-control)] ${color} px-1.5 py-1 text-white transition hover:brightness-110 ${cancelled ? "opacity-50" : ""}`}
+                        className={`focus-ring absolute inset-x-1 z-[1] overflow-hidden rounded-[var(--radius-control)] ${color} px-1.5 py-1 text-white transition hover:brightness-110 ${cancelled ? "opacity-50" : ""}`}
                         style={{ top, height }}
                       >
                         <p className="truncate text-xs font-bold leading-tight">

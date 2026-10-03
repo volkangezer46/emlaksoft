@@ -180,14 +180,14 @@ export default async function DealsPage({ searchParams }: { searchParams?: Promi
   return (
     <div className="space-y-6">
       <PageHeader title="Anlaşma tahtası" eyebrow="Anlaşma hattı" description="Yeni → nitelikli → müzakere → kazan/kayıp. Kazanıldığında komisyon otomatik üretilir." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex flex-wrap items-center gap-2">
+<>
             <ExportCsvButton
               label="Dışa aktar"
               action={exportDealsCsv}
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
+              className="focus-ring press inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-4 text-sm font-semibold text-ink-950 transition hover:bg-canvas disabled:opacity-50"
             />
             {canCreate ? <ButtonLink href="/app/anlasmalar/yeni" icon={Plus}>Yeni anlaşma</ButtonLink> : null}
-          </div></div>
+          </>
 } />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
