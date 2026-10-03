@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   StickyNote,
   HeartHandshake,
+  History,
   ListChecks,
   MessageSquareQuote,
   Tag,
@@ -46,6 +47,10 @@ import {
 import { CopySurveyLinkButton, CreateSurveyButton } from "../../raporlar/memnuniyet/survey-actions";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { DealTimelineSection } from "./deal-timeline-section";
+import { DEAL_TIMELINE_CATEGORIES } from "./deal-events";
+import { resolveCategory } from "@/lib/activity-timeline";
+import { stageLabelMap } from "@/lib/deal-stage-labels";
 export const metadata = { title: "Anlaşma detayı" };
 
 /** Pipeline aşamaları — deal-board ile aynı sıra; görünen ad/renk ofis tanımından (getStageLabels). */
@@ -86,7 +91,7 @@ function rel<T>(value: T | T[] | null | undefined): T | null {
  * eşleştiriliyor. Bu bir yaklaşım, kesin bağ değil; sayfada da öyle
  * etiketleniyor ("aynı portföy + müşteri").
  */
-const DEAL_TAB_IDS = ["ozet", "finans", "belgeler", "gorevler", "notlar"] as const;
+const DEAL_TAB_IDS = ["ozet", "zaman", "finans", "belgeler", "gorevler", "notlar"] as const;
 
 export default async function DealDetailPage({
   params,
@@ -99,7 +104,11 @@ export default async function DealDetailPage({
   const seeAllEarnings = canSeeAllEarnings(perms);
   const { id } = await params;
   // Seçili sekme sunucuda çözülür; yalnız aktif sekmenin bölümleri çizilir
-  const tab = resolveTab(await searchParams, DEAL_TAB_IDS, "ozet", { gorev: "gorevler" });
+  const sp = await searchParams;
+  const tab = resolveTab(sp, DEAL_TAB_IDS, "ozet", { gorev: "gorevler" });
+  const timelineCategory = resolveCategory(sp.kategori, DEAL_TIMELINE_CATEGORIES.map((c) => c.key));
+  const rawLimit = Number(Array.isArray(sp.adet) ? sp.adet[0] : sp.adet);
+  const timelineLimit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 40), 400) : 40;
   const supabase = await createClient();
   const [stageLabels, lossOptions] = await Promise.all([getStageLabels(), getLossReasonOptions()]);
 
@@ -321,6 +330,7 @@ export default async function DealDetailPage({
 
   const tabDefs: DetailTabDef[] = [
     { id: "ozet", label: "Özet", icon: LayoutDashboard },
+    { id: "zaman", label: "Zaman çizelgesi", icon: History },
     { id: "finans", label: "Finans", icon: Banknote, count: canSeeCommission ? komisyonlar.length : null },
     { id: "belgeler", label: "Belgeler & teklifler", icon: FileText },
     { id: "gorevler", label: "Görevler", icon: ListChecks, count: (tasks ?? []).length },
@@ -563,6 +573,17 @@ export default async function DealDetailPage({
                   </section>
                 </div>
             </div>
+          ) : null}
+
+          {tab === "zaman" ? (
+            <DealTimelineSection
+              deal={{ id: deal.id, created_at: deal.created_at, property_id: deal.property_id, customer_id: deal.customer_id }}
+              stageNames={stageLabelMap(stageLabels)}
+              showCommission={canSeeCommission}
+              showActors={earningsVisible}
+              category={timelineCategory}
+              limit={timelineLimit}
+            />
           ) : null}
 
           {tab === "finans" ? (
