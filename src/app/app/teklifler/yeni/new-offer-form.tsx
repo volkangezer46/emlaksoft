@@ -18,11 +18,12 @@ import { detailOrList } from "@/lib/form-logic";
 import { parseLooseNumber } from "@/lib/form-tabs";
 import { formatTry } from "@/lib/utils";
 import { OFFER_DRAFT_FIELDS, OFFER_FORM_ID, OFFER_TABS } from "./offer-tabs";
+import { formatNumberTr } from "@/lib/format";
 
 type PropertyOption = { id: string; property_code: string; title: string | null; list_price: number | null };
 type CustomerOption = { id: string; full_name: string };
 
-const formatTl = (value: number) => new Intl.NumberFormat("tr-TR").format(value);
+const formatTl = formatNumberTr;
 
 const TAB_ICONS = { taraflar: TI.taraflar, kosullar: TI.kosullar } as const;
 

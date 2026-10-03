@@ -10,6 +10,7 @@ import {
   setUserPermissionOverride,
 } from "@/app/actions/permissions";
 import type { AppAction, AppModule } from "@/lib/permissions";
+import { formatDateTr } from "@/lib/format";
 
 const ACTIONS: { value: AppAction; label: string }[] = [
   { value: "view", label: "Görüntüle" },
@@ -34,7 +35,7 @@ function isActive(row: OverrideRow) {
 }
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul", day: "numeric", month: "long", year: "numeric" });
+  return formatDateTr(iso, { day: "numeric", month: "long", year: "numeric" });
 }
 
 export function UserExceptions({

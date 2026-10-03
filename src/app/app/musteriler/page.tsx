@@ -56,6 +56,7 @@ import {
 import { CustomerMobileList, CustomerTable, type CustomerVM } from "./customer-rows";
 import { countCustomerTypes, heatTone, relativeFromDays } from "./customer-list-logic";
 import { fetchTenantTags } from "./tenant-tags";
+import { formatDateTr } from "@/lib/format";
 
 type LeadSignalRow = {
   customer_id: string;
@@ -180,11 +181,7 @@ function provinceName(p: CustomerRow["province"]) {
 }
 
 function formatDate(iso: string) {
-  return new Intl.DateTimeFormat("tr-TR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(iso));
+  return formatDateTr(iso);
 }
 
 const PAGER_BTN =

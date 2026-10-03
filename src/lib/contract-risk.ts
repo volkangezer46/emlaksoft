@@ -15,6 +15,8 @@
  * `createContract` yalnızca başlık ve gövdenin boş olmadığına bakıyordu.
  */
 
+import { DEFAULT_SALE_CAP_RATE } from "@/lib/commission-cap";
+
 export type RiskLevel = "error" | "warning" | "info";
 
 export type ContractRisk = {
@@ -69,7 +71,7 @@ const EXPECTED_CLAUSES: Record<string, { key: string; label: string }[]> = {
  * engellenmez. Mevzuat değişebilir; uyarı metni kullanıcıyı teyide
  * yönlendiriyor, kesin hüküm kurmuyor.
  */
-export const COMMISSION_CAP_PCT = 4;
+export const COMMISSION_CAP_PCT = DEFAULT_SALE_CAP_RATE; // tek tanım: commission-cap.ts
 
 /** Şablonlardaki yer tutucu: üç ya da daha fazla alt çizgi. */
 const PLACEHOLDER = /_{3,}/g;

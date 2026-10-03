@@ -21,6 +21,8 @@
  * alıcıya göre uçtan uca değiştiği için "yaklaşık" bile üretmek yanıltıcı olur.
  */
 
+import { formatTryAmount } from "@/lib/format";
+
 // ---------------------------------------------------------------------------
 // ORANLAR VE SABİTLER — kaynak + tarih notlarıyla
 // ---------------------------------------------------------------------------
@@ -543,12 +545,8 @@ export function computeLoanPlan(input: LoanPlanInput): LoanPlanResult {
 
 const nfTry = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 
-/** Kuruşsuz ₺ — hesaplayıcı ekranlarında ortak biçim. */
-export function formatTry(n: number | null | undefined): string {
-  const v = Number(n);
-  if (!Number.isFinite(v)) return "—";
-  return `${nfTry.format(Math.round(v))} ₺`;
-}
+/** Kuruşsuz ₺ — hesaplayıcı ekranlarında ortak biçim (tek kaynak: `@/lib/format`). */
+export const formatTry: (n: number | null | undefined) => string = formatTryAmount;
 
 /** Yaklaşıklık vurgusu — her çıktı ekranında görünmesi gereken tek cümle. */
 export const APPROX_DISCLAIMER =

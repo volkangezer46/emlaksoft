@@ -6,16 +6,8 @@
  * A platform sender is used only when ALLOW_PLATFORM_MESSAGING_FALLBACK=true.
  */
 
-import {
-  getTenantNetgsmConfig as resolveTenantNetgsmConfig,
-  isTenantSmsAvailable,
-  sendTenantSms,
-} from "@/lib/messaging/tenant-providers";
-import type { NetgsmConfig, SmsSendResult } from "@/lib/messaging/netgsm";
-
-export async function getTenantNetgsmConfig(tenantId: string): Promise<NetgsmConfig | null> {
-  return resolveTenantNetgsmConfig(tenantId);
-}
+import { isTenantSmsAvailable, sendTenantSms } from "@/lib/messaging/tenant-providers";
+import type { SmsSendResult } from "@/lib/messaging/netgsm";
 
 export async function isSignerSmsAvailable(
   tenantId: string,

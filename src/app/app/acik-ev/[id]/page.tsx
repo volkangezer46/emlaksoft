@@ -21,15 +21,11 @@ import { VisitorForm } from "./visitor-form";
 import { RegistrationQrCard } from "./registration-qr-card";
 import { StatusSelect } from "./status-select";
 import { ConvertVisitorButton } from "./convert-visitor-button";
+import { OPEN_HOUSE_STATUS_LABELS } from "@/lib/status-labels";
 
 export const metadata = { title: "Açık ev detayı" };
 
-const STATUS_LABELS: Record<string, string> = {
-  planned: "Planlandı",
-  active: "Devam ediyor",
-  completed: "Tamamlandı",
-  cancelled: "İptal",
-};
+const STATUS_LABELS = OPEN_HOUSE_STATUS_LABELS;
 
 const STATUS_VARIANT: Record<string, "info" | "success" | "default" | "danger"> = {
   planned: "info",

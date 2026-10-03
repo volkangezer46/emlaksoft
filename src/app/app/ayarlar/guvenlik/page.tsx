@@ -3,9 +3,10 @@ import { History, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { isNetgsmConfigured } from "@/lib/messaging/netgsm";
-import { getTenantNetgsmConfig } from "@/app/imza/_lib/sms";
+import { getTenantNetgsmConfig } from "@/lib/messaging/tenant-providers";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { TwoFactorForm } from "./two-factor-form";
+import { formatDateTimeTr } from "@/lib/format";
 
 export const metadata = { title: "Güvenlik" };
 
@@ -45,14 +46,7 @@ function deviceLabel(ua: string | null): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("tr-TR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Europe/Istanbul",
-  });
+  return formatDateTimeTr(iso, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 export default async function SecuritySettingsPage() {

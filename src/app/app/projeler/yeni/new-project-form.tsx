@@ -10,14 +10,11 @@ import { createProject } from "@/app/actions/projects";
 import { DAY_MS, msUntil } from "@/lib/clock";
 import { detailOrList } from "@/lib/form-logic";
 import { PROJECT_DRAFT_FIELDS, PROJECT_FORM_ID, PROJECT_TABS } from "./project-tabs";
+import { PROJECT_STATUS_LABELS } from "@/lib/status-labels";
 
 const TAB_ICONS = { proje: TI.proje, konum: TI.konum, aciklama: TI.aciklama } as const;
 const FIELD_LABELS = { name: "Proje adı" };
-const STATUS_LABELS: Record<string, string> = {
-  planning: "Planlama",
-  selling: "Satışta",
-  delivered: "Teslim edildi",
-};
+const STATUS_LABELS = PROJECT_STATUS_LABELS;
 
 function deliveryText(value: string): string | null {
   if (!value) return null;

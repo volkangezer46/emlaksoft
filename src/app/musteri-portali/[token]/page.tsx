@@ -27,6 +27,7 @@ import {
 } from "@/components/public/portal-kit";
 import type { MatchFeedbackVerdict } from "@/app/actions/customer-portal-feedback";
 import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
+import { formatDateTimeTr } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -55,9 +56,7 @@ function money(n: number | null) {
 }
 
 function formatDate(iso: string) {
-  return new Intl.DateTimeFormat("tr-TR", {
-    day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
-  }).format(new Date(iso));
+  return formatDateTimeTr(iso, { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function relName(v: { name?: string } | { name?: string }[] | null | undefined) {

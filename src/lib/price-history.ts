@@ -6,6 +6,8 @@
  * istiyoruz (para birimi/görünüm değişince ağ turu gerekmesin).
  */
 
+import { formatMoney } from "@/lib/format";
+
 export type PriceField = "list_price" | "min_price" | "hidden_price";
 
 export const PRICE_FIELD_LABEL: Record<PriceField, string> = {
@@ -41,15 +43,8 @@ export const CURRENCY_LABEL: Record<PriceCurrency, string> = {
   EUR: "€ EUR",
 };
 
-const fmt: Record<PriceCurrency, Intl.NumberFormat> = {
-  TRY: new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }),
-  USD: new Intl.NumberFormat("tr-TR", { style: "currency", currency: "USD", maximumFractionDigits: 0 }),
-  EUR: new Intl.NumberFormat("tr-TR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }),
-};
-
 export function formatPrice(amount: number | null | undefined, currency: PriceCurrency): string {
-  if (amount === null || amount === undefined) return "—";
-  return fmt[currency].format(amount);
+  return formatMoney(amount, currency);
 }
 
 /**

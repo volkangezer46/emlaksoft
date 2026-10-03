@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   UserRound,
 } from "lucide-react";
+import { formatNumberTr } from "@/lib/format";
 
 const PLAN_ICONS: Record<PlanId, ComponentType<{ className?: string }>> = {
   advisor: UserRound,
@@ -20,9 +21,7 @@ const PLAN_ICONS: Record<PlanId, ComponentType<{ className?: string }>> = {
   enterprise: Crown,
 };
 
-function formatTL(n: number) {
-  return n.toLocaleString("tr-TR");
-}
+const formatTL = formatNumberTr;
 
 export function Pricing() {
   const [yearly, setYearly] = useState(false);

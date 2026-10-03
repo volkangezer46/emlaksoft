@@ -8,20 +8,14 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { Button } from "@/components/ui/button";
 import { restoreCustomer, restoreProperty } from "./actions";
+import { formatDateTimeTr } from "@/lib/format";
 
 export const metadata = { title: "Çöp kutusu" };
 
 const RETENTION_DAYS = 90;
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("tr-TR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Europe/Istanbul",
-  });
+  return formatDateTimeTr(iso, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 /**
