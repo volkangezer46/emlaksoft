@@ -4,12 +4,18 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
-import { isDefinitionCategory, isSystemDefinitionValue, type DefinitionCategory } from "@/lib/definition-defaults";
+import { defaultLabelMap, isDefinitionCategory, isSystemDefinitionValue, type DefinitionCategory } from "@/lib/definition-defaults";
 import { countDefinitionUsage } from "@/lib/definition-usage";
+import { DEAL_STAGES } from "@/lib/workflow-state";
+
 
 export type DefinitionResult = { ok?: boolean; error?: string; id?: string };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const COLOR_RE = /^#[0-9a-f]{6}$/i;
+
+/** Aşama adları kategorisi: anahtar kümesi kodda sabit; ekleme/gizleme/sıralama yapılamaz (yalnız ad + renk). */
+const STAGE_CATEGORY = "deal_stage_label";
+const STAGE_FIXED_ERROR = "Anlaşma aşamaları sabittir: yeni aşama eklenemez, gizlenemez veya sıralanamaz. Yalnız mevcut aşamaların adı ve rengi değiştirilebilir.";
 
 type OwnRow = { id: string; category: string; value: string; label: string; color: string | null; sort_order: number; is_active: boolean };
 
@@ -60,6 +66,7 @@ export async function addDefinition(_prev: DefinitionResult, fd: FormData): Prom
   if (!value) value = label; // değer verilmezse etiketi kullan
 
   if (!isDefinitionCategory(category)) return { error: "Geçersiz kategori." };
+  if (category === STAGE_CATEGORY) return { error: STAGE_FIXED_ERROR };
   if (!label) return { error: "Etiket zorunludur." };
   if (label.length > 120 || value.length > 120) {
     return { error: "Etiket ve değer en fazla 120 karakter olabilir." };
@@ -105,6 +112,7 @@ export async function toggleDefinition(id: string, active: boolean): Promise<Def
   if (!UUID_RE.test(id)) return { error: "Tanım kaydı geçersiz." };
   const row = await loadOwn(id, gate.tenantId);
   if (!row) return { error: "Tanım bulunamadı veya sistem tanımı değiştirilemez." };
+  if (row.category === STAGE_CATEGORY) return { error: STAGE_FIXED_ERROR };
   if (!active && isSystemDefinitionValue(row.category, row.value)) {
     return { error: "Bu değer sistem tarafından kullanıldığı için gizlenemez." };
   }
@@ -188,6 +196,7 @@ export async function moveDefinition(id: string, direction: "up" | "down"): Prom
   if (direction !== "up" && direction !== "down") return { error: "Geçersiz yön." };
   const row = await loadOwn(id, gate.tenantId);
   if (!row) return { error: "Tanım bulunamadı veya sistem tanımı sıralanamaz." };
+  if (row.category === STAGE_CATEGORY) return { error: STAGE_FIXED_ERROR };
 
   const supabase = await createClient();
   const { data: own, error } = await supabase
@@ -262,5 +271,90 @@ export async function deleteDefinition(id: string): Promise<DefinitionResult> {
   if (!data) return { error: "Tanım bulunamadı veya sistem tanımı silinemez." };
   await audit(gate, "definition.delete", id, { category: row.category, value: row.value, label: row.label }, null);
   invalidate(gate.tenantId);
+  return { ok: true };
+}
+
+/**
+ * Anlaşma aşamasının GÖRÜNEN adını/rengini ofis için kaydeder (tenant satırı global varsayılanı geçersiz kılar).
+ * Aşama anahtarı (new/qualified/negotiation/won/lost) değişmez; yeni aşama oluşturulamaz.
+ */
+export async function setStageLabel(stage: string, label: string, color: string | null): Promise<DefinitionResult> {
+  const gate = await requirePermission("settings", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (!(DEAL_STAGES as readonly string[]).includes(stage)) return { error: STAGE_FIXED_ERROR };
+  const trimmed = label.trim();
+  if (!trimmed) return { error: "Aşama adı zorunludur." };
+  if (trimmed.length > 40) return { error: "Aşama adı en fazla 40 karakter olabilir." };
+  const nextColor = color ? color.trim() : null;
+  if (nextColor && !COLOR_RE.test(nextColor)) return { error: "Renk #rrggbb biçiminde olmalıdır." };
+
+  const supabase = await createClient();
+  const { data: existing, error: readError } = await supabase
+    .from("definitions")
+    .select("id, label, color")
+    .eq("tenant_id", gate.tenantId)
+    .eq("category", STAGE_CATEGORY)
+    .eq("value", stage)
+    .limit(1);
+  if (readError) return { error: "Aşama adı okunamadı." };
+  const current = existing?.[0] as { id: string; label: string; color: string | null } | undefined;
+
+  let id = current?.id ?? null;
+  if (current) {
+    const { error } = await supabase
+      .from("definitions")
+      .update({ label: trimmed, color: nextColor, is_active: true })
+      .eq("id", current.id)
+      .eq("tenant_id", gate.tenantId);
+    if (error) return { error: "Aşama adı güncellenemedi." };
+  } else {
+    const { data, error } = await supabase
+      .from("definitions")
+      .insert({
+        tenant_id: gate.tenantId,
+        category: STAGE_CATEGORY,
+        value: stage,
+        label: trimmed,
+        color: nextColor,
+        sort_order: (DEAL_STAGES as readonly string[]).indexOf(stage) + 1,
+      })
+      .select("id")
+      .single();
+    if (error || !data) return { error: "Aşama adı kaydedilemedi." };
+    id = data.id;
+  }
+  const fallback = defaultLabelMap(STAGE_CATEGORY)[stage] ?? stage;
+  await audit(
+    gate,
+    "definition.stage_label",
+    id,
+    { stage, label: current?.label ?? fallback, color: current?.color ?? null },
+    { stage, label: trimmed, color: nextColor },
+  );
+  invalidate(gate.tenantId);
+  revalidatePath("/app/anlasmalar");
+  return { ok: true, id: id ?? undefined };
+}
+
+/** Aşama adı/rengini varsayılana döndürür (ofis satırı silinir; won/lost anahtarları etkilenmez). */
+export async function resetStageLabel(stage: string): Promise<DefinitionResult> {
+  const gate = await requirePermission("settings", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (!(DEAL_STAGES as readonly string[]).includes(stage)) return { error: STAGE_FIXED_ERROR };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("definitions")
+    .delete()
+    .eq("tenant_id", gate.tenantId)
+    .eq("category", STAGE_CATEGORY)
+    .eq("value", stage)
+    .select("id, label, color");
+  if (error) return { error: "Varsayılana dönülemedi." };
+  const removed = (data ?? [])[0] as { id: string; label: string; color: string | null } | undefined;
+  if (removed) {
+    await audit(gate, "definition.stage_label_reset", removed.id, { stage, label: removed.label, color: removed.color }, { stage, label: defaultLabelMap(STAGE_CATEGORY)[stage] ?? stage });
+  }
+  invalidate(gate.tenantId);
+  revalidatePath("/app/anlasmalar");
   return { ok: true };
 }

@@ -3,7 +3,7 @@ import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { DEFAULT_DEFINITIONS, type DefinitionCategory } from "@/lib/definition-defaults";
-import { LOSS_REASON_OTHER } from "@/lib/loss-reason";
+import { mergeLossReasonDefaults } from "@/lib/loss-reason";
 import { resolveStageLabels, type StageLabels } from "@/lib/deal-stage-labels";
 
 export type { DefinitionCategory };
@@ -109,10 +109,7 @@ export async function getDefinitionsOrDefault(category: DefinitionCategory): Pro
  * (global seed uygulanmamışken ofis kendi nedenini eklese bile "Diğer" kaybolmaz).
  */
 export async function getLossReasonOptions(): Promise<DefinitionItem[]> {
-  const items = await getDefinitionsOrDefault("loss_reason");
-  if (items.some((i) => i.value === LOSS_REASON_OTHER)) return items;
-  const other = DEFAULT_DEFINITIONS.loss_reason.find((d) => d.value === LOSS_REASON_OTHER)!;
-  return [...items, { value: other.value, label: other.label, color: null }];
+  return mergeLossReasonDefaults(await getDefinitionsOrDefault("loss_reason"));
 }
 
 /** Anlaşma aşaması görünen ad/renkleri (ofis tanımı + varsayılan; her zaman 5 aşama döner). */

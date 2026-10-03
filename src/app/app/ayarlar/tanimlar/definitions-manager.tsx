@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/app/toast-provider";
 import { addDefinition, toggleDefinition, deleteDefinition, renameDefinition, moveDefinition, setDefinitionColor, type DefinitionResult } from "@/app/actions/definitions";
 import { isSystemDefinitionValue } from "@/lib/definition-defaults";
+import { StageLabelsPanel } from "./stage-labels-panel";
 
 export type DefRow = {
   id: string;
@@ -63,7 +64,11 @@ export function DefinitionsManager({ categories, tenantId }: { categories: Categ
         ))}
       </div>
 
-      {current ? <CategoryPanel category={current} tenantId={tenantId} /> : null}
+      {current?.key === "deal_stage_label" ? (
+        <StageLabelsPanel items={current.items} tenantId={tenantId} />
+      ) : current ? (
+        <CategoryPanel category={current} tenantId={tenantId} />
+      ) : null}
     </div>
   );
 }
@@ -189,6 +194,12 @@ function CategoryPanel({ category, tenantId }: { category: Category; tenantId: s
       aria-labelledby={`definition-tab-${category.key}`}
       className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]"
     >
+      {category.key === "loss_reason" ? (
+        <p className="mb-3 rounded-[var(--radius-card)] bg-canvas px-3.5 py-2.5 text-sm text-text-muted">
+          Anlaşma “Kaybedildi”ye taşınırken bu listeden seçim zorunludur; “Diğer” seçilirse açıklama notu da zorunlu olur.
+          Önceden serbest metinle girilmiş kayıp nedenleri değişmez ve raporlarda kendi adlarıyla görünmeye devam eder.
+        </p>
+      ) : null}
       {rowError ? <p className="mb-3 text-sm text-danger-500" role="alert">{rowError}</p> : null}
       <div className="space-y-2">
         {category.items.length === 0 ? (

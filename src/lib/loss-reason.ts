@@ -7,7 +7,7 @@
  *   "<value> | <not>"    seçim + not  ("diger" için not zorunlu)
  *   "<serbest metin>"    ESKİ kayıtlar; olduğu gibi görünür ve kendi adıyla gruplanır
  */
-import { defaultLabelMap } from "@/lib/definition-defaults";
+import { DEFAULT_DEFINITIONS, defaultLabelMap } from "@/lib/definition-defaults";
 
 export const LOSS_REASON_OTHER = "diger";
 export const LOSS_NOTE_SEPARATOR = " | ";
@@ -15,6 +15,24 @@ export const LOSS_NOTE_MAX = 300;
 export const LOSS_REASON_UNSPECIFIED = "Belirtilmemiş";
 
 type LabelSource = { value: string; label: string }[];
+
+/**
+ * Seçenek listesi = varsayılanlar (global seed uygulanmış olsun olmasın) + ofisin eklediği nedenler;
+ * aynı değerde DB etiketi/rengi kazanır; "Diğer" her zaman sonda ve her zaman var.
+ */
+export function mergeLossReasonDefaults<T extends { value: string; label: string; color: string | null }>(
+  items: T[],
+): { value: string; label: string; color: string | null }[] {
+  const byValue = new Map(items.map((i) => [i.value, i]));
+  const defaults = DEFAULT_DEFINITIONS.loss_reason;
+  const defaultValues = new Set(defaults.map((d) => d.value));
+  const base = defaults
+    .filter((d) => d.value !== LOSS_REASON_OTHER)
+    .map((d) => byValue.get(d.value) ?? { value: d.value, label: d.label, color: null });
+  const extras = items.filter((i) => !defaultValues.has(i.value));
+  const other = byValue.get(LOSS_REASON_OTHER) ?? { value: LOSS_REASON_OTHER, label: "Diğer", color: null };
+  return [...base, ...extras, other].map(({ value, label, color }) => ({ value, label, color }));
+}
 
 /** Varsayılan + ofis tanımı etiket haritası (gizlenmiş/silinmiş eski değerler de okunur kalsın). */
 export function lossReasonLabels(options: LabelSource): Record<string, string> {
