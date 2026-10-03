@@ -97,8 +97,8 @@ async function StartTab({ tenantId }: { tenantId: string | null }) {
                 <p className="mt-0.5 text-sm text-text-muted">{step.description}</p>
               </div>
               {step.done ? null : (
-                <ButtonLink href={step.href} variant="secondary" iconRight={ArrowRight}>
-                  {step.cta}
+                <ButtonLink href={`/app/baslangic?adim=${step.id}`} variant="secondary" iconRight={ArrowRight}>
+                  Şimdi kur
                 </ButtonLink>
               )}
             </li>

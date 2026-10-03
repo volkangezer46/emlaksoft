@@ -39,7 +39,7 @@ const ADVISOR_CORE = [
   "/app/komisyon",
   "/app/gelen-kutusu",
   "/app/degerleme",
-  "/app/destek",
+  "/app/yardim",
 ] as const;
 
 export const NAV_CORE_BY_ROLE: Readonly<Record<AppRole, readonly string[]>> = {
