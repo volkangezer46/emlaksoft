@@ -1,5 +1,6 @@
 "use server";
 
+import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { getBaseUrl } from "@/lib/base-url";
@@ -18,9 +19,9 @@ export async function requestPasswordReset(
   _prev: PasswordResetResult,
   formData: FormData,
 ): Promise<PasswordResetResult> {
-  const email = String(formData.get("email") ?? "").trim();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { error: "Geçerli bir e-posta adresi girin." };
+  const email = normalizeEmail(String(formData.get("email") ?? ""));
+  if (!email || !isValidEmail(email)) {
+    return { error: EMAIL_ERROR_MESSAGE };
   }
 
   // Hız sınırı — IP başına saatte 5 istek (e-posta bombardımanını engelle)

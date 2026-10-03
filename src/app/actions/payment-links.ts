@@ -11,6 +11,8 @@ import { fulfillPaymentLinkByToken } from "@/lib/billing/payment-link-fulfill";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { validateCheckoutBuyer } from "@/lib/billing/buyer";
+import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
+import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { getBaseUrl } from "@/lib/base-url";
 import { parseMoneyInput } from "@/lib/money-input";
 
@@ -155,13 +157,18 @@ export async function startPaymentLinkCheckout(token: string, formData: FormData
     return { error: "Bu ödeme daha önce tahsil edilmiş." };
   }
 
+  const buyerEmail = normalizeEmail(String(formData.get("email") ?? ""));
+  if (!isValidEmail(buyerEmail)) return { error: EMAIL_ERROR_MESSAGE };
+  const buyerPhone = parsePhone(String(formData.get("phone") ?? ""));
+  if (!buyerPhone.ok) return { error: buyerPhone.error ?? PHONE_ERROR_MESSAGE };
+
   let checkoutBuyer;
   try {
     checkoutBuyer = validateCheckoutBuyer({
       id: link.id,
       fullName: String(formData.get("full_name") ?? ""),
-      email: String(formData.get("email") ?? ""),
-      phone: String(formData.get("phone") ?? ""),
+      email: buyerEmail,
+      phone: buyerPhone.stored,
       identityNumber: String(formData.get("identity_number") ?? ""),
       address: String(formData.get("address") ?? ""),
       city: String(formData.get("city") ?? ""),

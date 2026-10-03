@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
-import { isValidTurkishMobile, normalizeTurkishPhone, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
+import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
+import { parsePhone, PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type PublicBookingResult = {
@@ -16,7 +17,6 @@ export type PublicBookingResult = {
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Public rezervasyonun müsaitlik, kayıt, audit ve bildirim niyeti tek RPC
@@ -28,7 +28,7 @@ export async function createPublicBooking(fd: FormData): Promise<PublicBookingRe
   const startIso = String(fd.get("slot") ?? "").trim();
   const fullName = String(fd.get("full_name") ?? "").trim();
   const phoneRaw = String(fd.get("phone") ?? "").trim();
-  const email = String(fd.get("email") ?? "").trim();
+  const email = normalizeEmail(String(fd.get("email") ?? ""));
   const note = String(fd.get("note") ?? "").trim();
   const kvkk = String(fd.get("kvkk") ?? "") === "on";
 
@@ -40,10 +40,11 @@ export async function createPublicBooking(fd: FormData): Promise<PublicBookingRe
   if (!UUID_RE.test(token)) return { error: "Geçersiz bağlantı." };
   if (!fullName) return { error: "Ad soyad zorunludur." };
   if (fullName.length > 160) return { error: "Ad soyad en fazla 160 karakter olabilir." };
-  if (!isValidTurkishMobile(phoneRaw)) return { error: TR_MOBILE_ERROR_MESSAGE };
-  if (email && !EMAIL_RE.test(email)) {
-    return { error: "Geçerli bir e-posta girin veya boş bırakın." };
-  }
+  const phoneParsed = parsePhone(phoneRaw);
+  if (!phoneParsed.ok) return { error: phoneParsed.error ?? PHONE_ERROR_MESSAGE };
+  // create_public_booking_atomic RPC'si şu an yalnız TR cep (05XXXXXXXXX) kabul eder.
+  if (phoneParsed.country !== "TR" || phoneParsed.kind !== "mobile") return { error: TR_MOBILE_ERROR_MESSAGE };
+  if (email && !isValidEmail(email)) return { error: EMAIL_ERROR_MESSAGE };
   if (email.length > 320) return { error: "E-posta adresi çok uzun." };
   if (note.length > 1000) return { error: "Not en fazla 1000 karakter olabilir." };
   if (!kvkk) return { error: "Devam etmek için KVKK onayı gereklidir." };
@@ -66,7 +67,7 @@ export async function createPublicBooking(fd: FormData): Promise<PublicBookingRe
       p_public_token: token,
       p_start_at: new Date(startMs).toISOString(),
       p_full_name: fullName,
-      p_phone: normalizeTurkishPhone(phoneRaw),
+      p_phone: phoneParsed.stored,
       p_email: email || null,
       p_note: note || null,
     },

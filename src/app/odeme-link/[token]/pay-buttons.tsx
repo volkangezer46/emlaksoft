@@ -3,6 +3,8 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { markPaymentLinkPaid, startPaymentLinkCheckout } from "@/app/actions/payment-links";
+import { EmailInput } from "@/components/ui/email-input";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 type BuyerDefaults = { fullName: string; email: string; phone: string };
 
@@ -66,9 +68,8 @@ export function PayButtons({
             </label>
             <label className="text-xs font-semibold text-text-muted">
               E-posta
-              <input
+              <EmailInput
                 name="email"
-                type="email"
                 required
                 maxLength={254}
                 autoComplete="email"
@@ -78,13 +79,10 @@ export function PayButtons({
             </label>
             <label className="text-xs font-semibold text-text-muted">
               Cep telefonu
-              <input
+              <PhoneInput
                 name="phone"
-                type="tel"
                 required
-                maxLength={20}
                 autoComplete="tel"
-                placeholder="05xx xxx xx xx"
                 defaultValue={defaults.phone}
                 className={inputClass}
               />

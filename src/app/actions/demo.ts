@@ -3,11 +3,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
-import {
-  isValidTurkishMobile,
-  normalizeTurkishPhone,
-  TR_MOBILE_ERROR_MESSAGE,
-} from "@/lib/phone";
+import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
+import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
 export type DemoResult = {
@@ -33,7 +30,7 @@ export async function requestDemo(
   const fullName = String(formData.get("full_name") ?? "").trim();
   const rawPhone = String(formData.get("phone") ?? "").trim();
   const company = String(formData.get("company") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const email = normalizeEmail(String(formData.get("email") ?? ""));
   const city = String(formData.get("city") ?? "").trim();
   const teamSize = String(formData.get("team_size") ?? "").trim();
   const message = String(formData.get("message") ?? "").trim();
@@ -45,9 +42,10 @@ export async function requestDemo(
 
   if (!fullName) return { error: "Ad soyad zorunlu." };
   if (fullName.length > 120) return { error: "Ad soyad en fazla 120 karakter olabilir." };
-  if (!isValidTurkishMobile(rawPhone)) return { error: TR_MOBILE_ERROR_MESSAGE };
-  if (email.length > 254 || (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
-    return { error: "Geçerli bir e-posta adresi girin." };
+  const phoneParsed = parsePhone(rawPhone);
+  if (!phoneParsed.ok) return { error: phoneParsed.error ?? PHONE_ERROR_MESSAGE };
+  if (email && !isValidEmail(email)) {
+    return { error: EMAIL_ERROR_MESSAGE };
   }
   if (
     company.length > 160 ||
@@ -61,7 +59,7 @@ export async function requestDemo(
     return { error: "Demo talebi için iletişim izni zorunludur." };
   }
 
-  const phone = normalizeTurkishPhone(rawPhone);
+  const phone = phoneParsed.stored;
   const requestId = UUID_RE.test(rawRequestId) ? rawRequestId : randomUUID();
   const requestHash = idempotencyHash(requestId, phone);
 

@@ -6,7 +6,8 @@ import { ArrowLeft, CalendarCheck2, CalendarPlus, CheckCircle2, Clock3, Loader2,
 import { createPublicBooking } from "@/app/actions/booking-public";
 import { formatTrDayParts, type BookingDay } from "@/lib/booking-slots";
 import { googleCalendarAddUrl } from "@/lib/calendar";
-import { sanitizeTurkishPhoneInput, TR_MOBILE_PLACEHOLDER } from "@/lib/phone";
+import { EmailInput } from "@/components/ui/email-input";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 const inputCls =
   "w-full rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-3 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400";
@@ -174,16 +175,13 @@ export function BookingForm({
           <label htmlFor="booking-phone" className="mb-1.5 block text-xs font-semibold text-text-muted">
             Cep telefonu *
           </label>
-          <input
+          <PhoneInput
             id="booking-phone"
             name="phone"
             required
-            type="tel"
-            inputMode="numeric"
             autoComplete="tel-national"
-            placeholder={TR_MOBILE_PLACEHOLDER}
             value={phone}
-            onChange={(e) => setPhone(sanitizeTurkishPhoneInput(e.target.value))}
+            onValueChange={setPhone}
             className={`${inputCls} numeric`}
           />
         </div>
@@ -192,10 +190,9 @@ export function BookingForm({
           <label htmlFor="booking-email" className="mb-1.5 block text-xs font-semibold text-text-muted">
             E-posta (isteğe bağlı)
           </label>
-          <input
+          <EmailInput
             id="booking-email"
             name="email"
-            type="email"
             autoComplete="email"
             placeholder="ornek@eposta.com"
             className={inputCls}

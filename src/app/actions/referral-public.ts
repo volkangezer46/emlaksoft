@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { notifyTenant } from "@/lib/notify";
-import { isValidTurkishMobile, normalizeTurkishPhone, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 
 export type PublicReferralResult = {
@@ -38,7 +38,8 @@ export async function submitReferralByToken(fd: FormData): Promise<PublicReferra
 
   if (!UUID_RE.test(token)) return { error: "Geçersiz bağlantı." };
   if (!name) return { error: "Tanıdığınızın adı zorunludur." };
-  if (!isValidTurkishMobile(phoneRaw)) return { error: TR_MOBILE_ERROR_MESSAGE };
+  const phoneParsed = parsePhone(phoneRaw);
+  if (!phoneParsed.ok) return { error: phoneParsed.error ?? PHONE_ERROR_MESSAGE };
   if (!kvkk) return { error: "Devam etmek için onay kutusunu işaretlemeniz gerekir." };
 
   // Token tahmini / spam koruması — IP başına dakikada 8 tavsiye denemesi.
@@ -77,7 +78,7 @@ export async function submitReferralByToken(fd: FormData): Promise<PublicReferra
     .maybeSingle();
   if (!referrer) return { error: "Bağlantı geçersiz veya kaldırılmış." };
 
-  const phone = normalizeTurkishPhone(phoneRaw);
+  const phone = phoneParsed.stored;
 
   // Mükerrer freni (link + telefon): aynı kişiyi ikinci kez ilettiyse yeni satır
   // ve yeni bildirim üretme — teşekkür ekranını yine göster.

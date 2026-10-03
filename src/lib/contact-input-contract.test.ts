@@ -21,7 +21,6 @@ const ROLLOUT = "rollout bekliyor";
 /** dosya -> gerekçe. Anahtar: depo köküne göre '/' ayraçlı yol. */
 const ALLOWLIST: Record<string, string> = {
   // (a)/(b) ham telefon/e-posta input'ları
-  "src/app/acik-ev-kayit/[token]/checkin-form.tsx": `${ROLLOUT}: ham tel input`,
   "src/app/admin/personel/page.tsx": `${ROLLOUT}: ham email input`,
   "src/app/app/acik-ev/[id]/visitor-form.tsx": `${ROLLOUT}: ham email input`,
   "src/app/app/ayarlar/company-form.tsx": `${ROLLOUT}: ham tel input`,
@@ -32,27 +31,12 @@ const ALLOWLIST: Record<string, string> = {
   "src/app/app/musteriler/yeni/customer-form.tsx": `${ROLLOUT}: ham email input`,
   "src/app/app/portfoyler/[id]/property-keys-section.tsx": `${ROLLOUT}: ham holder_phone input`,
   "src/app/app/sozlesmeler/[id]/contract-sign-panel.tsx": `${ROLLOUT}: ham tel + email input`,
-  "src/app/demo/demo-form.tsx": `${ROLLOUT}: ham email input`,
-  "src/app/giris/login-form.tsx": `${ROLLOUT}: ham email input`,
-  "src/app/kayit/register-form.tsx": `${ROLLOUT}: ham email input`,
-  "src/app/lead/[token]/lead-form.tsx": `${ROLLOUT}: ham email input`,
-  "src/app/odeme-link/[token]/pay-buttons.tsx": `${ROLLOUT}: ham tel + email input`,
-  "src/app/randevu-al/[token]/booking-form.tsx": `${ROLLOUT}: ham tel + email input`,
-  "src/app/sifre-sifirla/forgot-form.tsx": `${ROLLOUT}: ham email input`,
-  "src/app/tavsiye/[token]/referral-form.tsx": `${ROLLOUT}: ham tel input`,
   // (c) ortak doğrulayıcı kullanmayan server action'lar
-  "src/app/actions/auth.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
-  "src/app/actions/booking-public.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
   "src/app/actions/calls.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
   "src/app/actions/customers.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
-  "src/app/actions/demo.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
   "src/app/actions/onboarding-setup.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
-  "src/app/actions/open-house-public.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
-  "src/app/actions/password-reset.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
-  "src/app/actions/payment-links.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
   "src/app/actions/platform-staff.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
   "src/app/actions/property-keys.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
-  "src/app/actions/referral-public.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
   "src/app/actions/settings.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
   "src/app/actions/team.ts": `${ROLLOUT}: action ortak doğrulayıcı kullanmıyor`,
 };

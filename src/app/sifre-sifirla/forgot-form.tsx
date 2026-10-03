@@ -5,6 +5,7 @@ import { useActionState } from "react";
 import { ArrowLeft, KeyRound, Loader2, Mail, MailCheck, Send } from "lucide-react";
 import { requestPasswordReset, type PasswordResetResult } from "@/app/actions/password-reset";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { EmailInput } from "@/components/ui/email-input";
 
 const initial: PasswordResetResult = {};
 
@@ -46,10 +47,9 @@ export function ForgotPasswordForm() {
               </label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-                <input
+                <EmailInput
                   id="email"
                   name="email"
-                  type="email"
                   required
                   autoComplete="email"
                   autoFocus

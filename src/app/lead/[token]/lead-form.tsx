@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { EmailInput } from "@/components/ui/email-input";
 
 type Province = { id: string; name: string };
 
@@ -94,7 +95,7 @@ export function LeadForm({
       />
       <input name="full_name" required placeholder="Ad soyad *" className={inputCls} />
       <PhoneInput name="phone" className={inputCls} placeholder="Cep telefonu (05XX XXX XX XX)" />
-      <input name="email" type="email" placeholder="E-posta (opsiyonel)" className={inputCls} />
+      <EmailInput name="email" placeholder="E-posta (opsiyonel)" className={inputCls} />
 
       <div className="grid grid-cols-2 gap-3">
         <select name="transaction_type" defaultValue="" className={inputCls}>

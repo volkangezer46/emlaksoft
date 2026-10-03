@@ -1,4 +1,5 @@
-import { isValidTurkishMobile, toE164TurkishPhone } from "@/lib/phone";
+import { isValidEmail, normalizeEmail } from "@/lib/email";
+import { parsePhone } from "@/lib/phone";
 
 export type CheckoutBuyerDraft = {
   id: string;
@@ -36,10 +37,6 @@ function clean(value: string | null | undefined, maxLength: number) {
   return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, maxLength);
 }
 
-function validEmail(value: string) {
-  return value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
 /** Turkish citizen identity checksum; 10-digit tax numbers are format checked. */
 export function normalizeBuyerIdentityNumber(value: string | null | undefined): string | null {
   const normalized = String(value ?? "").replace(/[\s.-]/g, "");
@@ -66,16 +63,17 @@ export function validateCheckoutBuyer(input: CheckoutBuyerDraft): ValidatedCheck
   const id = clean(input.id, 32);
   const fullName = clean(input.fullName, 120);
   const nameParts = fullName.split(" ").filter(Boolean);
-  const email = clean(input.email, 254).toLowerCase();
-  const gsmNumber = isValidTurkishMobile(input.phone) ? toE164TurkishPhone(input.phone) : "";
+  const email = normalizeEmail(clean(input.email, 254));
+  const parsedPhone = parsePhone(input.phone);
+  const gsmNumber = parsedPhone.ok ? parsedPhone.e164 : "";
   const identityNumber = normalizeBuyerIdentityNumber(input.identityNumber);
   const address = clean(input.address, 250);
   const city = clean(input.city, 80);
 
   if (!id) throw new Error("Ödeme sahibi kimliği bulunamadı.");
   if (nameParts.length < 2) throw new Error("Ödeme için ad ve soyad eksiksiz girilmelidir.");
-  if (!validEmail(email)) throw new Error("Ödeme için geçerli bir e-posta adresi girilmelidir.");
-  if (!gsmNumber) throw new Error("Ödeme için geçerli bir Türkiye cep telefonu girilmelidir.");
+  if (!isValidEmail(email)) throw new Error("Ödeme için geçerli bir e-posta adresi girilmelidir.");
+  if (!gsmNumber) throw new Error("Ödeme için geçerli bir telefon numarası girilmelidir.");
   if (!identityNumber) throw new Error("Geçerli T.C. kimlik veya vergi numarası girilmelidir.");
   if (address.length < 10) throw new Error("Ödeme için açık adres en az 10 karakter olmalıdır.");
   if (city.length < 2) throw new Error("Ödeme için şehir bilgisi girilmelidir.");

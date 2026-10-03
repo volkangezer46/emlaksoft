@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
 import { requestDemo, type DemoResult } from "@/app/actions/demo";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { EmailInput } from "@/components/ui/email-input";
 
 const initial: DemoResult = {};
 
@@ -88,10 +89,9 @@ export function DemoForm() {
         <label className="mb-1.5 block text-sm text-text-muted" htmlFor="email">
           E-posta <span className="text-text-faint">(opsiyonel)</span>
         </label>
-        <input
+        <EmailInput
           id="email"
           name="email"
-          type="email"
           maxLength={254}
           autoComplete="email"
           className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"

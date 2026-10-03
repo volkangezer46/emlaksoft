@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { CheckCircle2, Loader2, Phone, Send } from "lucide-react";
 import { submitReferralByToken } from "@/app/actions/referral-public";
-import { formatTurkishPhone, sanitizeTurkishPhoneInput, toTelHref, TR_MOBILE_PLACEHOLDER } from "@/lib/phone";
+import { PhoneInput } from "@/components/ui/phone-input";
+import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 
 const inputCls =
   "w-full rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-3 text-sm text-ink-950 placeholder:text-text-faint outline-none transition focus:border-brand-400";
@@ -104,16 +105,13 @@ export function ReferralForm({
         <label htmlFor="ref-phone" className="mb-1.5 block text-xs font-semibold text-text-muted">
           Cep telefonu *
         </label>
-        <input
+        <PhoneInput
           id="ref-phone"
           name="referred_phone"
           required
-          type="tel"
-          inputMode="numeric"
           autoComplete="off"
-          placeholder={TR_MOBILE_PLACEHOLDER}
           value={phone}
-          onChange={(e) => setPhone(sanitizeTurkishPhoneInput(e.target.value))}
+          onValueChange={setPhone}
           className={`${inputCls} numeric`}
         />
       </div>
