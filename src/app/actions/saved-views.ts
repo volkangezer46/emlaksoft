@@ -17,7 +17,7 @@ const ROUTE_PARAM_WHITELIST: Record<string, readonly string[]> = {
   // src/app/app/musteriler/page.tsx
   "/app/musteriler": ["q", "type", "source", "etiket", "from", "to", "assigned", "sort", "sirala", "yon"],
   // src/app/app/portfoyler/page.tsx
-  "/app/portfoyler": ["q", "status", "saglik", "gorunum"],
+  "/app/portfoyler": ["q", "status", "saglik", "gorunum", "islem", "oda", "fiyat_min", "fiyat_max", "m2_min", "m2_max", "kat_min", "kat_max", "il", "ilce", "mahalle", "foto"],
   // src/app/app/komisyon/page.tsx
   "/app/komisyon": ["durum", "from", "to"],
   // src/app/app/gelen-kutusu/page.tsx

@@ -15,6 +15,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { searchWorkspace, type SearchHit } from "@/app/actions/search";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/app/empty-state";
+import { NlPanel } from "./nl-panel";
 
 /**
  * Global arama sonuç sayfası — komut paletindeki "Tüm sonuçları gör" hedefi.
@@ -57,7 +58,7 @@ function buildHref(q: string, tur?: string | null) {
 export default async function AramaSonuclariPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string; tur?: string }>;
+  searchParams?: Promise<{ q?: string; tur?: string; haric?: string }>;
 }) {
   await requireModulePage("dashboard");
   const params = (await searchParams) ?? {};
@@ -150,6 +151,9 @@ export default async function AramaSonuclariPage({
           </div>
         ) : null}
       </section>
+
+      {/* Doğal dil: "ne anladım" chip'leri (kural tabanlı), mevcut listelere filtre kontratıyla gider */}
+      <NlPanel q={q} haric={params.haric} />
 
       {/* İçgörü şeridi — sonuç dağılımı özeti */}
       {q.length >= 2 && topGroup ? (

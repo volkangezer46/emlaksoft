@@ -45,6 +45,8 @@ import { PropertyAuthorizationPanel } from "./property-extras";
 import { RelatedPropertiesWidget } from "./related-properties-widget";
 import { TapuInquiryPanel } from "./tapu-inquiry-panel";
 import { PropertyMap } from "@/components/app/property-map";
+import { PhotoQualityCard } from "@/components/app/photo-quality-card";
+import { NeighborhoodNotesPanel } from "@/components/app/neighborhood-notes-panel";
 import { computePriceHealth } from "@/lib/price-health";
 import { diagnoseSaleBlockers, isDiagnosable } from "@/lib/sale-diagnostics";
 import { SaleDiagnosticsCard } from "@/components/app/sale-diagnostics-card";
@@ -605,6 +607,11 @@ export default async function PropertyDetailPage({
             </section>
           </div>
 
+          {/* Mahalle notları (F5): ofis içi saha notları, vitrine çıkmaz */}
+          <Suspense fallback={null}>
+            <NeighborhoodNotesPanel neighborhoodId={property.neighborhood_id} />
+          </Suspense>
+
           {/* Benzer portföyler */}
           <Suspense fallback={<RelatedSkeleton />}>
             <RelatedPropertiesWidget
@@ -624,6 +631,11 @@ export default async function PropertyDetailPage({
               <MediaSection propertyId={property.id} tenantId={tenantId} canEdit={canEdit} />
             </Suspense>
           </div>
+
+          {/* Foto kalite kartı (F3): kural tabanlı, puansız */}
+          <Suspense fallback={null}>
+            <PhotoQualityCard propertyId={property.id} />
+          </Suspense>
 
           <AiContentPanel propertyId={property.id} />
             </div>
