@@ -70,7 +70,7 @@ export function VitrinForm({ settings }: { settings: VitrinSettings }) {
         />
         <Row
           id="vitrin-phone"
-          name="showPhone"
+          name="showCall"
           label="Ofis telefonunu göster"
           hint="Vitrinin üstünde arama düğmesi olarak ve arama motorlarına verilen ofis bilgisinde görünür."
           defaultChecked={settings.showPhone}

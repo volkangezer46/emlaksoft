@@ -22,7 +22,7 @@ export async function saveVitrinSettings(_prev: VitrinSettingsResult, formData: 
   const v = validateVitrinInput({
     intro: formData.get("intro"),
     enabled: formData.get("enabled"),
-    showPhone: formData.get("showPhone"),
+    showPhone: formData.get("showCall"),
     showLeadForm: formData.get("showLeadForm"),
     showValuation: formData.get("showValuation"),
     seoOptin: formData.get("seoOptin"),

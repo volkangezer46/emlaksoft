@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { parsePropertyDescription, withDescription } from "@/lib/property-description";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -409,7 +410,13 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
   // Mevcut features MERGE edilir: OCR/AI gibi form dışı kaynakların yazdığı
   // anahtarlar (ör. tapu alan bilgisi) form kaydında silinip gitmesin.
   const prevFeatures = (existing?.features ?? {}) as Record<string, unknown>;
-  const mergedFeatures = { ...prevFeatures, ...parseFeatureFields(formData, { rooms, sqm: sqmValue }) };
+  let mergedFeatures: Record<string, unknown> = { ...prevFeatures, ...parseFeatureFields(formData, { rooms, sqm: sqmValue }) };
+  // İlan açıklaması yalnız formda alan VARSA yazılır (tek yazma kuralı: lib/property-description.ts).
+  if (formData.has("description")) {
+    const d = parsePropertyDescription(formData.get("description"));
+    if (!d.ok) return { error: d.error };
+    mergedFeatures = withDescription(mergedFeatures, d.value);
+  }
 
   // Fiyat her güncellendiğinde sağlık ANINDA yeniden hesaplanır — önce emsal, yetersizse m² modeli.
   const health = await resolvePriceHealth(supabase, {

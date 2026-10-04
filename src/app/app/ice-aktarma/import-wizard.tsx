@@ -464,9 +464,9 @@ export function ImportWizard({
               {" "}{IMPORT_CHUNK_SIZE}&apos;lik parçalarla işlenir.
             </p>
             <div className="mt-3 rounded-[var(--radius-card)] border border-brand-300/50 bg-brand-50/60 px-4 py-3 text-xs text-text-muted" data-testid="excel-csv-guide">
-              <p className="font-semibold text-ink-950">Excel'den CSV olarak kaydedip yükleyin</p>
+              <p className="font-semibold text-ink-950">Excel&apos;den CSV olarak kaydedip yükleyin</p>
               <ol className="mt-1 list-decimal space-y-0.5 pl-4">
-                <li>Excel'de dosyanızı açın: Dosya, Farklı Kaydet.</li>
+                <li>Excel&apos;de dosyanızı açın: Dosya, Farklı Kaydet.</li>
                 <li>Türü &quot;CSV UTF-8 (virgülle ayrılmış)&quot; seçip kaydedin.</li>
                 <li>Oluşan .csv dosyasını aşağıdan yükleyin. .xlsx / .xls doğrudan yüklenemez.</li>
               </ol>

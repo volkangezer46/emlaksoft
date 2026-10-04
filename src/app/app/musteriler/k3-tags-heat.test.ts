@@ -96,7 +96,7 @@ describe("sıcaklık segmenti: ekran ve CSV aynı havuz sınırı", () => {
 describe("içe aktarma: yalnız CSV, Excel için açık yönerge + şablon", () => {
   it("sihirbaz Excel'den CSV yönergesini ve örnek şablon indirmeyi içerir", () => {
     const wiz = read("src/app/app/ice-aktarma/import-wizard.tsx");
-    expect(wiz).toContain("Excel'den CSV olarak kaydedip yükleyin");
+    expect(wiz).toContain("Excel&apos;den CSV olarak kaydedip yükleyin");
     expect(wiz).toContain("buildTemplateCsv");
     expect(wiz).toContain('accept=".csv,text/csv"');
     expect(wiz).toContain("doğrudan desteklenmiyor");
