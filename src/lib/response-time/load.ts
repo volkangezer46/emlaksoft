@@ -28,7 +28,7 @@ type Row = Record<string, unknown>;
 
 /**
  * Pencere içinde açılan müşterilerin ilk yanıt ölçümü. TEK okuma yolu: danışman metrikleri
- * (`advisor-metrics.ts`), Lead Hızı raporu ve oyunlaştırma aynı hesabı kullanır.
+ * (`advisor-metrics.ts`), Aday Hızı raporu ve oyunlaştırma aynı hesabı kullanır.
  * Yalnız okur (RLS ile tenant'a sınırlı; tenantId verilirse ayrıca süzülür).
  */
 export async function loadLeadResponses(
