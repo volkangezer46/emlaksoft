@@ -21,6 +21,7 @@ type Base = Pick<
   | "canSurvey"
   | "showMoney"
   | "survey"
+  | "requestedOutcome"
 >;
 
 /**
@@ -68,6 +69,8 @@ export async function KapanisPanel(props: Base) {
 
   return (
     <KapanisSihirbazi
+      // `?sonuc=` değişirse (panodan yeni bir bırakma) sihirbaz o akışla yeniden başlar.
+      key={props.requestedOutcome ?? "secim"}
       {...props}
       commissionRate={rateRaw != null ? Number(rateRaw) : null}
       commission={

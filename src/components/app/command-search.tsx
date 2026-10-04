@@ -42,11 +42,13 @@ export function CommandSearch({
   creatableModules,
   lockedHrefs,
   storageScope,
+  uiPrefCookie,
 }: {
   accessibleModules: AppModule[];
   creatableModules?: AppModule[];
   lockedHrefs?: string[];
   storageScope?: string;
+  uiPrefCookie?: string | null;
 }) {
   const [mounted, setMounted] = useState(false);
   const [openOnMount, setOpenOnMount] = useState(false);
@@ -85,7 +87,7 @@ export function CommandSearch({
   }
   return (
     <Suspense fallback={<Trigger />}>
-      <Panel accessibleModules={accessibleModules} creatableModules={creatableModules} lockedHrefs={lockedHrefs} initialOpen={openOnMount} storageScope={storageScope} />
+      <Panel accessibleModules={accessibleModules} creatableModules={creatableModules} lockedHrefs={lockedHrefs} initialOpen={openOnMount} storageScope={storageScope} uiPrefCookie={uiPrefCookie} />
     </Suspense>
   );
 }

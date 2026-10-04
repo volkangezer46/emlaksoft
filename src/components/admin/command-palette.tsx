@@ -1,5 +1,6 @@
 "use client";
 
+import { Kbd, KbdCombo } from "@/components/ui/kbd";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -36,6 +37,7 @@ const ALL_NAV: NavCmd[] = [
   { label: "Kontrol paneli", href: "/admin", icon: LayoutDashboard, module: "dashboard" },
   { label: "Demo & aday", href: "/admin/satis", icon: Handshake, module: "sales" },
   { label: "Ofisler", href: "/admin/tenants", icon: Building2, module: "tenants" },
+  { label: "Yeni ofis", href: "/admin/tenants/yeni", icon: Building2, module: "sales" },
   { label: "Üyeler", href: "/admin/members", icon: Users, module: "members" },
   { label: "Abonelik & fatura", href: "/admin/billing", icon: CreditCard, module: "billing" },
   { label: "Destek talepleri", href: "/admin/tickets", icon: LifeBuoy, module: "tickets" },
@@ -183,9 +185,9 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
       >
         <Search className="h-4 w-4 shrink-0 transition group-hover:text-brand-500" />
         <span className="hidden flex-1 truncate text-left text-sm sm:block">Ara… ofis, üye, destek talebi</span>
-        <kbd className="ml-auto hidden shrink-0 items-center gap-1 rounded-md border border-hairline bg-surface px-2 py-1 text-xs font-semibold text-text-faint lg:inline-flex">
-          Ctrl <span className="font-bold">K</span>
-        </kbd>
+        <span className="ml-auto hidden shrink-0 lg:inline-flex">
+          <KbdCombo keys={["mod", "K"]} />
+        </span>
       </button>
 
       {open ? (
@@ -282,11 +284,11 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
 
             <div className="hairline-t surface-sunken flex items-center justify-between px-4 py-2 text-xs text-text-faint">
               <span className="flex items-center gap-2">
-                <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5">↑↓</kbd> gezin
-                <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5">↵</kbd> aç
+                <Kbd>↑↓</Kbd> gezin
+                <Kbd>↵</Kbd> aç
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5">Esc</kbd> kapat
+                <Kbd>Esc</Kbd> kapat
               </span>
             </div>
           </div>

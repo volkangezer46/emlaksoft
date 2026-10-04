@@ -74,7 +74,7 @@ export async function KpiSatiri({ ctx }: { ctx: HomeCtx }) {
   ];
 
   return (
-    <KpiGrid count={cards.length} className="stagger-grid">
+    <KpiGrid count={cards.length}>
       {cards.map(({ key, ...card }) => (
         <KpiCard key={key} {...card} layout="inline" chart="bars" />
       ))}

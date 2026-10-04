@@ -4,6 +4,8 @@ import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
   EntityThumb,
+  MobileCard,
+  MobileCardList,
   RowActionLink,
   RowActions,
   StatusPill,
@@ -131,9 +133,9 @@ export function RentalTable({ rows, density }: { rows: RentalVM[]; density: Dens
 /** <md: tablo yerine kart listesi. */
 export function RentalMobileList({ rows }: { rows: RentalVM[] }) {
   return (
-    <ul className="space-y-2.5 md:hidden">
+    <MobileCardList>
       {rows.map((r) => (
-        <li key={r.id} className="surface-card relative rounded-[var(--radius-card)] p-3">
+        <MobileCard key={r.id}>
           <div className="flex items-start gap-3">
             <EntityThumb alt="" icon={KeyRound} size="sm" />
             <div className="min-w-0 flex-1">
@@ -150,8 +152,8 @@ export function RentalMobileList({ rows }: { rows: RentalVM[] }) {
               </div>
             </div>
           </div>
-        </li>
+        </MobileCard>
       ))}
-    </ul>
+    </MobileCardList>
   );
 }

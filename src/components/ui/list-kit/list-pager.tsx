@@ -4,7 +4,7 @@ import { formatCount, type ParamRecord } from "@/lib/ui/filter-params";
 import { pageHrefOf, type PageWindow } from "./list-logic";
 
 const BTN =
-  "focus-ring press inline-flex min-h-9 touch:min-h-11 items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+  "focus-ring press surface-interactive inline-flex min-h-9 touch:min-h-11 items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition";
 const BTN_OFF =
   "inline-flex min-h-9 touch:min-h-11 items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
@@ -33,7 +33,7 @@ export function ListPager({
       <div className="flex items-center gap-1.5">
         {w.hasPrev ? (
           <Link href={pageHrefOf(pathname, params, w.page - 1)} className={BTN}>
-            <ChevronLeft aria-hidden="true" className="h-4 w-4" /> Önceki
+            <ChevronLeft aria-hidden="true" className="icon-nudge-back h-4 w-4" /> Önceki
           </Link>
         ) : (
           <span className={BTN_OFF} aria-disabled="true">
@@ -45,7 +45,7 @@ export function ListPager({
         </span>
         {w.hasNext ? (
           <Link href={pageHrefOf(pathname, params, w.page + 1)} className={BTN}>
-            Sonraki <ChevronRight aria-hidden="true" className="h-4 w-4" />
+            Sonraki <ChevronRight aria-hidden="true" className="icon-nudge h-4 w-4" />
           </Link>
         ) : (
           <span className={BTN_OFF} aria-disabled="true">

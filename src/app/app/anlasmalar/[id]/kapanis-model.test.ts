@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  OUTCOME_PARAM,
   advisorShareOf,
   buildLossNote,
+  closingTabHref,
+  initialOutcome,
   initialStep,
   isReadyToWin,
   isStepUnlocked,
   outcomeForStage,
+  parseOutcomeParam,
   splitsError,
   splitsTotal,
   wonReadiness,
@@ -19,6 +23,37 @@ describe("kapanis-model", () => {
     expect(initialStep("won", "negotiation")).toBe("tutar");
     expect(initialStep("lost", "negotiation")).toBe("neden");
     expect(initialStep("lost", "lost")).toBe("takip");
+  });
+
+  it("panodan gelen sonuc parametresi ilgili akışı ön seçer", () => {
+    expect(closingTabHref("d1", "won")).toBe("/app/anlasmalar/d1?sekme=kapanis&sonuc=kazanildi");
+    expect(closingTabHref("d1", "lost")).toBe("/app/anlasmalar/d1?sekme=kapanis&sonuc=kaybedildi");
+    expect(parseOutcomeParam(OUTCOME_PARAM.won)).toBe("won");
+    expect(parseOutcomeParam("kaybedildi")).toBe("lost");
+    expect(parseOutcomeParam(["kazanildi", "kaybedildi"])).toBe("won");
+    expect(parseOutcomeParam(" Kazanildi ")).toBe("won");
+    expect(parseOutcomeParam("won")).toBeNull();
+    expect(parseOutcomeParam("")).toBeNull();
+    expect(parseOutcomeParam(undefined)).toBeNull();
+
+    // Açık anlaşma: istek ön seçilir ve akışın ilk adımı açılır; istek yoksa seçim ekranı.
+    expect(initialOutcome("negotiation", "won")).toBe("won");
+    expect(initialStep(initialOutcome("negotiation", "won"), "negotiation")).toBe("tutar");
+    expect(initialOutcome("new", "lost")).toBe("lost");
+    expect(initialStep(initialOutcome("new", "lost"), "new")).toBe("neden");
+    expect(initialOutcome("negotiation", null)).toBeNull();
+    expect(initialOutcome("negotiation", undefined)).toBeNull();
+  });
+
+  it("kapanmış anlaşmada sonuc parametresi yok sayılır; aşama belirler", () => {
+    expect(initialOutcome("won", "lost")).toBe("won");
+    expect(initialOutcome("lost", "won")).toBe("lost");
+    expect(initialStep(initialOutcome("won", "lost"), "won")).toBe("paylar");
+  });
+
+  it("ön seçim kilitleri açmaz: kazanılmadan paylar, kaybedilmeden takip kapalı", () => {
+    expect(isStepUnlocked("won", "paylar", "negotiation")).toBe(false);
+    expect(isStepUnlocked("lost", "takip", "new")).toBe(false);
   });
 
   it("kazanmadan önce yalnız tutar ve onay açık", () => {

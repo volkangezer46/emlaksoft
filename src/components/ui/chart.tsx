@@ -80,7 +80,7 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-[var(--radius-control)] border border-hairline bg-surface/95 px-3 py-2 shadow-[var(--inner-top),var(--elev-4)] backdrop-blur-sm">
+    <div className="rounded-[var(--radius-control)] border border-hairline bg-surface px-3 py-2 shadow-[var(--inner-top),var(--elev-4)]">
       {label != null ? (
         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-faint">
           {label}

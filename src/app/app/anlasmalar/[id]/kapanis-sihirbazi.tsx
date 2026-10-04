@@ -17,10 +17,10 @@ import {
   COLLECTION_TASK_PREFIX,
   advisorShareOf,
   buildLossNote,
+  initialOutcome,
   initialStep,
   isReadyToWin,
   isStepUnlocked,
-  outcomeForStage,
   splitsError,
   splitsTotal,
   stepsFor,
@@ -64,6 +64,8 @@ export type KapanisProps = {
   /** Para değerleri (komisyon, paylar): yalnız kendi anlaşması veya earnings_all. */
   showMoney: boolean;
   survey: { url: string; answered: boolean; score: number | null } | null;
+  /** Panodan veya "Geçiş" menüsünden gelen ön seçim (`?sonuc=`); kapanmış anlaşmada yok sayılır. */
+  requestedOutcome?: ClosingOutcome | null;
   // Aşağıdakiler KapanisPanel (sunucu) tarafından doldurulur.
   commissionRate?: number | null;
   commission?: { id: string; gross: number; vat: number; status: string; splits: { label: string; rate: number }[] } | null;
@@ -81,8 +83,11 @@ const money = (n: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDig
  */
 export function KapanisSihirbazi(props: KapanisProps) {
   const router = useRouter();
-  const [outcome, setOutcome] = useState<ClosingOutcome | null>(outcomeForStage(props.stage));
-  const [step, setStep] = useState<ClosingStep>(initialStep(outcomeForStage(props.stage), props.stage));
+  // Pano bir kartı Kazanıldı/Kaybedildi'ye bıraktığında buraya `?sonuc=` ile gelinir: ilgili akış
+  // seçili açılır. Aşama burada DEĞİŞMEZ; yalnız "… olarak kapat" düğmesi updateDealStage'i çağırır.
+  const startOutcome = initialOutcome(props.stage, props.requestedOutcome);
+  const [outcome, setOutcome] = useState<ClosingOutcome | null>(startOutcome);
+  const [step, setStep] = useState<ClosingStep>(initialStep(startOutcome, props.stage));
   const [taskCreated, setTaskCreated] = useState(false);
 
   if (props.stage !== "won" && props.stage !== "lost" && outcome === null) {

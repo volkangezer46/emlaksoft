@@ -13,6 +13,10 @@ import { cn } from "@/lib/utils";
  *   (5 öğe: 2→3→5, 6 öğe: 2→3→6, 7/8 öğe: 2→4).
  *
  * Statik Tailwind sınıfları kullanılır (dinamik sınıf adı üretilmez).
+ *
+ * Hareket: `DashboardGrid` ve `KpiGrid` çocukları ilk girişte `.list-stagger` ile sırayla belirir
+ * (motion.css; yalnız transform/opacity, reduced-motion ve TV modunda kapalı). İskelet ızgarasında
+ * `stagger={false}` verilir ki gerçek içerik gelince giriş iki kez oynamasın.
  */
 
 type Span = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
@@ -43,7 +47,7 @@ const XL_SPAN: Record<number, string> = {
 export function DashboardGrid({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
-      className={cn("grid grid-cols-1 items-stretch gap-4 md:grid-cols-6 xl:grid-cols-12", className)}
+      className={cn("list-stagger grid grid-cols-1 items-stretch gap-4 md:grid-cols-6 xl:grid-cols-12", className)}
       {...props}
     />
   );
@@ -156,15 +160,18 @@ export function KpiGrid({
   className,
   children,
   label = "Özet göstergeler",
+  stagger = true,
 }: {
   /** Çocuk sayısı: sütun düzenini belirler. */
   count: number;
   className?: string;
   children: ReactNode;
   label?: string;
+  /** İlk giriş stagger'ı (varsayılan açık). İskelet ızgarasında kapatın. */
+  stagger?: boolean;
 }) {
   return (
-    <div role="group" aria-label={label} className={cn("grid items-stretch gap-3 sm:gap-4", kpiColumns(count), className)}>
+    <div role="group" aria-label={label} className={cn("grid items-stretch gap-3 sm:gap-4", stagger && "list-stagger", kpiColumns(count), className)}>
       {children}
     </div>
   );

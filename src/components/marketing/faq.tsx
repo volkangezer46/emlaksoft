@@ -18,7 +18,7 @@ export function Faq() {
         <SectionHeading center eyebrow="Sık sorulan sorular" title={<span id="sss-baslik">Aklınızdaki sorular, <Em>net cevaplar.</Em></span>} />
         <div className="mk-faq" style={{ marginTop: "2.5rem" }}>
           {FAQS.map((f) => (
-            <details key={f.q}>
+            <details key={f.q} className="motion-details">
               <summary>
                 {f.q}
                 <i aria-hidden="true" />
