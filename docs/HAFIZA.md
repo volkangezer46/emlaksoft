@@ -7,7 +7,7 @@ Ayrıntı için ilgili belgeye bağlanır (içerik burada kopyalanmaz). Son gün
 ## 1. Yayın durumu (en kritik)
 
 - **Canlı (`origin/main`): `cf8ec63`.** Modüller (aç/kapa) + menü 41→36, K1, K2, K3, K5, K6, SEO merkezi, bakım modu, ana kapı.
-- **Yerelde yayınlanmamış: `origin/main`'in ~40 commit önünde.** Hepsi izole klonda tam doğrulandı (tsc, eslint, vitest,
+- **Yerelde yayınlanmamış: `origin/main`in ~70 commit önünde.** Hepsi izole klonda tam doğrulandı (tsc, eslint, vitest,
   check:links/cron, audit:actions, build). Son tam yeşil doğrulanan HEAD: `45d121a` (293 dosya, 2996 test).
 - **Push engelli:** otomatik izin sınıflandırıcısı `git push` komutunu reddetti. Sahip kendisi `git push origin main`
   çalıştırır ya da Bash için `git push` izin kuralı ekler. Aşılmaya çalışılmaz.
@@ -21,7 +21,12 @@ Ayrıntı için ilgili belgeye bağlanır (içerik burada kopyalanmaz). Son gün
 Canlıda uygulanan son: `20260813000300`. Aşağıdakilerin HİÇBİRİ uygulanmadı; kod hepsinde "etkin değil" ile zarifçe çalışır.
 Sıra: yedek/PITR doğrula → `npm run check:migrations -- --database` → `npm run db:migrate -- --dry-run` → `npm run db:migrate` → `npm run db:rls-audit`.
 
-`supabase/migrations/` (31 dosya, uygulanmayan): 20260814000100 telefon CHECK · 20260815000100 kayıp nedeni seed ·
+**Ek (2026-10-05):** `20260821000100` mahalle notları · `20260821000200` yasal kayıt defteri · `20260821000300` evrak linkleri ·
+**`20260823000100..000600` güvenlik denetimi 3 düzeltici migration'ları (approval_requests RLS+consumed_at, listing_pool insert/claim,
+kvkk_requests rol, property_owner_info update kapsamı, advisor_private PII biçim CHECK, kupon max_per_tenant) — ilgili ana
+migration'larla AYNI pencerede uygulanmalı.** Toplam uygulanmayan migration dosyası şu an 40 civarı (`ls supabase/migrations | awk '$0 > "20260813000300"'`).
+
+`supabase/migrations/` (ilk 31 dosya, uygulanmayan): 20260814000100 telefon CHECK · 20260815000100 kayıp nedeni seed ·
 20260816000100..001000 (komisyon payı/plan/ödeme, **000500 kazanç gizliliği RLS = davranış değiştirir, AYRI PENCERE**, hedef, atama kuralı) ·
 001100 kampanya claim · 001200 atama kuralı ilan hedefi · 001300 danışman özel · 001400 uzmanlık/bölge · 001500 ilan havuzu ·
 001600 örnek veri kapsamı · 001700 tenant_modules · 001790 SEO 404 · 010100 varsayılan deneme günü · 010200 oturum kapatma ·
@@ -54,8 +59,15 @@ uygulanmalı; yoksa RLS delikleri açık kalır.** K4 `is_document` migration'ı
 
 ## 4. Çalışan ajanlar (2026-10-05; raporlar gelince bu bölümü güncelle)
 
-Güvenlik düzeltmeleri kod katmanı + SQL/RLS · yasal kayıt defteri + evrak linki (F1/F4) · doğal dil arama + foto kalite + mahalle notu
-(F2/F3/F5) · organik büyüme · **coğrafya tek merkez (`src/lib/geo`, `/admin/geo`, tam admin yönetimi)**.
+Yerelde birleşenler (hepsi `main`'de, push bekliyor): güvenlik denetimi 3 (kod + SQL düzeltmeleri; rapor `docs/design/GUVENLIK_DENETIMI_3.md`),
+F1/F4 (kayıt defteri, evrak linki), F2/F3/F5 (doğal dil arama, foto kalite, mahalle notu), organik büyüme, AI kredi ölçümü,
+müşteri zekâsı + aday hızı, ar-ge-baskani ajan tanımı (`.claude/agents/ar-ge-baskani.md`).
+Hâlâ çalışanlar: **coğrafya tek merkez** (`src/lib/geo`, `/admin/geo`; üyelik kaydı dahil tüm formlar), **koltuk fiyatlama motoru**
+(`src/lib/billing/seat-pricing.ts`; ardından satın alma akışı + public hesaplayıcı ajanları), **mega menü yönetimi** (`/admin/site-menu`),
+uzman panel tartışması (tur 1: ofis sahibi, danışman/müşteri, strateji bitti; mühendis bekleniyor → tur 2 itiraz → tur 3 hakem).
+Panel çıktıları geçici klasörde (scratchpad/panel); kalıcı kararlar `docs/design/PANEL_KARAR_1.md`'ye yazılır.
+**Kullanıcı talimatı (2026-10-05):** bekleyen/devam eden her şey bitince servisi yeniden başlat ve canlıya al (= doğrulanmış `main`'i push et;
+Vercel deploy'u push tetikler; migration uygulamak sahibin işidir).
 
 ## 5. Çalışma yöntemi (tekrar keşfetme)
 
@@ -83,7 +95,7 @@ Güvenlik düzeltmeleri kod katmanı + SQL/RLS · yasal kayıt defteri + evrak l
 | Telefon | `src/lib/phone-rules.ts` (`parsePhoneStrict`), `PhoneInput` |
 | Rol etiketi / terim | `src/lib/role-labels.ts`, `src/lib/terminology.ts` |
 | Zaman | `src/lib/clock.ts` (TR ay sınırları `trMonth*`) |
-| Menü | `src/lib/nav-config.ts` (36 öğe/9 başlık sözleşmesi, ikonlar benzersiz `src/lib/icons.ts`) |
+| Menü | `src/lib/nav-config.ts` (37 öğe/9 başlık sözleşmesi, ikonlar benzersiz `src/lib/icons.ts`) |
 | Modül aç/kapa | `src/lib/modules/**` (registry, guard, pending-defs); tablo yokken hepsi açık |
 | Onay kuralları | `src/lib/oversight/approval-gate.ts` (varsayılan kapalı, 48 sa tek kullanımlık) |
 | AI | yalnız `src/lib/ai/openai-client.ts` + `redact.ts`; kredi `src/lib/ai/credits/**` |
