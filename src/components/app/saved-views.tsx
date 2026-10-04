@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Bookmark, BookmarkPlus, Loader2, X } from "lucide-react";
 import { useToast } from "@/components/app/toast-provider";
 import { createSavedView, deleteSavedView, type SavedView } from "@/app/actions/saved-views";
+import { useAutoAnimate } from "@/components/ui/auto-animate";
 
 /**
  * Kayıtlı görünümler şeridi — filtre çubuğunun hemen altına mount edilir.
@@ -73,6 +74,8 @@ export function SavedViews({
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  // Görünüm çipi eklenince/silinince yumuşak geçiş (key = görünüm id).
+  const chipsRef = useAutoAnimate<HTMLDivElement>();
 
   const active = cleanParams(currentParams);
   const hasFilters = Object.keys(active).length > 0;
@@ -121,7 +124,7 @@ export function SavedViews({
   }
 
   return (
-    <div className={className ?? "flex flex-wrap items-center gap-2"}>
+    <div ref={chipsRef} className={className ?? "flex flex-wrap items-center gap-2"}>
       <span className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
         <Bookmark className="h-3.5 w-3.5" /> Kayıtlı görünümler:
       </span>

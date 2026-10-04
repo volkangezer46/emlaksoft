@@ -13,7 +13,7 @@ export function DataPartnerStatus({
 }) {
   return (
     <div
-      className={`flex items-center gap-2.5 rounded-[var(--radius-card)] border px-3 py-2 backdrop-blur ${
+      className={`flex items-center gap-2.5 rounded-[var(--radius-card)] border px-3 py-2 ${
         configured ? "border-mint-400/30 bg-mint-400/10" : "border-white/10 bg-white/5"
       }`}
     >

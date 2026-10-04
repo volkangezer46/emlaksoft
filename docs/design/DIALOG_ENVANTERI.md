@@ -36,12 +36,12 @@ küçük tek amaçlı eylem; **Sıra** = ekle/düzenle akışı, sonraki turda t
 | app/gelen-kutusu/sms-dialog.tsx | SMS gönder | 1 | Sıra |
 | app/musteriler/cift-kayit/merge-wizard.tsx | Çift kayıt birleştir | 1 | Sıra |
 | app/projeler/[id]/units-board.tsx | Birim durum | 1 | Sıra |
-| app/anlasmalar/loss-reason-dialog.tsx | Kayıp nedeni | 1 | Kalır (kısa tek alan) |
+| app/anlasmalar/loss-reason-dialog.tsx | Kayıp nedeni | 1 | KALDIRILDI: pano artık Kapanış sekmesine yönlendirir |
 | components/app/portal-link-dialog.tsx, wa-template-menu.tsx | Bağlantı/şablon paylaşım | 1-2 | Kalır (paylaşım menüsü) |
 
 ## Kalan gerçek onay / önizleme yüzeyleri (değişmez)
 
 - components/ui/confirm-dialog.tsx (silme/yıkıcı onay)
-- anlasmalar/win-celebration-dialog.tsx, admin/tenants/[id]/subscription-panel.tsx, danisman/[slug]/agent-share-card.tsx
+- admin/tenants/[id]/subscription-panel.tsx, danisman/[slug]/agent-share-card.tsx
 - Tam ekran: public/gallery-lightbox.tsx, public/compare-table.tsx, belgeler/document-list.tsx, app/product-tour.tsx
 - Gezinme/yardım: components/app/keyboard-shortcuts-dialog.tsx, components/ui/console/nav-kit.tsx, app-sidebar, admin-sidebar

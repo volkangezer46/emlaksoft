@@ -4,7 +4,7 @@ import { setAppointmentStatus } from "@/app/actions/appointments";
 import { AddToCalendarButton } from "@/components/app/add-to-calendar-button";
 import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { EntityThumb, RowActionLink, RowActions, StatusPill, type Density, type PillTone } from "@/components/ui/list-kit";
+import { EntityThumb, MobileCard, MobileCardList, RowActionLink, RowActions, StatusPill, type Density, type PillTone } from "@/components/ui/list-kit";
 import type { CalendarEvent } from "@/lib/calendar";
 import { CompleteAppointmentDialog } from "./complete-appointment-dialog";
 import { AppointmentEditDialog } from "./appointment-edit-dialog";
@@ -223,9 +223,9 @@ export function AppointmentTable({ rows, density, typeOptions, advisors }: { row
 /** <md: tablo yerine kart listesi. */
 export function AppointmentMobileList({ rows, typeOptions, advisors }: { rows: AppointmentVM[]; typeOptions: TypeOption[] | undefined; advisors?: AdvisorOption[] }) {
   return (
-    <ul className="space-y-2.5 md:hidden">
+    <MobileCardList>
       {rows.map((a) => (
-        <li key={a.id} id={`randevu-m-${a.id}`} className="surface-card relative scroll-mt-24 rounded-[var(--radius-card)] p-3">
+        <MobileCard key={a.id} id={`randevu-m-${a.id}`} className="scroll-mt-24">
           <div className="flex items-start gap-3">
             <EntityThumb alt="" name={a.customerName} size="sm" />
             <div className="min-w-0 flex-1">
@@ -249,8 +249,8 @@ export function AppointmentMobileList({ rows, typeOptions, advisors }: { rows: A
           <div className="mt-2 border-t border-line pt-2">
             <Actions a={a} typeOptions={typeOptions} advisors={advisors} withCalendar />
           </div>
-        </li>
+        </MobileCard>
       ))}
-    </ul>
+    </MobileCardList>
   );
 }

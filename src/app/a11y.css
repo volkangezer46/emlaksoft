@@ -44,6 +44,116 @@
   }
 }
 
+/* ============================================================================
+   YÜKSEK KONTRAST — işletim sistemi "kontrastı artır" tercihi (prefers-contrast: more).
+   forced-colors'tan farkı: renkler bizde kalır, yalnız ayrım güçlenir.
+     - kenarlık: saç teli (yarı saydam %8) yerine 1px TAM renk, yüzeye karşı ≥ 3:1
+     - soluk metin: --text-muted / --text-faint koyulaşır (her yüzeyde ≥ 7:1, AAA)
+     - odak halkası: 3px düz çizgi; .focus-ring gölgesi yarı saydam yerine tam renk
+     - cam / yarı saydam yüzey: opak (aşağıdaki "opak yedekler" bloğu)
+   Oranlar src/lib/theme-contrast.test.ts içinde bu dosyadan okunup ölçülür.
+   `:root` satırları tokens.css'i, `html[data-theme="dark"]` satırları theme-dark.css'i
+   aynı özgüllükle ve daha sonra gelerek ezer (bu dosya ikisinden sonra içe aktarılır).
+   ========================================================================== */
+@media (prefers-contrast: more) {
+  :root {
+    --text-muted: #3d4658;
+    --text-faint: #475163;
+    --line: #74809a;
+    --line-strong: #5b6577;
+    --hairline: var(--line);
+    --hairline-strong: var(--line-strong);
+    --border-interactive: var(--line-strong);
+    --border-strong: var(--text-muted);
+    --focus-ring: 0 0 0 5px var(--ring);
+  }
+  html[data-theme="dark"] {
+    --text-muted: #c9d2e3;
+    --text-faint: #b3bfd4;
+    --line: #6f7d99;
+    --line-strong: #8492ad;
+    --hairline: var(--line);
+    --hairline-strong: var(--line-strong);
+    --border-interactive: var(--line-strong);
+    --border-strong: var(--text-muted);
+  }
+  /* Her zaman koyu bölümler (hero, yan menü içi .theme-dark): beyaz tabanlı tonlar güçlenir. */
+  :root .theme-dark {
+    --text-muted: rgba(255, 255, 255, 0.86);
+    --text-faint: rgba(255, 255, 255, 0.74);
+    --line: rgba(255, 255, 255, 0.45);
+    --hairline: rgba(255, 255, 255, 0.45);
+    --hairline-strong: rgba(255, 255, 255, 0.6);
+    --border-interactive: rgba(255, 255, 255, 0.6);
+    --border-strong: rgba(255, 255, 255, 0.8);
+  }
+  /* Beyaz etiket kapsamı rol token'larını kendi üstünde yeniden çözer (tokens.css); kenar
+     adları burada da tam renge bağlanır. İkisi de var() olduğundan açık/koyu fark etmez. */
+  :root .brand-scope {
+    --border-interactive: var(--line-strong);
+    --border-strong: var(--text-muted);
+  }
+  /* `:root` öneki: taban `:focus-visible` kuralı globals.css gövdesinde, bu dosyadan sonra gelir. */
+  :root :focus-visible {
+    outline-width: 3px;
+  }
+  /* Kenarlığı olmayan, yalnız zemin tonuyla ayrılan gömülü alan da çizgi alır
+     (odaktayken odak halkası öncelikli). */
+  :root .surface-sunken:not(:focus-visible) {
+    outline: 1px solid var(--line);
+    outline-offset: -1px;
+  }
+}
+
+/* ============================================================================
+   OPAK YEDEKLER — cam (backdrop-filter) ve yarı saydam yüzeylerin saydamlıksız hali.
+   Üç koşulda devreye girer:
+     1) tarayıcı backdrop-filter desteklemiyor            (@supports not)
+     2) kullanıcı "saydamlığı azalt" istiyor              (prefers-reduced-transparency)
+     3) kullanıcı yüksek kontrast istiyor                 (prefers-contrast: more)
+   Cam bütçesinde serbest yüzeylerin (globals.css "cam yüzey bütçesi") her birinin
+   yedeği buradadır; ana sayfa (.mk-*) yedekleri marketing.css'te. `:root` öneki:
+   taban kurallar globals.css gövdesinde (bu dosyadan SONRA) geldiği için özgüllükle
+   kazanılır.
+   ========================================================================== */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root .glass-bar,
+  :root .glass { background: var(--surface); }
+  :root .glass-card { background: var(--surface-raised); }
+  :root .glass-dark { background: #071a38; }
+  :root .pm-glass { background: #1b3156; }
+  :root .pm-glass:hover { background: #223a63; }
+  :root .mega-backdrop { background: rgba(4, 17, 39, 0.66); }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :root .glass-bar,
+  :root .glass,
+  :root .glass-card,
+  :root .glass-dark,
+  :root .pm-glass,
+  :root .mega-backdrop,
+  :root .dialog-overlay,
+  :root [class*="backdrop-blur"] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  :root .glass-bar,
+  :root .glass { background: var(--surface); }
+  :root .glass-card { background: var(--surface-raised); }
+  :root .glass-dark { background: #071a38; }
+  :root .pm-glass { background: #1b3156; }
+  :root .pm-glass:hover { background: #223a63; }
+  :root .mega-backdrop { background: rgba(4, 17, 39, 0.66); }
+  /* Tailwind opaklık yardımcılarıyla verilen yarı saydam yüzeyler (bg-surface/95 vb.) opak olur.
+     Yalnız sınıf belirtecinin BAŞI eşleşir; `hover:bg-surface/70` gibi varyantlar etkilenmez. */
+  :root :is([class^="bg-surface/"], [class*=" bg-surface/"]) { background-color: var(--surface); }
+  :root :is([class^="bg-canvas/"], [class*=" bg-canvas/"]) { background-color: var(--canvas); }
+  :root :is(.bg-white\/95, .bg-white\/90, .bg-white\/85, .bg-white\/80, .bg-white\/75, .bg-white\/70) { background-color: #ffffff; }
+  html[data-theme="dark"] :is(.bg-white\/95, .bg-white\/90, .bg-white\/85, .bg-white\/80, .bg-white\/75, .bg-white\/70):not(.theme-dark *) {
+    background-color: var(--surface);
+  }
+}
+
 /* Hareket azaltma: gerekli olmayan tüm animasyon/geçiş kapanır, kaydırma anlık. */
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -237,7 +237,7 @@ export function OwnerPortalLinkButton({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface/90 text-text-muted shadow-[var(--shadow-xs)] backdrop-blur transition hover:border-brand-300 hover:text-brand-600"
+          className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted shadow-[var(--shadow-xs)] transition hover:border-brand-300 hover:text-brand-600"
           aria-label={`${propertyLabel} için malik portalı linki üret`}
           title="Malik portalı linki"
         >

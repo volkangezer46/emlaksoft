@@ -1,6 +1,7 @@
 "use client";
 
 import { Keyboard, X } from "lucide-react";
+import { KbdCombo } from "@/components/ui/kbd";
 import {
   Dialog,
   DialogClose,
@@ -36,15 +37,8 @@ export function KeyboardShortcutsDialog({
                 className="flex items-center justify-between gap-4 rounded-[var(--radius-control)] px-3 py-2 odd:bg-canvas"
               >
                 <dt className="text-sm text-ink-950">{k.etiket}</dt>
-                <dd className="flex shrink-0 gap-1">
-                  {k.tuslar.split(" ").map((t, i) => (
-                    <kbd
-                      key={`${k.tuslar}-${i}`}
-                      className="numeric min-w-[22px] rounded-md border border-line bg-surface px-1.5 py-0.5 text-center text-xs font-semibold text-text-muted shadow-[var(--shadow-xs)]"
-                    >
-                      {t}
-                    </kbd>
-                  ))}
+                <dd className="shrink-0">
+                  <KbdCombo keys={k.tuslar.split(" ")} className="numeric min-w-[22px]" />
                 </dd>
               </div>
             ))}

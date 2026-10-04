@@ -13,6 +13,7 @@ import {
   LifeBuoy,
   ReceiptText,
   ScrollText,
+  Settings2,
   Users,
   Wallet,
 } from "lucide-react";
@@ -20,7 +21,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { stopImpersonation } from "@/app/actions/platform";
 import { getPlan, planLabel, PLANS } from "@/lib/billing/plans";
-import { DAY_MS, daysAgoIso, now } from "@/lib/clock";
+import { DAY_MS, daysAgoIso, daysFromNowIso, now } from "@/lib/clock";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { ActivityTimeline } from "@/components/ui/activity-timeline";
 import { MorphNav } from "@/components/ui/morph-tab-parts";
@@ -40,6 +41,8 @@ import {
   visibleTabs,
   type OfficeTab,
 } from "@/lib/admin/office-360";
+import { loadOfficeManagement, officeAdminCanMap } from "@/lib/admin/office-management";
+import { OfficeManagement } from "./office-management";
 import { SubscriptionPanel } from "./subscription-panel";
 import { CORE_MODULES, moduleForAction } from "./module-map";
 import {
@@ -62,6 +65,7 @@ const tenantStatusLabel: Record<string, string> = {
 
 const TAB_META: Record<OfficeTab, { label: string; icon: typeof History }> = {
   zaman: { label: "Zaman çizelgesi", icon: History },
+  yonetim: { label: "Yönetim", icon: Settings2 },
   abonelik: { label: "Abonelik ve ödemeler", icon: CreditCard },
   destek: { label: "Destek", icon: LifeBuoy },
   kullanim: { label: "Kullanım ve limitler", icon: Gauge },
@@ -91,7 +95,7 @@ export default async function AdminTenantDetailPage({
 
   const { data: tenant } = await admin
     .from("tenants")
-    .select("id, name, plan, status, created_at, tax_office, tax_number, license_no, address_line, city, phone")
+    .select("id, name, slug, plan, status, created_at, trial_ends_at, province_id, district_id, tax_office, tax_number, license_no, address_line, city, phone")
     .eq("id", id)
     .maybeSingle();
   if (!tenant) notFound();
@@ -147,7 +151,41 @@ export default async function AdminTenantDetailPage({
   // ---- Aktif sekmenin içeriği (yalnız gereken veri çekilir) ----
   let content: ReactNode = null;
 
-  if (active === "zaman" || active === "yasal") {
+  if (active === "yonetim") {
+    const can = officeAdminCanMap(staff.role);
+    const mgmt = await loadOfficeManagement(admin, id, { withMembers: access.members, withNotes: can.note });
+    content = (
+      <OfficeManagement
+        tenant={{
+          id: tenant.id,
+          name: tenant.name,
+          slug: tenant.slug ?? "",
+          plan: tenant.plan ?? "office",
+          status: tenant.status ?? "trial",
+          trialEndsLabel: fmtDay(tenant.trial_ends_at ?? null),
+          phone: tenant.phone,
+          city: tenant.city,
+          provinceId: tenant.province_id ?? null,
+          districtId: tenant.district_id ?? null,
+          addressLine: tenant.address_line,
+          licenseNo: tenant.license_no,
+          taxOffice: tenant.tax_office,
+          taxNumber: tenant.tax_number,
+        }}
+        can={can}
+        owner={mgmt.owner}
+        ownerCount={mgmt.ownerCount}
+        members={mgmt.members}
+        activeSeats={mgmt.activeSeats}
+        seatLimit={plan.limits.seats}
+        notes={mgmt.notes.map((n) => ({ ...n, createdLabel: relativeTimeTR(n.createdAt) }))}
+        provinces={mgmt.provinces}
+        plans={PLANS.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry, seats: p.limits.seats }))}
+        minTrialDate={daysFromNowIso(1).slice(0, 10)}
+        legalHref={tabHref("yasal")}
+      />
+    );
+  } else if (active === "zaman" || active === "yasal") {
     const tdata = await loadOfficeTimeline(admin, { id, name: tenant.name, created_at: tenant.created_at }, access, kpiData.sub);
     if (active === "zaman") {
       const all = buildOfficeTimeline(tdata);

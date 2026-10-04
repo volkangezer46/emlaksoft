@@ -6,6 +6,7 @@ import { ArrowUpRight, Crosshair, Loader2 } from "lucide-react";
 import { previewDemandMatches, type MatchPreviewResult } from "@/app/actions/match-preview";
 import { hasDemandContent, encodeDemandPreviewParam, type DemandFormValues } from "@/lib/demand-criteria";
 import { tierCls, tierLabel } from "@/lib/matching";
+import { AnimatedNumber } from "@/components/ui/animated-number";
 
 /**
  * Formda salt-okunur CANLI eşleşme önizlemesi. Değerler debounce ile `previewDemandMatches`
@@ -34,7 +35,8 @@ function request(key: string, values: DemandFormValues): Promise<MatchPreviewRes
 export function DemandMatchPreview({ values }: { values: DemandFormValues }) {
   const enabled = hasDemandContent(values) && (values.transaction_type ?? "").trim() !== "";
   const key = enabled ? encodeDemandPreviewParam(values) : "";
-  const [done, setDone] = useState<{ key: string; result: MatchPreviewResult } | null>(null);
+  // `prevCount`: bir önceki başarılı sonucun sayısı — yeni sonuç geldiğinde sayı eskiden yeniye akar.
+  const [done, setDone] = useState<{ key: string; result: MatchPreviewResult; prevCount?: number } | null>(null);
 
   useEffect(() => {
     if (!key) return;
@@ -42,7 +44,9 @@ export function DemandMatchPreview({ values }: { values: DemandFormValues }) {
     const timer = setTimeout(() => {
       request(key, values)
         .then((result) => {
-          if (!cancelled) setDone({ key, result });
+          if (!cancelled) {
+            setDone((old) => ({ key, result, prevCount: old?.result.ok ? old.result.count : old?.prevCount }));
+          }
         })
         .catch(() => {
           if (!cancelled) setDone({ key, result: { ok: false, error: "Önizleme alınamadı." } });
@@ -83,7 +87,9 @@ export function DemandMatchPreview({ values }: { values: DemandFormValues }) {
             className="focus-ring group flex items-center justify-between gap-2 rounded-[var(--radius-control)] px-1 py-0.5 text-sm font-semibold text-ink-950 hover:text-brand-600"
           >
             <span>
-              <span className="font-display text-xl font-extrabold">{current.count}</span>{" "}
+              <span className="font-display text-xl font-extrabold">
+                <AnimatedNumber value={current.count} from={done?.prevCount} />
+              </span>{" "}
               portföy eşleşiyor
             </span>
             <ArrowUpRight className="h-4 w-4 shrink-0 opacity-60 transition group-hover:opacity-100" aria-hidden />

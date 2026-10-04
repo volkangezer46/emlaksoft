@@ -13,6 +13,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { closingTabHref } from "./[id]/kapanis-model";
 
 type FlowItem = { from: DealStage; to: DealStage; label: (n: (s: DealStage) => string) => string; tone: string };
 
@@ -32,30 +33,20 @@ const FLOW: FlowItem[] = [
   { from: "lost", to: "negotiation", label: () => "Yeniden aç", tone: "bg-amber-500" },
 ];
 
-/** Tahta DnD'si de aynı kuralları izlesin diye tek kaynak: butonlarda hangi
- *  geçiş serbestse sürükle-bırakta da yalnız o serbesttir (won/lost'tan geri yok). */
-export function isAllowedTransition(from: string, to: DealStage) {
-  return FLOW.some((f) => f.from === from && f.to === to);
-}
-
+/**
+ * Kart üzerindeki "Geçiş" menüsü: sürükle-bırakın klavye/alternatif yolu.
+ * Kazanıldı ve Kaybedildi popup AÇMAZ; anlaşma detayındaki Kapanış sekmesine (sihirbaz) götürür,
+ * aşama orada onaylanınca değişir. Diğer geçişler doğrudan `updateDealStage` ile yapılır.
+ */
 export function StatusTransitionBar({
   dealId,
   stage,
-  onWonStart,
-  onWonError,
   stageLabels = defaultStageLabels(),
-  onLossRequest,
 }: {
   dealId: string;
   stage: string;
   /** Ofisin görünen aşama adları. */
   stageLabels?: StageLabels;
-  /** Kayıp geçişi neden seçimi gerektirir: verilirse diyalog çağırana aittir (tetikleyen düğme odağı için verilir). */
-  onLossRequest?: (trigger: HTMLElement | null) => void;
-  /** Won geçişi başlarken (server onayı beklenmeden) — kutlama sihirbazını açar; verildiğinde won toast'ı atlanır. */
-  onWonStart?: () => void;
-  /** Won geçişi hata verirse — sihirbaz kapatılır (mevcut geri sarma korunur). */
-  onWonError?: () => void;
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -69,15 +60,12 @@ export function StatusTransitionBar({
   const nameOf = (s: DealStage) => stageLabels[s].label;
 
   function run(to: DealStage) {
-    // Kayıp: neden seçilmeden geçiş yapılmaz (eski sabit "Durum geçişi" metni kaldırıldı).
-    if (to === "lost") {
-      if (!onLossRequest) return;
+    if (to === "won" || to === "lost") {
+      // Kapanış: tutar/paylar ya da kayıp nedeni sihirbazda sorulur; burada aşama değişmez.
       setOpen(false);
-      onLossRequest(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+      startTransition(() => router.push(closingTabHref(dealId, to)));
       return;
     }
-    // Kutlama sihirbazı optimistic açılır — server onayı beklenmez
-    if (to === "won") onWonStart?.();
     startTransition(async () => {
       const fd = new FormData();
       fd.set("deal_id", dealId);
@@ -85,12 +73,8 @@ export function StatusTransitionBar({
       const res = await updateDealStage(fd);
       if (res.error) {
         push(res.error, "err");
-        if (to === "won") onWonError?.();
       } else {
-        // Sihirbaz devralmışsa won toast'ı gösterilmez
-        if (!(to === "won" && onWonStart)) {
-          push(to === "won" ? "Kazanıldı · komisyon üretildi" : "Aşama güncellendi", "ok");
-        }
+        push("Aşama güncellendi", "ok");
         setOpen(false);
         router.refresh();
       }
