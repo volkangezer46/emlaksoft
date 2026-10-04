@@ -627,7 +627,7 @@ export default async function DocumentsPage({
   return (
     <div className="space-y-6">
       {/* ---------------------------------------------------------------- */}
-      <PageHeader title="Ofisin tüm dosyaları" eyebrow="Belge merkezi" description="Müşteri dosyaları, portföy medyası, sözleşmeler ve anlaşma evrakları tek listede. “Şu müşterinin kimlik fotokopisi nerede?” sorusunun tek cevabı burada." />
+      <PageHeader title="Ofisin tüm dosyaları" eyebrow="Belge merkezi" description="Müşteri dosyaları, portföy medyası, sözleşmeler ve anlaşma evrakları tek listede. “Şu müşterinin kimlik fotokopisi nerede?” sorusunun tek cevabı burada." actions={<Link href="/app/belgeler/evrak-linkleri" className="focus-ring inline-flex min-h-11 items-center rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-bold text-white transition hover:bg-brand-700">Evrak linkleri</Link>} />
 
       {/* --- 4 href'li StatCard ------------------------------------------- */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
