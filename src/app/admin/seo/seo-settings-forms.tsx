@@ -154,7 +154,7 @@ export function SitemapForm({ value, canEdit, preview }: { value: SeoSitemapSett
                 <span className="text-sm font-semibold text-ink-950">Yalnız opt-in ofisler (önerilen)</span>
                 <Switch name="onlyOptIn" defaultChecked={value.onlyOptIn} aria-label="Yalnız opt-in ofisler" />
               </label>
-              <FormField label="Opt-in ofis slug listesi" htmlFor="optInTenantSlugs" hint="Satır başına bir slug (örn. demo-ofis). Ofis sahibinin onayı olmadan eklemeyin.">
+              <FormField label="Opt-in ofis slug listesi" htmlFor="optInTenantSlugs" hint="YEDEK liste: ofis ayarındaki \"vitrinim aramalarda görünsün\" onayı (Ayarlar, Vitrin) asıl kaynaktır; veritabanı güncellemesi uygulanana kadar yalnız bu liste geçerlidir. Satır başına bir slug; ofis sahibinin onayı olmadan eklemeyin.">
                 <FormTextarea id="optInTenantSlugs" name="optInTenantSlugs" rows={4} defaultValue={value.optInTenantSlugs.join("\n")} />
               </FormField>
               <FormField label="Parça başına en çok URL" htmlFor="maxUrlsPerSitemap" hint="1.000 - 50.000. Aşılırsa sitemap indeksi ve /sitemap/1.xml, /sitemap/2.xml parçaları otomatik oluşur.">
