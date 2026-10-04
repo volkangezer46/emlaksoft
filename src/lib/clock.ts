@@ -187,3 +187,13 @@ export function trMonthStartMsFromKey(key: string): number {
   if (!m || Number(m[2]) < 1 || Number(m[2]) > 12) return Number.NaN;
   return Date.UTC(Number(m[1]), Number(m[2]) - 1, 1) - TR_OFFSET_MS;
 }
+
+/** Bir sonraki TR ayının başlangıcı (epoch ms) — kota penceresi üst sınırı (hariç). */
+export function trNextMonthStartMs(value: DateInput = Date.now()): number {
+  return trMonthStartMs(value, 1);
+}
+
+/** Bir sonraki TR ayının başlangıcının ISO karşılığı — `lt` filtreleri için. */
+export function trNextMonthStartIso(value: DateInput = Date.now()): string {
+  return new Date(trNextMonthStartMs(value)).toISOString();
+}

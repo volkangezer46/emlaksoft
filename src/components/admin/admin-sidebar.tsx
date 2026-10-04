@@ -97,6 +97,7 @@ const SECTIONS: { id: string; title: string | null; items: Item[] }[] = [
     items: [
       { href: "/admin/danisman", label: "Yapay zeka danışmanı", icon: Sparkles, hint: "Verilerden içgörü", module: "advisor" },
       { href: "/admin/raporlar", label: "Raporlar", icon: BarChart3, hint: "Platform analizi", module: "reports" },
+      { href: "/admin/ai-kullanim", label: "AI kullanımı", icon: Sparkles, hint: "Kredi ve rapor kotası", module: "billing" },
       { href: "/admin/aktivite", label: "Aktivite kaydı", icon: Activity, hint: "Denetim izi", module: "activity" },
     ],
   },

@@ -68,6 +68,7 @@ const cards: SettingCard[] = [
   { title: "Aday yakalama", desc: "Web formu/bağlantı, sırayla atama ve hızlı yanıt.", icon: Radio, tone: "bg-mint-500/12 text-mint-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/lead" },
   { title: "Modüller", desc: "Kullanmadığınız alanları kapatın, menü sadeleşsin. Verileriniz silinmez.", icon: Layers, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/moduller" },
   { title: "Ofis vitrini", desc: "Vitrinde görünecek bölümler, tanıtım metni ve arama motorlarında görünme onayı.", icon: Globe, tone: "bg-cyan-400/12 text-cyan-500", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/vitrin" },
+  { title: "AI kullanımı", desc: "Aylık AI kredisi, kalan hak ve kimin ne kadar kullandığı.", icon: Sparkles, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/ai-kullanim" },
   { title: "Fotoğraf filigranı", desc: "İlan fotoğraflarına ofis logosu/adı otomatik basılsın — ilan çalınmasına karşı.", icon: Droplets, tone: "bg-cyan-400/12 text-cyan-500", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/filigran" },
 ];
 
@@ -75,7 +76,7 @@ export default async function SettingsPage() {
   const { tenantId, role, perms } = await requireModulePage("settings");
   const canEditSettings = (perms.settings ?? []).includes("edit");
   // Modüller kartı yalnız ofis sahibi ve genel müdür içindir.
-  const visibleCards = cards.filter((c) => c.href !== "/app/ayarlar/moduller" || canManageModules(role));
+  const visibleCards = cards.filter((c) => (c.href !== "/app/ayarlar/moduller" && c.href !== "/app/ayarlar/ai-kullanim") || canManageModules(role));
   const supabase = await createClient();
 
   const [user, { data: tenantRow }, notifPrefs, { count: consentCount }, { count: activeConsentCount }, { count: auditCount }, { data: netgsmRow }, { data: whatsappRow }, netgsmPlatformConfigured] = await Promise.all([
