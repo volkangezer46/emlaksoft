@@ -13,6 +13,7 @@ import {
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { PrintButton } from "@/components/ui/print-button";
 import { ShareButton } from "./share-button";
+import { ValuationManage } from "./valuation-manage";
 
 export const metadata = { title: "Değerleme raporu" };
 
@@ -55,7 +56,9 @@ export default async function ValuationReportPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { tenantId } = await requireModulePage("valuation", "/app/degerleme");
+  const { tenantId, perms } = await requireModulePage("valuation", "/app/degerleme");
+  const canEdit = (perms.valuation ?? []).includes("edit");
+  const canDelete = (perms.valuation ?? []).includes("delete");
   const { id } = await params;
   const supabase = await createClient();
 
@@ -183,6 +186,14 @@ export default async function ValuationReportPage({
             )}
             <ShareButton valuationId={valuation.id} title={valuation.title} />
             <PrintButton tone="light" />
+            <ValuationManage
+              valuationId={valuation.id}
+              title={valuation.title}
+              notes={valuation.notes ?? null}
+              shared={Boolean(valuation.shared_at)}
+              canEdit={canEdit}
+              canDelete={canDelete}
+            />
           </>
         }
       />
