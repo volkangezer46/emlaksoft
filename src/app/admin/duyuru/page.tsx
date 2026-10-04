@@ -2,7 +2,9 @@ import Link from "next/link";
 import { Bell, History, Megaphone, Send } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
+import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { BroadcastForm } from "./broadcast-form";
+import { BroadcastRow } from "./broadcast-row";
 import { KIND_OPTIONS } from "./broadcast-options";
 
 const audienceLabel: Record<string, string> = {
@@ -15,6 +17,7 @@ const audienceLabel: Record<string, string> = {
 type AnnouncementRow = {
   id: string;
   title: string;
+  body: string | null;
   kind: string;
   audience: string;
   tenant_id: string | null;
@@ -28,9 +31,12 @@ function tenantNameOf(v: AnnouncementRow["tenant"]) {
   return (Array.isArray(v) ? v[0]?.name : v.name) ?? null;
 }
 
-export default async function BroadcastPage({ searchParams }: { searchParams: Promise<{ yeni?: string }> }) {
-  await requirePlatformModule("broadcast");
-  const { yeni } = await searchParams;
+export default async function BroadcastPage({ searchParams }: { searchParams: Promise<{ yeni?: string; sayfa?: string }> }) {
+  const staff = await requirePlatformModule("broadcast");
+  const canEdit = ["super_admin", "ops"].includes(staff.role);
+  const isSuperAdmin = staff.role === "super_admin";
+  const { yeni, sayfa } = await searchParams;
+  const page = parsePage(sayfa);
   const admin = createAdminClient();
 
   /*
@@ -42,7 +48,7 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
     { count: activeCount },
     { count: trialCount },
     { data: recentTenants },
-    { data: history },
+    { data: history, count: historyTotal },
   ] = await Promise.all([
     admin.from("tenants").select("id", { count: "exact", head: true }).neq("status", "cancelled"),
     admin.from("tenants").select("id", { count: "exact", head: true }).eq("status", "active"),
@@ -55,9 +61,9 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
       .limit(20),
     admin
       .from("platform_announcements")
-      .select("id, title, kind, audience, tenant_id, sent_count, created_at, tenant:tenants(name)")
+      .select("id, title, body, kind, audience, tenant_id, sent_count, created_at, tenant:tenants(name)", { count: "exact" })
       .order("created_at", { ascending: false })
-      .limit(20),
+      .range(...pageRange(page)),
   ]);
 
   const tenantOptions = (recentTenants ?? []).map((t) => ({
@@ -80,6 +86,8 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-6">
+      {/* Satır içi düzenleme paneli burada açılır; popup yok. */}
+      <div id="inline-panel-host" className="min-w-0 empty:hidden" />
       {/* Başlık */}
       <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
@@ -168,7 +176,7 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <History className="h-4 w-4 text-brand-600" /> Son duyurular
           </h2>
-          <span className="text-xs text-text-faint">Son {rows.length} gönderim</span>
+          <span className="text-xs text-text-faint">Toplam {historyTotal ?? 0} gönderim</span>
         </div>
         {rows.length === 0 ? (
           <p className="px-5 py-10 text-center text-sm text-text-muted">
@@ -176,40 +184,29 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
           </p>
         ) : (
           <div className="divide-y divide-line">
-            {rows.map((a) => {
-              const kindOpt = KIND_OPTIONS.find((k) => k.value === a.kind);
-              const tenantName = tenantNameOf(a.tenant);
-              return (
-                <div
-                  key={a.id}
-                  className="grid gap-2 px-5 py-3 transition hover:bg-brand-600/[0.02] sm:grid-cols-[1.4fr_1fr_auto_auto] sm:items-center"
-                >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${kindOpt?.cls ?? "bg-canvas text-text-muted"}`}>
-                      {kindOpt?.label ?? a.kind}
-                    </span>
-                    <p className="truncate text-sm font-semibold text-ink-950">{a.title}</p>
-                  </div>
-                  <p className="text-xs text-text-muted">
-                    {a.audience === "specific" && a.tenant_id ? (
-                      <Link href={`/admin/tenants/${a.tenant_id}`} className="font-semibold text-brand-600 transition hover:underline">
-                        {tenantName ?? "Belirli ofis"}
-                      </Link>
-                    ) : (
-                      (audienceLabel[a.audience] ?? a.audience)
-                    )}
-                  </p>
-                  <span className="numeric w-fit rounded-full bg-mint-500/10 px-2.5 py-1 text-xs font-bold text-mint-600">
-                    {a.sent_count} ofis
-                  </span>
-                  <p className="text-xs text-text-faint">
-                    {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(a.created_at))}
-                  </p>
-                </div>
-              );
-            })}
+            {rows.map((a) => (
+              <BroadcastRow
+                key={a.id}
+                canEdit={canEdit}
+                isSuperAdmin={isSuperAdmin}
+                row={{
+                  id: a.id,
+                  title: a.title,
+                  body: a.body,
+                  kind: a.kind,
+                  audienceLabel: audienceLabel[a.audience] ?? a.audience,
+                  tenantId: a.audience === "specific" ? a.tenant_id : null,
+                  tenantName: tenantNameOf(a.tenant),
+                  sentCount: a.sent_count,
+                  createdLabel: new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(a.created_at)),
+                }}
+              />
+            ))}
           </div>
         )}
+        <div className="px-5 pb-4">
+          <Pagination page={page} total={historyTotal ?? 0} hrefFor={(p) => (p > 1 ? `/admin/duyuru?sayfa=${p}` : "/admin/duyuru")} />
+        </div>
       </section>
     </div>
   );
