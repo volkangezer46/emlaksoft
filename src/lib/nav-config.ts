@@ -253,7 +253,18 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       { href: "/app/uyum", label: "Uyum", icon: ICONS.uyum, module: "compliance", tier: "more" },
       { href: "/app/belgeler", label: "Belge Merkezi", icon: ICONS.belge, module: "settings", tier: "more" },
-      { href: "/app/denetim", label: "Denetim", icon: ICONS.denetim, module: "settings", tier: "more" },
+      {
+        // Denetim kaydı + Ofis Kontrol Merkezi (danışman işlem akışı, uyarılar, onay kuralları) tek menü öğesi.
+        href: "/app/denetim",
+        label: "Denetim",
+        icon: ICONS.denetim,
+        module: "settings",
+        tabs: [
+          { href: "/app/denetim", label: "Denetim kaydı", icon: ICONS.denetim, module: "settings" },
+          { href: "/app/ofis-kontrol", label: "Ofis Kontrol", icon: ICONS.denetim, module: "team" },
+        ],
+        tier: "more",
+      },
       { href: "/app/abonelik", label: "Abonelik ve paket", icon: ICONS.abonelik, module: "billing", tier: "core" },
       {
         // Yardım ve Destek: tek menü öğesi; yardım merkezi + mevcut destek talepleri sekme.
