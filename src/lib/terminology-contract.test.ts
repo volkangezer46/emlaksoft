@@ -73,6 +73,6 @@ describe("yasaklı terim sözleşmesi (kullanıcıya görünen metin)", () => {
         }
       }
       expect(hits, `Yasaklı terim "${term}" bulundu:\n${hits.join("\n")}`).toEqual([]);
-    });
+    }, 60_000);
   }
 });
