@@ -338,7 +338,9 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
   color: var(--text);
   text-decoration: none;
 }
-.pm-row:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+/* Satır hover/basılı zemini rol token'ından (tokens.css). */
+.pm-row:hover { background: var(--surface-hover); }
+.pm-row:active { background: var(--surface-pressed); }
 .pm-row-ico { display: grid; place-items: center; width: 2rem; height: 2rem; flex: none; border-radius: var(--radius-control); background: var(--t-soft); color: var(--t-text); }
 .pm-row-ico svg { width: 1rem; height: 1rem; }
 .pm-empty { display: grid; place-items: center; gap: 0.5rem; padding: 1.25rem 0.5rem; text-align: center; color: var(--text-muted); font-size: 0.875rem; }

@@ -448,7 +448,7 @@ export function TabbedFormShell({
                 <button
                   type="button"
                   onClick={() => goToTab(m.tab.id, m.name)}
-                  className="focus-ring flex min-h-8 w-full items-center gap-2 rounded-[var(--radius-control)] px-2 text-left text-xs text-text-muted transition-colors duration-150 hover:bg-canvas hover:text-ink-950"
+                  className="focus-ring flex min-h-8 w-full items-center gap-2 rounded-[var(--radius-control)] px-2 text-left text-xs text-text-muted transition-colors duration-150 hover:bg-surface-hover hover:text-ink-950"
                 >
                   <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-warning-strong" />
                   <span className="min-w-0 flex-1 truncate">{m.label}</span>
@@ -624,7 +624,7 @@ export function TabbedFormShell({
                     aria-expanded={sideOpen}
                     aria-label={sideOpen ? "Özet panelini daralt" : "Özet panelini genişlet"}
                     title={sideOpen ? "Daralt" : "Özet ve önizleme"}
-                    className="focus-ring grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition-colors duration-150 hover:bg-canvas hover:text-ink-950"
+                    className="focus-ring grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition-colors duration-150 hover:bg-surface-hover hover:text-ink-950 active:bg-surface-pressed"
                   >
                     {sideOpen ? <PanelRightClose aria-hidden="true" className="h-4 w-4" /> : <PanelRightOpen aria-hidden="true" className="h-4 w-4" />}
                   </button>
@@ -720,7 +720,7 @@ export function SummaryRow({
       <button
         type="button"
         onClick={() => shell.goToTab(tab, field)}
-        className="focus-ring flex min-h-8 w-full items-baseline gap-3 rounded-[var(--radius-control)] px-2 py-1 text-left text-xs transition-colors duration-150 hover:bg-canvas"
+        className="focus-ring flex min-h-8 w-full items-baseline gap-3 rounded-[var(--radius-control)] px-2 py-1 text-left text-xs transition-colors duration-150 hover:bg-surface-hover"
       >
         {inner}
       </button>

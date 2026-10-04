@@ -1,7 +1,8 @@
 /* ============================================================================
    EmlakSoft — VURGU TEMALARI (yalnız /app ve /admin)
    ----------------------------------------------------------------------------
-   Seçim: <html data-accent="emerald|indigo|amber|graphite"> (+ data-theme="dark").
+   Seçim: <html data-accent="emerald|indigo|amber|graphite|gold|burgundy|petrol|olive">
+   (+ data-theme="dark").
    "ocean" varsayılandır ve öznitelik gerektirmez (tokens.css değerleri).
    Öznitelikleri ThemeController yönetir; ilk boyamada satır içi script
    (THEME_BOOT_SCRIPT) uygular. Public vitrin/portallar bu attribute'ları
@@ -11,14 +12,21 @@
    --accent-subtle, --accent-text, --info-*, gradyanlar zaten bu ölçeğe bağlı;
    bileşenlerde değişiklik gerekmez.
 
-     --brand-600  DOLGU  (düğme/aktif öğe) — üzerinde beyaz yazı ≥ 4.5:1
+     --brand-600  DOLGU  (düğme/aktif öğe) — üzerinde beyaz yazı ≥ 4.5:1 ve
+                                              yüzeylere karşı ≥ 3:1 (UI bileşen kenarı)
      --brand-700  METİN  (bağlantı/ikon)   — açıkta beyaz zeminde ≥ 4.5:1,
                                               koyuda --surface üzerinde ≥ 4.5:1
      --brand-500/400/300/50  yardımcı tonlar (hover, gradyan, yumuşak zemin)
 
-   Kontrast değerleri src/lib/design-tokens-contract.test.ts içinde hesaplanır
-   ve korunur; paleti değiştirirsen o test kırılır. Değerler: lib/theme.ts ACCENTS
+   Kontrast değerleri src/lib/theme-contrast.test.ts (9 temanın oran tablosu) ve
+   src/lib/design-tokens-contract.test.ts içinde CSS'ten okunup hesaplanır ve
+   korunur; paleti değiştirirsen o testler kırılır. Değerler: lib/theme.ts ACCENTS
    tablosuyla senkron kalmalı (örnek kart renkleri).
+
+   Koyuda dolgu penceresi: beyaz yazı ≥ 4.5:1 VE en açık koyu yüzey
+   (--surface-raised #15213a) üzerinde ≥ 3:1 → beyaz/dolgu oranı 4.5 ile 5.34
+   arasında olmalı. Açık temadaki dolgu bu pencerenin dışındaysa koyu blokta
+   --brand-600 ayrıca verilir (zümrüt, indigo, grafit, bordo, petrol, zeytin).
    ========================================================================== */
 
 /* ---- Zümrüt ---------------------------------------------------------------- */
@@ -31,6 +39,9 @@ html[data-accent="emerald"] {
   --brand-50: #ecfdf5;
 }
 html[data-theme="dark"][data-accent="emerald"] {
+  /* Açık dolgu #047857 koyu kartta (--surface-raised) 2.92:1 kalıyordu; bir kademe
+     açıldı (beyaz yazı 5.07:1, yüzey 3.42:1, kart 3.16:1). */
+  --brand-600: #047e5b;
   --brand-700: #34d399;
   --brand-50: rgba(16, 185, 129, 0.14);
 }
@@ -45,6 +56,9 @@ html[data-accent="indigo"] {
   --brand-50: #eef0ff;
 }
 html[data-theme="dark"][data-accent="indigo"] {
+  /* Açık dolgu #4350d6 koyu yüzeyde 2.78:1 ile UI eşiğinin (3:1) altındaydı; açıldı
+     (beyaz yazı 5.10:1, yüzey 3.41:1, kart 3.14:1). */
+  --brand-600: #5661da;
   --brand-700: #a5b4fc;
   --brand-50: rgba(99, 102, 241, 0.16);
 }
@@ -95,6 +109,65 @@ html[data-accent="gold"] {
 html[data-theme="dark"][data-accent="gold"] {
   --brand-700: #f0c36a;
   --brand-50: rgba(212, 162, 76, 0.16);
+}
+
+/* ---- Bordo-Krem (prestij / sıcak güven) --------------------------------------
+   Açık: dolgu #9b1c3a üstünde beyaz 8.01:1, metin #7f1530 beyazda 10.23:1; yumuşak
+   zemin krem (#fbf1e8). Koyu: dolgu #cc3555 (beyaz 4.99:1, yüzey 3.48:1), hover
+   #cf415f (beyaz 4.59:1), metin açık gül (#f08ba0, yüzeyde 7.36:1).
+   Not: --danger (kırmızı) ile yakın ton; durum rozetlerinde ikon + metin şart. */
+html[data-accent="burgundy"] {
+  --brand-700: #7f1530;
+  --brand-600: #9b1c3a;
+  --brand-500: #b02a4c;
+  --brand-400: #c8506d;
+  --brand-300: #e8a3b3;
+  --brand-50: #fbf1e8;
+}
+html[data-theme="dark"][data-accent="burgundy"] {
+  --brand-600: #cc3555;
+  --brand-500: #cf415f;
+  --brand-700: #f08ba0;
+  --brand-50: rgba(192, 49, 79, 0.16);
+}
+
+/* ---- Petrol (deniz yeşili, sakin ve kurumsal) --------------------------------
+   Açık: dolgu #0f766e üstünde beyaz 5.47:1, metin #0b5c56 beyazda 7.84:1.
+   Koyu: dolgu #107d74 (beyaz 4.99:1, yüzey 3.48:1), hover #11837b (beyaz 4.61:1),
+   metin #5eead4 (yüzeyde 11.74:1). */
+html[data-accent="petrol"] {
+  --brand-700: #0b5c56;
+  --brand-600: #0f766e;
+  --brand-500: #14918a;
+  --brand-400: #2fb3a8;
+  --brand-300: #8fe0d6;
+  --brand-50: #effaf8;
+}
+html[data-theme="dark"][data-accent="petrol"] {
+  --brand-600: #107d74;
+  --brand-500: #11837b;
+  --brand-700: #5eead4;
+  --brand-50: rgba(20, 184, 166, 0.14);
+}
+
+/* ---- Zeytin (doğal; toprak ve arsa/arazi çağrışımı) --------------------------
+   Açık: dolgu #566b1f üstünde beyaz 5.97:1, metin #435516 beyazda 8.24:1.
+   Koyu: dolgu #5f781d (beyaz 5.01:1; araştırmadaki #65801f 4.51:1 ile sınırdaydı),
+   yüzey 3.47:1, hover #647e1f (beyaz 4.62:1), metin #bfd86b (yüzeyde 10.96:1).
+   Not: --success (mint) ile yakın ton; durum rozetlerinde ikon + metin şart. */
+html[data-accent="olive"] {
+  --brand-700: #435516;
+  --brand-600: #566b1f;
+  --brand-500: #6b8226;
+  --brand-400: #8aa337;
+  --brand-300: #c5d98a;
+  --brand-50: #f5f8e8;
+}
+html[data-theme="dark"][data-accent="olive"] {
+  --brand-600: #5f781d;
+  --brand-500: #647e1f;
+  --brand-700: #bfd86b;
+  --brand-50: rgba(138, 163, 55, 0.16);
 }
 
 /* ---- Vurgu geçişi: yalnız renk, 150ms; hareket azaltmada anında ------------- */

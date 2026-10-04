@@ -189,8 +189,9 @@
 .mk-float {
   position: absolute; z-index: 4; display: flex; align-items: center; gap: 0.7em; padding: 0.7em 1em 0.7em 0.7em; border-radius: 1.1em;
   font-size: max(11px, 1.85cqw); line-height: 1.25; color: var(--mk-ink);
-  background: rgba(255, 255, 255, 0.78); border: 1px solid rgba(255, 255, 255, 0.9);
-  -webkit-backdrop-filter: blur(14px) saturate(1.5); backdrop-filter: blur(14px) saturate(1.5);
+  /* Cam bütçesi: sürekli hareket eden (mk-bob) üç rozet her karede yeniden bulanıklaştırılıyordu;
+     cam kaldırıldı, zemin opaklaştırıldı (0.78 -> 0.94). Ana sayfada cam: üst bar + portal şeridi. */
+  background: rgba(255, 255, 255, 0.94); border: 1px solid rgba(255, 255, 255, 0.9);
   box-shadow: 0 1.4em 2.6em rgba(16, 40, 110, 0.22), 0 0 0 1px rgba(29, 92, 255, 0.06);
   animation: mk-bob 6s ease-in-out infinite;
 }
@@ -257,6 +258,18 @@
 @keyframes mk-dash { to { stroke-dashoffset: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .mk *, .mk *::before, .mk *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* ---- Cam yüzey yedekleri (docs/DESIGN_SYSTEM.md "Cam yüzey bütçesi") ----
+   Bu sayfada cam yalnız sabit üst bar (.mk-nav::before) ve tek vurgu yüzeyi (.mk-portals).
+   backdrop-filter yoksa ya da kullanıcı saydamlığı/kontrastı kısıtladıysa ikisi de opak. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .mk-nav::before, .mk-portals { background: #ffffff; }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .mk-nav::before, .mk-portals { background: #ffffff; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .mk-nav::before { border-bottom-color: var(--mk-line); }
+  .mk-float { background: #ffffff; }
 }
 
 @media (max-width: 479px) {

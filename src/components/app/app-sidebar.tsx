@@ -460,7 +460,8 @@ export function AppSidebar({
       </DialogDrawerContent>
       <nav
         aria-label="Mobil hızlı gezinme"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-line/70 bg-surface/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
+        // Cam bütçesi: alt çubuk opak (cam yalnız sabit ÜST çubukta; mobil kaydırmada bulanıklık pahalı).
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line/70 bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
         <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1 + (showQuickNew ? 1 : 0)}, minmax(0, 1fr))` }}>
           {tabItems.map((tab) => {

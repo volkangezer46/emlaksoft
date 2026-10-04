@@ -39,7 +39,7 @@ export function BulkBar({
         type="button"
         onClick={onClear}
         aria-label="Seçimi temizle"
-        className="focus-ring ml-auto grid h-8 w-8 touch:h-11 touch:w-11 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-canvas hover:text-text"
+        className="focus-ring ml-auto grid h-8 w-8 touch:h-11 touch:w-11 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-surface-hover hover:text-text active:bg-surface-pressed"
       >
         <X aria-hidden="true" className="h-4 w-4" />
       </button>
