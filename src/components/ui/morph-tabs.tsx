@@ -194,7 +194,7 @@ export function MorphTabs({
             aria-expanded={!collapsed}
             aria-label={collapsed ? "Bölümler panelini genişlet" : "Bölümler panelini daralt"}
             title={collapsed ? "Genişlet" : "Daralt"}
-            className="focus-ring grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition-colors duration-150 hover:bg-surface-hover hover:text-ink-950 active:bg-surface-pressed"
+            className="focus-ring grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition-colors duration-(--motion-fast) hover:bg-surface-hover hover:text-ink-950 active:bg-surface-pressed"
           >
             {collapsed ? <PanelLeftOpen aria-hidden="true" className="h-4 w-4" /> : <PanelLeftClose aria-hidden="true" className="h-4 w-4" />}
           </button>

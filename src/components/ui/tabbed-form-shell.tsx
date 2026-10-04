@@ -401,7 +401,7 @@ export function TabbedFormShell({
             className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-canvas"
           >
             <div
-              className="h-full rounded-full bg-brand-600 transition-[width] duration-150 motion-reduce:transition-none"
+              className="h-full rounded-full bg-brand-600 transition-[width] duration-(--motion-fast) motion-reduce:transition-none"
               style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }}
             />
           </div>
@@ -409,10 +409,10 @@ export function TabbedFormShell({
       ) : null}
       {summaryNode ? <div className="space-y-3">{summaryNode}</div> : null}
       {tabs.some((t) => t.fields.some((f) => fieldInfo[f])) ? (
-        <details className="group rounded-[var(--radius-control)] border border-line bg-canvas/40 p-2">
+        <details className="motion-details group rounded-[var(--radius-control)] border border-line bg-canvas/40 p-2">
           <summary className="focus-ring flex min-h-8 cursor-pointer list-none items-center gap-2 rounded-[var(--radius-control)] px-2 text-xs font-semibold text-ink-950">
             Girilen bilgiler
-            <ChevronRight aria-hidden="true" className="ml-auto h-3.5 w-3.5 text-text-faint transition-transform duration-150 group-open:rotate-90 motion-reduce:transition-none" />
+            <ChevronRight aria-hidden="true" className="ml-auto h-3.5 w-3.5 text-text-faint transition-transform duration-(--motion-fast) group-open:rotate-90 motion-reduce:transition-none" />
           </summary>
           <div className="mt-2 space-y-3">
           {tabs.map((t) => {
@@ -448,7 +448,7 @@ export function TabbedFormShell({
                 <button
                   type="button"
                   onClick={() => goToTab(m.tab.id, m.name)}
-                  className="focus-ring flex min-h-8 w-full items-center gap-2 rounded-[var(--radius-control)] px-2 text-left text-xs text-text-muted transition-colors duration-150 hover:bg-surface-hover hover:text-ink-950"
+                  className="focus-ring flex min-h-8 w-full items-center gap-2 rounded-[var(--radius-control)] px-2 text-left text-xs text-text-muted transition-colors duration-(--motion-fast) hover:bg-surface-hover hover:text-ink-950"
                 >
                   <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-warning-strong" />
                   <span className="min-w-0 flex-1 truncate">{m.label}</span>
@@ -593,7 +593,7 @@ export function TabbedFormShell({
                 >
                   <summary className="focus-ring flex cursor-pointer list-none items-center gap-2 rounded-[var(--radius-control)] font-semibold text-ink-950">
                     <Sparkles aria-hidden="true" className="h-4 w-4 text-brand-600" /> Özet ve önizleme
-                    <ChevronRight aria-hidden="true" className="ml-auto h-4 w-4 text-text-faint transition-transform duration-150 group-open:rotate-90 motion-reduce:transition-none" />
+                    <ChevronRight aria-hidden="true" className="ml-auto h-4 w-4 text-text-faint transition-transform duration-(--motion-fast) group-open:rotate-90 motion-reduce:transition-none" />
                   </summary>
                   <div className="mt-3">{summaryBody}</div>
                 </details>
@@ -624,7 +624,7 @@ export function TabbedFormShell({
                     aria-expanded={sideOpen}
                     aria-label={sideOpen ? "Özet panelini daralt" : "Özet panelini genişlet"}
                     title={sideOpen ? "Daralt" : "Özet ve önizleme"}
-                    className="focus-ring grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition-colors duration-150 hover:bg-surface-hover hover:text-ink-950 active:bg-surface-pressed"
+                    className="focus-ring grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition-colors duration-(--motion-fast) hover:bg-surface-hover hover:text-ink-950 active:bg-surface-pressed"
                   >
                     {sideOpen ? <PanelRightClose aria-hidden="true" className="h-4 w-4" /> : <PanelRightOpen aria-hidden="true" className="h-4 w-4" />}
                   </button>
@@ -720,7 +720,7 @@ export function SummaryRow({
       <button
         type="button"
         onClick={() => shell.goToTab(tab, field)}
-        className="focus-ring flex min-h-8 w-full items-baseline gap-3 rounded-[var(--radius-control)] px-2 py-1 text-left text-xs transition-colors duration-150 hover:bg-surface-hover"
+        className="focus-ring flex min-h-8 w-full items-baseline gap-3 rounded-[var(--radius-control)] px-2 py-1 text-left text-xs transition-colors duration-(--motion-fast) hover:bg-surface-hover"
       >
         {inner}
       </button>
@@ -753,11 +753,11 @@ export function CollapsibleSummaryGroup({
   children: ReactNode;
 }) {
   return (
-    <details open={defaultOpen || undefined} className="group rounded-[var(--radius-control)] border border-line bg-canvas/60 p-2">
+    <details open={defaultOpen || undefined} className="motion-details group rounded-[var(--radius-control)] border border-line bg-canvas/60 p-2">
       <summary className="focus-ring flex min-h-8 cursor-pointer list-none items-center gap-2 rounded-[var(--radius-control)] px-2 text-xs">
         <span className="shrink-0 font-semibold text-ink-950">{title}</span>
         {brief ? <span className="min-w-0 flex-1 truncate text-right text-text-muted group-open:hidden" title={brief}>{brief}</span> : <span className="flex-1" />}
-        <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-text-faint transition-transform duration-150 group-open:rotate-90 motion-reduce:transition-none" />
+        <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-text-faint transition-transform duration-(--motion-fast) group-open:rotate-90 motion-reduce:transition-none" />
       </summary>
       <div className="mt-1 space-y-3">{children}</div>
     </details>

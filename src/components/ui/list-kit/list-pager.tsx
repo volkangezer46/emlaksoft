@@ -33,7 +33,7 @@ export function ListPager({
       <div className="flex items-center gap-1.5">
         {w.hasPrev ? (
           <Link href={pageHrefOf(pathname, params, w.page - 1)} className={BTN}>
-            <ChevronLeft aria-hidden="true" className="h-4 w-4" /> Önceki
+            <ChevronLeft aria-hidden="true" className="icon-nudge-back h-4 w-4" /> Önceki
           </Link>
         ) : (
           <span className={BTN_OFF} aria-disabled="true">
@@ -45,7 +45,7 @@ export function ListPager({
         </span>
         {w.hasNext ? (
           <Link href={pageHrefOf(pathname, params, w.page + 1)} className={BTN}>
-            Sonraki <ChevronRight aria-hidden="true" className="h-4 w-4" />
+            Sonraki <ChevronRight aria-hidden="true" className="icon-nudge h-4 w-4" />
           </Link>
         ) : (
           <span className={BTN_OFF} aria-disabled="true">

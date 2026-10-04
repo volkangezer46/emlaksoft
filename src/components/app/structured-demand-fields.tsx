@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { GeoSelect } from "@/components/app/geo-select";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
+import { useAutoAnimate } from "@/components/ui/auto-animate";
 import { FACADE_OPTIONS, HEATING_OPTIONS } from "@/app/app/portfoyler/yeni/property-options";
 import {
   CRITERIA_LABELS,
@@ -73,6 +74,8 @@ let extraRowSeq = 0;
 
 function ExtraLocations({ provinces }: { provinces: Province[] }) {
   const [rows, setRows] = useState<Array<{ key: number } & Record<keyof DemandLocation, string>>>([]);
+  // Ek bölge satırı eklenince/kaldırılınca yumuşak geçiş (key = satır sıra numarası).
+  const rowsRef = useAutoAnimate<HTMLDivElement>();
   const payload = JSON.stringify(
     rows.map((r) => ({
       province_id: r.province_id || null,
@@ -81,7 +84,7 @@ function ExtraLocations({ provinces }: { provinces: Province[] }) {
     })),
   );
   return (
-    <div className="space-y-3">
+    <div ref={rowsRef} className="space-y-3">
       <input type="hidden" name="extra_locations" value={rows.length ? payload : ""} readOnly />
       {rows.map((row, i) => (
         <div key={row.key} className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">

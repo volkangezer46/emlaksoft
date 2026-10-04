@@ -1,37 +1,102 @@
 /* ============================================================================
-   EmlakSoft — HAREKET SİSTEMİ (tek dosya). Kılavuz: docs/DESIGN_SYSTEM.md
+   EmlakSoft — HAREKET SİSTEMİ (tek dosya, TEK KAYNAK). Kılavuz: docs/DESIGN_SYSTEM.md
    "Hareket ve illüstrasyon".
    Bütçe: yalnız transform / opacity (+ SVG stroke-dashoffset); CLS yok; ipucu
    kullanılmaz. Her hareket `prefers-reduced-motion: no-preference` içindedir —
    reduce'ta içerik doğrudan bitiş durumunda durağan görünür.
+   Tek istisna: `.motion-details` (kullanıcı tıklamasıyla açılan <details> yüksekliği;
+   yalnız `interpolate-size` destekleyen tarayıcıda, kullanıcı girdisi sonrası).
    ========================================================================== */
 
 :root {
-  --motion-fast: 120ms;
-  --motion-base: 200ms;
-  --motion-slow: 360ms;
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  /* ---- Süre standardı: kontrol / panel / sayfa ---- */
+  --motion-fast: 140ms; /* kontrol: düğme, çip, anahtar, hover (120–150) */
+  --motion-base: 220ms; /* panel: açılır panel, diyalog, sekme içeriği (200–240) */
+  --motion-slow: 320ms; /* sayfa/bölüm girişi, liste girişi */
+  /* Çıkış girişten ~%30 kısa: giden içerik dikkat çekmeden hızlı çekilir. */
+  --motion-exit-fast: 100ms;
+  --motion-exit-base: 150ms;
+  --motion-exit-slow: 220ms;
+  /* Gezinme cross-fade'i: eski/yeni sayfa aynı sürede (eşit süre = parlaklık çukuru yok). */
+  --motion-nav: var(--motion-exit-base);
   --motion-stagger: 40ms;
+
+  /* ---- Easing ---- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  /* Yay: `linear()` desteklenmiyorsa hafif taşmalı cubic-bezier yedeği. */
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* Eski adlar (globals.css v2 katmanı) — yeni kod --motion-* kullanır. */
+  --dur-1: var(--motion-fast);
+  --dur-2: var(--motion-base);
+  --dur-3: var(--motion-base);
+  --dur-4: var(--motion-slow);
+
+  /* Tailwind `transition*` yardımcılarının varsayılanı da standarda bağlıdır. */
+  --default-transition-duration: var(--motion-fast);
+  --default-transition-timing-function: var(--ease-out);
+}
+
+/* Sönümlü yay (ζ≈0.65, ~%7 taşma): düğme bırakma, anahtar topuzu, sekme göstergesi. */
+@supports (animation-timing-function: linear(0, 1)) {
+  :root {
+    --ease-spring: linear(
+      0, 0.062 4%, 0.206 8%, 0.384 12%, 0.563 16%, 0.721 20%, 0.849 24%, 0.944 28%, 1.008 32%,
+      1.046 36%, 1.064 40%, 1.067 45%, 1.057 50%, 1.04 56%, 1.022 62%, 1.006 70%, 0.997 80%, 0.996 90%, 1
+    );
+  }
 }
 
 /* ---- Kart hover yükselme + düğme basma ---- */
 .hover-lift {
-  transition: transform var(--motion-base) var(--ease-out), box-shadow var(--motion-base) var(--ease-out);
+  transition:
+    transform var(--motion-base) var(--ease-out),
+    box-shadow var(--motion-base) var(--ease-out),
+    border-color var(--motion-base) var(--ease-out),
+    background-color var(--motion-fast) var(--ease-out);
 }
-.btn-press { transition: transform var(--motion-fast) var(--ease-out); }
-.btn-press:active { transform: scale(0.97); }
+.btn-press { transition: transform var(--motion-base) var(--ease-spring); }
+.btn-press:active {
+  transform: scale(0.97);
+  transition-duration: var(--motion-exit-fast);
+  transition-timing-function: var(--ease-out);
+}
+
+/* İskelet: taban rengi + (hareket serbestse) kayan parlama. Tek tanım burada. */
+.skeleton {
+  --skeleton-shine: rgba(255, 255, 255, 0.72);
+  background-color: color-mix(in srgb, var(--ink-950) 7%, #ffffff);
+}
+/* Yapısal kurallar `base` katmanında: `absolute` gibi yardımcı sınıflar bunları ezebilir. */
+@layer base {
+  .skeleton { position: relative; overflow: hidden; }
+  /* Odak halkası: `transition` yardımcısı olmayan öğelerde de halka yumuşak belirir. */
+  .focus-ring { transition: box-shadow var(--motion-fast) var(--ease-out); }
+  :where(a, button, summary, [tabindex]) { transition: outline-offset var(--motion-fast) var(--ease-out); }
+}
 
 @media (prefers-reduced-motion: no-preference) {
   @media (hover: hover) {
     .hover-lift:hover { transform: translateY(-2px); }
+    /* Yüzey kartında yükselme bir elevation adımıyla birlikte okunur. */
+    :is(.surface-card, .surface-card-flat).hover-lift:hover { box-shadow: var(--inner-top), var(--elev-3); }
+    /* Ok ikonları: üst etkileşimli öğe hover/odakta 2px ileri kayar. */
+    :is(a, button, summary, [role="button"]):is(:hover, :focus-visible) .icon-nudge { transform: translateX(2px); }
+    :is(a, button, summary, [role="button"]):is(:hover, :focus-visible) .icon-nudge-back { transform: translateX(-2px); }
   }
+  .icon-nudge, .icon-nudge-back { transition: transform var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out); }
 
-  /* ---- Liste giriş: 40 ms aralık, en çok 12 öğe (sonrası anında) ---- */
+  /* ---- Liste giriş: 40 ms aralık, en çok 12 öğe (sonrası anında) ----
+     `backwards`: animasyon bitince öğe kendi stiline döner; kalıcı yığın bağlamı
+     (açılır menülerin komşu kartın altında kalması) oluşmaz. */
   @keyframes list-in {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: none; }
   }
-  .list-stagger > * { animation: list-in var(--motion-slow) var(--ease-out) both; }
+  .list-stagger > * { animation: list-in var(--motion-slow) var(--ease-out) backwards; }
   .list-stagger > :nth-child(n + 13) { animation: none; }
   .list-stagger > :nth-child(2) { animation-delay: calc(var(--motion-stagger) * 1); }
   .list-stagger > :nth-child(3) { animation-delay: calc(var(--motion-stagger) * 2); }
@@ -44,6 +109,8 @@
   .list-stagger > :nth-child(10) { animation-delay: calc(var(--motion-stagger) * 9); }
   .list-stagger > :nth-child(11) { animation-delay: calc(var(--motion-stagger) * 10); }
   .list-stagger > :nth-child(12) { animation-delay: calc(var(--motion-stagger) * 11); }
+  /* TV modu hareketsizdir (DASHBOARD_SPEC). */
+  .tv-zoom .list-stagger > * { animation: none; }
 
   /* ---- İlerleme çubuğu dolumu (genişlik zaten doğru; yalnız ilk çizim) ---- */
   @keyframes progress-fill { from { transform: scaleX(0); } to { transform: none; } }
@@ -53,10 +120,67 @@
   @keyframes tick-draw { from { stroke-dashoffset: 40; } to { stroke-dashoffset: 0; } }
   .tick-draw { stroke-dasharray: 40; animation: tick-draw var(--motion-slow) var(--ease-out) 80ms both; }
 
-  /* ---- Sayfa geçişi: view transitions yoksa hafif fade (VT'de globals.css devralır) ---- */
-  @keyframes motion-fade { from { opacity: 0; } to { opacity: 1; } }
+  /* ---- Sayfa geçişi: view transitions yoksa hafif fade + 4px yükselme
+          (VT destekli tarayıcıda geçişi globals.css ::view-transition kuralları yürütür) ---- */
+  @keyframes motion-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
   @supports not (view-transition-name: root) {
-    .motion-page { animation: motion-fade var(--motion-base) var(--ease-out) both; }
+    .motion-page { animation: motion-fade var(--motion-nav) var(--ease-out) backwards; }
+  }
+
+  /* ---- Açılır panel / satır içi onay girişi: DOM'a girdiği anda yumuşak belirir.
+          `@starting-style` yoksa öğe bugünkü gibi anında görünür. ---- */
+  @supports (transition-behavior: allow-discrete) {
+    .motion-enter {
+      transition: opacity var(--motion-base) var(--ease-out), transform var(--motion-base) var(--ease-out);
+    }
+    @starting-style {
+      .motion-enter { opacity: 0; transform: translateY(-4px); }
+    }
+  }
+
+  /* ---- <details> açılma/kapanma yüksekliği (yalnız akış içi içerik; açılır-menü tipi
+          mutlak konumlu içerikte KULLANMA). Destek yoksa bugünkü anlık davranış. ---- */
+  @supports selector(::details-content) and (interpolate-size: allow-keywords) {
+    .motion-details { interpolate-size: allow-keywords; }
+    .motion-details::details-content {
+      block-size: 0;
+      opacity: 0;
+      overflow: clip;
+      overflow-clip-margin: 4px; /* odak halkası kırpılmasın */
+      transition-property: content-visibility, block-size, opacity;
+      transition-duration: var(--motion-exit-base);
+      transition-timing-function: var(--ease-out);
+      transition-behavior: allow-discrete;
+    }
+    .motion-details[open]::details-content {
+      block-size: auto;
+      opacity: 1;
+      transition-duration: var(--motion-base);
+    }
+  }
+
+  /* ---- Kaydırınca beliren bölüm: YALNIZ public sayfalar (landing, /fiyatlar).
+          /app ve /admin'de kullanılmaz. Destek yoksa içerik hep görünür. ---- */
+  @supports (animation-timeline: view()) {
+    @keyframes scroll-reveal-in {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: none; }
+    }
+    .scroll-reveal {
+      animation: scroll-reveal-in linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 35%;
+    }
+  }
+
+  /* ---- İskelet parlaması (transform; boyama yok) ---- */
+  @keyframes skeleton-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(90deg, transparent 0%, var(--skeleton-shine) 50%, transparent 100%);
+    animation: skeleton-sweep 1.4s linear infinite;
   }
 
   /* ---- İllüstrasyonlar ---- */
@@ -75,25 +199,50 @@
   .ill-draw.ill-d2 { animation-delay: 450ms; }
   .ill-check { animation-duration: 600ms; animation-delay: 250ms; }
 
-  /* ---- Kutlama konfetisi: CSS, 1.2 sn, bir kez ---- */
+  /* ---- Kutlama: disk + tik (Celebration `tick`) ve konfeti; CSS, bir kez ---- */
+  @keyframes celebrate-pop { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: none; } }
+  .celebrate-disc { animation: celebrate-pop 520ms var(--ease-spring) both; }
+  .celebrate .tick-draw { animation-delay: 280ms; }
+  .celebrate .confetti > i { animation-delay: 320ms; animation-fill-mode: forwards; }
+
   @keyframes confetti-burst {
     0% { opacity: 1; transform: translate(0, 0) rotate(0) scale(0.6); }
     100% { opacity: 0; transform: translate(var(--tx), var(--ty)) rotate(var(--rot)) scale(1); }
   }
-  .confetti { position: absolute; left: 50%; top: 40%; width: 0; height: 0; pointer-events: none; }
   .confetti > i {
-    --a: calc(var(--i) * 25.7deg);
-    --tx: calc(cos(var(--a)) * 96px);
-    --ty: calc(sin(var(--a)) * 72px + 24px);
-    --rot: calc(var(--i) * 70deg);
-    position: absolute; width: 7px; height: 11px; border-radius: 2px;
-    background: var(--brand-600);
     animation: confetti-burst 1.2s var(--ease-out) 1 both;
   }
-  .confetti > i:nth-child(3n + 1) { background: var(--mint-500); }
-  .confetti > i:nth-child(3n + 2) { background: var(--amber-400); }
 }
+
+/* Kutlama iskeleti (hareketten bağımsız yerleşim; reduce'ta durağan tik kalır). */
+.celebrate { position: relative; display: grid; place-items: center; width: 5.5rem; height: 5.5rem; }
+.celebrate-disc {
+  display: grid; place-items: center; width: 4rem; height: 4rem; border-radius: 9999px;
+  color: #fff; background: var(--mint-500);
+}
+.celebrate-disc[data-tone="neutral"] { background: var(--text-muted); }
+.confetti { position: absolute; left: 50%; top: 40%; width: 0; height: 0; pointer-events: none; }
+.celebrate .confetti { top: 50%; }
+.confetti > i {
+  --a: calc(var(--i) * 25.7deg);
+  --tx: calc(cos(var(--a)) * 96px);
+  --ty: calc(sin(var(--a)) * 72px + 24px);
+  --rot: calc(var(--i) * 70deg);
+  position: absolute; width: 7px; height: 11px; border-radius: 2px;
+  background: var(--brand-600);
+  opacity: 0;
+}
+.confetti > i:nth-child(4n + 1) { background: var(--mint-500); }
+.confetti > i:nth-child(4n + 2) { background: var(--amber-400); }
+.confetti > i:nth-child(4n + 3) { background: var(--cyan-400); }
 
 @media (prefers-reduced-motion: reduce) {
   .confetti { display: none; }
+}
+
+/* Koyu temada yükselme gölgeyle değil kenarlık parlaklığıyla okunur. */
+html[data-theme="dark"] .hover-lift:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+html[data-theme="dark"] .skeleton {
+  --skeleton-shine: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.07);
 }

@@ -4,7 +4,7 @@ import { IntentLink } from "@/components/app/intent-link";
 import { OwnerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import type { CompareItem } from "@/components/public/compare-table";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { EntityThumb, RowActionLink, RowActions, StatusPill, type Density, type PillTone } from "@/components/ui/list-kit";
+import { EntityThumb, MobileCard, MobileCardList, RowActionLink, RowActions, StatusPill, type Density, type PillTone } from "@/components/ui/list-kit";
 import { PropertyRowCheckbox, PropertySelectAllCheckbox } from "./property-bulk-actions";
 import { PropertyRowCompare } from "./property-row-compare";
 
@@ -146,9 +146,9 @@ export function PropertyTable({
 /** <md: tablo yerine dokunmatik dostu kart listesi (yatay kaydırma yok). */
 export function PropertyMobileList({ rows }: { rows: PropertyVM[] }) {
   return (
-    <ul className="space-y-2.5 md:hidden">
+    <MobileCardList>
       {rows.map((p) => (
-        <li key={p.id} className="surface-card relative flex gap-3 rounded-[var(--radius-card)] p-3">
+        <MobileCard key={p.id} className="flex gap-3">
           <EntityThumb src={p.coverSrc} alt="" icon={Building2} className="h-16 w-20" />
           <div className="min-w-0 flex-1">
             <Link href={p.href} prefetch={false} className="focus-ring line-clamp-2 font-semibold text-text after:absolute after:inset-0">
@@ -163,8 +163,8 @@ export function PropertyMobileList({ rows }: { rows: PropertyVM[] }) {
               {p.health ? <StatusPill tone={p.health.tone}>Fiyat: {p.health.label}</StatusPill> : null}
             </div>
           </div>
-        </li>
+        </MobileCard>
       ))}
-    </ul>
+    </MobileCardList>
   );
 }

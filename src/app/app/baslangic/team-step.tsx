@@ -84,7 +84,7 @@ export function TeamStep({ canInvite, nextHref }: { canInvite: boolean; nextHref
             />
             {r.message ? (
               <p
-                className={`sm:col-span-2 flex items-center gap-1 text-xs font-semibold ${r.status === "ok" ? "text-mint-600" : "text-danger-500"}`}
+                className={`motion-enter sm:col-span-2 flex items-center gap-1 text-xs font-semibold ${r.status === "ok" ? "text-mint-600" : "text-danger-500"}`}
                 role="status"
               >
                 {r.status === "ok" ? <Check className="h-3.5 w-3.5" aria-hidden /> : null}

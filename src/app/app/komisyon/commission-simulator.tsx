@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { calculateCommission } from "@/lib/commission";
 import { CommissionCapNotice } from "@/components/app/commission-cap-notice";
+import { AnimatedNumber } from "@/components/ui/animated-number";
 
 const DONUT_C = 2 * Math.PI * 42;
 
@@ -147,14 +148,14 @@ export function CommissionSimulator() {
           <CommissionCapNotice kind="sale" amount={result.deal} commissionAmount={result.gross} />
           <div className="rounded-[var(--radius-card)] border border-brand-300/35 bg-brand-600/5 p-4">
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">Komisyon (KDV hariç)</p>
-            <p className="mt-1 font-display text-3xl font-extrabold tabular-nums text-ink-950">{money(result.gross)}</p>
+            <p className="mt-1 font-display text-3xl font-extrabold tabular-nums text-ink-950"><AnimatedNumber value={result.gross} kind="currency" /></p>
             <p className="mt-1 text-xs text-text-muted">
               {money(result.deal)} bedel üzerinden %{rate}
               {vatIncluded ? " · girilen tutar KDV dahil kabul edildi" : ""}
             </p>
             <p className="hairline-t mt-2.5 flex items-center justify-between pt-2.5 text-xs">
               <span className="text-text-muted">Müşteriden tahsil edilecek</span>
-              <span className="font-display text-sm font-extrabold tabular-nums text-ink-950">{money(calc.gross)}</span>
+              <span className="font-display text-sm font-extrabold tabular-nums text-ink-950"><AnimatedNumber value={calc.gross} kind="currency" /></span>
             </p>
           </div>
         </div>
@@ -188,7 +189,7 @@ export function CommissionSimulator() {
                 />
               </svg>
               <div className="relative grid h-24 w-24 place-items-center rounded-full bg-surface text-center shadow-[0_8px_24px_-10px_rgba(15,23,42,0.4)]">
-                <div><p className="text-xs text-text-faint">Dağıtılacak</p><p className="font-display text-base font-extrabold tabular-nums text-ink-950">{money(result.gross)}</p></div>
+                <div><p className="text-xs text-text-faint">Dağıtılacak</p><p className="font-display text-base font-extrabold tabular-nums text-ink-950"><AnimatedNumber value={result.gross} kind="currency" /></p></div>
               </div>
             </div>
             <div className="space-y-3">
@@ -199,7 +200,7 @@ export function CommissionSimulator() {
               ].map((item) => (
                 <div key={item.label} className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3">
                   <span className={`grid h-9 w-9 place-items-center rounded-[var(--radius-control)] ${item.bg} ${item.color}`}><item.icon className="h-4 w-4" /></span>
-                  <div className="min-w-0 flex-1"><p className="text-xs text-text-muted">{item.label}</p><p className="font-display text-base font-bold tabular-nums text-ink-950">{money(item.value)}</p></div>
+                  <div className="min-w-0 flex-1"><p className="text-xs text-text-muted">{item.label}</p><p className="font-display text-base font-bold tabular-nums text-ink-950"><AnimatedNumber value={item.value} kind="currency" /></p></div>
                 </div>
               ))}
             </div>
@@ -214,7 +215,7 @@ export function CommissionSimulator() {
                   Danışmanın eline geçen
                 </p>
                 <p className="mt-0.5 font-display text-2xl font-extrabold tabular-nums text-mint-600">
-                  {money(calc.advisorNet)}
+                  <AnimatedNumber value={calc.advisorNet} kind="currency" />
                 </p>
               </div>
               {calc.withholding > 0 ? (

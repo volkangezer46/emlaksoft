@@ -43,7 +43,7 @@ export function Bx({
           </div>
           {href ? (
             <Link href={href} className="focus-ring inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-control)] px-1 text-xs font-semibold text-accent-text transition-colors hover:text-text">
-              {hrefLabel} <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+              {hrefLabel} <ArrowUpRight className="icon-nudge h-3.5 w-3.5" aria-hidden />
             </Link>
           ) : null}
         </header>
