@@ -60,7 +60,18 @@ function dueInfo(due: string | null, done: boolean) {
   return { text: fmt, cls: "text-text-muted" };
 }
 
-export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit: boolean; canDelete: boolean }) {
+export function TaskCard({
+  task,
+  canEdit,
+  canDelete,
+  members,
+}: {
+  task: TaskRow;
+  canEdit: boolean;
+  canDelete: boolean;
+  /** Düzenleme panelindeki "Atanan" seçici için ofis üyeleri. */
+  members?: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const { push } = useToast();
   const [pending, startTransition] = useTransition();
@@ -136,7 +147,7 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
         // Müşterisiz/portföysüz görevde gidilecek kayıt yok — kartın kendisi
         // düzenleme diyaloğunu açar (overlay tetikleyicili ikinci diyalog örneği).
         <TaskEditDialog
-          task={{ id: task.id, title: task.title, notes: task.notes, kind: task.kind, priority: task.priority, due_at: task.due_at, recurrence: task.recurrence }}
+          task={{ id: task.id, title: task.title, notes: task.notes, kind: task.kind, priority: task.priority, due_at: task.due_at, recurrence: task.recurrence, assigned_to: task.assigned_to }} members={members}
           variant="overlay"
         />
       ) : null}
@@ -196,7 +207,7 @@ export function TaskCard({ task, canEdit, canDelete }: { task: TaskRow; canEdit:
 
       <div className="relative z-10 flex shrink-0 items-center gap-1.5">
         {canEdit && !done ? (
-          <TaskEditDialog task={{ id: task.id, title: task.title, notes: task.notes, kind: task.kind, priority: task.priority, due_at: task.due_at, recurrence: task.recurrence }} />
+          <TaskEditDialog task={{ id: task.id, title: task.title, notes: task.notes, kind: task.kind, priority: task.priority, due_at: task.due_at, recurrence: task.recurrence, assigned_to: task.assigned_to }} members={members} />
         ) : null}
         {canEdit ? (
           done ? (
