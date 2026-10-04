@@ -27,6 +27,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { TR_OFFSET_MS, trParts } from "@/lib/clock";
+import { loadSampleKpiScope, type SampleKpiScope } from "@/lib/sample-scope";
 import type { EffectivePermissions } from "@/lib/permissions-effective";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
@@ -139,6 +140,8 @@ export type AdvisorMetricsResult = {
   profileTotal: number | null;
   /** Temel sorgulardan biri hata verdi: sayılara güvenilmez. */
   failed: boolean;
+  /** Örnek veri rakamlara karışıyorsa "Örnek veri dahil" etiketi (aksi halde null). */
+  sampleLabel: string | null;
   /** Tarama tavanına dayanıldı: sayılar eksik olabilir. */
   partial: boolean;
   seeAllEarnings: boolean;
@@ -174,6 +177,8 @@ export type LoadAdvisorMetricsOptions = {
   nowMs: number;
   /** Pasif kişileri de listele (varsayılan: yalnız aktifler; `subjectIds` verilirse aktiflik aranmaz). */
   includeInactive?: boolean;
+  /** Örnek veri KPI kapsamı. Verilmezse `loadSampleKpiScope` ile yüklenir (tek karar noktası: lib/sample-scope). */
+  sample?: SampleKpiScope;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -187,6 +192,8 @@ export type CommissionFetchOptions = {
   startIso?: string;
   endIso?: string;
   limit?: number;
+  /** Verilirse örnek (is_sample) komisyonlar kapsama göre dışlanır; verilmezse süzülmez (cüzdan/hakediş gerçek kayıttır). */
+  sample?: SampleKpiScope;
   /** `deal:deals(...)` içindeki alanlar; `assigned_to` MUTLAKA bulunmalı. */
   dealSelect?: string;
   /** Satırdaki ek kolonlar. */
@@ -221,6 +228,7 @@ export async function fetchCommissionRows<T extends ShareRow & { created_at: str
       .from("commissions")
       .select(`${cols}, deal:deals!commissions_deal_id_fkey${inner ? "!inner" : ""}(${dealSelect})`) as unknown as Builder;
     if (opts.tenantId) q = q.eq("tenant_id", opts.tenantId);
+    if (opts.sample) q = opts.sample.apply(q);
     if (opts.startIso) q = q.gte("created_at", opts.startIso);
     if (opts.endIso) q = q.lt("created_at", opts.endIso);
     return q.order("created_at", { ascending: false }).limit(limit);
@@ -445,6 +453,7 @@ export async function loadAdvisorMetrics(
   opts: LoadAdvisorMetricsOptions,
 ): Promise<AdvisorMetricsResult> {
   const { viewer, tenantId, period, nowMs } = opts;
+  const sample = opts.sample ?? (await loadSampleKpiScope(supabase, tenantId));
   const officeWide = hasOfficeWideDataScope(viewer.role);
   const seeAllEarnings = canSeeAllEarnings(viewer.perms);
   const scope: "office" | "self" = officeWide ? "office" : "self";
@@ -472,6 +481,8 @@ export async function loadAdvisorMetrics(
   const single = ids.length === 1 ? ids[0] : null;
   const scan = (q: Q, col: string): Q => (single ? q.eq(col, single) : q);
   const tq = (q: Q): Q => (tenantId ? q.eq("tenant_id", tenantId) : q);
+  /** Tenant + örnek veri kapsamı (is_sample taşıyan tablolar için). */
+  const tsq = (q: Q): Q => sample.apply(tq(q));
   let failed = Boolean(profilesRes.error);
   let partial = false;
   const noteScan = (rows: unknown[]) => {
@@ -485,7 +496,7 @@ export async function loadAdvisorMetrics(
     if (ids.length <= HEAD_COUNT_MAX_ADVISORS) {
       const counts = await Promise.all(
         ids.map(async (id) => {
-          const r = await refine(tq(supabase.from(table).select("id", { count: "exact", head: true }))).eq(col, id);
+          const r = await refine(tsq(supabase.from(table).select("id", { count: "exact", head: true }))).eq(col, id);
           if (r.error) failed = true;
           return [id, r.count ?? 0] as const;
         }),
@@ -493,7 +504,7 @@ export async function loadAdvisorMetrics(
       for (const [id, n] of counts) if (n > 0) out.set(id, n);
       return out;
     }
-    const r = await refine(tq(supabase.from(table).select(col))).not(col, "is", null).limit(SCAN_LIMIT);
+    const r = await refine(tsq(supabase.from(table).select(col))).not(col, "is", null).limit(SCAN_LIMIT);
     if (r.error) failed = true;
     const data = (r.data ?? []) as Row[];
     noteScan(data);
@@ -512,6 +523,7 @@ export async function loadAdvisorMetrics(
         seeAll: seeAllEarnings,
         startIso: period.startIso,
         endIso: period.endIso,
+        sample,
       })
     : Promise.resolve({ rows: [] as MetricsCommission[], error: false, partial: false });
 
@@ -531,25 +543,25 @@ export async function loadAdvisorMetrics(
     countPerAdvisor("properties", "assigned_to", (q) => q.is("deleted_at", null).in("status", LIVE_PROPERTY_STATUSES)),
     ids.length
       ? scan(
-          tq(supabase.from("customers").select("assigned_to").is("deleted_at", null)).gte("created_at", period.startIso).lt("created_at", period.endIso).not("assigned_to", "is", null),
+          tsq(supabase.from("customers").select("assigned_to").is("deleted_at", null)).gte("created_at", period.startIso).lt("created_at", period.endIso).not("assigned_to", "is", null),
           "assigned_to",
         ).limit(SCAN_LIMIT)
       : null,
     ids.length
       ? scan(
-          tq(supabase.from("calls").select("handled_by")).gte("started_at", period.startIso).lt("started_at", period.endIso).not("handled_by", "is", null),
+          tsq(supabase.from("calls").select("handled_by")).gte("started_at", period.startIso).lt("started_at", period.endIso).not("handled_by", "is", null),
           "handled_by",
         ).limit(SCAN_LIMIT)
       : null,
     ids.length
       ? scan(
-          tq(supabase.from("appointments").select("assigned_to")).neq("status", "cancelled").gte("scheduled_at", period.startIso).lt("scheduled_at", period.endIso).not("assigned_to", "is", null),
+          tsq(supabase.from("appointments").select("assigned_to")).neq("status", "cancelled").gte("scheduled_at", period.startIso).lt("scheduled_at", period.endIso).not("assigned_to", "is", null),
           "assigned_to",
         ).limit(SCAN_LIMIT)
       : null,
     ids.length
       ? scan(
-          tq(supabase.from("offers").select("created_by, status")).gte("created_at", period.startIso).lt("created_at", period.endIso).not("created_by", "is", null),
+          tsq(supabase.from("offers").select("created_by, status")).gte("created_at", period.startIso).lt("created_at", period.endIso).not("created_by", "is", null),
           "created_by",
         ).limit(SCAN_LIMIT)
       : null,
@@ -559,7 +571,7 @@ export async function loadAdvisorMetrics(
       : null,
     opts.withLeadSignals && ids.length
       ? scan(
-          tq(
+          tsq(
             supabase
               .from("customer_demands")
               .select("customer_id, customer:customers!customer_demands_customer_id_fkey!inner(assigned_to)")
@@ -571,7 +583,7 @@ export async function loadAdvisorMetrics(
           .limit(SCAN_LIMIT)
       : null,
     opts.withLeadSignals && ids.length
-      ? scan(tq(supabase.from("tasks").select("assigned_to, customer_id, due_at").eq("status", "open")), "assigned_to")
+      ? scan(tsq(supabase.from("tasks").select("assigned_to, customer_id, due_at").eq("status", "open")), "assigned_to")
           .not("assigned_to", "is", null)
           .limit(SCAN_LIMIT)
       : null,
@@ -637,6 +649,7 @@ export async function loadAdvisorMetrics(
     ...built,
     profileTotal: profilesRes.count ?? null,
     failed,
+    sampleLabel: sample.label,
     partial,
     seeAllEarnings,
   };
@@ -659,9 +672,12 @@ export async function loadTargetActualsLive(
     tenantId: string | null;
     targets: readonly TargetLike[];
     names: ReadonlyMap<string, string>;
+    /** Örnek veri KPI kapsamı; verilmezse yüklenir. */
+    sample?: SampleKpiScope;
   },
 ): Promise<Map<string, { deals: number; revenue: number; revenueVisible: boolean }>> {
   const { viewer, tenantId, targets, names } = opts;
+  const sample = opts.sample ?? (await loadSampleKpiScope(supabase, tenantId));
   const out = new Map<string, { deals: number; revenue: number; revenueVisible: boolean }>();
   if (targets.length === 0) return out;
   const seeAll = canSeeAllEarnings(viewer.perms);
@@ -669,16 +685,15 @@ export async function loadTargetActualsLive(
   const startIso = new Date(Math.min(...ranges.map((r) => r.start))).toISOString();
   const endIso = new Date(Math.max(...ranges.map((r) => r.end))).toISOString();
 
-  let oq = supabase
-    .from("offers")
-    .select("created_by, created_at")
+  let oq = sample
+    .apply(supabase.from("offers").select("created_by, created_at"))
     .eq("status", "accepted")
     .gte("created_at", startIso)
     .lt("created_at", endIso);
   if (tenantId) oq = oq.eq("tenant_id", tenantId);
   const [offerRes, comm] = await Promise.all([
     oq.limit(SCAN_LIMIT),
-    fetchCommissionRows<MetricsCommission>(supabase, { tenantId, viewerId: viewer.userId, seeAll, startIso, endIso }),
+    fetchCommissionRows<MetricsCommission>(supabase, { tenantId, viewerId: viewer.userId, seeAll, startIso, endIso, sample }),
   ]);
 
   const ambiguousNames = findAmbiguousNames([...names.values()]);

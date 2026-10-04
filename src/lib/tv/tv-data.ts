@@ -10,6 +10,7 @@ import { DAY_MS, formatTrTime, trDayStartMs, trParts } from "@/lib/clock";
 import type { EffectivePermissions } from "@/lib/permissions-effective";
 import { OPEN_DEMAND_STATUSES } from "@/lib/team/advisor-360";
 import { currentMonthPeriod, loadAdvisorMetrics } from "@/lib/team/advisor-metrics";
+import { loadSampleKpiScope } from "@/lib/sample-scope";
 import { buildTvEvents, shortName, type TvEvent } from "@/lib/tv/tv-logic";
 
 export type TvAppointment = {
@@ -43,6 +44,8 @@ export type TvProperty = {
 export type TvData = {
   at: string;
   revenueVisible: boolean;
+  /** Örnek veri rakamlara karışıyorsa "Örnek veri dahil" etiketi, aksi halde null (lib/sample-scope). */
+  sampleLabel: string | null;
   /** Temel sorgulardan biri hata verdi: sayılar eksik olabilir. */
   degraded: boolean;
   monthLabel: string;
@@ -97,6 +100,11 @@ export async function loadTvData(
   // PostgREST oluşturucusunun zincirleme tipi burada gereksiz karmaşık (advisor-metrics ile aynı gerekçe).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tq = (q: any) => q.eq("tenant_id", tenantId);
+  // Örnek veri kapsamı: ana ekran/ekip/raporlarla AYNI tek karar noktası.
+  const sample = await loadSampleKpiScope(supabase, tenantId);
+  // is_sample taşıyan tablolar için tenant + örnek veri kapsamı.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tsq = (q: any) => sample.apply(tq(q));
   const nowIso = new Date(nowMs).toISOString();
 
   const [
@@ -114,8 +122,8 @@ export async function loadTvData(
     evOffers,
     evProps,
   ] = await Promise.all([
-    loadAdvisorMetrics(supabase, { viewer, tenantId, period, nowMs, withTargets: true, withLeadSignals: true }),
-    tq(supabase.from("appointments").select("id, scheduled_at, status, assigned_to, appointment_type, customer:customers!appointments_customer_id_fkey(full_name)"))
+    loadAdvisorMetrics(supabase, { viewer, tenantId, period, nowMs, withTargets: true, withLeadSignals: true, sample }),
+    tsq(supabase.from("appointments").select("id, scheduled_at, status, assigned_to, appointment_type, customer:customers!appointments_customer_id_fkey(full_name)"))
       .neq("status", "cancelled")
       .gte("scheduled_at", dayStartIso)
       .lt("scheduled_at", dayEndIso)
@@ -126,13 +134,13 @@ export async function loadTvData(
       .eq("period_start", period.startDateKey)
       .is("profile_id", null)
       .limit(1),
-    tq(supabase.from("properties").select("id, property_code, title, list_price"))
+    tsq(supabase.from("properties").select("id, property_code, title, list_price"))
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(5),
-    tq(supabase.from("customer_demands").select("id", { count: "exact", head: true })).in("status", [...OPEN_DEMAND_STATUSES]),
-    tq(supabase.from("deals").select("id", { count: "exact", head: true })).not("stage", "in", "(won,lost)"),
-    tq(supabase.from("offers").select("id", { count: "exact", head: true })).eq("status", "accepted").gte("created_at", dayStartIso),
+    tsq(supabase.from("customer_demands").select("id", { count: "exact", head: true })).in("status", [...OPEN_DEMAND_STATUSES]),
+    tsq(supabase.from("deals").select("id", { count: "exact", head: true })).not("stage", "in", "(won,lost)"),
+    tsq(supabase.from("offers").select("id", { count: "exact", head: true })).eq("status", "accepted").gte("created_at", dayStartIso),
     tq(supabase.from("listing_closures").select("id", { count: "exact", head: true }))
       .gt("estimated_lost_commission", 0)
       .gte("created_at", period.startIso)
@@ -143,10 +151,10 @@ export async function loadTvData(
       .order("pinned", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(8),
-    tq(supabase.from("customers").select("id, created_at")).is("deleted_at", null).order("created_at", { ascending: false }).limit(10),
-    tq(supabase.from("appointments").select("id, updated_at")).eq("status", "completed").order("updated_at", { ascending: false }).limit(10),
-    tq(supabase.from("offers").select("id, created_at")).eq("status", "accepted").order("created_at", { ascending: false }).limit(10),
-    tq(supabase.from("properties").select("id, created_at")).is("deleted_at", null).order("created_at", { ascending: false }).limit(10),
+    tsq(supabase.from("customers").select("id, created_at")).is("deleted_at", null).order("created_at", { ascending: false }).limit(10),
+    tsq(supabase.from("appointments").select("id, updated_at")).eq("status", "completed").order("updated_at", { ascending: false }).limit(10),
+    tsq(supabase.from("offers").select("id, created_at")).eq("status", "accepted").order("created_at", { ascending: false }).limit(10),
+    tsq(supabase.from("properties").select("id, created_at")).is("deleted_at", null).order("created_at", { ascending: false }).limit(10),
   ]);
 
   const revenueVisible = opts.revenueRequested && metrics.seeAllEarnings;
@@ -216,6 +224,7 @@ export async function loadTvData(
   return {
     at: nowIso,
     revenueVisible,
+    sampleLabel: sample.label,
     degraded: metrics.failed || metrics.partial,
     monthLabel: `${MONTHS_TR[p.month]} ${p.year}`,
     appointments,

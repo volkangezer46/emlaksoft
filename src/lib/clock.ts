@@ -150,3 +150,40 @@ export function formatTrTime(value: DateInput): string {
   const p = trParts(value);
   return `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
 }
+
+// ---------------------------------------------------------------------------
+// Türkiye takvim AYI sınırları (T-03). Ay başı/sonu için `Date.UTC(...)` veya sunucunun
+// yerel saatini (`setDate(1)`, `getUTCMonth`) KULLANMA: UTC sunucuda ayın ilk 3 saati
+// önceki aya yazılır. Aşağıdaki yardımcılar sınırı Türkiye gece yarısına (UTC+3) göre kurar.
+// ---------------------------------------------------------------------------
+
+/** Verilen anın TR ayının (isteğe bağlı ± `offsetMonths`) 1'i 00:00 TR anı (epoch ms). */
+export function trMonthStartMs(value: DateInput = Date.now(), offsetMonths = 0): number {
+  const p = trParts(value);
+  return Date.UTC(p.year, p.month + offsetMonths, 1) - TR_OFFSET_MS;
+}
+
+/** `trMonthStartMs` ISO karşılığı: `gte`/`lt` filtreleri için. */
+export function trMonthStartIso(value: DateInput = Date.now(), offsetMonths = 0): string {
+  return new Date(trMonthStartMs(value, offsetMonths)).toISOString();
+}
+
+/** TR ayının "YYYY-MM" anahtarı (ay seçici/dönem anahtarı). */
+export function trMonthKey(value: DateInput = Date.now(), offsetMonths = 0): string {
+  return trDayKey(trMonthStartMs(value, offsetMonths)).slice(0, 7);
+}
+
+/** "YYYY-MM" anahtarını `delta` ay kaydırır ("2026-01", -1 → "2025-12"). Geçersiz anahtar null. */
+export function shiftMonthKey(key: string, delta: number): string | null {
+  const m = /^(\d{4})-(\d{2})$/.exec(key);
+  if (!m || Number(m[2]) < 1 || Number(m[2]) > 12) return null;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/** "YYYY-MM" anahtarının TR ay başı (epoch ms). Geçersiz anahtar NaN. */
+export function trMonthStartMsFromKey(key: string): number {
+  const m = /^(\d{4})-(\d{2})$/.exec(key);
+  if (!m || Number(m[2]) < 1 || Number(m[2]) > 12) return Number.NaN;
+  return Date.UTC(Number(m[1]), Number(m[2]) - 1, 1) - TR_OFFSET_MS;
+}

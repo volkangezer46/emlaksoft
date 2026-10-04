@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { escapeCsvCell } from "@/lib/csv";
 import { planLabel } from "@/lib/billing/plans";
+import { ROLE_LABELS } from "@/lib/role-labels";
 
 export type ExportResult = { error?: string; csv?: string; filename?: string };
 
@@ -98,10 +99,7 @@ const ticketStatusLabel: Record<string, string> = {
 const ticketPriorityLabel: Record<string, string> = {
   low: "Düşük", normal: "Normal", high: "Yüksek", urgent: "Acil",
 };
-const memberRoleLabel: Record<string, string> = {
-  owner: "Ofis sahibi", gm: "Genel müdür", branch_manager: "Şube müdürü", team_lead: "Takım lideri",
-  advisor: "Danışman", call_center: "Çağrı merkezi", accounting: "Muhasebe", readonly: "Salt okunur",
-};
+const memberRoleLabel: Record<string, string> = ROLE_LABELS; // tek kaynak: lib/role-labels.ts
 
 /** İlişkili `tenants(name)` alanı PostgREST'ten tekil ya da dizi gelebilir. */
 function relName(v: unknown): string {

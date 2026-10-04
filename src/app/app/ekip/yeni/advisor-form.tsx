@@ -20,6 +20,7 @@ import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import type { AppModule } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { ADVISOR_DRAFT_FIELDS, ADVISOR_FORM_ID, ADVISOR_TABS, type InviteMode } from "./advisor-tabs";
+import { ROLE_LABELS } from "@/lib/role-labels";
 
 export type RolePermissionSummary = {
   role: string;
@@ -38,13 +39,13 @@ const TAB_ICONS = {
 } as const;
 
 const ROLE_META: Record<string, { label: string; blurb: string }> = {
-  gm: { label: "Genel müdür", blurb: "Ofisin tamamını yönetir; ekip ve ayarlarda geniş yetki." },
-  branch_manager: { label: "Şube müdürü", blurb: "Şubesini ve ekibini yönetir, ofis geneli veriyi görür." },
-  team_lead: { label: "Takım lideri", blurb: "Saha danışmanı yetkileri; kendi kayıtlarıyla çalışır." },
-  advisor: { label: "Danışman", blurb: "Kendi müşteri, portföy ve randevularını yönetir." },
-  call_center: { label: "Çağrı merkezi", blurb: "Talep karşılama, arama ve randevu kaydı." },
-  accounting: { label: "Muhasebe", blurb: "Komisyon, gider ve kazanç raporları." },
-  readonly: { label: "Salt okunur", blurb: "Yalnız görüntüleme; hiçbir kaydı değiştiremez." },
+  gm: { label: ROLE_LABELS.gm, blurb: "Ofisin tamamını yönetir; ekip ve ayarlarda geniş yetki." },
+  branch_manager: { label: ROLE_LABELS.branch_manager, blurb: "Şubesini ve ekibini yönetir, ofis geneli veriyi görür." },
+  team_lead: { label: ROLE_LABELS.team_lead, blurb: "Saha danışmanı yetkileri; kendi kayıtlarıyla çalışır." },
+  advisor: { label: ROLE_LABELS.advisor, blurb: "Kendi müşteri, portföy ve randevularını yönetir." },
+  call_center: { label: ROLE_LABELS.call_center, blurb: "Talep karşılama, arama ve randevu kaydı." },
+  accounting: { label: ROLE_LABELS.accounting, blurb: "Komisyon, gider ve kazanç raporları." },
+  readonly: { label: ROLE_LABELS.readonly, blurb: "Yalnız görüntüleme; hiçbir kaydı değiştiremez." },
 };
 
 const ACTION_LABEL: Record<string, string> = { view: "Görüntüle", create: "Ekle", edit: "Düzenle", delete: "Sil" };

@@ -9,7 +9,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { EmptyState } from "@/components/app/empty-state";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { TvAutoRefresh, TvClock } from "@/app/app/tv-mode";
-import { now } from "@/lib/clock";
+import { now, shiftMonthKey } from "@/lib/clock";
 import {
   BADGES,
   BADGE_BY_CODE,
@@ -243,10 +243,7 @@ export default async function LigPage({
   const podium = rows.filter((r) => r.total > 0).slice(0, 3);
 
   // Dönem gezinme linkleri
-  const shift = (delta: number) => {
-    const d = new Date(range.startIso);
-    return periodOf(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + delta, 1)));
-  };
+  const shift = (delta: number) => shiftMonthKey(range.period, delta) as string;
   const keepScope = branchId ? `&kapsam=${branchId}` : "";
   const prevHref = `/app/lig?donem=${shift(-1)}${keepScope}`;
   const nextHref = isCurrent ? null : `/app/lig?donem=${shift(1)}${keepScope}`;

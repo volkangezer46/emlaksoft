@@ -246,7 +246,7 @@ export function TvBoard({ tenantId, officeName }: { tenantId: string; officeName
           <Brand variant="mark" tone={dark ? "dark" : "light"} height={56} alt="" />
           <div style={{ minWidth: 0 }}>
             <div className="tv-head-name">{officeName}</div>
-            <div className="tv-head-sub">Canlı Ofis Panosu{data ? ` · ${data.monthLabel}` : ""}</div>
+            <div className="tv-head-sub">Canlı Ofis Panosu{data ? ` · ${data.monthLabel}` : ""}{data?.sampleLabel ? ` · ${data.sampleLabel}` : ""}</div>
           </div>
           <div className="tv-head-spacer" />
           <span className="tv-badge" data-state={status === "ok" ? "live" : status === "loading" ? "live" : "offline"} role="status">

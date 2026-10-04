@@ -108,7 +108,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
   },
   {
     slug: "lead-skoru",
-    term: "Aday (lead) skoru",
+    term: "Aday skoru",
     aka: "Lead skoru",
     short:
       "Yeni gelen aday müşterinin ne kadar değerli olduğunu 0-100 arası gösterir. 65 ve üstü Sıcak, 35-64 Ilık, altı Soğuk.",

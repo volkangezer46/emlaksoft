@@ -8,6 +8,7 @@ import { useToast } from "@/components/app/toast-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { trMonthKey } from "@/lib/clock";
 
 type Charge = {
   id: string;
@@ -54,7 +55,7 @@ export function ChargesPanel({
   const { push } = useToast();
   const [, startTransition] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(() => trMonthKey());
 
   function createCharge() {
     setBusy("create");

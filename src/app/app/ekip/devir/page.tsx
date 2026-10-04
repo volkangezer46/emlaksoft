@@ -7,17 +7,8 @@ import { StatRow } from "@/components/ui/stat-row";
 import { EmptyState } from "@/components/app/empty-state";
 import { handoffEditableScopes } from "@/lib/team/handoff";
 import { MemberHandoff } from "../[id]/member-handoff";
+import { ROLE_LABELS } from "@/lib/role-labels";
 
-const ROLE_LABELS: Record<string, string> = {
-  owner: "Ofis sahibi",
-  gm: "Genel müdür",
-  branch_manager: "Şube müdürü",
-  team_lead: "Takım lideri",
-  advisor: "Danışman",
-  call_center: "Çağrı merkezi",
-  accounting: "Muhasebe",
-  readonly: "Salt okunur",
-};
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

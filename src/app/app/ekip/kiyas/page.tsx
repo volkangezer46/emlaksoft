@@ -21,14 +21,8 @@ import {
   trMonthContext,
   type ScorecardInput,
 } from "@/lib/team/scorecard";
+import { ROLE_LABELS } from "@/lib/role-labels";
 
-const ROLE_LABELS: Record<string, string> = {
-  owner: "Ofis sahibi",
-  gm: "Genel müdür",
-  branch_manager: "Şube müdürü",
-  team_lead: "Takım lideri",
-  advisor: "Danışman",
-};
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);

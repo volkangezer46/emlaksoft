@@ -1,6 +1,7 @@
 import { PhoneIncoming, Target } from "lucide-react";
 import { KpiCard, bucketCountFor, bucketDates, computeTrend, type KpiCardProps } from "@/components/ui/premium";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
+import { SampleDataBadge } from "@/components/ui/sample-data-badge";
 import { daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { ICONS } from "@/lib/icons";
 import { loadKpiCounts, loadPeriodStats, type HomeCtx } from "./data";
@@ -74,10 +75,13 @@ export async function KpiSatiri({ ctx }: { ctx: HomeCtx }) {
   ];
 
   return (
-    <KpiGrid count={cards.length}>
-      {cards.map(({ key, ...card }) => (
-        <KpiCard key={key} {...card} layout="inline" chart="bars" />
-      ))}
-    </KpiGrid>
+    <div className="flex flex-col gap-2">
+      <SampleDataBadge label={ctx.sample.label} className="self-start" />
+      <KpiGrid count={cards.length}>
+        {cards.map(({ key, ...card }) => (
+          <KpiCard key={key} {...card} layout="inline" chart="bars" />
+        ))}
+      </KpiGrid>
+    </div>
   );
 }

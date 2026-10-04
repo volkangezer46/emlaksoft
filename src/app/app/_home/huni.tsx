@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { ArrowUpRight, PieChart } from "lucide-react";
 import { Widget } from "../dashboard-widgets";
-import { loadDeals, loadDemandCounts } from "./data";
+import { loadDeals, loadDemandCounts, type HomeCtx } from "./data";
 import { pipelineStats } from "./helpers";
 
-export async function Huni() {
-  const [demand, deals] = await Promise.all([loadDemandCounts(), loadDeals()]);
+export async function Huni({ ctx }: { ctx: HomeCtx }) {
+  const [demand, deals] = await Promise.all([loadDemandCounts(ctx), loadDeals(ctx)]);
   const { dealWon, openDeals, conversion } = pipelineStats(demand, deals);
   // /app/talepler mevcut ?status= paramını kullanıyor (new|active|matched)
   const pipeline = [
