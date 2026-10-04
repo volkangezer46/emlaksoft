@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
  * Saf sunum: seçim durumu ve eylemler çağıranın (istemci sağlayıcısının) işidir;
  * çubuk yalnız seçim varken çağıran tarafından çizilir. Satırların üstünde
  * sticky durur, böylece uzun listede de eylemler erişilebilir kalır.
+ * Görünürken `.motion-enter` ile yumuşak belirir (CSS `@starting-style`; JS yok).
  */
 export function BulkBar({
   count,
@@ -27,7 +28,7 @@ export function BulkBar({
       role="region"
       aria-label="Toplu işlemler"
       className={cn(
-        "sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-brand-300/50 bg-surface px-4 py-2.5 shadow-[var(--shadow-lg)]",
+        "motion-enter sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-brand-300/50 bg-surface px-4 py-2.5 shadow-[var(--shadow-lg)]",
         className,
       )}
     >

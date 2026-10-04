@@ -134,7 +134,7 @@ export function InlinePanel({
         }
       }}
       className={cn(
-        "overflow-hidden rounded-[var(--radius-panel)] border border-brand-300 bg-surface shadow-[var(--elev-2)]",
+        "motion-enter overflow-hidden rounded-[var(--radius-panel)] border border-brand-300 bg-surface shadow-[var(--elev-2)]",
         className,
       )}
     >

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCheck, X } from "lucide-react";
 import { completeTasksBulk } from "@/app/actions/tasks";
 import { useToast } from "@/components/app/toast-provider";
+import { useAutoAnimate } from "@/components/ui/auto-animate";
 
 /**
  * Görev listesine toplu tamamlama katmanı.
@@ -36,6 +37,8 @@ export function TaskBulkList({ items }: { items: Item[] }) {
   const { push } = useToast();
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [pending, startTransition] = useTransition();
+  // Tamamlanan/silinen görev satırı yumuşak çıkar, kalanlar yerine kayar (key = görev id).
+  const listRef = useAutoAnimate<HTMLDivElement>();
   // Boş taban + birleştirici reducer: transition boyunca id'ler kümede kalır,
   // transition bitince taban boş kümeye döner (sunucu verisi artık "done" getirir).
   const [optimisticDone, markDone] = useOptimistic(
@@ -79,7 +82,7 @@ export function TaskBulkList({ items }: { items: Item[] }) {
 
   return (
     <OptimisticDoneContext.Provider value={optimisticDone}>
-    <div className="space-y-2">
+    <div ref={listRef} className="space-y-2">
       {hasSelectable ? (
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-300">

@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { Plus, Tag, X } from "lucide-react";
 import { addCustomerTag, removeCustomerTag } from "@/app/actions/customers";
+import { useAutoAnimate } from "@/components/ui/auto-animate";
 
 /**
  * Müşteri 360 hero'sundaki etiket chip'leri + "Etiket ekle" girişi.
@@ -28,6 +29,8 @@ export function CustomerTagChips({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+  // Etiket çipi eklenince/kaldırılınca yumuşak geçiş (key = etiket metni).
+  const chipsRef = useAutoAnimate<HTMLDivElement>();
 
   const lower = (s: string) => s.toLocaleLowerCase("tr-TR");
   const term = value.trim().replace(/\s+/g, " ");
@@ -62,7 +65,7 @@ export function CustomerTagChips({
 
   return (
     <div className="mt-2">
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div ref={chipsRef} className="flex flex-wrap items-center gap-1.5">
         {tags.map((tag) => (
           <span
             key={tag}

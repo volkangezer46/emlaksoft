@@ -25,6 +25,7 @@ import { useToast } from "@/components/app/toast-provider";
 import { markAllRead, markReadById, runOptimistic } from "@/lib/optimistic";
 import { daysFromNowIso } from "@/lib/clock";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { AutoAnimate } from "@/components/ui/auto-animate";
 
 const KIND_META: Record<string, { icon: LucideIcon; cls: string }> = {
   success: { icon: CheckCircle2, cls: "bg-mint-500/12 text-mint-600" },
@@ -294,10 +295,10 @@ export function NotificationBellPanel({
                 </div>
               ) : (
                 groups.map((g) => (
-                  <div key={g.label}>
+                  <AutoAnimate key={g.label}>
                     <p className="sticky top-0 z-10 bg-canvas/90 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint backdrop-blur">{g.label}</p>
                     {g.items.map(renderItem)}
-                  </div>
+                  </AutoAnimate>
                 ))
               )}
             </div>

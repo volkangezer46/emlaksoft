@@ -172,7 +172,7 @@ export function ActivityTimeline({
                           <span className="min-w-0 break-words text-sm font-semibold text-ink-950">{e.title}</span>
                           <span className="flex shrink-0 items-center gap-1 pt-0.5 text-xs text-text-faint">
                             <time dateTime={e.at} className="numeric">{formatTrTime(e.at)}</time>
-                            {e.href ? <ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5 transition group-hover:text-brand-600" /> : null}
+                            {e.href ? <ArrowUpRight aria-hidden="true" className="icon-nudge h-3.5 w-3.5 group-hover:text-brand-600" /> : null}
                           </span>
                         </span>
                         {e.detail ? <span className="mt-0.5 line-clamp-2 block break-words text-xs text-text-muted">{e.detail}</span> : null}

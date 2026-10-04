@@ -245,7 +245,7 @@ export function FormActionBar({
           className="absolute inset-x-0 top-0 h-0.5 overflow-hidden rounded-t-[var(--radius-card)]"
         >
           <div
-            className="h-full bg-brand-600 transition-[width] duration-200 motion-reduce:transition-none"
+            className="h-full bg-brand-600 transition-[width] duration-(--motion-base) motion-reduce:transition-none"
             style={{ width: `${(done / total) * 100}%` }}
           />
         </div>

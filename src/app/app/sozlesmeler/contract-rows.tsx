@@ -4,6 +4,8 @@ import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
   EntityThumb,
+  MobileCard,
+  MobileCardList,
   RowActionLink,
   RowActions,
   StatusPill,
@@ -123,9 +125,9 @@ export function ContractTable({ rows, density }: { rows: ContractVM[]; density: 
 /** <md: tablo yerine kart listesi. */
 export function ContractMobileList({ rows }: { rows: ContractVM[] }) {
   return (
-    <ul className="space-y-2.5 md:hidden">
+    <MobileCardList>
       {rows.map((c) => (
-        <li key={c.id} className="surface-card relative rounded-[var(--radius-card)] p-3">
+        <MobileCard key={c.id}>
           <div className="flex items-start gap-3">
             <EntityThumb alt="" icon={FileSignature} size="sm" />
             <div className="min-w-0 flex-1">
@@ -141,8 +143,8 @@ export function ContractMobileList({ rows }: { rows: ContractVM[] }) {
               </div>
             </div>
           </div>
-        </li>
+        </MobileCard>
       ))}
-    </ul>
+    </MobileCardList>
   );
 }

@@ -688,7 +688,7 @@ export function DataTable({
             ) : visible.length === 0 ? (
               <div className="surface-card rounded-[var(--radius-card)]">{emptyNode}</div>
             ) : (
-              <ul className="space-y-2">
+              <ul className="list-stagger space-y-2">
                 {visible.map((row, index) => {
                   const href = typeof row[ROW_HREF] === "string" ? (row[ROW_HREF] as string) : null;
                   const id = rowId(row);
@@ -698,7 +698,7 @@ export function DataTable({
                       key={String(row.id ?? index)}
                       className={cn(
                         "surface-card relative space-y-2 rounded-[var(--radius-card)] p-4",
-                        href && "transition-colors hover:bg-brand-600/[0.035]",
+                        href && "hover-lift",
                       )}
                     >
                       {href ? (
@@ -950,7 +950,7 @@ export function DataTable({
                 disabled={safePage === 0}
                 className={pagerButton}
               >
-                <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Önceki
+                <ChevronLeft className="icon-nudge-back h-4 w-4" aria-hidden="true" /> Önceki
               </button>
               <span className="px-1 text-text-faint">
                 {safePage + 1} / {totalPages}
@@ -961,7 +961,7 @@ export function DataTable({
                 disabled={safePage >= totalPages - 1}
                 className={pagerButton}
               >
-                Sonraki <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                Sonraki <ChevronRight className="icon-nudge h-4 w-4" aria-hidden="true" />
               </button>
             </div>
           </div>
@@ -972,7 +972,7 @@ export function DataTable({
           <div
             role="region"
             aria-label="Toplu eylemler"
-            className="surface-card sticky bottom-4 z-30 flex flex-wrap items-center gap-3 rounded-[var(--radius-panel)] px-4 py-2.5 shadow-[var(--elev-3)]"
+            className="surface-card motion-enter sticky bottom-4 z-30 flex flex-wrap items-center gap-3 rounded-[var(--radius-panel)] px-4 py-2.5 shadow-[var(--elev-3)]"
           >
             <p className="numeric text-sm font-semibold text-ink-950" aria-live="polite">
               {selectionLabel(effectiveSelected.size)}

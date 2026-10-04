@@ -100,6 +100,6 @@ html[data-theme="dark"][data-accent="gold"] {
 /* ---- Vurgu geçişi: yalnız renk, 150ms; hareket azaltmada anında ------------- */
 @media (prefers-reduced-motion: no-preference) {
   html[data-accent] body {
-    transition: background-color 150ms ease, color 150ms ease;
+    transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease;
   }
 }
