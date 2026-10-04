@@ -378,6 +378,8 @@ export default async function AppointmentsPage({
 
   const advisorList = (advisorRows ?? []).map((a) => ({ id: String(a.id), name: String(a.full_name ?? "İsimsiz danışman") }));
   const advisorName = new Map(advisorList.map((a) => [a.id, a.name]));
+  // Düzenleme panelindeki danışman seçici: yalnız yönetim katmanında (sunucu aynı kuralı uygular).
+  const editAdvisors = isYonetici ? advisorList.map((a) => ({ id: a.id, label: a.name })) : undefined;
 
   // Filtre linkleri diğer parametreleri korur (görünüm/tarih/arama/danışman dahil).
   const apptHref = (patch: { tip?: string; durum?: string; customer?: string; property?: string; gorunum?: string; tarih?: string; gun?: string; danisman?: string; q?: string }) => {
@@ -617,6 +619,11 @@ export default async function AppointmentsPage({
         duration_min: appt.duration_min,
         location: appt.location,
         notes: appt.notes,
+        assigned_to: appt.assigned_to,
+        customer_id: customer?.id ?? null,
+        customer_label: customer?.full_name ?? null,
+        property_id: property?.id ?? null,
+        property_label: property?.title || property?.property_code || null,
       },
       calendarEvent: {
         uid: appt.id,
@@ -859,8 +866,8 @@ export default async function AppointmentsPage({
             ) : null}
           </div>
           <ListLimitNotice shown={rows.length} total={apptTotal} hint="Geçmiş randevular için takvimi kullanın." />
-          <AppointmentTable rows={viewModels} density={density} typeOptions={appointmentTypeOptions} />
-          <AppointmentMobileList rows={viewModels} typeOptions={appointmentTypeOptions} />
+          <AppointmentTable rows={viewModels} density={density} typeOptions={appointmentTypeOptions} advisors={editAdvisors} />
+          <AppointmentMobileList rows={viewModels} typeOptions={appointmentTypeOptions} advisors={editAdvisors} />
           <ListPager pathname={PATH} params={urlParams} window={win} total={rows.length} />
         </section>
       )}

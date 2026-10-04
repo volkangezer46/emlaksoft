@@ -38,11 +38,12 @@ export type AppointmentVM = {
   confirmToken: string | null;
   isShowing: boolean;
   tutanakHref: string;
-  edit: { id: string; appointment_type: string; scheduled_at: string; duration_min: number | null; location: string | null; notes: string | null };
+  edit: { id: string; appointment_type: string; scheduled_at: string; duration_min: number | null; location: string | null; notes: string | null; assigned_to: string | null; customer_id: string | null; customer_label: string | null; property_id: string | null; property_label: string | null };
   calendarEvent: CalendarEvent;
 };
 
 type TypeOption = { value: string; label: string };
+type AdvisorOption = { id: string; label: string };
 
 const FORM_ICON_BTN =
   "focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-transparent transition hover:border-line hover:bg-canvas";
@@ -60,7 +61,7 @@ function StatusForm({ id, status, label, className, children }: { id: string; st
 }
 
 /** Satır eylemleri: onayla / tamamla (sonuç diyaloğu) / düzenle / iptal / teyit linki / tutanak. */
-function Actions({ a, typeOptions, withCalendar }: { a: AppointmentVM; typeOptions: TypeOption[] | undefined; withCalendar: boolean }) {
+function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM; typeOptions: TypeOption[] | undefined; advisors?: AdvisorOption[]; withCalendar: boolean }) {
   const completed = a.status === "completed";
   return (
     <div className="relative z-10 flex flex-wrap items-center justify-end gap-1.5">
@@ -80,7 +81,7 @@ function Actions({ a, typeOptions, withCalendar }: { a: AppointmentVM; typeOptio
           </button>
         </form>
       )}
-      {!completed ? <AppointmentEditDialog appointment={a.edit} typeOptions={typeOptions} /> : null}
+      {!completed ? <AppointmentEditDialog appointment={a.edit} typeOptions={typeOptions} advisors={advisors} /> : null}
       <RowActions>
         {a.cardHref ? <RowActionLink href={a.cardHref} label={`${a.customerName} randevusu detayı`} icon={Eye} /> : null}
         {a.status === "pending" ? (
@@ -140,7 +141,7 @@ function LeaveFlag({ a }: { a: AppointmentVM }) {
 }
 
 /** md+ tablo görünümü. */
-export function AppointmentTable({ rows, density, typeOptions }: { rows: AppointmentVM[]; density: Density; typeOptions: TypeOption[] | undefined }) {
+export function AppointmentTable({ rows, density, typeOptions, advisors }: { rows: AppointmentVM[]; density: Density; typeOptions: TypeOption[] | undefined; advisors?: AdvisorOption[] }) {
   return (
     <div className="hidden md:block">
       <TableFrame minWidth={1040} density={density} maxHeight="75vh">
@@ -208,7 +209,7 @@ export function AppointmentTable({ rows, density, typeOptions }: { rows: Appoint
                   <Pills a={a} />
                 </TD>
                 <TD>
-                  <Actions a={a} typeOptions={typeOptions} withCalendar={false} />
+                  <Actions a={a} typeOptions={typeOptions} advisors={advisors} withCalendar={false} />
                 </TD>
               </TR>
             ))}
@@ -220,7 +221,7 @@ export function AppointmentTable({ rows, density, typeOptions }: { rows: Appoint
 }
 
 /** <md: tablo yerine kart listesi. */
-export function AppointmentMobileList({ rows, typeOptions }: { rows: AppointmentVM[]; typeOptions: TypeOption[] | undefined }) {
+export function AppointmentMobileList({ rows, typeOptions, advisors }: { rows: AppointmentVM[]; typeOptions: TypeOption[] | undefined; advisors?: AdvisorOption[] }) {
   return (
     <ul className="space-y-2.5 md:hidden">
       {rows.map((a) => (
@@ -246,7 +247,7 @@ export function AppointmentMobileList({ rows, typeOptions }: { rows: Appointment
             </div>
           </div>
           <div className="mt-2 border-t border-line pt-2">
-            <Actions a={a} typeOptions={typeOptions} withCalendar />
+            <Actions a={a} typeOptions={typeOptions} advisors={advisors} withCalendar />
           </div>
         </li>
       ))}

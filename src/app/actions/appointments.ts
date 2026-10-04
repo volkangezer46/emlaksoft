@@ -9,6 +9,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { isAppointmentOutcome } from "@/lib/appointment-outcome";
 import { validateTenantReferences } from "@/lib/tenant-references";
+import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
 import {
   isAppointmentStatus,
   isAppointmentTransitionAllowed,
@@ -26,6 +27,29 @@ export type AppointmentResult = {
 };
 
 const TYPES = ["showing", "office", "valuation", "contract"];
+
+/** Başkası adına randevu açma / danışman değiştirme yetkisi: yönetim katmanı (müdür, takım lideri...). */
+function canAssignOthers(role: string): boolean {
+  return MANAGEMENT_TIER_ROLES.includes(role as TeamRole);
+}
+
+/**
+ * İstenen danışmanı çözer. Boşsa varsayılan döner; başkasıysa yalnız yönetim katmanı
+ * atayabilir ve hedef aynı ofisin aktif üyesi olmalıdır.
+ */
+async function resolveAdvisor(
+  gate: { tenantId: string; userId: string; role: string },
+  requested: string,
+  fallback: string,
+): Promise<{ ok: true; advisorId: string } | { ok: false; error: string }> {
+  if (!requested || requested === fallback) return { ok: true, advisorId: fallback };
+  if (!canAssignOthers(gate.role)) {
+    return { ok: false, error: "Başka bir danışman adına randevu atama yetkiniz yok." };
+  }
+  const ref = await validateTenantReferences(gate.tenantId, { profileId: requested });
+  if (!ref.ok) return { ok: false, error: ref.error };
+  return { ok: true, advisorId: requested };
+}
 
 type ConflictRow = {
   scheduled_at: string;
@@ -101,6 +125,8 @@ export async function createAppointment(formData: FormData): Promise<Appointment
   if (!date || !time) {
     return { error: "Tarih ve saat zorunlu." };
   }
+  const advisor = await resolveAdvisor(gate, String(formData.get("assigned_to") ?? "").trim(), gate.userId);
+  if (!advisor.ok) return { error: advisor.error };
 
   const scheduledAt = new Date(`${date}T${time}+03:00`);
   if (Number.isNaN(scheduledAt.getTime())) {
@@ -129,7 +155,7 @@ export async function createAppointment(formData: FormData): Promise<Appointment
     const warning = await findConflictWarning({
       supabase,
       tenantId: gate.tenantId,
-      advisorId: gate.userId,
+      advisorId: advisor.advisorId,
       scheduledAt,
       durationMin,
     });
@@ -146,7 +172,7 @@ export async function createAppointment(formData: FormData): Promise<Appointment
     location: location || null,
     notes: notes || null,
     status: "pending",
-    assigned_to: gate.userId,
+    assigned_to: advisor.advisorId,
     created_by: gate.userId,
   });
 
@@ -299,28 +325,55 @@ export async function updateAppointment(formData: FormData): Promise<Appointment
 
   const supabase = await createClient();
 
-  // Çakışma freni (createAppointment ile aynı davranış): randevunun sahibi
-  // danışman baz alınır; kaydın kendisi kontrol dışı tutulur.
+  const { data: current } = await supabase
+    .from("appointments")
+    .select("assigned_to, created_by")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!current) return { error: "Randevu bulunamadı." };
+  const currentAdvisor = (current.assigned_to as string | null) ?? (current.created_by as string | null);
+
+  // Danışman / müşteri / portföy değişikliği: alan formda varsa uygulanır (yoksa dokunulmaz).
+  const patchExtra: Record<string, unknown> = {};
+  let advisorId = currentAdvisor;
+  if (formData.has("assigned_to")) {
+    const advisor = await resolveAdvisor(
+      gate,
+      String(formData.get("assigned_to") ?? "").trim(),
+      currentAdvisor ?? gate.userId,
+    );
+    if (!advisor.ok) return { error: advisor.error };
+    advisorId = advisor.advisorId;
+    if (advisorId !== (current.assigned_to as string | null)) patchExtra.assigned_to = advisorId;
+  }
+  const hasCustomer = formData.has("customer_id");
+  const hasProperty = formData.has("property_id");
+  if (hasCustomer || hasProperty) {
+    const customerId = String(formData.get("customer_id") ?? "").trim();
+    const propertyId = String(formData.get("property_id") ?? "").trim();
+    const refs = await validateTenantReferences(gate.tenantId, {
+      customerId: customerId || null,
+      propertyId: propertyId || null,
+    });
+    if (!refs.ok) return { error: refs.error };
+    if (hasCustomer) patchExtra.customer_id = customerId || null;
+    if (hasProperty) patchExtra.property_id = propertyId || null;
+  }
+
+  // Çakışma freni (createAppointment ile aynı davranış): (yeni) danışman baz alınır;
+  // kaydın kendisi kontrol dışı tutulur.
   const confirmConflict = String(formData.get("confirm_conflict") ?? "") === "1";
-  if (!confirmConflict) {
-    const { data: current } = await supabase
-      .from("appointments")
-      .select("assigned_to, created_by")
-      .eq("id", id)
-      .eq("tenant_id", gate.tenantId)
-      .maybeSingle();
-    const advisorId = (current?.assigned_to as string | null) ?? (current?.created_by as string | null);
-    if (advisorId) {
-      const warning = await findConflictWarning({
-        supabase,
-        tenantId: gate.tenantId,
-        advisorId,
-        scheduledAt,
-        durationMin,
-        excludeId: id,
-      });
-      if (warning) return { conflictWarning: warning };
-    }
+  if (!confirmConflict && advisorId) {
+    const warning = await findConflictWarning({
+      supabase,
+      tenantId: gate.tenantId,
+      advisorId,
+      scheduledAt,
+      durationMin,
+      excludeId: id,
+    });
+    if (warning) return { conflictWarning: warning };
   }
 
   const { error } = await supabase
@@ -331,6 +384,7 @@ export async function updateAppointment(formData: FormData): Promise<Appointment
       duration_min: durationMin,
       location: location || null,
       notes: notes || null,
+      ...patchExtra,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
@@ -347,7 +401,7 @@ export async function updateAppointment(formData: FormData): Promise<Appointment
     action: "appointment.update",
     entityType: "appointment",
     entityId: id,
-    newValue: { appointment_type: appointmentType, scheduled_at: scheduledAt.toISOString() },
+    newValue: { appointment_type: appointmentType, scheduled_at: scheduledAt.toISOString(), ...patchExtra },
   });
 
   revalidatePath("/app/randevular");

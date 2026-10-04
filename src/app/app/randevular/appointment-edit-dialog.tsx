@@ -2,7 +2,9 @@
 
 import { formatTrTime, trDayKey } from "@/lib/clock";
 import { useState, useTransition } from "react";
-import { CalendarClock, MapPin, TriangleAlert } from "lucide-react";
+import { CalendarClock, MapPin, TriangleAlert, UsersRound } from "lucide-react";
+import { searchCustomers, searchProperties } from "@/app/actions/lookup";
+import { Combobox } from "@/components/ui/combobox";
 import { updateAppointment } from "@/app/actions/appointments";
 import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
@@ -15,6 +17,11 @@ type Appointment = {
   duration_min: number | null;
   location: string | null;
   notes: string | null;
+  assigned_to: string | null;
+  customer_id: string | null;
+  customer_label: string | null;
+  property_id: string | null;
+  property_label: string | null;
 };
 
 const DEFAULT_TYPES: TypeOption[] = [...DEFAULT_DEFINITIONS.appointment_type];
@@ -28,9 +35,12 @@ function localParts(iso: string) {
 export function AppointmentEditDialog({
   appointment,
   typeOptions,
+  advisors,
 }: {
   appointment: Appointment;
   typeOptions?: TypeOption[];
+  /** Yalnız yönetim katmanında dolu; danışman değiştirme seçicisi. */
+  advisors?: { id: string; label: string }[];
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +79,7 @@ export function AppointmentEditDialog({
       error={error}
       submitLabelOverride={conflictWarning ? "Yine de kaydet" : undefined}
       hiddenFields={<input type="hidden" name="id" value={appointment.id} />}
-      fieldLabels={{ appointment_type: "Tür", date: "Tarih", time: "Saat", duration_min: "Süre (dk)", location: "Konum", notes: "Not" }}
+      fieldLabels={{ appointment_type: "Tür", date: "Tarih", time: "Saat", duration_min: "Süre (dk)", assigned_to: "Danışman", customer_id: "Müşteri", property_id: "Portföy", location: "Konum", notes: "Not" }}
       trigger={({ onClick, ...aria }) => (
         <button
           type="button"
@@ -97,6 +107,7 @@ export function AppointmentEditDialog({
       }
       tabs={[
         { id: "zaman", label: "Zaman", icon: CalendarClock, fields: ["appointment_type", "date", "time", "duration_min"] },
+        { id: "katilimci", label: "Katılımcılar", icon: UsersRound, fields: [...(advisors && advisors.length > 0 ? ["assigned_to"] : []), "customer_id", "property_id"] },
         { id: "detay", label: "Konum ve not", icon: MapPin, fields: ["location", "notes"] },
       ]}
       panels={{
@@ -122,6 +133,51 @@ export function AppointmentEditDialog({
               Süre (dk)
               <input name="duration_min" type="number" min="0" step="5" defaultValue={appointment.duration_min ?? ""} className={`mt-1 ${fieldClass}`} />
             </label>
+          </>
+        ),
+        katilimci: (
+          <>
+            {advisors && advisors.length > 0 ? (
+              <label className="text-xs font-semibold text-text-muted sm:col-span-2">
+                Danışman
+                <select name="assigned_to" defaultValue={appointment.assigned_to ?? ""} className={`mt-1 ${fieldClass}`}>
+                  {!appointment.assigned_to ? <option value="">Atanmamış</option> : null}
+                  {advisors.map((a) => (
+                    <option key={a.id} value={a.id}>{a.label}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <div className="text-xs font-semibold text-text-muted">
+              Müşteri
+              <div className="mt-1">
+                <Combobox
+                  name="customer_id"
+                  aria-label="Müşteri"
+                  placeholder="Seçiniz"
+                  searchPlaceholder="Müşteri ara…"
+                  emptyText="Eşleşen müşteri yok"
+                  onSearch={searchCustomers}
+                  defaultValue={appointment.customer_id ?? ""}
+                  options={appointment.customer_id ? [{ value: appointment.customer_id, label: appointment.customer_label ?? "Müşteri" }] : []}
+                />
+              </div>
+            </div>
+            <div className="text-xs font-semibold text-text-muted">
+              Portföy
+              <div className="mt-1">
+                <Combobox
+                  name="property_id"
+                  aria-label="Portföy"
+                  placeholder="Seçiniz"
+                  searchPlaceholder="Portföy ara…"
+                  emptyText="Eşleşen portföy yok"
+                  onSearch={searchProperties}
+                  defaultValue={appointment.property_id ?? ""}
+                  options={appointment.property_id ? [{ value: appointment.property_id, label: appointment.property_label ?? "Portföy" }] : []}
+                />
+              </div>
+            </div>
           </>
         ),
         detay: (

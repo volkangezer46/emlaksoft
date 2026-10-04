@@ -4,6 +4,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { trDayKey } from "@/lib/clock";
 import { getDefinitions } from "@/lib/definitions";
 import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
+import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
 import { AppointmentForm } from "./appointment-form";
 
 export const metadata = { title: "Yeni randevu" };
@@ -24,7 +25,9 @@ export default async function NewAppointmentPage({
   const propertyId = (sp.property ?? "").trim();
   const supabase = await createClient();
 
-  const [{ data: customers }, { data: properties }, typeDefs, { data: pickedCustomer }, { data: pickedProperty }] =
+  // Danışman seçici yalnız yönetim katmanında (sunucu eylemi de aynı kuralı uygular).
+  const canAssign = MANAGEMENT_TIER_ROLES.includes(gate.role as TeamRole);
+  const [{ data: customers }, { data: properties }, typeDefs, { data: pickedCustomer }, { data: pickedProperty }, { data: advisorRows }] =
     await Promise.all([
       supabase.from("customers").select("id, full_name").is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
       supabase.from("properties").select("id, title, property_code").is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
@@ -35,6 +38,9 @@ export default async function NewAppointmentPage({
       propertyId
         ? supabase.from("properties").select("id, title, property_code").eq("id", propertyId).is("deleted_at", null).maybeSingle()
         : Promise.resolve({ data: null }),
+      canAssign
+        ? supabase.from("profiles").select("id, full_name").eq("tenant_id", gate.tenantId).eq("is_active", true).order("full_name").limit(200)
+        : Promise.resolve({ data: null as { id: string; full_name: string | null }[] | null }),
     ]);
 
   // Ön seçili kayıt "son 50" havuzu dışında kalsa da seçenekte bulunmalı.
@@ -66,6 +72,7 @@ export default async function NewAppointmentPage({
       defaultDate={defaultDate}
       defaultTime={defaultTime}
       userId={gate.userId}
+      advisors={canAssign ? (advisorRows ?? []).map((a) => ({ id: a.id, label: a.full_name ?? "İsimsiz" })) : undefined}
     />
   );
 }
