@@ -104,9 +104,13 @@ export async function voidInvoice(formData: FormData): Promise<BillingOpResult> 
   if (reason.length < 3) return { error: "İptal nedeni yazın." };
 
   const admin = createAdminClient();
+  const { data: cur } = await admin.from("invoices").select("meta").eq("id", invoiceId).maybeSingle();
   const { data: updated, error } = await admin
     .from("invoices")
-    .update({ status: "void", meta: { voided: { reason, by: g.staff.id, at: new Date().toISOString() } } })
+    .update({
+      status: "void",
+      meta: { ...((cur?.meta ?? {}) as Record<string, unknown>), voided: { reason, by: g.staff.id, at: new Date().toISOString() } },
+    })
     .eq("id", invoiceId)
     .in("status", ["open", "draft", "uncollectible"])
     .select("id, tenant_id")

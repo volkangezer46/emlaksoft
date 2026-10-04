@@ -10,6 +10,8 @@ import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagina
 import { now as clockNow } from "@/lib/clock";
 import { planLabel } from "@/lib/billing/plans";
 import type { CSSProperties } from "react";
+import { BillingNav } from "./billing-nav";
+import { CaptureActions } from "./capture-actions";
 
 const RING_C = 2 * Math.PI * 42;
 
@@ -74,7 +76,7 @@ export default async function AdminBillingPage({
 }: {
   searchParams?: Promise<{ durum?: string; from?: string; to?: string; q?: string; sayfa?: string; fsayfa?: string }>;
 }) {
-  await requirePlatformModule("billing");
+  const staff = await requirePlatformModule("billing");
   const sp = (await searchParams) ?? {};
   const durum = sp.durum && subStatus[sp.durum] ? sp.durum : undefined;
   const from = parseDateParam(sp.from);
@@ -204,6 +206,7 @@ export default async function AdminBillingPage({
 
   return (
     <div className="space-y-6">
+      <BillingNav active="genel" />
       <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-amber-400/20 blur-[80px]" />
@@ -348,6 +351,7 @@ export default async function AdminBillingPage({
                     <p className="text-text-muted">{new Date(capture.captured_at).toLocaleString("tr-TR")}</p>
                     {capture.last_error_code ? <p className="font-mono text-xs text-danger-600">{capture.last_error_code}</p> : null}
                   </div>
+                  <CaptureActions captureId={capture.id} status={capture.status} isSuperAdmin={staff.role === "super_admin"} />
                 </div>
               );
             })}
@@ -552,12 +556,14 @@ export default async function AdminBillingPage({
               const tenantId = idOf(inv.tenant as Rel);
               return (
               <div key={inv.id} className="group relative grid gap-2 px-5 py-3 transition hover:bg-brand-600/[0.02] sm:grid-cols-[1fr_.7fr_.7fr_.7fr] sm:items-center">
-                {tenantId ? (
-                  <Link href={`/admin/tenants/${tenantId}`} className="absolute inset-0" aria-label={`${inv.invoice_no} faturasının müşterisini aç`} />
-                ) : null}
+                <Link href={`/admin/billing/faturalar/${inv.id}`} className="absolute inset-0" aria-label={`${inv.invoice_no} fatura detayını aç`} />
                 <div>
                   <p className="text-sm font-semibold text-ink-950">{inv.invoice_no}</p>
-                  <p className="text-xs text-text-muted">{nameOf(inv.tenant as Rel)}</p>
+                  {tenantId ? (
+                    <Link href={`/admin/tenants/${tenantId}`} className="focus-ring relative z-10 text-xs text-text-muted hover:text-brand-600">{nameOf(inv.tenant as Rel)}</Link>
+                  ) : (
+                    <p className="text-xs text-text-muted">{nameOf(inv.tenant as Rel)}</p>
+                  )}
                 </div>
                 <p className="text-xs font-semibold">{money(Number(inv.total_try))}</p>
                 <div className="flex flex-wrap items-center gap-1.5">
