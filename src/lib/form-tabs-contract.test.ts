@@ -77,6 +77,7 @@ const FORMS = [
   {
     name: "portföy",
     source: "src/app/app/portfoyler/yeni/property-form.tsx",
+    extraSources: ["src/app/app/portfoyler/yeni/owner-info-section.tsx"],
     tabs: PROPERTY_TABS as readonly TabLike[],
     draft: PROPERTY_DRAFT_FIELDS as readonly string[],
   },

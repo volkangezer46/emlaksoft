@@ -42,6 +42,7 @@ import { EditPropertyDialog } from "./edit-property-dialog";
 import { DeletePropertyButton, ReassignProperty } from "./property-admin-actions";
 import { AiContentPanel } from "./ai-content-panel";
 import { PropertyAuthorizationPanel } from "./property-extras";
+import { PropertyOwnerCard } from "@/components/app/property-owner-card";
 import { RelatedPropertiesWidget } from "./related-properties-widget";
 import { TapuInquiryPanel } from "./tapu-inquiry-panel";
 import { PropertyMap } from "@/components/app/property-map";
@@ -342,6 +343,7 @@ export default async function PropertyDetailPage({
     { id: "anahtarlar", label: "Anahtarlar", icon: KeyRound },
     { id: "belgeler", label: "Belgeler & sağlık", icon: FileCheck2 },
     { id: "konum", label: "Konum", icon: MapPin },
+    { id: "sahip", label: "İlan sahibi", icon: UserRound },
     { id: "zaman", label: "Zaman çizelgesi", icon: History },
   ];
 
@@ -931,6 +933,8 @@ export default async function PropertyDetailPage({
           </section>
             </div>
           ) : null}
+
+          {tab === "sahip" && tenantId ? <PropertyOwnerCard tenantId={tenantId} propertyId={property.id} /> : null}
 
           {tab === "zaman" ? (
             <Suspense fallback={<TimelineSkeleton />}>

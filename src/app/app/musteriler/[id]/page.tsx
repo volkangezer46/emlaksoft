@@ -35,6 +35,7 @@ import { MatchedSection, MatchedSkeleton, SatisfactionSection } from "./sections
 import { buildCustomerEvents, CUSTOMER_TIMELINE_CATEGORIES } from "./customer-events";
 import { countByCategory, filterByCategory, resolveCategory } from "@/lib/activity-timeline";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
+import { CustomerOwnedListings } from "@/components/app/customer-owned-listings";
 import { Wallet } from "lucide-react";
 import { computeNextBestAction } from "./next-best-action";
 import { isPast, msSince, DAY_MS } from "@/lib/clock";
@@ -98,7 +99,7 @@ export default async function CustomerDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { perms, userId } = await requireModulePage("customers");
+  const { perms, userId, tenantId } = await requireModulePage("customers");
   const stageNames = stageLabelMap(await getStageLabels());
   const canEdit = (perms.customers ?? []).includes("edit");
   const canDelete = (perms.customers ?? []).includes("delete");
@@ -588,6 +589,8 @@ export default async function CustomerDetailPage({
       ) : null}
 
       <KpiStrip items={kpis} label="Müşteri özeti" />
+
+      {tenantId ? <CustomerOwnedListings tenantId={tenantId} customerId={customer.id} /> : null}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0">

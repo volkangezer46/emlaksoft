@@ -17,8 +17,30 @@ import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
 import { parseMoneyInput } from "@/lib/money-input";
 import { findPropertyDuplicates } from "@/lib/duplicate-finders";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
+import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
+import { parseOwnerInfoForm, type OwnerInfoInput } from "@/lib/property-owner/info";
+import { saveOwnerInfo } from "@/lib/property-owner/persist";
+import { publishBlockReason } from "@/lib/property-owner/server";
+import { enqueueListingPool, isPoolEnabled, toPoolProperty } from "@/lib/pool/server";
+import { assignPoolEntryAsSystem } from "@/lib/pool/system-assign";
+import { notifyNewListing, notifyPoolAssigned, notifyPoolEntry } from "@/lib/pool/notify";
 
-export type PropertyResult = { error?: string; ok?: boolean; matchedDemands?: number };
+export type PropertyResult = {
+  error?: string;
+  ok?: boolean;
+  matchedDemands?: number;
+  /** İlan sahibi bilgi tamamlama puanı (0-100); form gönderilmediyse yok. */
+  ownerInfoScore?: number;
+  /** Yayın için eksik zorunlu ilan sahibi alanları (boşsa yayına hazır). */
+  ownerMissing?: string[];
+  /** İlan havuzuna gönderildi (atama bekliyor / sahiplenme / otomatik atandı). */
+  pooled?: boolean;
+};
+
+/** Havuza yönlendirmede "kendi adına ekleyen" sayılan roller; diğer roller (ör. çağrı merkezi) ilanı atanmamış açar. */
+const LISTING_OWNER_ROLES = ["owner", "gm", "branch_manager", "team_lead", "advisor"];
 
 /** Boş ise null; geçerli bir enlem/boylam sayısıysa döndürür. */
 function parseCoord(raw: FormDataEntryValue | null): number | null {
@@ -200,6 +222,44 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   const priceValue = priceResult.value;
   const commissionValue = commissionResult.value;
 
+  // İlan sahibi (malik) bilgileri: yalnız yeni formda (owner_info_present) okunur; eski çağrılar etkilenmez.
+  let ownerInfo: OwnerInfoInput | null = null;
+  let ownerPhoneStored = "";
+  let ownerEmail = "";
+  if (formData.has("owner_info_present")) {
+    const parsed = parseOwnerInfoForm((n) => {
+      const v = formData.get(n);
+      return typeof v === "string" ? v : null;
+    });
+    if (parsed.error) return { error: parsed.error };
+    ownerInfo = parsed.value;
+    if (ownerInfo.minPrice != null && ownerInfo.minPrice > priceValue) {
+      return { error: "Minimum fiyat liste fiyatından yüksek olamaz." };
+    }
+    if (ownerInfo.ownerPhone) {
+      const phone = parsePhoneStrict(ownerInfo.ownerPhone);
+      if (!phone.ok) return { error: phone.error ?? PHONE_ERROR_MESSAGE };
+      ownerPhoneStored = phone.stored;
+    }
+    ownerEmail = normalizeEmail(ownerInfo.ownerEmail);
+    if (ownerEmail && !isValidEmail(ownerEmail)) return { error: EMAIL_ERROR_MESSAGE };
+    if (ownerInfo.ownerCustomerId) {
+      const { data: ownerCustomer } = await supabase
+        .from("customers")
+        .select("id, phone")
+        .eq("id", ownerInfo.ownerCustomerId)
+        .eq("tenant_id", gate.tenantId)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (!ownerCustomer) return { error: "Seçilen ilan sahibi müşteri bulunamadı." };
+      ownerInfo = { ...ownerInfo, existingOwnerHasPhone: Boolean((ownerCustomer as { phone?: string | null }).phone) };
+    }
+  }
+
+  // Havuz yönlendirmesi: havuz açıksa ve (danışman istediyse ya da ilanı kendi adına açamayacak bir rolse) ilan atanmamış açılır.
+  const wantsPool = formData.get("send_to_pool") === "1" || !LISTING_OWNER_ROLES.includes(gate.role);
+  const routeToPool = wantsPool ? await isPoolEnabled(supabase, gate.tenantId) : false;
+
   // Giriş anı mükerrer kontrolü: aynı ada/parsel, adres ya da başlık+mahalle varsa kasıtlı onay (allow_duplicate=1) gerekir.
   if (String(formData.get("allow_duplicate") ?? "") !== "1") {
     const dups = await findPropertyDuplicates(
@@ -274,8 +334,17 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
       parcel_lot: parcelLot || null,
       features,
       price_health: health,
-      assigned_to: gate.userId,
+      assigned_to: routeToPool ? null : gate.userId,
       created_by: gate.userId,
+      // Yetki sözleşmesi ve minimum fiyat mevcut properties sütunlarına yazılır (yetki belgesi paneliyle aynı alanlar).
+      ...(ownerInfo
+        ? {
+            min_price: ownerInfo.minPrice,
+            authorization_type: ownerInfo.authorizationType || null,
+            authorization_start: ownerInfo.authorizationStart || null,
+            authorization_end: ownerInfo.authorizationEnd || null,
+          }
+        : {}),
     })
     .select("id")
     .single();
@@ -283,6 +352,96 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   if (error || !data) {
     console.error("createProperty", error);
     return { error: planLimitErrorMessage(error) ?? "Portföy eklenemedi. Lütfen tekrar deneyin." };
+  }
+
+  // İlan sahibi: müşteri kaydına bağla + ayrıntıları yaz (şema yoksa notlara düşer; ilan her durumda oluşur).
+  let ownerInfoScore: number | undefined;
+  let ownerMissing: string[] | undefined;
+  if (ownerInfo) {
+    const saved = await saveOwnerInfo(supabase, {
+      tenantId: gate.tenantId,
+      userId: gate.userId,
+      propertyId: data.id,
+      propertyCode,
+      info: ownerInfo,
+      phoneStored: ownerPhoneStored,
+      emailNormalized: ownerEmail,
+      branchId: branchId || null,
+    });
+    ownerInfoScore = saved.evaluation.score;
+    ownerMissing = saved.evaluation.missing.map((m) => m.label);
+    if (saved.error) console.error("createProperty owner info", saved.error);
+    if (saved.customerId) revalidatePath("/app/musteriler");
+  }
+
+  // Havuz: kayıt aç, öneri üret, moda göre (otomatik atama / sahiplenme / yönetici bekler) karar ver.
+  let pooled = false;
+  if (routeToPool) {
+    const queued = await enqueueListingPool(supabase, {
+      tenantId: gate.tenantId,
+      propertyId: data.id,
+      actorId: gate.userId,
+      source: "manual",
+      property: toPoolProperty({
+        property_type: propertyType,
+        transaction_type: transactionType,
+        province_id: provinceId || null,
+        district_id: districtId || null,
+        neighborhood_id: neighborhoodId || null,
+        list_price: priceValue,
+      }),
+    });
+    const poolLabel = title || propertyCode;
+    if (queued.queued) {
+      pooled = true;
+      let finalDecision = queued.decision;
+      if (queued.decision.kind === "auto_assign") {
+        const res = await assignPoolEntryAsSystem({
+          tenantId: gate.tenantId,
+          entryId: queued.entryId,
+          profileId: queued.decision.profileId,
+          method: "auto",
+          score: queued.decision.score,
+          reason: "Puan eşiği aşıldı; otomatik atandı.",
+        });
+        if (res.ok) {
+          await notifyPoolAssigned(supabase, {
+            tenantId: gate.tenantId,
+            actorId: gate.userId,
+            assigneeId: queued.decision.profileId,
+            propertyId: data.id,
+            label: poolLabel,
+            method: "auto",
+          });
+        } else {
+          finalDecision = { kind: "await_owner", reason: "below_threshold" };
+        }
+      }
+      if (finalDecision.kind !== "auto_assign") {
+        await notifyPoolEntry(supabase, {
+          tenantId: gate.tenantId,
+          actorId: gate.userId,
+          propertyId: data.id,
+          label: poolLabel,
+          decision: finalDecision,
+        });
+      }
+    } else {
+      // Havuz kaydı açılamadı: ilan sahipsiz kalmasın, ekleyen danışmana verilir.
+      await supabase.from("properties").update({ assigned_to: gate.userId }).eq("id", data.id).eq("tenant_id", gate.tenantId);
+    }
+  }
+
+  // Ofis sahibine bildirim/görev: yeni ilan + (varsa) eksik ilan sahibi bilgisi.
+  if (!pooled) {
+    await notifyNewListing(supabase, {
+      tenantId: gate.tenantId,
+      actorId: gate.userId,
+      propertyId: data.id,
+      label: title || propertyCode,
+      ownerInfoScore: ownerInfoScore ?? null,
+      missing: ownerMissing ?? [],
+    });
   }
 
   await logActivity({
@@ -344,7 +503,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   revalidatePath(`/app/portfoyler/${data.id}`);
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
-  return { ok: true, matchedDemands };
+  return { ok: true, matchedDemands, ownerInfoScore, ownerMissing, pooled };
 }
 
 export async function updateProperty(formData: FormData): Promise<PropertyResult> {
@@ -515,6 +674,12 @@ export async function setPropertyStatus(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
   if (!id || !MANUAL_STATUSES.includes(status)) return;
+
+  // Yayın kapısı: eksik zorunlu ilan sahibi bilgisi olan ilan yayına alınamaz (taslak kalır). Kayıt/şema yoksa kapı yoktur.
+  if (status === "live") {
+    const blocked = await publishBlockReason(await createClient(), gate.tenantId, id);
+    if (blocked) redirect(`/app/portfoyler/${id}?sekme=sahip&yayin=eksik`);
+  }
 
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("transition_property_status_atomic", {
