@@ -66,7 +66,15 @@ export async function updateExpense(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("expenses")
-    .update({ title, amount, category, expense_date: expenseDate, notes, property_id: propertyId })
+    // Düzenleme formu portföy alanı taşımıyor: alan yoksa mevcut portföy bağı korunur (veri kaybı düzeltmesi).
+    .update({
+      title,
+      amount,
+      category,
+      expense_date: expenseDate,
+      notes,
+      ...(fd.has("property_id") ? { property_id: propertyId } : {}),
+    })
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .select("id")

@@ -6,6 +6,7 @@ import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { EntityThumb, MobileCard, MobileCardList, RowActionLink, RowActions, StatusPill, type Density, type PillTone } from "@/components/ui/list-kit";
 import type { CalendarEvent } from "@/lib/calendar";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CompleteAppointmentDialog } from "./complete-appointment-dialog";
 import { AppointmentEditDialog } from "./appointment-edit-dialog";
 import { CopyConfirmLink } from "./copy-confirm-link";
@@ -90,9 +91,23 @@ function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM;
           </StatusForm>
         ) : null}
         {!completed ? (
-          <StatusForm id={a.id} status="cancelled" label="Randevuyu iptal et" className="text-[var(--danger-strong)] hover:text-[var(--danger-strong)]">
-            <XCircle aria-hidden="true" className="h-4 w-4" />
-          </StatusForm>
+          <ConfirmDialog
+            trigger={
+              <button
+                type="button"
+                aria-label="Randevuyu iptal et"
+                title="Randevuyu iptal et"
+                className={`${FORM_ICON_BTN} text-[var(--danger-strong)] hover:text-[var(--danger-strong)]`}
+              >
+                <XCircle aria-hidden="true" className="h-4 w-4" />
+              </button>
+            }
+            title="Randevuyu iptal et"
+            description={`${a.customerName} ile ${a.dateLabel} ${a.timeLabel} randevusu iptal edilecek ve takvimden kalkacak.`}
+            confirmLabel="İptal et"
+            formAction={setAppointmentStatus}
+            hiddenFields={{ id: a.id, status: "cancelled" }}
+          />
         ) : null}
         {a.isShowing ? <RowActionLink href={a.tutanakHref} label="Yer gösterme tutanağı oluştur" icon={FileSignature} /> : null}
       </RowActions>
