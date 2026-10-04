@@ -33,7 +33,7 @@ describe("roleSummary", () => {
   it("izinli + yasaklı = tüm modüller; super_admin hiçbirini yasaklamaz", () => {
     for (const r of PLATFORM_ROLES) {
       const s = roleSummary(r);
-      expect(s.allowed.length + s.denied.length).toBe(15);
+      expect(s.allowed.length + s.denied.length).toBe(16);
     }
     expect(roleSummary("super_admin").denied).toEqual([]);
     expect(roleSummary("support").denied).toContain("Personel yönetimi");

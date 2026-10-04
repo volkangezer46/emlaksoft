@@ -8,7 +8,7 @@ import type { SeoRedirectRule } from "./schema";
  * Durumlar: 308 (kalıcı) ve 307 (geçici) — Next sayfa API'si bunları verir; Google 308'i 301 gibi işler.
  */
 
-const PROTECTED_FROM = [...NEVER_INDEX_PREFIXES, "/vitrin", "/danisman", "/araclar", "/brand-asset", "/_next"];
+const PROTECTED_FROM = [...NEVER_INDEX_PREFIXES, "/vitrin", "/danisman", "/araclar", "/brand-asset", "/site-menu-asset", "/_next"];
 
 /** Karşılaştırma anahtarı: sorgu/parça atılır, küçük harf, sondaki '/' atılır. */
 export function normalizeRedirectPath(p: string): string {

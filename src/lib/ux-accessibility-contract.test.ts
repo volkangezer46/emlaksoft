@@ -40,7 +40,7 @@ describe("navigation accessibility contract", () => {
 
   it("labels application and site navigation landmarks", () => {
     const sidebar = source("src/components/app/app-sidebar.tsx");
-    const siteHeader = source("src/components/site-header.tsx");
+    const siteHeader = source("src/components/site-menu/mega-menu.tsx");
 
     // Landmark etiketi NavScroller (ortak <nav>) üzerinden verilir.
     expect(sidebar).toContain('label="Uygulama ana menüsü"');
@@ -74,6 +74,7 @@ describe("navigation accessibility contract", () => {
       "src/app/page.tsx",
       ...marketingFiles("src/components/marketing"),
       "src/components/site-footer.tsx",
+      "src/lib/site-menu/defaults.ts",
     ]
       .map(source)
       .join("\n");
@@ -157,6 +158,8 @@ describe("navigation accessibility contract", () => {
     const sources = walk("src").filter((file) => !file.endsWith(".test.ts"));
 
     expect(sources.filter((file) => /from "@dnd-kit\//.test(source(file))).sort()).toEqual([
+      // Admin "Site menüsü" editörü: yalnız /admin/site-menu rotasının kendi parçasında (herkese açık sayfalara girmez).
+      "src/app/admin/site-menu/menu-tab.tsx",
       "src/app/app/anlasmalar/board-dnd.ts",
       "src/app/app/anlasmalar/deal-board.tsx",
     ]);

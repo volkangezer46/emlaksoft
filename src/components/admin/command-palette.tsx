@@ -11,6 +11,7 @@ import {
   MapPin,
   Radar,
   Palette,
+  PanelTop,
   Search,
   SearchCheck,
   User,
@@ -48,6 +49,7 @@ const ALL_NAV: NavCmd[] = [
   { label: "Sistem sağlığı", href: "/admin/sistem", icon: Radar, module: "sistem" },
   { label: "Marka (logo ve favicon)", href: "/admin/marka", icon: Palette, module: "marka" },
   { label: "SEO merkezi (sitemap, robots, robot)", href: "/admin/seo", icon: SearchCheck, module: "seo" },
+  { label: "Site menüsü (menü, alt bilgi, duyuru)", href: "/admin/site-menu", icon: PanelTop, module: "sitemenu" },
 ];
 
 // Yalnız yetkili sayfalar kaydedilir ve gösterilir (kayıt içeriği KVKK gereği saklanmaz).

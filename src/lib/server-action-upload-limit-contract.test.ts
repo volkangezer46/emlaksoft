@@ -43,6 +43,7 @@ describe("Server Action binary body limit", () => {
     expect(binaryActionFiles).toEqual([
       "src/app/actions/agent-profile.ts",
       "src/app/actions/platform-brand.ts",
+      "src/app/actions/site-menu.ts",
       "src/app/actions/tenant-logo.ts",
     ]);
 
@@ -53,6 +54,10 @@ describe("Server Action binary body limit", () => {
     expect(profile).toContain("const PHOTO_MAX_SIZE = 3 * 1024 * 1024");
     expect(profile).toContain("file.size > PHOTO_MAX_SIZE");
     expect(source("src/app/actions/platform-brand.ts")).toContain("file.size > HARD_FILE_LIMIT");
+    // Site menüsü medyası: en büyük dosya 2 MiB (+64 KiB pay) < 3 MiB; sınır sunucuda belleğe okumadan uygulanır.
+    const menu = source("src/app/actions/site-menu.ts");
+    expect(menu).toContain("file.size > HARD_FILE_LIMIT");
+    expect(menu).toContain("MEDIA_LIMITS.motionBytes + 64 * 1024");
   });
 
   it("keeps larger customer/property files on the signed direct-upload path", () => {
