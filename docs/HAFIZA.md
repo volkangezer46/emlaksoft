@@ -38,6 +38,15 @@ vitrin bölümleri/SEO opt-in (010700) · büyüme/referral (20260819000100) · 
 faturalama duraklatma/oransal/Business/koltuk (20260820000100, **oversight ile AYNI numara**) · AI kredi (000300) ·
 anket modülü (010000) · malik bağlantısı (20261005000100) · perf indeksleri.
 
+**Fiyat bütünlüğü taslağı (tam gövdeli, `pg_get_functiondef+replace` YOK):** `supabase/proposed/20261005000500_billing_plan_amount_integrity.sql`
+(+ rollback). `update_tenant_plan_subscription`, `fulfill_billing_payment` (10 arg), `provision_registration`, `convert_demo_request_to_tenant`
+fonksiyonlarını yeniden yazar (tutar plan tanımından, yıllık = aylık×10, fiyat kilidi yazılır, Business dahil). **`20260820000100_billing_pause_proration_business_seats.sql`
+taslağının D bölümünün YERİNE geçer; o taslak terfi ederken D bölümü ÇIKARILMALI** (aksi halde desen bulunamaz, A/B/C/E de uygulanmaz).
+Bağımlılıkları: 20260731000140, 20260802000300/400, 20260809000000, 20260810000100, 20260816010100, 20260817000210/220. Uygulanmadan Founders /
+yeni fiyat / admin plan değişimi KAPALI kalmalı. Ayrıca 20260731000138'den kalan 9 argümanlı `fulfill_billing_payment` overload'u eski sabitleri
+taşıyor (ayrı temizlik migration'ı önerilir). Mevcut abonelik tutarları bu migration ile DÜZELTİLMEZ (korunur); veri düzeltme ayrı karar.
+Katalog kuralı TS `resolveCatalogSettings` ile birebir aynı (ayar yoksa onaylı katalog; ayar var ama plan için fiyat yoksa `plans.ts` tabanı).
+
 **KURALLAR:** uygulanmış dosya değiştirilmez (forward-only); enum ADD VALUE + kullanımı ayrı dosya; `properties`↔`customers`
 ikinci FK eklenince PostgREST gömmeleri FK adıyla yazılmalı. **Güvenlik düzeltici migration'lar (denetim 3: approval_requests,
 listing_pool_entries, kvkk_requests, property_owner_info, advisor_private, coupons, anket) ilgili migration'larla AYNI pencerede
