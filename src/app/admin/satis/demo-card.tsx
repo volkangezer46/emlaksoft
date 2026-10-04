@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowUpRight, Building2, Check, MailCheck, MailWarning, MapPin, MessageCircle, Phone, Rocket, Send, StickyNote, UserPlus } from "lucide-react";
 import { toWhatsAppLink } from "@/lib/phone";
+import { DeleteLead, LeadPanel } from "./lead-panel";
 import { addDemoNote, assignDemo, convertDemoToTenant, resendConvertedOwnerAccessLink, setDemoStatus, type ConvertResult } from "@/app/actions/platform-sales";
 
 export type DemoRow = {
@@ -39,7 +40,7 @@ function relTime(iso: string) {
   return new Date(iso).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" });
 }
 
-export function DemoCard({ row, staff }: { row: DemoRow; staff: { id: string; full_name: string }[] }) {
+export function DemoCard({ row, staff, isSuperAdmin = false }: { row: DemoRow; staff: { id: string; full_name: string }[]; isSuperAdmin?: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [note, setNote] = useState("");
@@ -179,6 +180,23 @@ export function DemoCard({ row, staff }: { row: DemoRow; staff: { id: string; fu
           </button>
         )}
       </div>
+
+      <div className="mt-2 flex flex-wrap items-start gap-2">
+        <LeadPanel lead={row} />
+        {row.converted_tenant_id ? (
+          <button
+            type="button"
+            onClick={resendAccessLink}
+            disabled={pending}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-600/5 disabled:opacity-50"
+          >
+            <Send className="h-3 w-3" /> Erişim bağlantısını yeniden gönder
+          </button>
+        ) : isSuperAdmin ? (
+          <DeleteLead id={row.id} name={row.full_name} />
+        ) : null}
+      </div>
+      {!creds && accessMessage ? <p role="status" className="mt-2 text-xs font-medium text-text-muted">{accessMessage}</p> : null}
 
       {convertError ? (
         <p className="mt-2 rounded-[var(--radius-control)] border border-danger-500/30 bg-danger-500/8 px-3 py-2 text-xs font-medium text-danger-600">{convertError}</p>
