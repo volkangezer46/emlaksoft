@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
-import { PLATFORM_ROLE_LABELS, type PlatformRole } from "@/lib/platform-access";
+import type { PlatformRole } from "@/lib/platform-access";
+import { guardPlatformAction } from "@/lib/platform-guards";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { getBaseUrl } from "@/lib/base-url";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
@@ -253,4 +254,124 @@ export async function reactivateStaff(fd: FormData): Promise<StaffActionResult> 
   return { ok: true };
 }
 
-export { PLATFORM_ROLE_LABELS };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const STAFF_RATE = { key: "platform-staff-sec", limit: 15, windowSec: 600 } as const;
+
+export type StaffLinkResult = StaffActionResult & { link?: string };
+
+/** Personelin adını ve giriş e-postasını düzenle (yalnız süper admin). */
+export async function updateStaffProfile(fd: FormData): Promise<StaffActionResult> {
+  const gate = await guardPlatformAction({ module: "personel", roles: ["super_admin"], rate: STAFF_RATE });
+  if ("error" in gate) return { error: gate.error };
+
+  const id = (fd.get("id") as string | null)?.trim() ?? "";
+  const fullName = ((fd.get("full_name") as string | null) ?? "").trim();
+  const email = normalizeEmail(fd.get("email") as string | null);
+  if (!UUID_RE.test(id)) return { error: "Personel ID gerekli." };
+  if (fullName.length < 2 || fullName.length > 120) return { error: "Ad soyad 2 ile 120 karakter arasında olmalıdır." };
+  if (!email || !isValidEmail(email)) return { error: `${EMAIL_ERROR_MESSAGE}.` };
+
+  const admin = createAdminClient();
+  const { data: prev } = await admin
+    .from("platform_staff")
+    .select("email, full_name")
+    .eq("id", id)
+    .maybeSingle();
+  if (!prev) return { error: "Personel bulunamadı." };
+
+  if (prev.email.toLowerCase() !== email) {
+    const { data: clash } = await admin.from("platform_staff").select("id").eq("email", email).neq("id", id).maybeSingle();
+    if (clash) return { error: "Bu e-posta başka bir personelde kayıtlı." };
+    const { error: authError } = await admin.auth.admin.updateUserById(id, { email, email_confirm: true });
+    if (authError) return { error: authError.message || "Giriş e-postası güncellenemedi." };
+  }
+
+  const { error } = await admin
+    .from("platform_staff")
+    .update({ full_name: fullName, email, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return { error: "Personel bilgileri güncellenemedi." };
+
+  await logPlatformActivity({
+    actorId: gate.staff.id,
+    action: "platform_staff.update",
+    entityType: "platform_staff",
+    entityId: id,
+    meta: { old: { email: prev.email, full_name: prev.full_name }, new: { email, full_name: fullName } },
+  });
+  revalidatePath("/admin/personel");
+  revalidatePath(`/admin/personel/${id}`);
+  return { ok: true };
+}
+
+/**
+ * Personel için parola sıfırlama bağlantısı üret (süper admin). Bağlantı yalnız yanıtta döner,
+ * denetim kaydına yazılmaz. Daveti yinelemek için de bu bağlantı kullanılır.
+ */
+export async function generateStaffResetLink(fd: FormData): Promise<StaffLinkResult> {
+  const gate = await guardPlatformAction({ module: "personel", roles: ["super_admin"], rate: STAFF_RATE });
+  if ("error" in gate) return { error: gate.error };
+
+  const id = (fd.get("id") as string | null)?.trim() ?? "";
+  if (!UUID_RE.test(id)) return { error: "Personel ID gerekli." };
+
+  const admin = createAdminClient();
+  const { data: target } = await admin.from("platform_staff").select("email").eq("id", id).maybeSingle();
+  if (!target) return { error: "Personel bulunamadı." };
+
+  const { data, error } = await admin.auth.admin.generateLink({
+    type: "recovery",
+    email: target.email,
+    options: { redirectTo: `${getBaseUrl()}/admin/hesabim` },
+  });
+  const link = data?.properties?.action_link;
+  if (error || !link) return { error: "Sıfırlama bağlantısı üretilemedi." };
+
+  await logPlatformActivity({
+    actorId: gate.staff.id,
+    action: "platform_staff.reset_link",
+    entityType: "platform_staff",
+    entityId: id,
+    meta: { email: target.email },
+  });
+  return { ok: true, link };
+}
+
+/**
+ * Personelin parolasını geçici bir parolaya sıfırla (süper admin). Personel bir sonraki girişte
+ * parolayı değiştirmeye zorlanır (`must_change_password`; yönetim kabuğu parola değişene dek engeller).
+ */
+export async function resetStaffPassword(fd: FormData): Promise<StaffActionResult> {
+  const gate = await guardPlatformAction({ module: "personel", roles: ["super_admin"], rate: STAFF_RATE });
+  if ("error" in gate) return { error: gate.error };
+
+  const id = (fd.get("id") as string | null)?.trim() ?? "";
+  const tempPassword = ((fd.get("temp_password") as string | null) ?? "").trim();
+  if (!UUID_RE.test(id)) return { error: "Personel ID gerekli." };
+  if (tempPassword.length < 10 || tempPassword.length > 72) {
+    return { error: "Geçici parola 10 ile 72 karakter arasında olmalıdır." };
+  }
+
+  const admin = createAdminClient();
+  const { data: target } = await admin.from("platform_staff").select("email").eq("id", id).maybeSingle();
+  if (!target) return { error: "Personel bulunamadı." };
+
+  const { data: authRecord, error: readError } = await admin.auth.admin.getUserById(id);
+  if (readError || !authRecord.user) return { error: "Personelin kimlik kaydı bulunamadı." };
+
+  const { error } = await admin.auth.admin.updateUserById(id, {
+    password: tempPassword,
+    user_metadata: { ...(authRecord.user.user_metadata ?? {}), must_change_password: true },
+  });
+  if (error) return { error: error.message || "Parola sıfırlanamadı." };
+
+  await logPlatformActivity({
+    actorId: gate.staff.id,
+    action: "platform_staff.password_reset",
+    entityType: "platform_staff",
+    entityId: id,
+    meta: { email: target.email, must_change_password: true },
+  });
+  revalidatePath(`/admin/personel/${id}`);
+  return { ok: true };
+}

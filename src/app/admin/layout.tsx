@@ -9,6 +9,8 @@ import "@/app/console.css";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { ThemeController } from "@/components/theme-controller";
 import { isPlatformMfaRequired } from "@/lib/platform-mfa";
+import { getRequestUser } from "@/lib/supabase/auth-cache";
+import { OwnPasswordForm } from "@/app/admin/hesabim/account-forms";
 
 /** Kok loading.tsx kaldirildi: kabuk sorgulari Suspense icinde, splash hemen ustunde. */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -21,6 +23,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
 async function AdminShell({ children }: { children: React.ReactNode }) {
   const staff = await requirePlatformStaff();
+
+  // Geçici parolayla açılan hesap: kendi parolasını belirleyene dek yönetim kabuğu açılmaz.
+  const user = await getRequestUser();
+  if (user?.user_metadata?.must_change_password === true) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-canvas p-4">
+        <ThemeController />
+        <div className="w-full max-w-xl space-y-4">
+          <p role="status" className="rounded-[var(--radius-card)] border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+            {staff.full_name}, güvenliğiniz için yönetim paneline girmeden önce parolanızı değiştirmeniz gerekiyor.
+          </p>
+          <OwnPasswordForm forced />
+        </div>
+      </div>
+    );
+  }
+
   const roleLabel = PLATFORM_ROLE_LABELS[staff.role] ?? staff.role;
   const modules = platformModulesFor(staff.role);
 
