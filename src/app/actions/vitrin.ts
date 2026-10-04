@@ -7,6 +7,7 @@ import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { formatPhoneDisplay, PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { isPast } from "@/lib/clock";
+import { getDistrict, getProvince } from "@/lib/geo/reader";
 
 /**
  * Vitrin public etkileşimleri — kayıtlı arama + paylaşım beğenisi.
@@ -71,22 +72,14 @@ export async function createVitrinSavedSearch(input: SavedSearchInput): Promise<
   if (!tenant || !isPublicTenantActive(tenant.status)) return { ok: false, error: "Ofis bulunamadı." };
 
   // il/ilçe tutarlılığı — ilçe seçildiyse seçilen ile ait olmalı
-  const { data: province } = await admin
-    .from("geo_provinces")
-    .select("id, name")
-    .eq("id", input.provinceId)
-    .maybeSingle();
+  const province = await getProvince(input.provinceId);
   if (!province) return { ok: false, error: "İl seçimi geçersiz." };
 
   let districtId: string | null = null;
   let districtName: string | null = null;
   if (input.districtId) {
-    const { data: district } = await admin
-      .from("geo_districts")
-      .select("id, name, province_id")
-      .eq("id", input.districtId)
-      .maybeSingle();
-    if (!district || district.province_id !== province.id) {
+    const district = await getDistrict(input.districtId);
+    if (!district || district.provinceId !== province.id) {
       return { ok: false, error: "İl/ilçe seçimi geçersiz." };
     }
     districtId = district.id;

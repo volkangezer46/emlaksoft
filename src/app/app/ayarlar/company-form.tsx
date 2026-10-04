@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Building2, Check, Save } from "lucide-react";
 import { updateTenantInfo } from "@/app/actions/settings";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { GeoSelect } from "@/components/app/geo-select";
+import type { GeoOption } from "@/lib/geo/types";
 
 type Tenant = {
   name: string;
@@ -16,6 +18,8 @@ type Tenant = {
   phone: string | null;
   address_line: string | null;
   city: string | null;
+  province_id?: string | null;
+  district_id?: string | null;
   logo_url?: string | null;
   website?: string | null;
 };
@@ -23,7 +27,7 @@ type Tenant = {
 const fieldClass =
   "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
-export function CompanyForm({ tenant }: { tenant: Tenant }) {
+export function CompanyForm({ tenant, provinces }: { tenant: Tenant; provinces: GeoOption[] }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -63,9 +67,9 @@ export function CompanyForm({ tenant }: { tenant: Tenant }) {
           <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-phone">Telefon</label>
           <PhoneInput id="tenant-phone" name="phone" defaultValue={tenant.phone} className={fieldClass} />
         </div>
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-city">Şehir</label>
-          <input id="tenant-city" name="city" defaultValue={tenant.city ?? ""} className={fieldClass} placeholder="İstanbul" />
+        <div className="sm:col-span-2">
+          <GeoSelect provinces={provinces} defaultProvinceId={tenant.province_id} defaultDistrictId={tenant.district_id} withNeighborhood={false} />
+          {!tenant.province_id && tenant.city ? <p className="mt-1 text-xs text-text-muted">Kayıtlı şehir metni: {tenant.city}. İl seçerek kimliğe bağlayın.</p> : null}
         </div>
         <div className="sm:col-span-2">
           <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-address">Adres</label>

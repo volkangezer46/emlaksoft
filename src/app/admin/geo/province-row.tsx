@@ -21,6 +21,7 @@ export type ProvinceRowData = {
   population: number | null;
   districtCount: number;
   neighborhoodCount: number;
+  usage?: number | null;
   sync: Record<string, unknown> | null;
   syncAvailable: boolean;
 };
@@ -141,6 +142,14 @@ export function ProvinceRow({ province }: { province: ProvinceRowData }) {
             {province.districtCount} ilçe · {province.neighborhoodCount} mahalle
           </Link>
           {province.population ? ` · ${province.population.toLocaleString("tr-TR")} nüfus` : ""}
+          {typeof province.usage === "number" ? (
+            <>
+              {" · "}
+              <Link href={`/admin/geo/kullanim?level=province&id=${province.id}`} className="font-semibold transition hover:text-brand-600 hover:underline">
+                {province.usage.toLocaleString("tr-TR")} kayıt kullanıyor
+              </Link>
+            </>
+          ) : null}
         </p>
         {province.plate_code === 46 ? (
           <p className="mt-1 text-xs font-bold uppercase tracking-[0.1em] text-amber-700">Öncelikli doğrulama ili</p>

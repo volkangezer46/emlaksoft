@@ -16,7 +16,7 @@ import {
   User,
 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
-import { getProvincesCached } from "@/lib/geo";
+import { getProvinceOptions } from "@/lib/geo/reader";
 import { getDefinitions } from "@/lib/definitions";
 import { formatTry } from "@/lib/utils";
 import { msSince, DAY_MS } from "@/lib/clock";
@@ -172,7 +172,7 @@ export default async function AgPage({
     listNetworkPool({ provinceId: il || undefined, propertyType: tip || undefined, minPrice, maxPrice }),
     listMyNetworkListings(),
     listMyRequests(),
-    getProvincesCached(),
+    getProvinceOptions(),
     getDefinitions("property_type"),
     canCreate ? listMyLiveProperties() : Promise.resolve([]),
     listNetworkDemandPool({ provinceId: talepIl || undefined, propertyType: talepTip || undefined, minBudget, maxBudget }),

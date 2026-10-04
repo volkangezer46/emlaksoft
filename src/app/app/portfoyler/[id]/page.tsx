@@ -79,6 +79,7 @@ import { getStageLabels } from "@/lib/definitions";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
 import type { CSSProperties } from "react";
 import { priceHealthLabel, propertyStatusLabel } from "@/lib/property-labels";
+import { provinceOptionsResult } from "@/lib/geo/reader";
 
 const RING_C = 2 * Math.PI * 42;
 
@@ -185,7 +186,7 @@ export default async function PropertyDetailPage({
       .eq("property_id", id)
       .order("updated_at", { ascending: false })
       .limit(20),
-    supabase.from("geo_provinces").select("id, name").order("name"),
+    provinceOptionsResult({ includeInactive: true }),
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
     getDefinitions("property_type"),
     getDefinitions("transaction_type"),

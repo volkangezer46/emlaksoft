@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Crosshair,
   Droplets,
+  MapPin,
   Fingerprint,
   Layers,
   FileText,
@@ -29,6 +30,7 @@ import { isNetgsmConfigured } from "@/lib/messaging/netgsm";
 import { platformMessagingFallbackAllowed } from "@/lib/messaging/tenant-providers";
 import { sanitizeMatchingWeights, type MatchingWeights } from "@/lib/matching";
 import { CompanyForm } from "./company-form";
+import { getProvinceOptions } from "@/lib/geo/reader";
 import { MatchingWeightsForm } from "./matching-weights-form";
 import { LogoUploadForm } from "./logo-upload-form";
 import { IntegrationsForm } from "./integrations-form";
@@ -67,6 +69,7 @@ const cards: SettingCard[] = [
   { title: "Aday yakalama", desc: "Web formu/bağlantı, sırayla atama ve hızlı yanıt.", icon: Radio, tone: "bg-mint-500/12 text-mint-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/lead" },
   { title: "Modüller", desc: "Kullanmadığınız alanları kapatın, menü sadeleşsin. Verileriniz silinmez.", icon: Layers, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/moduller" },
   { title: "Fotoğraf filigranı", desc: "İlan fotoğraflarına ofis logosu/adı otomatik basılsın — ilan çalınmasına karşı.", icon: Droplets, tone: "bg-cyan-400/12 text-cyan-500", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/filigran" },
+  { title: "Bölge bildirimi", desc: "Eksik ya da yanlış mahalleyi platform ekibine bildirin.", icon: MapPin, tone: "bg-cyan-400/12 text-cyan-500", href: "/app/ayarlar/cografya-bildir" },
 ];
 
 export default async function SettingsPage() {
@@ -75,12 +78,13 @@ export default async function SettingsPage() {
   // Modüller kartı yalnız ofis sahibi ve genel müdür içindir.
   const visibleCards = cards.filter((c) => c.href !== "/app/ayarlar/moduller" || canManageModules(role));
   const supabase = await createClient();
+  const provinces = await getProvinceOptions();
 
   const [user, { data: tenantRow }, notifPrefs, { count: consentCount }, { count: activeConsentCount }, { count: auditCount }, { data: netgsmRow }, { data: whatsappRow }, netgsmPlatformConfigured] = await Promise.all([
     getRequestUser(),
     supabase
       .from("tenants")
-      .select("name, plan, tax_office, tax_number, license_no, brand_color, iban, phone, address_line, city, logo_url, website, sample_seeded_at, matching_weights")
+      .select("name, plan, tax_office, tax_number, license_no, brand_color, iban, phone, address_line, city, province_id, district_id, logo_url, website, sample_seeded_at, matching_weights")
       .limit(1)
       .maybeSingle(),
     getNotificationPrefs(),
@@ -98,7 +102,7 @@ export default async function SettingsPage() {
     isNetgsmConfigured(),
   ]);
 
-  const tenant = tenantRow ?? { name: "", plan: "office", tax_office: null, tax_number: null, license_no: null, brand_color: null, iban: null, phone: null, address_line: null, city: null, logo_url: null, website: null, sample_seeded_at: null };
+  const tenant = tenantRow ?? { name: "", plan: "office", tax_office: null, tax_number: null, license_no: null, brand_color: null, iban: null, phone: null, address_line: null, city: null, province_id: null, district_id: null, logo_url: null, website: null, sample_seeded_at: null };
   const sampleSeededAt = (tenant as { sample_seeded_at?: string | null }).sample_seeded_at ?? null;
   // matching_weights null = varsayılan set kullanılıyor; form başlangıcı için güvenli ayrıştır.
   const rawMatchingWeights = (tenant as { matching_weights?: unknown }).matching_weights ?? null;
@@ -242,7 +246,7 @@ export default async function SettingsPage() {
         <div className="mt-5 border-b border-line pb-5">
           <LogoUploadForm currentUrl={tenant.logo_url ?? null} officeName={tenant.name || "Ofis"} />
         </div>
-        <CompanyForm tenant={tenant} />
+        <CompanyForm tenant={tenant} provinces={provinces} />
         </ReadOnlyGate>
       </section>
 

@@ -4,6 +4,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { CustomerForm } from "./customer-form";
+import { provinceOptionsResult } from "@/lib/geo/reader";
 
 export const metadata = { title: "Yeni müşteri" };
 
@@ -29,7 +30,7 @@ export default async function NewCustomerPage({
 
   const supabase = await createClient();
   const [{ data: provinces }, { data: branches }, typeDefs, txDefs, propDefs, urgDefs] = await Promise.all([
-    supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
+    provinceOptionsResult(),
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
     getDefinitionsOrDefault("customer_type"),
     getDefinitionsOrDefault("transaction_type"),

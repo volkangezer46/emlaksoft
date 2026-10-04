@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { DemandForm } from "./demand-form";
+import { provinceOptionsResult } from "@/lib/geo/reader";
 
 export const metadata = { title: "Yeni talep" };
 
@@ -23,7 +24,7 @@ export default async function NewDemandPage({
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(300),
-    supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
+    provinceOptionsResult(),
     getDefinitionsOrDefault("transaction_type"),
     getDefinitionsOrDefault("property_type"),
     getDefinitionsOrDefault("demand_urgency"),

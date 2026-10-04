@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
+import { getDistrictNameMap, getProvinces } from "@/lib/geo/reader";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
@@ -109,7 +110,7 @@ export default async function TalepArzPage({
     demandQuery,
     propertyQuery,
     // İl referansı: filtre dropdown'ı + harita daire koordinatları tek sorgudan
-    supabase.from("geo_provinces").select("id, name, lat, lng").eq("is_active", true),
+    getProvinces().then((list) => ({ data: list.map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng })) })),
   ]);
 
   const demands = (demandData ?? []) as TalepArzDemandRow[];
@@ -128,8 +129,7 @@ export default async function TalepArzPage({
   const districtIds = [...new Set([...aggMap.values()].map((a) => a.districtId).filter((x): x is string => Boolean(x)))];
   const districtById = new Map<string, string>();
   if (districtIds.length > 0) {
-    const { data: districtData } = await supabase.from("geo_districts").select("id, name").in("id", districtIds);
-    for (const d of districtData ?? []) districtById.set(d.id, d.name);
+    for (const [id, name] of await getDistrictNameMap(districtIds)) districtById.set(id, name);
   }
 
   // Tablo satırları — bölge etiketi + metrikler; talep, sonra arz sırasıyla

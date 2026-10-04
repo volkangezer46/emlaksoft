@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { estimateMultiSourceValue } from "@/lib/valuation";
 import { intakeLead } from "@/lib/lead-intake";
-import { compareTr } from "@/lib/tr-text";
+import { districtWithProvinceResult, getDistrictOptions } from "@/lib/geo/reader";
 import { publicValuationSourceEntry } from "@/lib/public-valuation-source";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { publicEvidenceHash } from "@/lib/public-request-security";
@@ -32,16 +32,7 @@ export type PublicGeoOption = { id: string; name: string };
 /** İl seçilince ilçeleri getirir. geo_* kiracıya özel veri içermez. */
 export async function listPublicDistricts(provinceId: string): Promise<PublicGeoOption[]> {
   if (!provinceId) return [];
-  const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("geo_districts")
-    .select("id, name")
-    .eq("province_id", provinceId)
-    .eq("is_active", true);
-
-  if (error || !data) return [];
-  // Türkçe harf sırası DB'de değil burada (geo.ts ile aynı gerekçe).
-  return data.sort((a, b) => compareTr(a.name, b.name));
+  return getDistrictOptions(provinceId);
 }
 
 export type PublicEstimateInput = {
@@ -105,11 +96,7 @@ export async function estimatePublicValuation(
 
   const [{ data: tenant }, { data: district }] = await Promise.all([
     admin.from("tenants").select("id, name, status").eq("slug", slug).maybeSingle(),
-    admin
-      .from("geo_districts")
-      .select("id, name, province_id, province:geo_provinces(name)")
-      .eq("id", input.districtId)
-      .maybeSingle(),
+    districtWithProvinceResult(input.districtId),
   ]);
 
   if (!tenant || !isPublicTenantActive(tenant.status)) {
@@ -213,11 +200,7 @@ export async function submitValuationLead(
       .select("id, status, lead_capture_token, lead_capture_enabled")
       .eq("slug", slug)
       .maybeSingle(),
-    admin
-      .from("geo_districts")
-      .select("id, name, province:geo_provinces(name)")
-      .eq("id", input.districtId)
-      .maybeSingle(),
+    districtWithProvinceResult(input.districtId),
   ]);
 
   if (

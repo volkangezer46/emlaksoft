@@ -190,8 +190,7 @@ describe("navigation accessibility contract", () => {
   it("labels icon-only geographic administration controls", () => {
     for (const file of [
       "src/app/admin/geo/province-row.tsx",
-      "src/app/admin/geo/[provinceId]/district-row.tsx",
-      "src/app/admin/geo/[provinceId]/[districtId]/neighborhood-row.tsx",
+      "src/app/admin/geo/entity-list.tsx", // il/ilçe/mahalle ortak satır bileşeni
     ]) {
       const content = source(file);
       expect(content, file).toContain("aria-label=");

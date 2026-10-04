@@ -8,6 +8,7 @@ import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
+import { resolveOfficeGeo } from "@/lib/geo/resolve";
 import { isOnboardingStepId } from "@/lib/onboarding-checklist";
 import {
   parseSkipped,
@@ -30,19 +31,29 @@ export async function saveOfficeProfile(formData: FormData): Promise<OnboardingS
   if (!gate.ok) return { error: gate.error };
 
   const phone = String(formData.get("phone") ?? "").trim().slice(0, 40);
-  const city = String(formData.get("city") ?? "").trim().slice(0, 80);
+  const provinceId = String(formData.get("province_id") ?? "").trim();
+  const districtId = String(formData.get("district_id") ?? "").trim();
+  const legacyCity = String(formData.get("city") ?? "").trim().slice(0, 80);
   const licenseNo = String(formData.get("license_no") ?? "").trim().slice(0, 60);
   const name = String(formData.get("name") ?? "").trim().slice(0, 120);
   const addressLine = String(formData.get("address_line") ?? "").trim().slice(0, 200);
 
   if (formData.has("name") && !name) return { error: "Ofis adı boş bırakılamaz." };
-  if (!phone && !city && !licenseNo && !name && !addressLine) return { error: "En az bir alanı doldurun." };
+  if (!phone && !provinceId && !legacyCity && !licenseNo && !name && !addressLine) return { error: "En az bir alanı doldurun." };
   const parsedPhone = phone ? parsePhoneStrict(phone) : null;
   if (parsedPhone && !parsedPhone.ok) return { error: parsedPhone.error ?? PHONE_ERROR_MESSAGE };
 
-  const patch: Record<string, string> = { updated_at: new Date(now()).toISOString() };
+  // İl/ilçe kimlikleri TEK MERKEZDE doğrulanır (eski serbest metin gelirse servisle çözülür).
+  const geo = await resolveOfficeGeo({ provinceId, districtId, legacyCity });
+  if ("error" in geo) return { error: geo.error };
+
+  const patch: Record<string, string | null> = { updated_at: new Date(now()).toISOString() };
   if (parsedPhone?.ok) patch.phone = parsedPhone.stored;
-  if (city) patch.city = city;
+  if (geo.provinceId && geo.provinceName) {
+    patch.city = geo.provinceName;
+    patch.province_id = geo.provinceId;
+    patch.district_id = geo.districtId;
+  }
   if (licenseNo) patch.license_no = licenseNo;
   if (name) patch.name = name;
   if (addressLine) patch.address_line = addressLine;
@@ -63,7 +74,7 @@ export async function saveOfficeProfile(formData: FormData): Promise<OnboardingS
     newValue: {
       name: name || null,
       phone: parsedPhone?.stored || null,
-      city: city || null,
+      city: geo.provinceName,
       license_no: licenseNo || null,
     },
   });

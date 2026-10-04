@@ -16,6 +16,7 @@
     "test:smoke": "node scripts/smoke-test.js",
     "cron:smoke": "node scripts/cron-smoke.js",
     "geo:sync": "tsx scripts/geo-sync.ts",
+    "geo:import": "tsx scripts/geo-import.ts",
     "kur:backfill": "tsx scripts/tcmb-backfill.ts",
     "db:migrate": "tsx scripts/apply-migrations.ts",
     "db:smoke": "tsx scripts/smoke-auth.ts",

@@ -43,6 +43,7 @@ import { scoreSellerLikelihood, isOwnerCustomer, hasListingIntent } from "@/lib/
 import { SellerPotentialCard } from "@/components/app/seller-potential-card";
 // Ortak tekil SMS dialogu — tek kopya gelen-kutusu'nda yaşar (Yanıtla da onu kullanır)
 import { SmsDialog } from "../../gelen-kutusu/sms-dialog";
+import { provinceOptionsResult } from "@/lib/geo/reader";
 
 const RING_C = 2 * Math.PI * 42;
 
@@ -162,7 +163,7 @@ export default async function CustomerDetailPage({
       .eq("customer_id", id)
       .order("scheduled_at", { ascending: false })
       .limit(50),
-    supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
+    provinceOptionsResult({ includeInactive: true }),
     supabase
       .from("deals")
       .select("id, stage, deal_type, deal_value, updated_at")

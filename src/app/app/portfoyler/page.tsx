@@ -62,6 +62,7 @@ import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { fetchLatestRates, formatFx, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import { formatListingPrice } from "@/lib/format";
 import { formatDateTr } from "@/lib/format";
+import { searchGeoIds } from "@/lib/geo/reader";
 
 export const metadata = { title: "Portföyler" };
 
@@ -239,16 +240,15 @@ export default async function PropertiesPage({
    */
   let qOrClause: string | null = null;
   if (q) {
-    const [{ data: provHits }, { data: distHits }, { data: portalHits }] = await Promise.all([
-      supabase.from("geo_provinces").select("id").ilike("name", safeLike(q)).limit(20),
-      supabase.from("geo_districts").select("id").ilike("name", safeLike(q)).limit(50),
+    const [geoHits, { data: portalHits }] = await Promise.all([
+      searchGeoIds(q),
       // Portal adıyla arama artık DB tarafında: eşleşen ilanların property_id'leri
       // ana sorgunun or() koşuluna eklenir (bellekte augment yerine).
       supabase.from("portal_listings").select("property_id").ilike("portal_name", safeLike(q)).limit(500),
     ]);
     const clauses = [orIlike(["property_code", "title", "address_line"], q)];
-    const provClause = inFilter("province_id", (provHits ?? []).map((r) => r.id));
-    const distClause = inFilter("district_id", (distHits ?? []).map((r) => r.id));
+    const provClause = inFilter("province_id", geoHits.provinceIds);
+    const distClause = inFilter("district_id", geoHits.districtIds);
     const portalIds = [
       ...new Set((portalHits ?? []).map((r) => r.property_id as string | null).filter((v): v is string => Boolean(v))),
     ];

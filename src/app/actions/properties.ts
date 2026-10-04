@@ -16,6 +16,7 @@ import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
 import { parseMoneyInput } from "@/lib/money-input";
 import { findPropertyDuplicates } from "@/lib/duplicate-finders";
+import { getDistrictName, getProvinceName } from "@/lib/geo/reader";
 
 export type PropertyResult = { error?: string; ok?: boolean; matchedDemands?: number };
 
@@ -149,19 +150,12 @@ async function notifyPriceDropToMatchingDemands(input: {
  * fiyatı arasındaki fark, İstanbul ile Konya arasındakinden büyük. Bu yüzden
  * ilçe varsa il adı hiç sorgulanmıyor: tek bir gidiş-dönüş yeter.
  */
-async function resolveGeoHint(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  provinceId: string,
-  districtId: string,
-): Promise<string | null> {
+async function resolveGeoHint(provinceId: string, districtId: string): Promise<string | null> {
   if (districtId) {
-    const { data } = await supabase.from("geo_districts").select("name").eq("id", districtId).maybeSingle();
-    if (data?.name) return data.name;
+    const name = await getDistrictName(districtId);
+    if (name) return name;
   }
-  if (provinceId) {
-    const { data } = await supabase.from("geo_provinces").select("name").eq("id", provinceId).maybeSingle();
-    return data?.name ?? null;
-  }
+  if (provinceId) return getProvinceName(provinceId);
   return null;
 }
 
@@ -233,7 +227,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   // `districtHint` adi ilce demek ama ONCEDEN IL adi geciriliyordu; formda
   // ilce alani hic yoktu. Artik once ilce, yoksa il adi kullaniliyor —
   // ilce bazli m2 referanslari (Kadikoy, Cankaya, Nilufer...) ancak boyle devreye giriyor.
-  const districtHint = await resolveGeoHint(supabase, provinceId, districtId);
+  const districtHint = await resolveGeoHint(provinceId, districtId);
   // Tek sefer hesaplanır — hem emsal düzeltmesine hem insert'e aynı nesne girer.
   const features = parseFeatureFields(formData, { rooms, sqm: sqmValue });
   // Önce emsal motoru, yetersizse m² referans modeli — kalıcı price_health tek karar noktasından.
@@ -404,7 +398,7 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
   // `districtHint` adi ilce demek ama ONCEDEN IL adi geciriliyordu; formda
   // ilce alani hic yoktu. Artik once ilce, yoksa il adi kullaniliyor —
   // ilce bazli m2 referanslari (Kadikoy, Cankaya, Nilufer...) ancak boyle devreye giriyor.
-  const districtHint = await resolveGeoHint(supabase, provinceId, districtId);
+  const districtHint = await resolveGeoHint(provinceId, districtId);
 
   // Mevcut features MERGE edilir: OCR/AI gibi form dışı kaynakların yazdığı
   // anahtarlar (ör. tapu alan bilgisi) form kaydında silinip gitmesin.

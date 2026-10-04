@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, MapPinned, Search } from "lucide-react";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
-import { NeighborhoodRow, type NeighborhoodRowData } from "./neighborhood-row";
-import { NewNeighborhoodForm } from "./new-neighborhood-form";
+import { attachUsage, getAdminRow, listAdminRows } from "@/lib/geo/admin-store";
+import { getProvinceOptions } from "@/lib/geo/reader";
+import { GeoEntityList, type EntityRowData } from "../../entity-list";
+import { NewEntityForm } from "../../new-entity-form";
 
 const PAGE_SIZE = 300;
 
@@ -13,42 +14,34 @@ export default async function AdminGeoDistrictPage({
   searchParams,
 }: {
   params: Promise<{ provinceId: string; districtId: string }>;
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; durum?: string }>;
 }) {
-  await requirePlatformModule("geo");
+  const staff = await requirePlatformModule("geo");
+  const canWrite = staff.role === "super_admin";
   const { provinceId, districtId } = await params;
-  const { q } = await searchParams;
+  const { q, durum } = await searchParams;
   const query = (q ?? "").trim();
+  const status = durum === "pasif" ? "inactive" : durum === "aktif" ? "active" : "all";
 
-  const admin = createAdminClient();
-  const [{ data: province }, { data: district }] = await Promise.all([
-    admin.from("geo_provinces").select("id, name").eq("id", provinceId).maybeSingle(),
-    admin.from("geo_districts").select("id, province_id, name").eq("id", districtId).maybeSingle(),
+  const [province, district] = await Promise.all([getAdminRow("province", provinceId), getAdminRow("district", districtId)]);
+  if (!province || !district || district.parentId !== provinceId) notFound();
+
+  const [{ rows: found, total }, provinceOptions] = await Promise.all([
+    listAdminRows("neighborhood", { parentId: districtId, q: query, status, limit: PAGE_SIZE }),
+    getProvinceOptions({ includeInactive: true }),
   ]);
-
-  if (!province || !district || district.province_id !== provinceId) notFound();
-
-  let neighborhoodQuery = admin
-    .from("geo_neighborhoods")
-    .select("id, district_id, name, postal_code, population, is_active", { count: "exact" })
-    .eq("district_id", districtId)
-    .order("name", { ascending: true })
-    .limit(PAGE_SIZE);
-  if (query) neighborhoodQuery = neighborhoodQuery.ilike("name", `%${query}%`);
-
-  const { data: neighborhoods, count } = await neighborhoodQuery;
-
-  const rows: NeighborhoodRowData[] = (neighborhoods ?? []).map((n) => ({
+  const withUsage = await attachUsage("neighborhood", found);
+  const rows: EntityRowData[] = withUsage.map((n) => ({
     id: n.id,
-    district_id: n.district_id,
-    province_id: provinceId,
     name: n.name,
-    postal_code: n.postal_code,
+    parentId: n.parentId,
+    isActive: n.isActive,
+    lat: n.lat,
+    lng: n.lng,
+    postalCode: n.postalCode,
     population: n.population,
-    is_active: n.is_active,
+    usage: n.usage,
   }));
-
-  const total = count ?? rows.length;
   const truncated = total > rows.length;
 
   return (
@@ -71,8 +64,8 @@ export default async function AdminGeoDistrictPage({
       </section>
 
       <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
-        <div className="flex items-center gap-3 border-b border-line px-5 py-3.5">
-          <form className="relative flex-1 max-w-sm">
+        <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-3.5">
+          <form className="relative max-w-sm flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-faint" />
             <input
               type="text"
@@ -81,18 +74,25 @@ export default async function AdminGeoDistrictPage({
               placeholder="Mahalle ara…"
               className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-8 py-2 text-sm outline-none focus:border-brand-400"
             />
+            {durum ? <input type="hidden" name="durum" value={durum} /> : null}
           </form>
+          <nav aria-label="Durum süzgeci" className="flex gap-1 text-xs font-semibold">
+            {[["", "Tümü"], ["aktif", "Aktif"], ["pasif", "Pasif"]].map(([v, label]) => (
+              <Link
+                key={v || "tum"}
+                href={`/admin/geo/${provinceId}/${districtId}?${new URLSearchParams({ ...(query ? { q: query } : {}), ...(v ? { durum: v } : {}) }).toString()}`}
+                className={`rounded-full border px-2.5 py-1 ${(durum ?? "") === v ? "border-brand-400 text-brand-600" : "border-line text-text-muted"}`}
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
         </div>
 
-        <NewNeighborhoodForm provinceId={provinceId} districtId={districtId} />
+        {canWrite ? <NewEntityForm level="neighborhood" parentId={districtId} /> : null}
 
         <div className="max-h-[70vh] overflow-y-auto">
-          {rows.map((n) => (
-            <NeighborhoodRow key={n.id} neighborhood={n} />
-          ))}
-          {rows.length === 0 ? (
-            <p className="px-5 py-12 text-center text-sm text-text-muted">Eşleşen mahalle bulunamadı.</p>
-          ) : null}
+          <GeoEntityList level="neighborhood" rows={rows} canWrite={canWrite} provinceOptions={provinceOptions} />
         </div>
       </div>
     </div>

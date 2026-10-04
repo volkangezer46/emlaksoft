@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { OFFICE_ADMIN_ACTIONS, officeAdminCan, type OfficeAdminAction } from "@/lib/admin/office-admin-access";
 import type { PlatformRole } from "@/lib/platform-access";
+import { provinceOptionsResult } from "@/lib/geo/reader";
 
 /**
  * Ofis 360 > Yönetim sekmesinin veri katmanı.
@@ -71,7 +72,7 @@ export async function loadOfficeManagement(
           .order("created_at", { ascending: false })
           .limit(50)
       : Promise.resolve({ data: [] as NoteRow[] }),
-    admin.from("geo_provinces").select("id, name").order("name", { ascending: true }),
+    provinceOptionsResult(),
     opts.withNotes ? admin.from("platform_staff").select("id, full_name").limit(300) : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
   ]);
 

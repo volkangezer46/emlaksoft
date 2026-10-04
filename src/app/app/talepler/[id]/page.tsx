@@ -33,6 +33,7 @@ import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { EditDemandDialog } from "../../musteriler/[id]/edit-demand-dialog";
 import { DemandStatusSwitch } from "./demand-status-switch";
 import { extraCriteriaChips, parseDemandCriteria } from "@/lib/demand-criteria";
+import { provinceOptionsResult } from "@/lib/geo/reader";
 
 type Rel = { id?: string; name?: string; full_name?: string } | { id?: string; name?: string; full_name?: string }[] | null;
 
@@ -141,7 +142,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
     { data: networkRow },
     { data: agentProfile },
   ] = await Promise.all([
-    supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
+    provinceOptionsResult({ includeInactive: true }),
     fetchTenantMatchingWeights(supabase),
     propQuery.order("created_at", { ascending: false }).limit(200),
     customer

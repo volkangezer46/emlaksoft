@@ -20,6 +20,7 @@ import {
 } from "@/lib/admin/office-create-rules";
 import { officeSlugCandidates, provisionSafeCompanyName, validateOfficeSlug } from "@/lib/admin/office-slug";
 import { getBaseUrl } from "@/lib/base-url";
+import { getDistrict, getProvince } from "@/lib/geo/reader";
 import { getPlan, planLabel } from "@/lib/billing/plans";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
@@ -123,19 +124,17 @@ async function sendAccessLink(admin: Admin, email: string): Promise<boolean> {
 
 type GeoResolved = { ok: true; provinceName: string | null } | { ok: false; error: string };
 
-async function resolveGeo(admin: Admin, provinceId: string | null, districtId: string | null): Promise<GeoResolved> {
+async function resolveGeo(provinceId: string | null, districtId: string | null): Promise<GeoResolved> {
   if (!provinceId) return { ok: true, provinceName: null };
-  const [{ data: province }, district] = await Promise.all([
-    admin.from("geo_provinces").select("id, name").eq("id", provinceId).maybeSingle(),
-    districtId
-      ? admin.from("geo_districts").select("id, province_id").eq("id", districtId).maybeSingle()
-      : Promise.resolve({ data: null }),
+  const [province, district] = await Promise.all([
+    getProvince(provinceId),
+    districtId ? getDistrict(districtId) : Promise.resolve(null),
   ]);
   if (!province) return { ok: false, error: "Seçilen il bulunamadı." };
-  if (districtId && (!district.data || district.data.province_id !== provinceId)) {
+  if (districtId && (!district || district.provinceId !== provinceId)) {
     return { ok: false, error: "Seçilen ilçe bu ile ait değil." };
   }
-  return { ok: true, provinceName: String(province.name) };
+  return { ok: true, provinceName: province.name };
 }
 
 async function findOwners(admin: Admin, tenantId: string) {
@@ -252,7 +251,7 @@ export async function createTenantByAdmin(formData: FormData): Promise<CreateOff
   const [slugRow, staffRow, geo] = await Promise.all([
     admin.from("tenants").select("id").eq("slug", input.slug).maybeSingle(),
     admin.from("platform_staff").select("id").eq("email", input.ownerEmail).maybeSingle(),
-    resolveGeo(admin, input.provinceId, input.districtId),
+    resolveGeo(input.provinceId, input.districtId),
   ]);
   if (slugRow.error || staffRow.error) return { error: "Benzersizlik denetimi yapılamadı. Lütfen tekrar deneyin." };
   if (slugRow.data) {
@@ -499,7 +498,7 @@ export async function updateTenantProfileByAdmin(formData: FormData): Promise<Of
   const patch: Record<string, unknown> = {};
   if (parsed.data.profile) {
     const p = parsed.data.profile;
-    const geo = await resolveGeo(admin, p.provinceId, p.districtId);
+    const geo = await resolveGeo(p.provinceId, p.districtId);
     if (!geo.ok) return { error: geo.error };
     patch.name = p.name;
     patch.phone = p.phone;

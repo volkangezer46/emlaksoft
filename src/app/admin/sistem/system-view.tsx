@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, Bug, CheckCircle2, Clock3, Database, HeartPulse, KeyRound, Landmark, Layers, MapPin, MapPinned, Radar, XCircle } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { geoRowCount } from "@/lib/geo/reader";
 import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card";
 import { probeSchema } from "./schema-checks";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -99,9 +100,9 @@ export async function SystemView() {
     getPortalConfig("hepsiemlak"),
     getPortalConfig("zingat"),
     getPortalConfig("emlakjet"),
-    admin.from("geo_provinces").select("id", { count: "exact", head: true }),
-    admin.from("geo_districts").select("id", { count: "exact", head: true }),
-    admin.from("geo_neighborhoods").select("id", { count: "exact", head: true }),
+    geoRowCount("province"),
+    geoRowCount("district"),
+    geoRowCount("neighborhood"),
     admin.from("cron_heartbeats").select("job, last_run_at, last_status, last_detail"),
     probeSchema(),
     admin.from("error_logs").select("id", { count: "exact", head: true }).is("resolved_at", null),

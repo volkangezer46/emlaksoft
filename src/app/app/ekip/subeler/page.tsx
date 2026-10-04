@@ -4,6 +4,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatRow } from "@/components/ui/stat-row";
 import { BranchManager, type BranchRow, type ManagerOption } from "./branch-manager";
+import { provinceOptionsResult } from "@/lib/geo/reader";
 
 export const metadata = { title: "Şubeler" };
 
@@ -44,7 +45,7 @@ export default async function BranchesPage() {
 
   const [{ data: members }, { data: provinces }] = await Promise.all([
     supabase.from("profiles").select("id, full_name, role, is_active, branch_id").limit(500),
-    supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
+    provinceOptionsResult(),
   ]);
 
   const memberList = members ?? [];

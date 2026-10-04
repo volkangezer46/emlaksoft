@@ -8,6 +8,7 @@ import { isPublicTenantActive } from "@/lib/public-tenant";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { defaultDefinitionValues } from "@/lib/definition-defaults";
+import { provinceOptionsResult } from "@/lib/geo/reader";
 
 // ISR: vitrin gibi herkese açık — CDN önbellekli, 2 dk tazelenir.
 // SEO mıknatısı: bilerek indexlenebilir (noindex YOK).
@@ -70,7 +71,7 @@ export default async function VitrinDegerlemePage({
   // (getDefinitions ile aynı mantık — o, oturumlu istemci kullandığı için burada
   // admin istemciyle yeniden kurulur).
   const [{ data: provinces }, { data: defs }] = await Promise.all([
-    admin.from("geo_provinces").select("id, name").eq("is_active", true).order("name"),
+    provinceOptionsResult(),
     admin
       .from("definitions")
       .select("value, tenant_id, sort_order")

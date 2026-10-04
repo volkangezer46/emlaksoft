@@ -5,6 +5,8 @@ import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
 import { resolveWizardStep } from "@/lib/onboarding-checklist";
 import { getLossReasonOptions, getStageLabels } from "@/lib/definitions";
+import { createClient } from "@/lib/supabase/server";
+import { getProvinceOptions } from "@/lib/geo/reader";
 import { SetupWizard } from "./setup-wizard";
 
 export const metadata = { title: "Ofis kurulumu" };
@@ -26,11 +28,14 @@ export default async function OnboardingPage({
     );
   }
 
-  const [snap, { adim }, lossReasons, stageLabels] = await Promise.all([
+  const supabase = await createClient();
+  const [snap, { adim }, lossReasons, stageLabels, provinces, { data: geoRow }] = await Promise.all([
     loadOnboardingSnapshot(tenantId),
     searchParams,
     getLossReasonOptions(),
     getStageLabels(),
+    getProvinceOptions(),
+    supabase.from("tenants").select("province_id, district_id").eq("id", tenantId).maybeSingle(),
   ]);
   if (!snap) {
     return (
@@ -65,6 +70,8 @@ export default async function OnboardingPage({
           name: tenant?.name ?? "",
           phone: tenant?.phone ?? "",
           city: tenant?.city ?? "",
+          provinceId: (geoRow?.province_id as string | null) ?? null,
+          districtId: (geoRow?.district_id as string | null) ?? null,
           addressLine: tenant?.address_line ?? "",
           licenseNo: tenant?.license_no ?? "",
           logoUrl: tenant?.logo_url ?? null,
@@ -74,6 +81,7 @@ export default async function OnboardingPage({
         customers={counts.customers}
         properties={counts.properties}
         vitrinHref={tenant?.slug ? `/vitrin/${tenant.slug}` : null}
+        provinces={provinces}
       />
     </div>
   );

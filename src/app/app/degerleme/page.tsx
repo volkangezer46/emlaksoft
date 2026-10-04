@@ -22,6 +22,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { getDistrictNameMap, provinceOptionsResult } from "@/lib/geo/reader";
 type ValuationSource = { name: string; weight: number; value: number; note: string };
 
 const nf0 = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
@@ -81,7 +82,7 @@ export default async function ValuationPage({
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(100),
-    supabase.from("geo_provinces").select("id, name").order("name"),
+    provinceOptionsResult(),
     isEndeksaConfiguredFull(),
     isTapusorConfiguredFull(),
     // D4 — kira çarpanı / getiri: fiyat + m² girilmiş portföyler (satılık ve kiralık)
@@ -229,8 +230,7 @@ export default async function ValuationPage({
     ]),
   ];
   if (districtIds.length) {
-    const { data: districts } = await supabase.from("geo_districts").select("id, name").in("id", districtIds);
-    const names = new Map((districts ?? []).map((d) => [d.id, d.name as string]));
+    const names = await getDistrictNameMap(districtIds);
     for (const r of yieldRows) r.districtName = names.get(r.districtId) ?? "İlçe";
     for (const r of speedRows) r.districtName = r.districtId ? (names.get(r.districtId) ?? "İlçe") : "İlçesi girilmemiş";
   }
