@@ -62,6 +62,8 @@ export const actionLabel: Record<string, string> = {
   "billing.cancel_requested": "Abonelik iptal talebi",
   "billing.cancel_undone": "Abonelik iptal talebi geri alındı",
   "export.csv": "CSV dışa aktarma",
+  "kvkk.request_created": "KVKK talebi açıldı",
+  "kvkk.request_status": "KVKK talep durumu değişti",
 };
 export const HIGH_RISK_ACTIONS = [
   "customer.delete",
