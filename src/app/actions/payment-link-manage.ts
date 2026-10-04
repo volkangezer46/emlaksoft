@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { getBaseUrl } from "@/lib/base-url";
+import { normalizeExtendDays, paymentLinkCancelDecision } from "@/lib/workflow-rules";
 
 export type PaymentLinkManageResult = { error?: string; ok?: boolean };
 
@@ -73,8 +74,9 @@ export async function cancelPaymentLink(linkId: string): Promise<PaymentLinkMana
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
   if (!link) return { error: "Ödeme linki bulunamadı." };
-  if (link.status === "cancelled") return { ok: true };
-  if (link.status !== "open") return { error: "Yalnız açık ödeme linki iptal edilebilir." };
+  const pre = paymentLinkCancelDecision(String(link.status), false);
+  if (pre === "already_cancelled") return { ok: true };
+  if (pre === "not_open") return { error: "Yalnız açık ödeme linki iptal edilebilir." };
 
   const { data: capture } = await admin
     .from("billing_payment_captures")
@@ -82,7 +84,9 @@ export async function cancelPaymentLink(linkId: string): Promise<PaymentLinkMana
     .eq("payment_link_id", linkId)
     .limit(1)
     .maybeSingle();
-  if (capture) return { error: "Bu link için ödeme alınmış; iptal edilemez." };
+  if (paymentLinkCancelDecision(String(link.status), Boolean(capture)) === "captured") {
+    return { error: "Bu link için ödeme alınmış; iptal edilemez." };
+  }
 
   const { data: updated, error } = await admin
     .from("payment_links")
@@ -116,8 +120,8 @@ export async function extendPaymentLink(linkId: string, days: number): Promise<P
   const gate = await requirePermission("commissions", "edit");
   if (!gate.ok) return { error: gate.error };
   if (!UUID.test(linkId)) return { error: "Link seçimi geçersiz." };
-  const d = Math.trunc(Number(days));
-  if (!Number.isFinite(d) || d < 1 || d > 30) return { error: "Süre 1-30 gün arasında olmalı." };
+  const d = normalizeExtendDays(days);
+  if (d == null) return { error: "Süre 1-30 gün arasında olmalı." };
 
   const admin = createAdminClient();
   const { data: updated, error } = await admin

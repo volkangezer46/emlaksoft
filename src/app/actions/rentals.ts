@@ -9,6 +9,7 @@ import { computeLegalIncrease } from "@/lib/tufe";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
 import { parseMoneyInput } from "@/lib/money-input";
 import { isIsoDate } from "@/lib/workflow-state";
+import { checkRentalExtension } from "@/lib/workflow-rules";
 
 /**
  * Mülk Yönetimi (kiralama) server action'ları.
@@ -218,15 +219,14 @@ export async function extendRental(id: string, newEndDate: string | null): Promi
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
   if (!rental) return { error: "Kira kaydı bulunamadı." };
-  if (rental.status !== "active") return { error: "Yalnızca aktif kira uzatılabilir; sonlanmış kira için yeni kira kaydı açın." };
-  if (newEndDate) {
-    if (newEndDate <= String(rental.start_date)) return { error: "Bitiş tarihi başlangıçtan sonra olmalı." };
-    if (rental.end_date && newEndDate <= String(rental.end_date)) {
-      return { error: "Yeni bitiş tarihi mevcut bitiş tarihinden sonra olmalı." };
-    }
-  } else if (!rental.end_date) {
-    return { ok: true, id };
-  }
+  const check = checkRentalExtension({
+    status: String(rental.status),
+    startDate: String(rental.start_date).slice(0, 10),
+    currentEnd: rental.end_date ? String(rental.end_date).slice(0, 10) : null,
+    newEnd: newEndDate,
+  });
+  if (!check.ok) return { error: check.error };
+  if (check.noop) return { ok: true, id };
 
   const admin = createAdminClient();
   const { data: updated, error } = await admin

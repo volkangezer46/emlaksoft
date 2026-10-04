@@ -9,7 +9,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { isAppointmentOutcome } from "@/lib/appointment-outcome";
 import { validateTenantReferences } from "@/lib/tenant-references";
-import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
+import { advisorAssignmentDecision } from "@/lib/workflow-rules";
 import {
   isAppointmentStatus,
   isAppointmentTransitionAllowed,
@@ -28,11 +28,6 @@ export type AppointmentResult = {
 
 const TYPES = ["showing", "office", "valuation", "contract"];
 
-/** Başkası adına randevu açma / danışman değiştirme yetkisi: yönetim katmanı (müdür, takım lideri...). */
-function canAssignOthers(role: string): boolean {
-  return MANAGEMENT_TIER_ROLES.includes(role as TeamRole);
-}
-
 /**
  * İstenen danışmanı çözer. Boşsa varsayılan döner; başkasıysa yalnız yönetim katmanı
  * atayabilir ve hedef aynı ofisin aktif üyesi olmalıdır.
@@ -42,8 +37,9 @@ async function resolveAdvisor(
   requested: string,
   fallback: string,
 ): Promise<{ ok: true; advisorId: string } | { ok: false; error: string }> {
-  if (!requested || requested === fallback) return { ok: true, advisorId: fallback };
-  if (!canAssignOthers(gate.role)) {
+  const decision = advisorAssignmentDecision(gate.role, requested, fallback);
+  if (decision.kind === "self") return { ok: true, advisorId: decision.advisorId };
+  if (decision.kind === "denied") {
     return { ok: false, error: "Başka bir danışman adına randevu atama yetkiniz yok." };
   }
   const ref = await validateTenantReferences(gate.tenantId, { profileId: requested });

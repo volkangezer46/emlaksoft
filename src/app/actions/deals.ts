@@ -14,6 +14,7 @@ import { validateTenantReferences } from "@/lib/tenant-references";
 import { parseMoneyInput } from "@/lib/money-input";
 import { getLossReasonOptionsFresh } from "@/lib/definitions";
 import { validateLossReason } from "@/lib/loss-reason";
+import { dealLinkDecision } from "@/lib/workflow-rules";
 import {
   DEAL_STAGES as WORKFLOW_DEAL_STAGES,
   isDealStage,
@@ -363,19 +364,22 @@ export async function updateDealLinks(formData: FormData): Promise<DealResult> {
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
   if (currentError || !current) return { error: "Anlaşma bulunamadı." };
-  if (current.stage === "won") {
+  const linkDecision = dealLinkDecision({
+    stage: String(current.stage),
+    current: { propertyId: current.property_id, customerId: current.customer_id },
+    next: {
+      propertyId: hasProperty ? propertyId || null : undefined,
+      customerId: hasCustomer ? customerId || null : undefined,
+    },
+  });
+  if (linkDecision === "locked") {
     return { error: "Kazanılmış anlaşmanın portföy/müşteri bağı değiştirilemez; önce kazanmayı geri alın." };
   }
+  if (linkDecision === "noop") return { ok: true, dealId: id };
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (hasProperty) patch.property_id = propertyId || null;
   if (hasCustomer) patch.customer_id = customerId || null;
-  if (
-    (!hasProperty || (current.property_id ?? "") === propertyId) &&
-    (!hasCustomer || (current.customer_id ?? "") === customerId)
-  ) {
-    return { ok: true, dealId: id };
-  }
 
   const { data: updated, error } = await supabase
     .from("deals")
