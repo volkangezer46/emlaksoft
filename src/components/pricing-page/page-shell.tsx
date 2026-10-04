@@ -26,7 +26,8 @@ export function PricingShell({ children }: { children: ReactNode }) {
           <p>© EmlakSoft</p>
           <nav aria-label="Alt bilgi" className="flex flex-wrap gap-x-5 gap-y-1">
             <Link href="/" className="inline-flex min-h-11 items-center hover:text-ink-950 hover:underline">Ana sayfa</Link>
-            <Link href="/gizlilik" className="inline-flex min-h-11 items-center hover:text-ink-950 hover:underline">Gizlilik</Link>
+            <Link href="/araclar" className="inline-flex min-h-11 items-center hover:text-ink-950 hover:underline">Araçlar</Link>
+            <Link href="/gizlilik"className="inline-flex min-h-11 items-center hover:text-ink-950 hover:underline">Gizlilik</Link>
             <Link href="/kullanim-sartlari" className="inline-flex min-h-11 items-center hover:text-ink-950 hover:underline">Kullanım şartları</Link>
           </nav>
         </div>
