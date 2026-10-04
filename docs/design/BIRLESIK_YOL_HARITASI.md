@@ -293,7 +293,7 @@ Taslaklar (`supabase/proposed/`, migration DEĞİL, uygulanamaz):
 
 | Dosya | Ne | Sorun | Çözüm |
 |---|---|---|---|
-| `20260816001200_growth_referral_partner_attribution.sql` (+ `rollbacks/` karşılığı) | growth_* tabloları, `account_credit_ledger`, ortaklar, `signup_attributions` | **`migrations/20260816001200_assignment_rules_listing_target` ile AYNI numara** (rollbacks klasöründe de iki `…001200…rollback.sql` var) | Taşınırken yeni numara: öneri `20260819000100` (tüm dal numaralarından sonra). Bağımlılık: K2 tablolarına dokunmaz |
+| `20260819000100_growth_referral_partner_attribution.sql` (+ `rollbacks/` karşılığı) | growth_* tabloları, `account_credit_ledger`, ortaklar, `signup_attributions` | **`migrations/20260816001200_assignment_rules_listing_target` ile AYNI numara** (rollbacks klasöründe de iki `…001200…rollback.sql` var) | Taşınırken yeni numara: öneri `20260819000100` (tüm dal numaralarından sonra). Bağımlılık: K2 tablolarına dokunmaz |
 | `20260814_perf_indexes.sql` | 10 indeks önerisi | 8 haneli ad `^\d{14}[a-z]?_` desenine uymaz; `CREATE INDEX CONCURRENTLY` runner'ın tek transaction'ında çalışmaz | `14b` ilkinin yerine geçer: İKİSİNİ BİRLİKTE UYGULAMA. Ertelendi (O-13) |
 | `20260814b_perf_indexes_measured.sql` | 7 indeks (ölçüme göre daraltılmış) | aynı adlandırma/CONCURRENTLY sorunu | Ölçekli veri olmadan fayda doğrulanamadı |
 
