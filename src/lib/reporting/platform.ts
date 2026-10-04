@@ -65,25 +65,38 @@ export type PlatformReportingAggregate = {
   all_tenant_count: number;
 };
 
-const priceByPlan = new Map<PlanId, number>(PLANS.map((plan) => [plan.id, plan.monthlyTry]));
+/** Plan kimliği -> aylık liste fiyatı. Varsayılan kaynak plans.ts; panel düzenlemesi için okuyucudan beslenir. */
+export type PlanPriceMap = ReadonlyMap<string, number>;
 
-export function monthlyPrice(plan: PlanId): number {
-  return priceByPlan.get(plan) ?? 0;
+const defaultPrices: PlanPriceMap = new Map<string, number>(PLANS.map((plan) => [plan.id, plan.monthlyTry]));
+
+/** Plan tanımlarından (gizli dahil) fiyat haritası üretir; `getPlanDefinitions()` çıktısı verilir. */
+export function priceMapOf(defs: readonly { id: string; monthlyTry: number }[]): PlanPriceMap {
+  return new Map(defs.map((d) => [d.id, d.monthlyTry]));
 }
 
-/** Actual subscription MRR plus catalog fallback only for missing subscriptions. */
-export function exactMrr(planStats: readonly PlatformPlanStat[]): number {
+export function monthlyPrice(plan: PlanId, prices: PlanPriceMap = defaultPrices): number {
+  return prices.get(plan) ?? defaultPrices.get(plan) ?? 0;
+}
+
+/**
+ * Gerçek abonelik MRR'ı + yalnız aboneliği EKSİK aktif ofisler için katalog fiyatı.
+ * Kayıtlı abonelik tutarı (fatura tutarı) asla katalogdan yeniden hesaplanmaz.
+ */
+export function exactMrr(planStats: readonly PlatformPlanStat[], prices: PlanPriceMap = defaultPrices): number {
   return Math.round(planStats.reduce((total, row) => {
     const missing = Math.max(0, Number(row.active_count) - Number(row.subscription_count));
-    return total + Number(row.subscription_mrr) + missing * monthlyPrice(row.plan);
+    return total + Number(row.subscription_mrr) + missing * monthlyPrice(row.plan, prices);
   }, 0));
 }
 
-export function exactTrendMrr(row: PlatformMrrTrendRow): number {
-  const fallback = PLANS.reduce((total, plan) => {
-    const tenantCount = Number(row[`${plan.id}_count` as keyof PlatformMrrTrendRow] ?? 0);
-    const subscriptionCount = Number(row[`${plan.id}_subscription_count` as keyof PlatformMrrTrendRow] ?? 0);
-    return total + Math.max(0, tenantCount - subscriptionCount) * plan.monthlyTry;
-  }, 0);
+export function exactTrendMrr(row: PlatformMrrTrendRow, prices: PlanPriceMap = defaultPrices): number {
+  const ids = new Set<string>([...defaultPrices.keys(), ...prices.keys()]);
+  let fallback = 0;
+  for (const id of ids) {
+    const tenantCount = Number(row[`${id}_count` as keyof PlatformMrrTrendRow] ?? 0);
+    const subscriptionCount = Number(row[`${id}_subscription_count` as keyof PlatformMrrTrendRow] ?? 0);
+    fallback += Math.max(0, tenantCount - subscriptionCount) * (prices.get(id) ?? defaultPrices.get(id) ?? 0);
+  }
   return Math.round(Number(row.subscription_mrr) + fallback);
 }

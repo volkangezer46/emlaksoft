@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { Brand } from "@/components/brand/brand";
 import { ArrowRight, FileSignature, Scale, ShieldCheck } from "lucide-react";
-import { PLANS } from "@/lib/billing/plans";
+import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { trParts } from "@/lib/clock";
 
 type FooterLink = [label: string, href: string];
 
-const columns: { title: string; links: FooterLink[] }[] = [
+const BASE_COLUMNS: { title: string; links: FooterLink[] }[] = [
   {
     title: "Ürün",
     links: [
@@ -21,7 +21,8 @@ const columns: { title: string; links: FooterLink[] }[] = [
   },
   {
     title: "Paketler",
-    links: [...PLANS.map((p): FooterLink => [p.name, `/kayit?plan=${p.id}`]), ["Fiyatları karşılaştır", "/fiyatlar"]],
+    // Paket bağlantıları SiteFooter içinde etkin plan tanımlarından doldurulur.
+    links: [["Fiyatları karşılaştır", "/fiyatlar"]],
   },
   {
     title: "Kaynaklar",
@@ -54,7 +55,13 @@ const columns: { title: string; links: FooterLink[] }[] = [
   },
 ];
 
-export function SiteFooter() {
+export async function SiteFooter() {
+  const plans = await getPublicPlanDefinitions();
+  const columns = BASE_COLUMNS.map((col) =>
+    col.title === "Paketler"
+      ? { ...col, links: [...plans.map((p): FooterLink => [p.name, `/kayit?plan=${p.id}`]), ...col.links] }
+      : col,
+  );
   return (
     <footer className="mk-foot">
       <div className="mk-wrap" style={{ paddingBlock: "clamp(3rem, 2rem + 4vw, 5rem)" }}>

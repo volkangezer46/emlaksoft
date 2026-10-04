@@ -3,7 +3,7 @@ import { RegisterForm } from "./register-form";
 import { isRegistrationOpen } from "@/lib/platform-flags";
 import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/platform-setting-keys";
 import { normalizeBillingCycle, normalizePlanId } from "@/lib/billing/plans";
-import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
+import { getEffectiveTrialDays, getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
@@ -34,10 +34,11 @@ export default async function RegisterPage({
       </main>
     );
   }
-  const plans = await getPublicPlanDefinitions();
+  const [plans, trialDays] = await Promise.all([getPublicPlanDefinitions(), getEffectiveTrialDays()]);
   return (
     <RegisterForm
       plans={plans}
+      trialDays={trialDays}
       initialPlan={normalizePlanId(params.plan)}
       initialCycle={normalizeBillingCycle(params.cycle)}
     />
