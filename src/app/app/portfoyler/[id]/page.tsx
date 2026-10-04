@@ -80,6 +80,7 @@ import { getStageLabels } from "@/lib/definitions";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
 import type { CSSProperties } from "react";
 import { priceHealthLabel, propertyStatusLabel } from "@/lib/property-labels";
+import { SampleRecordBadge } from "@/components/ui/sample-data-badge";
 
 const RING_C = 2 * Math.PI * 42;
 
@@ -169,7 +170,7 @@ export default async function PropertyDetailPage({
     supabase
       .from("properties")
       .select(
-        "id, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, district_id, neighborhood_id, parcel_block, parcel_lot, lat, lng, features, price_health, published_at, created_at, updated_at, assigned_to, province:geo_provinces(name), district:geo_districts(name)",
+        "id, is_sample, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, district_id, neighborhood_id, parcel_block, parcel_lot, lat, lng, features, price_health, published_at, created_at, updated_at, assigned_to, province:geo_provinces(name), district:geo_districts(name)",
       )
       .eq("id", id)
       .is("deleted_at", null)
@@ -366,6 +367,7 @@ export default async function PropertyDetailPage({
                 Fiyat {priceHealthLabel(property.price_health)}
               </span>
               <span className="rounded-full bg-brand-600/20 px-2.5 py-1 text-xs font-bold text-cyan-300">{propertyStatusLabel(property.status)}</span>
+              <SampleRecordBadge show={property.is_sample === true} />
             </div>
             <h1 className="mt-3 font-display text-2xl font-extrabold text-white md:text-3xl">
               {property.title ?? property.property_code}

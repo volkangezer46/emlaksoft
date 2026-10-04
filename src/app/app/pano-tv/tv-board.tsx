@@ -7,6 +7,8 @@ import {
   AlertTriangle,
   CalendarClock,
   Building2,
+  UserPlus,
+  Sparkles,
   Gauge,
   LogOut,
   Maximize2,
@@ -22,9 +24,11 @@ import {
 } from "lucide-react";
 import { Brand } from "@/components/brand/brand";
 import { Celebration } from "@/components/ui/illustrations";
+import { AnimatedNumber } from "@/components/ui/animated-number";
 import { now, trParts } from "@/lib/clock";
 import type { TvData } from "@/lib/tv/tv-data";
 import {
+  ROTATION_OPTIONS,
   TV_SECTIONS,
   TV_SECTION_LABELS,
   TV_TEMPLATES,
@@ -49,34 +53,13 @@ const DAYS_TR = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma
 const MONTHS_TR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** Sayı geçişi: değer değişince eski değerden yenisine kısa süre yumuşak sayar (reduced-motion'da anında). */
-function TvNumber({ value, format = (n: number) => nf.format(n) }: { value: number; format?: (n: number) => string }) {
-  const reduced = useReducedMotion();
-  const [shown, setShown] = useState(value);
-  const from = useRef(value);
-  useEffect(() => {
-    if (reduced || from.current === value) {
-      from.current = value;
-      setShown(value);
-      return;
-    }
-    const start = performance.now();
-    const origin = from.current;
-    let raf = 0;
-    const step = (t: number) => {
-      const p = Math.min(1, (t - start) / 900);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setShown(Math.round(origin + (value - origin) * eased));
-      if (p < 1) raf = requestAnimationFrame(step);
-      else from.current = value;
-    };
-    raf = requestAnimationFrame(step);
-    return () => {
-      cancelAnimationFrame(raf);
-      from.current = value;
-    };
-  }, [value, reduced]);
-  return <>{format(shown)}</>;
+/**
+ * Sayı geçişi: tamsayılar hane hane akar (@number-flow/react, TEMBEL parça; hareket azaltmada düz metin).
+ * `format` verilirse (kısaltılmış para gibi) düz metin yazılır — nadiren değişir, DOM hafif kalır.
+ */
+function TvNumber({ value, format }: { value: number; format?: (n: number) => string }) {
+  if (format) return <>{format(value)}</>;
+  return <AnimatedNumber value={value} />;
 }
 
 function Pager({ page, pages }: { page: number; pages: number }) {
@@ -109,7 +92,7 @@ export function TvBoard({ tenantId, officeName }: { tenantId: string; officeName
   const [settings, updateSettings] = useTvSettings(tenantId);
   const [paused, setPaused] = useState(false);
   const { data, status, updatedAt, reload } = useTvData(tenantId, settings.showRevenue);
-  const tick = useRotation(paused);
+  const tick = useRotation(paused, settings.rotationSec);
   const clock = useClock();
   const reduced = useReducedMotion();
   const systemDark = useSystemDark();
@@ -124,6 +107,7 @@ export function TvBoard({ tenantId, officeName }: { tenantId: string; officeName
   const prevWon = useRef<number | null>(null);
   const prevIds = useRef<{ appt: Set<string>; prop: Set<string>; ev: Set<string> } | null>(null);
   const [fresh, setFresh] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<string | null>(null);
 
   useWakeLock(true);
 
@@ -131,6 +115,22 @@ export function TvBoard({ tenantId, officeName }: { tenantId: string; officeName
   useEffect(() => {
     document.documentElement.classList.add("tv-active");
     return () => document.documentElement.classList.remove("tv-active");
+  }, []);
+
+  // Kiosk: uygulama kabuğu (menü, üst şerit, sayfa içeriği) TV katmanının altında kalır; odak ve ekran
+  // okuyucu oraya gidemesin diye kardeş öğeler `inert` yapılır (çıkışta eski hâl geri gelir).
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const touched: Element[] = [];
+    for (let el: Element | null = root; el && el !== document.body; el = el.parentElement) {
+      for (const sib of Array.from(el.parentElement?.children ?? [])) {
+        if (sib === el || sib.hasAttribute("inert") || sib.tagName === "SCRIPT" || sib.tagName === "STYLE") continue;
+        sib.setAttribute("inert", "");
+        touched.push(sib);
+      }
+    }
+    return () => touched.forEach((el) => el.removeAttribute("inert"));
   }, []);
 
   // Tam ekran durumu + imleç gizleme (tam ekranda 3 sn hareketsizlik)
@@ -208,9 +208,16 @@ export function TvBoard({ tenantId, officeName }: { tenantId: string; officeName
     ]);
     prevIds.current = ids;
     let clear: ReturnType<typeof setTimeout> | undefined;
+    let toastTimer: ReturnType<typeof setTimeout> | undefined;
     if (added.size) {
       setFresh(added);
       clear = setTimeout(() => setFresh(new Set()), 6000);
+      // İnce bildirim: yeni kayıt anında köşede kısa süre görünür (tam ekran kutlama yalnız kazanılan anlaşmada)
+      const first = data.events.find((e) => added.has(e.id));
+      if (first) {
+        setToast(first.label);
+        toastTimer = setTimeout(() => setToast(null), 5000);
+      }
     }
     let stop: ReturnType<typeof setTimeout> | undefined;
     if (shouldCelebrate(prevWon.current, data.goal.deals)) {
@@ -221,6 +228,7 @@ export function TvBoard({ tenantId, officeName }: { tenantId: string; officeName
     return () => {
       if (clear) clearTimeout(clear);
       if (stop) clearTimeout(stop);
+      if (toastTimer) clearTimeout(toastTimer);
     };
   }, [data]);
 
@@ -298,7 +306,24 @@ export function TvBoard({ tenantId, officeName }: { tenantId: string; officeName
         </div>
       ) : null}
 
-      {status === "session" ? (
+      {toast && !celebrate ? (
+        <div className="tv-toast" role="status" aria-live="polite" key={toast}>
+          <Sparkles style={{ width: "1.2em", height: "1.2em" }} aria-hidden /> {toast}
+        </div>
+      ) : null}
+
+      {status === "session" && data ? (
+        <div className="tv-session" role="alert">
+          <span>Oturum süresi doldu; pano son verileri gösteriyor.</span>
+          {/* Oturum bittiği için tam sayfa yenileme isteniyor; Link ile istemci geçişi oturumu tazelemez. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+          <a className="tv-btn" data-primary="true" href="/giris?next=/app/pano-tv">
+            Yeniden giriş yap
+          </a>
+        </div>
+      ) : null}
+
+      {status === "session" && !data ? (
         <div className="tv-overlay" role="alert">
           <h2>Oturum süresi doldu</h2>
           <p>Panoyu sürdürmek için yeniden giriş yapın.</p>
@@ -380,7 +405,12 @@ function Sections({
 }) {
   const appts = useMemo(() => pageAt(data.appointments, 6, tick), [data.appointments, tick]);
   const league = useMemo(() => pageAt(data.league, 6, tick), [data.league, tick]);
-  const events = useMemo(() => pageAt(data.events, 6, tick), [data.events, tick]);
+  // Tek hücrelik kartlar 3'er satır sayfalar (büyük yazı sığsın)
+  const events = useMemo(() => pageAt(data.events, 3, tick), [data.events, tick]);
+  const leads = useMemo(() => pageAt(data.leads, 3, tick), [data.leads, tick]);
+  // Alt orta hücre dönüşümlü: canlı akış ↔ yeni portföyler (her rotasyonda biri)
+  const rotor = (["events", "properties"] as const).filter((k) => vis(k));
+  const rotorNow = rotor.length ? rotor[Math.floor(tick) % rotor.length] : null;
   const { goal, stats, alerts } = data;
   const sales = settings.template === "satis";
   const ringR = 42;
@@ -422,7 +452,7 @@ function Sections({
                   <circle className="tv-ring-fg" cx="50" cy="50" r={ringR} strokeDasharray={circ} strokeDashoffset={circ * (1 - pct / 100)} />
                 </svg>
                 <div className="tv-ring-label">
-                  %<TvNumber value={pct} format={(n) => String(n)} />
+                  <AnimatedNumber value={pct} kind="percent" />
                 </div>
               </div>
             ) : null}
@@ -493,22 +523,24 @@ function Sections({
         </Card>
       ) : null}
 
-      {vis("properties") ? (
-        <Card title="Yeni portföyler" icon={<Building2 style={{ width: "1.3em", height: "1.3em" }} aria-hidden />}>
-          {data.properties.length === 0 ? (
-            <p className="tv-empty">Henüz portföy yok.</p>
+      {vis("leads") ? (
+        <Card title="Yeni talepler" icon={<UserPlus style={{ width: "1.3em", height: "1.3em" }} aria-hidden />} pager={<Pager page={leads.page} pages={leads.pages} />}>
+          {leads.slice.length === 0 ? (
+            <p className="tv-empty">Henüz yeni talep yok.</p>
           ) : (
-            <div className="tv-props">
-              {data.properties.map((p) => (
-                <div key={p.id} className="tv-prop" data-fresh={fresh.has(p.id)}>
-                  {p.coverSrc ? <img src={p.coverSrc} alt="" loading="lazy" /> : null}
-                  <div className="tv-prop-cap">
-                    <b>{p.price !== null ? compactMoney(p.price) : "—"}</b>
-                    <span>{p.title}</span>
-                  </div>
-                </div>
+            <ul className="tv-list" key={leads.page}>
+              {leads.slice.map((l) => (
+                <li key={l.id} className="tv-row" data-fresh={fresh.has(`customer:${l.id}`)}>
+                  <span className="tv-row-main">
+                    <b>{l.name}</b>
+                    {l.source ? <span className="tv-row-sub">{l.source}</span> : null}
+                  </span>
+                  <span className="tv-row-sub" suppressHydrationWarning>
+                    {fmtAgo(l.at)}
+                  </span>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </Card>
       ) : null}
@@ -523,7 +555,7 @@ function Sections({
         </Card>
       ) : null}
 
-      {vis("events") ? (
+      {rotorNow === "events" ? (
         <Card title="Canlı akış" icon={<Radio style={{ width: "1.3em", height: "1.3em" }} aria-hidden />} pager={<Pager page={events.page} pages={events.pages} />}>
           {events.slice.length === 0 ? (
             <p className="tv-empty">Henüz hareket yok.</p>
@@ -540,6 +572,26 @@ function Sections({
                 </li>
               ))}
             </ul>
+          )}
+        </Card>
+      ) : null}
+
+      {rotorNow === "properties" ? (
+        <Card title="Yeni portföyler" icon={<Building2 style={{ width: "1.3em", height: "1.3em" }} aria-hidden />}>
+          {data.properties.length === 0 ? (
+            <p className="tv-empty">Henüz portföy yok.</p>
+          ) : (
+            <div className="tv-props">
+              {data.properties.map((p) => (
+                <div key={p.id} className="tv-prop" data-fresh={fresh.has(p.id)}>
+                  {p.coverSrc ? <img src={p.coverSrc} alt="" loading="lazy" /> : null}
+                  <div className="tv-prop-cap">
+                    <b>{p.price !== null ? compactMoney(p.price) : "—"}</b>
+                    <span>{p.title}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </Card>
       ) : null}
@@ -619,6 +671,16 @@ function SettingsPanel({
             {t === "auto" ? "Otomatik (sistem)" : t === "light" ? "Açık" : "Koyu"}
           </label>
         ))}
+      </fieldset>
+      <fieldset>
+        <legend className="tv-cap">Sayfa dönüş süresi</legend>
+        {ROTATION_OPTIONS.map((sec) => (
+          <label key={sec}>
+            <input type="radio" name="tv-rotation" checked={settings.rotationSec === sec} onChange={() => update({ rotationSec: sec })} />
+            {sec} saniye
+          </label>
+        ))}
+        <small>Liste sayfaları ve alt hücredeki canlı akış / portföy kartı bu sürede bir değişir.</small>
       </fieldset>
       <fieldset>
         <legend className="tv-cap">Bölümler</legend>

@@ -79,7 +79,7 @@ export function UserMenuPanel({
             }}
           >
             <MapIcon aria-hidden />
-            Turu yeniden başlat
+            Turları yeniden başlat
           </DropdownMenuItem>
         ) : null}
         {links.length > 0 || inApp ? <DropdownMenuSeparator /> : null}
