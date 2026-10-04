@@ -255,6 +255,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { href: "/app/belgeler", label: "Belge Merkezi", icon: ICONS.belge, module: "settings", tier: "more" },
       { href: "/app/denetim", label: "Denetim", icon: ICONS.denetim, module: "settings", tier: "more" },
       { href: "/app/abonelik", label: "Abonelik ve paket", icon: ICONS.abonelik, module: "billing", tier: "core" },
+      { href: "/app/buyume", label: "Arkadaşını getir", icon: ICONS.davet, module: "settings", tier: "more" },
       {
         // Yardım ve Destek: tek menü öğesi; yardım merkezi + mevcut destek talepleri sekme.
         href: "/app/yardim",

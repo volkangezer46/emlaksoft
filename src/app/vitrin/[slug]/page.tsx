@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { unstable_cache } from "next/cache";
+import { vitrinSignatureHref } from "@/lib/growth/attribution";
 import { ArrowRight, Building2, Calculator, MapPin, Ruler, BedDouble, Search, ShieldCheck } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LeadForm } from "@/app/lead/[token]/lead-form";
@@ -575,10 +576,14 @@ export default async function VitrinPage({
       </main>
 
       <footer className="border-t border-line py-6 text-center text-xs text-text-faint">
-        <Link href="/" className="font-semibold underline-offset-2 transition hover:text-brand-600 hover:underline">
-          Powered by EmlakSoft
+        <Link
+          href={vitrinSignatureHref(slug)}
+          rel="nofollow"
+          className="font-semibold underline-offset-2 transition hover:text-brand-600 hover:underline"
+        >
+          EmlakSoft ile hazırlandı
         </Link>{" "}
-        — Türkiye&apos;nin emlak işletim sistemi
+        — siz de ofisiniz için ücretsiz deneyin
       </footer>
     </div>
   );
