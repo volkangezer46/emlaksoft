@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { PERMISSION_EDITOR_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
+import { logActivity } from "@/lib/activity";
 import type { AppAction, AppModule, AppRole } from "@/lib/permissions";
 
 export type PermissionActionResult = { error?: string; ok?: boolean };
@@ -56,6 +57,14 @@ export async function updateTenantPermission(
     console.error("updateTenantPermission", error);
     return { error: "İzin güncellenemedi." };
   }
+
+  await logActivity({
+    tenantId: ctx.tenantId,
+    actorId: ctx.userId,
+    action: "permission.role_update",
+    entityType: "role_permission",
+    newValue: { role, module: mod, action, allowed },
+  });
 
   revalidatePath("/app/ayarlar/roller");
   revalidatePath("/app");
@@ -190,6 +199,14 @@ export async function resetRolePermissions(role: AppRole): Promise<PermissionAct
     console.error("resetRolePermissions", error);
     return { error: "Varsayılana döndürülemedi." };
   }
+
+  await logActivity({
+    tenantId: ctx.tenantId,
+    actorId: ctx.userId,
+    action: "permission.role_reset",
+    entityType: "role_permission",
+    newValue: { role },
+  });
 
   revalidatePath("/app/ayarlar/roller");
   revalidatePath("/app");
