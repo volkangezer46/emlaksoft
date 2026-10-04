@@ -213,6 +213,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/admin/tenants/[id]/page.tsx", fn: "AdminTenantDetailPage", calls: 1, tenantFilter: "var" },
   { file: "src/app/admin/tenants/page.tsx", fn: "AdminTenantsPage", calls: 1, tenantFilter: "var" },
   { file: "src/app/admin/tickets/[id]/page.tsx", fn: "AdminTicketDetailPage", calls: 1, tenantFilter: "var" },
+  { file: "src/app/admin/tickets/makrolar/page.tsx", fn: "MacrosPage", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/admin/tickets/page.tsx", fn: "AdminTicketsPage", calls: 1, tenantFilter: "var" },
   { file: "src/app/admin/tickets/yeni/page.tsx", fn: "NewAdminTicketPage", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/anket/[token]/page.tsx", fn: "SurveyPage", calls: 1, tenantFilter: "var" },
