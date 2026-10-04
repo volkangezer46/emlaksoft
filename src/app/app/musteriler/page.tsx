@@ -13,6 +13,7 @@ import {
   ChevronRight,
   ChevronsUpDown,
   Copy,
+  Upload,
   Flame,
   Gift,
   Moon,
@@ -662,6 +663,11 @@ export default async function CustomersPage({
             <ButtonLink href="/app/musteriler/cift-kayit" variant="secondary" size="sm" icon={Copy}>
               Çift kayıt kontrolü
             </ButtonLink>
+            {canCreate ? (
+              <ButtonLink href="/app/ice-aktarma" variant="secondary" size="sm" icon={Upload}>
+                İçe aktar
+              </ButtonLink>
+            ) : null}
             <ExportCsvButton
               action={exportCustomersCsv.bind(null, filters)}
               fullQuery={new URLSearchParams(Object.entries(filters).filter(([, v]) => v)).toString()}
