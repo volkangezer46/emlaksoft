@@ -78,7 +78,8 @@ function Content({
         <Icon aria-hidden="true" className={iconCls} />
       ) : null}
       {children}
-      {IconRight ? <IconRight aria-hidden="true" className={iconCls} /> : null}
+      {/* Sağ ikon (çoğunlukla ok) hover/odakta 2px ileri kayar: motion.css `.icon-nudge`. */}
+      {IconRight ? <IconRight aria-hidden="true" className={cn(iconCls, "icon-nudge")} /> : null}
     </>
   );
 }

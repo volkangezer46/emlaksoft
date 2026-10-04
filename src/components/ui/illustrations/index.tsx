@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import { IllustrationFrame, LINE, SOFT, TINT, type IllustrationTone } from "./frame";
 
 /**
@@ -213,16 +212,5 @@ export function Illustration({
   );
 }
 
-/**
- * Kutlama konfetisi — saf CSS, 1.2 sn, bir kez. YALNIZ anlaşma kazanıldığında /
- * ilk müşteri eklendiğinde kullan. reduced-motion'da hiç görünmez.
- */
-export function Celebration({ className = "" }: { className?: string }) {
-  return (
-    <span aria-hidden="true" className={`confetti ${className}`}>
-      {Array.from({ length: 14 }, (_, i) => (
-        <i key={i} style={{ "--i": i } as CSSProperties} />
-      ))}
-    </span>
-  );
-}
+/** Kutlama (konfeti / disk + tik) — tek kaynak `./celebration`. */
+export { Celebration } from "./celebration";

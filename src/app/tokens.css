@@ -215,7 +215,6 @@
   --animate-float: float 7s ease-in-out infinite;
   --animate-float-slow: float 11s ease-in-out infinite;
   --animate-aurora: aurora 18s ease-in-out infinite;
-  --animate-shimmer: shimmer 2.4s linear infinite;
   --animate-marquee: marquee 32s linear infinite;
   --animate-gradient: gradient-pan 6s ease infinite;
   --animate-pulse-ring: pulse-ring 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;

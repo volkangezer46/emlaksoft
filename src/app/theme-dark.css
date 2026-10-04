@@ -131,10 +131,6 @@ html[data-theme="dark"] .bg-amber-50:not(.theme-dark *) {
 html[data-theme="dark"] :is(.bg-zinc-50, .bg-zinc-100):not(.theme-dark *) {
   background-color: var(--surface-sunken);
 }
-html[data-theme="dark"] .skeleton {
-  background-color: rgba(255, 255, 255, 0.07);
-  background-image: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.08) 50%, transparent 100%);
-}
 html[data-theme="dark"] .glass-card {
   border-color: rgba(255, 255, 255, 0.08);
 }
