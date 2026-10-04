@@ -42,6 +42,7 @@ export const MODULE_LABELS: Record<AppModule, string> = {
   rentals:     "Kiralama Yönetimi",
   projects:    "Proje Satış",
   network:     "Ofisler Arası Ağ",
+  surveys:     "Anketler ve anketör",
   earnings_all: "Başkasının kazancı (yalnız Görüntüle)",
 };
 

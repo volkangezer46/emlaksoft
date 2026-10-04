@@ -47,8 +47,8 @@ function allHrefs(sections: ReturnType<typeof visibleSections>) {
 }
 
 describe("modül kayıt defteri", () => {
-  it("26 kapatılabilir modül, anahtarlar benzersiz ve DB biçimine uyar", () => {
-    expect(PERMISSION_MODULES_SOURCE.length).toBe(26);
+  it("27 kapatılabilir modül, anahtarlar benzersiz ve DB biçimine uyar", () => {
+    expect(PERMISSION_MODULES_SOURCE.length).toBe(27);
     expect(new Set(FEATURE_KEYS).size).toBe(FEATURE_KEYS.length);
     for (const key of FEATURE_KEYS) expect(key).toMatch(/^[a-z][a-z0-9_]{1,40}$/);
   });

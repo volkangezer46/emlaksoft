@@ -59,6 +59,7 @@ import {
   CalendarRange,
   ClipboardCheck,
   ClipboardList,
+  Headphones,
   Clock,
   Files,
   Info,
@@ -247,6 +248,8 @@ export const ICONS = {
   /** Raporlar sekmeleri: talep-arz dengesi, memnuniyet anketi. */
   talepArz: ArrowUpDown,
   memnuniyet: Smile,
+  /** Raporlar sekmesi: anketör kuyruğu ve anket sonuçları. */
+  anketor: Headphones,
 
   // --- Menü başlıkları (sayfa ikonlarından AYRI: başlık = kategori metaforu) -
   baslikBugun: Sun,

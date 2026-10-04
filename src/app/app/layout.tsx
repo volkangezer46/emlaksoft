@@ -74,6 +74,7 @@ const NAV_MODULES: AppModule[] = [
   "rentals",
   "projects",
   "network",
+  "surveys",
 ];
 
 type OfficeSummary = {

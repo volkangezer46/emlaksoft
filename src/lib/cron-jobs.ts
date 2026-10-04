@@ -33,6 +33,7 @@ export const CRON_JOBS = [
   { job: "haftalik-ozet", label: "Haftalık ofis özeti", path: "/api/cron/haftalik-ozet", schedule: "30 7 * * 1", cadenceLabel: "pazartesi 07:30", staleAfterMinutes: 12_960 },
   { job: "geo-sync", label: "Coğrafya tutarlılık denetimi", path: "/api/cron/geo-sync", schedule: "0 4 1 */3 *", cadenceLabel: "3 ayda bir", staleAfterMinutes: 144_000 },
   { job: "vitrin-alarm", label: "Vitrin fiyat alarmı", path: "/api/cron/vitrin-alarm", schedule: "30 10 * * *", cadenceLabel: "her gün 10:30", staleAfterMinutes: 2_160 },
+  { job: "anket-gorevleri", label: "Anket görevleri üretimi", path: "/api/cron/anket-gorevleri", schedule: "20 6 * * *", cadenceLabel: "her gün 06:20", staleAfterMinutes: 2_160 },
   { job: "anahtar-gecikme", label: "Anahtar gecikme takibi", path: "/api/cron/anahtar-gecikme", schedule: "0 9 * * *", cadenceLabel: "her gün 09:00", staleAfterMinutes: 2_160 },
   { job: "lig-snapshot", label: "Performans ligi anlık görüntüsü", path: "/api/cron/lig-snapshot", schedule: "0 2 1 * *", cadenceLabel: "ayın 1'i 02:00", staleAfterMinutes: 50_400 },
   { job: "ticket-sla", label: "Destek talebi SLA", path: "/api/cron/ticket-sla", schedule: "*/5 * * * *", cadenceLabel: "5 dakikada bir", staleAfterMinutes: 20 },
