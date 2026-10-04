@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/seo/store";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
-export const metadata: Metadata = {
-  title: "Çerez Politikası",
-  description: "EmlakSoft'un kullandığı çerezler ve yönetim seçenekleri.",
-  alternates: { canonical: "/cerez-politikasi" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildMetadata("/cerez-politikasi");
+}
 
 export default function CerezPolitikasiPage() {
   return (

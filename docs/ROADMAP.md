@@ -85,5 +85,5 @@ Ticari beta (güvenilir "Ofis paketi") → tam vizyon. Uygulama canlıda: https:
 - Proje talimatları (`CLAUDE.md`) "dark mode YOK" der; tasarım sistemi v3 çalışması "koyu tema" olarak anıldı ve
   `src/app/theme-dark.css` mevcut. Kod incelendiğinde `.theme-dark` bölüm sınıfı olarak kullanılıyor görünüyor
   (sayfa geneli tema anahtarı olup olmadığı doğrulanmadı). Karar sahibe aittir.
-- `CLAUDE.md` "13 cron route" yazar; `vercel.json` 27 zamanlama ve `src/app/api/cron` altında 27 route içerir.
+- `CLAUDE.md` "13 cron route" yazar; `vercel.json` 28 zamanlama ve `src/app/api/cron` altında 28 route içerir.
 - Eski devir belgeleri "secret rotasyonu bitmeden deploy yok" der; uygulama bu arada canlıya alınmış. Rotasyon açık (P0).

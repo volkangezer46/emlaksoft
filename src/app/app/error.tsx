@@ -53,6 +53,8 @@ export default function AppError({
           >
             <RotateCcw className="h-4 w-4" /> Tekrar dene
           </button>
+          {/* Hata sonrası sert gezinme bilerek (durum sıfırlanır); kök [...slug] rotası kuralı tetikler. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a
             href="/app"
             className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-5 py-2.5 text-sm font-semibold text-ink-950 transition hover:border-brand-300"

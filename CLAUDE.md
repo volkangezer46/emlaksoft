@@ -75,7 +75,9 @@ Oturumlu E2E yalnız izole test DB'de, açık `E2E_MUTATION_ALLOWED=true` ve ben
 - **PostgREST gömmeleri:** `properties`/`customers` gibi iki FK'lı tablolara gömme her zaman FK adıyla yazılır
   (`alias:properties!<tablo>_property_id_fkey(...)`); ipucusuz gömme listeyi sessizce boş bırakır
   (`src/lib/postgrest-embed-hint-contract.test.ts`).
-- **Cron:** 27 route `src/app/api/cron/*` + `vercel.json` (sayı `npm run check:cron` ile doğrulanır); hepsi `CRON_SECRET` Bearer doğrular
+- **SEO:** public sayfa metadata'sı yalnız `buildMetadata(path)` (`src/lib/seo/store.ts`); sayfa envanteri `src/lib/seo/registry.ts`, yönetim `/admin/seo` (modül `seo`),
+  sitemap/robots/yönlendirme/JSON-LD/robot tek yerde. Token'lı yüzeyler sitemap'e ASLA girmez. Yeni public sayfa kontrol listesi: `docs/MIMARI.md` "SEO sistemi".
+- **Cron:** 28 route `src/app/api/cron/*` + `vercel.json` (sayı `npm run check:cron` ile doğrulanır); hepsi `CRON_SECRET` Bearer doğrular
   ve `recordHeartbeat` yazar.
 
 Ayrıntı: `docs/MIMARI.md` · yol haritası: `docs/ROADMAP.md` · güncel durum: `docs/DURUM.md` · deploy: `docs/DEPLOY.md`.

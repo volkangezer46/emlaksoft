@@ -1,12 +1,13 @@
 import { isDemoLoginEnabled } from "@/lib/demo-environment";
 
-export const metadata = {
-  title: "Giriş Yap",
-  description: "EmlakSoft ofis ve personel paneline güvenli giriş.",
-  alternates: { canonical: "/giris" },
-  robots: { index: false, follow: true },
-};
+import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/seo/store";
 import { LoginForm } from "./login-form";
+
+// Giriş sayfası HER ZAMAN noindex'tir (registry canIndex=false kilidi; admin indekslenebilir yapamaz).
+export async function generateMetadata(): Promise<Metadata> {
+  return buildMetadata("/giris");
+}
 
 export default async function LoginPage({
   searchParams,

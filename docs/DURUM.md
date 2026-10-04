@@ -23,7 +23,7 @@ Bu sayılar bu tarihte dosya sisteminden/`package.json`'dan sayılmıştır; esk
 | Migration dosyası | 179 | `supabase/migrations/*.sql`; son: `20260813000300_expense_text_appointment_loose_definitions_system.sql` (canlı DB'de uygulandı, ledger 179/179) |
 | Canlıda uygulanmış migration | 176 (kullanıcı bildirimi — **doğrulanmadı**) | Kesin sonuç için `npm run check:migrations -- --database` |
 | `route.ts` dosyası | 51 | `src/app/**/route.ts` |
-| Cron route / `vercel.json` zamanlaması | 27 / 27 | `src/app/api/cron/*`, `vercel.json` |
+| Cron route / `vercel.json` zamanlaması | 28 / 28 | `src/app/api/cron/*`, `vercel.json` |
 | `page.tsx` | 160 (hepsi `src/app` altında) | `src/app/**/page.tsx` |
 | Test dosyası | 154 | `*.test.ts(x)` (src, e2e, scripts) |
 | Test (case) sayısı | **doğrulanmadı** | `npm run test` çıktısından alınmalı |

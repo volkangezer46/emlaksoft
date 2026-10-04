@@ -6,6 +6,7 @@ import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import { BrandProvider } from "@/components/brand/brand";
 import { getBrandMeta } from "@/lib/brand/store";
 import { brandIcons } from "@/lib/brand/icons";
+import { buildRootMetadata } from "@/lib/seo/store";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -42,18 +43,11 @@ const caveat = Caveat({
   fallback: ["Segoe Script", "cursive"],
 });
 
-const SITE_NAME = "EmlakSoft";
-const SITE_TITLE = "EmlakSoft — Türkiye’nin emlak işletim sistemi";
-const SITE_DESC =
-  "Müşteriden tapuya, ilandan komisyona kadar emlak ofisinizi tek platformda yönetin. İYS/EİDS hazırlık süreçleri ve yapay zeka destekli emlak CRM.";
-
+// Başlık, açıklama, Open Graph, Twitter ve arama motoru doğrulama kodları /admin/seo "Genel" sekmesinden
+// gelir (src/lib/seo/store.ts buildRootMetadata); ayar yokken değerler eskisiyle birebir aynıdır.
+// Canonical kökte VERİLMEZ: her sayfa kendi canonical'ını buildMetadata ile taşır (aksi halde
+// canonical'ı olmayan sayfalar ana sayfaya işaret ederdi).
 const baseMetadata: Metadata = {
-  title: {
-    default: SITE_TITLE,
-    template: "%s | EmlakSoft",
-  },
-  description: SITE_DESC,
-  applicationName: SITE_NAME,
   metadataBase: new URL(getBaseUrl()),
   manifest: "/manifest.webmanifest",
   keywords: [
@@ -66,20 +60,6 @@ const baseMetadata: Metadata = {
   publisher: "EmlakSoft",
   category: "business",
   formatDetection: { telephone: true, email: true, address: true },
-  alternates: { canonical: "/" },
-  openGraph: {
-    type: "website",
-    locale: "tr_TR",
-    siteName: SITE_NAME,
-    title: SITE_TITLE,
-    description: SITE_DESC,
-    url: "/",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: SITE_TITLE,
-    description: SITE_DESC,
-  },
   robots: {
     index: true,
     follow: true,
@@ -94,8 +74,8 @@ const baseMetadata: Metadata = {
 
 /** Favicon/ana ekran simgesi süper admin ayarından gelir (/admin/marka); ayar yoksa varsayılan dosyalar. */
 export async function generateMetadata(): Promise<Metadata> {
-  const brand = await getBrandMeta();
-  return { ...baseMetadata, icons: brandIcons(brand) };
+  const [brand, seoRoot] = await Promise.all([getBrandMeta(), buildRootMetadata()]);
+  return { ...baseMetadata, ...seoRoot, icons: brandIcons(brand) };
 }
 
 export const viewport: Viewport = {

@@ -20,6 +20,7 @@ import {
   Menu,
   Radar,
   Search,
+  SearchCheck,
   Palette,
   ShieldCheck,
   Sparkles,
@@ -104,6 +105,7 @@ const SECTIONS: { id: string; title: string | null; items: Item[] }[] = [
     items: [
       { href: "/admin/sistem", label: "Sistem sağlığı", icon: Radar, hint: "Geo, cron, push", module: "sistem" },
       { href: "/admin/marka", label: "Marka", icon: Palette, hint: "Logo ve favicon", module: "marka" },
+      { href: "/admin/seo", label: "SEO merkezi", icon: SearchCheck, hint: "Arama motoru, sitemap, robot", module: "seo" },
     ],
   },
 ];

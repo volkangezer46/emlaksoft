@@ -1,17 +1,12 @@
 import { RegisterForm } from "./register-form";
 import { normalizeBillingCycle, normalizePlanId } from "@/lib/billing/plans";
 
-export const metadata = {
-  title: "Ofisinizi Ücretsiz Oluşturun",
-  description:
-    "14 gün ücretsiz deneme ile EmlakSoft'a başlayın. Kredi kartı gerekmez. Deneme boyunca tüm paketlerin özellikleri açıktır. Portföy, müşteri ve komisyon yönetimi tek platformda.",
-  alternates: { canonical: "/kayit" },
-  openGraph: {
-    title: "EmlakSoft — Ücretsiz Başla",
-    description: "14 gün ücretsiz deneme. Emlak ofisinizi bugün dijitalleştirin.",
-    url: "/kayit",
-  },
-};
+import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/seo/store";
+
+export async function generateMetadata(): Promise<Metadata> {
+  return buildMetadata("/kayit");
+}
 
 export default async function RegisterPage({
   searchParams,

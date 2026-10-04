@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/seo/store";
 import Link from "next/link";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
-export const metadata: Metadata = {
-  title: "İptal & İade Politikası",
-  description: "Abonelik iptali, cayma hakkı ve iade koşulları.",
-  alternates: { canonical: "/iptal-iade" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildMetadata("/iptal-iade");
+}
 
 export default function IptalIadePage() {
   return (
