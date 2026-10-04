@@ -61,7 +61,7 @@ export const PLAN_GATES: readonly PlanGate[] = [
   { href: "/app/franchise", title: "Franchise BI", minPlan: "enterprise", pitch: "Şube ve ofis bazlı karşılaştırmalı yönetim raporları." },
 ];
 
-const PLAN_ORDER: readonly PlanId[] = ["advisor", "office", "professional", "enterprise"];
+const PLAN_ORDER: readonly PlanId[] = ["advisor", "office", "professional", "business", "enterprise"];
 
 export function planRank(plan: PlanId): number {
   return PLAN_ORDER.indexOf(plan);

@@ -18,6 +18,7 @@ import { OPEN_HOUSE_DRAFT_FIELDS, OPEN_HOUSE_TABS } from "@/app/app/acik-ev/yeni
 import { PRESENTATION_DRAFT_FIELDS, PRESENTATION_TABS } from "@/app/app/portfoyler/sunumlar/yeni/presentation-tabs";
 import { ADVISOR_DRAFT_FIELDS, ADVISOR_TABS } from "@/app/app/ekip/yeni/advisor-tabs";
 import { BROADCAST_DRAFT_FIELDS, BROADCAST_TABS } from "@/app/admin/duyuru/broadcast-tabs";
+import { ADMIN_TICKET_DRAFT_FIELDS, ADMIN_TICKET_TABS } from "@/app/admin/tickets/yeni/ticket-tabs";
 import { STAFF_DRAFT_FIELDS, STAFF_TABS } from "@/app/admin/personel/yeni/staff-tabs";
 import { OFFICE_CREATE_TABS, OFFICE_DRAFT_FIELDS } from "@/app/admin/tenants/yeni/office-tabs";
 import { isSensitiveFieldName } from "./form-tabs";
@@ -169,6 +170,12 @@ const FORMS = [
     source: "src/app/admin/duyuru/broadcast-form.tsx",
     tabs: BROADCAST_TABS as readonly TabLike[],
     draft: BROADCAST_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "admin destek talebi",
+    source: "src/app/admin/tickets/yeni/admin-ticket-form.tsx",
+    tabs: ADMIN_TICKET_TABS as readonly TabLike[],
+    draft: ADMIN_TICKET_DRAFT_FIELDS as readonly string[],
   },
   {
     name: "platform personeli",

@@ -1,4 +1,7 @@
-export type PlanId = "advisor" | "office" | "professional" | "enterprise";
+export type PlanId = "advisor" | "office" | "professional" | "business" | "enterprise";
+
+/** Yıllık ödemede ödenen ay sayısı varsayılanı ("10 öde 12 kullan"); plan başına panelden değişir. */
+export const DEFAULT_YEARLY_PAID_MONTHS = 10;
 export type BillingCycle = "monthly" | "yearly";
 
 export type PlanLimits = {
@@ -17,6 +20,22 @@ export type PlanDef = {
   popular?: boolean;
   features: string[];
   limits: PlanLimits;
+  /** Yıllık ödemede ödenen ay sayısı (varsayılan 10). Yıllık tutar = aylık x bu sayı. */
+  yearlyPaidMonths?: number;
+  /** Ek kullanıcı aylık fiyatı (KDV hariç); yoksa ek kullanıcı satılmaz. */
+  extraSeatMonthlyTry?: number | null;
+  /** Aylık AI kredi kotası (yalnız alan; ölçüm altyapısı ayrı paketle gelir). */
+  aiCreditsMonthly?: number | null;
+  /** Aylık profesyonel değerleme raporu kotası (yalnız alan). */
+  valuationReportsMonthly?: number | null;
+  /** true: fiyat yerine "Bize ulaşın" gösterilir, çevrimiçi ödeme açılmaz. */
+  customPricing?: boolean;
+  /** true: kayıt/fiyat sayfası ve yeni ödemede gizli; mevcut aboneler etkilenmez. */
+  hidden?: boolean;
+  /** Listeleme sırası (küçük önce). */
+  order?: number;
+  /** Kampanya (Founders) indirimli aylık fiyatı; kampanya aktif değilse yok sayılır. */
+  campaignMonthlyTry?: number | null;
 };
 
 /**
@@ -91,7 +110,7 @@ export const PLANS: readonly PlanDef[] = [
   },
 ] as const;
 
-const PLAN_IDS = new Set<PlanId>(PLANS.map((plan) => plan.id));
+const PLAN_IDS = new Set<PlanId>([...PLANS.map((plan) => plan.id), "business"]);
 
 export function isPlanId(value: string): value is PlanId {
   return PLAN_IDS.has(value as PlanId);
@@ -109,10 +128,39 @@ export function getPlan(id: string): PlanDef {
   return PLANS.find((plan) => plan.id === id) ?? PLANS[1]!;
 }
 
-/** Yıllık ödemede yüzde 20 indirim uygulanır. */
+/** Yıllık tutar = aylık x yıllık ödenen ay sayısı (varsayılan 10). */
 export function planAmountTry(planId: PlanId, cycle: BillingCycle): number {
-  const monthly = getPlan(planId).monthlyTry;
-  return cycle === "yearly" ? Math.round(monthly * 12 * 0.8) : monthly;
+  return planAmountOf(getPlan(planId), cycle);
+}
+
+/** Verilen tanım için dönem tutarı (panelden düzenlenmiş tanımlar dahil). */
+export function planAmountOf(
+  def: Pick<PlanDef, "monthlyTry" | "yearlyPaidMonths">,
+  cycle: BillingCycle,
+): number {
+  const months = def.yearlyPaidMonths ?? DEFAULT_YEARLY_PAID_MONTHS;
+  return cycle === "yearly" ? Math.round(def.monthlyTry * months) : def.monthlyTry;
+}
+
+/** Yıllık ödemede aylığa göre indirim yüzdesi (yuvarlanmış). */
+export function yearlyDiscountPercentOf(def: Pick<PlanDef, "yearlyPaidMonths">): number {
+  const months = def.yearlyPaidMonths ?? DEFAULT_YEARLY_PAID_MONTHS;
+  return Math.max(0, Math.round((1 - months / 12) * 100));
+}
+
+/** "10 öde 12 kullan" biçiminde kısa etiket. */
+export function yearlyOfferLabel(def: Pick<PlanDef, "yearlyPaidMonths">): string {
+  const months = def.yearlyPaidMonths ?? DEFAULT_YEARLY_PAID_MONTHS;
+  return `${months} öde 12 kullan`;
+}
+
+/** Kayıt/fiyat sayfası ve yeni ödemede gösterilecek (gizli olmayan) tanımlar, sıraya göre. */
+export function visiblePlans<T extends Pick<PlanDef, "hidden" | "order">>(defs: readonly T[]): T[] {
+  return defs
+    .map((d, i) => ({ d, i }))
+    .filter(({ d }) => !d.hidden)
+    .sort((a, b) => (a.d.order ?? a.i) - (b.d.order ?? b.i))
+    .map(({ d }) => d);
 }
 
 export function planLabel(id: string): string {
@@ -122,3 +170,21 @@ export function planLabel(id: string): string {
 export function planLimit(planId: string, key: keyof PlanLimits): number | null {
   return getPlan(planId).limits[key];
 }
+
+/**
+ * "Business" paketi şablonu. PLANS (veritabanı sözleşmeli kimlikler) içinde DEĞİLDİR:
+ * `plan` CHECK kısıtı ve plan_entitlements satırı forward-only migration
+ * (20260817000210_plan_business_and_pricing_support.sql) uygulanana kadar satılamaz.
+ * Yalnız okuyucu ve panel düzenleyicisi bunu "gizli" başlangıç tanımı olarak bilir.
+ */
+export const BUSINESS_PLAN_TEMPLATE: PlanDef = {
+  id: "business",
+  name: "Business",
+  monthlyTry: 8990,
+  blurb: "Çok şubeli büyük ofis",
+  eyebrow: "BÜYÜME",
+  features: ["40 kullanıcıya kadar", "Profesyonel paketin tüm özellikleri", "Öncelikli destek"],
+  limits: { seats: 40, customers: null, activeProperties: null, branches: 20 },
+  hidden: true,
+  order: 35,
+};

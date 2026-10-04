@@ -20,8 +20,8 @@ describe("billing plan catalog", () => {
     expect(normalizeBillingCycle("weekly")).toBe("monthly");
   });
 
-  it("uses a twenty percent yearly discount", () => {
-    expect(planAmountTry("advisor", "yearly")).toBe(990 * 12 * 0.8);
+  it("charges ten months for a yearly plan", () => {
+    expect(planAmountTry("advisor", "yearly")).toBe(990 * 10);
   });
 
   it("exposes enforceable advisor usage limits", () => {

@@ -20,7 +20,8 @@ const PLAN_RANK: Record<PlanId, number> = {
   advisor: 0,
   office: 1,
   professional: 2,
-  enterprise: 3,
+  business: 3,
+  enterprise: 4,
 };
 
 export function normalizeRegistrationTeamSize(value: string): RegistrationTeamSize {

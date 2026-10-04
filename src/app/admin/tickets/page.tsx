@@ -23,7 +23,6 @@ import type { TicketStatus } from "@/lib/support/ticket-contract";
 import { slaStateOf } from "./sla";
 import { TicketStatusDonut, TicketResolutionGauge } from "./ticket-dashboard-visuals";
 import { TicketQueueView, type TicketQueueRow } from "./ticket-queue-view";
-import { NewAdminTicketDialog, type TicketTenantOption } from "./new-admin-ticket-dialog";
 import {
   buildTicketListHref,
   formatDurationHours,
@@ -45,12 +44,6 @@ const STATUS_COLOR: Record<string, string> = {
   waiting: "var(--amber-400)",
   resolved: "var(--mint-500)",
   closed: "rgba(10,34,71,0.25)",
-};
-
-const TENANT_STATUS_LABEL: Record<string, string> = {
-  trial: "Deneme",
-  active: "Aktif",
-  past_due: "Ödeme bekliyor",
 };
 
 const SLA_FILTER_LABEL: Record<string, string> = {
@@ -419,42 +412,12 @@ export default async function AdminTicketsPage({
   const newLast14 = dailyNew.reduce((sum, day) => sum + day.value, 0);
 
   const selectedTenant = selectedTenantResult.data;
-  const tenantOptions: TicketTenantOption[] = (tenantOptionsResult.data ?? []).map((tenant) => ({
-    value: tenant.id,
-    label: tenant.name,
-    hint: TENANT_STATUS_LABEL[tenant.status] ?? tenant.status,
-  }));
   const staticCategoryOptions = TICKET_CATEGORY_KEYS.map((value, index) => ({
     value,
     label: TICKET_CATEGORY_LABEL[value],
     sort: index + 1,
   }));
   const definitionRows = categoryDefinitionsResult.data ?? [];
-  const globalDefinitions = definitionRows.filter((definition) => definition.tenant_id === null);
-  const dialogCategoryByValue = new Map<
-    string,
-    { value: string; label: string; sort: number; tenantScoped: boolean }
-  >();
-  for (const definition of (filters.tenant ? definitionRows : globalDefinitions)) {
-    const tenantScoped = definition.tenant_id !== null;
-    const existing = dialogCategoryByValue.get(definition.value);
-    if (!existing || (tenantScoped && !existing.tenantScoped)) {
-      dialogCategoryByValue.set(definition.value, {
-        value: definition.value,
-        label: definition.label,
-        sort: definition.sort_order ?? 0,
-        tenantScoped,
-      });
-    }
-  }
-  if (dialogCategoryByValue.size === 0) {
-    for (const category of staticCategoryOptions) {
-      dialogCategoryByValue.set(category.value, { ...category, tenantScoped: false });
-    }
-  }
-  const dialogCategoryOptions = [...dialogCategoryByValue.values()]
-    .sort((left, right) => left.sort - right.sort || left.label.localeCompare(right.label, "tr-TR"))
-    .map(({ value, label }) => ({ value, label }));
 
   const categoryByValue = new Map<string, { value: string; label: string; sort: number; tenantScoped: boolean }>();
   for (const definition of definitionRows) {
@@ -528,11 +491,18 @@ export default async function AdminTicketsPage({
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
             <ExportButton action={exportTicketsCsv} label="CSV dışa aktar" variant="light" />
-            <NewAdminTicketDialog
-              tenants={tenantOptions}
-              categories={dialogCategoryOptions}
-              defaultTenantId={filters.tenant}
-            />
+            <Link
+              href={filters.tenant ? `/admin/tickets/yeni?tenant=${filters.tenant}` : "/admin/tickets/yeni"}
+              className="btn-shine focus-ring press inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-sm font-bold text-white"
+            >
+              <LifeBuoy className="h-4 w-4" aria-hidden /> Yeni talep oluştur
+            </Link>
+            <Link
+              href="/admin/tickets/makrolar"
+              className="focus-ring press inline-flex min-h-10 items-center rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink-950"
+            >
+              Hazır yanıtlar
+            </Link>
           </div>
         </div>
       </header>

@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, FileSignature, ShieldAlert, Sparkles } from "lucide-react";
 import { Pricing } from "@/components/pricing";
-import { PLANS } from "@/lib/billing/plans";
+import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
+import type { PlanDef } from "@/lib/billing/plans";
 import { buildFaq, lostCommissionPlanName, yearlyDiscountPercent } from "@/lib/pricing-page-model";
 import { ComparisonTable } from "@/components/pricing-page/comparison-table";
 import { PricingShell, Section } from "@/components/pricing-page/page-shell";
@@ -21,12 +22,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function FiyatlarPage() {
+export default async function FiyatlarPage() {
+  const plans: PlanDef[] = await getPublicPlanDefinitions();
   const faq = buildFaq();
   const discount = yearlyDiscountPercent();
   const lost = lostCommissionPlanName();
-  const roiPlans = PLANS.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry, seats: p.limits.seats }));
-  const defaultPlanId = (PLANS.find((p) => p.popular) ?? PLANS[0]!).id;
+  const roiPlans = plans.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry, seats: p.limits.seats }));
+  const defaultPlanId = (plans.find((p) => p.popular) ?? plans[0]!).id;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -69,7 +71,7 @@ export default function FiyatlarPage() {
       </div>
 
       <section aria-label="Paketler" className="mx-auto max-w-6xl px-4 pb-4 pt-6 sm:px-6">
-        <Pricing />
+        <Pricing plans={plans} />
       </section>
 
       <section aria-label="Bilmeniz gerekenler" className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
@@ -87,7 +89,7 @@ export default function FiyatlarPage() {
       </section>
 
       <Section id="karsilastirma" title="Paketleri yan yana karşılaştırın" lead="Tablo, uygulamadaki gerçek paket kuralları ve sayfa kilitlerinden üretilir.">
-        <ComparisonTable />
+        <ComparisonTable plans={plans} />
       </Section>
 
       <Section

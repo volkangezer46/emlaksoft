@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { exportDemoRequestsCsv } from "@/app/actions/platform-export";
 import { DemoCard, type DemoRow } from "./demo-card";
+import { LeadPanel } from "./lead-panel";
 
 const FILTERS: { key: string; label: string }[] = [
   { key: "all", label: "Tümü" },
@@ -40,7 +41,7 @@ export default async function AdminSalesPage({
 }: {
   searchParams: Promise<{ durum?: string; q?: string; sayfa?: string }>;
 }) {
-  await requirePlatformModule("sales");
+  const salesStaff = await requirePlatformModule("sales");
   const sp = await searchParams;
   const filter = sp.durum && FILTERS.some((f) => f.key === sp.durum) ? sp.durum : "all";
   const q = (sp.q ?? "").trim();
@@ -102,13 +103,20 @@ export default async function AdminSalesPage({
 
   return (
     <div className="space-y-5">
+      {/* Satır içi sekmeli paneller (aday ekle/düzenle) burada açılır; popup yok. */}
+      <div id="inline-panel-host" className="min-w-0 empty:hidden" />
       <AdminPageHeader
         eyebrow="EmlakSoft · Satış hunisi"
         icon={Handshake}
         title="Demo talepleri & aday yönetimi"
         description="Tanıtım formundan gelen talepleri niteleyin, atayın ve aboneliğe dönüştürün."
         glow="mint"
-        actions={<ExportButton action={exportDemoRequestsCsv} label="Excel'e aktar" />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <LeadPanel />
+            <ExportButton action={exportDemoRequestsCsv} label="Excel'e aktar" />
+          </div>
+        }
       >
         <AdminStatGrid className="mt-6">
           {kpis.map((k) => (
@@ -200,7 +208,7 @@ export default async function AdminSalesPage({
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">
           {visible.map((row) => (
-            <DemoCard key={row.id} row={row} staff={staffList} />
+            <DemoCard key={row.id} row={row} staff={staffList} isSuperAdmin={salesStaff.role === "super_admin"} />
           ))}
         </div>
       )}

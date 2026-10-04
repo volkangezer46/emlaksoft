@@ -1,10 +1,10 @@
 import { Check, Minus } from "lucide-react";
-import { PLANS } from "@/lib/billing/plans";
+import { PLANS, type PlanDef } from "@/lib/billing/plans";
 import { buildComparison } from "@/lib/pricing-page-model";
 
 /** Paket karşılaştırma tablosu: satırlar plans.ts + page-gates.ts'ten üretilir. */
-export function ComparisonTable() {
-  const groups = buildComparison();
+export function ComparisonTable({ plans = PLANS }: { plans?: readonly PlanDef[] } = {}) {
+  const groups = buildComparison(plans);
   return (
     <div
       className="relative overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-sm)]"
@@ -19,7 +19,7 @@ export function ComparisonTable() {
             <th scope="col" className="sticky left-0 z-10 w-[34%] bg-surface-2 px-4 py-3 font-semibold text-ink-950">
               Özellik
             </th>
-            {PLANS.map((p) => (
+            {plans.map((p) => (
               <th key={p.id} scope="col" className="px-3 py-3 text-center font-semibold text-ink-950">
                 {p.name}
               </th>
@@ -29,7 +29,7 @@ export function ComparisonTable() {
         {groups.map((g) => (
           <tbody key={g.title}>
             <tr>
-              <th scope="colgroup" colSpan={PLANS.length + 1} className="bg-brand-50 px-4 py-2 text-xs font-bold uppercase tracking-wide text-brand-700">
+              <th scope="colgroup" colSpan={plans.length + 1} className="bg-brand-50 px-4 py-2 text-xs font-bold uppercase tracking-wide text-brand-700">
                 {g.title}
               </th>
             </tr>
@@ -39,7 +39,7 @@ export function ComparisonTable() {
                   {row.label}
                 </th>
                 {row.cells.map((cell, i) => (
-                  <td key={PLANS[i]!.id} className="px-3 py-3 text-center tabular-nums text-text">
+                  <td key={plans[i]!.id} className="px-3 py-3 text-center tabular-nums text-text">
                     {cell.included === undefined ? (
                       cell.text
                     ) : cell.included ? (
