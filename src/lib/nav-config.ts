@@ -100,6 +100,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/portfoyler", label: "Portföyler", icon: ICONS.portfoy, module: "properties" },
           { href: "/app/portfoyler/anahtarlar", label: "Anahtar Takibi", icon: ICONS.anahtarTakip, module: "properties" },
           { href: "/app/portfoyler/sunumlar", label: "Sunumlar", icon: ICONS.sunum, module: "properties" },
+          { href: "/app/ilan-havuzu", label: "İlan Havuzu", icon: ICONS.ilanHavuzu, module: "properties" },
         ],
         tier: "core",
       },

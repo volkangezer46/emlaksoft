@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+import { publishBlockReason } from "@/lib/property-owner/server";
 import {
   publishToPortal,
   updateOnPortal,
@@ -87,6 +88,10 @@ export async function publishPropertyToPortal(
     .maybeSingle();
 
   if (!property) return { error: "Portföy bulunamadı." };
+
+  // Yayın kapısı: havuzda bekleyen veya eksik ilan sahibi bilgisi olan ilan portala gönderilemez.
+  const blocked = await publishBlockReason(supabase, gate.tenantId, propertyId);
+  if (blocked) return { error: blocked };
 
   // API yapılandırıldı mı?
   const configured = await isPortalConfigured(portalName);

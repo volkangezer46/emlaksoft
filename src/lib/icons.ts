@@ -81,6 +81,7 @@ import {
   KeyRound,
   Layers,
   LayoutDashboard,
+  Waypoints,
   LifeBuoy,
   ListChecks,
   Mail,
@@ -149,6 +150,8 @@ export const ICONS = {
   teklif: Tag,
   /** Gelen kutusu (form/portal başvuruları). */
   gelenKutusu: Inbox,
+  /** İlan havuzu: atanmamış ilanların uzmanlığa göre dağıtımı. */
+  ilanHavuzu: Waypoints,
 
   // --- Finans ---------------------------------------------------------------
   /** Komisyon / hakediş. */

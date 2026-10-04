@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+import { createClient } from "@/lib/supabase/server";
+import { publishBlockReason } from "@/lib/property-owner/server";
 
 const MANUAL_STATUSES = ["draft", "live", "reserved", "passive", "withdrawn", "archived"] as const;
 
@@ -30,6 +32,15 @@ export async function bulkUpdatePropertyStatus(
   }
   const uniqueIds = [...new Set(ids.map((id) => String(id).trim()).filter(Boolean))];
   if (!uniqueIds.length) return { error: "Güncellenecek portföy seçilmedi." };
+
+  // Yayın kapısı: havuzda bekleyen veya eksik ilan sahibi bilgisi olan ilan yayına alınamaz.
+  if (newStatus === "live") {
+    const supabase = await createClient();
+    for (const id of uniqueIds) {
+      const blocked = await publishBlockReason(supabase, gate.tenantId, id);
+      if (blocked) return { error: blocked };
+    }
+  }
 
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("transition_property_status_atomic", {
