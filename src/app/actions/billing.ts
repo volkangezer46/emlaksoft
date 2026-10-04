@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { PLANS, planAmountOf, type BillingCycle, type PlanId } from "@/lib/billing/plans";
 import { getPlanDefinition } from "@/lib/billing/plan-definitions";
+import { quoteCoupon, redeemCoupon } from "@/lib/billing/coupon-server";
 import {
   IYZICO_CURRENCY,
   initializeCheckoutForm,
@@ -72,7 +73,18 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
   if (planDef.hidden || planDef.customPricing) {
     return { error: "Bu paket çevrimiçi satın alınamıyor. Lütfen bizimle iletişime geçin." };
   }
-  const amountTry = planAmountOf(planDef, cycle);
+  const listAmountTry = planAmountOf(planDef, cycle);
+  // Kupon (isteğe bağlı `coupon` alanı): önce tüketmeden doğrulanır, fatura oluşunca atomik tüketilir.
+  const couponCode = String(formData.get("coupon") ?? "").trim();
+  let couponDiscountTry = 0;
+  let couponNormalized = "";
+  if (couponCode) {
+    const quote = await quoteCoupon(couponCode, plan, listAmountTry);
+    if (!quote.ok) return { error: quote.error };
+    couponDiscountTry = quote.discountTry;
+    couponNormalized = quote.code;
+  }
+  const amountTry = Math.round((listAmountTry - couponDiscountTry) * 100) / 100;
   const invoiceAmounts = invoiceAmountsTry(amountTry);
   const conversationId = `es-${gate.tenantId.slice(0, 8)}-${randomBytes(12).toString("hex")}`;
   const configured = isIyzicoConfigured();
@@ -116,6 +128,20 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
     });
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Fatura taslağı oluşturulamadı." };
+  }
+
+  if (couponNormalized) {
+    const redeemed = await redeemCoupon({
+      code: couponNormalized,
+      tenantId: gate.tenantId,
+      invoiceId,
+      plan,
+      baseAmountTry: listAmountTry,
+    });
+    if (!redeemed.ok || Math.abs(redeemed.discountTry - couponDiscountTry) > 0.01) {
+      await markCheckoutInvoiceFailed({ invoiceId, tenantId: gate.tenantId });
+      return { error: redeemed.ok ? "Kupon tutarı değişti; lütfen yeniden deneyin." : redeemed.error };
+    }
   }
 
   // Sandbox anahtarı yoksa: demo ödeme akışı — YALNIZCA geliştirmede/açıkça izin verildiğinde.

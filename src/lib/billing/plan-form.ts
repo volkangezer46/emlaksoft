@@ -41,7 +41,7 @@ export function parsePlanForm(base: PlanDef, f: Fields): { plan: PlanDef } | { e
   if ("error" in seatPrice) return seatPrice;
   const campaignPrice = intField(f.campaign_monthly_try, "Kampanya fiyatı", { min: 1, max: PLAN_FIELD_LIMITS.priceMax, nullable: true });
   if ("error" in campaignPrice) return campaignPrice;
-  if (campaignPrice.value !== null && campaignPrice.value >= price.value) return { error: "Kampanya fiyatı liste fiyatından düşük olmalı." };
+  if (campaignPrice.value !== null && campaignPrice.value >= (price.value as number)) return { error: "Kampanya fiyatı liste fiyatından düşük olmalı." };
   const ai = intField(f.ai_credits_monthly, "AI kredi kotası", { min: 0, max: PLAN_FIELD_LIMITS.quotaMax, nullable: true });
   if ("error" in ai) return ai;
   const valuation = intField(f.valuation_reports_monthly, "Değerleme raporu kotası", { min: 0, max: PLAN_FIELD_LIMITS.quotaMax, nullable: true });
