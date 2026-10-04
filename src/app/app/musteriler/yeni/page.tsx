@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
-import { parsePhone } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { CustomerForm } from "./customer-form";
 
 export const metadata = { title: "Yeni müşteri" };
@@ -18,7 +18,10 @@ export default async function NewCustomerPage({
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
   const phoneRaw = one(sp.phone).trim();
-  const initialPhone = phoneRaw && parsePhone(phoneRaw).ok ? parsePhone(phoneRaw).stored : "";
+  const initialPhone = (() => {
+    const p = phoneRaw ? parsePhoneStrict(phoneRaw) : null;
+    return p && p.ok ? p.stored : "";
+  })();
   const linkRaw = one(sp.bagla).trim();
   const linkRef = LINK_REF.test(linkRaw) ? linkRaw : "";
   const { perms, userId } = await requireModulePage("customers");

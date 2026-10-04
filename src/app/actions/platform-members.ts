@@ -7,7 +7,8 @@ import { logPlatformActivity } from "@/lib/platform-activity";
 import { ASSIGNABLE_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
 import { getPlan } from "@/lib/billing/plans";
 import { getBaseUrl } from "@/lib/base-url";
-import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 
 export type MemberActionResult = { ok?: boolean; error?: string; link?: string };
 
@@ -38,7 +39,7 @@ export async function updateMemberProfile(fd: FormData): Promise<MemberActionRes
   if (fullName.length < 2 || fullName.length > 120) return { error: "Ad soyad 2 ile 120 karakter arasında olmalıdır." };
   let phone: string | null = null;
   if (phoneRaw) {
-    const parsed = parsePhone(phoneRaw);
+    const parsed = parsePhoneStrict(phoneRaw);
     if (!parsed.ok) return { error: parsed.error ?? PHONE_ERROR_MESSAGE };
     phone = parsed.stored;
   }
