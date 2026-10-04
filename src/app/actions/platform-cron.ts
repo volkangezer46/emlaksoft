@@ -6,6 +6,7 @@ import { logPlatformActivity } from "@/lib/platform-activity";
 import { CRON_JOBS } from "@/lib/cron-jobs";
 import { getBaseUrl } from "@/lib/base-url";
 import { now } from "@/lib/clock";
+import { fetchExternal, readExternalText } from "@/lib/external-fetch";
 
 export type CronRunResult = {
   ok?: boolean;
@@ -46,14 +47,17 @@ export async function runCronJobNow(fd: FormData): Promise<CronRunResult> {
   let status = 0;
   let detail = "";
   try {
-    const res = await fetch(`${getBaseUrl()}${job.path}`, {
-      method: "GET",
-      headers: secret ? { authorization: `Bearer ${secret}` } : {},
-      cache: "no-store",
-      signal: AbortSignal.timeout(CRON_TIMEOUT_MS),
-    });
+    const res = await fetchExternal(
+      `${getBaseUrl()}${job.path}`,
+      {
+        method: "GET",
+        headers: secret ? { authorization: `Bearer ${secret}` } : {},
+        cache: "no-store",
+      },
+      { timeoutMs: CRON_TIMEOUT_MS },
+    );
     status = res.status;
-    detail = (await res.text()).slice(0, 400);
+    detail = (await readExternalText(res).catch(() => "")).slice(0, 400);
   } catch (e) {
     detail = e instanceof Error ? e.message.slice(0, 200) : "Bağlantı hatası";
   }
