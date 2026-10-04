@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowUpRight, Eye, EyeOff, Mail, Phone, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatTurkishPhone } from "@/lib/phone";
-import { MergeWizard } from "./merge-wizard";
+import { MergeButton, MergePanel } from "./merge-wizard";
 
 export type DuplicateRecord = {
   customer_id: string;
@@ -208,7 +208,7 @@ export function DuplicateGroupsClient({ groups }: { groups: DuplicateGroup[] }) 
                       >
                         Bu grup mükerrer değil
                       </button>
-                      {g.kayitlar.length > 1 ? <MergeWizard kayitlar={g.kayitlar} /> : null}
+                      {g.kayitlar.length > 1 ? <MergeButton panelId={`merge-${g.kayitlar[0].customer_id}`} /> : null}
                     </>
                   )}
                 </div>
@@ -251,6 +251,9 @@ export function DuplicateGroupsClient({ groups }: { groups: DuplicateGroup[] }) 
                   );
                 })}
               </ul>
+              {g.kayitlar.length > 1 ? (
+                <MergePanel panelId={`merge-${g.kayitlar[0].customer_id}`} kayitlar={g.kayitlar} />
+              ) : null}
             </section>
           );
         })

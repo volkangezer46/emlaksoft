@@ -23,9 +23,9 @@ import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { EmptyState } from "@/components/app/empty-state";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
-import { SmsDialog } from "./sms-dialog";
+import { SmsReplyButton, SmsReplyPanel } from "./sms-panel";
 import { WaTemplateMenu } from "@/components/app/wa-template-menu";
-import { RowQuickActions } from "./row-actions";
+import { RowQuickActions, TaskPanel } from "./row-actions";
 import { LinkToCustomer } from "./link-to-customer";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
@@ -454,7 +454,7 @@ export async function InboxView({
             const telHref = toTelHref(item.phone);
             const waHref = toWhatsAppLink(item.phone);
             return (
-              <li key={item.key} className="group relative flex items-start gap-3 px-4 py-3 transition hover:bg-canvas">
+              <li key={item.key} className="group relative flex flex-wrap items-start gap-3 px-4 py-3 transition hover:bg-canvas">
                 {/* Satır overlay linki — müşteri kartına gider (müşterisizse link yok) */}
                 {item.customerId ? (
                   <Link
@@ -507,18 +507,14 @@ export async function InboxView({
                 <div className="flex shrink-0 items-center gap-1.5">
                   {/* İkincil eylemler overlay'in üstünde kalmalı → relative z-10 */}
                   {item.customerId ? (
-                    <SmsDialog
-                      customerId={item.customerId}
-                      customerName={item.customerName ?? "Müşteri"}
-                      consentGranted={smsGrantedIds.has(item.customerId)}
-                      variant="row"
-                    />
+                    <SmsReplyButton panelId={`sms-${item.key}`} customerName={item.customerName ?? "Müşteri"} />
                   ) : null}
                   {item.customerId ? (
                     <RowQuickActions
                       customerId={item.customerId}
                       customerName={item.customerName ?? "Müşteri"}
                       message={item.summary}
+                      taskPanelId={`task-${item.key}`}
                     />
                   ) : null}
                   {telHref ? (
@@ -547,6 +543,22 @@ export async function InboxView({
                     {relativeTime(item.at)}
                   </span>
                 </div>
+                {item.customerId ? (
+                  <>
+                    <SmsReplyPanel
+                      panelId={`sms-${item.key}`}
+                      customerId={item.customerId}
+                      customerName={item.customerName ?? "Müşteri"}
+                      consentGranted={smsGrantedIds.has(item.customerId)}
+                    />
+                    <TaskPanel
+                      panelId={`task-${item.key}`}
+                      customerId={item.customerId}
+                      customerName={item.customerName ?? "Müşteri"}
+                      message={item.summary}
+                    />
+                  </>
+                ) : null}
               </li>
             );
           })}

@@ -10,14 +10,7 @@ import {
   Loader2,
   ShieldAlert,
 } from "lucide-react";
-import {
-  Dialog,
-  DialogBody,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { InlinePanel, useInlinePanel } from "@/components/ui/inline-panel";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getMergePreview, mergeCustomers, type MergePreview } from "@/app/actions/customers";
@@ -33,13 +26,31 @@ import type { DuplicateRecord } from "./groups-client";
  * Geri alınamazlık her adımda açıkça belirtilir; asıl yazma işlemi yalnızca
  * ConfirmDialog onayından sonra çalışır.
  */
-export function MergeWizard({ kayitlar }: { kayitlar: DuplicateRecord[] }) {
+/** Grup başlığındaki düğme: sayfa içi birleştirme panelini açar/kapatır (popup yok). */
+export function MergeButton({ panelId }: { panelId: string }) {
+  const { open, toggle } = useInlinePanel(panelId);
+  return (
+    <Button variant="primary" size="sm" aria-expanded={open} aria-controls={panelId} onClick={(e) => toggle(e.currentTarget)}>
+      <GitMerge className="h-3.5 w-3.5" /> Birleştir
+    </Button>
+  );
+}
+
+/** Grubun altında açılan 3 adımlı birleştirme paneli. */
+export function MergePanel({ panelId, kayitlar }: { panelId: string; kayitlar: DuplicateRecord[] }) {
+  return (
+    <InlinePanel id={panelId} title="Müşteri kayıtlarını birleştir" icon={<GitMerge />} className="mt-3">
+      {(close) => <MergeBody kayitlar={kayitlar} close={close} />}
+    </InlinePanel>
+  );
+}
+
+function MergeBody({ kayitlar, close }: { kayitlar: DuplicateRecord[]; close: () => void }) {
   const router = useRouter();
   const enDolu = Math.max(...kayitlar.map((k) => k.activity));
   const onerilenId =
     kayitlar.find((k) => k.activity === enDolu)?.customer_id ?? kayitlar[0]?.customer_id ?? "";
 
-  const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"select" | "summary" | "done">("select");
   const [primaryId, setPrimaryId] = useState(onerilenId);
   const [preview, setPreview] = useState<MergePreview | null>(null);
@@ -49,13 +60,6 @@ export function MergeWizard({ kayitlar }: { kayitlar: DuplicateRecord[] }) {
 
   const duplicateIds = kayitlar.map((k) => k.customer_id).filter((id) => id !== primaryId);
   const primary = kayitlar.find((k) => k.customer_id === primaryId);
-
-  function reset() {
-    setStep("select");
-    setPrimaryId(onerilenId);
-    setPreview(null);
-    setError("");
-  }
 
   function goSummary() {
     setError("");
@@ -88,27 +92,11 @@ export function MergeWizard({ kayitlar }: { kayitlar: DuplicateRecord[] }) {
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (!o) reset();
-      }}
-    >
-      <DialogTrigger asChild>
-        <Button variant="primary" size="sm">
-          <GitMerge className="h-3.5 w-3.5" /> Birleştir
-        </Button>
-      </DialogTrigger>
-      <DialogContent size="md">
-        {step === "done" ? (
+    <div>
+      {
+        step === "done" ? (
           <>
-            <DialogHeader
-              icon={<CheckCircle2 />}
-              title="Birleştirme tamamlandı"
-              description="Kopya kayıtlar silindi, geçmiş ana kayda taşındı."
-            />
-            <DialogBody>
+            <div className="p-4">
               <div className="grid place-items-center py-4 text-center">
                 <span className="grid h-14 w-14 place-items-center rounded-[var(--radius-card)] bg-mint-500/12 text-mint-600">
                   <CheckCircle2 className="h-7 w-7" />
@@ -121,27 +109,20 @@ export function MergeWizard({ kayitlar }: { kayitlar: DuplicateRecord[] }) {
                   kayıtlar ana kayda taşındı.
                 </p>
               </div>
-            </DialogBody>
-            <DialogFooter>
-              <Button variant="secondary" onClick={() => setOpen(false)}>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-line p-4">
+              <Button variant="secondary" onClick={close}>
                 Kapat
               </Button>
               <ButtonLink href={`/app/musteriler/${primaryId}`}>Ana kaydı aç</ButtonLink>
-            </DialogFooter>
+            </div>
           </>
         ) : (
           <>
-            <DialogHeader
-              icon={<GitMerge />}
-              tone="danger"
-              title="Müşteri kayıtlarını birleştir"
-              description={
-                step === "select"
-                  ? "Adım 1/3 — Tutulacak ana kaydı seçin"
-                  : "Adım 2/3 — Taşınacakları kontrol edin"
-              }
-            />
-            <DialogBody className="space-y-4">
+            <p className="px-4 pt-4 text-xs font-semibold text-text-muted">
+              {step === "select" ? "Adım 1/3 — Tutulacak ana kaydı seçin" : "Adım 2/3 — Taşınacakları kontrol edin"}
+            </p>
+            <div className="space-y-4 p-4">
               {error ? (
                 <p
                   className="rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 px-3 py-2 text-sm text-danger-600"
@@ -263,11 +244,11 @@ export function MergeWizard({ kayitlar }: { kayitlar: DuplicateRecord[] }) {
                   )}
                 </>
               )}
-            </DialogBody>
-            <DialogFooter>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-line p-4">
               {step === "select" ? (
                 <>
-                  <Button variant="secondary" onClick={() => setOpen(false)}>
+                  <Button variant="secondary" onClick={close}>
                     Vazgeç
                   </Button>
                   <Button onClick={goSummary} disabled={!primaryId || duplicateIds.length === 0}>
@@ -300,10 +281,10 @@ export function MergeWizard({ kayitlar }: { kayitlar: DuplicateRecord[] }) {
                   />
                 </>
               )}
-            </DialogFooter>
+            </div>
           </>
-        )}
-      </DialogContent>
-    </Dialog>
+        )
+      }
+    </div>
   );
 }
