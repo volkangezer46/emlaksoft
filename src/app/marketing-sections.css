@@ -210,3 +210,78 @@
 @supports (animation-timeline: view()) {
   .mk-reveal { animation: mk-in linear both; animation-timeline: view(); animation-range: entry 0% entry 35%; }
 }
+
+/* ---- mega menü (içerik: src/lib/marketing-nav.ts) ---- */
+.mk-mega { position: absolute; left: 0; right: 0; top: 100%; z-index: 5; padding-top: 0.5rem; pointer-events: none; }
+.mk-mega[hidden] { display: none; }
+.mk-mega-in { pointer-events: auto; display: grid; grid-template-columns: minmax(0, 1fr) 19rem; gap: 1.25rem; width: min(70rem, calc(100% - 2rem)); margin-inline: auto; padding: 1.25rem; background: #fff; border: 1px solid var(--mk-line); border-radius: 24px; box-shadow: var(--mk-sh-3); animation: mk-drop var(--motion-base) var(--mk-ease); }
+.mk-mega-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem 1.5rem; align-content: start; }
+.mk-mega-cols[data-cols="1"] { grid-template-columns: minmax(0, 1fr); }
+.mk-mega-title { margin: 0 0 0.375rem 0.75rem; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mk-muted); }
+.mk-mega ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.125rem; }
+.mk-mega li { animation: mk-in var(--motion-base) var(--mk-ease) both; animation-delay: calc(var(--i, 0) * 30ms); }
+.mk-mega li a { display: flex; align-items: center; gap: 0.75rem; min-height: 3.25rem; padding: 0.5rem 0.75rem; border-radius: 14px; text-decoration: none; color: var(--mk-ink); transition: background-color var(--motion-fast), transform var(--motion-fast) var(--mk-ease); }
+.mk-mega li a:hover { background: #f1f5ff; transform: translateX(2px); }
+.mk-mega li b { display: block; font-size: 0.9375rem; font-weight: 700; }
+.mk-mega li small { display: block; font-size: 0.8125rem; color: var(--mk-muted); margin-top: 1px; }
+.mk-mega li a:hover .mk-panel-ico { background: var(--mk-blue-text); color: #fff; }
+.mk-mega-feat { position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; padding: 1.25rem; border-radius: 18px; text-decoration: none; color: #fff; background: linear-gradient(165deg, #0b1e4a 0%, #14174a 60%, #2a1672 100%); transition: transform var(--motion-base) var(--mk-ease), box-shadow var(--motion-base); }
+.mk-mega-feat::before { content: ""; position: absolute; z-index: -1; right: -3rem; top: -3rem; width: 11rem; height: 11rem; border-radius: 50%; background: radial-gradient(circle, rgba(122, 60, 240, 0.55), transparent 68%); }
+.mk-mega-feat:hover { transform: translateY(-2px); box-shadow: 0 16px 36px rgba(16, 40, 110, 0.32); }
+.mk-mega-feat-ico { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 14px; background: rgba(255, 255, 255, 0.14); color: #b9d0ff; }
+.mk-mega-feat-eyebrow { font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #9fc0ff; }
+.mk-mega-feat b { font-family: var(--font-manrope), system-ui, sans-serif; font-size: 1.125rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.25; }
+.mk-mega-feat small { font-size: 0.875rem; line-height: 1.5; color: rgba(255, 255, 255, 0.82); }
+.mk-mega-feat-cta { display: inline-flex; align-items: center; gap: 0.35rem; margin-top: auto; padding-top: 0.5rem; font-size: 0.9375rem; font-weight: 700; color: #fff; }
+.mk-mega-feat-cta svg { transition: transform var(--motion-fast) var(--mk-ease); }
+.mk-mega-feat:hover .mk-mega-feat-cta svg { transform: translateX(3px); }
+.mk-nav[data-menu]::before { background: rgba(255, 255, 255, 0.98); }
+/* Mobil panel: alt başlık + öne çıkan kart */
+.mk-sheet-sub { margin: 0.25rem 0 0.25rem 0.5rem; font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mk-muted); }
+.mk-sheet-group .mk-mega-feat { margin: 0.25rem 0 1rem; }
+.mk-sheet-group[open] > :not(summary) { animation: mk-in var(--motion-base) var(--mk-ease) both; }
+
+/* ---- ayrıntılar (Highlights) ---- */
+.mk-hl-grid { list-style: none; margin: 2.5rem 0 0; padding: 0; display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 720px) { .mk-hl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .mk-hl-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } .mk-hl { grid-column: span 2; } .mk-hl-wide { grid-column: span 3; } }
+.mk-hl { position: relative; display: flex; flex-direction: column; gap: 0.5rem; padding: 1.5rem; border-radius: 24px; background: #fff; border: 1px solid var(--mk-line); box-shadow: var(--mk-sh-1); transition: transform var(--motion-base) var(--mk-ease), box-shadow var(--motion-base), border-color var(--motion-base); }
+.mk-hl:hover { transform: translateY(-3px); box-shadow: var(--mk-sh-2); border-color: #c5d3f5; }
+.mk-hl p { margin: 0; font-size: 0.9375rem; line-height: 1.6; color: var(--mk-body); }
+.mk-hl-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.5rem; }
+.mk-hl-visual { position: relative; margin-top: auto; padding-top: 1rem; }
+.mk-hl-visual .mk-tag { position: absolute; right: 0.5rem; bottom: 0.5rem; font-size: 0.6875rem; }
+.mk-hl-tv { display: grid; gap: 0.5rem; padding: 1rem; border-radius: 16px; background: linear-gradient(160deg, #081a45, #130f3a); }
+.mk-hl-tv i { display: block; height: 0.75rem; width: var(--w); border-radius: 999px; background: linear-gradient(90deg, #5a8bff, #a58bff); transform-origin: left center; animation: mk-bar 4.8s ease-in-out infinite alternate; animation-delay: var(--d, 0s); }
+.mk-hl-tog { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; padding: 1rem; border-radius: 16px; background: #f1f5ff; }
+.mk-hl-tog span { position: relative; height: 1.5rem; border-radius: 999px; background: #c5cfe6; }
+.mk-hl-tog span::after { content: ""; position: absolute; left: 0.2rem; top: 0.2rem; width: 1.1rem; height: 1.1rem; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(10, 23, 54, 0.3); }
+.mk-hl-tog span::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--mk-blue-text); opacity: 0; }
+.mk-hl-tog span.on::before { opacity: 1; }
+.mk-hl-tog span.on::after { transform: translateX(1.5rem); }
+.mk-hl-tog span:nth-child(2)::before { animation: mk-tog-bg 6s ease-in-out infinite alternate; }
+.mk-hl-tog span:nth-child(2)::after { animation: mk-tog 6s ease-in-out infinite alternate; }
+@keyframes mk-bar { from { transform: scaleX(0.55); } to { transform: scaleX(1); } }
+@keyframes mk-tog { 0%, 40% { transform: translateX(0); } 60%, 100% { transform: translateX(1.5rem); } }
+@keyframes mk-tog-bg { 0%, 40% { opacity: 0; } 60%, 100% { opacity: 1; } }
+.mk-fine a { color: var(--mk-blue-text); font-weight: 600; }
+
+/* ---- kademeli giriş: --i sırası ile (yalnız kaydırma-zaman çizelgesi destekleyen tarayıcı; yalnız opacity/transform) ---- */
+@supports (animation-timeline: view()) {
+  .mk-stagger > * { animation: mk-in linear both; animation-timeline: view(); animation-range: entry calc(var(--i, 0) * 4%) entry calc(32% + var(--i, 0) * 4%); }
+  .mk-step.mk-reveal { animation-range: entry calc(var(--i, 0) * 5%) entry calc(35% + var(--i, 0) * 5%); }
+}
+.mk-trust[data-count="4"] > li:last-child { grid-column: auto; }
+@media (min-width: 900px) { .mk-trust[data-count="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.mk-trust b { font-variant-numeric: tabular-nums; }
+
+/* ---- ince hareket: hero ışığı ve paralaks (compositor: transform) ---- */
+@keyframes mk-drift { to { transform: translate3d(-4rem, 3rem, 0) scale(1.08); } }
+.mk-hero-bg::before { content: ""; position: absolute; right: 4%; top: -6rem; width: 36rem; height: 36rem; border-radius: 50%; background: radial-gradient(circle, rgba(122, 60, 240, 0.2), transparent 66%); animation: mk-drift 16s ease-in-out infinite alternate; }
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes mk-par { to { transform: translate3d(0, 2.5rem, 0); } }
+    .mk-scene-sky { animation: mk-par linear both; animation-timeline: scroll(root); animation-range: 0 70vh; }
+  }
+}
+@media (max-width: 559px) { .mk-hero-bg::before { display: none; } }

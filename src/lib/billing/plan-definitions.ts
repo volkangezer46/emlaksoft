@@ -4,7 +4,7 @@ import {
   PLAN_DEFINITIONS_SETTING_KEY,
   applyPlanOverrides,
   effectiveMonthlyTry,
-  parsePlanCatalogSettings,
+  resolveCatalogSettings,
   type PlanCampaignSettings,
   type PlanCatalogSettings,
 } from "@/lib/billing/plan-overrides";
@@ -32,9 +32,9 @@ export const PLAN_DEFINITIONS_TAG = "plan-definitions";
 const loadCatalog = unstable_cache(
   async (): Promise<PlanCatalogSettings> => {
     const raw = await getPlatformSetting(PLAN_DEFINITIONS_SETTING_KEY);
-    return parsePlanCatalogSettings(raw);
+    return resolveCatalogSettings(raw);
   },
-  ["plan-catalog-v2"],
+  ["plan-catalog-v3"],
   { tags: [PLAN_DEFINITIONS_TAG], revalidate: 300 },
 );
 

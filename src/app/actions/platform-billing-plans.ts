@@ -14,7 +14,7 @@ import {
   RECOMMENDED_CATALOG_OVERRIDES,
   applyPlanOverrides,
   diffAgainstDefault,
-  parsePlanCatalogSettings,
+  resolveCatalogSettings,
   serializePlanCatalogSettings,
   type PlanCatalogSettings,
 } from "@/lib/billing/plan-overrides";
@@ -36,7 +36,7 @@ async function guard(action: string) {
 }
 
 async function loadSettings(): Promise<PlanCatalogSettings> {
-  return parsePlanCatalogSettings(await getPlatformSetting(PLAN_DEFINITIONS_SETTING_KEY));
+  return resolveCatalogSettings(await getPlatformSetting(PLAN_DEFINITIONS_SETTING_KEY));
 }
 
 async function persist(settings: PlanCatalogSettings, staffId: string): Promise<boolean> {

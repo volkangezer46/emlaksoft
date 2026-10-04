@@ -70,14 +70,15 @@ describe("/fiyatlar sözleşmesi: tek kaynak plans.ts + page-gates.ts", () => {
     }
     const kayit = read("src/app/kayit/register-form.tsx");
     expect(kayit).toContain("Kredi kartı gerekmez");
-    expect(kayit).toContain("14 gün ücretsiz");
+    expect(kayit).not.toContain("14 gün");
+    expect(kayit).toContain("trialDays");
     expect(read("src/components/pricing.tsx")).toContain("KDV hariç");
   });
 
   it("FAQ JSON-LD yalnız görünen SSS'den üretilir", () => {
     const page = read("src/app/fiyatlar/page.tsx");
     expect(page).toContain("faq.map");
-    expect(page.match(/const faq = buildFaq\(\)/g)).toHaveLength(1);
+    expect(page.match(/const faq = buildFaq\(\{ trialDays, plans \}\)/g)).toHaveLength(1);
   });
 
   it("hesaplayıcı commission.ts'i yeniden kullanır ve sektör verisi yoktur", () => {
