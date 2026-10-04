@@ -19,7 +19,7 @@ const TABS = [
 export default async function AdminSystemPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ sekme?: string; durum?: string; son?: string; sayfa?: string }>;
+  searchParams?: Promise<{ sekme?: string; durum?: string; son?: string; sayfa?: string; q?: string; kaynak?: string; ofis?: string }>;
 }) {
   await requirePlatformModule("sistem");
   const sp = (await searchParams) ?? {};

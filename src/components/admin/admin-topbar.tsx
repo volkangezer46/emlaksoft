@@ -17,6 +17,7 @@ import {
   MapPin,
   Plus,
   Undo2,
+  UserRound,
 } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
 
@@ -149,7 +150,10 @@ export function AdminTopbar({
           initials={staffName.split(/\s+/).map((p) => p[0] ?? "").join("").slice(0, 2).toLocaleUpperCase("tr-TR") || "P"}
           name={staffName}
           subtitle={roleLabel}
-          links={[{ href: "/app", label: "Ofis paneline dön", icon: Undo2 }]}
+          links={[
+            { href: "/admin/hesabim", label: "Hesabım", icon: UserRound },
+            { href: "/app", label: "Ofis paneline dön", icon: Undo2 },
+          ]}
         />
       </div>
     </header>

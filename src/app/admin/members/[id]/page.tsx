@@ -7,6 +7,8 @@ import {
   CalendarDays,
   History,
   KeyRound,
+  LayoutList,
+  Pencil,
   Mail,
   Phone,
   ShieldCheck,
@@ -17,6 +19,8 @@ import { requirePlatformModule } from "@/lib/platform";
 import { formatTurkishPhone } from "@/lib/phone";
 import { auditActionLabel, relativeTimeTR } from "@/lib/admin-format";
 import { formatDateTimeTr } from "@/lib/format";
+import { PageTabs } from "@/components/app/page-tabs";
+import { MemberAccessPanel, MemberInfoForm } from "./member-forms";
 
 const roleLabel: Record<string, string> = {
   owner: "Ofis sahibi",
@@ -50,9 +54,23 @@ function fmtDateTime(iso: string) {
   return formatDateTimeTr(iso, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export default async function AdminMemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  await requirePlatformModule("members");
+const MEMBER_TABS = [
+  { id: "genel", label: "Genel", icon: LayoutList },
+  { id: "bilgiler", label: "Bilgiler", icon: Pencil },
+  { id: "erisim", label: "Erişim", icon: ShieldCheck },
+] as const;
+
+export default async function AdminMemberDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ sekme?: string }>;
+}) {
+  const staff = await requirePlatformModule("members");
   const { id } = await params;
+  const sekme = (await searchParams)?.sekme;
+  const active = sekme === "bilgiler" || sekme === "erisim" ? sekme : "genel";
   const admin = createAdminClient();
 
   /*
@@ -153,6 +171,30 @@ export default async function AdminMemberDetailPage({ params }: { params: Promis
         </div>
       </section>
 
+      <PageTabs base={`/admin/members/${id}`} label="Üye sekmeleri" tabs={MEMBER_TABS} active={active} />
+
+      {active === "bilgiler" ? (
+        <MemberInfoForm
+          id={id}
+          fullName={profile.full_name}
+          phone={profile.phone}
+          email={authUser?.email ?? null}
+        />
+      ) : null}
+
+      {active === "erisim" ? (
+        <MemberAccessPanel
+          id={id}
+          role={profile.role}
+          roleLabel={roleLabel[profile.role] ?? profile.role}
+          isActive={profile.is_active}
+          canRole={staff.role === "super_admin"}
+          canActive={staff.role === "super_admin" || staff.role === "ops"}
+          canReset={staff.role === "super_admin"}
+        />
+      ) : null}
+
+      {active === "genel" ? (
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Son girişler */}
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
@@ -221,6 +263,7 @@ export default async function AdminMemberDetailPage({ params }: { params: Promis
           )}
         </section>
       </div>
+      ) : null}
     </div>
   );
 }

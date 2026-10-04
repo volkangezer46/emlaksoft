@@ -13,6 +13,8 @@ import { OpenAiKeyForm } from "@/components/admin/openai-key-form";
 import { EndeksaKeyForm, TapusorKeyForm } from "@/components/admin/integration-keys-form";
 import { PortalApiKeysSection } from "@/components/admin/portal-keys-form";
 import { getPortalConfig } from "@/lib/integrations/portals";
+import { CronRunButton } from "./cron-run-button";
+import { MessagingKeysSection } from "./messaging-keys-form";
 
 const TOTAL_PROVINCES = 81;
 
@@ -76,16 +78,23 @@ export async function SystemView() {
   const [
     dbKey,
     dbEndeksaId, dbEndeksaSecret, dbTapusorKey,
+    dbNetgsmUser, dbNetgsmPass, dbNetgsmHeader, dbWaUrl, dbWaToken,
     sahibindenConfig, hepsiemlakConfig, zingatConfig, emlakjetConfig,
     { count: provinces }, { count: districts }, { count: neighborhoods },
     { data: heartbeatRows },
     schemaRows,
     { count: openErrors },
+    { data: manualRunRows },
   ] = await Promise.all([
     getPlatformSetting("openai_api_key"),
     getPlatformSetting("endeksa_client_id"),
     getPlatformSetting("endeksa_client_secret"),
     getPlatformSetting("tapusor_api_key"),
+    getPlatformSetting("netgsm_usercode"),
+    getPlatformSetting("netgsm_password"),
+    getPlatformSetting("netgsm_msgheader"),
+    getPlatformSetting("whatsapp_api_url"),
+    getPlatformSetting("whatsapp_api_token"),
     getPortalConfig("sahibinden"),
     getPortalConfig("hepsiemlak"),
     getPortalConfig("zingat"),
@@ -96,7 +105,23 @@ export async function SystemView() {
     admin.from("cron_heartbeats").select("job, last_run_at, last_status, last_detail"),
     probeSchema(),
     admin.from("error_logs").select("id", { count: "exact", head: true }).is("resolved_at", null),
+    admin
+      .from("platform_audit_logs")
+      .select("id, actor_id, meta, created_at")
+      .eq("action", "platform_cron.run")
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
+  const canRun = staff.role === "super_admin";
+  type ManualRun = { id: string; actor_id: string | null; meta: { job?: string; label?: string; status?: number; ok?: boolean; duration_ms?: number } | null; created_at: string };
+  const manualRuns = (manualRunRows ?? []) as ManualRun[];
+  const runActorIds = [...new Set(manualRuns.map((r) => r.actor_id).filter(Boolean))] as string[];
+  const { data: runActors } = runActorIds.length
+    ? await admin.from("platform_staff").select("id, full_name").in("id", runActorIds)
+    : { data: [] as { id: string; full_name: string }[] };
+  const runActorName = new Map((runActors ?? []).map((a) => [a.id, a.full_name] as const));
+  const lastManualByJob = new Map<string, ManualRun>();
+  for (const r of manualRuns) if (r.meta?.job && !lastManualByJob.has(r.meta.job)) lastManualByJob.set(r.meta.job, r);
 
   const heartbeats = new Map<string, Heartbeat>();
   for (const h of (heartbeatRows ?? []) as Heartbeat[]) heartbeats.set(h.job, h);
@@ -136,6 +161,19 @@ export async function SystemView() {
   // Endeksa/Tapusor masked değerler (güvenli gösterim)
   const maskedEndeksaId = endeksaClientId ? mask(endeksaClientId, 4, 3) : null;
   const maskedTapusorKey = tapusorApiKey ? mask(tapusorApiKey) : null;
+
+  // Netgsm / WhatsApp — DB öncelikli, env yedek; ekrana yalnız maskeli özet düşer (parola/anahtar asla)
+  const netgsmUser = dbNetgsmUser?.trim() || process.env.NETGSM_USERCODE?.trim() || null;
+  const netgsmHeader = dbNetgsmHeader?.trim() || process.env.NETGSM_MSGHEADER?.trim() || null;
+  const netgsmConfigured = Boolean(netgsmUser && (dbNetgsmPass?.trim() || process.env.NETGSM_PASSWORD) && netgsmHeader);
+  const waUrl = dbWaUrl?.trim() || process.env.WHATSAPP_API_URL?.trim() || null;
+  const waConfigured = Boolean(waUrl && (dbWaToken?.trim() || process.env.WHATSAPP_API_TOKEN));
+  let waHost: string | null = null;
+  try {
+    waHost = waUrl ? new URL(waUrl).hostname : null;
+  } catch {
+    waHost = null;
+  }
 
   const provinceCoverage = Math.round(((provinces ?? 0) / TOTAL_PROVINCES) * 100);
   const cronConfigured = Boolean(process.env.CRON_SECRET?.trim());
@@ -267,8 +305,12 @@ export async function SystemView() {
                       <span className="numeric">{job}</span> · {cadenceLabel}
                       {hb ? ` · ${relativeTimeTR(hb.last_run_at)}` : " · hiç çalışmadı"}
                       {hb?.last_detail ? ` · ${formatCronDetail(hb.last_detail)}` : ""}
+                      {lastManualByJob.get(job)
+                        ? ` · elle: ${relativeTimeTR(lastManualByJob.get(job)!.created_at)}`
+                        : ""}
                     </p>
                   </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
                   {failed ? (
                     <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-danger-500/10 px-2.5 py-1 text-xs font-bold text-danger-500">
                       <XCircle className="h-3.5 w-3.5" /> Hata
@@ -282,10 +324,38 @@ export async function SystemView() {
                       <CheckCircle2 className="h-3.5 w-3.5" /> Sağlıklı
                     </span>
                   )}
+                  {canRun ? <CronRunButton job={job} label={label} /> : null}
+                  </div>
                 </div>
               );
             })}
           </div>
+          {manualRuns.length > 0 ? (
+            <div className="mt-4 border-t border-line pt-3">
+              <p className="text-xs font-semibold text-ink-950">Son elle çalıştırmalar ({manualRuns.length})</p>
+              <ul className="mt-2 space-y-1.5">
+                {manualRuns.map((r) => (
+                  <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted">
+                    <span className="min-w-0 truncate">
+                      <span className="font-semibold text-ink-950">{r.meta?.label ?? r.meta?.job ?? "İş"}</span>
+                      {" · "}
+                      {r.actor_id ? (runActorName.get(r.actor_id) ?? r.actor_id.slice(0, 8)) : "Sistem"}
+                      {typeof r.meta?.duration_ms === "number" ? ` · ${Math.round(r.meta.duration_ms / 100) / 10} sn` : ""}
+                    </span>
+                    <span className="inline-flex items-center gap-2">
+                      <span className={r.meta?.ok ? "font-semibold text-mint-700" : "font-semibold text-danger-600"}>
+                        {r.meta?.ok ? "Başarılı" : `Hata${r.meta?.status ? ` (${r.meta.status})` : ""}`}
+                      </span>
+                      <span className="text-text-faint">{relativeTimeTR(r.created_at)}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <Link href="/admin/aktivite?kaynak=platform&islem=platform_cron.run" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">
+                Tüm kayıtlar <ArrowUpRight className="h-3 w-3" />
+              </Link>
+            </div>
+          ) : null}
           <p className="mt-3 text-xs text-text-faint">
             Her görev kendi çalışma sıklığına göre değerlendirilir. Kalp atışı yazılamazsa
             sunucu kaydı oluşur; zamanlanmış işin ana sonucu bloklanmaz.
@@ -421,6 +491,15 @@ export async function SystemView() {
         maskedHepsiemlak={maskedHepsiemlak}
         maskedZingat={maskedZingat}
         maskedEmlakjet={maskedEmlakjet}
+      />
+
+      {/* SMS / WhatsApp sağlayıcı bilgileri */}
+      <MessagingKeysSection
+        canEdit={staff.role === "super_admin"}
+        netgsmConfigured={netgsmConfigured}
+        netgsmSummary={netgsmUser ? `${netgsmUser}${netgsmHeader ? ` · ${netgsmHeader}` : ""}` : null}
+        whatsappConfigured={waConfigured}
+        whatsappSummary={waHost}
       />
 
       {/* Bilinçli ertelenenler */}

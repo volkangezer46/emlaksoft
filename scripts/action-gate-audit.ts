@@ -40,6 +40,7 @@ const GATES = [
   // Platform (super admin) tarafi
   "requirePlatformStaff",
   "requirePlatformModule",
+  "guardPlatformAction",
   "getPlatformStaff",
   "getPlatformStaffIdentity",
   "isPlatformStaff",

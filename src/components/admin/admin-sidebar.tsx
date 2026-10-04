@@ -21,6 +21,7 @@ import {
   Radar,
   Search,
   Palette,
+  Settings,
   ShieldCheck,
   Sparkles,
   Users,
@@ -103,6 +104,7 @@ const SECTIONS: { id: string; title: string | null; items: Item[] }[] = [
     title: "Sistem",
     items: [
       { href: "/admin/sistem", label: "Sistem sağlığı", icon: Radar, hint: "Geo, cron, push", module: "sistem" },
+      { href: "/admin/ayarlar", label: "Ayarlar", icon: Settings, hint: "Bakım, kayıt, deneme", module: "sistem" },
       { href: "/admin/marka", label: "Marka", icon: Palette, hint: "Logo ve favicon", module: "marka" },
     ],
   },

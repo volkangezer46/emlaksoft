@@ -20,9 +20,8 @@ import {
   updateStaffRole,
   deactivateStaff,
   reactivateStaff,
-  PLATFORM_ROLE_LABELS,
 } from "@/app/actions/platform-staff";
-import type { PlatformRole } from "@/lib/platform-access";
+import { PLATFORM_ROLE_LABELS, type PlatformRole } from "@/lib/platform-access";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { daysAgoIso } from "@/lib/clock";

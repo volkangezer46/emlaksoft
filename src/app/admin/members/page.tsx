@@ -112,7 +112,7 @@ export default async function AdminMembersPage({
     role:       m.role,
     status:     m.is_active ? "active" : "passive",
     created_at: m.created_at,
-    [ROW_HREF]: m.tenant_id ? `/admin/tenants/${m.tenant_id}` : null,
+    [ROW_HREF]: `/admin/members/${m.id}`,
   }));
 
   // Telefon + ofis linki: DataTable satır overlay'inin ÜSTÜNDE kalan aksiyonlar

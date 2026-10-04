@@ -1,11 +1,14 @@
 import Link from "next/link";
-import { AlertTriangle, Bug, CheckCircle2, ChevronDown, Clock3, Info, Repeat } from "lucide-react";
+import { AlertTriangle, Bug, CheckCircle2, ChevronDown, Clock3, Info, Repeat, Search, X } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { now } from "@/lib/clock";
+import { orIlike } from "@/lib/pgrst";
 import { ResolveErrorButton } from "./resolve-button";
+import { ErrorsBulkBar, ReopenErrorButton } from "./error-bulk";
+import { ERRORS_BULK_FORM_ID } from "./bulk-form-id";
 
 export const metadata = { title: "Üretim hataları" };
 
@@ -24,10 +27,15 @@ type Row = {
   tenant: { name: string } | { name: string }[] | null;
 };
 
-function hrefWith(p: { durum?: string; son?: string; sayfa?: number }) {
+type Filters = { durum?: string; son?: string; q?: string; kaynak?: string; ofis?: string };
+
+function hrefWith(p: Filters & { sayfa?: number }) {
   const sp = new URLSearchParams();
   if (p.durum) sp.set("durum", p.durum);
   if (p.son) sp.set("son", p.son);
+  if (p.q) sp.set("q", p.q);
+  if (p.kaynak) sp.set("kaynak", p.kaynak);
+  if (p.ofis) sp.set("ofis", p.ofis);
   if (p.sayfa && p.sayfa > 1) sp.set("sayfa", String(p.sayfa));
   const s = sp.toString();
   return s ? `/admin/sistem?sekme=hatalar&${s}` : "/admin/sistem?sekme=hatalar";
@@ -77,17 +85,27 @@ function ozetle(rows: Row[]) {
 export async function ErrorsView({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; son?: string; sayfa?: string }>;
+  searchParams?: Promise<{ durum?: string; son?: string; sayfa?: string; q?: string; kaynak?: string; ofis?: string }>;
 }) {
   await requirePlatformModule("sistem");
   const params = (await searchParams) ?? {};
   const cozulmusGoster = params.durum === "cozulmus";
   const sonBirSaat = params.son === "1saat";
+  const q = (params.q ?? "").trim().slice(0, 80);
+  const kaynak = params.kaynak === "server" || params.kaynak === "client" ? params.kaynak : undefined;
+  const ofis = /^[0-9a-f-]{36}$/i.test(params.ofis ?? "") ? params.ofis : undefined;
+  const base: Filters = {
+    durum: params.durum,
+    son: sonBirSaat ? "1saat" : undefined,
+    q: q || undefined,
+    kaynak,
+    ofis,
+  };
   const sayfa = parsePage(params.sayfa);
   const simdi = now();
 
   const admin = createAdminClient();
-  let q = admin
+  let listQ = admin
     .from("error_logs")
     .select("id, tenant_id, source, digest, message, stack, path, occurrences, first_seen, last_seen, resolved_at, tenant:tenants(name)", {
       count: "exact",
@@ -95,8 +113,11 @@ export async function ErrorsView({
     .order("last_seen", { ascending: false })
     .range(...pageRange(sayfa));
 
-  q = cozulmusGoster ? q.not("resolved_at", "is", null) : q.is("resolved_at", null);
-  if (sonBirSaat) q = q.gte("last_seen", new Date(simdi - 3_600_000).toISOString());
+  listQ = cozulmusGoster ? listQ.not("resolved_at", "is", null) : listQ.is("resolved_at", null);
+  if (sonBirSaat) listQ = listQ.gte("last_seen", new Date(simdi - 3_600_000).toISOString());
+  if (kaynak) listQ = listQ.eq("source", kaynak);
+  if (ofis) listQ = listQ.eq("tenant_id", ofis);
+  if (q) listQ = listQ.or(orIlike(["message", "path"], q));
 
   // "Son 1 saatte" kartı sayfa dilimine değil, aynı durum filtresindeki TÜM
   // kayıtlara bakar — sayfa 2'de yanlış sayı göstermesin.
@@ -106,11 +127,15 @@ export async function ErrorsView({
     .gte("last_seen", new Date(simdi - 3_600_000).toISOString());
   sonSaatQ = cozulmusGoster ? sonSaatQ.not("resolved_at", "is", null) : sonSaatQ.is("resolved_at", null);
 
-  const [{ data, count }, { count: acikSayi }, { count: sonSaatSayi }] = await Promise.all([
-    q,
+  const [{ data, count }, { count: acikSayi }, { count: sonSaatSayi }, ofisRes] = await Promise.all([
+    listQ,
     admin.from("error_logs").select("id", { count: "exact", head: true }).is("resolved_at", null),
     sonSaatQ,
+    ofis
+      ? admin.from("tenants").select("name").eq("id", ofis).maybeSingle()
+      : Promise.resolve({ data: null as { name: string } | null }),
   ]);
+  const ofisAdi = ofisRes.data?.name ?? null;
 
   const rows = (data ?? []) as unknown as Row[];
   const { toplamOlay } = ozetle(rows);
@@ -140,7 +165,7 @@ export async function ErrorsView({
                 label: "Son 1 saatte",
                 value: String(sonSaat),
                 icon: Clock3,
-                href: hrefWith({ durum: params.durum, son: sonBirSaat ? undefined : "1saat" }),
+                href: hrefWith({ ...base, son: sonBirSaat ? undefined : "1saat" }),
                 active: sonBirSaat,
               },
             ].map((k) =>
@@ -176,7 +201,7 @@ export async function ErrorsView({
         ].map((o) => (
           <Link
             key={o.l}
-            href={hrefWith({ durum: o.v || undefined, son: sonBirSaat ? "1saat" : undefined })}
+            href={hrefWith({ ...base, durum: o.v || undefined })}
             aria-current={(o.v === "cozulmus") === cozulmusGoster ? "page" : undefined}
             className={`focus-ring press rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold transition ${
               (o.v === "cozulmus") === cozulmusGoster
@@ -188,7 +213,7 @@ export async function ErrorsView({
           </Link>
         ))}
         <Link
-          href={hrefWith({ durum: params.durum, son: sonBirSaat ? undefined : "1saat" })}
+          href={hrefWith({ ...base, son: sonBirSaat ? undefined : "1saat" })}
           aria-current={sonBirSaat ? "page" : undefined}
           className={`focus-ring press ml-auto inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold transition ${
             sonBirSaat ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
@@ -197,6 +222,66 @@ export async function ErrorsView({
           <Clock3 className="h-3.5 w-3.5" /> Son 1 saat
         </Link>
       </nav>
+
+      <form
+        action="/admin/sistem"
+        role="search"
+        className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-3"
+      >
+        <input type="hidden" name="sekme" value="hatalar" />
+        {params.durum ? <input type="hidden" name="durum" value={params.durum} /> : null}
+        {sonBirSaat ? <input type="hidden" name="son" value="1saat" /> : null}
+        {ofis ? <input type="hidden" name="ofis" value={ofis} /> : null}
+        <label className="relative min-w-0 flex-1 basis-56">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-faint" aria-hidden />
+          <input
+            type="search"
+            name="q"
+            defaultValue={q}
+            placeholder="Hata metni veya sayfa yolu ara…"
+            aria-label="Hata metni veya sayfa yolu ara"
+            className="focus-ring w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2 pl-9 pr-3 text-sm outline-none transition focus:border-brand-400"
+          />
+        </label>
+        <select
+          name="kaynak"
+          defaultValue={kaynak ?? ""}
+          aria-label="Kaynak"
+          className="focus-ring rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm"
+        >
+          <option value="">Tüm kaynaklar</option>
+          <option value="server">Sunucu</option>
+          <option value="client">İstemci</option>
+        </select>
+        <button
+          type="submit"
+          className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-xs font-semibold text-white"
+        >
+          Filtrele
+        </button>
+        {q || kaynak || ofis ? (
+          <span className="flex flex-wrap items-center gap-2">
+            {q ? (
+              <Link href={hrefWith({ ...base, q: undefined })} className="focus-ring press inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
+                Arama: {q} <X className="h-3 w-3" />
+              </Link>
+            ) : null}
+            {kaynak ? (
+              <Link href={hrefWith({ ...base, kaynak: undefined })} className="focus-ring press inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
+                Kaynak: {kaynak === "server" ? "Sunucu" : "İstemci"} <X className="h-3 w-3" />
+              </Link>
+            ) : null}
+            {ofis ? (
+              <Link href={hrefWith({ ...base, ofis: undefined })} className="focus-ring press inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
+                Ofis: {ofisAdi ?? "Kiracı"} <X className="h-3 w-3" />
+              </Link>
+            ) : null}
+          </span>
+        ) : null}
+        <p className="basis-full text-xs text-text-faint">{count ?? 0} kayıt eşleşiyor. Arama sunucuda çalışır ve tüm sayfaları tarar.</p>
+      </form>
+
+      {!cozulmusGoster && rows.length > 0 ? <ErrorsBulkBar pageCount={rows.length} /> : null}
 
       {rows.length === 0 ? (
         <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
@@ -221,6 +306,15 @@ export async function ErrorsView({
             return (
               <article key={r.id} className="surface-card rounded-[var(--radius-panel)] p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
+                  {!cozulmusGoster ? (
+                    <input
+                      type="checkbox"
+                      form={ERRORS_BULK_FORM_ID}
+                      value={r.id}
+                      aria-label="Toplu işlem için seç"
+                      className="mt-1 h-4 w-4 shrink-0 accent-[var(--color-brand-600)]"
+                    />
+                  ) : null}
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-2">
                       <Badge variant={r.source === "server" ? "danger" : "warning"}>
@@ -232,12 +326,20 @@ export async function ErrorsView({
                         </span>
                       ) : null}
                       {r.tenant_id ? (
-                        <Link
-                          href={`/admin/tenants/${r.tenant_id}`}
-                          className="text-xs font-semibold text-brand-600 transition hover:underline"
-                        >
-                          {tenant?.name ?? "Kiracı"}
-                        </Link>
+                        <>
+                          <Link
+                            href={`/admin/tenants/${r.tenant_id}`}
+                            className="text-xs font-semibold text-brand-600 transition hover:underline"
+                          >
+                            {tenant?.name ?? "Kiracı"}
+                          </Link>
+                          <Link
+                            href={hrefWith({ ...base, ofis: r.tenant_id })}
+                            className="text-xs font-semibold text-text-muted transition hover:text-brand-600 hover:underline"
+                          >
+                            yalnız bu ofis
+                          </Link>
+                        </>
                       ) : (
                         <span className="text-xs text-text-muted">Kiracı bilinmiyor</span>
                       )}
@@ -255,7 +357,10 @@ export async function ErrorsView({
                     </p>
                   </div>
                   {r.resolved_at ? (
-                    <Badge variant="success">Çözüldü</Badge>
+                    <span className="inline-flex items-center gap-2">
+                      <Badge variant="success">Çözüldü</Badge>
+                      <ReopenErrorButton id={r.id} />
+                    </span>
                   ) : (
                     <ResolveErrorButton id={r.id} />
                   )}
@@ -286,7 +391,7 @@ export async function ErrorsView({
             page={sayfa}
             total={count ?? 0}
             hrefFor={(p) =>
-              hrefWith({ durum: params.durum, son: sonBirSaat ? "1saat" : undefined, sayfa: p })
+              hrefWith({ ...base, sayfa: p })
             }
           />
         </div>
