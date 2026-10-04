@@ -295,7 +295,7 @@ export function NotificationBellPanel({
               ) : (
                 groups.map((g) => (
                   <div key={g.label}>
-                    <p className="sticky top-0 z-10 bg-canvas/90 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint backdrop-blur">{g.label}</p>
+                    <p className="sticky top-0 z-10 bg-canvas px-4 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">{g.label}</p>
                     {g.items.map(renderItem)}
                   </div>
                 ))

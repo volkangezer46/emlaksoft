@@ -47,7 +47,7 @@ export function ExportButton({
       disabled={pending}
       className={`focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border px-3 py-2 text-xs font-semibold transition disabled:opacity-60 ${
         variant === "dark"
-          ? "border-white/20 bg-white/10 text-white backdrop-blur-sm hover:border-white/35 hover:bg-white/15"
+          ? "border-white/20 bg-white/10 text-white hover:border-white/35 hover:bg-white/15"
           : "border-line bg-canvas text-ink-950 hover:border-brand-400 hover:text-brand-600"
       }`}
     >

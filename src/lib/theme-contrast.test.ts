@@ -356,3 +356,45 @@ describe("rol adlı etkileşim token'ları", () => {
     expect(rgb(darkFallback, "--surface-hover")).toEqual(mustHex(DARK, "--text", "koyu"));
   });
 });
+
+// ---- Yüksek kontrast (a11y.css, prefers-contrast: more) ---------------------------
+
+describe("yüksek kontrast tercihi (prefers-contrast: more)", () => {
+  const a11yCss = read("src/app/a11y.css");
+  const hc = supportsBlock(a11yCss, "@media (prefers-contrast: more)");
+  const hcLight = block(hc, ":root");
+  const hcDark = block(hc, 'html[data-theme="dark"]');
+
+  it("blok a11y.css'te tanımlı; saydamlığı azalt tercihi de karşılanır", () => {
+    expect(a11yCss).toContain("@media (prefers-contrast: more)");
+    expect(a11yCss).toContain("@media (prefers-reduced-transparency: reduce), (prefers-contrast: more)");
+  });
+
+  it("soluk metin tonları koyulaşır: her yüzeyde ≥ 7:1 (AAA), açık + koyu", () => {
+    for (const t of ["--text-muted", "--text-faint"]) {
+      for (const s of LIGHT_SURFACES) expect(contrast(mustHex(hcLight, t, "yk açık"), s), `açık ${t}`).toBeGreaterThanOrEqual(7);
+      for (const s of DARK_SURFACES) expect(contrast(mustHex(hcDark, t, "yk koyu"), s), `koyu ${t}`).toBeGreaterThanOrEqual(7);
+    }
+  });
+
+  it("kenarlık tam renk: çizgi her yüzeyde ≥ 3:1, belirgin çizgi ≥ 4.5:1", () => {
+    for (const [body, surfaces, mode] of [
+      [hcLight, LIGHT_SURFACES, "açık"],
+      [hcDark, DARK_SURFACES, "koyu"],
+    ] as const) {
+      for (const s of surfaces) {
+        expect(contrast(mustHex(body, "--line", mode), s), `${mode} --line`).toBeGreaterThanOrEqual(3);
+        expect(contrast(mustHex(body, "--line-strong", mode), s), `${mode} --line-strong`).toBeGreaterThanOrEqual(4.5);
+      }
+      // Saç teli artık yarı saydam değil: çizgi rengine bağlanır.
+      expect(rawToken(body, "--hairline")).toBe("var(--line)");
+      expect(rawToken(body, "--hairline-strong")).toBe("var(--line-strong)");
+      expect(rawToken(body, "--border-interactive")).toBe("var(--line-strong)");
+    }
+  });
+
+  it("odak halkası kalınlaşır ve tam renk olur", () => {
+    expect(rawToken(hcLight, "--focus-ring")).toBe("0 0 0 5px var(--ring)");
+    expect(hc).toMatch(/:root :focus-visible \{\s*outline-width: 3px;/);
+  });
+});

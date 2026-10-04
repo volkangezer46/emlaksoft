@@ -363,7 +363,8 @@ export function AdminSidebar({
       {/* Mobil alt gezinme */}
       <nav
         aria-label="Admin hızlı gezinme"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/8 bg-[#0a1224]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
+        // Cam bütçesi: alt çubuk opak (cam yalnız sabit ÜST çubukta).
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/8 bg-[#0a1224] pb-[env(safe-area-inset-bottom)] md:hidden"
       >
         <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}>
           {tabItems.map((tab) => {
