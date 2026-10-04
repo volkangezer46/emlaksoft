@@ -25,6 +25,7 @@ import { saveOwnerInfo } from "@/lib/property-owner/persist";
 import { publishBlockReason } from "@/lib/property-owner/server";
 import { enqueueListingPool, isPoolEnabled, toPoolProperty } from "@/lib/pool/server";
 import { assignPoolEntryAsSystem } from "@/lib/pool/system-assign";
+import { requestApprovalIfNeeded } from "@/lib/oversight/approval-gate";
 import { notifyNewListing, notifyPoolAssigned, notifyPoolEntry } from "@/lib/pool/notify";
 
 export type PropertyResult = {
@@ -555,11 +556,35 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
   // güncellemeden ÖNCE oku — trigger tarihçeyi zaten yazıyor, burada tek amaç kıyas.
   const { data: existing } = await supabase
     .from("properties")
-    .select("list_price, property_code, status, features")
+    .select("list_price, commission_rate, property_code, status, features")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
   const oldPrice = existing?.list_price != null ? Number(existing.list_price) : null;
+  const oldCommissionRate = existing?.commission_rate != null ? Number(existing.commission_rate) : null;
+
+  // Ofis kontrol onay kapısı (varsayılan kapalı): yalnız fiyat DÜŞÜRME ve komisyon oranı İNDİRİMİ.
+  // pending/requested/error → işlem durur; approved/not_required → devam.
+  if (oldPrice != null && Number.isFinite(oldPrice) && priceValue < oldPrice) {
+    const approval = await requestApprovalIfNeeded(gate.tenantId, gate.userId, "price_drop", {
+      oldPrice,
+      newPrice: priceValue,
+      entityId: id,
+      entityType: "property",
+      title,
+    });
+    if (approval.status !== "not_required" && approval.status !== "approved") return { error: approval.message };
+  }
+  if (oldCommissionRate != null && Number.isFinite(oldCommissionRate) && commissionValue < oldCommissionRate) {
+    const approval = await requestApprovalIfNeeded(gate.tenantId, gate.userId, "commission_discount", {
+      standardRate: oldCommissionRate,
+      requestedRate: commissionValue,
+      entityId: id,
+      entityType: "property",
+      title,
+    });
+    if (approval.status !== "not_required" && approval.status !== "approved") return { error: approval.message };
+  }
 
   // `districtHint` adi ilce demek ama ONCEDEN IL adi geciriliyordu; formda
   // ilce alani hic yoktu. Artik once ilce, yoksa il adi kullaniliyor —
@@ -702,12 +727,19 @@ export async function setPropertyStatus(formData: FormData): Promise<void> {
   revalidateVitrinPaths(); // yayına alma/çıkarma vitrin listesini anında değiştirir
 }
 
-export async function deleteProperty(formData: FormData): Promise<void> {
+export async function deleteProperty(formData: FormData): Promise<{ error?: string } | void> {
   const gate = await requirePermission("properties", "delete");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
   const id = String(formData.get("id") ?? "").trim();
   const redirectTo = String(formData.get("redirect_to") ?? "").trim();
   if (!id) return;
+
+  // Ofis kontrol onay kapısı (varsayılan kapalı): kural açıksa silme yönetici onayı bekler.
+  const approval = await requestApprovalIfNeeded(gate.tenantId, gate.userId, "listing_delete", {
+    entityId: id,
+    entityType: "property",
+  });
+  if (approval.status !== "not_required" && approval.status !== "approved") return { error: approval.message };
 
   const supabase = await createClient();
   const { error } = await supabase

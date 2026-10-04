@@ -159,8 +159,8 @@ export function OversightSettingsForm({
           })}
         </ul>
         <p className="text-xs text-text-muted">
-          Not: Onay kuralları, ilgili işlem ekranları kapıyı çağırdığında uygulanır (fiyat güncelleme, ilan silme, komisyon ve
-          dışa aktarma akışları). Kural açık olsa da bağlantısı yapılmamış bir ekranda işlem beklemez.
+          Not: Onay kuralları ilan fiyatı düşürme, komisyon oranı indirimi, ilan silme ve toplu dışa aktarma işlemlerine uygulanır.
+          Onay 48 saat geçerlidir ve tek kullanımlıktır; yönetici (sahip/genel müdür) işlemleri onaya takılmaz.
         </p>
       </section>
 

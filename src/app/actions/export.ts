@@ -13,6 +13,7 @@ import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { getStageLabels } from "@/lib/definitions";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
 import { logActivity } from "@/lib/activity";
+import { requestApprovalIfNeeded } from "@/lib/oversight/approval-gate";
 import { filterCustomersByHeatSegment } from "@/lib/customer-heat-export";
 import { applyCustomerFilters, normalizeCustomerFilters, type CustomerListFilters } from "@/lib/customer-list-filters";
 
@@ -41,6 +42,13 @@ async function exportResult(
   filename: string,
   omitFullDownload = false,
 ): Promise<ExportResult> {
+  // Ofis kontrol onay kapısı (varsayılan kapalı): tüm dışa aktarmalar bu tek çıkış noktasından geçer.
+  const approval = await requestApprovalIfNeeded(gate.tenantId, gate.userId, "bulk_export", {
+    rows: rows.length,
+    exportEntity: entity,
+  });
+  if (approval.status !== "not_required" && approval.status !== "approved") return { error: approval.message };
+
   const truncated = rows.length >= EXPORT_LIMIT;
   let csv = toCsv(rows);
   if (truncated) {

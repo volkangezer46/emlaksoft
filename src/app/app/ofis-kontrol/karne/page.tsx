@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Info, UsersRound } from "lucide-react";
+import { ROLE_LABELS } from "@/lib/role-labels";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
@@ -31,14 +32,6 @@ const CERT_CLS: Record<Cert["tone"], string> = {
   warn: "bg-amber-400/15 text-amber-700",
   danger: "bg-danger-500/10 text-danger-600",
   none: "bg-ink-950/[0.06] text-text-muted",
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  owner: "Ofis sahibi",
-  gm: "Genel müdür",
-  branch_manager: "Şube müdürü",
-  team_lead: "Takım lideri",
-  advisor: "Danışman",
 };
 
 function Metric({ label, value, href, attention }: { label: string; value: number | string; href: string; attention?: boolean }) {
