@@ -43,6 +43,7 @@ import { scoreSellerLikelihood, isOwnerCustomer, hasListingIntent } from "@/lib/
 import { SellerPotentialCard } from "@/components/app/seller-potential-card";
 // Ortak tekil SMS dialogu — tek kopya gelen-kutusu'nda yaşar (Yanıtla da onu kullanır)
 import { SmsDialog } from "../../gelen-kutusu/sms-dialog";
+import { SampleDataBadge } from "@/components/ui/sample-data-badge";
 
 const RING_C = 2 * Math.PI * 42;
 
@@ -141,7 +142,7 @@ export default async function CustomerDetailPage({
   ] = await Promise.all([
     supabase
       .from("customers")
-      .select("id, full_name, phone, email, customer_types, tags, branch_id, assigned_to, source, lead_source, lead_source_detail, notes, blacklist, created_at, province_id, district_id, birth_date, anniversary_date, anniversary_note, is_foreign, nationality, province:geo_provinces(name), district:geo_districts(name)")
+      .select("id, is_sample, full_name, phone, email, customer_types, tags, branch_id, assigned_to, source, lead_source, lead_source_detail, notes, blacklist, created_at, province_id, district_id, birth_date, anniversary_date, anniversary_note, is_foreign, nationality, province:geo_provinces(name), district:geo_districts(name)")
       .eq("id", id)
       .is("deleted_at", null)
       .maybeSingle(),
@@ -420,6 +421,7 @@ export default async function CustomerDetailPage({
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-display text-2xl font-extrabold text-white md:text-3xl">{customer.full_name}</h1>
+                <SampleDataBadge show={customer.is_sample === true} />
                 {customer.blacklist ? (
                   <span className="rounded-full bg-danger-500/20 px-2 py-0.5 text-xs font-bold text-danger-400">Kara liste</span>
                 ) : (
