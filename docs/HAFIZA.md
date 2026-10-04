@@ -125,7 +125,7 @@ Vercel deploy'u push tetikler; migration uygulamak sahibin işidir).
 Migration uygulama (sıra §2) · `git push` (§1) · `ADVISOR_PII_KEY` üretimi (`openssl rand -hex 32`, kaybedilirse TC/IBAN geri gelmez) ·
 Supabase redirect allowlist'e `/app/hesabim?eposta=onay` · fiyat/DB tutarı kararı (§3) · Google Search Console'a sitemap ekleme ·
 yayın öncesi güvenlik (MFA bayrağı, demo kartlarını kapat, anahtar rotasyonu, yedek/PITR) · TÜFE/kredi faizi/harç doğrulaması ·
-ödül/ortak programı oranları · canlı QA (mobil form çubuğu, menü yoğunluğu, pano sürükle-bırak, ofis açma, yeni TV/tur/sihirbaz).
+ödül/ortak programı oranları · KVKK açık rıza metni ("tanıtım amacıyla", `src/lib/legal-copy.ts`; asıl amaç talebe dönüş) AVUKAT ONAYI GEREKİR · canlı QA (mobil form çubuğu, menü yoğunluğu, pano sürükle-bırak, ofis açma, yeni TV/tur/sihirbaz).
 
 ## 9. Belge dizini (nerede ne var)
 
