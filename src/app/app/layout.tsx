@@ -36,6 +36,8 @@ import type { AppModule } from "@/lib/permissions";
 import { planLabel } from "@/lib/billing/plans";
 import { lockedHrefs } from "@/lib/billing/page-gates";
 import { getAppActions } from "@/lib/palette-core";
+import { ClosedModulesProvider } from "@/components/app/closed-modules-context";
+import { getClosedFeatures } from "@/lib/modules/state";
 import { RouteSplash } from "@/components/route-splash";
 import { parseUiPrefs, uiPrefCookieName, uiPrefsCss } from "@/lib/ui-prefs";
 
@@ -195,11 +197,15 @@ async function AppShell({
         : Promise.resolve(null);
   // Plan kullanım kartı (gerçek head-count) yalnız tenant+plana bağlı: profil gelir gelmez başlar.
   const usagePromise = user && tenantId && !platformStaffFullAccess ? getPlanUsage(supabase, tenantId, office?.plan).catch(() => []) : Promise.resolve([]);
-  const [effectivePerms, scoreComputed, planUsage, specBadges] = await Promise.all([
+  // Ofisin kapattığı modüller (menü, sekme, palet ve hızlı oluşturmadan çıkar). Platform personeli etkilenmez.
+  const closedModulesPromise: Promise<string[]> =
+    tenantId && !platformStaffFullAccess ? getClosedFeatures(tenantId).catch(() => []) : Promise.resolve([]);
+  const [effectivePerms, scoreComputed, planUsage, specBadges, closedModules] = await Promise.all([
     effectivePermsPromise,
     scorePromise,
     usagePromise,
     speculationValid && specBadgesPromise ? specBadgesPromise : Promise.resolve(null),
+    closedModulesPromise,
   ]);
   const officeScore: number | null = scoreComputed ? scoreComputed.score : null;
   const officeScoreLabel = scoreComputed ? scoreComputed.label : "—";
@@ -215,7 +221,7 @@ async function AppShell({
     platformStaffFullAccess || effectiveHasPermission(effectivePerms ?? {}, mod, "create");
   // Hızlı oluştur + komut paleti "Eylemler": yalnız "create" yetkili modüller.
   const creatableModules = NAV_MODULES.filter((mod) => accessibleModules.includes(mod) && canCreate(mod));
-  const hasQuickCreate = getAppActions(creatableModules, "", lockedNavHrefs).length > 0;
+  const hasQuickCreate = getAppActions(creatableModules, "", lockedNavHrefs, closedModules).length > 0;
   // Menü sayı rozetleri: gerçek veri; hata olursa rozet çıkmaz. Spekülatif sorgu
   // etkin izinle süzülür; geçersizse (claim != profil) eski sıralı yol çalışır.
   const navBadges = platformStaffFullAccess
@@ -243,6 +249,7 @@ async function AppShell({
       {uiCss ? <style>{uiCss}</style> : null}
       <SidebarBoot />
       <ErrorBoundary>
+        <ClosedModulesProvider closed={closedModules}>
         {brandColor ? (
           <style>{`.brand-scope{--brand-600:${brandColor};--brand-700:color-mix(in srgb,${brandColor} 80%,#000);--brand-500:color-mix(in srgb,${brandColor} 86%,#fff);--brand-400:color-mix(in srgb,${brandColor} 68%,#fff);--brand-300:color-mix(in srgb,${brandColor} 42%,#fff);--grad-brand:linear-gradient(120deg,${brandColor},var(--cyan-400) 55%,var(--mint-500));--shadow-glow-brand:0 20px 50px -18px color-mix(in srgb,${brandColor} 55%,transparent);}`}</style>
         ) : null}
@@ -328,6 +335,7 @@ async function AppShell({
           </main>
         </div>
         </div>
+        </ClosedModulesProvider>
       </ErrorBoundary>
     </ToastProvider>
   );

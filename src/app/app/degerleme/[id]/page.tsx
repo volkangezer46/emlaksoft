@@ -55,7 +55,7 @@ export default async function ValuationReportPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { tenantId } = await requireModulePage("valuation");
+  const { tenantId } = await requireModulePage("valuation", "/app/degerleme");
   const { id } = await params;
   const supabase = await createClient();
 

@@ -162,7 +162,7 @@ export default async function DocumentsPage({
     sayfa?: string;
   }>;
 }) {
-  const { perms } = await requireModulePage("settings");
+  const { perms } = await requireModulePage("settings", "/app/belgeler");
   const params = (await searchParams) ?? {};
 
   const kaynakF: DocSource | "" = isDocSource(params.kaynak) ? params.kaynak : "";

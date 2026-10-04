@@ -76,7 +76,7 @@ export default async function AsistanPage({
 }: {
   searchParams?: Promise<{ q?: string; oturum?: string }>;
 }) {
-  await requireModulePage("dashboard");
+  await requireModulePage("dashboard", "/app/asistan");
   const { q = "", oturum = "" } = (await searchParams) ?? {};
 
   const [snapshot, aiEnabled, insights, sessions] = await Promise.all([

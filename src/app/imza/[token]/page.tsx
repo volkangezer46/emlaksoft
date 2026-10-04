@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { CheckCircle2, Clock3, FileText, ShieldCheck } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { PublicModuleClosed } from "@/components/modules/public-module-closed";
+import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { SignPanel } from "./sign-panel";
 import { PrintButton } from "./print-button";
 import { isPast } from "@/lib/clock";
@@ -48,6 +50,7 @@ export default async function PublicContractSignPage({ params }: { params: Promi
   const tenant = contract.tenant as { name?: string; status?: string | null } | { name?: string; status?: string | null }[] | null;
   const tenantRow = Array.isArray(tenant) ? tenant[0] : tenant;
   if (!tenantRow || !isPublicTenantActive(tenantRow.status)) notFound();
+  if (await isPublicFeatureClosed(admin, contract.tenant_id, "contracts")) return <PublicModuleClosed officeName={tenantRow.name} />;
   const office = tenantRow?.name || "EmlakSoft";
   const signers = ((contract.signers ?? []) as SignerRow[]).slice().sort((a, b) => a.full_name.localeCompare(b.full_name, "tr"));
   const expired = isPast(contract.expires_at);

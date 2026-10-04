@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
+import { getClosedFeatures } from "@/lib/modules/state";
+import type { FeatureKey } from "@/lib/modules/registry";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { DashboardGrid, DashCell, DashboardStack, KpiGrid } from "@/components/ui/dashboard-grid";
@@ -64,8 +66,11 @@ export default async function AppHomePage({
   const { tenantId, perms, role, userId } = await requireModulePage("dashboard");
   // Yeni danışman ilk girişinde kısa "Hoş geldin" akışına yönlenir (bir kez; çerez tercihi).
   if (!tvMode && tenantId && (await loadShouldShowWelcome(userId, role))) redirect("/app/hos-geldin");
+  // Kapalı modüllerin ana ekran blokları çizilmez (tek kapı: lib/modules/state).
+  const closedFeatures = await getClosedFeatures(tenantId);
+  const off = (key: FeatureKey) => closedFeatures.includes(key);
   const user = await getRequestUser();
-  const fullName = (user?.user_metadata?.full_name as string | undefined) ?? "";
+  const fullName =(user?.user_metadata?.full_name as string | undefined) ?? "";
 
   const isManagement = hasOfficeWideDataScope(role);
   // Kapsam: varsayılan "ben"; yalnız yönetim rolleri ?kapsam=ofis ile ofis geneline açabilir.
@@ -82,8 +87,8 @@ export default async function AppHomePage({
     canSeeCommissions: (perms.commissions ?? []).includes("view"),
     tvMode,
     // Kiralama/proje şeridi yalnız modülü görebilene sorulur.
-    canSeeRentals: (perms.rentals ?? []).includes("view"),
-    canSeeProjects: (perms.projects ?? []).includes("view"),
+    canSeeRentals: (perms.rentals ?? []).includes("view") && !off("rentals"),
+    canSeeProjects: (perms.projects ?? []).includes("view") && !off("projects"),
     canSeeProperties: (perms.properties ?? []).includes("view"),
     period: parsePeriod(donem),
     fullName,
@@ -183,10 +188,10 @@ export default async function AppHomePage({
         cell(7, komisyon, "komisyon"),
         cell(12, kpi, "kpi"),
         cell(8, trend, "trend"),
-        cell(4, hedef, "hedef"),
+        ...(off("team_perf") ? [] : [cell(4, hedef, "hedef")]),
         cell(4, randevu, "randevu"),
         cell(4, gorev, "gorev"),
-        cell(4, kayip, "kayip"),
+        ...(off("leak") ? [] : [cell(4, kayip, "kayip")]),
       ]
     : [
         cell(6, bugun, "bugun"),
@@ -212,7 +217,7 @@ export default async function AppHomePage({
         cell(12, <Suspense fallback={null}><KiralamaProje ctx={ctx} /></Suspense>, "kiralama", "empty:hidden"),
         cell(5, <Suspense fallback={<BlokIskelet className="h-80" />}><Huni /></Suspense>, "huni"),
         cell(7, <Suspense fallback={<BlokIskelet className="h-80" />}><CanliAkis ctx={ctx} /></Suspense>, "canli"),
-        cell(4, <Suspense fallback={<PanelIskelet />}><PortalSagligi /></Suspense>, "portal"),
+        ...(off("portals") ? [] : [cell(4, <Suspense fallback={<PanelIskelet />}><PortalSagligi /></Suspense>, "portal")]),
         cell(4, <Suspense fallback={<PanelIskelet />}><Ekip ctx={ctx} /></Suspense>, "ekip"),
         cell(4, <Suspense fallback={<PanelIskelet />}><KaynakDagilimi /></Suspense>, "kaynak"),
         ...(tvMode ? [] : [cell(12, <HizliAksiyonlar />, "hizli")]),
@@ -242,6 +247,7 @@ export default async function AppHomePage({
         {/* Rol bazlı ilk blok: yönetimde "Bugün karar bekleyenler", diğerlerinde "Sıradaki en iyi eylem". */}
         {!tvMode &&
           (isManagement ? (
+            off("approvals") && off("offers") ? null :
             <Suspense fallback={<KararBekleyenlerIskelet />}>
               <KararBekleyenler ctx={ctx} />
             </Suspense>

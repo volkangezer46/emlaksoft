@@ -104,7 +104,7 @@ export default async function ReferralsPage({
 }: {
   searchParams: Promise<{ durum?: string; q?: string; sayfa?: string }>;
 }) {
-  const { perms } = await requireModulePage("customers");
+  const { perms } = await requireModulePage("customers", "/app/tavsiyeler");
   const canEdit = (perms.customers ?? []).includes("edit");
   const canCreate = (perms.customers ?? []).includes("create");
 

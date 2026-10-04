@@ -3,6 +3,8 @@ import { lockedGate } from "@/lib/billing/page-gates";
 import { getRequestProfile, getTenantGateContext } from "@/lib/cache/request";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaff } from "@/lib/platform";
+import { featureForHref, moduleClosedHref } from "@/lib/modules/registry";
+import { isModuleEnabled } from "@/lib/modules/state";
 import { type AppModule, DEFAULT_MATRIX } from "@/lib/permissions";
 import {
   effectiveCanAccessModule,
@@ -59,6 +61,11 @@ export async function requireModulePage(mod: AppModule, href?: string) {
   if (href && tenantId) {
     const gate = lockedGate(href, await getTenantGateContext(tenantId));
     if (gate) redirect(`/app/paket?ozellik=${encodeURIComponent(gate.href)}`);
+  }
+  // Sıra: oturum -> yetki -> paket -> modül. Ofisin kapattığı modül 404 değil, açıklayıcı sayfa gösterir.
+  if (href && tenantId) {
+    const closedKey = featureForHref(href);
+    if (closedKey && !(await isModuleEnabled(tenantId, closedKey))) redirect(moduleClosedHref(closedKey));
   }
   return { userId: user.id, role, tenantId, perms };
 }

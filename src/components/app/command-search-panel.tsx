@@ -27,6 +27,7 @@ import {
   X,
 } from "lucide-react";
 import { ShortcutHint } from "./shortcut-hint";
+import { useClosedModules } from "@/components/app/closed-modules-context";
 import { Kbd, KbdCombo } from "@/components/ui/kbd";
 import { searchWorkspace, type SearchHit } from "@/app/actions/search";
 import { evaluatePaletteInput } from "@/lib/palette-calc";
@@ -118,11 +119,12 @@ export function CommandSearchPanel({
   const recents = useSyncExternalStore(recentsStore.subscribe, recentsStore.read, recentsStore.getServerSnapshot);
   const allowedModules = useMemo(() => new Set(accessibleModules), [accessibleModules]);
   // Yetki süzgeci: Eylemler ve Git, menüyle aynı kaynaktan (nav-config) ve erişilebilir modüllerden gelir.
+  const closedModules = useClosedModules();
   const quickActions = useMemo(
-    () => getAppActions(creatableModules ?? accessibleModules, q, lockedHrefs ?? []),
-    [accessibleModules, creatableModules, lockedHrefs, q],
+    () => getAppActions(creatableModules ?? accessibleModules, q, lockedHrefs ?? [], closedModules),
+    [accessibleModules, creatableModules, lockedHrefs, q, closedModules],
   );
-  const goItems = useMemo(() => getAppGoItems(accessibleModules, q), [accessibleModules, q]);
+  const goItems = useMemo(() => getAppGoItems(accessibleModules, q, closedModules), [accessibleModules, q, closedModules]);
   // Görünüm komutları: güncel tercih tarayıcıdan okunur (sunucu çıktısı sabit "||" anlık görüntüsü).
   const appearanceSnap = useSyncExternalStore(
     subscribeTheme,
@@ -140,19 +142,22 @@ export function CommandSearchPanel({
   }, [appearanceSnap, q]);
   const visibleRecents = useMemo(() => {
     const pageHrefs = new Set([
-      ...getAppActions(creatableModules ?? accessibleModules, "", lockedHrefs ?? []).map((a) => a.href),
-      ...getAppGoItems(accessibleModules).map((a) => a.href),
+      ...getAppActions(creatableModules ?? accessibleModules, "", lockedHrefs ?? [], closedModules).map((a) => a.href),
+      ...getAppGoItems(accessibleModules, "", closedModules).map((a) => a.href),
     ]);
     return recents.filter((item) =>
       isSearchKind(item.kind) ? allowedModules.has(RECENT_KIND_MODULE[item.kind]) : pageHrefs.has(item.href),
     );
-  }, [accessibleModules, allowedModules, creatableModules, lockedHrefs, recents]);
+  }, [accessibleModules, allowedModules, creatableModules, lockedHrefs, recents, closedModules]);
   const pageIcons = useMemo(
     () =>
       new Map<string, PaletteEntry["icon"]>(
-        [...getAppActions(creatableModules ?? accessibleModules, "", lockedHrefs ?? []), ...getAppGoItems(accessibleModules)].map((e) => [e.href, e.icon]),
+        [
+          ...getAppActions(creatableModules ?? accessibleModules, "", lockedHrefs ?? [], closedModules),
+          ...getAppGoItems(accessibleModules, "", closedModules),
+        ].map((e) => [e.href, e.icon]),
       ),
-    [accessibleModules, creatableModules, lockedHrefs],
+    [accessibleModules, creatableModules, lockedHrefs, closedModules],
   );
 
   const runSearch = useCallback((value: string) => {

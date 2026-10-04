@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useClosedModules } from "@/components/app/closed-modules-context";
 import { getAppActions, type PaletteEntry } from "@/lib/palette-core";
 import type { AppModule } from "@/lib/permissions";
 
@@ -35,7 +36,8 @@ function groupEntries(entries: PaletteEntry[]) {
 
 /** Lazy gövde: kabuk tıklanınca yüklenir ve menü açık gelir. */
 export function QuickCreateMenuBody({ creatableModules, lockedHrefs }: { creatableModules: AppModule[]; lockedHrefs: string[] }) {
-  const groups = groupEntries(getAppActions(creatableModules, "", lockedHrefs));
+  const closedModules = useClosedModules();
+  const groups = groupEntries(getAppActions(creatableModules, "", lockedHrefs, closedModules));
   return (
     <DropdownMenu defaultOpen>
       <DropdownMenuTrigger asChild>

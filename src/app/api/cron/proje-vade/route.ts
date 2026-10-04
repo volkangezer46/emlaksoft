@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/lib/notify-batch";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { logActivity } from "@/lib/activity";
+import { getDisabledModulesByTenant, isDisabledFor } from "@/lib/modules/state";
 
 function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -68,6 +69,10 @@ export async function GET(req: NextRequest) {
     byTenant.set(t, agg);
   }
 
+  // Modül kapısı: "Proje Satışı" kapalı ofislere bildirim yazılmaz (durum güncellemesi veri bakımıdır, sürer).
+  const disabledModules = await getDisabledModulesByTenant(admin);
+  for (const t of [...byTenant.keys()]) if (isDisabledFor(disabledModules, t, "projects")) byTenant.delete(t);
+
   const tenantIds = [...byTenant.keys()];
   const windowStart = new Date(Date.now() - 20 * 3600_000).toISOString();
   const alreadyNotified = await findNotifiedIds(admin, {
@@ -127,6 +132,7 @@ export async function GET(req: NextRequest) {
   const releasedByTenant = new Map<string, number>();
   for (const u of released ?? []) {
     const t = String(u.tenant_id);
+    if (isDisabledFor(disabledModules, t, "projects")) continue;
     releasedByTenant.set(t, (releasedByTenant.get(t) ?? 0) + 1);
   }
   const releaseNotified = await findNotifiedIds(admin, {

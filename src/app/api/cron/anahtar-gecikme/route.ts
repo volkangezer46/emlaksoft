@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/lib/notify-batch";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { keyOverdueDays } from "@/lib/key-overdue";
+import { getDisabledModulesByTenant, isDisabledFor } from "@/lib/modules/state";
 
 function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -72,7 +73,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "query_failed" }, { status: 500 });
     }
 
-    const rows = (data ?? []) as unknown as OverdueKey[];
+    // Modül kapısı: "Anahtar Takibi" kapalı ofislere uyarı yazılmaz (kayıtlar silinmez).
+    const disabledModules = await getDisabledModulesByTenant(admin);
+    const rows = ((data ?? []) as unknown as OverdueKey[]).filter((r) => !isDisabledFor(disabledModules, r.tenant_id, "keys"));
     if (rows.length === 0) {
       await recordHeartbeat("anahtar-gecikme", "ok", "geciken anahtar yok");
       return NextResponse.json({ ok: true, overdue: 0, notified: 0 });

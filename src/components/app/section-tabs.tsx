@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 import type { ReactNode } from "react";
+import { useClosedModules } from "@/components/app/closed-modules-context";
 import { MorphNav } from "@/components/ui/morph-tab-parts";
 import { resolveActiveNav, visibleSections } from "@/lib/nav-config";
 import { findActiveNavigationHref } from "@/lib/navigation";
@@ -31,7 +32,8 @@ export function SectionTabs({
   actions?: ReactNode;
 }) {
   const pathname = usePathname();
-  const sections = useMemo(() => visibleSections(accessibleModules), [accessibleModules]);
+  const closedModules = useClosedModules();
+  const sections = useMemo(() => visibleSections(accessibleModules, { closed: closedModules }), [accessibleModules, closedModules]);
   const { section, href: activeHref } = resolveActiveNav(pathname, sections);
   if (!section) return null;
   const current = sections.find((s) => s.id === section.id)!;

@@ -13,6 +13,7 @@ import type { NavBadge, PlanUsageRow } from "@/lib/nav-badges";
 import { getHrefStore, MAX_RECENT_SHOWN, pushRecent, togglePin } from "@/lib/nav-memory";
 import { getAppActions, OPEN_PALETTE_EVENT } from "@/lib/palette-core";
 import type { AppModule } from "@/lib/permissions";
+import { useClosedModules } from "@/components/app/closed-modules-context";
 import { ShortcutHint } from "@/components/app/shortcut-hint";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
@@ -71,13 +72,18 @@ export function AppSidebar({
 
   // Menü 9 iş başlığıdır (bkz. src/lib/nav-config.ts). Başlıkta izinli hiçbir sayfa yoksa gizlenir.
   // Tam liste: etkin sayfa tespiti, sabitlenenler ve son kullanılanlar için (hiçbir sayfa kaybolmaz).
-  const allSections = useMemo(() => visibleSections(accessibleModules), [accessibleModules]);
+  // Ofisin kapattığı modüller menüden ve "Daha fazla" listesinden çıkar (veri silinmez).
+  const closedModules = useClosedModules();
+  const allSections = useMemo(() => visibleSections(accessibleModules, { closed: closedModules }), [accessibleModules, closedModules]);
   // Sade görünümde ana liste yalnız çekirdek; çekirdek dışı "Daha fazla" altındadır.
   const sections = useMemo(
-    () => (simple ? visibleSections(accessibleModules, { mode: "simple", role }) : allSections),
-    [simple, accessibleModules, role, allSections],
+    () => (simple ? visibleSections(accessibleModules, { mode: "simple", role, closed: closedModules }) : allSections),
+    [simple, accessibleModules, role, allSections, closedModules],
   );
-  const more = useMemo(() => (simple ? moreSections(accessibleModules, { role }) : []), [simple, accessibleModules, role]);
+  const more = useMemo(
+    () => (simple ? moreSections(accessibleModules, { role, closed: closedModules }) : []),
+    [simple, accessibleModules, role, closedModules],
+  );
   const { section: activeSection, href: activeHref } = resolveActiveNav(pathname, allSections);
   const activeId = activeSection?.id ?? null;
   const activeInMore = more.some((s) => s.items.some((i) => i.href === activeHref));
@@ -109,7 +115,7 @@ export function AppSidebar({
   const creatable = creatableModules ?? accessibleModules;
   const actionsFor = (section: VisibleSection) => {
     const owned = section.items.flatMap((i) => [i.href, ...(i.tabs?.map((t) => t.href) ?? [])]).filter((h) => h !== "/app");
-    return getAppActions(creatable, "", lockedHrefs).filter((a) => owned.some((h) => a.href === h || a.href.startsWith(`${h}/`)));
+    return getAppActions(creatable, "", lockedHrefs, closedModules).filter((a) => owned.some((h) => a.href === h || a.href.startsWith(`${h}/`)));
   };
 
   const totalBadges = badges.reduce((n, b) => n + b.count, 0);

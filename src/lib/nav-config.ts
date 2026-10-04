@@ -3,6 +3,7 @@ import { ICONS } from "@/lib/icons";
 import { findActiveNavigationHref } from "@/lib/navigation";
 import type { AppModule } from "@/lib/permissions";
 import { coreHrefsFor, isHiddenInSimple } from "@/lib/nav-roles";
+import { featureForHref } from "@/lib/modules/registry";
 
 /**
  * /app menüsünün TEK kaynağı. 55 düz link yerine 9 iş başlığı: kullanıcı önce
@@ -67,12 +68,21 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     title: "Müşteriler",
     icon: ICONS.baslikMusteri,
     items: [
-      { href: "/app/musteriler", label: "Müşteriler", icon: ICONS.musteri, module: "customers", tier: "core" },
+      {
+        // Akıllı Listeler ve Tavsiyeler Müşteriler öğesinin sekmesidir (yollar değişmez; modül kapalıysa sekme gizlenir).
+        href: "/app/musteriler",
+        label: "Müşteriler",
+        icon: ICONS.musteri,
+        module: "customers",
+        tabs: [
+          { href: "/app/musteriler", label: "Müşteriler", icon: ICONS.musteri, module: "customers" },
+          { href: "/app/akilli-listeler", label: "Akıllı Listeler", icon: ICONS.akilliListe, module: "customers" },
+          { href: "/app/tavsiyeler", label: "Tavsiyeler", icon: ICONS.tavsiye, module: "customers" },
+        ],
+        tier: "core",
+      },
       // Talepler sayfasının ikinci sekmesi "Eşleşme" (matching izniyle gizlenir); /app/eslestirme yönlendirir.
       { href: "/app/talepler", label: "Talepler", icon: ICONS.talep, module: "demands", tier: "core" },
-      { href: "/app/akilli-listeler", label: "Akıllı Listeler", icon: ICONS.akilliListe, module: "customers", tier: "more" },
-      { href: "/app/tavsiyeler", label: "Tavsiyeler", icon: ICONS.tavsiye, module: "customers", tier: "more" },
-      { href: "/app/kayip-satis", label: "Kayıp nedenleri", icon: ICONS.dusus, module: "customers", tier: "more" },
     ],
   },
   {
@@ -80,7 +90,19 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     title: "Portföy",
     icon: ICONS.baslikPortfoy,
     items: [
-      { href: "/app/portfoyler", label: "Portföyler", icon: ICONS.portfoy, module: "properties", tier: "core" },
+      {
+        // Anahtar Takibi ve Sunumlar Portföyler öğesinin sekmesidir (yollar değişmez).
+        href: "/app/portfoyler",
+        label: "Portföyler",
+        icon: ICONS.portfoy,
+        module: "properties",
+        tabs: [
+          { href: "/app/portfoyler", label: "Portföyler", icon: ICONS.portfoy, module: "properties" },
+          { href: "/app/portfoyler/anahtarlar", label: "Anahtar Takibi", icon: ICONS.anahtarTakip, module: "properties" },
+          { href: "/app/portfoyler/sunumlar", label: "Sunumlar", icon: ICONS.sunum, module: "properties" },
+        ],
+        tier: "core",
+      },
       {
         href: "/app/kiralama",
         label: "Kiralama",
@@ -96,8 +118,6 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { href: "/app/projeler", label: "Projeler", icon: ICONS.proje, module: "projects", tier: "more" },
       { href: "/app/acik-ev", label: "Açık Ev", icon: ICONS.acikEv, module: "open_house", tier: "more" },
       { href: "/app/portallar", label: "Portal Kontrol", icon: ICONS.portal, module: "portals", tier: "more" },
-      { href: "/app/portfoyler/anahtarlar", label: "Anahtar Takibi", icon: ICONS.anahtarTakip, module: "properties", tier: "more" },
-      { href: "/app/portfoyler/sunumlar", label: "Sunumlar", icon: ICONS.sunum, module: "properties", tier: "more" },
       { href: "/app/ag", label: "Ofisler Arası Ağ", icon: ICONS.ag, module: "network", tier: "more" },
     ],
   },
@@ -106,7 +126,19 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     title: "Anlaşmalar",
     icon: ICONS.baslikAnlasma,
     items: [
-      { href: "/app/anlasmalar", label: "Anlaşmalar", icon: ICONS.anlasma, module: "commissions", tier: "core" },
+      {
+        // Kayıp nedenleri Anlaşmalar öğesinin sekmesidir; sekme kendi izniyle (müşteriler) gizlenir.
+        href: "/app/anlasmalar",
+        label: "Anlaşmalar",
+        icon: ICONS.anlasma,
+        module: "commissions",
+        tabs: [
+          { href: "/app/anlasmalar", label: "Anlaşmalar", icon: ICONS.anlasma, module: "commissions" },
+          { href: "/app/kayip-satis", label: "Kayıp nedenleri", icon: ICONS.dusus, module: "customers" },
+        ],
+        needsItemModule: true,
+        tier: "core",
+      },
       { href: "/app/teklifler", label: "Teklifler", icon: ICONS.teklif, module: "offers", tier: "more" },
       { href: "/app/sozlesmeler", label: "Sözleşmeler", icon: ICONS.sozlesme, module: "contracts", tier: "more" },
     ],
@@ -251,11 +283,18 @@ export const NAV_ALIASES: Readonly<Record<string, string>> = {
   "/app/eslestirme": "/app/talepler?sekme=eslesme",
 };
 
-/** Sekmeli öğeyi erişilebilir sekmelere indirger; hiç sekme kalmazsa null. */
-function visibleItem(item: NavItem, accessible: readonly AppModule[]): NavItem | null {
-  if (!item.tabs) return accessible.includes(item.module) ? item : null;
+/** Yol, ofisin KAPATTIĞI bir modüle mi ait? (çekirdek yol asla kapalı sayılmaz) */
+function isClosedHref(href: string, closed: readonly string[]): boolean {
+  if (closed.length === 0) return false;
+  const key = featureForHref(href);
+  return key !== null && closed.includes(key);
+}
+
+/** Sekmeli öğeyi erişilebilir ve açık sekmelere indirger; hiç sekme kalmazsa null. */
+function visibleItem(item: NavItem, accessible: readonly AppModule[], closed: readonly string[] = []): NavItem | null {
+  if (!item.tabs) return accessible.includes(item.module) && !isClosedHref(item.href, closed) ? item : null;
   if (item.needsItemModule && !accessible.includes(item.module)) return null;
-  const tabs = item.tabs.filter((t) => accessible.includes(t.module));
+  const tabs = item.tabs.filter((t) => accessible.includes(t.module) && !isClosedHref(t.href, closed));
   const first = tabs[0];
   if (!first) return null;
   return { ...item, href: first.href, module: first.module, tabs };
@@ -263,7 +302,12 @@ function visibleItem(item: NavItem, accessible: readonly AppModule[]): NavItem |
 
 /** "full": tüm yetkili sayfalar. "simple": yalnız rolün çekirdek sayfaları (gerisi `moreSections`). */
 export type NavMode = "simple" | "full";
-export type NavViewOptions = { mode?: NavMode; role?: string | null };
+export type NavViewOptions = {
+  mode?: NavMode;
+  role?: string | null;
+  /** Ofisin kapattığı modül anahtarları (src/lib/modules): menüde ve sekmelerde görünmez. */
+  closed?: readonly string[];
+};
 
 /**
  * Erişilebilir modüllere göre görünen başlıklar; her başlığın girişi ilk görünen sayfasıdır.
@@ -273,7 +317,7 @@ export function visibleSections(accessible: readonly AppModule[], opts: NavViewO
   const core = opts.mode === "simple" ? coreHrefsFor(opts.role) : null;
   return NAV_SECTIONS.map((section) => {
     const items = section.items.flatMap((item) =>
-      core && !core.has(item.href) ? [] : (visibleItem(item, accessible) ?? []),
+      core && !core.has(item.href) ? [] : (visibleItem(item, accessible, opts.closed) ?? []),
     );
     return { ...section, items, href: items[0]?.href ?? "/app" };
   }).filter((section) => section.items.length > 0);
@@ -283,11 +327,14 @@ export function visibleSections(accessible: readonly AppModule[], opts: NavViewO
  * Sade görünümde "Daha fazla" altına inen yetkili öğeler (çekirdek dışı). Yönetici olmayan rollerde
  * yönetim sayfaları (Ayarlar, Otomasyon…) burada da yer almaz; tam görünümde ve doğrudan adreste durur.
  */
-export function moreSections(accessible: readonly AppModule[], opts: { role?: string | null } = {}): VisibleSection[] {
+export function moreSections(
+  accessible: readonly AppModule[],
+  opts: { role?: string | null; closed?: readonly string[] } = {},
+): VisibleSection[] {
   const core = coreHrefsFor(opts.role);
   return NAV_SECTIONS.map((section) => {
     const items = section.items.flatMap((item) =>
-      core.has(item.href) || isHiddenInSimple(opts.role, item.href) ? [] : (visibleItem(item, accessible) ?? []),
+      core.has(item.href) || isHiddenInSimple(opts.role, item.href) ? [] : (visibleItem(item, accessible, opts.closed) ?? []),
     );
     return { ...section, items, href: items[0]?.href ?? "/app" };
   }).filter((section) => section.items.length > 0);

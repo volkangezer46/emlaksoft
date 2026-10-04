@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { insertNotifications, type NotificationRow } from "@/lib/notify-batch";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { getDisabledModulesByTenant, isDisabledFor } from "@/lib/modules/state";
 import { resolvePriceHealth } from "@/lib/comparables";
 
 function authorized(req: NextRequest) {
@@ -108,7 +109,11 @@ export async function GET(req: NextRequest) {
 
   // Döngü içi insert yerine toplu yazma: 200 ilan için 200 gidiş-dönüş
   // yerine tek istek (500'lük parçalar hâlinde).
-  const rows: NotificationRow[] = (listings ?? []).map((row) => ({
+  // Modül kapısı: "Portal Kontrol" kapalı ofislere teyit uyarısı yazılmaz (fiyat sağlığı adımı etkilenmez).
+  const disabledModules = await getDisabledModulesByTenant(admin);
+  const rows: NotificationRow[] = (listings ?? [])
+    .filter((row) => !isDisabledFor(disabledModules, String(row.tenant_id), "portals"))
+    .map((row) => ({
     tenant_id: String(row.tenant_id),
     title: "Portal teyit gecikti",
     body: `${row.portal_name}${row.portal_listing_id ? ` #${row.portal_listing_id}` : ""} — 7+ gündür teyit yok`,

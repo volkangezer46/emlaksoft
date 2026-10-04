@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { getCustomerPortalData } from "@/app/actions/customer-portal";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { PublicModuleClosed } from "@/components/modules/public-module-closed";
+import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { AddToCalendarButton } from "@/components/app/add-to-calendar-button";
 import { MatchFeedback } from "./match-feedback";
@@ -92,6 +94,7 @@ export default async function CustomerPortalPage({
   // görselleri, yayın durumu (vitrin yalnızca "live" portföyleri gösterir)
   // ve müşterinin daha önce verdiği beğen/geç geri bildirimleri.
   const admin = createAdminClient();
+  if (await isPublicFeatureClosed(admin, tenant.id, "client_portals")) return <PublicModuleClosed officeName={tenant.name} />;
   const matchIds = matches.map((m) => m.id);
   const [{ data: customerRel }, coverRes, statusRes, feedbackRes] = await Promise.all([
     admin

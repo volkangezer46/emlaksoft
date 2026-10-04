@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { after } from "next/server";
 import { Gift, HeartHandshake, Link2Off, Phone, ShieldCheck } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { PublicModuleClosed } from "@/components/modules/public-module-closed";
+import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 import {
   PublicGhostButton,
@@ -64,6 +66,7 @@ export default async function ReferralPage({
   };
   const tenant = rel(link.tenant as TenantShape | TenantShape[] | null);
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
+  if (await isPublicFeatureClosed(admin, link.tenant_id, "smart_lists")) return <PublicModuleClosed officeName={tenant.name} />;
   const { data: customer } = await admin
     .from("customers")
     .select("full_name")
