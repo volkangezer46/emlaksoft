@@ -44,6 +44,45 @@ export async function createDue(_prev: DueResult, fd: FormData): Promise<DueResu
   return { ok: true, id: data.id };
 }
 
+/** Aidat düzenleme: başlık, tutar, dönem, son ödeme, not (portföy bağı korunur; yalnız alan gelirse değişir). */
+export async function updateDue(_prev: DueResult, fd: FormData): Promise<DueResult> {
+  const gate = await requirePermission("expenses", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const id = String(fd.get("id") ?? "").trim();
+  if (!UUID_RE.test(id)) return { error: "Aidat kaydı geçersiz." };
+  const parsed = parseDueInput(fd);
+  if (!parsed.ok) return { error: parsed.error };
+  const { title, amount, period, dueDate, propertyId, notes } = parsed.value;
+  if (fd.has("property_id")) {
+    const references = await validateTenantReferences(gate.tenantId, { propertyId });
+    if (!references.ok) return { error: references.error };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("property_dues")
+    .update({
+      title,
+      amount,
+      period,
+      due_date: dueDate,
+      notes,
+      ...(fd.has("property_id") ? { property_id: propertyId } : {}),
+    })
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("updateDue", { code: error.code || "unknown" });
+    return { error: "Aidat güncellenemedi." };
+  }
+  if (!data) return { error: "Aidat kaydı bulunamadı." };
+  revalidatePath("/app/aidat");
+  return { ok: true, id };
+}
+
 export async function toggleDuePaid(id: string, paid: boolean): Promise<DueResult> {
   const gate = await requirePermission("expenses", "edit");
   if (!gate.ok) return { error: gate.error };

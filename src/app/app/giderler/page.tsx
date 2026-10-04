@@ -61,13 +61,15 @@ function tarihKisa(iso: string) {
 export default async function GiderlerPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ kategori?: string; from?: string; to?: string }>;
+  searchParams?: Promise<{ kategori?: string; from?: string; to?: string; adet?: string }>;
 }) {
   const { perms } = await requireModulePage("expenses", "/app/giderler");
   const params = (await searchParams) ?? {};
   const fromF = ISO_DATE.test(params.from ?? "") ? params.from! : null;
   const toF = ISO_DATE.test(params.to ?? "") ? params.to! : null;
   const now = new Date(nowMs());
+  // Sayfalama: ?adet= 200'den başlar, "Daha fazla göster" 200 artırır (tavan 1000).
+  const adet = Math.min(Math.max(Math.trunc(Number(params.adet)) || 200, 200), 1000);
 
   const supabase = await createClient();
   const [expenses, catDefs, aggregateResult] = await Promise.all([
@@ -75,7 +77,7 @@ export default async function GiderlerPage({
     // NOT: KPI/kırılım/trend artık aşağıdaki RPC'den gelir, bu diziden DEĞİL —
     // liste görünümü için 200 kayıt tavanı yeterli, ama toplam/tutar asla bu
     // tavana bağlı olmamalı (bkz. tenant_expense_aggregates).
-    listExpenses(undefined, { from: fromF ?? undefined, to: toF ?? undefined }),
+    listExpenses(undefined, { from: fromF ?? undefined, to: toF ?? undefined }, adet),
     getDefinitionsOrDefault("expense_category"),
     supabase.rpc("tenant_expense_aggregates", { p_from: fromF, p_to: toF, p_as_of: now.toISOString() }),
   ]);
@@ -390,6 +392,16 @@ export default async function GiderlerPage({
           canDelete={canDelete}
         />
       )}
+      {expenses.length >= adet && adet < 1000 ? (
+        <div className="text-center">
+          <Link
+            href={qs({ kategori: kategoriF || null, from: fromF, to: toF, adet: String(adet + 200) })}
+            className="focus-ring inline-flex rounded-[var(--radius-control)] border border-line px-4 py-2 text-sm font-semibold text-brand-600 hover:border-brand-300"
+          >
+            Daha fazla göster ({adet} kayıt gösteriliyor)
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 }
