@@ -15,6 +15,7 @@ import {
   applyPlanOverrides,
   diffAgainstDefault,
   resolveCatalogSettings,
+  sanitizeSeatTiers,
   serializePlanCatalogSettings,
   type PlanCatalogSettings,
 } from "@/lib/billing/plan-overrides";
@@ -22,6 +23,13 @@ import { parsePlanForm } from "@/lib/billing/plan-form";
 import { PLAN_DEFINITIONS_TAG } from "@/lib/billing/plan-definitions";
 import { PLAN_SUPPORT_TAG, getPlanSupport } from "@/lib/billing/plan-support";
 import type { PlanDef, PlanId } from "@/lib/billing/plans";
+import { validateSeatCatalog } from "@/lib/billing/seat-pricing";
+import {
+  SEAT_SETTINGS_KEY,
+  SEAT_WARN_PERCENT_MAX,
+  SEAT_WARN_PERCENT_MIN,
+  serializeSeatSettings,
+} from "@/lib/billing/seat-settings";
 
 export type PlanOpResult = { ok?: boolean; error?: string; notice?: string };
 
@@ -110,6 +118,8 @@ export async function savePlanDefinition(formData: FormData): Promise<PlanOpResu
 
   const effective = applyPlanOverrides(nextOverrides);
   if (!effective.some((p) => !p.hidden)) return { error: "En az bir paket yayında kalmalı." };
+  const seatReport = validateSeatCatalog(effective);
+  if (seatReport.errors.length > 0) return { error: `Ek kullanıcı fiyatlaması geçersiz: ${seatReport.errors[0]}` };
 
   const before = applyPlanOverrides(settings.overrides).find((p) => p.id === id)!;
   const limitsChanged = JSON.stringify(before.limits) !== JSON.stringify(parsed.plan.limits);
@@ -128,7 +138,11 @@ export async function savePlanDefinition(formData: FormData): Promise<PlanOpResu
     entityId: id,
     meta: { diff },
   });
-  return { ok: true, notice: notice ?? "Paket kaydedildi. Mevcut aboneliklerin tutarı değişmez; yeni ödemeler yeni fiyatla alınır." };
+  const warn = seatReport.warnings.length > 0 ? ` Uyarı: ${seatReport.warnings[0]}` : "";
+  return {
+    ok: true,
+    notice: `${notice ?? "Paket kaydedildi. Mevcut aboneliklerin tutarı değişmez; yeni ödemeler yeni fiyatla alınır."}${warn}`,
+  };
 }
 
 /** Paketin düzenlemelerini siler; plans.ts varsayılanına döner (limitler de senkronlanır). */
@@ -215,4 +229,84 @@ export async function saveCampaignSettings(formData: FormData): Promise<PlanOpRe
       ? "Kaydedildi."
       : "Kaydedildi. Deneme günü, 20260816010100 migration'ı uygulanana kadar 14 gün olarak verilir.",
   };
+}
+
+/**
+ * Fiyat simülatöründen "uygula": tek paketin taban fiyatı + ek kullanıcı kademeleri/yuvarlama/azami koltuk.
+ * Katalog düzeyinde doğrulanır (hata varsa yazılmaz). Mevcut abonelerin kayıtlı/kilitli tutarı değişmez.
+ */
+export async function applySimulatedSeatPricing(formData: FormData): Promise<PlanOpResult> {
+  const g = await guard("seat-apply");
+  if ("error" in g) return { error: g.error };
+  const id = String(formData.get("plan_id") ?? "");
+  if (!isPlanId(id)) return { error: "Geçersiz paket." };
+  const base = BASE_CATALOG.find((p) => p.id === id)!;
+
+  const priceRaw = String(formData.get("monthly_try") ?? "").trim();
+  if (!/^\d+$/.test(priceRaw) || Number(priceRaw) < 1 || Number(priceRaw) > PLAN_FIELD_LIMITS.priceMax) {
+    return { error: "Aylık taban fiyat pozitif tam sayı olmalı." };
+  }
+  let tiersJson: unknown;
+  try {
+    tiersJson = JSON.parse(String(formData.get("seat_tiers_json") ?? "null"));
+  } catch {
+    return { error: "Kademe verisi okunamadı." };
+  }
+  const tiers = sanitizeSeatTiers(tiersJson);
+  if (tiers === undefined) return { error: "Kademeler geçersiz (tam sayı, en fazla 12 kademe)." };
+  const roundingRaw = String(formData.get("seat_rounding") ?? "none");
+  if (roundingRaw !== "none" && roundingRaw !== "x9" && roundingRaw !== "x0") return { error: "Yuvarlama düzeni geçersiz." };
+  const maxRaw = String(formData.get("max_seats") ?? "").trim();
+  if (maxRaw && (!/^\d+$/.test(maxRaw) || Number(maxRaw) < 1 || Number(maxRaw) > PLAN_FIELD_LIMITS.maxSeatsMax)) {
+    return { error: "Azami kullanıcı pozitif tam sayı olmalı." };
+  }
+
+  const settings = await loadSettings();
+  const current = applyPlanOverrides(settings.overrides).find((p) => p.id === id)!;
+  const edited: PlanDef = {
+    ...current,
+    monthlyTry: Number(priceRaw),
+    extraSeatTiers: tiers,
+    maxSeats: maxRaw ? Number(maxRaw) : null,
+    seatRounding: roundingRaw === "none" ? null : roundingRaw,
+  };
+  if (current.campaignMonthlyTry && current.campaignMonthlyTry >= edited.monthlyTry) {
+    return { error: "Taban fiyat, kampanya fiyatının üstünde kalmalı; önce kampanya fiyatını güncelleyin." };
+  }
+  const nextOverrides = { ...settings.overrides };
+  const diff = diffAgainstDefault(base, edited);
+  if (Object.keys(diff).length > 0) nextOverrides[id] = diff;
+  else delete nextOverrides[id];
+  const effective = applyPlanOverrides(nextOverrides);
+  const report = validateSeatCatalog(effective);
+  if (report.errors.length > 0) return { error: `Uygulanamadı: ${report.errors[0]}` };
+
+  if (!(await persist({ ...settings, overrides: nextOverrides }, g.staff.id))) return { error: "Ayar kaydedilemedi." };
+  await logPlatformActivity({
+    actorId: g.staff.id,
+    action: "billing.seat_pricing.apply",
+    entityType: "plan",
+    entityId: id,
+    meta: { monthlyTry: edited.monthlyTry, tiers: tiers ?? null, maxSeats: edited.maxSeats ?? null, rounding: roundingRaw },
+  });
+  const warn = report.warnings.length > 0 ? ` Uyarı: ${report.warnings[0]}` : "";
+  return { ok: true, notice: `Fiyatlama uygulandı. Mevcut abonelerin kayıtlı ve kilitli tutarı değişmez; yeni satışlar ve ek kullanıcılar yeni fiyatla alınır.${warn}` };
+}
+
+/** Koltuk doluluk uyarı eşiği (ofis tarafı satın alma yönlendirmesi bu eşiği kullanır). */
+export async function saveSeatSettings(formData: FormData): Promise<PlanOpResult> {
+  const g = await guard("seat-settings");
+  if ("error" in g) return { error: g.error };
+  const raw = String(formData.get("warn_percent") ?? "").trim();
+  const n = Number(raw);
+  if (!/^\d+$/.test(raw) || n < SEAT_WARN_PERCENT_MIN || n > SEAT_WARN_PERCENT_MAX) {
+    return { error: `Uyarı eşiği ${SEAT_WARN_PERCENT_MIN}-${SEAT_WARN_PERCENT_MAX} arasında tam sayı (yüzde) olmalı.` };
+  }
+  if (!(await setPlatformSetting(SEAT_SETTINGS_KEY, serializeSeatSettings({ warnPercent: n }), g.staff.id))) {
+    return { error: "Ayar kaydedilemedi." };
+  }
+  updateTag(PLAN_DEFINITIONS_TAG);
+  revalidatePath("/admin/billing/planlar");
+  await logPlatformActivity({ actorId: g.staff.id, action: "billing.seat_settings.save", entityType: "plan", meta: { warnPercent: n } });
+  return { ok: true, notice: `Uyarı eşiği %${n} olarak kaydedildi; %100'de "dolu" gösterilir.` };
 }
