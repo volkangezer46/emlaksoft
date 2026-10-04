@@ -137,6 +137,7 @@ const PHONE_FIELD_READ = /\b(?:input|data|payload|body|values|params)\.(?:phone|
 
 /** dosya -> gerekçe (telefon alanı okuyup sıkı doğrulayıcıya referans vermeyen sunucu dosyaları). */
 const SERVER_PHONE_EXCEPTIONS: Record<string, string> = {
+  "src/app/actions/platform-tenants.ts": "telefonlar lib/admin/office-create-input.ts zod şemalarında (parsePhoneStrict) doğrulanmış gelir",
   "src/app/actions/duplicates.ts": "yalnız mükerrer ARAMA: kayıt yazmaz; duplicate-match anahtarı normalize eder",
   "src/app/actions/public-valuation.ts": "telefonu doğrulamadan intakeLead'e iletir; intakeLead (lib/lead-intake.ts) parsePhoneStrict ile doğrular",
   "src/app/api/leads/[token]/route.ts": "telefonu doğrulamadan intakeLead'e iletir; intakeLead (lib/lead-intake.ts) parsePhoneStrict ile doğrular",
@@ -197,7 +198,7 @@ describe("telefon sunucu kapısı ve PhoneInput tek kaynak", () => {
 
   it("sunucu istisnaları gerekçeli ve (delege edenler) gerçekten sıkı doğrulayıcıya dayanıyor", () => {
     for (const [f, why] of Object.entries(SERVER_PHONE_EXCEPTIONS)) expect(why.trim().length, f).toBeGreaterThan(0);
-    expect(readFileSync("src/lib/lead-intake.ts", "utf8")).toMatch(/parsePhoneStrict(/);
+    expect(readFileSync("src/lib/lead-intake.ts", "utf8")).toContain("parsePhoneStrict(");
   });
 
   it("hafif parsePhone( yalnız izinli (istemci/karşılaştırma) dosyalarda; kayıt yapanlar parsePhoneStrict kullanır", () => {
