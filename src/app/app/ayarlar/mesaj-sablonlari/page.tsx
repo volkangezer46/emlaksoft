@@ -3,13 +3,14 @@ import { ArrowLeft, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import type { MessageTemplateRow } from "@/app/actions/message-templates";
+import { ReadOnlyGate } from "../read-only-gate";
 import { TemplatesManager } from "./templates-manager";
 
 import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Mesaj şablonları" };
 
 export default async function MessageTemplatesSettingsPage() {
-  const { tenantId } = await requireModulePage("settings");
+  const { tenantId, perms } = await requireModulePage("settings");
   const supabase = await createClient();
 
   const { data } = await supabase
@@ -57,7 +58,9 @@ export default async function MessageTemplatesSettingsPage() {
         </p>
       </section>
 
-      <TemplatesManager templates={templates} />
+      <ReadOnlyGate canEdit={(perms.settings ?? []).includes("edit")}>
+        <TemplatesManager templates={templates} />
+      </ReadOnlyGate>
     </div>
   );
 }

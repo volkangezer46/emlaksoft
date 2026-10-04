@@ -6,6 +6,7 @@ import {
   Droplets,
   Fingerprint,
   Layers,
+  FileText,
   Megaphone,
   MessageSquareText,
   Plug,
@@ -30,6 +31,7 @@ import { CompanyForm } from "./company-form";
 import { MatchingWeightsForm } from "./matching-weights-form";
 import { LogoUploadForm } from "./logo-upload-form";
 import { IntegrationsForm } from "./integrations-form";
+import { ReadOnlyGate } from "./read-only-gate";
 import { NotificationPrefsPanel } from "@/components/app/notification-prefs";
 import { planLabel } from "@/lib/billing/plans";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
@@ -56,6 +58,7 @@ const cards: SettingCard[] = [
   { title: "Entegrasyonlar", desc: "Hazır, yapılandırma bekleyen ve planlanan dış servis bağlantıları.", icon: Plug, tone: "bg-cyan-400/12 text-cyan-500", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/entegrasyonlar" },
   { title: "Duyuru panosu", desc: "Ekibe duyuru yayınlayın, kim okudu takip edin.", icon: Megaphone, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/bildirimler?sekme=duyurular" },
   { title: "Mesaj şablonları", desc: "WhatsApp için hazır metinler — değişkenler tek tıkla dolar.", icon: MessageSquareText, tone: "bg-mint-500/12 text-mint-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/mesaj-sablonlari" },
+  { title: "Sözleşme şablonları", desc: "Hazır sözleşme metinlerini ekleyin, düzenleyin, pasife alın.", icon: FileText, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/sozlesme-sablonlari" },
   { title: "Güvenlik", desc: "SMS ile iki adımlı doğrulama ve giriş geçmişi.", icon: ShieldCheck, tone: "bg-mint-500/12 text-mint-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/guvenlik" },
   { title: "Çöp kutusu", desc: "Silinen müşteri ve portföyleri 90 gün içinde geri alın.", icon: Trash2, tone: "bg-danger-500/10 text-danger-500", href: "/app/ayarlar/cop-kutusu" },
   { title: "Tanımlar & seçim listeleri", desc: "Müşteri tipi, kaynak, portföy tipi gibi tüm dropdown seçeneklerini yönetin.", icon: Sliders, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/tanimlar" },
@@ -65,7 +68,8 @@ const cards: SettingCard[] = [
 ];
 
 export default async function SettingsPage() {
-  const { tenantId, role } = await requireModulePage("settings");
+  const { tenantId, role, perms } = await requireModulePage("settings");
+  const canEditSettings = (perms.settings ?? []).includes("edit");
   // Modüller kartı yalnız ofis sahibi ve genel müdür içindir.
   const visibleCards = cards.filter((c) => c.href !== "/app/ayarlar/moduller" || canManageModules(role));
   const supabase = await createClient();
@@ -232,10 +236,12 @@ export default async function SettingsPage() {
             <p className="text-xs text-text-muted">Logo, ofis adı ve iletişim bilgileri</p>
           </div>
         </div>
+        <ReadOnlyGate canEdit={canEditSettings}>
         <div className="mt-5 border-b border-line pb-5">
           <LogoUploadForm currentUrl={tenant.logo_url ?? null} officeName={tenant.name || "Ofis"} />
         </div>
         <CompanyForm tenant={tenant} />
+        </ReadOnlyGate>
       </section>
 
       {/* Eşleştirme ağırlıkları */}
@@ -255,7 +261,9 @@ export default async function SettingsPage() {
             Eşleştirme sayfası <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>
         </div>
-        <MatchingWeightsForm initial={matchingWeights} />
+        <ReadOnlyGate canEdit={canEditSettings}>
+          <MatchingWeightsForm initial={matchingWeights} />
+        </ReadOnlyGate>
       </section>
 
       {/* Entegrasyonlar */}
@@ -268,11 +276,13 @@ export default async function SettingsPage() {
           </div>
         </div>
         <div className="mt-5">
+          <ReadOnlyGate canEdit={canEditSettings}>
           <IntegrationsForm
             netgsm={netgsm}
             platformConfigured={platformFallbackConfigured}
             whatsapp={whatsapp}
           />
+          </ReadOnlyGate>
         </div>
       </section>
 

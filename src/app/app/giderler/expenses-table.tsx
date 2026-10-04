@@ -98,7 +98,7 @@ export function ExpensesTable({
               <TH align="right">Tutar</TH>
               <TH align="right" className="hidden sm:table-cell">Tarih</TH>
               {hasActions ? (
-                <TH align="right" className="hidden w-px sm:table-cell">
+                <TH align="right" className="w-px">
                   <span className="sr-only">İşlemler</span>
                 </TH>
               ) : null}
@@ -149,7 +149,7 @@ export function ExpensesTable({
                   <TD align="right">{tryFormatter.format(Number(e.amount))}</TD>
                   <TD align="right" className="hidden sm:table-cell">{formatDate(e.expense_date)}</TD>
                   {hasActions ? (
-                    <TD align="right" className="hidden whitespace-nowrap sm:table-cell">
+                    <TD align="right" className="whitespace-nowrap">
                       <span className="relative z-10 inline-flex items-center gap-1">
                         <ConfirmDialog
                           title="Gideri sil"
@@ -188,7 +188,7 @@ export function ExpensesTable({
                 <TD className="hidden sm:table-cell" />
                 <TD align="right">{tryFormatter.format(total)}</TD>
                 <TD className="hidden sm:table-cell" />
-                {hasActions ? <TD className="hidden sm:table-cell" /> : null}
+                {hasActions ? <TD /> : null}
               </TR>
             </TFoot>
           ) : null}

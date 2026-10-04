@@ -6,6 +6,7 @@ import { LeadCapturePanel } from "./lead-capture-panel";
 import { VitrinQr } from "@/components/public/vitrin-qr";
 import { getBaseUrl } from "@/lib/base-url";
 
+import { ReadOnlyGate } from "../read-only-gate";
 import { PageHeader } from "@/components/ui/page-header";
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,9 @@ export default async function LeadCaptureSettingsPage() {
           </Link></div>
 } />
 
-      <LeadCapturePanel token={token} enabled={enabled} baseUrl={baseUrl} vitrinUrl={vitrinUrl} />
+      <ReadOnlyGate canEdit={(ctx.perms.settings ?? []).includes("edit")}>
+        <LeadCapturePanel token={token} enabled={enabled} baseUrl={baseUrl} vitrinUrl={vitrinUrl} />
+      </ReadOnlyGate>
 
       {/* Vitrin QR kodu — basılı materyal için indirme + yazdırma */}
       <VitrinQr vitrinUrl={vitrinUrl} />

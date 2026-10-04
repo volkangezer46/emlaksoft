@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   saveNetgsmCredentials,
   clearNetgsmCredentials,
+  sendNetgsmTestSms,
   saveWhatsAppCredentials,
   clearWhatsAppCredentials,
   type TenantIntegrationResult,
@@ -56,6 +57,15 @@ export function IntegrationsForm({
       setTimeout(() => setSaved(false), 2500);
     });
   };
+
+  const [testPending, startTest] = useTransition();
+  const [testResult, setTestResult] = useState<{ ok?: boolean; error?: string } | null>(null);
+  function onTestSms() {
+    setTestResult(null);
+    startTest(async () => {
+      setTestResult(await sendNetgsmTestSms());
+    });
+  }
 
   async function onClear() {
     setClearError(null);
@@ -165,10 +175,17 @@ export function IntegrationsForm({
 
         {error ? <p className="sm:col-span-3 text-sm text-danger-500" role="alert">{error}</p> : null}
         {clearError ? <p className="sm:col-span-3 text-sm text-danger-500" role="alert">{clearError}</p> : null}
+        {testResult?.error ? <p className="sm:col-span-3 text-sm text-danger-500" role="alert">{testResult.error}</p> : null}
+        {testResult?.ok ? <p className="sm:col-span-3 text-sm font-semibold text-mint-600" role="status">Deneme SMS&apos;i profilinizdeki telefona gönderildi.</p> : null}
 
         <div className="flex items-center justify-end gap-2 sm:col-span-3">
           {saved ? (
             <span className="flex items-center gap-1.5 text-sm font-semibold text-mint-600"><Check className="h-4 w-4" /> Kaydedildi</span>
+          ) : null}
+          {netgsm ? (
+            <Button type="button" variant="secondary" size="sm" onClick={onTestSms} loading={testPending}>
+              <MessageSquareText className="h-3.5 w-3.5" /> Deneme SMS
+            </Button>
           ) : null}
           {netgsm ? (
             <ConfirmDialog

@@ -18,6 +18,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listContractVersions } from "@/app/actions/contracts";
 import { ContractSignPanel } from "./contract-sign-panel";
+import { SignerEditPanel } from "./signer-edit-panel";
 import { CancelContractButton } from "./cancel-contract-button";
 import { CopySignLink } from "./copy-sign-link";
 import { FillFieldsDialog } from "./fill-fields-dialog";
@@ -399,6 +400,16 @@ export default async function ContractDetailPage({
                               {canEdit && s.status === "pending" && "token" in s && s.token
                                 ? <CopySignLink token={String(s.token)} />
                                 : null}
+                              {canEdit && s.status === "pending" ? (
+                                <SignerEditPanel
+                                  signer={{
+                                    id: String(s.id),
+                                    full_name: String(s.full_name),
+                                    email: (s.email as string | null) ?? null,
+                                    phone: (s.phone as string | null) ?? null,
+                                  }}
+                                />
+                              ) : null}
                               {/* SMS OTP ile telefonunu doğrulayan imzalayan rozeti */}
                               {s.verified_at ? (
                                 <span className="whitespace-nowrap rounded-full bg-mint-500/12 px-2 py-0.5 text-xs font-bold text-mint-600" title="Telefon SMS koduyla doğrulandı">

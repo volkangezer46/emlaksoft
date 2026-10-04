@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { ReadOnlyGate } from "../read-only-gate";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_DEFINITIONS, DEFINITION_CATEGORIES } from "@/lib/definition-defaults";
@@ -10,7 +11,7 @@ import { HelpTip } from "@/components/ui/help-tip";
 export const metadata = { title: "Tanımlar" };
 
 export default async function DefinitionsPage() {
-  const { tenantId } = await requireModulePage("settings");
+  const { tenantId, perms } = await requireModulePage("settings");
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -57,7 +58,9 @@ export default async function DefinitionsPage() {
 
       <PageHeader title="Seçim listeleri & tanımlar" eyebrow="Tanımlar" description={<>Müşteri tipi, kaynak, portföy tipi, kayıp nedeni gibi formlardaki tüm seçenekler ve anlaşma aşama adları buradan yönetilir. Sistemin hazır seçenekleri korunur; ofisinize özel seçenekler ekleyebilir, kendi eklediklerinizi düzenleyebilirsiniz. <HelpTip topic="tanimlar" /></>} />
 
-      <DefinitionsManager categories={categories} tenantId={tenantId} />
+      <ReadOnlyGate canEdit={(perms.settings ?? []).includes("edit")}>
+        <DefinitionsManager categories={categories} tenantId={tenantId} />
+      </ReadOnlyGate>
     </div>
   );
 }

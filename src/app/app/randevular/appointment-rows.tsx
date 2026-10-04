@@ -6,6 +6,7 @@ import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { EntityThumb, MobileCard, MobileCardList, RowActionLink, RowActions, StatusPill, type Density, type PillTone } from "@/components/ui/list-kit";
 import type { CalendarEvent } from "@/lib/calendar";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CompleteAppointmentDialog } from "./complete-appointment-dialog";
 import { AppointmentEditDialog } from "./appointment-edit-dialog";
 import { CopyConfirmLink } from "./copy-confirm-link";
@@ -38,16 +39,17 @@ export type AppointmentVM = {
   confirmToken: string | null;
   isShowing: boolean;
   tutanakHref: string;
-  edit: { id: string; appointment_type: string; scheduled_at: string; duration_min: number | null; location: string | null; notes: string | null };
+  edit: { id: string; appointment_type: string; scheduled_at: string; duration_min: number | null; location: string | null; notes: string | null; assigned_to: string | null; customer_id: string | null; customer_label: string | null; property_id: string | null; property_label: string | null };
   calendarEvent: CalendarEvent;
 };
 
 type TypeOption = { value: string; label: string };
+type AdvisorOption = { id: string; label: string };
 
 const FORM_ICON_BTN =
   "focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-transparent transition hover:border-line hover:bg-canvas";
 
-function StatusForm({ id, status, label, className, children }: { id: string; status: "confirmed" | "cancelled"; label: string; className: string; children: React.ReactNode }) {
+function StatusForm({ id, status, label, className, children }: { id: string; status: "confirmed" | "cancelled" | "signature"; label: string; className: string; children: React.ReactNode }) {
   return (
     <form action={setAppointmentStatus}>
       <input type="hidden" name="id" value={id} />
@@ -60,7 +62,7 @@ function StatusForm({ id, status, label, className, children }: { id: string; st
 }
 
 /** Satır eylemleri: onayla / tamamla (sonuç diyaloğu) / düzenle / iptal / teyit linki / tutanak. */
-function Actions({ a, typeOptions, withCalendar }: { a: AppointmentVM; typeOptions: TypeOption[] | undefined; withCalendar: boolean }) {
+function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM; typeOptions: TypeOption[] | undefined; advisors?: AdvisorOption[]; withCalendar: boolean }) {
   const completed = a.status === "completed";
   return (
     <div className="relative z-10 flex flex-wrap items-center justify-end gap-1.5">
@@ -80,7 +82,7 @@ function Actions({ a, typeOptions, withCalendar }: { a: AppointmentVM; typeOptio
           </button>
         </form>
       )}
-      {!completed ? <AppointmentEditDialog appointment={a.edit} typeOptions={typeOptions} /> : null}
+      {!completed ? <AppointmentEditDialog appointment={a.edit} typeOptions={typeOptions} advisors={advisors} /> : null}
       <RowActions>
         {a.cardHref ? <RowActionLink href={a.cardHref} label={`${a.customerName} randevusu detayı`} icon={Eye} /> : null}
         {a.status === "pending" ? (
@@ -88,10 +90,29 @@ function Actions({ a, typeOptions, withCalendar }: { a: AppointmentVM; typeOptio
             <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
           </StatusForm>
         ) : null}
-        {!completed ? (
-          <StatusForm id={a.id} status="cancelled" label="Randevuyu iptal et" className="text-[var(--danger-strong)] hover:text-[var(--danger-strong)]">
-            <XCircle aria-hidden="true" className="h-4 w-4" />
+        {a.status === "confirmed" ? (
+          <StatusForm id={a.id} status="signature" label="İmzaya al (imza bekleniyor olarak işaretle)" className="text-brand-600 hover:text-brand-600">
+            <FileSignature aria-hidden="true" className="h-4 w-4" />
           </StatusForm>
+        ) : null}
+        {!completed ? (
+          <ConfirmDialog
+            trigger={
+              <button
+                type="button"
+                aria-label="Randevuyu iptal et"
+                title="Randevuyu iptal et"
+                className={`${FORM_ICON_BTN} text-[var(--danger-strong)] hover:text-[var(--danger-strong)]`}
+              >
+                <XCircle aria-hidden="true" className="h-4 w-4" />
+              </button>
+            }
+            title="Randevuyu iptal et"
+            description={`${a.customerName} ile ${a.dateLabel} ${a.timeLabel} randevusu iptal edilecek ve takvimden kalkacak.`}
+            confirmLabel="İptal et"
+            formAction={setAppointmentStatus}
+            hiddenFields={{ id: a.id, status: "cancelled" }}
+          />
         ) : null}
         {a.isShowing ? <RowActionLink href={a.tutanakHref} label="Yer gösterme tutanağı oluştur" icon={FileSignature} /> : null}
       </RowActions>
@@ -140,7 +161,7 @@ function LeaveFlag({ a }: { a: AppointmentVM }) {
 }
 
 /** md+ tablo görünümü. */
-export function AppointmentTable({ rows, density, typeOptions }: { rows: AppointmentVM[]; density: Density; typeOptions: TypeOption[] | undefined }) {
+export function AppointmentTable({ rows, density, typeOptions, advisors }: { rows: AppointmentVM[]; density: Density; typeOptions: TypeOption[] | undefined; advisors?: AdvisorOption[] }) {
   return (
     <div className="hidden md:block">
       <TableFrame minWidth={1040} density={density} maxHeight="75vh">
@@ -208,7 +229,7 @@ export function AppointmentTable({ rows, density, typeOptions }: { rows: Appoint
                   <Pills a={a} />
                 </TD>
                 <TD>
-                  <Actions a={a} typeOptions={typeOptions} withCalendar={false} />
+                  <Actions a={a} typeOptions={typeOptions} advisors={advisors} withCalendar={false} />
                 </TD>
               </TR>
             ))}
@@ -220,7 +241,7 @@ export function AppointmentTable({ rows, density, typeOptions }: { rows: Appoint
 }
 
 /** <md: tablo yerine kart listesi. */
-export function AppointmentMobileList({ rows, typeOptions }: { rows: AppointmentVM[]; typeOptions: TypeOption[] | undefined }) {
+export function AppointmentMobileList({ rows, typeOptions, advisors }: { rows: AppointmentVM[]; typeOptions: TypeOption[] | undefined; advisors?: AdvisorOption[] }) {
   return (
     <MobileCardList>
       {rows.map((a) => (
@@ -246,7 +267,7 @@ export function AppointmentMobileList({ rows, typeOptions }: { rows: Appointment
             </div>
           </div>
           <div className="mt-2 border-t border-line pt-2">
-            <Actions a={a} typeOptions={typeOptions} withCalendar />
+            <Actions a={a} typeOptions={typeOptions} advisors={advisors} withCalendar />
           </div>
         </MobileCard>
       ))}

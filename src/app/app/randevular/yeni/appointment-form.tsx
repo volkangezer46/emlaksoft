@@ -35,6 +35,7 @@ export function AppointmentForm({
   defaultDate,
   defaultTime,
   userId,
+  advisors,
 }: {
   customers: Option[];
   properties: Option[];
@@ -48,6 +49,8 @@ export function AppointmentForm({
   /** ?saat= (HH:MM) ya da 10:00. */
   defaultTime: string;
   userId: string;
+  /** Yalnız yönetim katmanında dolu: başka danışman adına randevu açma seçici listesi. */
+  advisors?: Option[];
 }) {
   // Sunucu çakışma bulursa kayıt YAPILMAZ ve conflictWarning döner; form uyarı
   // bandı + gizli confirm_conflict=1 ile ikinci gönderimde kayıt geçer.
@@ -105,6 +108,15 @@ export function AppointmentForm({
     ),
     katilimci: (
       <>
+        {advisors && advisors.length > 0 ? (
+          <FormField label="Danışman" htmlFor="appointment-advisor" hint="Boş bırakırsanız randevu sizin adınıza açılır." className="sm:col-span-2">
+            <FormSelect name="assigned_to" defaultValue={userId}>
+              {advisors.map((a) => (
+                <option key={a.id} value={a.id}>{a.id === userId ? `${a.label} (ben)` : a.label}</option>
+              ))}
+            </FormSelect>
+          </FormField>
+        ) : null}
         <FormField label="Müşteri" htmlFor="appointment-customer">
           <Combobox
             name="customer_id"
@@ -171,6 +183,14 @@ export function AppointmentForm({
         <SummaryGroup title="Randevu bilgisi">
           <SummaryRow label="Tarih" value={day ?? "Zorunlu"} muted={!day} tab="zaman" field="date" />
           <SummaryRow label="Saat" value={time || "Zorunlu"} muted={!time} tab="zaman" field="time" />
+          {advisors && advisors.length > 0 ? (
+            <SummaryRow
+              label="Danışman"
+              value={advisors.find((a) => a.id === (values.assigned_to ?? userId))?.label ?? "Ben"}
+              tab="katilimci"
+              field="assigned_to"
+            />
+          ) : null}
           <SummaryRow label="Müşteri" value={customer ?? "Seçilmedi"} muted={!customer} tab="katilimci" field="customer_id" />
           <SummaryRow label="Portföy" value={property ?? "Seçilmedi"} muted={!property} tab="katilimci" field="property_id" />
           <SummaryRow label="Konum" value={location || "Girilmedi"} muted={!location} tab="katilimci" field="location" />

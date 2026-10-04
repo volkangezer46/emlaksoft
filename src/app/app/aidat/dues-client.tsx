@@ -12,6 +12,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { Combobox } from "@/components/ui/combobox";
 import { searchProperties } from "@/app/actions/lookup";
+import { DueEditPanel } from "./due-edit-panel";
 
 type Property = { id: string; property_code: string; title: string | null };
 type Due = {
@@ -238,7 +239,7 @@ export function DuesClient({
                 <TH className="hidden sm:table-cell">Dönem</TH>
                 <TH align="right">Tutar</TH>
                 <TH>Durum</TH>
-                <TH align="right" className="hidden sm:table-cell"><span className="sr-only">İşlem</span></TH>
+                <TH align="right"><span className="sr-only">İşlem</span></TH>
               </TR>
             </THead>
             <TBody>
@@ -296,9 +297,14 @@ export function DuesClient({
                           {paid ? "Ödendi" : overdue ? "Gecikti" : "Bekliyor"}
                         </Badge>
                       </TD>
-                      <TD align="right" className="hidden sm:table-cell">
-                        {/* relative + z-10: satır linkinin üstünde kalsın */}
+                      <TD align="right">
+                        {/* relative + z-10: satır linkinin üstünde kalsın; mobilde de görünür */}
                         <div className="relative z-10 flex items-center justify-end gap-1.5">
+                          {canBulk ? (
+                            <DueEditPanel
+                              due={{ id: d.id, title: d.title, amount: Number(d.amount), period: d.period, due_date: d.due_date, notes: d.notes }}
+                            />
+                          ) : null}
                           <button type="button" onClick={() => toggle(d.id, !paid)} disabled={busy === d.id}
                             className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2 py-1 text-xs font-semibold text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas disabled:opacity-50">
                             {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : paid ? <Undo2 className="h-3 w-3" /> : <Check className="h-3 w-3 text-mint-600" />}

@@ -4,13 +4,8 @@ import { useMemo, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bolt, Check, ChevronLeft, ChevronRight, Filter, Loader2, Plus, Trash2, Wand2, Zap } from "lucide-react";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogHeader,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { createPortal } from "react-dom";
+import { INLINE_PANEL_HOST_ID } from "@/components/ui/inline-tabbed-panel";
 import { createAutomation, updateAutomation } from "@/app/actions/automations";
 import {
   TRIGGER_OPTIONS,
@@ -472,11 +467,9 @@ export function AutomationWizard({
               Vazgeç
             </Link>
           ) : (
-            <DialogClose asChild>
-              <button type="button" className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
-                Vazgeç
-              </button>
-            </DialogClose>
+            <button type="button" onClick={() => setOpen(false)} className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas">
+              Vazgeç
+            </button>
           )}
           <div className="flex items-center gap-2">
             {step > 0 && (
@@ -521,26 +514,38 @@ export function AutomationWizard({
     );
   }
 
+  /* Popup yok: düzenleme sayfa içi panel olarak (inline-panel-host) açılır. */
+  const host = open && typeof document !== "undefined" ? document.getElementById(INLINE_PANEL_HOST_ID) : null;
+  const panel = open ? (
+    <section
+      aria-label={initial ? "Otomasyonu düzenle" : "Yeni otomasyon"}
+      className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]"
+    >
+      <header className="flex items-center gap-3 border-b border-line px-6 py-4">
+        <span className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
+          <Wand2 className="h-4 w-4" aria-hidden="true" />
+        </span>
+        <div>
+          <h2 className="font-display font-bold text-ink-950">{initial ? "Otomasyonu düzenle" : "Yeni otomasyon"}</h2>
+          <p className="text-xs text-text-muted">Tetikleyici → koşul → aksiyon: kuralınızı 3 adımda oluşturun.</p>
+        </div>
+      </header>
+      {content}
+    </section>
+  ) : null;
+
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (next) {
+    <>
+      <span
+        onClick={() => {
+          setOpen((v) => !v);
           setStep(0);
           setError(null);
-        }
-      }}
-    >
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent size="lg">
-        <DialogHeader
-          icon={<Wand2 />}
-          title={initial ? "Otomasyonu düzenle" : "Yeni otomasyon"}
-          description="Tetikleyici → koşul → aksiyon: kuralınızı 3 adımda oluşturun."
-        />
-        {content}
-      </DialogContent>
-    </Dialog>
+        }}
+      >
+        {trigger}
+      </span>
+      {panel && host ? createPortal(panel, host) : panel}
+    </>
   );
 }

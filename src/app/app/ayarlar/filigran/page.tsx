@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { ReadOnlyGate } from "../read-only-gate";
 import { requireModulePage } from "@/lib/require-module-page";
 import { sanitizeWatermarkSettings } from "@/lib/watermark";
 import { WatermarkForm } from "./watermark-form";
@@ -56,12 +57,14 @@ export default async function WatermarkSettingsPage() {
 } />
 
       <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
-        <WatermarkForm
-          initial={settings}
-          officeName={tenant?.name ?? ""}
-          logoUrl={tenant?.logo_url ?? null}
-          sampleMediaId={sample?.id ?? null}
-        />
+        <ReadOnlyGate canEdit={(ctx.perms.settings ?? []).includes("edit")}>
+          <WatermarkForm
+            initial={settings}
+            officeName={tenant?.name ?? ""}
+            logoUrl={tenant?.logo_url ?? null}
+            sampleMediaId={sample?.id ?? null}
+          />
+        </ReadOnlyGate>
       </section>
 
       <section className="rounded-[var(--radius-panel)] border border-line bg-canvas p-5 text-sm text-text-muted">

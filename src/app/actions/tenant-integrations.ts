@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/require-permission";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { isDemoLoginEnabled } from "@/lib/demo-environment";
+import { getTenantNetgsmConfig, sendTenantSms } from "@/lib/messaging/tenant-providers";
 import { canonicalizeNetgsmReceiver } from "@/lib/webhooks/netgsm-contract";
 import {
   canonicalizeMetaNumericId,
@@ -227,6 +231,49 @@ export async function saveWhatsAppCredentials(
 }
 
 /** Deletes the tenant route and its cascaded service-only token atomically. */
+/**
+ * Netgsm bağlantı testi (B9): yalnız İŞLEMİ YAPAN kullanıcının kendi profilindeki telefona,
+ * ofisin kendi Netgsm hesabıyla tek bir deneme SMS'i gönderir. Başka numara kabul edilmez;
+ * hız sınırlı (10 dk'da 3), demo ortamında ve platform fallback'inde kapalıdır.
+ */
+export async function sendNetgsmTestSms(): Promise<TenantIntegrationResult> {
+  const gate = await requirePermission("settings", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (isDemoLoginEnabled()) return { error: "Demo ortamında dış SMS gönderimi kapalıdır." };
+
+  const { allowed } = await checkRateLimit(`netgsm-test:${gate.tenantId}`, {
+    limit: 3,
+    windowSec: 600,
+    failurePolicy: "deny",
+  });
+  if (!allowed) return { error: "Çok sık denendi. Birkaç dakika sonra tekrar deneyin." };
+
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("phone")
+    .eq("id", gate.userId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  const phone = (profile?.phone as string | null) ?? null;
+  if (!phone) return { error: "Profilinizde telefon yok. Test SMS'i yalnız kendi telefonunuza gönderilir." };
+
+  // Yalnız ofisin kendi hesabı: platform fallback'ine düşülmez.
+  if (!(await getTenantNetgsmConfig(gate.tenantId))) {
+    return { error: "Önce ofisinizin Netgsm bilgilerini kaydedin; test yalnız ofis hesabıyla yapılır." };
+  }
+  const result = await sendTenantSms(
+    gate.tenantId,
+    phone,
+    "EmlakSoft Netgsm baglanti testi: SMS ayarlariniz calisiyor.",
+  );
+  if (!result.ok) {
+    console.error("sendNetgsmTestSms", { code: result.code ?? "provider_error" });
+    return { error: "Test SMS'i gönderilemedi. Kullanıcı kodu, şifre ve onaylı başlığı kontrol edin." };
+  }
+  return { ok: true };
+}
+
 export async function clearWhatsAppCredentials(): Promise<TenantIntegrationResult> {
   const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return { error: gate.error };

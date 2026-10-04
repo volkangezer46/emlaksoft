@@ -2,24 +2,23 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, TrendingUp } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import { applyRentIncrease } from "@/app/actions/rentals";
 import { useToast } from "@/components/app/toast-provider";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Dialog, DialogBody, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTrigger } from "@/components/ui/dialog";
-import { FormField, Input } from "@/components/ui/input";
+import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 }
 
+const fieldClass =
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300";
+
 /**
- * Yenileme radarındaki "Artışı uygula" dialogu.
+ * Yenileme radarındaki "Artışı uygula" akışı — popup yok, sayfa içi panel.
  *
  * Önerilen yeni kira TÜFE tavanından gelir (düzenlenebilir); tavan aşımında
- * uyarı gösterilir ve uygulama engellenir. Onay ConfirmDialog ile alınır —
- * action tarafı (applyRentIncrease) tavanı sunucuda da doğrular.
+ * uygulama engellenir. Action tarafı (applyRentIncrease) tavanı sunucuda da doğrular.
  */
 export function ApplyIncreaseDialog({
   rentalId,
@@ -39,112 +38,88 @@ export function ApplyIncreaseDialog({
   const router = useRouter();
   const { push } = useToast();
   const [open, setOpen] = useState(false);
-  const [rent, setRent] = useState<string>(String(suggestedRent));
-  const [date, setDate] = useState<string>(renewalDate);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const rentNum = Number(rent);
-  const validRent = rentNum > currentRent;
-  const overCap = rentNum > suggestedRent;
-  const canApply = validRent && !overCap && !!date && !pending;
-
-  const confirm = () =>
+  const submit = (fd: FormData) => {
+    setError(null);
+    const rentNum = Number(String(fd.get("new_rent") ?? "").replace(",", "."));
+    const date = String(fd.get("effective_date") ?? "").trim();
+    if (!Number.isFinite(rentNum) || rentNum <= currentRent) {
+      setError("Yeni kira mevcut kiradan yüksek olmalı.");
+      return;
+    }
+    if (rentNum > suggestedRent) {
+      setError(`Girilen tutar yasal tavanı aşıyor — TÜFE %${appliedRate.toFixed(2)} ile en fazla ${money(suggestedRent)} uygulanabilir.`);
+      return;
+    }
+    if (!date) {
+      setError("Uygulama tarihi seçin.");
+      return;
+    }
     startTransition(async () => {
       const res = await applyRentIncrease(rentalId, rentNum, date);
       if (res.error) {
         setError(res.error);
         return;
       }
-      setError(null);
       push("Kira artışı uygulandı", "ok");
       setOpen(false);
       router.refresh();
     });
+  };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="secondary" className="gap-1.5">
-          <TrendingUp className="h-3.5 w-3.5" /> Artışı uygula
-        </Button>
-      </DialogTrigger>
-      <DialogContent size="sm">
-        <DialogHeader
-          icon={<TrendingUp />}
-          title="Kira artışını uygula"
-          description={`${propertyName} — TÜFE tavanına göre önerilen oran %${appliedRate.toFixed(2)}.`}
-        />
-        <DialogBody className="space-y-4">
-          <div className="flex items-center justify-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas p-3 text-sm">
-            <span className="font-semibold text-text-muted">{money(currentRent)}</span>
-            <ArrowRight className="h-4 w-4 text-brand-600" />
-            <span className="font-bold text-ink-950">{validRent ? money(rentNum) : "—"}</span>
-          </div>
-          <FormField
-            label="Yeni aylık kira (₺)"
-            required
-            htmlFor={`increase-rent-${rentalId}`}
-            hint={`TÜFE tavanlı öneri: ${money(suggestedRent)} — daha düşük girilebilir, tavan aşılamaz.`}
-          >
-            <Input
-              id={`increase-rent-${rentalId}`}
-              type="number"
-              min={currentRent + 1}
-              max={suggestedRent}
-              step="1"
-              value={rent}
-              onChange={(e) => setRent(e.target.value)}
-              required
-            />
-          </FormField>
-          <FormField label="Uygulama tarihi" required htmlFor={`increase-date-${rentalId}`} hint="Yenileme (yıldönümü) tarihi önerilir.">
-            <Input
-              id={`increase-date-${rentalId}`}
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
-          </FormField>
-          {overCap ? (
-            <p className="rounded-[var(--radius-control)] border border-amber-300/50 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700" role="alert">
-              Girilen tutar yasal tavanı aşıyor — TÜFE %{appliedRate.toFixed(2)} ile en fazla {money(suggestedRent)} uygulanabilir.
-            </p>
-          ) : null}
-          {!validRent && rent !== "" ? (
-            <p className="text-xs font-medium text-danger-600" role="alert">
-              Yeni kira mevcut kiradan yüksek olmalı.
-            </p>
-          ) : null}
-          {error ? (
-            <p className="text-sm font-medium text-danger-600" role="alert">
-              {error}
-            </p>
-          ) : null}
-        </DialogBody>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="secondary">Vazgeç</Button>
-          </DialogClose>
-          <ConfirmDialog
-            tone="default"
-            title="Kira artışı uygulansın mı?"
-            description={
-              validRent
-                ? `${money(currentRent)} → ${money(rentNum)} — bundan sonraki tahakkuklar yeni tutardan oluşturulur; mevcut bekleyen tahakkuklar değişmez.`
-                : undefined
-            }
-            confirmLabel="Evet, uygula"
-            onConfirm={confirm}
-            trigger={
-              <Button disabled={!canApply} loading={pending}>
-                Artışı uygula
-              </Button>
-            }
-          />
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <InlineTabbedPanel
+      open={open}
+      onOpenChange={setOpen}
+      title="Kira artışını uygula"
+      description={`${propertyName} — TÜFE tavanına göre önerilen oran %${appliedRate.toFixed(2)}. Mevcut kira ${money(currentRent)}; bundan sonraki tahakkuklar yeni tutardan oluşur, bekleyenler değişmez.`}
+      icon={<TrendingUp />}
+      onSubmit={submit}
+      pending={pending}
+      error={error}
+      submitLabel="Artışı uygula"
+      pendingLabel="Uygulanıyor…"
+      fieldLabels={{ new_rent: "Yeni aylık kira (₺)", effective_date: "Uygulama tarihi" }}
+      trigger={({ onClick, ...aria }) => (
+        <button
+          type="button"
+          onClick={onClick}
+          {...aria}
+          className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300"
+        >
+          <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" /> Artışı uygula
+        </button>
+      )}
+      tabs={[{ id: "artis", label: "Artış", icon: TrendingUp, fields: ["new_rent", "effective_date"] }]}
+      panels={{
+        artis: (
+          <>
+            <label className="text-xs font-semibold text-text-muted">
+              Yeni aylık kira (₺)
+              <input
+                name="new_rent"
+                type="number"
+                min={currentRent + 1}
+                max={suggestedRent}
+                step="1"
+                required
+                defaultValue={suggestedRent}
+                className={`mt-1 ${fieldClass}`}
+              />
+              <span className="mt-1 block font-normal text-text-faint">
+                TÜFE tavanlı öneri: {money(suggestedRent)} — daha düşük girilebilir, tavan aşılamaz.
+              </span>
+            </label>
+            <label className="text-xs font-semibold text-text-muted">
+              Uygulama tarihi
+              <input name="effective_date" type="date" required defaultValue={renewalDate} className={`mt-1 ${fieldClass}`} />
+              <span className="mt-1 block font-normal text-text-faint">Yenileme (yıldönümü) tarihi önerilir.</span>
+            </label>
+          </>
+        ),
+      }}
+    />
   );
 }

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, XCircle, Repeat, Undo2 } from "lucide-react";
 import { updateOfferStatus } from "@/app/actions/offers";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export function OfferStatusActions({ offerId, status }: { offerId: string; status: string }) {
   const router = useRouter();
@@ -37,22 +38,37 @@ export function OfferStatusActions({ offerId, status }: { offerId: string; statu
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => run("accepted")}
-          className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-mint-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
-        >
-          <CheckCircle2 className="h-4 w-4" /> Kabul et
-        </button>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => run("rejected")}
-          className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-danger-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
-        >
-          <XCircle className="h-4 w-4" /> Reddet
-        </button>
+        <ConfirmDialog
+          title="Teklifi kabul et"
+          description="Teklif kabul edilir ve kapanır; kapanan teklif geri açılamaz."
+          confirmLabel="Kabul et"
+          tone="default"
+          onConfirm={() => run("accepted")}
+          trigger={
+            <button
+              type="button"
+              disabled={pending}
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-mint-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+            >
+              <CheckCircle2 className="h-4 w-4" /> Kabul et
+            </button>
+          }
+        />
+        <ConfirmDialog
+          title="Teklifi reddet"
+          description="Teklif reddedilir ve kapanır; kapanan teklif geri açılamaz."
+          confirmLabel="Reddet"
+          onConfirm={() => run("rejected")}
+          trigger={
+            <button
+              type="button"
+              disabled={pending}
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-danger-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+            >
+              <XCircle className="h-4 w-4" /> Reddet
+            </button>
+          }
+        />
         <button
           type="button"
           disabled={pending}
@@ -61,14 +77,21 @@ export function OfferStatusActions({ offerId, status }: { offerId: string; statu
         >
           <Repeat className="h-4 w-4" /> Karşı teklif
         </button>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => run("withdrawn")}
-          className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-medium text-text-muted transition hover:bg-canvas disabled:opacity-60"
-        >
-          <Undo2 className="h-4 w-4" /> Geri çek
-        </button>
+        <ConfirmDialog
+          title="Teklifi geri çek"
+          description="Teklif geri çekilir ve kapanır; kapanan teklif geri açılamaz."
+          confirmLabel="Geri çek"
+          onConfirm={() => run("withdrawn")}
+          trigger={
+            <button
+              type="button"
+              disabled={pending}
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-medium text-text-muted transition hover:bg-canvas disabled:opacity-60"
+            >
+              <Undo2 className="h-4 w-4" /> Geri çek
+            </button>
+          }
+        />
       </div>
 
       {counterMode ? (

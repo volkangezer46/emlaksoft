@@ -1,3 +1,4 @@
+import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
 import { redirect } from "next/navigation";
 import { AlarmClock, CalendarClock, CheckCircle2, Plus, Sunrise } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -66,7 +67,7 @@ function endOfToday() {
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string; filter?: string; mine?: string; tur?: string; tekrar?: string; sayfa?: string; yeni?: string }>;
+  searchParams?: Promise<{ q?: string; filter?: string; mine?: string; tur?: string; tekrar?: string; sayfa?: string; yeni?: string; danisman?: string }>;
 }) {
   const ctx = await requireModulePage("tasks");
   const canEdit = (ctx.perms.tasks ?? []).includes("edit");
@@ -78,6 +79,9 @@ export default async function TasksPage({
   const mine = params.mine === "1";
   const tur = KIND_FILTERS.some((k) => k.key === params.tur) ? params.tur! : "";
   const tekrar = params.tekrar === "1";
+  // Danışman filtresi (yönetim katmanı): ?danisman=<profil id>
+  const isManager = MANAGEMENT_TIER_ROLES.includes(ctx.role as TeamRole);
+  const danismanF = isManager && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.danisman ?? "") ? params.danisman! : "";
   const q = (params.q ?? "").trim().slice(0, 80);
   const page = parsePage(params.sayfa);
   const offset = (page - 1) * PAGE_SIZE;
@@ -89,11 +93,15 @@ export default async function TasksPage({
   if (tur) urlParams.tur = tur;
   if (tekrar) urlParams.tekrar = "1";
   if (mine) urlParams.mine = "1";
+  if (danismanF) urlParams.danisman = danismanF;
   const hrefWith = (patch: Record<string, string>) => buildHref(PATH, mergeResetPage(urlParams, patch));
   const savedViewParams = urlParams;
 
   const supabase = await createClient();
   const savedViewsPromise = listSavedViews(PATH);
+  // Atama / düzenleme / filtre için ofis üyeleri (kiracı RLS ile sınırlı).
+  const { data: memberRows } = await supabase.from("profiles").select("id, full_name").eq("tenant_id", ctx.tenantId).eq("is_active", true).order("full_name").limit(200);
+  const members = (memberRows ?? []).map((m) => ({ id: m.id as string, name: (m.full_name as string | null) ?? "İsimsiz" }));
   const nowIso = new Date(now()).toISOString();
 
   let query = supabase
@@ -106,6 +114,7 @@ export default async function TasksPage({
     .eq("tenant_id", ctx.tenantId);
 
   if (mine) query = query.eq("assigned_to", ctx.userId);
+  if (danismanF) query = query.eq("assigned_to", danismanF);
   if (tur) query = query.eq("kind", tur);
   if (tekrar) query = query.not("recurrence", "is", null);
   if (q) query = query.or(orIlike(["title", "notes"], q));
@@ -217,7 +226,7 @@ export default async function TasksPage({
         bulkItems.push({
           id: t.id,
           selectable: canEdit && t.status === "open",
-          card: <TaskCard task={t} canEdit={canEdit} canDelete={canDelete} />,
+          card: <TaskCard task={t} canEdit={canEdit} canDelete={canDelete} members={members} />,
         });
       }
     }
@@ -226,7 +235,7 @@ export default async function TasksPage({
       bulkItems.push({
         id: t.id,
         selectable: canEdit && t.status === "open",
-        card: <TaskCard task={t} canEdit={canEdit} canDelete={canDelete} />,
+        card: <TaskCard task={t} canEdit={canEdit} canDelete={canDelete} members={members} />,
       });
     }
   }
@@ -246,6 +255,7 @@ export default async function TasksPage({
     { key: "tur", label: "Tür", format: (v) => KIND_FILTERS.find((k) => k.key === v)?.label ?? v },
     { key: "tekrar", label: "Tekrar", format: () => "Tekrarlayan" },
     { key: "mine", label: "Atanan", format: () => "Sadece benim" },
+    { key: "danisman", label: "Danışman", format: (v) => members.find((m) => m.id === v)?.name ?? v },
   ]);
 
   const emptyAll = counts.all === 0;
@@ -268,7 +278,7 @@ export default async function TasksPage({
             params={urlParams}
             searchPlaceholder="Görev başlığı veya notu ara…"
             searchLabel="Görev ara"
-            panelParamKeys={["tekrar", "mine"]}
+            panelParamKeys={["tekrar", "mine", "danisman"]}
             panel={
               <FilterGrid>
                 <FilterSelect
@@ -280,6 +290,14 @@ export default async function TasksPage({
                     { value: "1", label: "Sadece benim" },
                   ]}
                 />
+                {isManager && members.length > 0 ? (
+                  <FilterSelect
+                    name="danisman"
+                    label="Danışman"
+                    value={danismanF}
+                    options={[{ value: "", label: "Tüm danışmanlar" }, ...members.map((m) => ({ value: m.id, label: m.name }))]}
+                  />
+                ) : null}
                 <FilterSelect
                   name="tekrar"
                   label="Tekrar"

@@ -14,6 +14,7 @@ type Task = {
   priority: string;
   due_at: string | null;
   recurrence: string | null;
+  assigned_to?: string | null;
 };
 
 const KINDS = [
@@ -44,8 +45,11 @@ function toLocalInput(iso: string | null) {
 export function TaskEditDialog({
   task,
   variant = "icon",
+  members,
 }: {
   task: Task;
+  /** Atanan seçici (görev devri); verilmezse atama alanı gösterilmez. */
+  members?: { id: string; name: string }[];
   /**
    * "icon": eylem çubuğundaki kalem düğmesi (varsayılan).
    * "overlay": kartın tamamını kaplayan görünmez tetikleyici — müşterisiz/
@@ -80,7 +84,7 @@ export function TaskEditDialog({
       pending={pending}
       error={state.error}
       hiddenFields={<input type="hidden" name="id" value={task.id} />}
-      fieldLabels={{ title: "Başlık", kind: "Tür", priority: "Öncelik", due_at: "Son tarih", recurrence: "Tekrar", notes: "Not" }}
+      fieldLabels={{ title: "Başlık", kind: "Tür", priority: "Öncelik", due_at: "Son tarih", recurrence: "Tekrar", assigned_to: "Atanan", notes: "Not" }}
       trigger={({ onClick, ...aria }) =>
         variant === "overlay" ? (
           <button
@@ -104,7 +108,7 @@ export function TaskEditDialog({
       }
       tabs={[
         { id: "genel", label: "Genel", icon: ListTodo, fields: ["title", "kind", "priority", "notes"] },
-        { id: "zaman", label: "Zamanlama", icon: CalendarClock, fields: ["due_at", "recurrence"] },
+        { id: "zaman", label: "Zamanlama", icon: CalendarClock, fields: ["due_at", "recurrence", ...(members && members.length > 0 ? ["assigned_to"] : [])] },
       ]}
       panels={{
         genel: (
@@ -161,6 +165,17 @@ export function TaskEditDialog({
               </select>
               {!due ? <span className="mt-1 block font-normal text-text-faint">Tekrar için önce son tarih seçin.</span> : null}
             </label>
+            {members && members.length > 0 ? (
+              <label className="text-xs font-semibold text-text-muted sm:col-span-2">
+                Atanan
+                <select name="assigned_to" defaultValue={task.assigned_to ?? ""} className={`mt-1 ${fieldClass}`}>
+                  {!task.assigned_to ? <option value="">Atanmamış</option> : null}
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
           </>
         ),
       }}

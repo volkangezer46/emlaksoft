@@ -17,7 +17,7 @@ export const APPOINTMENT_TABS = [
     id: "katilimci",
     label: "Katılımcılar ve yer",
     description: "Müşteri ve portföy yazarak aranır (Türkçe karakter duyarsız).",
-    fields: ["customer_id", "property_id", "location", "notes"],
+    fields: ["assigned_to", "customer_id", "property_id", "location", "notes"],
     required: [],
   },
 ] as const;
