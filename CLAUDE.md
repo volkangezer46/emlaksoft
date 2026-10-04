@@ -80,5 +80,8 @@ Oturumlu E2E yalnız izole test DB'de, açık `E2E_MUTATION_ALLOWED=true` ve ben
 - **Cron:** 30 route `src/app/api/cron/*` + `vercel.json` (sayı `npm run check:cron` ile doğrulanır); hepsi `CRON_SECRET` Bearer doğrular
   ve `recordHeartbeat` yazar.
 
+**PROJE HAFIZASI (önce bunu oku, durumu sıfırdan tarama): `docs/HAFIZA.md`** — yayın durumu, migration sırası, açık işler, kararlar,
+tek-kaynak haritası, çalışma/doğrulama yöntemi.
+
 Ayrıntı: `docs/MIMARI.md` · yol haritası: `docs/ROADMAP.md` · güncel durum: `docs/DURUM.md` · deploy: `docs/DEPLOY.md`.
 Eski devir/sprint belgeleri: `docs/arsiv/`. CANLI: https://emlaksoft.vercel.app
