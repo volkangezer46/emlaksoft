@@ -57,10 +57,13 @@ export function RegisterForm({
   initialPlan = "office",
   initialCycle = "monthly",
   plans = PLANS,
+  trialDays = 14,
 }: {
   initialPlan?: PlanId;
   initialCycle?: BillingCycle;
   plans?: readonly PlanDef[];
+  /** Gerçekte verilen deneme günü (sunucuda getEffectiveTrialDays). */
+  trialDays?: number;
 }) {
   const [state, action, pending] = useActionState(signUp, initial);
   const [step, setStep] = useState(1);
@@ -97,7 +100,7 @@ export function RegisterForm({
   return (
     <AuthShell
       panelTitle="Ofisinizi 2 dakikada dijitalleştirin"
-      panelDesc="14 gün ücretsiz, kredi kartsız ve taahhütsüz. Kurulum sihirbazı ofisinizi adım adım hazırlar; verileriniz rol, yetki ve denetim kontrolleriyle korunur."
+      panelDesc={`${trialDays} gün ücretsiz, kredi kartsız ve taahhütsüz. Kurulum sihirbazı ofisinizi adım adım hazırlar; verileriniz rol, yetki ve denetim kontrolleriyle korunur.`}
     >
       <div className="mt-8 lg:mt-0">
         <h1 className="font-display text-3xl font-extrabold text-ink-950">Ücretsiz başlayın</h1>
@@ -302,7 +305,7 @@ export function RegisterForm({
                 )}
               </button>
             </div>
-            <p className="text-center text-xs text-text-faint">Kredi kartı gerekmez · 14 gün ücretsiz · Taahhütsüz</p>
+            <p className="text-center text-xs text-text-faint">Kredi kartı gerekmez · {trialDays} gün ücretsiz · Taahhütsüz</p>
           </div>
         </form>
 

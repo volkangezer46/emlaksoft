@@ -70,14 +70,17 @@ describe("/fiyatlar sözleşmesi: tek kaynak plans.ts + page-gates.ts", () => {
     }
     const kayit = read("src/app/kayit/register-form.tsx");
     expect(kayit).toContain("Kredi kartı gerekmez");
-    expect(kayit).toContain("14 gün ücretsiz");
+    // Gün sayısı sabit değil: sunucudan (getEffectiveTrialDays) gelir; varsayılan 14.
+    expect(kayit).toContain("{trialDays} gün ücretsiz");
+    expect(kayit).toContain("trialDays = 14");
+    expect(read("src/app/kayit/page.tsx")).toContain("getEffectiveTrialDays");
     expect(read("src/components/pricing.tsx")).toContain("KDV hariç");
   });
 
   it("FAQ JSON-LD yalnız görünen SSS'den üretilir", () => {
     const page = read("src/app/fiyatlar/page.tsx");
     expect(page).toContain("faq.map");
-    expect(page.match(/const faq = buildFaq\(\)/g)).toHaveLength(1);
+    expect(page.match(/const faq = buildFaq\(/g)).toHaveLength(1);
   });
 
   it("hesaplayıcı commission.ts'i yeniden kullanır ve sektör verisi yoktur", () => {

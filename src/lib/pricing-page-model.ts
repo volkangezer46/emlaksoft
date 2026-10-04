@@ -1,4 +1,4 @@
-import { PLANS, getPlan, planAmountOf, planAmountTry, type PlanDef, type PlanId } from "@/lib/billing/plans";
+import { PLANS, getPlan, planAmountOf, yearlyDiscountPercentOf, type PlanDef, type PlanId } from "@/lib/billing/plans";
 import { PLAN_GATES, findGate, planRank, requiredPlanName } from "@/lib/billing/page-gates";
 
 /**
@@ -7,11 +7,10 @@ import { PLAN_GATES, findGate, planRank, requiredPlanName } from "@/lib/billing/
  * TL tutarı veya paket kapsamı yazılmaz (bkz. pricing-page-contract.test.ts).
  */
 
-/** Yıllık ödeme indirimi (%), `planAmountTry` sonucundan türetilir. */
-export function yearlyDiscountPercent(): number {
-  const base = PLANS[0]!;
-  const full = base.monthlyTry * 12;
-  return Math.round((1 - planAmountTry(base.id, "yearly") / full) * 100);
+/** Yıllık ödeme indirimi (%): etkin plan tanımının "ödenen ay sayısından" türetilir (panelden değişebilir). */
+export function yearlyDiscountPercent(plans: readonly PlanDef[] = PLANS): number {
+  const base = plans.find((p) => !p.customPricing) ?? plans[0] ?? PLANS[0]!;
+  return yearlyDiscountPercentOf(base);
 }
 
 export type CompareCell = { text: string; included?: boolean };
@@ -66,15 +65,17 @@ export function lostCommissionPlanName(): string {
 
 export type FaqItem = { q: string; a: string };
 
-export function buildFaq(): FaqItem[] {
-  const discount = yearlyDiscountPercent();
+/** `plans`: etkin (panelden düzenlenmiş) tanımlar; `trialDays`: gerçekte verilen deneme günü (getEffectiveTrialDays). */
+export function buildFaq(opts: { plans?: readonly PlanDef[]; trialDays?: number } = {}): FaqItem[] {
+  const discount = yearlyDiscountPercent(opts.plans);
+  const trialDays = opts.trialDays ?? 14;
   const lost = lostCommissionPlanName();
   const contractGate = findGate("/app/sozlesmeler");
   const contractPlan = contractGate ? requiredPlanName(contractGate) : getPlan("office").name;
   return [
     {
       q: "Deneme ücretsiz mi, kredi kartı gerekir mi?",
-      a: "Kayıt olunca 14 gün ücretsiz deneme başlar ve kredi kartı istenmez. Deneme boyunca tüm paketlerin özellikleri açıktır; seçtiğiniz paketin kapsamı denemeden sonra geçerli olur.",
+      a: `Kayıt olunca ${trialDays} gün ücretsiz deneme başlar ve kredi kartı istenmez. Deneme boyunca tüm paketlerin özellikleri açıktır; seçtiğiniz paketin kapsamı denemeden sonra geçerli olur.`,
     },
     {
       q: "Fiyatlara KDV dahil mi?",
