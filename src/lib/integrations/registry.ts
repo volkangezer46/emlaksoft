@@ -165,6 +165,15 @@ export async function listIntegrations(tenantId: string | null = null): Promise<
       requires: "Tapusor API anahtarı (TAPUSOR_API_KEY)",
     },
     {
+      key: "emlakfiyati",
+      name: "Emlakfiyati",
+      category: "degerleme",
+      description: "Değerleme motoruna dördüncü kaynak olarak takılacak arayüz iskeleti; sağlayıcı API belgesi ve anlaşması bekleniyor.",
+      unlocks: "Değerlemede Emlakfiyati tahmini (ofis emsal motoru en yüksek ağırlıkta kalır).",
+      status: "planned",
+      requires: "Emlakfiyati API belgesi + ticari anlaşma + anahtarlar (sahibin sağlayacağı liste: ONERI bölüm 3.2)",
+    },
+    {
       key: "bank_rates",
       name: "Banka kredi oranları",
       category: "degerleme",

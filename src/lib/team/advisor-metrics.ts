@@ -41,6 +41,8 @@ import {
 } from "@/lib/team/advisor-share";
 import { conversionPct, targetProgressPct } from "@/lib/team/scorecard";
 import { computeTargetActuals, targetPeriodRange, type TargetLike } from "@/lib/team/target-actuals";
+import { summarizeByAdvisor } from "@/lib/response-time/core";
+import { loadLeadResponses } from "@/lib/response-time/load";
 
 export const METRIC_ROLES = ["owner", "gm", "branch_manager", "team_lead", "advisor"] as const;
 export const LIVE_PROPERTY_STATUSES = ["live", "Yayında"];
@@ -710,4 +712,47 @@ export async function loadTargetActualsLive(
     out.set(t.id, { deals: a.deals, revenue: visible ? a.revenue : 0, revenueVisible: visible });
   }
   return out;
+}
+
+/* -------------------------------------------------------------------------- */
+/* İlk yanıt süresi (lead hızı) — YALNIZ EKLEME                                 */
+/* -------------------------------------------------------------------------- */
+
+export type AdvisorResponseTime = {
+  /** Yanıtlanan kayıtların ortalama ilk yanıt süresi (çalışma dakikası); yanıtlanan yoksa null ("veri yok"). */
+  avgFirstResponseMin: number | null;
+  respondedCount: number;
+  waitingCount: number;
+  withinSlaPct: number | null;
+};
+
+/**
+ * Danışman başına ilk yanıt süresi. Tanım ve hesap `@/lib/response-time` içindedir (tek kaynak);
+ * burada yalnız dönem + kapsam kuralı uygulanır: ofis geneli rol tüm ekibi, diğerleri yalnız kendini görür.
+ * `gamification-query.ts`teki `avgFirstResponseMin: null` bu sonuçla beslenebilir (sahibi o dosyadır).
+ */
+export async function loadAdvisorResponseTimes(
+  supabase: SupabaseClient,
+  opts: { viewer: MetricsViewer; tenantId: string | null; period: MetricsPeriod; nowMs: number; slaMin?: number },
+): Promise<{ byAdvisor: Map<string, AdvisorResponseTime>; failed: boolean; partial: boolean }> {
+  const officeWide = hasOfficeWideDataScope(opts.viewer.role);
+  const res = await loadLeadResponses(supabase, {
+    tenantId: opts.tenantId,
+    startIso: opts.period.startIso,
+    endIso: opts.period.endIso,
+    assignedToIn: officeWide ? null : [opts.viewer.userId],
+    slaMin: opts.slaMin,
+    nowMs: opts.nowMs,
+  });
+  const byAdvisor = new Map<string, AdvisorResponseTime>();
+  for (const g of summarizeByAdvisor(res.rows)) {
+    if (!g.advisorId) continue;
+    byAdvisor.set(g.advisorId, {
+      avgFirstResponseMin: g.summary.avgMin,
+      respondedCount: g.summary.responded,
+      waitingCount: g.summary.waiting,
+      withinSlaPct: g.summary.withinSlaPct,
+    });
+  }
+  return { byAdvisor, failed: res.failed, partial: res.partial };
 }
