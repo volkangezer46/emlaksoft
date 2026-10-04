@@ -174,7 +174,7 @@ export default async function CustomerDetailPage({
       .select("id, channel, status, granted_at")
       .eq("customer_id", id)
       .order("created_at", { ascending: false }),
-    tab === "dosyalar"
+    tab === "belgeler"
       ? supabase
           .from("customer_files")
           .select("id, file_name, file_size, file_type, storage_path, label, created_at, uploader:profiles!customer_files_uploaded_by_fkey(full_name)")

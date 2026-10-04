@@ -120,6 +120,67 @@ export async function deleteCommunication(id: string, customerId?: string): Prom
 }
 
 // ---------------------------------------------------------------------------
+// Eşleşmemiş çağrı / iletişim kaydını müşteriye bağla (gelen kutusu + çağrı kaydı)
+// ---------------------------------------------------------------------------
+
+/**
+ * Müşterisiz (eşleşmemiş) çağrı ya da iletişim kaydını mevcut bir müşteriye bağlar.
+ * Yalnız `customer_id` boş kayıtlar bağlanır (başka müşteriye ait kayıt devri bu action değildir).
+ * Çağrı için `calls:edit`, iletişim kaydı için `customers:edit` gerekir; müşteri aynı ofiste olmalı.
+ */
+export async function linkRecordToCustomer(
+  kind: "call" | "comm",
+  recordId: string,
+  customerId: string,
+): Promise<CommResult> {
+  const gate = kind === "call"
+    ? await requirePermission("calls", "edit")
+    : await requirePermission("customers", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const recId = String(recordId ?? "").trim();
+  const custId = String(customerId ?? "").trim();
+  if (!recId || !custId) return { error: "Kayıt ve müşteri seçilmeli." };
+
+  const supabase = await createClient();
+  const { data: customer } = await supabase
+    .from("customers")
+    .select("id")
+    .eq("id", custId)
+    .eq("tenant_id", gate.tenantId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!customer) return { error: "Müşteri bulunamadı." };
+
+  const { data, error } = await supabase
+    .from(kind === "call" ? "calls" : "communications")
+    .update({ customer_id: custId })
+    .eq("id", recId)
+    .eq("tenant_id", gate.tenantId)
+    .is("customer_id", null)
+    .select("id");
+  if (error) {
+    console.error("linkRecordToCustomer", error);
+    return { error: "Kayıt müşteriye bağlanamadı." };
+  }
+  if (!data || data.length === 0) return { error: "Kayıt zaten bir müşteriye bağlı ya da bulunamadı." };
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: kind === "call" ? "call.link_customer" : "communication.link_customer",
+    entityType: kind === "call" ? "call" : "communication",
+    entityId: recId,
+    newValue: { customer_id: custId },
+  });
+
+  revalidatePath("/app/gelen-kutusu");
+  revalidatePath("/app/arama");
+  revalidatePath(`/app/musteriler/${custId}`);
+  return { ok: true, id: recId };
+}
+
+// ---------------------------------------------------------------------------
 // Tekil SMS gönder (müşteri 360 + gelen kutusu "Yanıtla")
 // ---------------------------------------------------------------------------
 
