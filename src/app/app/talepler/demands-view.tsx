@@ -455,6 +455,7 @@ export async function DemandsView({
               density={density}
               page={page}
               advisorName={advisorName}
+              canEdit={canEdit}
             />
           </Suspense>
         </>
@@ -533,7 +534,9 @@ async function DemandList({
   density,
   page,
   advisorName,
+  canEdit,
 }: {
+  canEdit: boolean;
   pending: Pending;
   urlParams: Record<string, string>;
   density: Density;

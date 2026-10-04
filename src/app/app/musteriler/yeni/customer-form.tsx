@@ -121,7 +121,7 @@ export function CustomerForm({
       <>
         <FormField label="Telefon" htmlFor="phone">
           <PhoneInput name="phone" className={fieldClass} defaultValue={initialPhone || undefined} />
-          {linkRef ? <input type="hidden" name="link_ref" value={linkRef} /> : null}
+          {linkRef ? <input type="hidden" name={"link_ref"} value={linkRef} /> : null}
         </FormField>
         <FormField label="E-posta" htmlFor="email">
           <EmailInput name="email" />
