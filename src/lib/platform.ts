@@ -103,7 +103,7 @@ export const getPlatformMfaCandidate = cache(async (): Promise<PlatformStaff | n
 });
 
 /** Active platform identity with a session-level Supabase AAL2 proof. */
-export const getPlatformStaffIdentity = cache(async (): Promise<PlatformStaff | null> => {
+const getPlatformStaffIdentityBase = cache(async (): Promise<PlatformStaff | null> => {
   const staff = await getPlatformMfaCandidate();
   if (!staff) return null;
   // Geliştirme sürecinde AAL2 şartı kapalı (bkz. src/lib/platform-mfa.ts).
@@ -115,7 +115,34 @@ export const getPlatformStaffIdentity = cache(async (): Promise<PlatformStaff | 
   return staff;
 });
 
-/** Platform capability identity. Readonly impersonation never carries admin powers. */
+/** Geçici parolayla açılmış hesap: kendi parolasını belirleyene dek yalnız parola değiştirme ve çıkış serbesttir. */
+export function mustChangePassword(user: { user_metadata?: Record<string, unknown> } | null | undefined): boolean {
+  return user?.user_metadata?.must_change_password === true;
+}
+
+/** AAL2 kanıtlı personel kimliği; parolası değişmemiş hesap için null (ofise bürünme dahil hiçbir yetki yok). */
+export const getPlatformStaffIdentity = cache(async (): Promise<PlatformStaff | null> => {
+  const staff = await getPlatformStaffIdentityBase();
+  if (!staff) return null;
+  if (mustChangePassword(await getRequestUser())) return null;
+  return staff;
+});
+
+/**
+ * Parola değişimi beklese bile personel kimliği. YALNIZ zorunlu parola ekranı (admin layout, /admin/hesabim)
+ * ve kendi hesabı action'ları (`platform-account.ts`) kullanır; başka hiçbir yer çağırmaz
+ * (sözleşme testi: platform-password-gate-contract.test.ts).
+ */
+export const getPlatformStaffUnrestricted = cache(async (): Promise<PlatformStaff | null> => {
+  const user = await getRequestUser();
+  if (!user || user.app_metadata?.impersonating === true) return null;
+  return getPlatformStaffIdentityBase();
+});
+
+/**
+ * Platform capability identity. Readonly impersonation never carries admin powers.
+ * Parolası değişmemiş personel için null döner: tüm admin action'ları ve /api/admin rotaları reddedilir.
+ */
 export const getPlatformStaff = cache(async (): Promise<PlatformStaff | null> => {
   const user = await getRequestUser();
   if (!user || user.app_metadata?.impersonating === true) return null;
@@ -127,6 +154,7 @@ export async function requirePlatformStaff(): Promise<PlatformStaff> {
   if (!staff) {
     const user = await getRequestUser();
     if (!user) redirect("/giris?next=/admin");
+    if (mustChangePassword(user) && (await getPlatformStaffUnrestricted())) redirect("/admin/hesabim");
     const candidate = await getPlatformMfaCandidate();
     if (candidate && user.app_metadata?.impersonating !== true) {
       redirect("/giris/mfa?next=/admin");
@@ -134,6 +162,13 @@ export async function requirePlatformStaff(): Promise<PlatformStaff> {
     redirect("/app");
   }
   return staff;
+}
+
+/** Zorunlu parola ekranı için kapı (bkz. `getPlatformStaffUnrestricted`). */
+export async function requirePlatformStaffForAccount(): Promise<PlatformStaff> {
+  const staff = await getPlatformStaffUnrestricted();
+  if (staff) return staff;
+  return requirePlatformStaff();
 }
 
 /**

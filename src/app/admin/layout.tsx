@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { RouteSplash } from "@/components/route-splash";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
-import { requirePlatformStaff } from "@/lib/platform";
+import { mustChangePassword, requirePlatformStaffForAccount } from "@/lib/platform";
 import { PLATFORM_ROLE_LABELS, platformModulesFor } from "@/lib/platform-access";
 import { getAdminBadges, getAdminHealth } from "@/lib/admin-badges";
 import "@/app/console.css";
@@ -22,11 +22,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 }
 
 async function AdminShell({ children }: { children: React.ReactNode }) {
-  const staff = await requirePlatformStaff();
+  const staff = await requirePlatformStaffForAccount();
 
   // Geçici parolayla açılan hesap: kendi parolasını belirleyene dek yönetim kabuğu açılmaz.
   const user = await getRequestUser();
-  if (user?.user_metadata?.must_change_password === true) {
+  if (mustChangePassword(user)) {
     return (
       <div className="grid min-h-screen place-items-center bg-canvas p-4">
         <ThemeController />

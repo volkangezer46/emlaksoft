@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getPlatformStaff } from "@/lib/platform";
+import { getPlatformStaffUnrestricted } from "@/lib/platform";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logPlatformActivity } from "@/lib/platform-activity";
@@ -11,11 +11,11 @@ import { logPlatformActivity } from "@/lib/platform-activity";
 export type AccountResult = { ok?: boolean; error?: string };
 
 /**
- * Personelin KENDİ hesabı: kimlik `getPlatformStaff` (AAL2 dahil) ile doğrulanır.
+ * Personelin KENDİ hesabı: kimlik `getPlatformStaffUnrestricted` (AAL2 dahil; zorunlu parola ekranı da çalışsın diye kısıtsız) ile doğrulanır.
  * Hesap sahibi dışında kimse bu action'larla başka bir hesaba dokunamaz: hedef her zaman oturumdaki kullanıcıdır.
  */
 async function currentStaff() {
-  const [candidate, user] = await Promise.all([getPlatformStaff(), getRequestUser()]);
+  const [candidate, user] = await Promise.all([getPlatformStaffUnrestricted(), getRequestUser()]);
   if (!candidate || !user) return null;
   return { staff: candidate, user };
 }

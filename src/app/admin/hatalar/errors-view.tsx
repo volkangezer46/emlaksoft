@@ -9,6 +9,7 @@ import { orIlike } from "@/lib/pgrst";
 import { ResolveErrorButton } from "./resolve-button";
 import { ErrorsBulkBar, ReopenErrorButton } from "./error-bulk";
 import { ERRORS_BULK_FORM_ID } from "./bulk-form-id";
+import { hrefWith, type Filters } from "./errors-href";
 
 export const metadata = { title: "Üretim hataları" };
 
@@ -26,20 +27,6 @@ type Row = {
   resolved_at: string | null;
   tenant: { name: string } | { name: string }[] | null;
 };
-
-type Filters = { durum?: string; son?: string; q?: string; kaynak?: string; ofis?: string };
-
-function hrefWith(p: Filters & { sayfa?: number }) {
-  const sp = new URLSearchParams();
-  if (p.durum) sp.set("durum", p.durum);
-  if (p.son) sp.set("son", p.son);
-  if (p.q) sp.set("q", p.q);
-  if (p.kaynak) sp.set("kaynak", p.kaynak);
-  if (p.ofis) sp.set("ofis", p.ofis);
-  if (p.sayfa && p.sayfa > 1) sp.set("sayfa", String(p.sayfa));
-  const s = sp.toString();
-  return s ? `/admin/sistem?sekme=hatalar&${s}` : "/admin/sistem?sekme=hatalar";
-}
 
 function rel<T>(v: T | T[] | null): T | null {
   if (!v) return null;
@@ -159,8 +146,8 @@ export async function ErrorsView({
           <div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
               { label: "Açık hata türü", value: String(acikSayi ?? 0), icon: AlertTriangle, href: "/admin/sistem?sekme=hatalar", active: false },
-              { label: "Listelenen", value: String(rows.length), icon: Info, href: null, active: false },
-              { label: "Sayfadaki olay", value: String(toplamOlay), icon: Repeat, href: null, active: false },
+              { label: "Eşleşen hata", value: String(count ?? 0), icon: Info, href: hrefWith(base), active: false },
+              { label: "Sayfadaki olay", value: String(toplamOlay), icon: Repeat, href: `${hrefWith(base)}#hata-listesi`, active: false },
               {
                 label: "Son 1 saatte",
                 value: String(sonSaat),
@@ -300,7 +287,7 @@ export async function ErrorsView({
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div id="hata-listesi" className="space-y-3">
           {rows.map((r) => {
             const tenant = rel(r.tenant);
             return (
