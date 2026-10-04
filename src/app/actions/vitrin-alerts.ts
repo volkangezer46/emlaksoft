@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isVitrinEnabled } from "@/lib/vitrin-settings";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { notifyTenant } from "@/lib/notify";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
@@ -57,6 +58,7 @@ export async function createVitrinPriceAlert(input: PriceAlertInput): Promise<Pr
   const admin = createAdminClient();
   const { data: tenant } = await admin.from("tenants").select("id, name, status").eq("slug", slug).maybeSingle();
   if (!tenant || !isPublicTenantActive(tenant.status)) return { ok: false, error: "Ofis bulunamadı." };
+  if (!(await isVitrinEnabled(admin, tenant.id))) return { ok: false, error: "Ofis bulunamadı." };
 
   // İlan bu tenant'a ait, yayında ve fiyatlı olmalı — baseline fiyatsız alarm anlamsız.
   const { data: property } = await admin

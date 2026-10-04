@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Calculator, Clock3, ShieldCheck, Sparkles } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isVitrinEnabled } from "@/lib/vitrin-settings";
 import { ValuationFunnel } from "@/components/public/valuation-funnel";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
@@ -28,6 +29,7 @@ export async function generateMetadata({
     .eq("slug", slug)
     .maybeSingle();
   if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "Vitrin bulunamadı" };
+  if (!(await isVitrinEnabled(admin, tenant.id))) return { title: "Vitrin bulunamadı" };
 
   const title = `${tenant.name} | Ücretsiz Değerleme`;
   const description = `Eviniz ne kadar eder? ${tenant.name} ile il, ilçe ve m² bilgisinden ücretsiz ön değerleme alın; net değerleme için danışman sizi arasın.`;
@@ -64,6 +66,7 @@ export default async function VitrinDegerlemePage({
 
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
   if (await isPublicFeatureClosed(admin, tenant.id, "vitrin")) return <PublicModuleClosed officeName={tenant.name} />;
+  if (!(await isVitrinEnabled(admin, tenant.id))) notFound();
 
   // provinces + mülk tipi tanımları tenant'tan bağımsız değil ama paralel çekilebilir.
   // Tanımlar: global (tenant_id null) + ofise özel; aynı value'da ofis kazanır

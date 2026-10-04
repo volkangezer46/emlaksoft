@@ -7,6 +7,8 @@ import { isPublicTenantActive } from "@/lib/public-tenant";
 import { isFeatureEnabledIn } from "@/lib/modules/logic";
 import { loadTenantModuleState } from "@/lib/modules/state";
 import { validateAnswers } from "@/lib/surveys/logic";
+import { isSurveyTaskLinkExpired } from "@/lib/surveys/task-expiry";
+import { now } from "@/lib/clock";
 import { completeSurveyTask, loadSurveySettings, loadTemplateQuestions } from "@/lib/surveys/server";
 
 export type PublicSurveyResult = {
@@ -175,7 +177,7 @@ export async function submitSurveyTaskByToken(fd: FormData): Promise<PublicSurve
   const admin = createAdminClient();
   const { data: task } = await admin
     .from("survey_tasks")
-    .select("id, tenant_id, event_type, audience, customer_id, property_id, deal_id, agent_id, contact_name, attempts, status, template_id")
+    .select("id, tenant_id, event_type, audience, customer_id, property_id, deal_id, agent_id, contact_name, attempts, status, template_id, due_at")
     .eq("public_token", token)
     .maybeSingle();
   const invalid = { error: "Bağlantı geçersiz veya anket bulunamadı." };
@@ -188,6 +190,19 @@ export async function submitSurveyTaskByToken(fd: FormData): Promise<PublicSurve
   if (!isFeatureEnabledIn(moduleState, "surveys")) return invalid;
   if (task.status === "completed") return { ok: true, alreadyAnswered: true };
   if (task.status !== "pending" && task.status !== "unreachable") return invalid;
+  // Görev token'ı süresiz değildir: due_at + SURVEY_TASK_LINK_VALID_DAYS gün sonra bağlantı kapanır.
+  if (isSurveyTaskLinkExpired(task.due_at as string | null, now())) return invalid;
+  // Örnek (is_sample) ilana bağlı görev public yüzde cevap almaz (anket sayfasıyla aynı kural).
+  if (task.property_id) {
+    const { data: p } = await admin
+      .from("properties")
+      .select("id")
+      .eq("id", task.property_id)
+      .eq("tenant_id", tenantId)
+      .eq("is_sample", false)
+      .maybeSingle();
+    if (!p) return invalid;
+  }
 
   const questions = await loadTemplateQuestions(admin, tenantId, String(task.template_id));
   const check = validateAnswers(questions, raw);

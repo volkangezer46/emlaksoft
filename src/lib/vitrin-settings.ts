@@ -20,3 +20,12 @@ export async function loadVitrinSettings(client: SupabaseClient, tenantId: strin
   }
   return { available: true, settings: settingsFromRow(data as Record<string, unknown> | null) };
 }
+
+/**
+ * Vitrin açık mı? `vitrin_enabled=false` TÜM public vitrin yüzeylerini kapatır (ana sayfa, ilan detayı,
+ * değerleme, favoriler, OG görselleri, talep/alarm/arama kayıt action'ları). Sütun yoksa bugünkü davranış: açık.
+ */
+export async function isVitrinEnabled(client: SupabaseClient, tenantId: string): Promise<boolean> {
+  const { settings } = await loadVitrinSettings(client, tenantId);
+  return settings.enabled;
+}

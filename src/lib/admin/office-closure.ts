@@ -34,7 +34,20 @@ export function planClosure(type: ClosureRequestType, tenantStatus: string, reas
   };
 }
 
-/** Arşivlenmiş ofisin sahibi, yalnız bu durumdaki talepler varken veri paketini indirebilir. */
+/**
+ * Arşivlenmiş ofisin sahibi, YALNIZ platformun işleyip "completed" yaptığı (kapatma işlenmiş) talep varken
+ * veri paketini indirebilir. open / in_progress / rejected talep indirme hakkı vermez (sahibin açtığı talep tek başına yetmez).
+ */
 export function closureDownloadAllowed(tenantStatus: string | null | undefined, requestStatuses: string[]): boolean {
-  return tenantStatus === "cancelled" && requestStatuses.some((s) => s !== "rejected");
+  return tenantStatus === "cancelled" && requestStatuses.some((s) => s === "completed");
+}
+
+/**
+ * Talebi acan kullanici, islem aninda HALA ofisin aktif sahibi/genel muduru mu?
+ * (Talebi acan ayrildiysa/pasife alindiysa/rolu dustuyse talep islenmez: yetkisiz eski talep ofisi kapatamaz.)
+ */
+export function requesterMayCloseOffice(profile: { role?: string | null; is_active?: boolean | null; tenant_id?: string | null } | null | undefined, tenantId: string): boolean {
+  if (!profile || profile.is_active !== true) return false;
+  if (String(profile.tenant_id ?? "") !== tenantId) return false;
+  return profile.role === "owner" || profile.role === "gm";
 }

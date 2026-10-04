@@ -16,6 +16,11 @@ vi.mock("@/lib/require-permission", () => ({ requirePermission: mocks.requirePer
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: mocks.checkRateLimit }));
 vi.mock("@/lib/activity", () => ({ logActivity: mocks.logActivity }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
+// Onay kapisi bu dosyanin konusu degil (kendi testleri var). Okuma hatasinda artik fail-open olmadigi icin
+// sahte supabase'in oversight_settings okumasi kapiyi durdururdu; kapi "gerekli degil" olarak sabitlenir.
+vi.mock("@/lib/oversight/approval-gate", () => ({
+  requestApprovalIfNeeded: vi.fn(async () => ({ status: "not_required" })),
+}));
 vi.mock("@/lib/permissions-effective", async (orig) => ({
   ...(await orig<typeof import("@/lib/permissions-effective")>()),
   getEffectivePermissions: mocks.getEffectivePermissions,

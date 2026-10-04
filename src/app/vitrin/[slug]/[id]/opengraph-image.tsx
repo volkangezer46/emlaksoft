@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isVitrinEnabled } from "@/lib/vitrin-settings";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { OG_SIZE, renderVitrinOg } from "@/lib/vitrin-og";
 
@@ -19,7 +20,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
     .select("id, name, status, logo_url, brand_color")
     .eq("slug", slug)
     .maybeSingle();
-  const active = tenant && isPublicTenantActive(tenant.status);
+  const active = tenant && isPublicTenantActive(tenant.status) && (await isVitrinEnabled(admin, tenant.id));
   const { data: p } = active
     ? await admin
         .from("properties")

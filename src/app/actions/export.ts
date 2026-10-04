@@ -46,6 +46,7 @@ async function exportResult(
   const approval = await requestApprovalIfNeeded(gate.tenantId, gate.userId, "bulk_export", {
     rows: rows.length,
     exportEntity: entity,
+    channel: "quick",
   });
   if (approval.status !== "not_required" && approval.status !== "approved") return { error: approval.message };
 

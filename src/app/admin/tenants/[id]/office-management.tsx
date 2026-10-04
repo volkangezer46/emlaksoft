@@ -59,7 +59,8 @@ import {
   OFFICE_STATUS_LABELS,
   OFFICE_USER_ROLES,
 } from "@/lib/admin/office-create-rules";
-import type { ManagementMember, ManagementNote, OfficeAdminCanMap } from "@/lib/admin/office-management";
+import { roleLabel } from "@/lib/role-labels";
+import type { ClosureRequestRow, ManagementMember, ManagementNote, OfficeAdminCanMap } from "@/lib/admin/office-management";
 import { OFFICE_SLUG_MAX, sanitizeSlugTyping, validateOfficeSlug } from "@/lib/admin/office-slug";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { formatPhoneDisplay } from "@/lib/phone";
@@ -105,7 +106,7 @@ export type OfficeManagementProps = {
   /** Deneme uzatma tarih alanının en küçük değeri (yarın, TR; YYYY-AA-GG). */
   minTrialDate: string;
   legalHref: string;
-  closureRequests: { id: string; type: "account_closure" | "data_export"; status: string; dueLabel: string; note: string | null }[];
+  closureRequests: { id: string; type: "account_closure" | "data_export"; status: string; dueLabel: string; note: string | null; requestedBy: ClosureRequestRow["requestedBy"] }[];
 };
 
 type ActionState = { error?: string; message?: string } | null;
@@ -1174,6 +1175,15 @@ function ClosureRequests({ tenant, requests }: { tenant: ManagedTenant; requests
                 Talebi işle
               </button>
             </div>
+            <p className="text-xs text-text-muted">
+              Talebi açan:{" "}
+              {r.requestedBy
+                ? `${r.requestedBy.fullName ?? "Adsız kullanıcı"} (${roleLabel(r.requestedBy.role)}${r.requestedBy.isActive ? "" : ", pasif"})`
+                : "bilinmiyor"}
+              {!r.requestedBy || !r.requestedBy.isActive || (r.requestedBy.role !== "owner" && r.requestedBy.role !== "gm")
+                ? " — bu kullanıcı artık aktif sahip/genel müdür değil; talep işlenemez."
+                : ""}
+            </p>
             {r.note ? <p className="text-xs text-text-muted">Not: {r.note}</p> : null}
             {openId === r.id ? (
               <form onSubmit={(e) => act.run(formDataOf(e, tenant.id, { request_id: r.id }))} className="grid gap-3">

@@ -5,7 +5,7 @@ import { setTenantLifecycleByAdmin } from "@/app/actions/platform-tenants";
 import { logActivity } from "@/lib/activity";
 import { OFFICE_ADMIN_DENIED, officeAdminCan } from "@/lib/admin/office-admin-access";
 import { confirmationMatches } from "@/lib/admin/office-create-rules";
-import { isClosureRequestType, planClosure } from "@/lib/admin/office-closure";
+import { isClosureRequestType, planClosure, requesterMayCloseOffice } from "@/lib/admin/office-closure";
 import { now } from "@/lib/clock";
 import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
@@ -47,7 +47,7 @@ export async function processOfficeClosureRequestByAdmin(formData: FormData): Pr
     admin.from("tenants").select("id, name, status").eq("id", tenantId).maybeSingle(),
     admin
       .from("kvkk_requests")
-      .select("id, tenant_id, request_type, status")
+      .select("id, tenant_id, request_type, status, created_by")
       .eq("id", requestId)
       .eq("tenant_id", tenantId)
       .maybeSingle(),
@@ -61,6 +61,18 @@ export async function processOfficeClosureRequestByAdmin(formData: FormData): Pr
   }
   if (!confirmationMatches(String(formData.get("confirm_name") ?? ""), String(tenant.name))) {
     return { error: "Onay için ofis adını aynen yazın." };
+  }
+
+  // Talebi acan kullanici HALA bu ofisin aktif sahibi/genel muduru olmali (eski/yetkisiz talep ofisi arsivleyemez).
+  const requesterId = (request as { created_by?: string | null }).created_by;
+  if (!requesterId) return { error: "Talebi açan kullanıcı belirlenemedi; talep işlenemez." };
+  const { data: requester } = await admin
+    .from("profiles")
+    .select("role, is_active, tenant_id")
+    .eq("id", requesterId)
+    .maybeSingle();
+  if (!requesterMayCloseOffice(requester, tenantId)) {
+    return { error: "Talebi açan kullanıcı artık bu ofisin aktif sahibi/genel müdürü değil. Talep işlenemez; reddedin veya ofisle iletişime geçin." };
   }
 
   const plan = planClosure(request.request_type, String(tenant.status), reason);

@@ -17,8 +17,8 @@ function jsonError(error: string, status: number, headers?: Record<string, strin
 /**
  * GET /api/export/kapanis/[entity] — ARŞİVLENMİŞ (iptal) ofisin SAHİBİ için veri paketi (CSV, varlık başına).
  * Normal dışa aktarma rotası askıdaki/iptal ofiste tenant-guard ile kapalıdır; bu rota yalnız şu koşullarda açılır:
- * oturum açmış gerçek ofis sahibi (destek oturumu değil) + ofis durumu 'cancelled' + reddedilmemiş bir
- * hesap kapatma/veri indirme talebi. Veri RLS'li oturum istemcisiyle okunur (service_role YOK); platform personeli
+ * oturum açmış gerçek ofis sahibi (destek oturumu değil) + ofis durumu 'cancelled' + platformun "tamamlandı" yaptığı
+ * (kapatma işlenmiş) bir hesap kapatma/veri indirme talebi. Veri RLS'li oturum istemcisiyle okunur (service_role YOK); platform personeli
  * müşteri verisini okumaz. Kalıcı silme yoktur; bu yalnız okuma/indirme.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ entity: string }> }) {

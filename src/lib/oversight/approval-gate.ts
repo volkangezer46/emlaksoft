@@ -20,7 +20,6 @@ import type { ApprovalKind } from "@/lib/approvals";
 import { now } from "@/lib/clock";
 import {
   APPROVAL_ACTION_META,
-  defaultApprovalRules,
   type ApprovalActionType,
   type ApprovalRules,
 } from "@/lib/oversight/settings";
@@ -40,6 +39,8 @@ export type ApprovalPayload = {
   /** bulk_export */
   rows?: number | null;
   exportEntity?: string | null;
+  /** bulk_export: hizli (2000 satir) / tam akis. Parmak izine girer; hizli onay tam akista kullanilamaz. */
+  channel?: "quick" | "full" | null;
 };
 
 export type ApprovalDecision =
@@ -58,7 +59,27 @@ const fmt = (n: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigit
 
 function fp(type: ApprovalActionType, p: ApprovalPayload): string {
   const key = p.entityId ?? p.exportEntity ?? "-";
-  return `oversight:${type}:${key}`;
+  // Kanal parmak izinin parcasidir; deger ise tuketim aninda `approvalCovers` ile karsilastirilir.
+  const channel = p.channel ? `:${p.channel}` : "";
+  return `oversight:${type}:${key}${channel}`;
+}
+
+/**
+ * SAF: onaylanmis talep, simdi yapilmak istenen islemi KAPSIYOR mu (deger baglama).
+ * Yeni deger onaylanandan daha kotu olamaz: fiyat/komisyon onaylanan yeni degerin altina inemez,
+ * export satir sayisi onaylananin ustune cikamaz. Onayli deger yoksa (eski kayit) kapsamaz.
+ */
+export function approvalCovers(
+  actionType: ApprovalActionType,
+  decision: Extract<ApprovalDecision, { required: true }>,
+  open: { requestedValue?: number | null },
+): boolean {
+  if (actionType === "listing_delete") return true;
+  const approved = open.requestedValue;
+  const wanted = decision.requestedValue;
+  if (approved == null || wanted == null || !Number.isFinite(approved) || !Number.isFinite(wanted)) return false;
+  if (actionType === "bulk_export") return wanted <= approved;
+  return wanted >= approved; // price_drop / commission_discount: daha derin dusus yok
 }
 
 /** SAF: kural + payload -> onay gerekli mi. Kapali kural / gecersiz veri her zaman `required:false`. */
@@ -141,6 +162,9 @@ export type OpenApprovalRow = {
   id: string;
   status: "bekliyor" | "onaylandi";
   decidedAt: string | null;
+  /** Onaylanan talebin degerleri (tuketimde yeni islemle karsilastirilir). */
+  requestedValue?: number | null;
+  currentValue?: number | null;
 };
 
 /** DB bagimliliklari — testte sahtesi verilir. */
@@ -151,7 +175,11 @@ export type ApprovalGateStore = {
   /** Parmak izine uyan, aktorun en son bekleyen/onayli talebi. */
   findOpen(tenantId: string, actorId: string, fingerprint: string): Promise<OpenApprovalRow | null>;
   isConsumed(tenantId: string, approvalId: string): Promise<boolean>;
-  consume(tenantId: string, actorId: string, approvalId: string): Promise<void>;
+  /**
+   * Onayi TEK KEZ tuket. true: bu cagri tuketti (islem devam edebilir); false: baska cagri tuketti, tuketilemedi
+   * ya da denetim kaydi yazilamadi (onay tuketilmis sayilir, islem reddedilir).
+   */
+  consume(tenantId: string, actorId: string, approvalId: string): Promise<boolean>;
   create(
     tenantId: string,
     actorId: string,
@@ -183,7 +211,9 @@ export async function requestApprovalIfNeeded(
 ): Promise<ApprovalGateResult> {
   try {
     const s = store ?? (await import("@/lib/oversight/approval-store")).createApprovalGateStore();
-    const rules = await s.loadRules(tenantId).catch(() => defaultApprovalRules());
+    // Okuma HATASI fail-open olamaz: firlatir -> asagidaki catch `error` doner (islem durur).
+    // "Tablo yok" durumunu depo kendisi varsayilan kapaliya cevirir (bkz. loadApprovalRules).
+    const rules = await s.loadRules(tenantId);
     const decision = evaluateApprovalRule(rules, actionType, payload);
     if (!decision.required) return { status: "not_required" };
     if (await s.isManager(tenantId, actorId)) return { status: "not_required" };
@@ -192,8 +222,15 @@ export async function requestApprovalIfNeeded(
     if (open?.status === "onaylandi") {
       const decided = open.decidedAt ? new Date(open.decidedAt).getTime() : NaN;
       const fresh = Number.isFinite(decided) && nowMs - decided <= APPROVAL_VALID_HOURS * 3_600_000;
-      if (fresh && !(await s.isConsumed(tenantId, open.id))) {
-        await s.consume(tenantId, actorId, open.id);
+      if (fresh && approvalCovers(actionType, decision, open) && !(await s.isConsumed(tenantId, open.id))) {
+        // Atomik tuketim: yaristan kaybeden / denetim kaydi yazamayan cagri islemi REDDEDER.
+        const consumed = await s.consume(tenantId, actorId, open.id);
+        if (!consumed) {
+          return {
+            status: "error",
+            message: "Onay kullanılamadı (zaten kullanılmış olabilir). Lütfen yeni bir onay talep edin.",
+          };
+        }
         return { status: "approved", approvalId: open.id };
       }
     }

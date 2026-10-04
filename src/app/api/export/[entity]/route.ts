@@ -50,6 +50,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ entity: 
   const approval = await requestApprovalIfNeeded(gate.tenantId, gate.userId, "bulk_export", {
     rows: 100000,
     exportEntity: entity,
+    channel: "full",
   });
   if (approval.status !== "not_required" && approval.status !== "approved") {
     return jsonError(approval.message, 403);
