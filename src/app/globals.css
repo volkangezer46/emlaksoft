@@ -215,6 +215,13 @@ aside::-webkit-scrollbar-thumb,
 .press { transition: transform 0.12s ease, box-shadow 0.18s ease; }
 .press:active { transform: translateY(1px) scale(0.98); }
 
+/* Opak zeminli denetim (ikincil düğme, sayfalama düğmesi, istatistik kutusu): rol
+   token'ları yarı saydam olduğundan hover/basılı tonu zemin renginin ÜSTÜNE bindirilir
+   (zemin rengi yerinde kalır). Saydam zeminli öğelerde (hayalet düğme, satır, çip)
+   doğrudan `hover:bg-surface-hover active:bg-surface-pressed` kullanılır. */
+.surface-interactive:hover { background-image: linear-gradient(var(--surface-hover), var(--surface-hover)); }
+.surface-interactive:active { background-image: linear-gradient(var(--surface-pressed), var(--surface-pressed)); }
+
 /* Hover'da yükselme — kart/satır için. Gölge ve konum birlikte değişir,
    yalnızca renk değiştirmek "tıklanabilir" hissi vermiyor. */
 .lift-hover { transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease; }

@@ -49,7 +49,7 @@ export function DropdownMenuItem({
         "flex cursor-pointer select-none items-center gap-2.5 rounded-[var(--radius-control)] px-3 py-2 text-sm outline-none transition [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0",
         danger
           ? "text-danger-500 data-[highlighted]:bg-danger-500/[0.08]"
-          : "text-ink-950 data-[highlighted]:bg-brand-600/[0.07] data-[highlighted]:text-brand-700",
+          : "text-ink-950 data-[highlighted]:bg-surface-selected data-[highlighted]:text-brand-700",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className,
       )}
@@ -67,7 +67,7 @@ export function DropdownMenuCheckboxItem({
       {...props}
       className={cn(
         "relative flex cursor-pointer select-none items-center gap-2 rounded-[var(--radius-control)] py-2 pl-8 pr-3 text-sm text-ink-950 outline-none transition",
-        "data-[highlighted]:bg-brand-600/[0.07] data-[highlighted]:text-brand-700",
+        "data-[highlighted]:bg-surface-selected data-[highlighted]:text-brand-700",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className,
       )}

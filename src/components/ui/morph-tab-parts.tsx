@@ -20,12 +20,12 @@ export function morphTabClass(kind: MorphTabKind): string {
   return cn(
     "mt-tab focus-ring relative flex min-h-11 shrink-0 items-center rounded-[var(--radius-control)] px-1 text-left text-sm font-medium text-text-muted transition-colors duration-150 hover:text-ink-950",
     kind === "rail" &&
-      "hover:bg-canvas data-[active=true]:bg-brand-600/10 data-[active=true]:font-semibold data-[active=true]:text-brand-700",
+      "hover:bg-surface-hover data-[active=true]:bg-surface-selected data-[active=true]:font-semibold data-[active=true]:text-brand-700",
     kind === "pill" &&
       "hover:bg-surface/70 data-[active=true]:bg-surface data-[active=true]:font-semibold data-[active=true]:text-ink-950 data-[active=true]:shadow-[var(--shadow-xs)]",
     // Alt çizgili şerit: aktif = ikon kapsülü + marka renkli alt çizgi (kapsül Face'te `capsule`).
     kind === "underline" &&
-      "hover:bg-canvas data-[active=true]:font-semibold data-[active=true]:text-ink-950 after:pointer-events-none after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:origin-center after:scale-x-50 after:rounded-full after:bg-brand-600 after:opacity-0 after:transition-[opacity,transform] after:duration-200 data-[active=true]:after:scale-x-100 data-[active=true]:after:opacity-100 motion-reduce:after:transition-none",
+      "hover:bg-surface-hover data-[active=true]:font-semibold data-[active=true]:text-ink-950 after:pointer-events-none after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:origin-center after:scale-x-50 after:rounded-full after:bg-brand-600 after:opacity-0 after:transition-[opacity,transform] after:duration-200 data-[active=true]:after:scale-x-100 data-[active=true]:after:opacity-100 motion-reduce:after:transition-none",
   );
 }
 

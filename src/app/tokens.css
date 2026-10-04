@@ -232,7 +232,7 @@
   --bg: var(--canvas);
   --heading: var(--ink-950);
   --border: var(--line);
-  --border-strong: var(--line-strong);
+  /* Belirgin ve etkileşimli kenar adları aşağıda, "rol adlı etkileşim token'ları" bloğundadır. */
   /* Dolgulu vurgu yüzeyinde (düğme) metin; --accent üzerinde ≥4.5:1 (test korur). */
   --accent-fg: #ffffff;
   /* Vurgunun METİN/bağlantı tonu: --surface üzerinde ≥4.5:1. --accent dolgu içindir. */
@@ -257,9 +257,57 @@
   --fs-caption: 0.75rem;
 }
 
+/* ---- ROL ADLI ETKİLEŞİM TOKEN'LARI (Radix 4 / 5 / 7 / 8. adımların karşılığı) ----
+   Bileşenler hover / basılı / seçili zemin ve etkileşimli kenar için elle renk yazmaz:
+
+     --surface-hover       üzerine gelinen satır, hayalet düğme, çip, menü satırı
+     --surface-pressed     basılı an (:active)
+     --surface-selected    seçili satır, aktif sekme, menüde vurgulu seçenek (vurgu tonlu)
+     --border-interactive  denetim kenarı (ikincil düğme, hover'da beliren kenar)
+     --border-strong       belirgin ayırıcı, hover'da güçlenen kenar
+
+   TEK FORMÜL: hepsi yarı saydamdır; --text (seçilide --brand-600) rengini bulunduğu
+   zeminin ÜSTÜNE bindirir. Bu yüzden açık/koyu tema, 9 vurgu ve her yüzey
+   (--surface, --surface-raised, --surface-sunken, --canvas) için ayrı değer yazılmaz.
+   `.theme-dark` (koyu hero) ve `.brand-scope` (beyaz etiket) kendi --text / --brand-600
+   değerleriyle yeniden çözer. Sınıflar: bg-surface-hover, bg-surface-pressed,
+   bg-surface-selected, border-border-interactive, border-border-strong. Opak zeminli
+   denetimde (bg-surface) `surface-interactive` yardımcı sınıfı tonu zeminin üstüne bindirir.
+
+   ORANLAR (src/lib/theme-contrast.test.ts ölçer): hover %4 ve basılı %8 ile --text ve
+   --text-muted her yüzeyde ≥ 4.5:1 kalır; --text-faint ana panel yüzeyinde (--surface)
+   hover'da ≥ 4.5:1. Yüzdeyi artırmak soluk metni AA'nın altına iter; önce testi çalıştır.
+
+   YEDEK: color-mix(in oklch) desteklemeyen tarayıcıda aşağıdaki düz renkler geçerlidir
+   (koyu tema yedeği theme-dark.css'te, aynı @supports koşulunun tersiyle). */
+:root {
+  --surface-hover: rgba(23, 32, 51, 0.04);
+  --surface-pressed: rgba(23, 32, 51, 0.08);
+  --surface-selected: var(--brand-50);
+  --border-interactive: rgba(23, 32, 51, 0.22);
+  --border-strong: rgba(23, 32, 51, 0.32);
+}
+@supports (color: color-mix(in oklch, #000 50%, transparent)) {
+  :root,
+  .theme-dark,
+  .brand-scope {
+    --surface-hover: color-mix(in oklch, var(--text) 4%, transparent);
+    --surface-pressed: color-mix(in oklch, var(--text) 8%, transparent);
+    --surface-selected: color-mix(in oklch, var(--brand-600) 12%, transparent);
+    --border-interactive: color-mix(in oklch, var(--text) 22%, transparent);
+    --border-strong: color-mix(in oklch, var(--text) 32%, transparent);
+  }
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-accent-fg: var(--accent-fg);
   --color-accent-text: var(--accent-text);
   --color-accent-hover: var(--accent-hover);
+
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-pressed: var(--surface-pressed);
+  --color-surface-selected: var(--surface-selected);
+  --color-border-interactive: var(--border-interactive);
+  --color-border-strong: var(--border-strong);
 }

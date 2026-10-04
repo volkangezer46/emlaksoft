@@ -156,7 +156,7 @@ export function InlinePanel({
           type="button"
           onClick={close}
           aria-label="Paneli kapat"
-          className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-canvas hover:text-ink-950"
+          className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-surface-hover hover:text-ink-950 active:bg-surface-pressed"
         >
           <X className="h-5 w-5" aria-hidden="true" />
         </button>

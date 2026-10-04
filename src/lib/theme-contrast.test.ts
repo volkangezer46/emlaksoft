@@ -241,3 +241,118 @@ describe("tema kontrastı (9 vurgu, CSS'ten ölçülür)", () => {
     });
   }
 });
+
+// ---- Rol adlı etkileşim token'ları (tokens.css + theme-dark.css) ----------------
+
+const ROL_TOKENLARI = ["--surface-hover", "--surface-pressed", "--surface-selected", "--border-interactive", "--border-strong"];
+const SUPPORTS = "(color: color-mix(in oklch, #000 50%, transparent))";
+
+/** `@supports <koşul> { ... }` bloğunun gövdesi (iç içe bir düzey süslü parantez). */
+function supportsBlock(css: string, head: string): string {
+  const start = css.indexOf(head);
+  if (start < 0) throw new Error(`@supports yok: ${head}`);
+  let depth = 0;
+  for (let i = css.indexOf("{", start); i < css.length; i++) {
+    if (css[i] === "{") depth++;
+    else if (css[i] === "}" && --depth === 0) return css.slice(start, i);
+  }
+  throw new Error(`@supports kapanmıyor: ${head}`);
+}
+
+/** `color-mix(in oklch, var(--x) N%, transparent)` → { kaynak: "--x", alfa: N/100 } */
+function mixOf(body: string, token: string): { source: string; alpha: number } {
+  const raw = rawToken(body, token);
+  const m = raw?.match(/^color-mix\(in oklch, var\((--[a-z0-9-]+)\) (\d+)%, transparent\)$/);
+  if (!m) throw new Error(`tek formül değil: ${token}=${raw}`);
+  return { source: m[1]!, alpha: Number(m[2]) / 100 };
+}
+
+describe("rol adlı etkileşim token'ları", () => {
+  const formula = supportsBlock(tokensCss, `@supports ${SUPPORTS}`);
+  const darkFallback = supportsBlock(darkCss, `@supports not ${SUPPORTS}`);
+
+  it("beş token: düz renk yedeği + @supports içinde color-mix(in oklch) tek formülü", () => {
+    const fallback = tokensCss.slice(0, tokensCss.indexOf(`@supports ${SUPPORTS}`));
+    for (const t of ROL_TOKENLARI) {
+      expect(rawToken(fallback, t), `${t} yedek`).toBeTruthy();
+      expect(rawToken(fallback, t), `${t} yedek düz renk`).not.toContain("color-mix");
+      expect(mixOf(formula, t).alpha, `${t} formül`).toBeGreaterThan(0);
+    }
+    // Zemin tonları metinden, seçili zemin vurgudan türer; hepsi bulunduğu yüzeyin üstüne biner.
+    expect(mixOf(formula, "--surface-hover").source).toBe("--text");
+    expect(mixOf(formula, "--surface-pressed").source).toBe("--text");
+    expect(mixOf(formula, "--surface-selected").source).toBe("--brand-600");
+    expect(mixOf(formula, "--border-interactive").source).toBe("--text");
+    expect(mixOf(formula, "--border-strong").source).toBe("--text");
+    // Koyu hero ve beyaz etiket kapsamı kendi --text / --brand-600 değeriyle yeniden çözer.
+    expect(formula).toContain(".theme-dark");
+    expect(formula).toContain(".brand-scope");
+  });
+
+  it("kademe sırası: hover < basılı, etkileşimli kenar < belirgin kenar", () => {
+    expect(mixOf(formula, "--surface-hover").alpha).toBeLessThan(mixOf(formula, "--surface-pressed").alpha);
+    expect(mixOf(formula, "--border-interactive").alpha).toBeLessThan(mixOf(formula, "--border-strong").alpha);
+  });
+
+  it("koyu tema: formül yeniden yazılmaz; yalnız @supports not içinde düz renk yedeği vardır", () => {
+    for (const t of ["--surface-hover", "--surface-pressed", "--border-interactive", "--border-strong"]) {
+      expect(rawToken(darkFallback, t), `${t} koyu yedek`).toMatch(/^rgba\(/);
+    }
+    // Ana koyu blok rol token'ı tanımlamaz (tanımlasaydı :root'taki formülü ezerdi).
+    for (const t of ROL_TOKENLARI) expect(rawToken(DARK, t), `${t} ana koyu blok`).toBeNull();
+  });
+
+  it("Tailwind sınıfları üretilir (bg-surface-hover, border-border-interactive ...)", () => {
+    for (const t of ROL_TOKENLARI) expect(tokensCss).toContain(`--color-${t.slice(2)}: var(${t});`);
+  });
+
+  for (const a of ACCENTS) {
+    for (const mode of ["light", "dark"] as const) {
+      it(`${a.label} (${mode === "light" ? "açık" : "koyu"}): seçili zeminde vurgu metni ve gövde metni ≥ 4.5:1`, () => {
+        const p = palette(a.value, mode);
+        const { alpha } = mixOf(formula, "--surface-selected");
+        const body = mustHex(mode === "light" ? LIGHT : DARK, "--text", mode);
+        for (const s of mode === "light" ? LIGHT_SURFACES : DARK_SURFACES) {
+          const selected = over(p.fill, alpha, s);
+          expect(contrast(p.text, selected), "vurgu metni").toBeGreaterThanOrEqual(4.5);
+          expect(contrast(body, selected), "gövde metni").toBeGreaterThanOrEqual(4.5);
+        }
+      });
+    }
+  }
+
+  it("hover ve basılı zeminde gövde ve soluk metin ≥ 4.5:1 (açık + koyu, tüm yüzeyler)", () => {
+    for (const [mode, body, surfaces] of [
+      ["açık", LIGHT, LIGHT_SURFACES],
+      ["koyu", DARK, DARK_SURFACES],
+    ] as const) {
+      const text = mustHex(body, "--text", mode);
+      for (const token of ["--surface-hover", "--surface-pressed"]) {
+        const { alpha } = mixOf(formula, token);
+        for (const s of surfaces) {
+          const bg = over(text, alpha, s);
+          for (const t of ["--text", "--text-muted"]) {
+            expect(contrast(mustHex(body, t, mode), bg), `${mode} ${t} / ${token}`).toBeGreaterThanOrEqual(4.5);
+          }
+        }
+      }
+      // Soluk metin (--text-faint) durağan yüzeyde tam eşikte kalibre edildi; hover tonu ana panel
+      // yüzeyinde (--surface) onu AA'nın altına itmemeli. Diğer yüzeylerde garanti yoktur.
+      const hover = over(text, mixOf(formula, "--surface-hover").alpha, surfaces[0]!);
+      expect(contrast(mustHex(body, "--text-faint", mode), hover), `${mode} --text-faint / hover`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("formül ve düz renk yedeği aynı yüzdeyi taşır (iki liste ayrışmaz)", () => {
+    const fallback = tokensCss.slice(0, tokensCss.indexOf(`@supports ${SUPPORTS}`));
+    const alphaOf = (body: string, token: string) => Number(rawToken(body, token)?.match(/,\s*([\d.]+)\)$/)?.[1]);
+    for (const t of ["--surface-hover", "--surface-pressed", "--border-interactive", "--border-strong"]) {
+      expect(alphaOf(fallback, t), `${t} açık yedek`).toBe(mixOf(formula, t).alpha);
+      expect(alphaOf(darkFallback, t), `${t} koyu yedek`).toBe(mixOf(formula, t).alpha);
+    }
+    // Yedek renk, temanın --text değeridir (açık #172033, koyu #e8edf7).
+    const rgb = (body: string, token: string) => rawToken(body, token)?.match(/^rgba\((\d+), (\d+), (\d+),/)?.slice(1).map(Number);
+    expect(rgb(fallback, "--surface-hover")).toEqual(mustHex(LIGHT, "--text", "açık"));
+    expect(rgb(darkFallback, "--surface-hover")).toEqual(mustHex(DARK, "--text", "koyu"));
+  });
+});

@@ -13,12 +13,17 @@ import { cn } from "@/lib/utils";
  *
  * `href` verilirse Link olarak render edilir (aynı görünüm, gezinme için).
  */
+/* Hover/basılı zeminler rol token'larından gelir (tokens.css "rol adlı etkileşim
+   token'ları"): hayalet saydam zeminde `surface-hover/pressed`, ikincil opak zeminde
+   `surface-interactive` (ton zeminin üstüne biner). Birincil hover `accent-hover`:
+   açıkta --brand-700, koyuda --brand-500 (koyuda --brand-700 açık METİN tonudur;
+   üstünde beyaz yazı okunmaz). */
 const VARIANTS = {
   primary:
-    "bg-brand-600 text-white shadow-[var(--inner-top-dark)] hover:bg-brand-700",
+    "bg-brand-600 text-white shadow-[var(--inner-top-dark)] hover:bg-accent-hover",
   secondary:
-    "border border-hairline-strong bg-surface text-ink-950 hover:bg-canvas",
-  ghost: "text-text-muted hover:bg-canvas hover:text-ink-950",
+    "surface-interactive border border-border-interactive bg-surface text-ink-950 hover:border-border-strong",
+  ghost: "text-text-muted hover:bg-surface-hover hover:text-ink-950 active:bg-surface-pressed",
   danger: "bg-danger-600 text-white hover:bg-danger-700",
 } as const;
 

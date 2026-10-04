@@ -38,6 +38,17 @@ describe("tasarım token sözleşmesi", () => {
     expect(bad(/text-zinc-/)).toEqual([]);
   });
 
+  it("src/components/ui: dağınık hover/seçili zemin sınıfı yok (rol token'ları: surface-hover/pressed/selected)", () => {
+    const ui = FILES.filter((f) => f.split("\\").join("/").startsWith("src/components/ui/"));
+    const bad = (re: RegExp) => ui.filter((f) => re.test(readFileSync(f, "utf8"))).map((f) => f.split("\\").join("/"));
+    // Saydam zeminde hover: bg-surface-hover; opak zeminde: surface-interactive.
+    expect(bad(/hover:bg-(?:canvas|surface-2)(?![\w-])/)).toEqual([]);
+    // Menü/seçenek vurgusu ve seçili satır: bg-surface-selected.
+    expect(bad(/data-\[highlighted\]:bg-brand-/)).toEqual([]);
+    // Birincil düğme hover'ı: bg-accent-hover (koyuda --brand-700 açık metin tonudur; beyaz yazı okunmaz).
+    expect(bad(/hover:bg-brand-700(?![\w-])/)).toEqual([]);
+  });
+
   it("koyu tema yalnız /app ve /admin için tanımlı ve kök layout'ta açılış script'i var", () => {
     const layout = readFileSync("src/app/layout.tsx", "utf8");
     expect(layout).toContain("THEME_BOOT_SCRIPT");
