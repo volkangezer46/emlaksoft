@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import Link from "next/link";
 import { KeyRound, Mail, Power, Save, Send } from "lucide-react";
 import {
+  requestMemberEmailChange,
   resendMemberInvite,
   sendMemberPasswordReset,
   updateMemberProfile,
@@ -13,6 +14,7 @@ import { updateTeamMember } from "@/app/actions/team";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { EmailInput } from "@/components/ui/email-input";
 import { FormField, FormInput } from "@/components/ui/form-controls";
 import { PhoneInput } from "@/components/ui/phone-input";
 
@@ -56,6 +58,8 @@ export function MemberInfoPanel({
   const [saveState, saveAction, saving] = useActionState(updateMemberProfile, initial);
   const [resetState, resetAction, resetting] = useActionState(sendMemberPasswordReset, initial);
   const [inviteState, inviteAction, inviting] = useActionState(resendMemberInvite, initial);
+  const [emailState, emailAction, emailing] = useActionState(requestMemberEmailChange, initial);
+  const [askingEmail, setAskingEmail] = useState(false);
   const [activeState, activeAction, toggling] = useActionState(
     async (_p: MemberAdminResult, fd: FormData): Promise<MemberAdminResult> => {
       const r = await updateTeamMember(fd);
@@ -87,7 +91,7 @@ export function MemberInfoPanel({
             <FormField label="Unvan" htmlFor="mi-title" className="sm:col-span-2" hint="Kartvizit ve ekip listesinde görünür.">
               <FormInput id="mi-title" name="title" maxLength={80} defaultValue={title ?? ""} placeholder="Gayrimenkul Danışmanı" />
             </FormField>
-            <FormField label="E-posta (giriş kimliği)" htmlFor="mi-giris" className="sm:col-span-2" hint="E-posta değişikliği için güvenli doğrulama akışı henüz yok; değişiklik gerekirse destek ile iletişime geçin.">
+            <FormField label="E-posta (giriş kimliği)" htmlFor="mi-giris" className="sm:col-span-2" hint="Yönetici e-postayı doğrudan yazamaz; aşağıdaki Erişim kartından üyeden değişikliği istersiniz.">
               <FormInput id="mi-giris" value={email ?? "—"} readOnly disabled />
             </FormField>
             <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
@@ -129,6 +133,23 @@ export function MemberInfoPanel({
           </div>
           <ResultAlert state={resetState} />
           <ResultAlert state={inviteState} />
+          {askingEmail ? (
+            <form action={emailAction} className="space-y-3 rounded-[var(--radius-control)] border border-line p-3">
+              <input type="hidden" name="id" value={memberId} />
+              <FormField label="Yeni e-posta önerisi" htmlFor="mi-newmail" required hint="Üyeye bildirim gider; değişimi üye parola onayı ve doğrulama bağlantısıyla kendisi tamamlar. Onaylanana kadar eski adres geçerlidir.">
+                <EmailInput id="mi-newmail" name="new_email" required />
+              </FormField>
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" icon={Send} loading={emailing} disabled={!isActive}>Üyeden değişikliği iste</Button>
+                <Button type="button" variant="secondary" onClick={() => setAskingEmail(false)}>Vazgeç</Button>
+              </div>
+            </form>
+          ) : (
+            <Button type="button" variant="secondary" icon={Mail} onClick={() => setAskingEmail(true)} disabled={!isActive}>
+              E-posta değişikliği iste
+            </Button>
+          )}
+          <ResultAlert state={emailState} />
         </CardContent>
       </Card>
 

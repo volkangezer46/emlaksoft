@@ -138,6 +138,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/actions/platform-staff.ts", fn: "signOutStaffSessions", calls: 1, tenantFilter: "yok" },
   { file: "src/app/actions/platform-staff.ts", fn: "updateStaffProfile", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/platform-staff.ts", fn: "updateStaffRole", calls: 1, tenantFilter: "uygulanamaz" },
+  { file: "src/app/actions/platform-tenant-closure.ts", fn: "processOfficeClosureRequestByAdmin", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/platform-tenants.ts", fn: "addTenantPlatformNote", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/platform-tenants.ts", fn: "addTenantUserByAdmin", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/platform-tenants.ts", fn: "changeTenantOwnerEmailByAdmin", calls: 1, tenantFilter: "uygulanamaz" },
