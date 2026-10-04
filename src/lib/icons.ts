@@ -301,6 +301,8 @@ export const TAB_ICONS = {
   hedef: Flag,
   guvenlik: LockKeyhole,
   rol: UserCog,
+  fatura: Receipt,
+  baslangic: Rocket,
 } satisfies Record<string, LucideIcon>;
 
 /**
