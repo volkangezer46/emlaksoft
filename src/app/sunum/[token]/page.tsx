@@ -98,6 +98,7 @@ export default async function PublicPresentationPage({
           )
           .in("id", propertyIds)
           .eq("tenant_id", pres.tenant_id)
+          .eq("is_sample", false)
           .is("deleted_at", null)
       : Promise.resolve({ data: [] }),
   ]);
@@ -132,7 +133,8 @@ export default async function PublicPresentationPage({
     const { data: descRows } = await admin
       .from("properties")
       .select("id, description")
-      .in("id", properties.map((p) => p.id as string));
+      .in("id", properties.map((p) => p.id as string))
+      .eq("is_sample", false);
     for (const d of (descRows ?? []) as { id: string; description?: string | null }[]) {
       const text = String(d.description ?? "").trim();
       if (text) descById.set(d.id, text);

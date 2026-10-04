@@ -6,7 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
-import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { isOnboardingStepId } from "@/lib/onboarding-checklist";
 import {
   parseSkipped,
@@ -36,7 +37,7 @@ export async function saveOfficeProfile(formData: FormData): Promise<OnboardingS
 
   if (formData.has("name") && !name) return { error: "Ofis adı boş bırakılamaz." };
   if (!phone && !city && !licenseNo && !name && !addressLine) return { error: "En az bir alanı doldurun." };
-  const parsedPhone = phone ? parsePhone(phone) : null;
+  const parsedPhone = phone ? parsePhoneStrict(phone) : null;
   if (parsedPhone && !parsedPhone.ok) return { error: parsedPhone.error ?? PHONE_ERROR_MESSAGE };
 
   const patch: Record<string, string> = { updated_at: new Date(now()).toISOString() };
@@ -117,7 +118,7 @@ export async function saveOwnPhone(formData: FormData): Promise<OnboardingSetupR
   if (!gate.ok) return { error: gate.error };
   const phone = String(formData.get("phone") ?? "").trim().slice(0, 40);
   if (!phone) return { error: "Telefon numarası girin." };
-  const parsed = parsePhone(phone);
+  const parsed = parsePhoneStrict(phone);
   if (!parsed.ok) return { error: parsed.error ?? PHONE_ERROR_MESSAGE };
   const supabase = await createClient();
   const { error } = await supabase

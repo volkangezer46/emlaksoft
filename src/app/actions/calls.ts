@@ -5,7 +5,8 @@ import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
-import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 
 export type CallResult = { error?: string; ok?: boolean };
 
@@ -23,7 +24,7 @@ export async function createCall(formData: FormData): Promise<CallResult> {
   if (!rawPhone || !["inbound", "outbound", "missed"].includes(direction)) {
     return { error: "Telefon ve çağrı yönü zorunlu." };
   }
-  const parsedPhone = parsePhone(rawPhone);
+  const parsedPhone = parsePhoneStrict(rawPhone);
   if (!parsedPhone.ok) return { error: parsedPhone.error ?? PHONE_ERROR_MESSAGE };
   const phone = parsedPhone.stored;
   if (direction !== "missed" && !disposition) {

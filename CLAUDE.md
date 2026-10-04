@@ -60,11 +60,18 @@ Oturumlu E2E yalnız izole test DB'de, açık `E2E_MUTATION_ALLOWED=true` ve ben
   IBAN, kart) `src/lib/ai/redact.ts` ile maskelenir; doğrudan `api.openai.com` çağrısı yazma (sözleşme testi bunu yakalar).
 - **service_role:** `createAdminClient` kullanımı `src/lib/admin-client-allowlist.ts` kabul listesindedir; yeni kullanım
   testi kırar (`npx tsx scripts/audit-admin-client.ts --write` ile envanter ve kabul listesi yenilenir). Envanter: `docs/security/`.
-- **İletişim alanları:** her telefon girişi `PhoneInput` (`src/components/ui/phone-input.tsx`, ülke seçici, varsayılan TR,
-  saklama: TR `05XXXXXXXXX`, yabancı `+<E.164>`), her e-posta girişi `EmailInput` olmak zorundadır; sunucuda server action içinde `parsePhone` (`src/lib/phone.ts`) ve `normalizeEmail`/`isValidEmail` (`src/lib/email.ts`) ile
-  doğrulanıp normalize edilir (üretimdeki gerçek yol budur). `src/lib/validation/contact.ts` (zod `phoneSchema`/`emailSchema`) aynı
-  yardımcıları saran hazır şemadır ama bugün üretimde import EDİLMİYOR; zod ile doğrulanan yeni action'larda kullanılabilir. Ham `<input type="tel|email">` yazma;
-  `src/lib/contact-input-contract.test.ts` yeni ihlalde kırılır.
+- **İletişim alanları (TEK MERKEZ):** her telefon girişi `PhoneInput` (`src/components/ui/phone-input.tsx`, ülke seçici,
+  varsayılan TR), her e-posta girişi `EmailInput` olmak zorundadır. Ülke kuralları TEK kaynaktan gelir:
+  `src/lib/phone-rules.ts` (libphonenumber-js/min, sabit sürüm). Her ülke kendi biçimine göre girilir: yazarken ülkeye göre
+  biçimlenir, ülkenin en uzun olası uzunluğunun üstüne rakam YAZILMAZ (TR: ulusal 10 hane, `0` hariç; fazlası kırpılır +
+  hafif uyarı), harf/sembol atılır, ülke değişince numara silinmez ama uyumsuzsa uyarılır, `+49…` yapıştırınca ülke seçilir.
+  Saklama: TR `05XXXXXXXXX` / sabit `0XXXXXXXXXX`, yabancı `+<E.164>` (değişmez). SUNUCUDA telefon kaydeden her action
+  `parsePhoneStrict` (`@/lib/phone-rules`) veya `phoneSchema`/`optionalPhoneSchema` (`src/lib/validation/contact.ts`) kullanır;
+  hafif `parsePhone` yalnız istemci önizleme/karşılaştırma içindir. İstemci dosyası `phone-rules`'u STATİK import etmez
+  (paket bütçesi; yalnız PhoneInput dinamik yükler). Ham `<input type="tel|email">` yazma.
+  **Yeni telefon girişi kontrol listesi:** (1) form: `PhoneInput`; (2) action: `parsePhoneStrict`/`phoneSchema` ile doğrula,
+  `stored` değerini yaz; (3) içe aktarma/webhook/public form dahil ham telefon string'i DB'ye gitmez;
+  (4) `src/lib/contact-input-contract.test.ts` yeşil (istisna gerekiyorsa gerekçeli listeye); (5) gösterim `formatPhoneDisplay`.
 - **PostgREST gömmeleri:** `properties`/`customers` gibi iki FK'lı tablolara gömme her zaman FK adıyla yazılır
   (`alias:properties!<tablo>_property_id_fkey(...)`); ipucusuz gömme listeyi sessizce boş bırakır
   (`src/lib/postgrest-embed-hint-contract.test.ts`).

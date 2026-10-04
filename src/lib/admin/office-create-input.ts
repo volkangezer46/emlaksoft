@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { isPlanId, normalizeBillingCycle, type BillingCycle, type PlanId } from "@/lib/billing/plans";
 import type { RegistrationTeamSize } from "@/lib/billing/registration-plan";
-import { parsePhone, PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { emailSchema } from "@/lib/validation/contact";
 import {
   OFFICE_ACCESS_MODES,
@@ -81,7 +82,7 @@ function oneOf<T extends string>(label: string, values: readonly T[], fallback: 
 const officePhone = z.unknown().transform((v, ctx): string | null => {
   const s = text(v);
   if (!s) return null;
-  const p = parsePhone(s);
+  const p = parsePhoneStrict(s);
   if (!p.ok) {
     ctx.addIssue({ code: "custom", message: `Ofis telefonu: ${p.error ?? PHONE_ERROR_MESSAGE}` });
     return z.NEVER;
@@ -97,7 +98,7 @@ function trMobile(label: string) {
   return z.unknown().transform((v, ctx): string | null => {
     const s = text(v);
     if (!s) return null;
-    const p = parsePhone(s);
+    const p = parsePhoneStrict(s);
     if (!p.ok || p.country !== "TR" || p.kind !== "mobile") {
       ctx.addIssue({ code: "custom", message: `${label}: ${TR_MOBILE_ERROR_MESSAGE}` });
       return z.NEVER;

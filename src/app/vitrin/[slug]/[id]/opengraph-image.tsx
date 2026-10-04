@@ -28,6 +28,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
         .eq("tenant_id", tenant.id)
         .eq("status", "live")
         .is("deleted_at", null)
+        .eq("is_sample", false)
         .maybeSingle()
     : { data: null };
 

@@ -4,7 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { notifyTenant } from "@/lib/notify";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
-import { formatPhoneDisplay, parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { formatPhoneDisplay, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 
 /**
  * Vitrin fiyat alarmı — "Fiyat düşünce haber ver".
@@ -39,7 +40,7 @@ export async function createVitrinPriceAlert(input: PriceAlertInput): Promise<Pr
   const propertyId = (input.propertyId ?? "").trim();
   if (!slug || !UUID_RE.test(propertyId)) return { ok: false, error: "Geçersiz ilan." };
 
-  const phoneParsed = parsePhone(input.phone);
+  const phoneParsed = parsePhoneStrict(input.phone);
   if (!phoneParsed.ok) {
     return { ok: false, error: phoneParsed.error ?? PHONE_ERROR_MESSAGE };
   }

@@ -16,7 +16,8 @@ import { restoreImpersonationMetadata } from "@/lib/impersonation";
 import { bootstrapPlatformStaffIfAllowed } from "@/lib/platform";
 import { sendSms } from "@/lib/messaging/netgsm";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
-import { parsePhone, PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -345,7 +346,7 @@ export async function signUp(
   // 2FA SMS'i de Netgsm (yalnız TR) ile gider. Yabancı numara için migration gerekir.
   let phone = "";
   if (rawPhone) {
-    const parsed = parsePhone(rawPhone);
+    const parsed = parsePhoneStrict(rawPhone);
     if (!parsed.ok) return { error: parsed.error ?? PHONE_ERROR_MESSAGE };
     if (parsed.country !== "TR" || parsed.kind !== "mobile") return { error: TR_MOBILE_ERROR_MESSAGE };
     phone = parsed.stored;

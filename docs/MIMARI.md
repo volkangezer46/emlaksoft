@@ -51,3 +51,10 @@ SQL tarafı `current_tenant_id()` JWT claim'i ile RLS (migration 002, role-aware
 Portal scrape yok · tam Türkçe UI · koyu tema yalnız /app ve /admin (vitrin/portallar hep açık) · sahte metrik yok (her sayı tıklanabilir) ·
 `Date.now()` bileşende yasak → `src/lib/clock.ts` · multi-tenant izolasyon her katmanda.
 Para/tarih biçimi tek kaynak: `src/lib/format.ts` (TR saat dilimi, hidrasyon güvenli); ortak durum etiketleri `src/lib/status-labels.ts`.
+
+## Demo veri kuralları
+
+Tek merkez: `src/lib/sample-scope.ts`. `is_sample=true` kayıtlar (örnek veri) için:
+1. **Public görünürlük yok:** vitrin liste/detay, OG görselleri, sitemap, sunum, paylaş, danışman kartı, malik/müşteri portalı, randevu teyit/alma, tavsiye, favoriler, açık ev, değerleme raporu: her `properties` sorgusu `.eq("is_sample", false)` / `publicPropertyFilter` / `notSample` taşır; demo kayda doğrudan URL 404 verir. `src/lib/sample-scope.test.ts` kaynak taramasıyla zorlar; yeni public yüzey `PUBLIC_FILES` listesine eklenir.
+2. **Dış gönderim yok:** otomasyon SMS (`automation-engine.ts`) ve kampanya teslimi (`campaign-delivery.ts`) demo alıcıyı `demo_blocked` ile atlar; yeni dış gönderim yolu `isSampleRecipient`/`isSampleCustomer` kapısı taşımalıdır. İç bildirimler (ekibe zil) serbesttir.
+3. **KPI eşiği:** lig/KPI/rapor/TV demo kayıtları YALNIZ ofiste gerçek (is_sample=false) müşteri ve portföy sayısı `SAMPLE_KPI_THRESHOLD` (5) altındaysa içerir (`includeSample`, `getSampleScope`, `sampleValues`); eşik aşılınca demo dışlanır. Şu an uygulanan: lig (`gamification-query.ts`); diğer KPI sorguları aynı yardımcıyla geçirilmelidir.

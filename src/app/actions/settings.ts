@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { MATCHING_WEIGHT_KEYS, type MatchingWeights } from "@/lib/matching";
-import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 
 export type SettingsResult = { error?: string; ok?: boolean };
 
@@ -82,7 +83,7 @@ export async function updateTenantInfo(formData: FormData): Promise<SettingsResu
 
   if (!name) return { error: "Ofis adı zorunlu." };
 
-  const parsedPhone = phone ? parsePhone(phone) : null;
+  const parsedPhone = phone ? parsePhoneStrict(phone) : null;
   if (parsedPhone && !parsedPhone.ok) return { error: parsedPhone.error ?? PHONE_ERROR_MESSAGE };
 
   // IBAN format kontrolü — TR ile başlayan 26 karakter (opsiyonel)

@@ -6,7 +6,8 @@ import { createAppointment, type AppointmentResult } from "@/app/actions/appoint
 import { requirePermission } from "@/lib/require-permission";
 import { createClient } from "@/lib/supabase/server";
 import { parseTrLocalDateTime, toTrLocalInput } from "@/lib/clock";
-import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { QUICK_INTENT_TYPES, type QuickIntent } from "./quick-intents";
 
 /**
@@ -37,7 +38,7 @@ export async function quickLogCall(formData: FormData): Promise<CallResult> {
 
   if (!customerId && !phone) return { error: "Müşteri seçin ya da telefon girin." };
   if (phone) {
-    const parsed = parsePhone(phone);
+    const parsed = parsePhoneStrict(phone);
     if (!parsed.ok) return { error: parsed.error ?? PHONE_ERROR_MESSAGE };
   } else {
     // Telefon girilmediyse seçilen müşterinin kayıtlı numarası kullanılır (RLS + müşteri görüntüleme izni).

@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyTenant } from "@/lib/notify";
 import { prepareTenantSmsSender } from "@/lib/messaging/tenant-providers";
+import { DEMO_BLOCKED, isSampleRecipient } from "@/lib/sample-scope";
 
 /**
  * Otomasyon motoru — `automations` tablosundaki kuralları fiilen ÇALIŞTIRAN katman.
@@ -181,12 +182,14 @@ async function resolveConsentedMarketingPhone(
 
   const { data: customer, error: customerError } = await admin
     .from("customers")
-    .select("phone")
+    .select("phone, is_sample")
     .eq("id", payload.customerId)
     .eq("tenant_id", tenantId)
     .is("deleted_at", null)
     .eq("blacklist", false)
     .maybeSingle();
+  // Demo müşteriye gerçek gönderim yok (son savunma)
+  if (isSampleRecipient(customer)) return { ok: false, reason: DEMO_BLOCKED };
   const phone = typeof customer?.phone === "string" ? customer.phone.trim() : "";
   if (customerError || !phone) return { ok: false, reason: "customer_or_phone_unavailable" };
 

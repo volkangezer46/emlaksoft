@@ -29,6 +29,7 @@ const columns: { title: string; links: FooterLink[] }[] = [
       ["Neden EmlakSoft", "/#neden"],
       ["Nasıl çalışır", "/#nasil"],
       ["Sık sorulan sorular", "/#sss"],
+      ["Araçlar", "/araclar"],
       ["Giriş yap", "/giris"],
     ],
   },

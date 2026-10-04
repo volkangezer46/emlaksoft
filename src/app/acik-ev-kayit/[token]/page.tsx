@@ -65,6 +65,7 @@ export default async function OpenHouseCheckinPage({
     .select("title, property_code")
     .eq("id", event.property_id)
     .eq("tenant_id", event.tenant_id)
+    .eq("is_sample", false)
     .is("deleted_at", null)
     .maybeSingle();
   if (!property) notFound();

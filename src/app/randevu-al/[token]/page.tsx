@@ -86,6 +86,7 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
       admin
         .from("appointments")
         .select("scheduled_at, duration_min")
+        .eq("is_sample", false)
         .eq("tenant_id", setting.tenant_id)
         .eq("assigned_to", setting.staff_id)
         .neq("status", "cancelled")
