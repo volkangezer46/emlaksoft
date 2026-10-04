@@ -45,6 +45,7 @@ uygulanmalı; yoksa RLS delikleri açık kalır.** K4 `is_document` migration'ı
 
 ## 3. Bekleyen / engelli işler
 
+- **Uzman paneli kararı (2026-10-05):** canlıya almadan zorunlu paketler (P1-P7), ilk 30 gün planı, sahip kararları (S1-S13) ve "asla yapılmayacaklar" için `docs/design/PANEL_KARAR_1.md`.
 - **K4 dalı** (`worktree-agent-aaa0895d41f425d97`): portföy düzenleme/mobil/anahtar/açık ev/belge. Public medya sorguları
   `is_document` sütununa bağlı → migration uygulanmadan `main`'e alınmaz (public vitrinde görsel kaybolur).
 - **Fiyat kararı (sahip):** veritabanı fonksiyonu `update_tenant_plan_subscription` plan değişince tutarı eski sabit
