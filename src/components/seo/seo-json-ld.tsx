@@ -19,13 +19,14 @@ export async function SeoJsonLd({
   faq?: readonly { q: string; a: string }[];
   tool?: { title: string; description: string; url: string };
 }) {
-  const [s, plans] = await Promise.all([getSeoSettings(), getPublicPlanDefinitions()]);
+  const [s, planDefs] = await Promise.all([getSeoSettings(), getPublicPlanDefinitions()]);
   const kinds = s.pages[path]?.jsonLd ?? getSeoPage(path)?.jsonLd ?? [];
   const graph = buildPageJsonLd({
     global: s.global,
     base: getBaseUrl(),
     path,
-    plans: plans.filter((p) => !p.customPricing).map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry })),
+    // Özel fiyatlı ("Bize ulaşın") planın aylık tutarı yoktur; yapılandırılmış veriye sahte fiyat basılmaz.
+    plans: planDefs.filter((p) => !p.customPricing).map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry })),
     faq,
     kinds,
     tool,

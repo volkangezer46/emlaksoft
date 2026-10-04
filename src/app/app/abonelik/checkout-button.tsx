@@ -10,14 +10,18 @@ export function CheckoutButton({
   cycle,
   label,
   variant = "primary",
+  couponsEnabled = false,
 }: {
   plan: PlanId;
   cycle: BillingCycle;
   label: string;
   variant?: "primary" | "ghost";
+  /** coupons tablosu yoksa (migration uygulanmadı) kupon alanı hiç gösterilmez. */
+  couponsEnabled?: boolean;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [coupon, setCoupon] = useState("");
 
   async function onClick() {
     setPending(true);
@@ -25,6 +29,7 @@ export function CheckoutButton({
     const fd = new FormData();
     fd.set("plan", plan);
     fd.set("cycle", cycle);
+    if (couponsEnabled && coupon.trim()) fd.set("coupon", coupon.trim());
     const result = await startPlanCheckout(fd);
     if (result.checkoutUrl) {
       window.location.href = result.checkoutUrl;
@@ -36,6 +41,21 @@ export function CheckoutButton({
 
   return (
     <div>
+      {couponsEnabled ? (
+        <div className="mb-2">
+          <label htmlFor={`coupon-${plan}`} className="sr-only">Kupon kodu</label>
+          <input
+            id={`coupon-${plan}`}
+            type="text"
+            value={coupon}
+            onChange={(e) => setCoupon(e.target.value.toUpperCase())}
+            placeholder="Kupon kodu (varsa)"
+            autoComplete="off"
+            maxLength={40}
+            className="w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs uppercase tracking-wide text-ink-950 placeholder:normal-case placeholder:tracking-normal"
+          />
+        </div>
+      ) : null}
       <button
         type="button"
         disabled={pending}

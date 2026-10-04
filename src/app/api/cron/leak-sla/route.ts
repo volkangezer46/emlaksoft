@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
-import { getDisabledModulesByTenant, isDisabledFor } from "@/lib/modules/state";
+import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 
 function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
     sent += 1;
   }
 
-  await recordHeartbeat("leak-sla", "ok", `${sent} SLA uyarısı`);
+  await recordHeartbeat("leak-sla", "ok", `${sent} SLA uyarısı${skippedTenantsNote(disabledModules, "leak")}`);
 
   return NextResponse.json({ ok: true, sent });
 }

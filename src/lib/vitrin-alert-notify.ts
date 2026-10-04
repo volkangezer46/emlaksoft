@@ -35,14 +35,18 @@ export type VitrinAlertRunResult = {
 
 const fmt = (v: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(v);
 
-export async function processVitrinPriceAlerts(admin: AdminClient): Promise<VitrinAlertRunResult> {
+export async function processVitrinPriceAlerts(
+  admin: AdminClient,
+  /** "Vitrin" modülünü kapatmış ofisler: alarmları taranmaz, bildirim yazılmaz. */
+  skipTenantIds: ReadonlySet<string> = new Set(),
+): Promise<VitrinAlertRunResult> {
   const { data: alerts } = await admin
     .from("vitrin_price_alerts")
     .select("id, tenant_id, property_id, name, phone, baseline_price")
     .is("notified_at", null)
     .limit(1000);
 
-  const pending = (alerts ?? []) as PendingAlert[];
+  const pending = ((alerts ?? []) as PendingAlert[]).filter((a) => !skipTenantIds.has(a.tenant_id));
   if (!pending.length) return { pending: 0, notified: 0 };
 
   // İlanları tek sorguda çek (N+1 yerine) — yalnız yayında + silinmemiş.

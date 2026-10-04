@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { getDisabledModulesByTenant, skippedTenantsNote, tenantsDisabledFor } from "@/lib/modules/state";
 import { processVitrinPriceAlerts } from "@/lib/vitrin-alert-notify";
 
 function authorized(req: NextRequest) {
@@ -22,11 +23,13 @@ export async function GET(req: NextRequest) {
 
   try {
     const admin = createAdminClient();
-    const result = await processVitrinPriceAlerts(admin);
+    const disabledModules = await getDisabledModulesByTenant(admin);
+    const result = await processVitrinPriceAlerts(admin, new Set(tenantsDisabledFor(disabledModules, "vitrin")));
+    const note = skippedTenantsNote(disabledModules, "vitrin");
     await recordHeartbeat(
       "vitrin-alarm",
       "ok",
-      result.pending === 0 ? "bekleyen alarm yok" : `${result.pending} alarm tarandı, ${result.notified} bildirim`,
+      (result.pending === 0 ? "bekleyen alarm yok" : `${result.pending} alarm tarandı, ${result.notified} bildirim`) + note,
     );
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {

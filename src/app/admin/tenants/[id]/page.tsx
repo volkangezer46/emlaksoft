@@ -187,6 +187,7 @@ export default async function AdminTenantDetailPage({
         plans={PLANS.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry, seats: p.limits.seats }))}
         minTrialDate={daysFromNowIso(1).slice(0, 10)}
         legalHref={tabHref("yasal")}
+        closureRequests={mgmt.closureRequests.map((r) => ({ ...r, dueLabel: r.dueAt.slice(0, 10) }))}
       />
       <ModulePanel
         tenantId={tenant.id}

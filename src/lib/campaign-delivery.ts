@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getDisabledModulesByTenant, tenantsDisabledFor } from "@/lib/modules/state";
 import { DEMO_BLOCKED, isSampleCampaignRecipient } from "@/lib/sample-scope";
 import {
   prepareTenantSmsSender,
@@ -59,6 +60,8 @@ export type CampaignDeliveryWorkerSummary = {
   failureReasons?: string[];
   /** Şablon sözleşmesine uymadığı için atlanan eski WhatsApp kampanyaları (migration 20260816001100 bunları 'failed' yapar). */
   quarantinedCampaigns?: number;
+  /** "Kampanyalar" modülünü kapatmış ve bu turda atlanan ofis sayısı. */
+  skippedTenants?: number;
   recipientsClaimed: number;
   sent: number;
   blocked: number;
@@ -468,14 +471,16 @@ type CampaignCandidateRow = {
  */
 async function claimAroundInvalidCampaigns(
   admin: ReturnType<typeof createAdminClient>,
+  excludeTenantIds: readonly string[] = [],
 ): Promise<{ claim: unknown; quarantined: string[]; error: string | null }> {
   const quarantined: string[] = [];
-  const { data, error } = await admin
+  let query = admin
     .from("campaigns")
     .select("id, channel, message, whatsapp_template_name, whatsapp_template_language")
-    .in("status", ["sending", "scheduled"])
-    .order("created_at", { ascending: true })
-    .limit(50);
+    .in("status", ["sending", "scheduled"]);
+  // Modül kapısı: "Kampanyalar" kapalı ofislerin kampanyası claim edilmez (silinmez, zamanlanmış kalır).
+  if (excludeTenantIds.length > 0) query = query.not("tenant_id", "in", `(${excludeTenantIds.join(",")})`);
+  const { data, error } = await query.order("created_at", { ascending: true }).limit(50);
   if (error) return { claim: null, quarantined, error: error.code ?? "candidate_query" };
 
   for (const row of (data ?? []) as CampaignCandidateRow[]) {
@@ -517,6 +522,7 @@ export async function runCampaignDeliveryWorker(options?: {
     50,
   );
   const admin = createAdminClient();
+  const skippedTenantIds = tenantsDisabledFor(await getDisabledModulesByTenant(admin), "campaigns");
   const summary: CampaignDeliveryWorkerSummary = {
     campaignsClaimed: 0,
     campaignsCompleted: 0,
@@ -529,14 +535,19 @@ export async function runCampaignDeliveryWorker(options?: {
     retrying: 0,
     deadLettered: 0,
   };
+  if (skippedTenantIds.length > 0) summary.skippedTenants = skippedTenantIds.length;
 
   for (let index = 0; index < campaignLimit; index += 1) {
-    const { data: claimData, error: claimError } = await admin.rpc("claim_campaign_delivery", {
-      p_campaign_id: null,
-      p_tenant_id: null,
-      p_force: false,
-      p_lease_seconds: CAMPAIGN_LEASE_SECONDS,
-    });
+    // Kapalı modüllü ofis varsa genel claim RPC'si onları ayıklayamaz: aday listesi üzerinden tek tek claim edilir.
+    const { data: claimData, error: claimError } =
+      skippedTenantIds.length > 0
+        ? { data: null, error: { code: CHECK_VIOLATION_CODE } }
+        : await admin.rpc("claim_campaign_delivery", {
+            p_campaign_id: null,
+            p_tenant_id: null,
+            p_force: false,
+            p_lease_seconds: CAMPAIGN_LEASE_SECONDS,
+          });
     let claimResult: unknown = claimData;
     if (claimError) {
       // 23514: eski (şablonsuz) WhatsApp kampanyası claim UPDATE'inde kısıta takılıyor.
@@ -544,7 +555,7 @@ export async function runCampaignDeliveryWorker(options?: {
       if (claimError.code !== CHECK_VIOLATION_CODE) {
         throw new Error(`campaign_claim_failed:${claimError.code ?? "unknown"}`);
       }
-      const fallback = await claimAroundInvalidCampaigns(admin);
+      const fallback = await claimAroundInvalidCampaigns(admin, skippedTenantIds);
       summary.quarantinedCampaigns = (summary.quarantinedCampaigns ?? 0) + fallback.quarantined.length;
       if (fallback.quarantined.length > 0 && (summary.failureReasons ?? []).length < 3) {
         summary.failureReasons = [

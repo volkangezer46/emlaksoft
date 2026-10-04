@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { computePresetChanges, MODULE_PRESETS, type ModulePreset } from "@/lib/modules/logic";
+import type { PendingItem } from "@/lib/modules/pending-defs";
 import {
   CORE_AREAS,
   dependentsOf,
@@ -49,12 +50,15 @@ export function ModulesBoard({
   closed,
   locked,
   planLocked,
+  pendingWork,
   canEdit,
 }: {
   cards: ModuleCardData[];
   closed: string[];
   locked: string[];
   planLocked: string[];
+  /** Modül anahtarına göre bekleyen iş satırları (yalnız sayısı 0'dan büyük olanlar). */
+  pendingWork: Record<string, PendingItem[]>;
   canEdit: boolean;
 }) {
   const router = useRouter();
@@ -241,6 +245,23 @@ export function ModulesBoard({
                           Bu modülü kapatırsanız menüden ve aramadan gizlenir, ana ekranda görünmez, otomasyon ve bildirim üretmez.
                           Verileriniz silinmez; istediğiniz zaman yeniden açabilirsiniz.
                         </p>
+                        {(pendingWork[card.key] ?? []).length > 0 ? (
+                          <div className="rounded-[var(--radius-control)] border border-amber-400/40 bg-surface p-2.5">
+                            <p className="font-semibold text-amber-800">Bu modülde bekleyen iş var:</p>
+                            <ul className="mt-1 space-y-0.5">
+                              {(pendingWork[card.key] ?? []).map((item) => (
+                                <li key={item.id}>
+                                  <Link href={item.href} className="font-semibold text-brand-600 hover:underline">
+                                    <span className="numeric">{item.count}</span> {item.label}
+                                  </Link>
+                                </li>
+                              ))}
+                            </ul>
+                            <p className="mt-1 text-text-muted">
+                              Yine de kapatabilirsiniz; kayıtlar silinmez, modülü açınca olduğu gibi döner. Otomatik işlemler (zamanlanmış gönderim, hatırlatma vb.) kapalıyken çalışmaz.
+                            </p>
+                          </div>
+                        ) : null}
                         {dependents.length > 0 ? (
                           <p className="font-semibold text-amber-800">Bunlar da kapanır: {dependents.map(labelOf).join(", ")}.</p>
                         ) : null}

@@ -6,8 +6,7 @@ import { trParts } from "@/lib/clock";
 
 type FooterLink = [label: string, href: string];
 
-function buildColumns(plans: readonly { id: string; name: string }[]): { title: string; links: FooterLink[] }[] {
-  return [
+const BASE_COLUMNS: { title: string; links: FooterLink[] }[] = [
   {
     title: "Ürün",
     links: [
@@ -22,7 +21,8 @@ function buildColumns(plans: readonly { id: string; name: string }[]): { title: 
   },
   {
     title: "Paketler",
-    links: [...plans.map((p): FooterLink => [p.name, `/kayit?plan=${p.id}`]), ["Fiyatları karşılaştır", "/fiyatlar"]],
+    // Paket bağlantıları SiteFooter içinde etkin plan tanımlarından doldurulur.
+    links: [["Fiyatları karşılaştır", "/fiyatlar"]],
   },
   {
     title: "Kaynaklar",
@@ -53,11 +53,15 @@ function buildColumns(plans: readonly { id: string; name: string }[]): { title: 
       ["destek@emlaksoft.com.tr", "mailto:destek@emlaksoft.com.tr"],
     ],
   },
-  ];
-}
+];
 
 export async function SiteFooter() {
-  const columns = buildColumns(await getPublicPlanDefinitions());
+  const plans = await getPublicPlanDefinitions();
+  const columns = BASE_COLUMNS.map((col) =>
+    col.title === "Paketler"
+      ? { ...col, links: [...plans.map((p): FooterLink => [p.name, `/kayit?plan=${p.id}`]), ...col.links] }
+      : col,
+  );
   return (
     <footer className="mk-foot">
       <div className="mk-wrap" style={{ paddingBlock: "clamp(3rem, 2rem + 4vw, 5rem)" }}>
