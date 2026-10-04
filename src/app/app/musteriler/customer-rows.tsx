@@ -81,7 +81,7 @@ function HeatCell({ c }: { c: CustomerVM }) {
       ) : null}
       {c.lead ? (
         <span
-          title={`Lead skoru: ${c.lead.score}`}
+          title={`Aday skoru: ${c.lead.score}`}
           className={`numeric rounded-full px-1.5 text-xs font-semibold ${c.lead.hot ? "tone-warning" : "bg-canvas text-text-faint"}`}
         >
           {c.lead.score}

@@ -10,6 +10,12 @@ import { buildComparison, buildFaq, trialPhrase, yearlyDiscountPercent } from "@
 import { yearlyOffer } from "@/lib/marketing-copy";
 
 describe("varsayılan katalog: panel kaydı yoksa önerilen katalog", () => {
+  it("kodda mekanizması olmayan insan hizmeti vaatleri varsayılan özellik listelerinde yok", () => {
+    const defs = applyPlanOverrides(resolveCatalogSettings(null).overrides);
+    const all = defs.flatMap((p) => p.features).join(" | ");
+    expect(all).not.toMatch(/öncelikli destek|özel onboarding|destek sla/i);
+  });
+
   it("ham kayıt yoksa/boşsa önerilen katalog geçerlidir", () => {
     for (const raw of [null, undefined, "", "   "]) {
       expect(resolveCatalogSettings(raw).overrides).toEqual(RECOMMENDED_CATALOG_OVERRIDES);

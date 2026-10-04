@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  APPROVAL_PENDING_MESSAGE,
   approvalCovers,
   evaluateApprovalRule,
   requestApprovalIfNeeded,
@@ -68,7 +69,7 @@ function fakeStore(
   const calls = { created: 0, consumed: 0 };
   const store: ApprovalGateStore = {
     loadRules: async () => over.rules ?? defaultApprovalRules(),
-    isManager: async () => over.manager ?? false,
+    isApprovalExempt: async () => over.manager ?? false,
     findOpen: async () => over.open ?? null,
     isConsumed: async () => over.consumed ?? false,
     consume: async () => {
@@ -100,9 +101,16 @@ describe("requestApprovalIfNeeded", () => {
     const r = await requestApprovalIfNeeded("t", "u", "price_drop", BIG, store, NOW);
     expect(r.status).toBe("requested");
     expect(calls.created).toBe(1);
+    expect(r.status === "requested" && r.message).toBe(APPROVAL_PENDING_MESSAGE);
   });
 
-  it("yönetici kendi işleminde beklemez", async () => {
+  it("bekleme mesaji hata degil durum bilgisi: tek sabit, /app/onaylar yolu icerir", () => {
+    expect(APPROVAL_PENDING_MESSAGE).toContain("yönetici onayı bekliyor; talebiniz iletildi");
+    expect(APPROVAL_PENDING_MESSAGE).toContain("Onaylanınca aynı işlemi tekrar yapabilirsiniz");
+    expect(APPROVAL_PENDING_MESSAGE).toContain("/app/onaylar");
+  });
+
+  it("muaf aktör (owner/gm) kendi işleminde beklemez", async () => {
     const { store, calls } = fakeStore({ rules: RULES, manager: true });
     expect((await requestApprovalIfNeeded("t", "u", "price_drop", BIG, store, NOW)).status).toBe("not_required");
     expect(calls.created).toBe(0);
@@ -112,6 +120,7 @@ describe("requestApprovalIfNeeded", () => {
     const { store, calls } = fakeStore({ rules: RULES, open: { id: "a1", status: "bekliyor", decidedAt: null } });
     const r = await requestApprovalIfNeeded("t", "u", "price_drop", BIG, store, NOW);
     expect(r.status).toBe("pending");
+    expect(r.status === "pending" && r.message).toBe(APPROVAL_PENDING_MESSAGE);
     expect(calls.created).toBe(0);
   });
 

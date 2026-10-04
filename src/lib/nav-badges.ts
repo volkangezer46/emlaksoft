@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { now } from "@/lib/clock";
-import { isManagerRole } from "@/lib/approvals";
+import { isApprovalDeciderRole } from "@/lib/approvals";
 import type { AppModule } from "@/lib/permissions";
 import { getPlan } from "@/lib/billing/plans";
 
@@ -72,7 +72,7 @@ export async function getNavBadges({ supabase, tenantId, userId, role, accessibl
     );
   }
 
-  if (accessible.includes("commissions") && isManagerRole(role)) {
+  if (accessible.includes("commissions") && isApprovalDeciderRole(role)) {
     jobs.push(
       (async () => {
         const { count, error } = await supabase

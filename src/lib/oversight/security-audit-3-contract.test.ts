@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadApprovalRules } from "@/lib/oversight/store";
 import { isSurveyTaskLinkExpired, SURVEY_TASK_LINK_VALID_DAYS } from "@/lib/surveys/task-expiry";
 import { requesterMayCloseOffice } from "@/lib/admin/office-closure";
-import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
+import { isApprovalExemptRole } from "@/lib/team/assignable-roles";
 
 /**
  * Guvenlik denetimi 3 — uygulama katmani duzeltmelerinin sozlesme testleri.
@@ -49,16 +49,16 @@ describe("#3 atomik tuketim (kaynak)", () => {
 });
 
 describe("#5 yonetici muafiyeti dar", () => {
-  it("team_lead muaf degil; owner/gm/branch_manager muaf", () => {
-    expect(hasOfficeWideDataScope("team_lead")).toBe(false);
-    expect(hasOfficeWideDataScope("advisor")).toBe(false);
-    for (const r of ["owner", "gm", "branch_manager"]) expect(hasOfficeWideDataScope(r)).toBe(true);
+  it("yalniz owner/gm muaf; branch_manager ve team_lead talep acar", () => {
+    for (const r of ["branch_manager", "team_lead", "advisor", "accounting", "readonly"]) expect(isApprovalExemptRole(r)).toBe(false);
+    for (const r of ["owner", "gm"]) expect(isApprovalExemptRole(r)).toBe(true);
   });
 
-  it("depo muafiyeti hasOfficeWideDataScope ile verir, MANAGEMENT_TIER ile degil", () => {
+  it("depo muafiyeti isApprovalExemptRole ile verir, MANAGEMENT_TIER / ofis geneli kapsam ile degil", () => {
     const s = src("src/lib/oversight/approval-store.ts");
-    expect(s).toContain("return hasOfficeWideDataScope(data?.role)");
-    expect(s).not.toMatch(/isManagerRole/);
+    expect(s).toContain("return isApprovalExemptRole(data?.role)");
+    expect(s).not.toMatch(/hasOfficeWideDataScope/);
+    expect(s).not.toMatch(/isApprovalDeciderRole/);
     expect(s).toMatch(/YALNIZ UYGULAMA KATMANIDIR/);
   });
 

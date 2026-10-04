@@ -15,8 +15,6 @@ const ALLOW: Record<string, string> = {
   // /admin satış CRM'i platform satış adayını "lead" diye anar (ofis kullanıcısına görünmez).
   "src/app/admin/satis": "platform satış CRM'i (yalnız /admin)",
   "src/app/actions/platform-sales.ts": "platform satış CRM'i mesajları (yalnız /admin)",
-  // Müşteriler paketi (başka ajanın sahası): "Lead skoru" metinleri o paketin birleşiminden sonra "Aday skoru" olacak.
-  "src/app/app/musteriler": "musteriler paketi sahibi düzeltecek (BIRLESIK_YOL_HARITASI §5.1)",
   // Sözlük ve test dosyaları yasaklı terimi tanımlamak/anlatmak için anar.
   "src/lib/terminology.ts": "sözlük tanımı",
   "src/lib/terminology-contract.test.ts": "sözleşme testi",
