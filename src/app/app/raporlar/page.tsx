@@ -265,7 +265,7 @@ export default async function ReportsPage() {
           </details>
         }
       />
-      <div className="stagger-grid mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="list-stagger mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: "Aylık komisyon", value: money(commissionTotal), icon: ICONS.komisyon, tone: "text-amber-700", href: "/app/komisyon", trend: commissionMoM, trendTitle: "Geçen aya göre" },
           { label: "Tahmini kayıp", value: money(lost), icon: ICONS.alarm, tone: "text-danger-500", href: "/app/kayip-kacak", trend: lostMoM, trendTitle: "Geçen aya göre" },

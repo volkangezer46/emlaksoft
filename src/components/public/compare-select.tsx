@@ -111,10 +111,11 @@ export function CompareToggle({
         e.stopPropagation();
         toggleCompare(item);
       }}
-      className={`focus-ring press relative z-10 grid h-9 w-9 place-items-center rounded-full border shadow-[var(--shadow-sm)] backdrop-blur transition disabled:cursor-not-allowed disabled:opacity-50 ${
+      // Cam bütçesi: her ilan kartında tekrar eder; cam yok, zemin neredeyse opak.
+      className={`focus-ring press relative z-10 grid h-9 w-9 place-items-center rounded-full border shadow-[var(--shadow-sm)] transition disabled:cursor-not-allowed disabled:opacity-50 ${
         active
           ? "border-mint-500/50 bg-mint-500 text-white"
-          : "border-white/40 bg-white/85 text-ink-950/60 hover:text-mint-600"
+          : "border-white/40 bg-white/95 text-ink-950/60 hover:text-mint-600"
       }`}
     >
       {active ? <Check className="h-4 w-4" /> : <Scale className="h-4 w-4" />}
@@ -138,7 +139,7 @@ export function CompareBar() {
     <>
       {/* Mobilde panel alt gezinme çubuğunun (h~64px) üstünde durur */}
       <div className="fixed inset-x-0 bottom-20 z-[70] flex justify-center px-4 pb-[env(safe-area-inset-bottom)] md:bottom-4 md:pb-0">
-        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-ink-950/95 py-2 pl-4 pr-2 text-white shadow-xl backdrop-blur">
+        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-ink-950 py-2 pl-4 pr-2 text-white shadow-xl">
           <span className="text-xs font-semibold text-white/70">
             {ready ? `${items.length} ilan seçili` : "Karşılaştırmak için en az 2 ilan seçin"}
           </span>

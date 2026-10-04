@@ -1,5 +1,17 @@
 ﻿import { describe, expect, it } from "vitest";
-import { APP_ACTIONS, getAppActions, getAppGoItems, matchesQuery, mergeRecent, parseRecents } from "./palette-core";
+import { ACCENTS } from "./theme";
+import { UI_FONTS } from "./ui-prefs";
+import {
+  APP_ACTIONS,
+  APPEARANCE_COMMANDS,
+  getAppActions,
+  getAppearanceCommands,
+  getAppGoItems,
+  matchesQuery,
+  mergeRecent,
+  nextUiPrefs,
+  parseRecents,
+} from "./palette-core";
 
 describe("palette-core", () => {
   it("Türkçe duyarlı süzgeç", () => {
@@ -69,6 +81,43 @@ describe("palette-core: yeni eylemleri", () => {
   it("paket kilitli sayfalar Eylemler'den elenir", () => {
     const all = ["customers", "properties"] as const;
     expect(getAppActions(all, "", ["/app/portfoyler"]).map((a) => a.href)).toEqual(["/app/hizli", "/app/musteriler/yeni"]);
+  });
+
+  describe("görünüm komutları", () => {
+    it("her vurgu teması ve yazı boyutu için komut üretilir (tek kaynak)", () => {
+      const ids = APPEARANCE_COMMANDS.map((c) => c.id);
+      for (const a of ACCENTS) expect(ids).toContain(`vurgu:${a.value}`);
+      for (const f of UI_FONTS) expect(ids).toContain(`yazi:${f.value}`);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it("2 karakterden kısa sorguda liste açılmaz", () => {
+      expect(getAppearanceCommands("k", { ui: null })).toEqual([]);
+    });
+
+    it("'koyu tema' ve vurgu aramaları, seçili olanı işaretler", () => {
+      const dark = getAppearanceCommands("koyu tema", { theme: "dark", ui: null });
+      expect(dark.map((c) => c.id)).toEqual(["tema:dark"]);
+      expect(dark[0]!.current).toBe(true);
+      const bordo = getAppearanceCommands("bordo", { accent: "ocean", ui: null });
+      expect(bordo.map((c) => c.id)).toEqual(["vurgu:burgundy"]);
+      expect(bordo[0]!.current).toBe(false);
+    });
+
+    it("yazı boyutu ve sade görünüm çerez adı yoksa gizlenir; sade yalnız uygulanabilir yönüyle", () => {
+      expect(getAppearanceCommands("yazı boyutu", { ui: null })).toEqual([]);
+      const ui = { simple: true, font: "large" } as const;
+      expect(getAppearanceCommands("yazı boyutu", { ui }).length).toBe(UI_FONTS.length);
+      expect(getAppearanceCommands("sade görünüm", { ui }).map((c) => c.id)).toEqual(["sade:off"]);
+      expect(getAppearanceCommands("sade görünüm", { ui: { ...ui, simple: false } }).map((c) => c.id)).toEqual(["sade:on"]);
+    });
+
+    it("nextUiPrefs yalnız ilgili alanı değiştirir", () => {
+      const cur = { simple: true, font: "large" } as const;
+      expect(nextUiPrefs(cur, { kind: "font", value: "xlarge" })).toEqual({ simple: true, font: "xlarge" });
+      expect(nextUiPrefs(cur, { kind: "simple", value: false })).toEqual({ simple: false, font: "large" });
+      expect(nextUiPrefs(cur, { kind: "theme", value: "dark" })).toEqual(cur);
+    });
   });
 });
 
