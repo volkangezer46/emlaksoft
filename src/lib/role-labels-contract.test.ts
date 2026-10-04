@@ -44,8 +44,8 @@ describe("rol etiketi tek kaynak", () => {
         .forEach((line, i) => {
           if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
           // yalnız tanım biçimleri: anahtar: "Etiket" ya da label: "Etiket"
-          for (const l of labels) {
-            if (new RegExp(`(?:[:=]\\s*|label:\\s*)"${l}"`).test(line)) hits.push(`${rel}:${i + 1}  ${line.trim().slice(0, 90)}`);
+          for (const re of res) {
+            if (re.test(line)) hits.push(`${rel}:${i + 1}  ${line.trim().slice(0, 90)}`);
           }
         });
     }

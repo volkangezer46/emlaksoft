@@ -32,7 +32,7 @@ Not: eski belgelerdeki "113 rota, 170 birim + 28 E2E test, 15 cron" gibi sayıla
 
 ## Kapılar (son koşum durumu)
 
-Bu belge yazılırken `type-check`, `lint`, `test`, `build` çalıştırılmadı — **doğrulanmadı**. Deploy öncesi `docs/DEPLOY.md` §1 kapıları koşulmalıdır.
+Dalga 1 tutarlılık paketi dalında (2026-10-04) koşulan: `tsc --noEmit` temiz; dokunulan dosyalarda `eslint` temiz; `vitest run` 273 dosya / 2824 test yeşil; `check:links` ve `audit:actions` temiz; `next build` (preview ortam değişkenleriyle) başarılı. Bu sonuçlar o dal içindir; main'e birleşimden sonra ve deploy öncesi `docs/DEPLOY.md` §1 kapıları yeniden koşulmalıdır. `check:migrations -- --database` ve canlı doğrulama bu turda koşulmadı.
 
 ## Son 7 günün özeti (2026-09-25 → 2026-10-02; git log, hepsi 2026-10-02 tarihli commit)
 
