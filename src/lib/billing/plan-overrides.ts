@@ -1,4 +1,12 @@
-import { BUSINESS_PLAN_TEMPLATE, PLANS, type PlanDef, type PlanId, type PlanLimits } from "@/lib/billing/plans";
+import {
+  BUSINESS_PLAN_TEMPLATE,
+  PLANS,
+  type PlanDef,
+  type PlanId,
+  type PlanLimits,
+  type SeatRounding,
+  type SeatTier,
+} from "@/lib/billing/plans";
 
 /**
  * Panelden düzenlenen paket tanımlarının saf (sunucu bağımsız) katmanı: doğrulama,
@@ -16,6 +24,8 @@ export const PLAN_FIELD_LIMITS = {
   priceMax: 1_000_000,
   limitMax: 10_000_000,
   quotaMax: 100_000_000,
+  seatTiersMax: 12,
+  maxSeatsMax: 100_000,
   orderMax: 1000,
   campaignNameMax: 60,
   trialDaysMin: 1,
@@ -35,6 +45,9 @@ export type PlanOverride = {
   limits?: Partial<PlanLimits>;
   yearlyPaidMonths?: number;
   extraSeatMonthlyTry?: number | null;
+  extraSeatTiers?: SeatTier[] | null;
+  maxSeats?: number | null;
+  seatRounding?: SeatRounding | null;
   aiCreditsMonthly?: number | null;
   valuationReportsMonthly?: number | null;
   customPricing?: boolean;
@@ -82,6 +95,31 @@ function cleanNullableInt(v: unknown, min: number, max: number): number | null |
   return isInt(v, min, max) ? v : undefined;
 }
 
+/**
+ * Kademe dizisinin YAPISAL temizliği (tam sayı, sıra, üst sınır). Anlamsal doğrulama (boşluk, monotonluk,
+ * yuvarlama) seat-pricing.ts `validateSeatTiers` işidir. Yapısal olarak bozuksa undefined döner.
+ * null = kademeleri temizle.
+ */
+export function sanitizeSeatTiers(raw: unknown): SeatTier[] | null | undefined {
+  if (raw === null) return null;
+  if (!Array.isArray(raw)) return undefined;
+  if (raw.length === 0) return null;
+  if (raw.length > PLAN_FIELD_LIMITS.seatTiersMax) return undefined;
+  const out: SeatTier[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") return undefined;
+    const t = item as Record<string, unknown>;
+    if (!isInt(t.fromSeat, 1, PLAN_FIELD_LIMITS.maxSeatsMax)) return undefined;
+    const to = t.toSeat === null || t.toSeat === undefined ? null : t.toSeat;
+    if (to !== null && !isInt(to, 1, PLAN_FIELD_LIMITS.maxSeatsMax)) return undefined;
+    if (!isInt(t.monthlyTry, 1, PLAN_FIELD_LIMITS.priceMax)) return undefined;
+    out.push({ fromSeat: t.fromSeat, toSeat: to, monthlyTry: t.monthlyTry });
+  }
+  return out;
+}
+
+const SEAT_ROUNDINGS: readonly SeatRounding[] = ["none", "x9", "x0"];
+
 /** Güvensiz girdiyi (JSON/form) doğrulanmış tek paket düzenlemesine çevirir; geçersiz alanı sessizce atar. */
 export function sanitizePlanOverride(raw: unknown): PlanOverride {
   if (!raw || typeof raw !== "object") return {};
@@ -101,6 +139,14 @@ export function sanitizePlanOverride(raw: unknown): PlanOverride {
   if (isInt(r.order, 0, PLAN_FIELD_LIMITS.orderMax)) out.order = r.order;
   const seatPrice = cleanNullableInt(r.extraSeatMonthlyTry, 1, PLAN_FIELD_LIMITS.priceMax);
   if (seatPrice !== undefined) out.extraSeatMonthlyTry = seatPrice;
+  const tiers = sanitizeSeatTiers(r.extraSeatTiers);
+  if (tiers !== undefined) out.extraSeatTiers = tiers;
+  const maxSeats = cleanNullableInt(r.maxSeats, 1, PLAN_FIELD_LIMITS.maxSeatsMax);
+  if (maxSeats !== undefined) out.maxSeats = maxSeats;
+  if (r.seatRounding === null) out.seatRounding = null;
+  else if (typeof r.seatRounding === "string" && (SEAT_ROUNDINGS as readonly string[]).includes(r.seatRounding)) {
+    out.seatRounding = r.seatRounding as SeatRounding;
+  }
   const campaignPrice = cleanNullableInt(r.campaignMonthlyTry, 1, PLAN_FIELD_LIMITS.priceMax);
   if (campaignPrice !== undefined) out.campaignMonthlyTry = campaignPrice;
   const ai = cleanNullableInt(r.aiCreditsMonthly, 0, PLAN_FIELD_LIMITS.quotaMax);
@@ -199,6 +245,12 @@ export function applyPlanOverrides(overrides: PlanOverrides, base: readonly Plan
     if (o.yearlyPaidMonths !== undefined) next.yearlyPaidMonths = o.yearlyPaidMonths;
     const seat = nullable(o.extraSeatMonthlyTry, plan.extraSeatMonthlyTry);
     if (seat !== undefined) next.extraSeatMonthlyTry = seat;
+    const tiers = nullable(o.extraSeatTiers, plan.extraSeatTiers);
+    if (tiers !== undefined) next.extraSeatTiers = tiers;
+    const maxSeats = nullable(o.maxSeats, plan.maxSeats);
+    if (maxSeats !== undefined) next.maxSeats = maxSeats;
+    const rounding = nullable(o.seatRounding, plan.seatRounding);
+    if (rounding !== undefined) next.seatRounding = rounding;
     const ai = nullable(o.aiCreditsMonthly, plan.aiCreditsMonthly);
     if (ai !== undefined) next.aiCreditsMonthly = ai;
     const valuation = nullable(o.valuationReportsMonthly, plan.valuationReportsMonthly);
@@ -238,6 +290,11 @@ export function diffAgainstDefault(plan: PlanDef, edited: PlanDef): PlanOverride
   if (JSON.stringify(edited.features) !== JSON.stringify(plan.features)) o.features = edited.features;
   if (edited.yearlyPaidMonths !== plan.yearlyPaidMonths) o.yearlyPaidMonths = edited.yearlyPaidMonths;
   if ((edited.extraSeatMonthlyTry ?? null) !== (plan.extraSeatMonthlyTry ?? null)) o.extraSeatMonthlyTry = edited.extraSeatMonthlyTry ?? null;
+  if (JSON.stringify(edited.extraSeatTiers ?? null) !== JSON.stringify(plan.extraSeatTiers ?? null)) {
+    o.extraSeatTiers = edited.extraSeatTiers ?? null;
+  }
+  if ((edited.maxSeats ?? null) !== (plan.maxSeats ?? null)) o.maxSeats = edited.maxSeats ?? null;
+  if ((edited.seatRounding ?? null) !== (plan.seatRounding ?? null)) o.seatRounding = edited.seatRounding ?? null;
   if ((edited.aiCreditsMonthly ?? null) !== (plan.aiCreditsMonthly ?? null)) o.aiCreditsMonthly = edited.aiCreditsMonthly ?? null;
   if ((edited.valuationReportsMonthly ?? null) !== (plan.valuationReportsMonthly ?? null)) {
     o.valuationReportsMonthly = edited.valuationReportsMonthly ?? null;
@@ -264,10 +321,25 @@ export function diffAgainstDefault(plan: PlanDef, edited: PlanDef): PlanOverride
  */
 export const RECOMMENDED_CATALOG_OVERRIDES: PlanOverrides = {
   advisor: { monthlyTry: 749 },
-  office: { extraSeatMonthlyTry: 399 },
+  office: {
+    extraSeatMonthlyTry: 399,
+    extraSeatTiers: [
+      { fromSeat: 1, toSeat: 5, monthlyTry: 399 },
+      { fromSeat: 6, toSeat: 15, monthlyTry: 349 },
+      { fromSeat: 16, toSeat: null, monthlyTry: 299 },
+    ],
+    maxSeats: 20,
+    seatRounding: "x9",
+  },
   professional: {
     monthlyTry: 4990,
     extraSeatMonthlyTry: 349,
+    extraSeatTiers: [
+      { fromSeat: 1, toSeat: 10, monthlyTry: 349 },
+      { fromSeat: 11, toSeat: null, monthlyTry: 299 },
+    ],
+    maxSeats: 40,
+    seatRounding: "x9",
     limits: { seats: 15 },
     features: [
       "15 kullanıcıya kadar · 10 şube",

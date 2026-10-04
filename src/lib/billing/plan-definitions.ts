@@ -34,7 +34,7 @@ const loadCatalog = unstable_cache(
     const raw = await getPlatformSetting(PLAN_DEFINITIONS_SETTING_KEY);
     return parsePlanCatalogSettings(raw);
   },
-  ["plan-catalog-v2"],
+  ["plan-catalog-v3"],
   { tags: [PLAN_DEFINITIONS_TAG], revalidate: 300 },
 );
 
