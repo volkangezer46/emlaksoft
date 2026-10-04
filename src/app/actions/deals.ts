@@ -332,6 +332,82 @@ export async function updateDeal(formData: FormData): Promise<DealResult> {
   return { ok: true, dealId: id };
 }
 
+/**
+ * Anlaşmaya portföy / müşteri sonradan bağlama (P0-3). Kazanma ikisini şart koştuğu için
+ * portföysüz açılan anlaşma buradan tamamlanır. Alan formda yoksa dokunulmaz; boş değer bağı
+ * kaldırır. Kazanılmış anlaşmada bağ değişmez (komisyon/portföy durumu kapanışa bağlıdır).
+ */
+export async function updateDealLinks(formData: FormData): Promise<DealResult> {
+  const gate = await requirePermission("commissions", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const id = String(formData.get("deal_id") ?? "").trim();
+  if (!id) return { error: "Anlaşma bulunamadı." };
+  const hasProperty = formData.has("property_id");
+  const hasCustomer = formData.has("customer_id");
+  if (!hasProperty && !hasCustomer) return { error: "Bağlanacak portföy veya müşteri seçin." };
+  const propertyId = String(formData.get("property_id") ?? "").trim();
+  const customerId = String(formData.get("customer_id") ?? "").trim();
+
+  const references = await validateTenantReferences(gate.tenantId, {
+    propertyId: propertyId || null,
+    customerId: customerId || null,
+  });
+  if (!references.ok) return { error: references.error };
+
+  const supabase = await createClient();
+  const { data: current, error: currentError } = await supabase
+    .from("deals")
+    .select("id, stage, property_id, customer_id")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (currentError || !current) return { error: "Anlaşma bulunamadı." };
+  if (current.stage === "won") {
+    return { error: "Kazanılmış anlaşmanın portföy/müşteri bağı değiştirilemez; önce kazanmayı geri alın." };
+  }
+
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (hasProperty) patch.property_id = propertyId || null;
+  if (hasCustomer) patch.customer_id = customerId || null;
+  if (
+    (!hasProperty || (current.property_id ?? "") === propertyId) &&
+    (!hasCustomer || (current.customer_id ?? "") === customerId)
+  ) {
+    return { ok: true, dealId: id };
+  }
+
+  const { data: updated, error } = await supabase
+    .from("deals")
+    .update(patch)
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .eq("stage", current.stage)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("updateDealLinks", error);
+    return { error: "Bağlantılar güncellenemedi." };
+  }
+  if (!updated) return { error: "Anlaşma aşaması başka bir işlemde değişti. Sayfayı yenileyin." };
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "deal.update_links",
+    entityType: "deal",
+    entityId: id,
+    oldValue: { property_id: current.property_id, customer_id: current.customer_id },
+    newValue: patch,
+  });
+
+  revalidatePath("/app/anlasmalar");
+  revalidatePath(`/app/anlasmalar/${id}`);
+  revalidatePath("/app/komisyon");
+  revalidateTenantData(gate.tenantId);
+  return { ok: true, dealId: id };
+}
+
 // ============================================================
 // İşlem dosyası — kapora + masraf kalemleri (deal_costs)
 // ============================================================

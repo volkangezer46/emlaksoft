@@ -41,6 +41,7 @@ import {
   NotesSkeleton,
 } from "./sections";
 import { KapanisPanel } from "./kapanis-panel";
+import { DealLinkPanel } from "./deal-link-panel";
 /*
  * Anket üretme + link kopyalama client bileşenleri memnuniyet raporunda zaten
  * var; YENİDEN YAZILMADI, aynen import edildi (o dosyaya dokunulmadı). Aksi
@@ -547,6 +548,14 @@ export default async function DealDetailPage({
                         Bu anlaşmaya portföy bağlanmamış.
                       </p>
                     )}
+                    {!kazanildi && (perms.commissions ?? []).includes("edit") ? (
+                      <DealLinkPanel
+                        dealId={deal.id}
+                        property={property ? { id: property.id, label: property.title || property.property_code } : null}
+                        customer={customer ? { id: customer.id, label: customer.full_name } : null}
+                        focus={!property ? "property" : "customer"}
+                      />
+                    ) : null}
                   </section>
 
                   {/* Bağlı müşteri — tıklanabilir */}
