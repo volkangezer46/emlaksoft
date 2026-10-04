@@ -299,6 +299,65 @@ export async function listOpenHouseVisitors(openHouseId: string) {
 }
 
 /** Tek bir acik ev kaydi (detay sayfasi icin). */
+/** Açık ev etkinliğini düzenler (tarih/saat, süre, konum, kapasite, not). Biten/iptal edilen düzenlenemez. */
+export async function updateOpenHouse(
+  openHouseId: string,
+  fd: FormData,
+): Promise<OpenHouseResult> {
+  const gate = await requirePermission("open_house", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const scheduledAt = String(fd.get("scheduled_at") ?? "").trim();
+  const durationMin = parseInt(String(fd.get("duration_min") ?? "120"));
+  const location = String(fd.get("location") ?? "").trim() || null;
+  const notes = String(fd.get("notes") ?? "").trim() || null;
+  const maxVisitors = parseInt(String(fd.get("max_visitors") ?? "0")) || null;
+
+  if (!scheduledAt) return { error: "Tarih/saat zorunludur." };
+  const scheduledDate = parseTrLocalDateTime(scheduledAt);
+  if (!scheduledDate) return { error: "Geçerli bir tarih/saat girin." };
+  if (!Number.isInteger(durationMin) || durationMin < 15 || durationMin > 1_440) {
+    return { error: "Süre 15-1440 dakika arasında olmalıdır." };
+  }
+  if (maxVisitors != null && (!Number.isInteger(maxVisitors) || maxVisitors < 1 || maxVisitors > 10_000)) {
+    return { error: "Ziyaretçi kapasitesi 1-10000 arasında olmalıdır." };
+  }
+  if (location && location.length > 500) return { error: "Konum en fazla 500 karakter olabilir." };
+  if (notes && notes.length > 5000) return { error: "Not en fazla 5000 karakter olabilir." };
+
+  const supabase = await createClient();
+  const { data: current } = await supabase
+    .from("open_houses")
+    .select("status, visitor_count")
+    .eq("id", openHouseId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!current) return { error: "Açık ev etkinliği bulunamadı." };
+  if (current.status === "completed" || current.status === "cancelled") {
+    return { error: "Tamamlanan ya da iptal edilen etkinlik düzenlenemez." };
+  }
+  if (maxVisitors != null && (current.visitor_count ?? 0) > maxVisitors) {
+    return { error: `Kapasite mevcut ziyaretçi sayısından (${current.visitor_count}) küçük olamaz.` };
+  }
+
+  const { error } = await supabase
+    .from("open_houses")
+    .update({
+      scheduled_at: scheduledDate.toISOString(),
+      duration_min: durationMin,
+      location,
+      notes,
+      max_visitors: maxVisitors,
+    })
+    .eq("id", openHouseId)
+    .eq("tenant_id", gate.tenantId);
+  if (error) return { error: "Açık ev güncellenemedi." };
+
+  revalidatePath("/app/acik-ev");
+  revalidatePath(`/app/acik-ev/${openHouseId}`);
+  return { ok: true, id: openHouseId };
+}
+
 export async function getOpenHouse(openHouseId: string) {
   const gate = await requirePermission("open_house", "view");
   if (!gate.ok) return null;
