@@ -19,6 +19,8 @@ import { PLANS, getPlan, planAmountTry, planLabel, type BillingCycle } from "@/l
 import { isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { CheckoutButton } from "./checkout-button";
+import { CancelPanel } from "./cancel-panel";
+import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { HelpTip } from "@/components/ui/help-tip";
@@ -37,10 +39,11 @@ const statusLabel: Record<string, string> = {
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ paid?: string; demo?: string; plan?: string; error?: string; cycle?: string }>;
+  searchParams: Promise<{ paid?: string; demo?: string; plan?: string; error?: string; cycle?: string; sekme?: string }>;
 }) {
-  await requireModulePage("billing");
+  const auth = await requireModulePage("billing");
   const sp = await searchParams;
+  const active = resolveTab(sp, ["plan", "faturalar", "iptal"], "plan");
   const cycle = (sp.cycle === "yearly" ? "yearly" : "monthly") as BillingCycle;
   const supabase = await createClient();
   const configured = isIyzicoConfigured();
@@ -70,11 +73,11 @@ export default async function BillingPage({
     tenantId
       ? supabase
           .from("invoices")
-          .select("id, invoice_no, status, total_try, paid_at, created_at")
+          .select("id, invoice_no, status, total_try, paid_at, created_at, period_start, period_end")
           .eq("tenant_id", tenantId)
           .in("status", ["open", "paid", "void", "uncollectible"])
           .order("created_at", { ascending: false })
-          .limit(8)
+          .limit(active === "faturalar" ? 50 : 8)
       : Promise.resolve({ data: [] }),
     tenantId
       ? supabase
@@ -94,6 +97,26 @@ export default async function BillingPage({
   ]);
 
   const currentPlan = sub?.plan ?? tenant?.plan ?? "office";
+
+  // Dönem sonu iptal (K5): kolonlar henüz yoksa sorgu hata verir ve iptal sekmesi gizlenir.
+  const { data: cancelRow, error: cancelColError } = tenantId
+    ? await supabase
+        .from("subscriptions")
+        .select("cancel_at_period_end")
+        .eq("tenant_id", tenantId)
+        .maybeSingle()
+    : { data: null, error: { message: "tenant yok" } };
+  const cancelSupported = !cancelColError;
+  const pendingCancel = Boolean(cancelRow?.cancel_at_period_end);
+  const periodEndLabel = sub?.current_period_end
+    ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date(sub.current_period_end))
+    : null;
+  const canCancel = auth.role === "owner" || auth.role === "gm";
+  const tabs: DetailTabDef[] = [
+    { id: "plan", label: "Plan ve kullanım" },
+    { id: "faturalar", label: "Faturalar" },
+    { id: "iptal", label: "İptal", hidden: !cancelSupported },
+  ];
 
   const currentPlanDef = getPlan(currentPlan);
   const usage = [
@@ -155,6 +178,46 @@ export default async function BillingPage({
         </div>
       ) : null}
 
+      {pendingCancel && cancelSupported ? (
+        <Link
+          href="/app/abonelik?sekme=iptal"
+          className="block rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm font-medium text-amber-700"
+        >
+          İptal talebiniz var: aboneliğiniz{periodEndLabel ? ` ${periodEndLabel} tarihinde` : " dönem sonunda"} sona erecek. Ayrıntı ve geri alma için tıklayın.
+        </Link>
+      ) : null}
+
+      {/* Limit uyarıları: %80 ve üzeri kullanım, ilgili modüle götürür */}
+      {usage
+        .filter((u) => u.limit && u.value / u.limit >= 0.8)
+        .map((u) => (
+          <Link
+            key={u.label}
+            href={u.href}
+            className={`block rounded-[var(--radius-card)] border px-4 py-3 text-sm font-medium ${
+              u.value >= (u.limit ?? 0)
+                ? "border-danger-500/30 bg-danger-500/10 text-danger-600"
+                : "border-amber-400/40 bg-amber-400/10 text-amber-700"
+            }`}
+          >
+            {u.label}: {u.value}/{u.limit}{" "}
+            {u.value >= (u.limit ?? 0) ? "— paket limiti doldu, üst pakete geçin." : "— limite yaklaşıyorsunuz."}
+          </Link>
+        ))}
+
+      <DetailTabs basePath="/app/abonelik" tabs={tabs} active={active} label="Abonelik sekmeleri" />
+
+      {active === "iptal" && cancelSupported ? (
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <h2 className="font-display font-bold text-ink-950">Aboneliği iptal et</h2>
+          <div className="mt-3">
+            <CancelPanel canCancel={canCancel} pendingCancel={pendingCancel} endsAtLabel={periodEndLabel} />
+          </div>
+        </section>
+      ) : null}
+
+      {active === "plan" ? (
+      <>
       {/* Kullanım göstergeleri — gerçek kayıt sayıları; kartlar ilgili modüle gider */}
       <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -273,7 +336,11 @@ export default async function BillingPage({
         })}
       </div>
 
+      </>
+      ) : null}
+
       {/* Fatura geçmişi — okunabilir tablo düzeni (mobilde yatay kaydırma) */}
+      {active === "faturalar" ? (
       <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -300,12 +367,13 @@ export default async function BillingPage({
                   <TH>Ödeme tarihi</TH>
                   <TH>Durum</TH>
                   <TH align="right">Tutar</TH>
+                  <TH align="right">Detay</TH>
                 </TR>
               </THead>
               <TBody>
                 {(invoices ?? []).map((inv) => (
                   <TR key={inv.id}>
-                    <TD className="font-semibold text-ink-950">{inv.invoice_no}</TD>
+                    <TD className="font-semibold text-ink-950"><Link href={`/app/abonelik/fatura/${inv.id}`} className="hover:text-brand-600 hover:underline">{inv.invoice_no}</Link></TD>
                     <TD className="text-text-muted">
                       {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(inv.created_at))}
                     </TD>
@@ -320,11 +388,16 @@ export default async function BillingPage({
                           inv.status === "paid" ? "bg-mint-500/10 text-mint-600" : "bg-amber-400/15 text-amber-600"
                         }`}
                       >
-                        {inv.status === "paid" ? "Ödendi" : inv.status === "pending" ? "Bekliyor" : inv.status}
+                        {{ paid: "Ödendi", open: "Ödeme bekliyor", void: "İptal", uncollectible: "Tahsil edilemedi" }[inv.status as string] ?? inv.status}
                       </span>
                     </TD>
                     <TD align="right" className="numeric font-display font-bold text-ink-950">
                       {money(Number(inv.total_try))}
+                    </TD>
+                    <TD align="right">
+                      <Link href={`/app/abonelik/fatura/${inv.id}`} className="text-xs font-semibold text-brand-600 hover:underline">
+                        Aç / yazdır
+                      </Link>
                     </TD>
                   </TR>
                 ))}
@@ -333,6 +406,7 @@ export default async function BillingPage({
           </TableFrame>
         )}
       </section>
+      ) : null}
     </div>
   );
 }
