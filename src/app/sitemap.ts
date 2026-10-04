@@ -56,6 +56,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .select("id, tenant_id, updated_at")
       .eq("status", "live")
       .is("deleted_at", null)
+      .eq("is_sample", false)
       .order("updated_at", { ascending: false })
       .limit(10000);
     for (const l of listings ?? []) {

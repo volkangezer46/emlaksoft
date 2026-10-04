@@ -24,7 +24,8 @@ export default async function Image({ params }: { params: Promise<{ slug: string
     .select("id", { count: "exact", head: true })
     .eq("tenant_id", tenant.id)
     .eq("status", "live")
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .eq("is_sample", false);
   return renderVitrinOg({
     office: tenant.name ?? "EmlakSoft",
     logoUrl: tenant.logo_url,

@@ -120,6 +120,7 @@ export default async function CustomerPortalPage({
           .eq("tenant_id", tenant.id)
           .is("deleted_at", null)
           .in("id", matchIds)
+          .eq("is_sample", false)
       : Promise.resolve({
           data: [] as {
             id: string;

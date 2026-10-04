@@ -40,8 +40,10 @@ function adminClient(results: {
     select: vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
-          is: vi.fn().mockReturnValue({
-            in: vi.fn().mockResolvedValue(results.properties),
+          eq: vi.fn().mockReturnValue({
+            is: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue(results.properties),
+            }),
           }),
         }),
       }),

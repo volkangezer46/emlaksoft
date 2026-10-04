@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { DEMO_BLOCKED, isSampleCampaignRecipient } from "@/lib/sample-scope";
 import {
   prepareTenantSmsSender,
   prepareTenantWhatsAppSender,
@@ -375,7 +376,16 @@ async function processClaimedCampaign(
 
     // No database or network work is intentionally placed between the consent
     // verification above and this provider call.
-    const providerResult = await sendToProvider(delivery, smsSender, whatsAppSender);
+    // Demo (is_sample) müşteriye ASLA gerçek gönderim yapılmaz (son savunma).
+    const providerResult: ProviderResult = (await isSampleCampaignRecipient(admin, delivery.recipientId))
+      ? {
+          ok: false,
+          provider: DEMO_BLOCKED,
+          errorCode: DEMO_BLOCKED,
+          errorMessage: "Demo kayıt: gerçek gönderim engellendi.",
+          retryable: false,
+        }
+      : await sendToProvider(delivery, smsSender, whatsAppSender);
     const { data: completionData, error: completionError } = await admin.rpc(
       "complete_campaign_recipient_delivery",
       {

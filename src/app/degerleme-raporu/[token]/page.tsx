@@ -78,6 +78,7 @@ export default async function PublicValuationReportPage({
           )
           .eq("id", valuation.property_id)
           .eq("tenant_id", valuation.tenant_id)
+          .eq("is_sample", false)
           .is("deleted_at", null)
           .maybeSingle()
       : Promise.resolve({ data: null }),

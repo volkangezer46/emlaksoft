@@ -161,6 +161,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
         .eq("assigned_to", agent.id)
         .eq("status", "live")
         .is("deleted_at", null)
+        .eq("is_sample", false)
         .order("created_at", { ascending: false })
         .limit(MAX_LISTINGS),
       admin
@@ -218,6 +219,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
         .from("customers")
         .select("id, full_name")
         .eq("tenant_id", agent.tenant_id)
+        .eq("is_sample", false)
         .is("deleted_at", null)
         .in("id", surveyCustomerIds)
     : { data: [] as { id: string; full_name: string | null }[] };
