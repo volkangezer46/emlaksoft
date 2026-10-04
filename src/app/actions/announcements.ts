@@ -14,13 +14,14 @@ export type AnnouncementLevel = (typeof LEVELS)[number];
 
 /** Form alanlarını ayrıştırıp doğrular — create/update ortak. */
 function parseAnnouncementForm(fd: FormData):
-  | { ok: true; title: string; body: string; level: AnnouncementLevel; pinned: boolean; ends_at: string | null }
+  | { ok: true; title: string; body: string; level: AnnouncementLevel; pinned: boolean; starts_at: string | null; ends_at: string | null }
   | { ok: false; error: string } {
   const title = String(fd.get("title") ?? "").trim();
   const body = String(fd.get("body") ?? "").trim();
   const level = String(fd.get("level") ?? "info");
   const pinned = fd.get("pinned") === "on";
   const endsAtRaw = String(fd.get("ends_at") ?? "").trim();
+  const startsAtRaw = String(fd.get("starts_at") ?? "").trim();
 
   if (!title) return { ok: false, error: "Başlık zorunludur." };
   if (title.length > 200) return { ok: false, error: "Başlık en fazla 200 karakter olabilir." };
@@ -35,7 +36,18 @@ function parseAnnouncementForm(fd: FormData):
     ends_at = parsed.toISOString();
   }
 
-  return { ok: true, title, body, level: level as AnnouncementLevel, pinned, ends_at };
+  // Yayın başlangıcı (opsiyonel): boşsa oluştururken hemen, düzenlerken mevcut değer korunur.
+  let starts_at: string | null = null;
+  if (startsAtRaw) {
+    const parsedStart = parseTrLocalDateTime(startsAtRaw);
+    if (!parsedStart) return { ok: false, error: "Başlangıç tarihi geçersiz." };
+    starts_at = parsedStart.toISOString();
+  }
+  if (starts_at && ends_at && ends_at <= starts_at) {
+    return { ok: false, error: "Bitiş tarihi başlangıçtan sonra olmalı." };
+  }
+
+  return { ok: true, title, body, level: level as AnnouncementLevel, pinned, starts_at, ends_at };
 }
 
 function revalidateAnnouncements() {
@@ -59,6 +71,7 @@ export async function createAnnouncement(_prev: AnnouncementResult, fd: FormData
     body: parsed.body,
     level: parsed.level,
     pinned: parsed.pinned,
+    ...(parsed.starts_at ? { starts_at: parsed.starts_at } : {}),
     ends_at: parsed.ends_at,
     created_by: gate.userId,
   });
@@ -67,8 +80,10 @@ export async function createAnnouncement(_prev: AnnouncementResult, fd: FormData
     return { error: "Duyuru yayınlanamadı." };
   }
 
-  // Ekibe tenant-geneli bildirim — duyurular dashboard bandında göründüğü için hedef /app
-  await notifyTenant({
+  // Ekibe tenant-geneli bildirim — duyurular dashboard bandında göründüğü için hedef /app.
+  // İleri tarihli (planlı) duyuruda bildirim gönderilmez; bant başlangıçta kendiliğinden görünür.
+  const scheduledLater = parsed.starts_at != null && new Date(parsed.starts_at).getTime() > Date.now();
+  if (!scheduledLater) await notifyTenant({
     tenantId: gate.tenantId,
     title: `📢 Yeni duyuru: ${parsed.title}`,
     body: parsed.body.length > 140 ? `${parsed.body.slice(0, 140)}…` : parsed.body,
@@ -99,6 +114,7 @@ export async function updateAnnouncement(_prev: AnnouncementResult, fd: FormData
       body: parsed.body,
       level: parsed.level,
       pinned: parsed.pinned,
+      ...(parsed.starts_at ? { starts_at: parsed.starts_at } : {}),
       ends_at: parsed.ends_at,
     })
     .eq("id", id)

@@ -145,6 +145,16 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
+              <label htmlFor="ann-starts" className="text-xs font-bold text-text-muted">Yayın başlangıcı (boş = hemen)</label>
+              <input
+                id="ann-starts"
+                name="starts_at"
+                type="datetime-local"
+                defaultValue={toLocalInput(editing?.starts_at ?? null)}
+                className="focus-ring mt-1.5 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950"
+              />
+            </div>
+            <div>
               <label htmlFor="ann-level" className="text-xs font-bold text-text-muted">Seviye</label>
               <select
                 id="ann-level"

@@ -30,6 +30,7 @@ import { CompanyForm } from "./company-form";
 import { MatchingWeightsForm } from "./matching-weights-form";
 import { LogoUploadForm } from "./logo-upload-form";
 import { IntegrationsForm } from "./integrations-form";
+import { ReadOnlyGate } from "./read-only-gate";
 import { NotificationPrefsPanel } from "@/components/app/notification-prefs";
 import { planLabel } from "@/lib/billing/plans";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
@@ -64,7 +65,8 @@ const cards: SettingCard[] = [
 ];
 
 export default async function SettingsPage() {
-  const { tenantId } = await requireModulePage("settings");
+  const { tenantId, perms } = await requireModulePage("settings");
+  const canEditSettings = (perms.settings ?? []).includes("edit");
   const supabase = await createClient();
 
   const [user, { data: tenantRow }, notifPrefs, { count: consentCount }, { count: activeConsentCount }, { count: auditCount }, { data: netgsmRow }, { data: whatsappRow }, netgsmPlatformConfigured] = await Promise.all([
@@ -229,10 +231,12 @@ export default async function SettingsPage() {
             <p className="text-xs text-text-muted">Logo, ofis adı ve iletişim bilgileri</p>
           </div>
         </div>
+        <ReadOnlyGate canEdit={canEditSettings}>
         <div className="mt-5 border-b border-line pb-5">
           <LogoUploadForm currentUrl={tenant.logo_url ?? null} officeName={tenant.name || "Ofis"} />
         </div>
         <CompanyForm tenant={tenant} />
+        </ReadOnlyGate>
       </section>
 
       {/* Eşleştirme ağırlıkları */}
@@ -252,7 +256,9 @@ export default async function SettingsPage() {
             Eşleştirme sayfası <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>
         </div>
-        <MatchingWeightsForm initial={matchingWeights} />
+        <ReadOnlyGate canEdit={canEditSettings}>
+          <MatchingWeightsForm initial={matchingWeights} />
+        </ReadOnlyGate>
       </section>
 
       {/* Entegrasyonlar */}
@@ -265,11 +271,13 @@ export default async function SettingsPage() {
           </div>
         </div>
         <div className="mt-5">
+          <ReadOnlyGate canEdit={canEditSettings}>
           <IntegrationsForm
             netgsm={netgsm}
             platformConfigured={platformFallbackConfigured}
             whatsapp={whatsapp}
           />
+          </ReadOnlyGate>
         </div>
       </section>
 
