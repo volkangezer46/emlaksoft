@@ -249,7 +249,8 @@ export async function updateAppointmentStatus(formData: FormData): Promise<Appoi
   }
 
   const patch: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
-  if (status === "signature" || status === "completed") {
+  // "signature" imza BEKLİYOR demektir; imza zamanı yalnız tamamlanınca yazılır.
+  if (status === "completed") {
     patch.signed_at = new Date().toISOString();
   }
 

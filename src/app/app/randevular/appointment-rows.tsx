@@ -49,7 +49,7 @@ type AdvisorOption = { id: string; label: string };
 const FORM_ICON_BTN =
   "focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-transparent transition hover:border-line hover:bg-canvas";
 
-function StatusForm({ id, status, label, className, children }: { id: string; status: "confirmed" | "cancelled"; label: string; className: string; children: React.ReactNode }) {
+function StatusForm({ id, status, label, className, children }: { id: string; status: "confirmed" | "cancelled" | "signature"; label: string; className: string; children: React.ReactNode }) {
   return (
     <form action={setAppointmentStatus}>
       <input type="hidden" name="id" value={id} />
@@ -88,6 +88,11 @@ function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM;
         {a.status === "pending" ? (
           <StatusForm id={a.id} status="confirmed" label="Randevuyu onayla" className="text-[var(--success-strong)] hover:text-[var(--success-strong)]">
             <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
+          </StatusForm>
+        ) : null}
+        {a.status === "confirmed" ? (
+          <StatusForm id={a.id} status="signature" label="İmzaya al (imza bekleniyor olarak işaretle)" className="text-brand-600 hover:text-brand-600">
+            <FileSignature aria-hidden="true" className="h-4 w-4" />
           </StatusForm>
         ) : null}
         {!completed ? (
