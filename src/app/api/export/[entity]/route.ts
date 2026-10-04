@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logActivity } from "@/lib/activity";
+import { requestApprovalIfNeeded } from "@/lib/oversight/approval-gate";
 import { EXPORT_ENTITIES, isFullExportEntity } from "@/lib/export-entities";
 import { EXPORT_QUERIES, openFullCsvStream } from "@/lib/export-full";
 import { daysAgoIso } from "@/lib/clock";
@@ -42,6 +43,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ entity: 
     return jsonError("Çok fazla tam dışa aktarma isteği. Lütfen birkaç dakika sonra tekrar deneyin.", 429, {
       "Retry-After": "600",
     });
+  }
+
+  // Ofis kontrol onay kapısı (varsayılan kapalı). Tam akışta satır sayısı önceden bilinmez; tam dışa aktarma
+  // her zaman toplu sayılır (en yüksek eşik değeri verilir), böylece hızlı dışa aktarmanın kuralı atlanamaz.
+  const approval = await requestApprovalIfNeeded(gate.tenantId, gate.userId, "bulk_export", {
+    rows: 100000,
+    exportEntity: entity,
+  });
+  if (approval.status !== "not_required" && approval.status !== "approved") {
+    return jsonError(approval.message, 403);
   }
 
   // B1: komisyon/denetim akışı yalnız earnings_all sahibine ofis geneli açılır.
