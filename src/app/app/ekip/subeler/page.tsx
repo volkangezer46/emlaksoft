@@ -22,7 +22,7 @@ type ProvinceRel = { name?: string } | { name?: string }[] | null;
 
 /** Şubeler: ekip merkezinin sekmesi. Ekle / düzenle / aktif-pasif / müdür / telefon. */
 export default async function BranchesPage() {
-  const { perms } = await requireModulePage("team", "/app/ekip/subeler");
+  const { perms } = await requireModulePage("team", "/app/ekip");
   const canManage = (perms.team ?? []).includes("create");
   const supabase = await createClient();
 

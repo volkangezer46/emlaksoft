@@ -50,8 +50,8 @@ export function ProfileForm({
       <FormField label="Unvan" htmlFor="hs-title" hint="Kartvizit ve ekip listesinde görünür.">
         <FormInput id="hs-title" name="title" maxLength={80} defaultValue={title ?? ""} />
       </FormField>
-      <FormField label="E-posta (giriş kimliği)" htmlFor="hs-email" hint="E-posta değişikliği için destek ile iletişime geçin.">
-        <FormInput id="hs-email" value={email} readOnly disabled />
+      <FormField label="E-posta (giriş kimliği)" htmlFor="hs-giris" hint="E-posta değişikliği için destek ile iletişime geçin.">
+        <FormInput id="hs-giris" value={email} readOnly disabled />
       </FormField>
       <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
         <Button type="submit" icon={Save} loading={pending}>Kaydet</Button>

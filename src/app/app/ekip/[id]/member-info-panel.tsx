@@ -87,8 +87,8 @@ export function MemberInfoPanel({
             <FormField label="Unvan" htmlFor="mi-title" className="sm:col-span-2" hint="Kartvizit ve ekip listesinde görünür.">
               <FormInput id="mi-title" name="title" maxLength={80} defaultValue={title ?? ""} placeholder="Gayrimenkul Danışmanı" />
             </FormField>
-            <FormField label="E-posta (giriş kimliği)" htmlFor="mi-email" className="sm:col-span-2" hint="E-posta değişikliği için güvenli doğrulama akışı henüz yok; değişiklik gerekirse destek ile iletişime geçin.">
-              <FormInput id="mi-email" value={email ?? "—"} readOnly disabled />
+            <FormField label="E-posta (giriş kimliği)" htmlFor="mi-giris" className="sm:col-span-2" hint="E-posta değişikliği için güvenli doğrulama akışı henüz yok; değişiklik gerekirse destek ile iletişime geçin.">
+              <FormInput id="mi-giris" value={email ?? "—"} readOnly disabled />
             </FormField>
             <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
               <Button type="submit" icon={Save} loading={saving}>Kaydet</Button>

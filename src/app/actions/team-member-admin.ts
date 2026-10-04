@@ -8,6 +8,7 @@ import { getBaseUrl } from "@/lib/base-url";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
+import { requirePermission } from "@/lib/require-permission";
 import { authorizeMemberManagement } from "@/lib/team/member-admin";
 
 export type MemberAdminResult = { ok?: boolean; error?: string; message?: string };
@@ -25,6 +26,8 @@ export async function updateMemberProfile(
   _prev: MemberAdminResult,
   formData: FormData,
 ): Promise<MemberAdminResult> {
+  const gate = await requirePermission("team", "edit");
+  if (!gate.ok) return { error: gate.error };
   const id = String(formData.get("id") ?? "").trim();
   const ctx = await authorizeMemberManagement(id);
   if (!ctx.ok) return { error: ctx.error };
@@ -135,6 +138,8 @@ export async function sendMemberPasswordReset(
   _prev: MemberAdminResult,
   formData: FormData,
 ): Promise<MemberAdminResult> {
+  const gate = await requirePermission("team", "edit");
+  if (!gate.ok) return { error: gate.error };
   return sendAccessMail(formData, "reset");
 }
 
@@ -143,5 +148,7 @@ export async function resendMemberInvite(
   _prev: MemberAdminResult,
   formData: FormData,
 ): Promise<MemberAdminResult> {
+  const gate = await requirePermission("team", "edit");
+  if (!gate.ok) return { error: gate.error };
   return sendAccessMail(formData, "invite");
 }
