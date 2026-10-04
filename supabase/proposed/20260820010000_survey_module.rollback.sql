@@ -9,3 +9,7 @@ drop table if exists public.survey_templates;
 drop table if exists public.survey_triggers;
 drop table if exists public.survey_assignees;
 drop table if exists public.survey_settings;
+-- Güvenlik yardımcıları (denetim 3 / #7). Tablolardan SONRA düşer (politikalar tablolarla birlikte gider).
+drop function if exists public.guard_survey_task_update();
+drop function if exists public.survey_can_work_task(uuid);
+drop function if exists public.survey_is_manager();
