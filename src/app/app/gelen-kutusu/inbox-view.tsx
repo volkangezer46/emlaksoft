@@ -26,6 +26,9 @@ import { SavedViews } from "@/components/app/saved-views";
 import { SmsReplyButton, SmsReplyPanel } from "./sms-panel";
 import { WaTemplateMenu } from "@/components/app/wa-template-menu";
 import { RowQuickActions, TaskPanel } from "./row-actions";
+import { ReplyDraftButton, ReplyDraftPanel } from "./reply-draft-button";
+import { isAiConfigured } from "@/lib/ai-advisor";
+import { isModuleEnabled } from "@/lib/modules/state";
 import { LinkToCustomer } from "./link-to-customer";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
@@ -87,6 +90,11 @@ const YON_FILTERS = [
   { value: "cevapsiz", label: "Cevapsız", direction: "missed" },
 ] as const;
 
+/** Cevap taslağı yalnız GELEN whatsapp/sms/e-posta iletişim kayıtları için (anahtar "c-<id>"). */
+function canDraftReply(item: UnifiedItem): boolean {
+  return item.key.startsWith("c-") && item.direction === "inbound" && ["whatsapp", "sms", "email"].includes(item.channel);
+}
+
 function relativeTime(iso: string): string {
   const mins = Math.floor(msSince(iso) / 60_000);
   if (mins < 1) return "Az önce";
@@ -123,7 +131,9 @@ export async function InboxView({
     sayfa?: string;
   }>;
 }) {
-  const { userId } = await requireModulePage("calls");
+  const { userId, tenantId: inboxTenantId } = await requireModulePage("calls");
+  // AI cevap taslağı: yapılandırılmamışsa ya da AI Asistan modülü kapalıysa düğme hiç görünmez.
+  const replyDraftOn = (await isAiConfigured()) && (await isModuleEnabled(inboxTenantId, "ai_assistant"));
   const supabase = await createClient();
   // WhatsApp şablon değişkenleri — {ofis} ve {danisman} satır menüsüne prop'lanır
   // Bağımsız sorgular hemen başlar; aşağıdaki ana Promise.all ile aynı turda beklenir
@@ -509,6 +519,9 @@ export async function InboxView({
                   {item.customerId ? (
                     <SmsReplyButton panelId={`sms-${item.key}`} customerName={item.customerName ?? "Müşteri"} />
                   ) : null}
+                  {replyDraftOn && item.customerId && canDraftReply(item) ? (
+                    <ReplyDraftButton panelId={`draft-${item.key}`} customerName={item.customerName ?? "Müşteri"} />
+                  ) : null}
                   {item.customerId ? (
                     <RowQuickActions
                       customerId={item.customerId}
@@ -551,6 +564,15 @@ export async function InboxView({
                       customerName={item.customerName ?? "Müşteri"}
                       consentGranted={smsGrantedIds.has(item.customerId)}
                     />
+                    {replyDraftOn && canDraftReply(item) ? (
+                      <ReplyDraftPanel
+                        panelId={`draft-${item.key}`}
+                        communicationId={item.key.slice(2)}
+                        customerId={item.customerId}
+                        customerName={item.customerName ?? "Müşteri"}
+                        consentGranted={smsGrantedIds.has(item.customerId)}
+                      />
+                    ) : null}
                     <TaskPanel
                       panelId={`task-${item.key}`}
                       customerId={item.customerId}

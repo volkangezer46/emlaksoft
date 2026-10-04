@@ -29,6 +29,7 @@ import {
   ArrowLeftRight,
   ArrowUpDown,
   Smile,
+  Timer,
   Award,
   BadgeCheck,
   Banknote,
@@ -247,6 +248,7 @@ export const ICONS = {
   /** Raporlar sekmeleri: talep-arz dengesi, memnuniyet anketi. */
   talepArz: ArrowUpDown,
   memnuniyet: Smile,
+  leadHizi: Timer,
 
   // --- Menü başlıkları (sayfa ikonlarından AYRI: başlık = kategori metaforu) -
   baslikBugun: Sun,

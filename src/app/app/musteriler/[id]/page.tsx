@@ -41,6 +41,8 @@ import { isPast, msSince, DAY_MS } from "@/lib/clock";
 import { getBaseUrl } from "@/lib/base-url";
 import { scoreSellerLikelihood, isOwnerCustomer, hasListingIntent } from "@/lib/seller-prediction";
 import { SellerPotentialCard } from "@/components/app/seller-potential-card";
+import { CustomerIntelCard } from "./customer-intel-card";
+import { OwnedPropertiesCard } from "./owned-properties-card";
 // Ortak tekil SMS dialogu — tek kopya gelen-kutusu'nda yaşar (Yanıtla da onu kullanır)
 import { SmsDialog } from "../../gelen-kutusu/sms-dialog";
 
@@ -98,7 +100,7 @@ export default async function CustomerDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { perms, userId } = await requireModulePage("customers");
+  const { perms, userId, tenantId: pageTenantId } = await requireModulePage("customers");
   const stageNames = stageLabelMap(await getStageLabels());
   const canEdit = (perms.customers ?? []).includes("edit");
   const canDelete = (perms.customers ?? []).includes("delete");
@@ -699,6 +701,17 @@ export default async function CustomerDetailPage({
             </section>
           )}
           {sellerPrediction ? <SellerPotentialCard prediction={sellerPrediction} /> : null}
+          <OwnedPropertiesCard customerId={customer.id} tenantId={pageTenantId} />
+          <CustomerIntelCard
+            customerId={customer.id}
+            tenantId={pageTenantId}
+            createdAt={customer.created_at}
+            blacklist={Boolean(customer.blacklist)}
+            comms={(commsData ?? []) as { channel: string; direction: string; created_at: string }[]}
+            calls={calls}
+            openDemands={activeDemandCount}
+            hasOpenOfferOrDeal={(dealsData ?? []).some((d) => d.stage !== "won" && d.stage !== "lost") || (offersData ?? []).some((o) => o.status === "submitted")}
+          />
         </aside>
       </div>
     </div>

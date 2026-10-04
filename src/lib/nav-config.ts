@@ -194,6 +194,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/bolge-analizi", label: "Bölge", icon: ICONS.bolge, module: "reports" },
           { href: "/app/raporlar/talep-arz", label: "Talep-arz", icon: ICONS.talepArz, module: "reports" },
           { href: "/app/raporlar/memnuniyet", label: "Memnuniyet", icon: ICONS.memnuniyet, module: "reports" },
+          { href: "/app/raporlar/lead-hizi", label: "Lead hızı", icon: ICONS.leadHizi, module: "reports" },
           { href: "/app/franchise", label: "Şube", icon: ICONS.sube, module: "reports" },
         ],
         tier: "core",
