@@ -24,6 +24,8 @@ import { agentInitials, shortenCustomerName } from "@/lib/agent-profile";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { AgentShareCard } from "./agent-share-card";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { PublicModuleClosed } from "@/components/modules/public-module-closed";
+import { isPublicFeatureClosed } from "@/lib/modules/public";
 
 /**
  * Danışman dijital kartviziti — PUBLIC mini profil sitesi.
@@ -140,6 +142,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
   if (!agent) notFound();
 
   const admin = createAdminClient();
+  if (await isPublicFeatureClosed(admin, agent.tenant_id, "vitrin")) return <PublicModuleClosed />;
 
   const [{ data: tenant }, { data: booking }, { data: listingRows, count: listingCount }, { data: surveyRows }] =
     await Promise.all([

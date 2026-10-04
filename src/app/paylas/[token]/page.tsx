@@ -11,6 +11,8 @@ import { ShareFeedback } from "@/components/public/share-feedback";
 import { ShareButton } from "@/components/public/share-button";
 import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { PublicModuleClosed } from "@/components/modules/public-module-closed";
+import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { normalizeExternalHref } from "@/lib/external-href";
 
 export const dynamic = "force-dynamic";
@@ -138,6 +140,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
     !shareTenant ||
     !isPublicTenantActive(shareTenant.status)
   ) notFound();
+  if (await isPublicFeatureClosed(admin, share.tenant_id, "presentations")) return <PublicModuleClosed officeName={shareTenant.name} />;
   if (isPast(share.expires_at)) {
     return (
       <div className="grid min-h-screen place-items-center bg-canvas px-4">

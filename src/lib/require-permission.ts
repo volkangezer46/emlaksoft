@@ -4,6 +4,7 @@ import {
   getEffectivePermissions,
   immutableReadonlyPermissions,
 } from "@/lib/permissions-effective";
+import { moduleActionBlock } from "@/lib/modules/guard";
 import {
   requireActiveTenant,
   requireTenantForPayment,
@@ -36,6 +37,10 @@ export async function requirePermission(
   if (!effectiveHasPermission(perms, mod, action)) {
     return { ok: false, error: "Bu işlem için yetkiniz yok." };
   }
+
+  // Sıra: oturum -> yetki -> modül. Ofisin kapattığı modülün yazma eylemleri doğrudan POST ile de reddedilir.
+  const moduleBlock = await moduleActionBlock(gate.tenantId, mod, action);
+  if (moduleBlock) return { ok: false, error: moduleBlock };
 
   return {
     ok: true,

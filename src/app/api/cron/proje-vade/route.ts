@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/lib/notify-batch";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { logActivity } from "@/lib/activity";
-import { getDisabledModulesByTenant, isDisabledFor } from "@/lib/modules/state";
+import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 
 function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -157,7 +157,7 @@ export async function GET(req: NextRequest) {
   await recordHeartbeat(
     "proje-vade",
     "ok",
-    `${overdueFlipped} satır gecikmeye alındı, ${notified} bildirim, ${releasedCount} rezervasyon serbest`,
+    `${overdueFlipped} satır gecikmeye alındı, ${notified} bildirim, ${releasedCount} rezervasyon serbest${skippedTenantsNote(disabledModules, "projects")}`,
   );
 
   return NextResponse.json({

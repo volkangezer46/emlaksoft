@@ -5,6 +5,8 @@ import { ArrowLeft, Heart } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { FavorilerClient } from "./favoriler-client";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { PublicModuleClosed } from "@/components/modules/public-module-closed";
+import { isPublicFeatureClosed } from "@/lib/modules/public";
 
 /**
  * Vitrin favoriler sayfası — SSR kabuğu kişisel veri içermez (ISR güvenli):
@@ -41,6 +43,7 @@ export default async function VitrinFavorilerPage({ params }: { params: Promise<
     .eq("slug", slug)
     .maybeSingle();
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
+  if (await isPublicFeatureClosed(admin, tenant.id, "vitrin")) return <PublicModuleClosed officeName={tenant.name} />;
 
   return (
     <div className="min-h-screen bg-canvas">
