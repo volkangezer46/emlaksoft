@@ -12,7 +12,7 @@ import type { TimelineEvent } from "@/lib/activity-timeline";
  * (ad, telefon, e-posta, not) bu katmanda HİÇ okunmaz. IP yalnız süper adminde gösterilir.
  */
 
-export const OFFICE_TABS = ["zaman", "abonelik", "destek", "kullanim", "ekip", "yasal", "fatura"] as const;
+export const OFFICE_TABS = ["zaman", "yonetim", "abonelik", "destek", "kullanim", "ekip", "yasal", "fatura"] as const;
 export type OfficeTab = (typeof OFFICE_TABS)[number];
 
 export const TIMELINE_CATEGORIES: { key: string; label: string }[] = [
@@ -97,6 +97,25 @@ const ACCOUNT_ACTION_TITLES: Record<string, string> = {
   "ops.impersonate.stop": "Personel müşteri görünümünden çıktı",
   "tenant.create": "Ofis oluşturuldu",
   "tenant.update": "Ofis bilgileri güncellendi",
+  "tenant.slug_change": "Vitrin adresi değiştirildi",
+  "tenant.trial_extend": "Deneme süresi uzatıldı",
+  "tenant.suspend": "Ofis askıya alındı",
+  "tenant.reactivate": "Ofis yeniden etkinleştirildi",
+  "tenant.archive": "Ofis arşivlendi",
+  "tenant.restore": "Ofis arşivden geri yüklendi",
+  "tenant.owner_access_link": "Sahibe erişim bağlantısı gönderildi",
+  "tenant.owner_email_change": "Sahip e-postası değiştirildi",
+  "tenant.owner_transfer": "Sahiplik devredildi",
+  "tenant.user_add": "Ofise kullanıcı eklendi",
+  "tenant.user_deactivate": "Ofis kullanıcısı pasife alındı",
+  "tenant.user_reactivate": "Ofis kullanıcısı yeniden etkinleştirildi",
+  "tenant.note": "Dahili not eklendi",
+  "billing.tenant_plan_status": "Paket veya durum değiştirildi",
+  "team.member_created": "Kullanıcı hesabı oluşturuldu (platform)",
+  "team.member_deactivated": "Kullanıcı pasife alındı (platform)",
+  "team.member_reactivated": "Kullanıcı yeniden etkinleştirildi (platform)",
+  "team.owner_transfer": "Ofis sahipliği devredildi (platform)",
+  "team.owner_email_change": "Sahip e-postası değiştirildi (platform)",
   "subscription.update": "Abonelik güncellendi",
   "settings.update": "Ofis ayarları güncellendi",
   "settings.watermark_update": "Filigran ayarı güncellendi",

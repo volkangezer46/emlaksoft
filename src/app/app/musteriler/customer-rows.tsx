@@ -5,6 +5,8 @@ import { CustomerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
   EntityThumb,
+  MobileCard,
+  MobileCardList,
   RowActionAnchor,
   RowActionLink,
   RowActions,
@@ -206,9 +208,9 @@ export function CustomerTable({
 /** <md: tablo yerine dokunmatik dostu kart listesi; hızlı ara / WhatsApp / randevu eylemleri. */
 export function CustomerMobileList({ rows }: { rows: CustomerVM[] }) {
   return (
-    <ul className="space-y-2.5 md:hidden">
+    <MobileCardList>
       {rows.map((c) => (
-        <li key={c.id} className="surface-card relative rounded-[var(--radius-card)] p-3">
+        <MobileCard key={c.id}>
           <div className="flex items-start gap-3">
             <EntityThumb alt="" name={c.name} size="sm" />
             <div className="min-w-0 flex-1">
@@ -233,8 +235,8 @@ export function CustomerMobileList({ rows }: { rows: CustomerVM[] }) {
               <span className="numeric ml-auto text-xs text-text-muted">{c.phoneDisplay}</span>
             </div>
           ) : null}
-        </li>
+        </MobileCard>
       ))}
-    </ul>
+    </MobileCardList>
   );
 }

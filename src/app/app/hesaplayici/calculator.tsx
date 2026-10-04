@@ -17,6 +17,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Combobox } from "@/components/ui/combobox";
 import { useToast } from "@/components/app/toast-provider";
+import { AnimatedNumber } from "@/components/ui/animated-number";
 import {
   APPROX_DISCLAIMER,
   DEFAULT_DOWN_PAYMENT_PCT,
@@ -214,6 +215,7 @@ export function PurchaseCalculator({
   const summary = [
     {
       label: "Cepten çıkan toplam",
+      amount: costs.cashOutOfPocket,
       value: formatTry(costs.cashOutOfPocket),
       hint: `${formatTry(costs.downPayment)} peşinat + ${formatTry(costs.totalCosts)} masraf`,
       icon: Wallet,
@@ -221,6 +223,7 @@ export function PurchaseCalculator({
     },
     {
       label: "Aylık taksit",
+      amount: loan.monthlyPayment > 0 ? loan.monthlyPayment : null,
       value: loan.monthlyPayment > 0 ? formatTry(loan.monthlyPayment) : "Kredi yok",
       hint: loan.monthlyPayment > 0 ? `${months} ay · aylık %${monthlyRatePct}` : "Peşin alım",
       icon: Banknote,
@@ -228,6 +231,7 @@ export function PurchaseCalculator({
     },
     {
       label: "Toplam faiz",
+      amount: loan.totalInterest > 0 ? loan.totalInterest : null,
       value: loan.totalInterest > 0 ? formatTry(loan.totalInterest) : "—",
       hint: loan.totalPayment > 0 ? `Toplam geri ödeme ${formatTry(loan.totalPayment)}` : "Faiz oluşmaz",
       icon: Percent,
@@ -565,7 +569,8 @@ export function PurchaseCalculator({
                   <s.icon className="h-3.5 w-3.5" /> {s.label}
                 </p>
                 <p className="numeric mt-1.5 font-display text-2xl font-extrabold tabular-nums text-ink-950">
-                  {s.value}
+                  {/* Sayı ise girdi değiştikçe akar (biçim `formatTry` ile aynı: "1.234 ₺"); değilse metin. */}
+                  {Number.isFinite(s.amount) && s.amount != null ? <AnimatedNumber value={Math.round(s.amount)} suffix=" ₺" /> : s.value}
                 </p>
                 <p className="mt-0.5 text-xs text-text-muted">{s.hint}</p>
               </div>

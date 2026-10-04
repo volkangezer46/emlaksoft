@@ -117,7 +117,7 @@ export default async function AppHomePage({
     <div data-tour="kpi" className="min-w-0">
       <Suspense
         fallback={
-          <KpiGrid count={4}>
+          <KpiGrid count={4} stagger={false}>
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} role="status" aria-busy="true" className="pm-card pm-card-inline h-full">
                 <span className="sr-only">Yükleniyor</span>

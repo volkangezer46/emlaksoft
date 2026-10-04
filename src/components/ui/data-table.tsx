@@ -269,7 +269,7 @@ function CellContent({
         href={target}
         // relative + z-10: satırı kaplayan görünmez bağlantının
         // üstünde kalsın, tıklama buraya gelsin
-        className="focus-ring press relative z-10 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 py-1.5 touch:min-h-11 text-xs font-semibold text-brand-700 shadow-[var(--elev-1)] transition hover:bg-brand-600/5"
+        className="focus-ring press relative z-10 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] surface-interactive border border-hairline bg-surface px-3 py-1.5 touch:min-h-11 text-xs font-semibold text-brand-700 shadow-[var(--elev-1)] transition"
       >
         {col.linkLabel ?? "Aç"}
       </Link>
@@ -288,7 +288,7 @@ function CellContent({
 }
 
 const pagerButton =
-  "focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 touch:min-h-11 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas disabled:pointer-events-none disabled:opacity-40";
+  "focus-ring press surface-interactive inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 touch:min-h-11 font-medium text-ink-950 shadow-[var(--elev-1)] transition disabled:pointer-events-none disabled:opacity-40";
 
 export function DataTable({
   columns,
@@ -567,7 +567,7 @@ export function DataTable({
       <button
         type="button"
         onClick={() => setQuery("")}
-        className="focus-ring press inline-flex h-8 touch:h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 text-xs font-semibold text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas"
+        className="focus-ring press surface-interactive inline-flex h-8 touch:h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 text-xs font-semibold text-ink-950 shadow-[var(--elev-1)] transition"
       >
         <X className="h-3.5 w-3.5" aria-hidden="true" /> Aramayı temizle
       </button>
@@ -618,7 +618,7 @@ export function DataTable({
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      className="focus-ring press inline-flex h-8 touch:h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 text-xs font-semibold text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas"
+                      className="focus-ring press surface-interactive inline-flex h-8 touch:h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 text-xs font-semibold text-ink-950 shadow-[var(--elev-1)] transition"
                     >
                       <Columns3 className="h-3.5 w-3.5" aria-hidden="true" /> Sütunlar
                       {hiddenKeys.size > 0 ? (
@@ -688,7 +688,7 @@ export function DataTable({
             ) : visible.length === 0 ? (
               <div className="surface-card rounded-[var(--radius-card)]">{emptyNode}</div>
             ) : (
-              <ul className="space-y-2">
+              <ul className="list-stagger space-y-2">
                 {visible.map((row, index) => {
                   const href = typeof row[ROW_HREF] === "string" ? (row[ROW_HREF] as string) : null;
                   const id = rowId(row);
@@ -698,7 +698,7 @@ export function DataTable({
                       key={String(row.id ?? index)}
                       className={cn(
                         "surface-card relative space-y-2 rounded-[var(--radius-card)] p-4",
-                        href && "transition-colors hover:bg-brand-600/[0.035]",
+                        href && "surface-interactive hover-lift",
                       )}
                     >
                       {href ? (
@@ -849,7 +849,7 @@ export function DataTable({
                         className={cn(
                           densityMeta.rowClass,
                           (revealRowActions || keyboardNav) && "group",
-                          isSelected && "bg-brand-600/[0.06]",
+                          isSelected && "bg-surface-selected",
                           keyboardNav &&
                             "outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--accent)]",
                         )}
@@ -950,7 +950,7 @@ export function DataTable({
                 disabled={safePage === 0}
                 className={pagerButton}
               >
-                <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Önceki
+                <ChevronLeft className="icon-nudge-back h-4 w-4" aria-hidden="true" /> Önceki
               </button>
               <span className="px-1 text-text-faint">
                 {safePage + 1} / {totalPages}
@@ -961,7 +961,7 @@ export function DataTable({
                 disabled={safePage >= totalPages - 1}
                 className={pagerButton}
               >
-                Sonraki <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                Sonraki <ChevronRight className="icon-nudge h-4 w-4" aria-hidden="true" />
               </button>
             </div>
           </div>
@@ -972,7 +972,7 @@ export function DataTable({
           <div
             role="region"
             aria-label="Toplu eylemler"
-            className="surface-card sticky bottom-4 z-30 flex flex-wrap items-center gap-3 rounded-[var(--radius-panel)] px-4 py-2.5 shadow-[var(--elev-3)]"
+            className="surface-card motion-enter sticky bottom-4 z-30 flex flex-wrap items-center gap-3 rounded-[var(--radius-panel)] px-4 py-2.5 shadow-[var(--elev-3)]"
           >
             <p className="numeric text-sm font-semibold text-ink-950" aria-live="polite">
               {selectionLabel(effectiveSelected.size)}
@@ -981,7 +981,7 @@ export function DataTable({
             <button
               type="button"
               onClick={clearSelection}
-              className="focus-ring press ml-auto inline-flex h-8 touch:h-11 items-center gap-1.5 rounded-[var(--radius-control)] px-2.5 text-xs font-semibold text-text-muted transition hover:bg-canvas hover:text-ink-950"
+              className="focus-ring press ml-auto inline-flex h-8 touch:h-11 items-center gap-1.5 rounded-[var(--radius-control)] px-2.5 text-xs font-semibold text-text-muted transition hover:bg-surface-hover hover:text-ink-950 active:bg-surface-pressed"
             >
               <X className="h-3.5 w-3.5" aria-hidden="true" /> Seçimi temizle
             </button>

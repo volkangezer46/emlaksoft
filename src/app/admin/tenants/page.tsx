@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { daysAgoIso } from "@/lib/clock";
-import { Activity, ArrowUpRight, Building2, Search, ShieldAlert, X } from "lucide-react";
+import { Activity, ArrowUpRight, Building2, Plus, Search, Settings2, ShieldAlert, X } from "lucide-react";
+import { officeAdminCan } from "@/lib/admin/office-admin-access";
 import { startImpersonation } from "@/app/actions/platform";
 import { exportTenantsCsv } from "@/app/actions/platform-export";
 import { ExportButton } from "@/components/admin/export-button";
@@ -53,7 +54,8 @@ export default async function AdminTenantsPage({
   searchParams?: Promise<{ q?: string; durum?: string; plan?: string; sayfa?: string; audit?: string }>;
 }) {
   const staff = await requirePlatformModule("tenants");
-  const canImpersonate = staff.role === "super_admin" || staff.role === "ops" || staff.role === "support";
+  const canCreate = officeAdminCan(staff.role, "create");
+  const canImpersonate =staff.role === "super_admin" || staff.role === "ops" || staff.role === "support";
   const sp = (await searchParams) ?? {};
   const query = (sp.q ?? "").trim();
   const durum = sp.durum && statusLabel[sp.durum] ? sp.durum : undefined;
@@ -158,8 +160,37 @@ export default async function AdminTenantsPage({
               {filtered ? `${tenantCount ?? rows.length} / ${stats.length} ofis · filtre aktif` : `${stats.length} ofis`} · paket ve durum
               burada yönetilir
             </p>
-            <div className="mt-4">
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {canCreate ? (
+                <Link
+                  href="/admin/tenants/yeni"
+                  className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-amber-400 px-4 py-2 text-sm font-bold text-ink-950 transition hover:bg-amber-300"
+                >
+                  <Plus className="h-4 w-4" /> Ofis ekle
+                </Link>
+              ) : null}
               <ExportButton action={exportTenantsCsv} label="Excel'e aktar" />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                { label: "Toplam ofis", value: stats.length, href: buildHref({}) },
+                { label: "Aktif", value: statusCounts[0].count, href: buildHref({ q: query, plan, durum: "active" }) },
+                { label: "Denemede", value: statusCounts[1].count, href: buildHref({ q: query, plan, durum: "trial" }) },
+                {
+                  label: "Askıda / gecikmiş",
+                  value: statusCounts[2].count + statusCounts[3].count,
+                  href: buildHref({ q: query, plan, durum: statusCounts[3].count > 0 ? "suspended" : "past_due" }),
+                },
+              ].map((k) => (
+                <Link
+                  key={k.label}
+                  href={k.href}
+                  className="focus-ring press rounded-[var(--radius-control)] border border-white/10 bg-white/5 px-3 py-2 transition hover:bg-white/10"
+                >
+                  <p className="font-display text-lg font-extrabold text-white">{k.value}</p>
+                  <p className="text-xs text-white/70">{k.label}</p>
+                </Link>
+              ))}
             </div>
             <div className="mt-5 flex h-24 items-end gap-2.5">
               {planCounts.map((p, i) => {
@@ -343,6 +374,12 @@ export default async function AdminTenantsPage({
                   planOptions={PLANS.map((catalogPlan) => [catalogPlan.id, catalogPlan.name] as [string, string])}
                   statusOptions={Object.entries(statusLabel)}
                 />
+                <Link
+                  href={`/admin/tenants/${t.id}?sekme=yonetim`}
+                  className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-bold text-ink-950 transition hover:bg-canvas"
+                >
+                  <Settings2 className="h-3.5 w-3.5" /> Yönet
+                </Link>
                 {canImpersonate ? (
                   <form action={startImpersonation}>
                     <input type="hidden" name="tenant_id" value={t.id} />
@@ -355,9 +392,18 @@ export default async function AdminTenantsPage({
             </article>
           ))}
           {rows.length === 0 ? (
-            <p className="px-5 py-12 text-center text-sm text-text-muted">
-              {filtered ? "Filtreyle eşleşen ofis bulunamadı." : "Henüz kayıtlı ofis yok."}
-            </p>
+            <div className="px-5 py-12 text-center text-sm text-text-muted">
+              <p>{filtered ? "Filtreyle eşleşen ofis bulunamadı." : "Henüz kayıtlı ofis yok."}</p>
+              {filtered ? (
+                <Link href="/admin/tenants" className="mt-2 inline-block font-semibold text-brand-600 hover:underline">
+                  Filtreleri temizle
+                </Link>
+              ) : canCreate ? (
+                <Link href="/admin/tenants/yeni" className="mt-2 inline-block font-semibold text-brand-600 hover:underline">
+                  İlk ofisi ekle
+                </Link>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>

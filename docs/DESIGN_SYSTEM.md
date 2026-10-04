@@ -336,13 +336,15 @@ Tetikleyici düğme olduğu yerde kalır (render prop `trigger`); kontrollü kul
 
 **GIF yok** (ağır, erişilemez, temaya uymaz). Yerine SVG + CSS: tek hareket dosyası `src/app/motion.css`, illüstrasyon kiti `src/components/ui/illustrations/`.
 
-**Token'lar:** `--motion-fast` 120 ms · `--motion-base` 200 ms · `--motion-slow` 360 ms · `--ease-out` · `--motion-stagger` 40 ms.
+**Token'lar (tek kaynak `motion.css`):** `--motion-fast` 140 ms (kontrol) · `--motion-base` 220 ms (panel) · `--motion-slow` 320 ms (sayfa/liste girişi) · çıkışlar ~%30 kısa (`--motion-exit-fast/base/slow` 100/150/220) · `--ease-out` · `--ease-spring` (`linear()` yay, `@supports` yedekli) · `--motion-stagger` 40 ms. Süreleri bileşende sabit yazma, token kullan.
 **Bütçe:** yalnız `transform`/`opacity` (SVG çizgi için `stroke-dashoffset`); CLS yok; `will-change` yok; INP etkilenmez. Her hareket `prefers-reduced-motion: no-preference` içindedir; reduce'ta içerik bitiş durumunda durağandır.
 
 | İhtiyaç | Kullanım |
 |---|---|
 | KPI sayı sayacı | `StatCard` içinde otomatik (`ui/count-up.tsx`): sunucu sonuç değerini basar, ekrana girince bir kez sayar; biçimli (para, %) değerlere dokunmaz |
 | Liste giriş | `.list-stagger` ebeveyne (40 ms aralık, en çok 12 öğe) |
+| Canlı değişen sayı | `AnimatedNumber` (`ui/animated-number.tsx`, `@number-flow/react`, dinamik parça; sunucu/reduced-motion'da düz tr-TR metin): hesaplayıcı önizlemeleri, canlı eşleşme sayısı, ROI sonucu |
+| Liste ekle/çıkar/sırala | `useAutoAnimate` / `<AutoAnimate>` (`ui/auto-animate.tsx`): yalnız zaten istemci listeler, kararlı `key` |
 | Kart hover | `.hover-lift`; düğme basma `.btn-press` (ya da mevcut `.press`) |
 | İlerleme dolumu | `Progress` otomatik (`.motion-progress-fill`) |
 | Başarı tiki | `<Illustration kind="basari" />` veya SVG path'ine `.tick-draw` |
@@ -355,6 +357,12 @@ Tetikleyici düğme olduğu yerde kalır (render prop `trigger`); kontrollü kul
 **EmptyState tek bileşen** (`@/components/ui/empty-state`; eski `components/app/empty-state` ve `ui/empty-state-v3` re-export): `variant` panel (varsayılan) | full | compact | inline; `illustration` (modül anahtarı; eski `list|search|error|start` da geçerli), tek ana `action` (+ `secondary`, `help` = "Nasıl çalışır?"). `icon` lucide bileşeni ya da düğüm olabilir.
 
 **İkon:** kavramsal ikonlar `src/lib/icons.ts` sözlüğünden (`ICONS.musteri`); rastgele lucide kavramları yalnız ok/çarpı gibi süslerde.
+
+**CountUp ile AnimatedNumber rol ayrımı:** `CountUp` = ilk görünümde bir kez sayar (sunucu KPI'ları, ek KB yok). `AnimatedNumber` = kullanıcı girdisiyle değer değiştikçe akar. Aynı öğede ikisi birden kullanılmaz; kapanış sihirbazında kullanılmaz.
+
+**Kutlama:** tek kaynak `ui/illustrations/celebration.tsx`; `ui/celebrate.tsx` yalnız re-export'tur.
+
+**Ücretsiz CSS:** `@starting-style` panel girişi, `animation-timeline: view()` yalnız public landing ve /fiyatlar; hepsi `@supports` yedekli, reduced-motion'da kapalı.
 
 ## Marka
 

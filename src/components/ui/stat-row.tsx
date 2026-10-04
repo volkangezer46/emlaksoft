@@ -48,7 +48,7 @@ export function StatRow({
             key={`${it.label}-${it.href}`}
             href={it.href}
             className={cn(
-              "focus-ring flex min-h-12 min-w-0 flex-col justify-center rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 transition hover:border-brand-400 hover:bg-surface-2",
+              "focus-ring surface-interactive flex min-h-12 min-w-0 flex-col justify-center rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 transition hover:border-brand-400",
               zero && "opacity-60 hover:opacity-100",
             )}
           >

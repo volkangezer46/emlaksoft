@@ -322,7 +322,7 @@ function PanelBody({
         className="mb-2 h-1.5 overflow-hidden rounded-full bg-surface"
       >
         <div
-          className="h-full rounded-full bg-brand-600 transition-[width] duration-150 motion-reduce:transition-none"
+          className="h-full rounded-full bg-brand-600 transition-[width] duration-(--motion-fast) motion-reduce:transition-none"
           style={{ width: `${total ? (filled / total) * 100 : 0}%` }}
         />
       </div>
@@ -338,7 +338,7 @@ function PanelBody({
                     key={f}
                     type="button"
                     onClick={() => goTo(tab.id, f)}
-                    className="focus-ring flex min-h-8 w-full items-baseline gap-3 rounded-[var(--radius-control)] px-1.5 py-1 text-left text-xs transition-colors hover:bg-surface"
+                    className="focus-ring flex min-h-8 w-full items-baseline gap-3 rounded-[var(--radius-control)] px-1.5 py-1 text-left text-xs transition-colors hover:bg-surface-hover"
                   >
                     <span className="shrink-0 text-text-muted">{fieldLabels?.[f] ?? i.label ?? f}</span>
                     <span
@@ -386,7 +386,7 @@ function PanelBody({
           type="button"
           onClick={requestClose}
           aria-label="Paneli kapat"
-          className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-canvas hover:text-ink-950"
+          className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-surface-hover hover:text-ink-950 active:bg-surface-pressed"
         >
           <X className="h-5 w-5" aria-hidden="true" />
         </button>
@@ -453,7 +453,7 @@ function PanelBody({
         ) : null}
 
         {confirmLeave ? (
-          <div role="alertdialog" aria-label="Kaydedilmemiş değişiklikler" className="mt-4 flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-amber-400/50 bg-amber-400/10 px-4 py-3 text-xs">
+          <div role="alertdialog" aria-label="Kaydedilmemiş değişiklikler" className="motion-enter mt-4 flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-amber-400/50 bg-amber-400/10 px-4 py-3 text-xs">
             <p className="min-w-0 flex-1 font-semibold text-amber-700">Kaydedilmemiş değişiklikler var. Yine de kapatılsın mı?</p>
             <Button type="button" size="sm" variant="secondary" onClick={() => setConfirmLeave(false)}>Düzenlemeye dön</Button>
             <Button type="button" size="sm" variant="danger" onClick={onRequestClose}>Değişiklikleri at</Button>

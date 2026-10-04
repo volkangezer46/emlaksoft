@@ -5,6 +5,7 @@ import type { RefObject } from "react";
 import { AlertCircle, Check, ChevronDown, CircleCheck, Ellipsis, Loader2, Save, TriangleAlert } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { isDirty, serializeEntries } from "@/lib/form-dirty";
 import { setSubmitIntent } from "@/lib/form-submit-intent";
 import { formatClock } from "@/lib/form-tabs";
@@ -228,7 +229,8 @@ export function FormActionBar({
     <div
       data-kb={keyboardOpen ? "1" : undefined}
       className={cn(
-        "fab-bar relative z-10 rounded-[var(--radius-card)] border border-line bg-surface/95 shadow-[var(--elev-2)] backdrop-blur",
+        // Cam bütçesi: yapışkan alt çubuk opak (cam yalnız sabit üst çubukta).
+        "fab-bar relative z-10 rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--elev-2)]",
         mode === "sticky" &&
           "sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:bottom-2 lg:pb-0",
         mode === "inline" && "mt-5",
@@ -245,7 +247,7 @@ export function FormActionBar({
           className="absolute inset-x-0 top-0 h-0.5 overflow-hidden rounded-t-[var(--radius-card)]"
         >
           <div
-            className="h-full bg-brand-600 transition-[width] duration-200 motion-reduce:transition-none"
+            className="h-full bg-brand-600 transition-[width] duration-(--motion-base) motion-reduce:transition-none"
             style={{ width: `${(done / total) * 100}%` }}
           />
         </div>
@@ -315,21 +317,21 @@ export function FormActionBar({
             ) : null}
             {shortcuts ? (
               <span className="hidden min-w-0 truncate text-xs text-text-faint lg:inline">
-                <kbd className="rounded border border-line bg-canvas px-1 font-sans">Ctrl</kbd>
+                <Kbd mod />
                 {" + "}
-                <kbd className="rounded border border-line bg-canvas px-1 font-sans">Enter</kbd> ile kaydet
+                <Kbd>Enter</Kbd> ile kaydet
                 {shortcuts === "save-tabs" ? (
                   <>
                     {" · "}
-                    <kbd className="rounded border border-line bg-canvas px-1 font-sans">Alt</kbd>
+                    <Kbd>Alt</Kbd>
                     {" + "}
-                    <kbd className="rounded border border-line bg-canvas px-1 font-sans">↑↓</kbd> sekme
+                    <Kbd>↑↓</Kbd> sekme
                   </>
                 ) : null}
                 {shortcuts === "save-esc" ? (
                   <>
                     {" · "}
-                    <kbd className="rounded border border-line bg-canvas px-1 font-sans">Esc</kbd> kapat
+                    <Kbd>Esc</Kbd> kapat
                   </>
                 ) : null}
               </span>

@@ -76,7 +76,7 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
 }
 /* Kartlar hareket etmez: hover'da yalnız gölge + kenar (spec: "kart hover'da hareket yok") */
 @media (prefers-reduced-motion: no-preference) {
-  .pm-card { transition: box-shadow 160ms ease, border-color 160ms ease; }
+  .pm-card { transition: box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out); }
 }
 .pm-card:hover { box-shadow: var(--inner-top), var(--pm-shadow-hover); border-color: color-mix(in srgb, var(--t, var(--accent)) 38%, var(--hairline)); }
 .pm-card-head { display: flex; align-items: center; gap: 0.7rem; }
@@ -93,8 +93,12 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
 }
 .pm-ico svg { width: 1.2rem; height: 1.2rem; }
 .pm-card-title { flex: 1; min-width: 4.5rem; overflow-wrap: normal; word-break: normal; hyphens: auto; font-size: 0.875rem; font-weight: 600; color: var(--text); }
-.pm-card-arrow { flex: none; color: var(--text-faint); transition: transform 160ms ease, color 160ms ease; }
+.pm-card-arrow { flex: none; color: var(--text-faint); transition: transform var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out); }
 .pm-card:hover .pm-card-arrow { color: var(--t-text); }
+/* Kart yerinde durur; yalnız ok ikonu 2px ileri kayar (ikon mikro hareketi). */
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .pm-card:is(:hover, :focus-visible) .pm-card-arrow { transform: translateX(2px); }
+}
 .pm-value {
   font-family: var(--font-manrope), system-ui, sans-serif;
   font-size: 1.875rem;
@@ -205,7 +209,7 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 10px 24px -16px rgba(0, 0, 0, 0.5);
 }
 @media (prefers-reduced-motion: no-preference) {
-  .pm-glass { transition: background-color 160ms ease, border-color 160ms ease; }
+  .pm-glass { transition: background-color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out); }
 }
 /* Mobil: iskelet ve gerçek kutu aynı asgari yüksekliği paylaşır (CLS). */
 @media (max-width: 639px) { .pm-glass { min-height: 8.75rem; } }
@@ -320,7 +324,7 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
   color: var(--text);
 }
 @media (prefers-reduced-motion: no-preference) {
-  .pm-bx { transition: box-shadow 160ms ease, border-color 160ms ease; }
+  .pm-bx { transition: box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out); }
 }
 .pm-bx:hover { box-shadow: var(--inner-top), var(--pm-shadow-hover); border-color: color-mix(in srgb, var(--accent) 26%, var(--hairline)); }
 .pm-bx-title { font-family: var(--font-manrope), system-ui, sans-serif; font-size: 0.9375rem; line-height: 1.25rem; font-weight: 700; color: var(--heading); }
@@ -338,7 +342,9 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
   color: var(--text);
   text-decoration: none;
 }
-.pm-row:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+/* Satır hover/basılı zemini rol token'ından (tokens.css). */
+.pm-row:hover { background: var(--surface-hover); }
+.pm-row:active { background: var(--surface-pressed); }
 .pm-row-ico { display: grid; place-items: center; width: 2rem; height: 2rem; flex: none; border-radius: var(--radius-control); background: var(--t-soft); color: var(--t-text); }
 .pm-row-ico svg { width: 1rem; height: 1rem; }
 .pm-empty { display: grid; place-items: center; gap: 0.5rem; padding: 1.25rem 0.5rem; text-align: center; color: var(--text-muted); font-size: 0.875rem; }
@@ -346,17 +352,17 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
 .pm-grid-line { stroke: var(--hairline-strong); stroke-width: 1; stroke-dasharray: 2 4; }
 @keyframes pm-rise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 @media (prefers-reduced-motion: no-preference) {
-  .pm-bar { transform-box: fill-box; transform-origin: bottom; animation: pm-rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .pm-bar { transform-box: fill-box; transform-origin: bottom; animation: pm-rise var(--motion-slow) var(--ease-out) both; }
 }
 
 /* ---- Sekmeli formlar (TabbedFormShell, docs/DESIGN_SYSTEM.md "Sekmeli formlar") ------
-   Panel geçişi: 150 ms opaklık + 4px kayma. Yalnız hareket tercihine saygılı ekranlarda. */
+   Panel geçişi: --motion-base opaklık + 4px kayma. Yalnız hareket tercihine saygılı ekranlarda. */
 @keyframes tfs-in {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .tfs-panel:not([hidden]) { animation: tfs-in 150ms ease-out; }
+  .tfs-panel:not([hidden]) { animation: tfs-in var(--motion-base) var(--ease-out); }
 }
 
 /* ---- FormActionBar (src/components/ui/form-action-bar.tsx) ---------------------------
@@ -378,9 +384,9 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
   to { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .fab-shake { animation: fab-shake 360ms ease-in-out; }
-  .fab-pop { animation: fab-pop 320ms cubic-bezier(0.2, 0.8, 0.2, 1); }
-  .fab-fade { animation: fab-fade 160ms ease-out; }
+  .fab-shake { animation: fab-shake var(--motion-slow) ease-in-out; }
+  .fab-pop { animation: fab-pop var(--motion-slow) var(--ease-out); }
+  .fab-fade { animation: fab-fade var(--motion-fast) var(--ease-out); }
 }
 /* Mobil klavye açıkken çubuk akışa döner (klavyenin/alt gezinmenin üstüne binmez). */
 .fab-bar[data-kb="1"] { position: static; }
@@ -426,15 +432,15 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
 .pm-prop-tx { margin-left: auto; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); }
 /* ---- MorphTabs (docs/DESIGN_SYSTEM.md "Sekmeler (MorphTabs)") ----------------------
    Aktif sekme genişler (ikon + etiket [+ açıklama]), pasifler ikona küçülür. Genişlik animasyonu
-   `grid-template-columns: 0fr -> 1fr` ile (içerik ölçmeden, <=200 ms); etiket DOM'da kalır (erişilebilir ad).
+   `grid-template-columns: 0fr -> 1fr` ile (içerik ölçmeden, --motion-fast); etiket DOM'da kalır (erişilebilir ad).
    `prefers-reduced-motion: reduce` altında hepsi anında. Yalnız YENİ kurallar; mevcutlar değişmez. */
-.mt-tab { --mt-ease: cubic-bezier(0.3, 0.7, 0.2, 1); }
+.mt-tab { --mt-ease: var(--ease-out); }
 .mt-lw {
   display: grid;
   grid-template-columns: 0fr;
   min-width: 0;
   opacity: 0;
-  transition: grid-template-columns 180ms var(--mt-ease), opacity 140ms ease-out;
+  transition: grid-template-columns var(--motion-fast) var(--mt-ease), opacity var(--motion-exit-fast) ease-out;
 }
 .mt-li { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .mt-tab[data-density="full"] .mt-lw,
@@ -444,7 +450,7 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
   display: grid;
   grid-template-rows: 0fr;
   opacity: 0;
-  transition: grid-template-rows 180ms var(--mt-ease), opacity 140ms ease-out;
+  transition: grid-template-rows var(--motion-fast) var(--mt-ease), opacity var(--motion-exit-fast) ease-out;
 }
 .mt-dw > span { min-height: 0; overflow: hidden; }
 .mt-tab[data-orient="vertical"][data-density="full"] .mt-dw { grid-template-rows: 1fr; opacity: 1; }
@@ -473,7 +479,7 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
   .mt-strip[data-idle="auto"] .mt-tab[data-density="icon"] .mt-lw-count { display: grid; }
 }
 /* Dikey ray: kendi hücresinde genişler; daraltılmışken üzerine gelince kayan yüzey (flyout) olarak taşar. */
-.mt-rail { position: relative; width: 100%; transition: width 200ms var(--mt-ease, ease-out), box-shadow 200ms ease-out; }
+.mt-rail { position: relative; width: 100%; transition: width var(--motion-base) var(--mt-ease, var(--ease-out)), box-shadow var(--motion-base) var(--ease-out); }
 .mt-rail[data-rail="collapsed"][data-peek="1"] {
   width: 15rem;
   z-index: 30;
@@ -489,7 +495,7 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
     align-items: start;
     gap: 1.5rem;
     grid-template-columns: var(--tfs-rail) minmax(0, 1fr);
-    transition: grid-template-columns 200ms cubic-bezier(0.3, 0.7, 0.2, 1);
+    transition: grid-template-columns var(--motion-base) var(--ease-out);
   }
 }
 @media (min-width: 1280px) {
@@ -500,8 +506,8 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
 @keyframes mt-in-next { from { opacity: 0; transform: translateX(1.25rem); } to { opacity: 1; transform: none; } }
 @keyframes mt-in-prev { from { opacity: 0; transform: translateX(-1.25rem); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: no-preference) {
-  .tfs-form[data-dir="next"] .tfs-panel:not([hidden]) { animation: mt-in-next 200ms cubic-bezier(0.3, 0.7, 0.2, 1); }
-  .tfs-form[data-dir="prev"] .tfs-panel:not([hidden]) { animation: mt-in-prev 200ms cubic-bezier(0.3, 0.7, 0.2, 1); }
+  .tfs-form[data-dir="next"] .tfs-panel:not([hidden]) { animation: mt-in-next var(--motion-base) var(--ease-out); }
+  .tfs-form[data-dir="prev"] .tfs-panel:not([hidden]) { animation: mt-in-prev var(--motion-base) var(--ease-out); }
 }
 @media (prefers-reduced-motion: reduce) {
   .mt-lw, .mt-dw, .mt-rail, .tfs-layout { transition: none !important; }
