@@ -3,7 +3,7 @@
  *
  * Iki katman:
  *  1. `evaluateApprovalRule`: SAF karar (kural + payload -> gerekli mi, neden, talep metni). Testle kapali.
- *  2. `requestApprovalIfNeeded`: kapi. Kural kapaliysa / esik altindaysa / aktor yonetici ise HICBIR sey yapmaz
+ *  2. `requestApprovalIfNeeded`: kapi. Kural kapaliysa / esik altindaysa / aktor owner/gm (muaf) ise HICBIR sey yapmaz
  *     ("not_required"); aksi halde mevcut onay_requests akisina (approval_requests) talep acar ya da daha once
  *     onaylanmis talebi TEK KULLANIMLIK tuketir.
  *
@@ -170,8 +170,8 @@ export type OpenApprovalRow = {
 /** DB bagimliliklari — testte sahtesi verilir. */
 export type ApprovalGateStore = {
   loadRules(tenantId: string): Promise<ApprovalRules>;
-  /** Aktor yonetici kademesinde mi (yonetici kendi islemini bekletmez). */
-  isManager(tenantId: string, actorId: string): Promise<boolean>;
+  /** Aktor muaf mi: YALNIZ owner/gm kendi islemini bekletmez (branch_manager dahil digerleri talep acar). */
+  isApprovalExempt(tenantId: string, actorId: string): Promise<boolean>;
   /** Parmak izine uyan, aktorun en son bekleyen/onayli talebi. */
   findOpen(tenantId: string, actorId: string, fingerprint: string): Promise<OpenApprovalRow | null>;
   isConsumed(tenantId: string, approvalId: string): Promise<boolean>;
@@ -188,6 +188,13 @@ export type ApprovalGateStore = {
     actionType: ApprovalActionType,
   ): Promise<{ id: string } | null>;
 };
+
+/**
+ * Onay beklenirken kullaniciya gosterilen TEK mesaj (hata degil, durum bilgisi).
+ * "pending" ve "requested" durumlari ayni sabiti kullanir; cagiran action'lar `gate.message`i aynen iletir.
+ */
+export const APPROVAL_PENDING_MESSAGE =
+  "Bu işlem ofis kuralı gereği yönetici onayı bekliyor; talebiniz iletildi. Onaylanınca aynı işlemi tekrar yapabilirsiniz. Onay durumu: /app/onaylar";
 
 export type ApprovalGateResult =
   | { status: "not_required" }
@@ -216,7 +223,7 @@ export async function requestApprovalIfNeeded(
     const rules = await s.loadRules(tenantId);
     const decision = evaluateApprovalRule(rules, actionType, payload);
     if (!decision.required) return { status: "not_required" };
-    if (await s.isManager(tenantId, actorId)) return { status: "not_required" };
+    if (await s.isApprovalExempt(tenantId, actorId)) return { status: "not_required" };
 
     const open = await s.findOpen(tenantId, actorId, decision.fingerprint);
     if (open?.status === "onaylandi") {
@@ -238,7 +245,7 @@ export async function requestApprovalIfNeeded(
       return {
         status: "pending",
         approvalId: open.id,
-        message: "Bu işlem için yönetici onayı bekleniyor. Karar verilince işleminizi tamamlayabilirsiniz.",
+        message: APPROVAL_PENDING_MESSAGE,
       };
     }
 
@@ -247,7 +254,7 @@ export async function requestApprovalIfNeeded(
     return {
       status: "requested",
       approvalId: created.id,
-      message: `Bu işlem ofis kuralı gereği yönetici onayı gerektiriyor (${decision.reason}) Talebiniz iletildi; onaylanınca işlemi tekrar yapabilirsiniz.`,
+      message: APPROVAL_PENDING_MESSAGE,
     };
   } catch (e) {
     console.error("requestApprovalIfNeeded", e);

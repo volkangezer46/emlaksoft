@@ -49,10 +49,10 @@ uygulanmalı; yoksa RLS delikleri açık kalır.** K4 `is_document` migration'ı
   `is_document` sütununa bağlı → migration uygulanmadan `main`'e alınmaz (public vitrinde görsel kaybolur).
 - **Fiyat kararı (sahip):** veritabanı fonksiyonu `update_tenant_plan_subscription` plan değişince tutarı eski sabit
   990/2490/5990/12900'e yazıyor ve kayıtlı tutarı eziyor; kampanya/kilitli fiyat ödemeye YANSIMIYOR (`price_lock_*` yazılmıyor).
-- "Öncelikli destek / Özel onboarding / SLA" gibi mekanizması olmayan hizmet vaatleri admin özellik listesinde duruyor.
+- "Öncelikli destek / Özel onboarding / SLA" gibi mekanizması olmayan hizmet vaatleri varsayılan kataloglardan ÇIKARILDI (admin plan editöründen elle eklenebilir).
 - Admin "Önerilen kataloğu uygula" yapılana dek `plan_entitlements` limitleri eski (Profesyonel 20, yeni 15).
 - Havuza yalnız elle ilan ekleme bağlı (içe aktarma/portal/ağ `enqueueListingPool`'a bağlı DEĞİL).
-- Aktivite akışı tek zaman çizgisi değil; AI asistan SMS kartı ve gelen kutusu `SmsDialog` popup'ı kaldı; "Lead skoru" metni müşteri ekranlarında.
+- Aktivite akışı tek zaman çizgisi değil; AI asistan SMS kartı ve gelen kutusu `SmsDialog` popup'ı kaldı; "Lead skoru" metni "Aday skoru" yapıldı.
 - Raporlar/ana ekran komisyon özeti SQL toplulaştırmalarından beslenir (is_sample süzmez; eşik uygulanamadı, migration ister).
 - Sahiplik devri kodu YOK (atomik RPC yok; taslak + tasarım var). Abonelik duraklatma/oransal yükseltme sadece taslak.
 - Ö-7, Ö-8 (oneri listesi) ve organik büyüme paketlerinin geri kalanı, F1-F5 (aşağıda ajanlar), devir dosyası + Codex komutu.
@@ -97,7 +97,7 @@ Vercel deploy'u push tetikler; migration uygulamak sahibin işidir).
 | Zaman | `src/lib/clock.ts` (TR ay sınırları `trMonth*`) |
 | Menü | `src/lib/nav-config.ts` (37 öğe/9 başlık sözleşmesi, ikonlar benzersiz `src/lib/icons.ts`) |
 | Modül aç/kapa | `src/lib/modules/**` (registry, guard, pending-defs); tablo yokken hepsi açık |
-| Onay kuralları | `src/lib/oversight/approval-gate.ts` (varsayılan kapalı, 48 sa tek kullanımlık) |
+| Onay kuralları | `src/lib/oversight/approval-gate.ts` (varsayılan kapalı, 48 sa tek kullanımlık; muafiyet yalnız owner/gm, `APPROVAL_EXEMPT_ROLES`; karar yetkisi `APPROVAL_DECIDER_ROLES`; tek mesaj `APPROVAL_PENDING_MESSAGE`) |
 | AI | yalnız `src/lib/ai/openai-client.ts` + `redact.ts`; kredi `src/lib/ai/credits/**` |
 | SEO | `src/lib/seo/**`, admin `/admin/seo`, sitemap/robots dinamik |
 | Danışman kimlik şifreleme | `src/lib/advisor/pii-crypto.ts` (`ADVISOR_PII_KEY`; anahtar yoksa alanlar kapalı) |

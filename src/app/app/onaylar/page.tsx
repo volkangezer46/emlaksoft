@@ -28,7 +28,7 @@ import {
   formatDelta,
   isApprovalKind,
   isApprovalStatus,
-  isManagerRole,
+  isApprovalDeciderRole,
   isOverdue,
   kindMeta,
   slaHours,
@@ -119,7 +119,7 @@ export default async function OnaylarPage({
   const kim = params.kim === "benim" || params.kim === "bana" ? params.kim : "";
   const sayfa = Math.max(1, Number.parseInt(params.sayfa ?? "1", 10) || 1);
 
-  const manager = isManagerRole(role);
+  const manager = isApprovalDeciderRole(role);
   const supabase = await createClient();
   const t = nowMs();
 

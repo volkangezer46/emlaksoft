@@ -286,7 +286,6 @@ export const RECOMMENDED_CATALOG_OVERRIDES: PlanOverrides = {
       "Danışman KPI, lig ve hedefler",
       "Otomasyon, iş akışı ve onay akışları",
       "KVKK uyum ve ofisler arası ağ",
-      "Öncelikli destek",
     ],
   },
   business: { monthlyTry: 8990, limits: { seats: 40 } },

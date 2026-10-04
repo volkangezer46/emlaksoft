@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activity";
 import { notifyTenant } from "@/lib/notify";
-import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
+import { isApprovalExemptRole } from "@/lib/team/assignable-roles";
 import { daysFromNowIso } from "@/lib/clock";
 import { loadApprovalRules } from "@/lib/oversight/store";
 import type { ApprovalGateStore } from "@/lib/oversight/approval-gate";
@@ -21,7 +21,7 @@ function isMissingColumn(error: { code?: string; message?: string } | null | und
  *
  * NOT: Bu kapi YALNIZ UYGULAMA KATMANIDIR. Ayni tenant'in RLS'li kullanicisi veritabanina dogrudan
  * (PostgREST) yazarsa kapidan gecmez; DB tarafi korumasi ayri migration'dadir. Yonetici muafiyeti
- * yalniz owner/gm/branch_manager'dir (team_lead muaf degil).
+ * yalniz owner/gm'dir (branch_manager ve team_lead muaf degil; HAFIZA.md §7).
  */
 export function createApprovalGateStore(): ApprovalGateStore {
   return {
@@ -30,7 +30,7 @@ export function createApprovalGateStore(): ApprovalGateStore {
       return loadApprovalRules(supabase, tenantId);
     },
 
-    async isManager(tenantId, actorId) {
+    async isApprovalExempt(tenantId, actorId) {
       const supabase = await createClient();
       const { data } = await supabase
         .from("profiles")
@@ -38,8 +38,8 @@ export function createApprovalGateStore(): ApprovalGateStore {
         .eq("id", actorId)
         .eq("tenant_id", tenantId)
         .maybeSingle();
-      // Muafiyet DAR: yalniz ofis geneli roller (owner/gm/branch_manager). team_lead muaf DEGILDIR.
-      return hasOfficeWideDataScope(data?.role);
+      // Muafiyet DAR: yalniz owner/gm. branch_manager ve team_lead muaf DEGILDIR (onay talebi acarlar).
+      return isApprovalExemptRole(data?.role);
     },
 
     async findOpen(tenantId, actorId, fingerprint) {
