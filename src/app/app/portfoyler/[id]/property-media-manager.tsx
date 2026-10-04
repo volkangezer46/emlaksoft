@@ -19,13 +19,6 @@ import {
   type PropertyDocFields,
 } from "@/app/actions/property-media";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { uploadToDirectFileTarget } from "@/lib/direct-file-upload-client";
 import { DEFAULT_WATERMARK, type WatermarkSettings } from "@/lib/watermark";
 import { applyWatermarkToFile, loadWatermarkLogo } from "@/lib/watermark-canvas";
@@ -280,6 +273,7 @@ export function PropertyMediaManager({
     setOcrBusyId(mediaId);
     ocrReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setOcrOpen(true);
+    requestAnimationFrame(() => document.getElementById("ocr-paneli")?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
     setOcrError(null);
     setOcrValues({});
     setOcrGuven(null);
@@ -1013,36 +1007,30 @@ export function PropertyMediaManager({
       </div>
 
       {/* C8: Belge OCR sonuç dialogu */}
-      <Dialog open={ocrOpen} onOpenChange={setOcrOpen}>
-        <DialogContent
-          size="lg"
-          overlayClassName="bg-ink-950/40 backdrop-blur-sm"
-          className="max-w-xl rounded-[var(--radius-panel)] border-line p-5 shadow-none"
-          onCloseAutoFocus={(event) => {
-            event.preventDefault();
-            const target = ocrReturnFocusRef.current;
-            ocrReturnFocusRef.current = null;
-            target?.focus();
-          }}
+      {ocrOpen ? (
+        <div
+          id="ocr-paneli"
+          role="region"
+          aria-label="Belgeden okunan bilgiler"
+          className="m-5 scroll-mt-24 rounded-[var(--radius-panel)] border border-brand-300 bg-surface p-5"
         >
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <DialogTitle className="flex items-center gap-2 font-display font-bold text-ink-950">
+                <h3 className="flex items-center gap-2 font-display font-bold text-ink-950">
                   <Sparkles className="h-4 w-4 text-brand-600" /> Belgeden okunan bilgiler
-                </DialogTitle>
-                <DialogDescription className="mt-0.5 text-xs text-text-muted">
+                </h3>
+                <p className="mt-0.5 text-xs text-text-muted">
                   AI çıktısıdır, hata içerebilir — uygulamadan önce kontrol edip düzeltin. Bulunamayan alanlar boş bırakılır.
-                </DialogDescription>
+                </p>
               </div>
-              <DialogClose asChild>
-                <button
-                  type="button"
-                  aria-label="Kapat"
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted hover:text-ink-950"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </DialogClose>
+              <button
+                type="button"
+                aria-label="Kapat"
+                onClick={() => setOcrOpen(false)}
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted hover:text-ink-950"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
             {ocrPending ? (
@@ -1107,8 +1095,8 @@ export function PropertyMediaManager({
                 </div>
               </>
             )}
-        </DialogContent>
-      </Dialog>
+        </div>
+      ) : null}
     </section>
   );
 }
