@@ -51,7 +51,11 @@ export type PlanDef = {
 };
 
 /**
- * Paket, fiyat, satış metni ve kullanım sınırları için tek kaynak.
+ * Paket, fiyat, satış metni ve kullanım sınırları için kod tarafı varsayılanı (ham katalog).
+ * Sahibin onayladığı katalog: Danışman 749, Ofis 2.490 (ek kullanıcı kademeli 399/349/299),
+ * Profesyonel 4.990 (15 kullanıcı, ek 349/299), Business 8.990 (gizli), Kurumsal özel teklif.
+ * `RECOMMENDED_CATALOG_OVERRIDES` (plan-overrides.ts) ile AYNI değerleri taşır; ikisinin
+ * uyumu plan-default-catalog.test.ts ile korunur. Fiyat değişikliği yalnız yeni satışları etkiler.
  * Yalnızca bugün çalışan özellikler burada listelenir; yol haritasındaki
  * API/softphone/white-label özellikleri ürün gerçekten hazır olmadan eklenmez.
  */
@@ -59,7 +63,7 @@ export const PLANS: readonly PlanDef[] = [
   {
     id: "advisor",
     name: "Danışman",
-    monthlyTry: 990,
+    monthlyTry: 749,
     blurb: "Bağımsız danışman",
     eyebrow: "BAŞLANGIÇ",
     features: [
@@ -87,22 +91,36 @@ export const PLANS: readonly PlanDef[] = [
       "Kampanya, gider ve raporlar",
     ],
     limits: { seats: 5, customers: null, activeProperties: null, branches: 3 },
+    extraSeatMonthlyTry: 399,
+    extraSeatTiers: [
+      { fromSeat: 1, toSeat: 5, monthlyTry: 399 },
+      { fromSeat: 6, toSeat: 15, monthlyTry: 349 },
+      { fromSeat: 16, toSeat: null, monthlyTry: 299 },
+    ],
+    maxSeats: 20,
+    seatRounding: "x9",
   },
   {
     id: "professional",
     name: "Profesyonel",
-    monthlyTry: 5990,
+    monthlyTry: 4990,
     blurb: "Büyük ofis ve çok şube",
     eyebrow: "ÖLÇEKLENEN EKİP",
     features: [
-      "20 kullanıcıya kadar · 10 şube",
+      "15 kullanıcıya kadar · 10 şube",
       "Kayıp-kaçak komisyon motoru",
       "Danışman KPI, lig ve hedefler",
       "Otomasyon, iş akışı ve onay akışları",
       "KVKK uyum ve ofisler arası ağ",
-      "Öncelikli destek",
     ],
-    limits: { seats: 20, customers: null, activeProperties: null, branches: 10 },
+    limits: { seats: 15, customers: null, activeProperties: null, branches: 10 },
+    extraSeatMonthlyTry: 349,
+    extraSeatTiers: [
+      { fromSeat: 1, toSeat: 10, monthlyTry: 349 },
+      { fromSeat: 11, toSeat: null, monthlyTry: 299 },
+    ],
+    maxSeats: 40,
+    seatRounding: "x9",
   },
   {
     id: "enterprise",
@@ -115,10 +133,9 @@ export const PLANS: readonly PlanDef[] = [
       "Sınırsız şube",
       "Proje satışı ve franchise BI",
       "Merkezi rol ve denetim yönetimi",
-      "Özel onboarding",
-      "Sözleşmeli destek SLA'sı",
     ],
     limits: { seats: 50, customers: null, activeProperties: null, branches: null },
+    customPricing: true,
   },
 ] as const;
 
@@ -195,7 +212,7 @@ export const BUSINESS_PLAN_TEMPLATE: PlanDef = {
   monthlyTry: 8990,
   blurb: "Çok şubeli büyük ofis",
   eyebrow: "BÜYÜME",
-  features: ["40 kullanıcıya kadar", "Profesyonel paketin tüm özellikleri", "Öncelikli destek"],
+  features: ["40 kullanıcıya kadar", "Profesyonel paketin tüm özellikleri"],
   limits: { seats: 40, customers: null, activeProperties: null, branches: 20 },
   hidden: true,
   order: 35,

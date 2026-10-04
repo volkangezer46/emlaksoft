@@ -37,7 +37,10 @@ describe("/fiyatlar sözleşmesi: tek kaynak plans.ts + page-gates.ts", () => {
     for (const gate of PLAN_GATES) expect(labels).toContain(gate.title);
     for (const row of groups.flatMap((g) => g.rows)) expect(row.cells).toHaveLength(PLANS.length);
     const monthly = groups[0]!.rows[0]!.cells.map((c) => c.text);
-    PLANS.forEach((p, i) => expect(monthly[i]).toContain(p.monthlyTry.toLocaleString("tr-TR")));
+    // Özel fiyatlı paket (Kurumsal) tutar yerine "Özel teklif" gösterir; diğerleri liste fiyatını.
+    PLANS.forEach((p, i) =>
+      expect(monthly[i]).toContain(p.customPricing ? "Özel teklif" : p.monthlyTry.toLocaleString("tr-TR")),
+    );
   });
 
   it("kayıp-kaçak yalnız Profesyonel ve üzeri, yıllık indirim plans.ts ile tutarlı", () => {

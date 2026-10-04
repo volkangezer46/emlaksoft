@@ -61,3 +61,39 @@ describe("fiyat sayfası modeli admin tanımlarını izler", () => {
     expect(buildFaq({ plans: defs })[0]!.a).not.toMatch(/\d+ gün/);
   });
 });
+
+describe("plans.ts ham varsayılanı onaylı katalogla aynı (tek kaynak kayması olmaz)", () => {
+  const raw = applyPlanOverrides({});
+  const recommended = applyPlanOverrides(RECOMMENDED_CATALOG_OVERRIDES);
+
+  const pick = (p: (typeof raw)[number]) => ({
+    monthlyTry: p.monthlyTry,
+    extraSeatMonthlyTry: p.extraSeatMonthlyTry ?? null,
+    extraSeatTiers: p.extraSeatTiers ?? null,
+    maxSeats: p.maxSeats ?? null,
+    seatRounding: p.seatRounding ?? null,
+    limits: p.limits,
+    hidden: Boolean(p.hidden),
+    customPricing: Boolean(p.customPricing),
+    yearlyPaidMonths: p.yearlyPaidMonths ?? 10,
+  });
+
+  it("fiyat, ek kullanıcı kademesi, sınır ve görünürlük alanları RECOMMENDED_CATALOG_OVERRIDES ile eşit", () => {
+    expect(raw.map((p) => p.id)).toEqual(recommended.map((p) => p.id));
+    for (const r of recommended) {
+      expect(pick(raw.find((p) => p.id === r.id)!), `plan ${r.id}`).toEqual(pick(r));
+    }
+  });
+
+  it("ham katalogda eski fiyatlar yok ve ücretsiz paket yok", () => {
+    const prices = Object.fromEntries(raw.map((p) => [p.id, p.monthlyTry]));
+    expect(prices).toMatchObject({ advisor: 749, office: 2490, professional: 4990, business: 8990 });
+    expect(Object.values(prices).every((v) => v > 0)).toBe(true);
+    expect(raw.find((p) => p.id === "professional")!.limits.seats).toBe(15);
+  });
+
+  it("ham varsayılan özellik listelerinde mekanizmasız destek vaadi yok", () => {
+    const text = raw.flatMap((p) => p.features).join(" | ");
+    expect(text).not.toMatch(/Öncelikli destek|Özel onboarding|destek SLA/i);
+  });
+});

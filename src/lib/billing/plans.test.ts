@@ -21,7 +21,7 @@ describe("billing plan catalog", () => {
   });
 
   it("charges ten months for a yearly plan", () => {
-    expect(planAmountTry("advisor", "yearly")).toBe(990 * 10);
+    expect(planAmountTry("advisor", "yearly")).toBe(749 * 10);
   });
 
   it("exposes enforceable advisor usage limits", () => {
