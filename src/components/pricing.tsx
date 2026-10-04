@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ComponentType } from "react";
-import { PLANS, planAmountTry, type PlanId } from "@/lib/billing/plans";
+import { PLANS, planAmountOf, type PlanDef, type PlanId } from "@/lib/billing/plans";
 import {
   ArrowRight,
   BriefcaseBusiness,
@@ -23,7 +23,8 @@ const PLAN_ICONS: Record<PlanId, ComponentType<{ className?: string }>> = {
 
 const formatTL = formatNumberTr;
 
-export function Pricing() {
+/** `plans`: sunucudan gelen etkin (panelden düzenlenebilir) tanımlar; verilmezse plans.ts varsayılanı. */
+export function Pricing({ plans = PLANS }: { plans?: readonly PlanDef[] } = {}) {
   const [yearly, setYearly] = useState(false);
 
   return (
@@ -66,11 +67,11 @@ export function Pricing() {
       </div>
 
       <div className="mt-9 grid gap-4 lg:grid-cols-4">
-        {PLANS.map((plan) => {
+        {plans.map((plan) => {
           const PlanIcon = PLAN_ICONS[plan.id];
           const price = yearly
-            ? Math.round(planAmountTry(plan.id, "yearly") / 12)
-            : planAmountTry(plan.id, "monthly");
+            ? Math.round(planAmountOf(plan, "yearly") / 12)
+            : planAmountOf(plan, "monthly");
           return (
             <div
               key={plan.id}

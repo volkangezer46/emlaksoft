@@ -1,4 +1,4 @@
-import { PLANS, getPlan, planAmountTry, type PlanDef, type PlanId } from "@/lib/billing/plans";
+import { PLANS, getPlan, planAmountOf, planAmountTry, type PlanDef, type PlanId } from "@/lib/billing/plans";
 import { PLAN_GATES, findGate, planRank, requiredPlanName } from "@/lib/billing/page-gates";
 
 /**
@@ -22,20 +22,20 @@ const tl = new Intl.NumberFormat("tr-TR");
 const fmt = (n: number) => `${tl.format(n)} ₺`;
 const limit = (n: number | null, unit: string) => (n === null ? "Sınırsız" : `${tl.format(n)} ${unit}`.trim());
 
-function numericRow(label: string, pick: (p: PlanDef) => string): CompareRow {
-  return { label, cells: PLANS.map((p) => ({ text: pick(p) })) };
+function numericRow(plans: readonly PlanDef[], label: string, pick: (p: PlanDef) => string): CompareRow {
+  return { label, cells: plans.map((p) => ({ text: pick(p) })) };
 }
 
-export function buildComparison(): CompareGroup[] {
+export function buildComparison(plans: readonly PlanDef[] = PLANS): CompareGroup[] {
   const pricing: CompareGroup = {
     title: "Fiyat ve limitler",
     rows: [
-      numericRow("Aylık fiyat (KDV hariç)", (p) => fmt(p.monthlyTry)),
-      numericRow("Yıllık ödemede aylık karşılığı (KDV hariç)", (p) => fmt(Math.round(planAmountTry(p.id, "yearly") / 12))),
-      numericRow("Kullanıcı", (p) => `${tl.format(p.limits.seats)}`),
-      numericRow("Şube", (p) => limit(p.limits.branches, "")),
-      numericRow("Müşteri kaydı", (p) => limit(p.limits.customers, "")),
-      numericRow("Aktif portföy", (p) => limit(p.limits.activeProperties, "")),
+      numericRow(plans, "Aylık fiyat (KDV hariç)", (p) => fmt(p.monthlyTry)),
+      numericRow(plans, "Yıllık ödemede aylık karşılığı (KDV hariç)", (p) => fmt(Math.round(planAmountOf(p, "yearly") / 12))),
+      numericRow(plans, "Kullanıcı", (p) => `${tl.format(p.limits.seats)}`),
+      numericRow(plans, "Şube", (p) => limit(p.limits.branches, "")),
+      numericRow(plans, "Müşteri kaydı", (p) => limit(p.limits.customers, "")),
+      numericRow(plans, "Aktif portföy", (p) => limit(p.limits.activeProperties, "")),
     ],
   };
 
@@ -48,7 +48,7 @@ export function buildComparison(): CompareGroup[] {
     }
     group.rows.push({
       label: gate.title,
-      cells: PLANS.map((p) => {
+      cells: plans.map((p) => {
         const included = planRank(p.id) >= planRank(gate.minPlan);
         return { text: included ? "Dahil" : "Pakette yok", included };
       }),

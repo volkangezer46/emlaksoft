@@ -115,6 +115,11 @@ export function planAmountTry(planId: PlanId, cycle: BillingCycle): number {
   return cycle === "yearly" ? Math.round(monthly * 12 * 0.8) : monthly;
 }
 
+/** Verilen tanım için dönem tutarı (panelden düzenlenmiş tanımlar dahil). Yıllıkta yüzde 20 indirim. */
+export function planAmountOf(def: Pick<PlanDef, "monthlyTry">, cycle: BillingCycle): number {
+  return cycle === "yearly" ? Math.round(def.monthlyTry * 12 * 0.8) : def.monthlyTry;
+}
+
 export function planLabel(id: string): string {
   return isPlanId(id) ? getPlan(id).name : id;
 }

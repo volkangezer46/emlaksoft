@@ -21,7 +21,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { PasswordStrengthMeter } from "@/components/auth/password-strength";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
-import { getPlan, type BillingCycle, type PlanId } from "@/lib/billing/plans";
+import { PLANS, getPlan, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
 import {
   defaultTeamSizeForPlan,
   registrationPlanForTeamSize,
@@ -56,9 +56,11 @@ function errorStep(message: string): 1 | 2 | null {
 export function RegisterForm({
   initialPlan = "office",
   initialCycle = "monthly",
+  plans = PLANS,
 }: {
   initialPlan?: PlanId;
   initialCycle?: BillingCycle;
+  plans?: readonly PlanDef[];
 }) {
   const [state, action, pending] = useActionState(signUp, initial);
   const [step, setStep] = useState(1);
@@ -72,7 +74,7 @@ export function RegisterForm({
 
   const errorTargetStep = state.error ? errorStep(state.error) : null;
   const selectedPlanId = registrationPlanForTeamSize(initialPlan, teamSize);
-  const selectedPlan = getPlan(selectedPlanId);
+  const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? getPlan(selectedPlanId);
 
   function validateStep(ref: React.RefObject<HTMLDivElement | null>) {
     const inputs = ref.current?.querySelectorAll<HTMLInputElement>("input");
