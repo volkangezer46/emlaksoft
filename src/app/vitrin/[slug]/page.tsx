@@ -73,7 +73,8 @@ export async function generateMetadata({
     .select("id", { count: "exact", head: true })
     .eq("tenant_id", tenant.id)
     .eq("status", "live")
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .eq("is_sample", false);
 
   const title = `${tenant.name} | Portföy Vitrini`;
   const description = `${tenant.name} güncel portföy vitrini — ${count ?? 0} aktif ilan. Satılık ve kiralık portföyleri inceleyin, yerinde inceleme için talep bırakın.`;
@@ -137,7 +138,8 @@ export default async function VitrinPage({
       )
       .eq("tenant_id", tenant.id)
       .eq("status", "live")
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .eq("is_sample", false);
 
     if (q) {
       // Tek yerde temizleme: PostgREST gramerini bozan karakterler ve LIKE jokerleri safeLike/orIlike ile atılır, uzunluk sınırlıdır.
@@ -164,6 +166,7 @@ export default async function VitrinPage({
         .eq("tenant_id", tenant.id)
         .eq("status", "live")
         .is("deleted_at", null)
+        .eq("is_sample", false)
         .limit(200),
       // Döviz karşılığı sunucuda hesaplanır — ISR (revalidate=120) korunur.
       fetchLatestRates(admin),

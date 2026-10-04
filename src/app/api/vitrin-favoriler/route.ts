@@ -129,7 +129,8 @@ export async function POST(req: NextRequest) {
       .eq("tenant_id", tenant.id)
       .eq("status", "live")
       .is("deleted_at", null)
-      .in("id", ids);
+      .in("id", ids)
+      .eq("is_sample", false);
     if (propertiesError) return databaseUnavailable(operation, propertiesError);
 
     const rows = props ?? [];

@@ -43,6 +43,7 @@ async function fetchDescription(
     .select("description")
     .eq("id", propertyId)
     .eq("tenant_id", tenantId)
+    .eq("is_sample", false)
     .is("deleted_at", null)
     .maybeSingle();
   const col = (data as { description?: string | null } | null)?.description;
@@ -81,6 +82,7 @@ export async function generateMetadata({
     .select("title, property_code, transaction_type, property_type, list_price, features")
     .eq("id", share.entity_id)
     .eq("tenant_id", share.tenant_id)
+    .eq("is_sample", false)
     .is("deleted_at", null)
     .maybeSingle();
   if (!property) return noindex;
@@ -163,6 +165,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
       )
       .eq("id", share.entity_id)
       .eq("tenant_id", share.tenant_id)
+      .eq("is_sample", false)
       .is("deleted_at", null)
       .maybeSingle(),
     admin
