@@ -78,7 +78,7 @@ export default async function LedgerPage({
 }: {
   searchParams?: Promise<{ filtre?: string; tur?: string; sayfa?: string; duzelt?: string }>;
 }) {
-  const { role } = await requireModulePage("compliance", BASE);
+  const { role } = await requireModulePage("compliance", "/app/uyum");
   const sp = (await searchParams) ?? {};
   const f = parseLedgerFilters(sp);
   const officeLevel = role === "owner" || role === "gm";
