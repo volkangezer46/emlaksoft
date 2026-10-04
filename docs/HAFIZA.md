@@ -91,6 +91,9 @@ Vercel deploy'u push tetikler; migration uygulamak sahibin işidir).
 - **Build kırıcılar (tsc/vitest yakalamaz):** `"use server"` dosyasından yalnız async export; istemci bileşeninde sunucu modülü
   (supabase/server, next/headers) import yok; `"use client"` ilk satır; bileşende `Date.now()/new Date()` yasak (clock.ts);
   `text-[Npx]` yasak; ham `<input type=tel|email>` yasak; PostgREST gömmeleri FK adıyla.
+- **WORKTREE TABANI:** ajan worktree'leri yerel `main`'den DEĞİL `origin/main`'den (canlı commit) çıkar; yayınlanmamış işi görmezler. Her ajan prompt'una
+  "ÖNCE `git merge --ff-only main` yap, sonra çalış" yazılmalı. Yapmayan ajan eski tabanda (ör. mega menü ajanı cf8ec63'te) çalışıp ana sayfa/fiyat
+  okuyucu gibi sonradan yazılmış işi ezer; çatışma çıkarsa birleşimi iptal edip işi yazan ajana `SendMessage` ile "main'i merge et ve uzlaştır" de.
 - Ajanların kendi ortamı build edemeyebilir (node_modules eksik) → birleşimden sonra izole klonda tam doğrulama ŞART.
 - Aynı ajan raporunu tekrar tekrar gönderirse (arka plan çocuğu) `TaskStop` ile durdur; dalda `git log main..dal` boşsa yeni iş yoktur.
 
