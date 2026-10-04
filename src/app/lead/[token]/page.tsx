@@ -8,6 +8,9 @@ import { LeadForm } from "./lead-form";
 
 export const dynamic = "force-dynamic";
 
+// Token'lı kişiye özel başvuru formu: arama motorlarına kapalı (robots.txt Disallow'a ek olarak meta noindex).
+export const metadata = { robots: { index: false, follow: false } };
+
 export default async function PublicLeadPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const admin = createAdminClient();

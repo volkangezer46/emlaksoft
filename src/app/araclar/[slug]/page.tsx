@@ -9,6 +9,7 @@ import {
   RentalYieldCalculator,
 } from "@/components/tools/calculators";
 import { getBaseUrl } from "@/lib/base-url";
+import { buildMetadata } from "@/lib/seo/store";
 import { getPublishedTool, publishedTools, type ToolSlug } from "@/lib/tools/registry";
 
 export const dynamicParams = false;
@@ -20,13 +21,7 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const tool = getPublishedTool((await params).slug);
   if (!tool) return {};
-  const path = `/araclar/${tool.slug}`;
-  return {
-    title: tool.title,
-    description: tool.description,
-    alternates: { canonical: path },
-    openGraph: { title: `${tool.title} | EmlakSoft`, description: tool.description, url: path, type: "website" },
-  };
+  return buildMetadata(`/araclar/${tool.slug}`, { title: tool.title, description: tool.description });
 }
 
 function Calculator({ slug }: { slug: ToolSlug }) {

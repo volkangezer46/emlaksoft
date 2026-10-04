@@ -12,8 +12,15 @@ import { PricingSection } from "@/components/marketing/pricing-section";
 import { Faq } from "@/components/marketing/faq";
 import { FinalCta } from "@/components/marketing/final-cta";
 import { LandingJsonLd } from "@/components/marketing/landing-jsonld";
+import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/seo/store";
 import "./marketing.css";
 import "./marketing-sections.css";
+
+// Canonical "/" burada verilir (kökte yok); başlık/açıklama/OG ayarlardan, ayar yokken layout varsayılanı.
+export async function generateMetadata(): Promise<Metadata> {
+  return buildMetadata("/");
+}
 
 /**
  * Ana sayfa yalnızca bölümleri birleştirir ("Kurumsal Parlak"). Statik sayfa: cookies()/headers() yok;

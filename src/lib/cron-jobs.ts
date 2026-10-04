@@ -43,4 +43,5 @@ export const CRON_JOBS = [
   { job: "direct-file-upload-cleanup", label: "Doğrudan dosya yükleme temizliği", path: "/api/cron/direct-file-upload-cleanup", schedule: "25,55 * * * *", cadenceLabel: "30 dakikada bir", staleAfterMinutes: 90 },
   { job: "public-mutation-outbox", label: "Public işlem bildirim kuyruğu", path: "/api/cron/public-mutation-outbox", schedule: "*/2 * * * *", cadenceLabel: "2 dakikada bir", staleAfterMinutes: 10 },
   { job: "geo-province-sync", label: "İl bazlı coğrafya tarama kuyruğu", path: "/api/cron/geo-province-sync", schedule: "*/5 * * * *", cadenceLabel: "5 dakikada bir", staleAfterMinutes: 20 },
+  { job: "seo-robot", label: "SEO robotu (site denetimi ve IndexNow)", path: "/api/cron/seo-robot", schedule: "20 4 * * *", cadenceLabel: "her gün 04:20", staleAfterMinutes: 2_160 },
 ] as const satisfies readonly CronJobDefinition[];

@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/seo/store";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
-export const metadata: Metadata = {
-  title: "KVKK Aydınlatma Metni",
-  description: "6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında aydınlatma metni.",
-  alternates: { canonical: "/kvkk-aydinlatma" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildMetadata("/kvkk-aydinlatma");
+}
 
 export default function KvkkAydinlatmaPage() {
   return (
